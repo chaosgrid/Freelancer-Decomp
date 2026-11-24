@@ -180,43 +180,43 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
                   L"DEBUG - You have received a group invitation from:");
     LoadGroupText(Texts[kNnGroupTextTradeFrom], 0, 0x6006fu,
                   L"DEBUG - You have received a trade request from:");
-    LoadGroupText(Texts[kNnGroupTextLeaveGroup], 0x828b, 0x60020u, L"DEBUG - Leave Group");
-    LoadGroupText(Texts[kNnGroupTextAccept], 0x828b, 0x60013u, L"DEBUG - Accept");
-    LoadGroupText(Texts[kNnGroupTextDecline], 0x828b, 0x6001au, L"DEBUG - Decline");
-    LoadGroupText(Texts[kNnGroupTextAcceptTrade], 0x828b, 0x60014u, L"DEBUG - Accept Trade");
-    LoadGroupText(Texts[kNnGroupTextDeclineTrade], 0x828b, 0x6001bu, L"DEBUG - Decline Trade");
-    LoadGroupText(Texts[kNnGroupTextNoInvitations], 0x9ca4, 0x6006du,
+    LoadGroupText(Texts[kNnGroupTextLeaveGroup], kTextStyleButton, 0x60020u, L"DEBUG - Leave Group");
+    LoadGroupText(Texts[kNnGroupTextAccept], kTextStyleButton, 0x60013u, L"DEBUG - Accept");
+    LoadGroupText(Texts[kNnGroupTextDecline], kTextStyleButton, 0x6001au, L"DEBUG - Decline");
+    LoadGroupText(Texts[kNnGroupTextAcceptTrade], kTextStyleButton, 0x60014u, L"DEBUG - Accept Trade");
+    LoadGroupText(Texts[kNnGroupTextDeclineTrade], kTextStyleButton, 0x6001bu, L"DEBUG - Decline Trade");
+    LoadGroupText(Texts[kNnGroupTextNoInvitations], kTextStyleBody, 0x6006du,
                   L"DEBUG - There are no outstanding group invitations.");
-    LoadGroupText(Texts[kNnGroupTextInviteSent], 0x3ea8, 0x60065u,
+    LoadGroupText(Texts[kNnGroupTextInviteSent], kTextStyleNotice, 0x60065u,
                   L"DEBUG - Group invitation sent to:");
-    LoadGroupText(Texts[kNnGroupTextJoinedGroup], 0x3ea8, 0x60067u,
+    LoadGroupText(Texts[kNnGroupTextJoinedGroup], kTextStyleNotice, 0x60067u,
                   L"DEBUG - You have joined into a group with:");
-    LoadGroupText(Texts[kNnGroupTextNewMember], 0x3ea8, 0x60066u, L"DEBUG - New group member:");
-    LoadGroupText(Texts[kNnGroupTextLeftGroup], 0x3ea8, 0x60069u,
+    LoadGroupText(Texts[kNnGroupTextNewMember], kTextStyleNotice, 0x60066u, L"DEBUG - New group member:");
+    LoadGroupText(Texts[kNnGroupTextLeftGroup], kTextStyleNotice, 0x60069u,
                   L"DEBUG - You have left your group.");
-    LoadGroupText(Texts[kNnGroupTextMemberLeft], 0x3ea8, 0x60068u,
+    LoadGroupText(Texts[kNnGroupTextMemberLeft], kTextStyleNotice, 0x60068u,
                   L"DEBUG - A group member has left:");
-    LoadGroupText(Texts[kNnGroupTextAbortMission], 0x3ea8, 0x60060u,
+    LoadGroupText(Texts[kNnGroupTextAbortMission], kTextStyleNotice, 0x60060u,
                   L"DEBUG - You must abort or complete your mission.");
-    LoadGroupText(Texts[kNnGroupTextJoinFailedMission], 0x3ea8, 0x60061u,
+    LoadGroupText(Texts[kNnGroupTextJoinFailedMission], kTextStyleNotice, 0x60061u,
                   L"DEBUG - A player failed to join your group due to already being involved "
                   L"in a mission: ");
-    LoadGroupText(Texts[kNnGroupTextCannotInviteSelf], 0x3ea8, 0x6005bu,
+    LoadGroupText(Texts[kNnGroupTextCannotInviteSelf], kTextStyleNotice, 0x6005bu,
                   L"DEBUG - You cannot invite yourself to join a group.");
-    LoadGroupText(Texts[kNnGroupTextGroupFull], 0x3ea8, 0x60059u, L"DEBUG - Your group is full.");
-    LoadGroupText(Texts[kNnGroupTextAlreadyInYourGroup], 0x3ea8, 0x6005au,
+    LoadGroupText(Texts[kNnGroupTextGroupFull], kTextStyleNotice, 0x60059u, L"DEBUG - Your group is full.");
+    LoadGroupText(Texts[kNnGroupTextAlreadyInYourGroup], kTextStyleNotice, 0x6005au,
                   L"DEBUG - You cannot invite a player already in your group.");
-    LoadGroupText(Texts[kNnGroupTextCannotJoinOwnGroup], 0x3ea8, 0x6005eu,
+    LoadGroupText(Texts[kNnGroupTextCannotJoinOwnGroup], kTextStyleNotice, 0x6005eu,
                   L"DEBUG - You cannot join your own group.");
-    LoadGroupText(Texts[kNnGroupTextNotInvited], 0x3ea8, 0x60062u,
+    LoadGroupText(Texts[kNnGroupTextNotInvited], kTextStyleNotice, 0x60062u,
                   L"DEBUG - You have not received an invitation to this group:");
-    LoadGroupText(Texts[kNnGroupTextAlreadyMember], 0x3ea8, 0x6005du,
+    LoadGroupText(Texts[kNnGroupTextAlreadyMember], kTextStyleNotice, 0x6005du,
                   L"DEBUG - You are already a member of this group:");
-    LoadGroupText(Texts[kNnGroupTextGroupNowFull], 0x3ea8, 0x6005cu,
+    LoadGroupText(Texts[kNnGroupTextGroupNowFull], kTextStyleNotice, 0x6005cu,
                   L"DEBUG - Sorry, but this group is now full:");
-    LoadGroupText(Texts[kNnGroupTextNotInGroup], 0x3ea8, 0x6005fu,
+    LoadGroupText(Texts[kNnGroupTextNotInGroup], kTextStyleNotice, 0x6005fu,
                   L"DEBUG - You cannot leave your group because you are not in a group.");
-    LoadGroupText(Texts[kNnGroupTextPlayerDied], 0x3ea8, 0x60051u, L"DEBUG - A player has died:");
+    LoadGroupText(Texts[kNnGroupTextPlayerDied], kTextStyleNotice, 0x60051u, L"DEBUG - A player has died:");
     LoadGroupText(Texts[kNnGroupTextAttentionRequired], 0, 0x60012u,
                   L"DEBUG - ATTENTION REQUIRED");
 
@@ -275,9 +275,9 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
     {
         float const AttachOffset[3] = {-0.23f, 0.035f + 0.2f, 0.0f};
         AttentionTitle = CreateRichTextWin("AttentionTitle", 0.46f, 0.035f, AttachOffset, false);
-        StyleNode Style1(0x9ca4);
+        StyleNode Style1(kTextStyleBody);
         AttentionTitle->AppendNode(Style1);
-        StyleNode Style2(0x1df5);
+        StyleNode Style2(kTextStyleScreenTitle);
         AttentionTitle->AppendNode(Style2);
         RDLRefNode Ref(Texts[kNnGroupTextAttentionRequired]);
         AttentionTitle->AppendNode(Ref);
@@ -457,7 +457,7 @@ void NnGroupControl::RefreshRequestDisplay()
         RequestDisplay->ClearContent();
         JustifyNode Justify(TextJustifyCenter);    // JustifyNode(1)
         RequestDisplay->AppendNode(Justify);
-        StyleNode Style(0x9ca4);
+        StyleNode Style(kTextStyleBody);
         RequestDisplay->AppendNode(Style);
         RDLRefNode Ref(Texts[kNnGroupTextNoInvitations]);
         RequestDisplay->AppendNode(Ref);
@@ -478,7 +478,7 @@ void NnGroupControl::RefreshRequestDisplay()
         {
             JustifyNode Justify(TextJustifyCenter);    // JustifyNode(1)
             RequestDisplay->AppendNode(Justify);
-            StyleNode Style(0x9ca4);
+            StyleNode Style(kTextStyleBody);
             RequestDisplay->AppendNode(Style);
         }
 
@@ -581,7 +581,7 @@ void NnGroupControl::AddTradeRequest(unsigned ShipId)
         DiscardEntry(Entry);
         return;
     }
-    StyleNode Style(0x3ea8);
+    StyleNode Style(kTextStyleNotice);
     RdlAppendNode(Entry->Body, Style.Clone());
     AppendPrefixAndName(Entry, Texts[kNnGroupTextTradeFrom], Name);
     ChatCommitEntries();
@@ -644,7 +644,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
         Name = FindChatNameForWord(Payload);
         if (Name == nullptr)
             break;
-        StyleNode Style(0x3ea8);
+        StyleNode Style(kTextStyleNotice);
         RdlAppendNode(Entry->Body, Style.Clone());
         AppendPrefixAndName(Entry, Texts[kNnGroupTextInviteFrom], Name);
         ChatCommitEntries();

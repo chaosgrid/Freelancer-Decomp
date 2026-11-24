@@ -11,7 +11,7 @@
 #include "common_csys.h"           // Transform
 #include "common_iface.h"          // IObjInspect, IObjRW, ObjInspectOf, ObjRwFromWatchable
 #include "common_iustategraph.h"   // FindClosestHostileTarget
-#include "common_systemmanager.h"  // SystemManager -- what NavHelper points at
+#include "common_systemmanager.h"  // SystemManager -- what SysMgr points at
 
 #include <cmath>
 #include <cstdint>
@@ -53,20 +53,8 @@ namespace
 // FUN_062c7790.
 // ----------------------------------------------------------------------------
 EvadeBehavior::EvadeBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , OwnerContext(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime(0.0f)
-    , BehaviorMgrPtr(nullptr)
-    , NavHelper(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
-    , Mode2c(0)
+    : Behavior(InTypeId)
+    , EvadeMode(0)
     , Dodge()                    // FUN_062d77d0
     , BreakAway()                // FUN_062d8970
     , DodgeMissile()             // FUN_062d94b0
@@ -83,7 +71,6 @@ EvadeBehavior::EvadeBehavior(int InTypeId)
     , ConeCos2b8(0.0f)
     , ConeCos2bc(0.707f)         // 0x3f34fdf4 (0.707f, not cos 45)
 {
-    ConstructBase(InTypeId);     // FUN_062d2020
 }
 
 // FUN_062c7900 (FUN_062c78e0 is the scalar-deleting thunk): the five set_pointer(0)
@@ -102,15 +89,15 @@ bool EvadeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     if (!bOk)
         return bOk;
 
-    // Every Idea gets (owner, NavHelper, Manager); results unread.
-    Dodge.SetContext(OwnerContext, NavHelper, Manager);
+    // Every Idea gets (owner, SysMgr, Manager); results unread.
+    Dodge.SetContext(OwnerContext, SysMgr, Manager);
     Dodge.ConeAngle = 1.5707964f;                                   // .text:062a66b0
     Dodge.DodgeDistance = 50.0f;                                    // .text:062a33d0
     Dodge.IntervalTime = 6.0f;                                      // .text:063275d0
-    BreakAway.SetContext(OwnerContext, NavHelper, Manager);
-    DodgeMissile.SetContext(OwnerContext, NavHelper, Manager);
-    Face.SetContext(OwnerContext, NavHelper, Manager);
-    Afterburner.SetContext(OwnerContext, NavHelper, Manager);
+    BreakAway.SetContext(OwnerContext, SysMgr, Manager);
+    DodgeMissile.SetContext(OwnerContext, SysMgr, Manager);
+    Face.SetContext(OwnerContext, SysMgr, Manager);
+    Afterburner.SetContext(OwnerContext, SysMgr, Manager);
 
     DodgeTime2a8 = 10.0f;
     Elapsed2b0 = 0.0f;
@@ -123,7 +110,7 @@ bool EvadeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 // ----------------------------------------------------------------------------
 int EvadeBehavior::PickDodgeStyle()
 {
-    pub::AI::Personality::EvadeDodgeUseStruct const& P = NavHelper->PersonalityData.EvadeDodgeParams;
+    pub::AI::Personality::EvadeDodgeUseStruct const& P = SysMgr->PersonalityData.EvadeDodgeParams;
     float const Sum = static_cast<float>(((static_cast<double>(P.EvadeDodgeStyleWeightWaggle) +
                                             P.EvadeDodgeStyleWeightWaggleRandom) +
                                            P.EvadeDodgeStyleWeightSlide) +
@@ -148,23 +135,23 @@ int EvadeBehavior::PickDodgeStyle()
 void EvadeBehavior::OnEngage()
 {
     Behavior::OnEngage();                                              // FUN_062d20d0
-    Mode2c = 0;
-    SetCruiseLock(1, 3);                                            // FUN_062d21d0
+    EvadeMode = 0;
+    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
     Elapsed2b0 = 0.0f;
 
     Dodge.Picker.SetWatchObject(WatchedObject(Watcher2a0));         // FUN_062d88e0
     BreakAway.Picker.SetWatchObject(WatchedObject(Watcher2a0));     // FUN_062d88e0
 
-    if (NavHelper->SelfTarget.Iface->is_player())
+    if (SysMgr->SelfTarget.Iface->is_player())
     {
         // The owner's get_throttle result is unread; its out-param (preset 1.0f) is used.
         float Throttle = 1.0f;
-        static_cast<IObjInspect const*>(static_cast<IObjRW*>(OwnerContext))->get_throttle(Throttle);
+        static_cast<IObjInspect const*>(OwnerContext)->get_throttle(Throttle);
         Dodge.Throttle = Throttle;
         BreakAway.Throttle = Throttle;
     }
 
-    pub::AI::Personality const& Pers = NavHelper->PersonalityData;
+    pub::AI::Personality const& Pers = SysMgr->PersonalityData;
     pub::AI::Personality::EvadeDodgeUseStruct const& D = Pers.EvadeDodgeParams;
     pub::AI::Personality::EvadeBreakUseStruct const& B = Pers.EvadeBreakParams;
 
@@ -228,10 +215,10 @@ void EvadeBehavior::OnEngage()
         BreakAway.AfterburnerDelay = static_cast<float>(static_cast<double>(B.EvadeBreakAfterburnerDelay) - R);
     }
 
-    if (NavHelper->SelfTarget.Iface->is_player())
+    if (SysMgr->SelfTarget.Iface->is_player())
     {
         // Negated rotation column 2 -> FUN_062d88c0.
-        Transform const& Xf = NavHelper->SelfTarget.Iface->get_transform();
+        Transform const& Xf = SysMgr->SelfTarget.Iface->get_transform();
         Vector Forward;
         Forward.x = -Xf.Rotation.E[0][2];
         Forward.y = -Xf.Rotation.E[1][2];
@@ -259,11 +246,11 @@ void EvadeBehavior::OnDisengage()
 int EvadeBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     int Result = 2;
 
     // JobParams.bForceAttackFormation is Sys+0x1958.
-    if (Sys->PersonalityData.JobParams.bForceAttackFormation != 0 && NavHelper->Timers.IsTimer0Active())
+    if (Sys->PersonalityData.JobParams.bForceAttackFormation != 0 && SysMgr->Timers.IsTimer0Active())
     {
         Flag2b4 = 1;
         Elapsed2b0 = DodgeTime2a8;
@@ -272,13 +259,13 @@ int EvadeBehavior::OnEvaluateReadiness(float Unused)
 
     if (SystemManagerTimerTableHasMissileReactionTarget(&Sys->Timers))   // FUN_062e8870
     {
-        ModeSelector0xc = Flag29 ? 3 : 0;
-        return ModeSelector0xc;
+        Readiness = Flag29 ? 3 : 0;
+        return Readiness;
     }
-    if (Sys->GunConvergenceStateBytes.FollowerDirectiveGateA())       // FUN_062ecb20
+    if (Sys->FormationLeaders.FollowerDirectiveGateA())       // FUN_062ecb20
     {
-        ModeSelector0xc = Flag29 ? 3 : 2;
-        return ModeSelector0xc;
+        Readiness = Flag29 ? 3 : 2;
+        return Readiness;
     }
 
     IObjInspect* const Closest = FindClosestHostileTarget(&Sys->Timers,
@@ -299,14 +286,14 @@ int EvadeBehavior::OnEvaluateReadiness(float Unused)
                 unsigned int const SelfId = Sys->SelfTarget.Iface->get_id();
                 if (Victim->get_id() == SelfId)
                 {
-                    ModeSelector0xc = Flag29 ? 3 : 1;
-                    return ModeSelector0xc;
+                    Readiness = Flag29 ? 3 : 1;
+                    return Readiness;
                 }
             }
 
             // ... or one of this ship's formation followers.
             IObjRW* Followers[0x10];
-            int const Count = static_cast<IObjRW*>(OwnerContext)->get_formation_followers(Followers, 0x10);
+            int const Count = OwnerContext->get_formation_followers(Followers, 0x10);
             for (int Index = 0; Index < Count; ++Index)
             {
                 IObjRW* const Follower = Followers[Index];
@@ -317,15 +304,15 @@ int EvadeBehavior::OnEvaluateReadiness(float Unused)
                     continue;
                 if (Victim->get_id() == Follower->get_id())
                 {
-                    ModeSelector0xc = Flag29 ? 3 : 1;
-                    return ModeSelector0xc;
+                    Readiness = Flag29 ? 3 : 1;
+                    return Readiness;
                 }
             }
         }
     }
 
-    ModeSelector0xc = Flag29 ? 3 : Result;
-    return ModeSelector0xc;
+    Readiness = Flag29 ? 3 : Result;
+    return Readiness;
 }
 
 // ----------------------------------------------------------------------------
@@ -333,87 +320,87 @@ int EvadeBehavior::OnEvaluateReadiness(float Unused)
 // ----------------------------------------------------------------------------
 void EvadeBehavior::PostUpdate()
 {
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     Flag2b4 = 0;
     if (Sys->PersonalityData.JobParams.bForceAttackFormation != 0)
-        Flag2b4 = NavHelper->Timers.IsTimer0Active() ? 1 : 0;    // FUN_062e8810
+        Flag2b4 = SysMgr->Timers.IsTimer0Active() ? 1 : 0;    // FUN_062e8810
     if (Flag2b4 != 0)
         Elapsed2b0 = DodgeTime2a8;
     if (Flag2b5 == 0)
-        Flag2b5 = NavHelper->Timers.IsTimer1Active() ? 1 : 0;    // FUN_062e8820
+        Flag2b5 = SysMgr->Timers.IsTimer1Active() ? 1 : 0;    // FUN_062e8820
 }
 
 // ----------------------------------------------------------------------------
-// Slot 7, LAB_062c7d60. Mode2c 1..4 dispatch through a jump table; anything else returns 2.
+// Slot 7, LAB_062c7d60. EvadeMode 1..4 dispatch through a jump table; anything else returns 2.
 // ----------------------------------------------------------------------------
 int EvadeBehavior::OnUpdate()
 {
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     pub::AI::Personality const& Pers = Sys->PersonalityData;
 
     // A non-player ship evades only something it is watching, and only while that object
     // lies outside its own heading cone.
-    if (!NavHelper->SelfTarget.Iface->is_player())
+    if (!SysMgr->SelfTarget.Iface->is_player())
     {
         if (!IsWatching(Watcher2a0) || !WatchedOutsideCone(Watcher2a0, OwnerContext, ConeCos2bc))
         {
-            UpdateResult10 = 2;
+            UpdateResult = 2;
             return 2;
         }
     }
 
-    int const OldMode = Mode2c;
+    int const OldMode = EvadeMode;
     if (SystemManagerTimerTableHasMissileReactionTarget(&Sys->Timers))
     {
-        Mode2c = 4;
+        EvadeMode = 4;
     }
-    else if (NavHelper->Timers.IsTimer2Active())                 // FUN_062e8860
+    else if (SysMgr->Timers.IsTimer2Active())                 // FUN_062e8860
     {
-        Mode2c = 3;
+        EvadeMode = 3;
     }
     // Strictly less (unordered fails).
     else if (Flag2b6 == 0 && Elapsed2b0 < DodgeTime2a8)
     {
-        Mode2c = 1;
+        EvadeMode = 1;
     }
     else
     {
         if (Flag2b7 != 0)
         {
-            UpdateResult10 = 2;
+            UpdateResult = 2;
             return 2;
         }
         // Strictly greater, the sum unrounded.
         if (!(static_cast<double>(BreakTime2ac) + DodgeTime2a8 > Elapsed2b0))
         {
-            UpdateResult10 = 2;
+            UpdateResult = 2;
             return 2;
         }
-        Mode2c = 2;
+        EvadeMode = 2;
     }
 
-    if (OldMode != Mode2c)
+    if (OldMode != EvadeMode)
     {
-        if (Mode2c == 1)
+        if (EvadeMode == 1)
         {
             if (Pers.FormationParams.bBreakApartFormationOnEvadeDodge != 0)   // Sys+0x17fd
-                NavHelper->GunConvergenceStateBytes.NotifyFormationLeader1(Pers.FormationParams.BreakFormationOnEvadeDodgeTime);
+                SysMgr->FormationLeaders.NotifyFormationLeader1(Pers.FormationParams.BreakFormationOnEvadeDodgeTime);
             if (Pers.FormationParams.bRegroupFormationOnEvadeDodge != 0)      // Sys+0x1804
-                NavHelper->GunConvergenceStateBytes.NotifyFormationLeader2();
+                SysMgr->FormationLeaders.NotifyFormationLeader2();
         }
-        if (Mode2c == 2)
+        if (EvadeMode == 2)
         {
             if (Pers.FormationParams.bBreakApartFormationOnEvadeBreak != 0)   // Sys+0x1805
-                NavHelper->GunConvergenceStateBytes.NotifyFormationLeader1(Pers.FormationParams.BreakFormationOnEvadeBreakTime);
+                SysMgr->FormationLeaders.NotifyFormationLeader1(Pers.FormationParams.BreakFormationOnEvadeBreakTime);
             if (Pers.FormationParams.bRegroupFormationOnEvadeBreak != 0)      // Sys+0x180c
-                NavHelper->GunConvergenceStateBytes.NotifyFormationLeader2();
+                SysMgr->FormationLeaders.NotifyFormationLeader2();
         }
         OnDisengage();                                                    // virtual, slot 4
     }
 
     Elapsed2b0 = Elapsed2b0 + DeltaTime;
 
-    switch (Mode2c)
+    switch (EvadeMode)
     {
     case 1:
     {
@@ -432,7 +419,7 @@ int EvadeBehavior::OnUpdate()
             Zero2.z = 0.0f;
             Sys->Thrust.SetNudgeDirection(Zero2);
             Sys->Thrust.SetThrottle(1.0f, 0);
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
 
@@ -464,7 +451,7 @@ int EvadeBehavior::OnUpdate()
             Afterburner.Update(DeltaTime);
         else
             Afterburner.Commit();
-        UpdateResult10 = 0;
+        UpdateResult = 0;
         return 0;
     }
 
@@ -473,10 +460,10 @@ int EvadeBehavior::OnUpdate()
         int const R = BreakAway.Update(DeltaTime);
         if (R != 0)
         {
-            UpdateResult10 = 2;
+            UpdateResult = 2;
             return 2;
         }
-        UpdateResult10 = R;
+        UpdateResult = R;
         return R;
     }
 
@@ -484,17 +471,17 @@ int EvadeBehavior::OnUpdate()
     {
         if (IsWatching(Watcher2a0) && !WatchedOutsideCone(Watcher2a0, OwnerContext, 0.7f))  // 0x3f333333
         {
-            UpdateResult10 = 2;
+            UpdateResult = 2;
             return 2;
         }
         BreakAway.BreakStyle = 2;                                   // .text:063275d0
         int const R = BreakAway.Update(DeltaTime);
         if (R != 0)
         {
-            UpdateResult10 = 2;
+            UpdateResult = 2;
             return 2;
         }
-        UpdateResult10 = R;
+        UpdateResult = R;
         return R;
     }
 
@@ -512,18 +499,18 @@ int EvadeBehavior::OnUpdate()
             Mode = 0;
         else
         {
-            UpdateResult10 = 1;
+            UpdateResult = 1;
             return 1;
         }
         DodgeMissile.SetWatchObject(ObjRwFromWatchable(MissileRaw));    // FUN_062d9ae0
         DodgeMissile.Mode1c = Mode;                                 // .text:0631d950
         DodgeMissile.Update(DeltaTime);
-        UpdateResult10 = 1;
+        UpdateResult = 1;
         return 1;
     }
 
     default:
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 }
@@ -533,11 +520,12 @@ int EvadeBehavior::OnUpdate()
 // ----------------------------------------------------------------------------
 bool EvadeBehavior::OnApplyDirective(void* DirectiveOp)
 {
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     void* Target;
     if (DirectiveOp != nullptr)
     {
-        Target = Sys->Timers.FindVerifiedObject((unsigned const*)(static_cast<char*>(DirectiveOp) + 0xc));
+        Target = Sys->Timers.FindVerifiedObject(
+            &static_cast<pub::AI::DirectiveEvadeOp const*>(DirectiveOp)->ThreatId);
     }
     else
     {

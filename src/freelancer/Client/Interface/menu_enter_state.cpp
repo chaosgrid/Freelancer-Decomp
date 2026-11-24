@@ -125,7 +125,7 @@ namespace
         LeaveClientLocationBase();
         G_GfScriptManager.Shutdown();
         SetPlayerBaseIdRetail(0);
-        SetPlayerFactionScratchRetail(0);
+        SetPlayerLocationIdRetail(0);
         SetFadeImmediate(1.0f);
         SetFadeTarget(0.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
         SetClientLocationNoServerNotify(false);
@@ -197,7 +197,7 @@ bool MenuNavStartSinglePlayer(FMenuNavState* Nav)
 {
     // FUN_005739c0 (thiscall on the IntroFocus).
     SetMultiPlayer(false);
-    Nav->Flag22d = 0;
+    Nav->bFromMultiplayer = 0;
     ChatDestroyMsgWin();
     G_LoginMgr.LoginName = L"SinglePlayer";
     G_LoginMgr.LoginPassword = L"";
@@ -218,7 +218,7 @@ namespace
     {
         G_LoginMgr.DestroyGun();
 
-        if (Nav->Flag22d != 0)
+        if (Nav->bFromMultiplayer != 0)
         {
             // Back from multiplayer: restart the single-player session (retail inlines
             // MenuNavStartSinglePlayer here).
@@ -273,7 +273,7 @@ namespace
         }
         for (int Index = 0; Index < 5; ++Index)
         {
-            Column.Buttons[Index].FieldE8 = 1;
+            Column.Buttons[Index].HAlign = 1; // centred
             Column.Buttons[Index].SetFlagsE4E5(1, 1);
         }
         Column.AnimTime = -2.0;
@@ -361,7 +361,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         ResetMissionOfferAnswerRetail();
         G_LoginMgr.Reset();
         SetMultiPlayer(true);
-        Nav->Flag22d = 1;
+        Nav->bFromMultiplayer = 1;
         ChatCreateMsgWin();
         Nav->CurrentState = 5;
         {
@@ -467,7 +467,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             if (GetIntroConfigState()->bDrawScripts && GIntroModeLatch != 4)
                 LeaveIntroBase();
             bool bSelected = false;
-            if (Nav->Flag20c != 0)
+            if (Nav->bHasCharacterPick != 0)
             {
                 bSelected = G_LoginMgr.SelectCharacterById(Nav->CharacterId);
             }
@@ -522,7 +522,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             else
             {
                 Nav->CharacterId = Restart->Id;
-                Nav->Flag20c = 1;
+                Nav->bHasCharacterPick = 1;
                 Nav->CurrentState = 0xc;
             }
         }
@@ -675,7 +675,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         {
             Nav->CurrentState = CharacterPage.Result;
             Nav->CharacterId = CharacterPage.SelectedCharacter;
-            Nav->Flag20c = 1;
+            Nav->bHasCharacterPick = 1;
         }
         break;
     }
@@ -737,7 +737,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         {
             Nav->CurrentState = SinglePage.Result;
             Nav->CharacterId = SinglePage.SelectedCharacter;
-            Nav->Flag20c = 1;
+            Nav->bHasCharacterPick = 1;
         }
         break;
     }
@@ -767,10 +767,11 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         Dt = 0.2;
     // Whole milliseconds go to the script manager; the remainder is computed from the sum
     // rounded to float, while floor() takes the unrounded sum.
-    double const Sum = static_cast<double>(Nav->Field230) + Dt;
+    double const Sum = static_cast<double>(Nav->ScriptTimeRemainder) + Dt;
     float const SumAsFloat = static_cast<float>(Sum);
     double const Milliseconds = floor(Sum * 1000.0);
-    Nav->Field230 = static_cast<float>(static_cast<double>(SumAsFloat) - Milliseconds * 0.001);
+    Nav->ScriptTimeRemainder =
+        static_cast<float>(static_cast<double>(SumAsFloat) - Milliseconds * 0.001);
     G_GfScriptManager.Update(static_cast<int>(Milliseconds));
 
     float const DtFloat = static_cast<float>(Dt);
@@ -818,12 +819,12 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
 
     // Once: the loading screen gets its progress bar, drops the startup Image and stops
     // clearing.
-    if (Nav->Flag22c == 0)
+    if (Nav->bLoadingScreenSettled == 0)
     {
         LoadingScreenCreateProgressBar();
         LoadingScreenReleaseImage();
         LoadingScreenSetClear(0);
-        Nav->Flag22c = 1;
+        Nav->bLoadingScreenSettled = 1;
     }
 
     return TransitionCode;

@@ -4,59 +4,6 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "common_physys.h"
-
-#include "common_archetype.h"
-#include "common_cobject.h"
-#include "common_cobjdb.h"
-#include "common_id.h"
-#include "common_universe.h"
-#include "common_net.h"
-#include "common_phyarch.h"
-#include "common_misc.h"
-#include "common_server.h"
-
-#include "dacom.h"
-#include "DALib.h"
-#include "x86math.h"  // I3DMathEngine::MatrixToQuaternion, FQuaternion, FMatrix
-#include "ivp_collision/ivp_collision.h"
-#include "ivp_physics/ivp_core.h"
-#include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_environment.h"
-#include "ivp_physics/ivp_controller.h"
-#include "ivp_physics/ivp_material.h"
-#include "ivp_physics/ivp_listener.h"
-#include "ivp_physics/ivp_mindist_settings.h"
-#include "ivp_physics/ivp_mindist.h"
-#include "common_csys.h"  // Acquire3DMathEngine
-#include "ivp_compact_builder/ivp_compact_ledge.h"
-#include "ivp_compact_builder/ivp_surface_builder_pointsoup.h"
-#include "ivp_compact_builder/ivp_surface_builder_ledge_soup.h"
-#include "ivp_physics/ivp_surman_polygon.h"
-#include "ivp_collision/ivp_ray_solver.h"
-#include "ivp_collision/ivp_sphere_query.h"
-
-#include <assert.h>
-#include <float.h>
-#include <math.h>
-#include <new>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <map>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <mmsystem.h>  // timeGetTime; winmm is linked by common_playeraccount.cpp
-
-// Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
-#ifdef GetCurrentTime
-#undef GetCurrentTime
-#endif
-
 #include "Physics/common_physys_internal.h"
 
 using namespace CmnPhySys;
@@ -330,8 +277,9 @@ void IVP_Controller_Golem::set_target_quaternion(float const InTargetQuat[4],
 //   0.0f (DAT_063a53d4), not a compare with the bound.
 // - Orientation teleport: the operands are reversed from the position gate
 //   (DeltaOrientation^2 < |rotErr|^2 teleports).
-// - Retail quirk kept: the torque scale is negated when the quaternion dot product is
-//   non-negative, not when it is negative.
+// - The torque scale is negated when the quaternion dot product is >= 0 (C0 clear at
+//   06343471): the error is current relative to target, so the correction opposes it, and the
+//   dot flips the sign for the other double-cover representation (NaN keeps it positive).
 // - The error accumulator decays by 0.9f (DAT_063a53fc).
 //
 // FPU-stack ordering that matters: the extrapolation keeps two live copies of the elapsed time
@@ -483,7 +431,7 @@ void IVP_Controller_Golem::do_simulation_controller(IVP_Event_Sim* EventSim,
          + (double)(Core->QWorldFCoreNext.y) * CurrentTargetQuat.y)
         + (double)(CurrentTargetQuat.x) * Core->QWorldFCoreNext.x;
 
-    // Retail quirk kept: negated on dot >= 0, not on dot < 0 (or unordered).
+    // Negated on dot >= 0, kept on dot < 0 or unordered, as in retail.
     double RotScale = (double)(IDt) * TorqueFactor;
     if (QuatDot >= 0.0)
         RotScale = -RotScale;
@@ -493,8 +441,9 @@ void IVP_Controller_Golem::do_simulation_controller(IVP_Event_Sim* EventSim,
     RotError.k[0] = (float)(RotScale * RotError.k[0]);
     RotError.k[1] = (float)(RotError.k[1] * RotScale);
 
-    // Retail damps rotation with DampFactor (+0x48), the linear factor; AngularDampFactor
-    // (+0x50) is written by the constructor and never read here.
+    // Retail: rotation is damped with DampFactor (+0x48, fld [esi+48h] at 063434C3), the
+    // linear factor; the golem never reads AngularDampFactor (+0x50), which only the
+    // IVP_Controller_Motion servo uses.
     double const NegDamp = -(double)(DampFactor);
     float RotDelta[3];
     RotDelta[0] = (float)(NegDamp * Core->RotSpeed.x + RotError.k[0]);
@@ -659,7 +608,7 @@ bool __cdecl PhySys::BeamBodyToWorldPose(IVP_Real_Object* ReferenceBodyOrNull, I
     int Guard = 100;
     // The difference goes to the listener as a float but is compared unrounded (a tiny
     // negative value would round to -0.0f). The loop continues while it is negative or NaN.
-    double ExcessExact = (double)Hull.PoolKeyThreshold - Hull.AccumulatedDeltaA;
+    double ExcessExact = (double)Hull.PoolMinKey - Hull.AccumulatedDeltaA;
     float Excess = (float)ExcessExact;
     while (!(ExcessExact >= 0.0))
     {
@@ -672,7 +621,7 @@ bool __cdecl PhySys::BeamBodyToWorldPose(IVP_Real_Object* ReferenceBodyOrNull, I
         if (GuardBeforeDecrement < 0)
             break;
 
-        ExcessExact = (double)Hull.PoolKeyThreshold - Hull.AccumulatedDeltaA;
+        ExcessExact = (double)Hull.PoolMinKey - Hull.AccumulatedDeltaA;
         Excess = (float)ExcessExact;
     }
 
@@ -694,10 +643,10 @@ bool __cdecl PhySys::BeamBodyToWorldPose(IVP_Real_Object* ReferenceBodyOrNull, I
 void __cdecl PhySys::AttachGolemController(CObject* Object, CreateParms const& Parms)
 {
     // CreateParms+0x18: 1 golem, 2 weld, anything else returns.
-    if (Parms.Type == 1)
+    if (Parms.Type == PhySys::ANIM_TECHNIQUE_GOLEM)
     {
         // The mode is set before the controller exists.
-        Object->PhysicsControlMode = 1;
+        Object->PhysicsControlMode = PhySys::ANIM_TECHNIQUE_GOLEM;
 
         // Default-construct the tuning struct, then overwrite it from the GOLEM_* globals.
         FLControllerGolemParms GolemParms;
@@ -723,7 +672,7 @@ void __cdecl PhySys::AttachGolemController(CObject* Object, CreateParms const& P
         Object->GolemController = Golem;
 
         // No miss test on the system lookup, as in retail.
-        IVP_Time const Now = PhySys::GetCurrentTime(Parms.CollisionGroupId);
+        IVP_Time const Now = PhySys::GetCurrentTime(Parms.SystemId);
 
         I3DMathEngine* const Math = Acquire3DMathEngine();
 
@@ -740,10 +689,10 @@ void __cdecl PhySys::AttachGolemController(CObject* Object, CreateParms const& P
         return;
     }
 
-    if (Parms.Type != 2)
+    if (Parms.Type != PhySys::ANIM_TECHNIQUE_MERGED)
         return;
 
-    Object->PhysicsControlMode = 2;
+    Object->PhysicsControlMode = PhySys::ANIM_TECHNIQUE_MERGED;
 
     // FUN_06343700(Root body, Object body, -1.0f).
     CObject* const Root = GetRoot(Object);

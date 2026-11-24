@@ -152,7 +152,7 @@ public:
     IVP_Object* an_object_to_be_checked;                        // +0x10 round-robin cursor of check_for_unused_objects
     int32_t number_of_real_objects;                             // +0x14
 };
-static_assert(sizeof(IVP_Cluster_Manager) == 0x18, "IVP_Cluster_Manager is 0x18 bytes (operator new(0x18) at .text:0634c2a9)");
+static_assert(sizeof(IVP_Cluster_Manager) == 0x18, "IVP_Cluster_Manager is 0x18 bytes (operator new(0x18) in FUN_0634bf50, 0634c2a9)");
 
 // FUN_06345e40: IVP_Real_Object method -- -1 when the object has no OV element
 // (+0x90), else the element's collision count (word at element+0x2a, the

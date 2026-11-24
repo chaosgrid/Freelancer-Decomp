@@ -7,8 +7,8 @@
 #include "Interface/Pages/page_account_select.h"
 
 #include "Core/globals.h"          // GetClientFrameTimeCapped (FUN_0042d680)
-#include "Common/Fonts/ids_rdl.h"          // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode, RdlClear
 #include "Interface/menu_ui_init.h"     // PlayUiSoundSlot (FUN_00564570), PlayOrRewindUiSoundSlot
+#include "Interface/Pages/intro_page_util.h" // AppendNodeClone, LoadStyledIds, HideWin3D / ShowWin3D
 #include "NeuroNet/nn_error.h"         // NnErrorRunModal (FUN_00473cb0)
 #include "NeuroNet/nn_ui_pulse.h"      // G_HudChromeColorRgba (DAT_00679bb4)
 #include "Interface/tooltip_hover.h"    // FToolTipHoverInfo
@@ -16,6 +16,7 @@
 #include "Interface/ui_text_edit.h"
 #include "Interface/ui_text_msg_button.h"
 #include "Interface/win3d_immediate.h"  // Win3DVec3Add (FUN_00423b30)
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_net.h"       // CPlayerAccount
 #include "common_text.h"
@@ -35,39 +36,9 @@ namespace
     // u"0123456789-ABCDEF" (0x00614c74), handed to FUN_0057c860 with a count of 0x12 -- the
     // seventeen characters and the terminator.
     wchar_t const kAccountIdChars[] = L"0123456789-ABCDEF";
-
-    // The idiom FUN_005727f0 spells at every RDL append: the node cloned (slot +0x1c), the
-    // clone pushed by FUN_0046c800 (whose cell clones it again), the first clone deleted
-    // (FUN_0045eeb0 / the inline slot-0 call).
-    void AppendNodeClone(RenderDisplayList& Rdl, RDLNode const& Node)
-    {
-        RDLNode* const Temp = Node.Clone();
-        RdlAppendNode(Rdl, Temp->Clone());
-        delete Temp;
-    }
-
-    // Inlined twice in FUN_005727f0; the list clear is FUN_0046c860.
-    void LoadStyledIds(RenderDisplayList& Rdl, unsigned Ids)
-    {
-        RdlClear(Rdl);
-        {
-            StyleNode const Style(0x9ca4);
-            AppendNodeClone(Rdl, Style);
-        }
-        if (LoadIdsIntoRdl(Ids, Rdl))
-            RdlRemoveLastParagraph(Rdl);
-    }
-
-    void HideWin3D(Win3D* Object)
-    {
-        Object->Flags = static_cast<unsigned char>(Object->Flags & 0xfc);
-    }
-
-    void ShowWin3D(Win3D* Object)
-    {
-        Object->Flags = static_cast<unsigned char>(Object->Flags | 3);
-    }
 }
+
+using namespace IntroPageUtil;
 
 PageAccountSelect::PageAccountSelect()
     : UIPage::MasterWin(Desc.GetPageData())
@@ -113,14 +84,15 @@ bool PageAccountSelect::Create(Win3D* NewParent, void* /*Payload*/)
 
     RegisterEvent(0xf); // FUN_005760d0 on the Event::Handler face
 
-    LoadStyledIds(ExplainText, 0x60005);
-    LoadStyledIds(Text601eb, 0x601eb);
+    // Inlined twice (the list clear FUN_0046c860, StyleNode 0x9ca4, FUN_0057da40, the cut).
+    LoadStyledIds(ExplainText, kTextStyleBody, 0x60005);
+    LoadStyledIds(EsrbNoticeText, kTextStyleBody, 0x601eb);
 
     // The key field: the hex-and-dash allow list shown upper case, '-' for anything refused.
     AccountId->SetFixedStyle(true);   // FUN_0057bdd0(1)
     AccountId->SetImeEnabled(false);  // FUN_0057be30(0)
     {
-        StyleNode const Style(0x9ca4);
+        StyleNode const Style(kTextStyleBody);
         AppendNodeClone(AccountId->FixedStyle, Style); // +0x4fc
     }
     {

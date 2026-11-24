@@ -53,7 +53,6 @@
 #include "common_text.h"            // StyleNode
 
 #include "DALib.h"
-#include "dacom.h"
 #include "engine/engbase.h"
 
 #include <math.h>
@@ -626,7 +625,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     // Retail clones the StyleNode twice: the list takes a clone of the clone, and the first
     // clone is deleted.
     {
-        StyleNode Style(0x3ea8);
+        StyleNode Style(kTextStyleNotice);
         RDLNode* const Clone = Style.Clone();
         RdlAppendNode(StyleList, Clone->Clone());
         delete Clone;
@@ -789,7 +788,7 @@ void HudTarget::DrawViewObject()
     {
         return;
     }
-    if (Simple == nullptr || !IsClass(Simple, 0x103))
+    if (Simple == nullptr || !IsClass(Simple, CObject::ClassEqObj))
     {
         return;
     }
@@ -850,7 +849,7 @@ void HudTarget::UpdateLabels()
     }
 
     // CShip +0x2bd: a player's ship.
-    CShip* const Ship = IsClass(Object, 0x503) ? static_cast<CShip*>(Object) : nullptr;
+    CShip* const Ship = IsClass(Object, CObject::ClassShip) ? static_cast<CShip*>(Object) : nullptr;
     bool const bPlayerShip = Ship != nullptr && Ship->bIsPlayer != 0;
 
     // The font and the rest position: the home offset (+0x2d4) copied to the offset (+0xa8),
@@ -1090,11 +1089,11 @@ intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 if (GetPlayerObjRW() != nullptr)
                 {
                     CObject* const Object = CObjectOfObjRw(WatchedObjRw(ViewObject));
-                    if (Object != nullptr && IsClass(Object, 0x503) &&
+                    if (Object != nullptr && IsClass(Object, CObject::ClassShip) &&
                         static_cast<CSimple*>(Object)->OwnerPlayer != 0)
                     {
                         // Only the low byte of the result is returned.
-                        return static_cast<unsigned char>(HudPostCommand(0xc9, 0));
+                        return static_cast<unsigned char>(HudPostCommand(USER_GROUP_INVITE, 0));
                     }
                 }
                 return 1;
@@ -1114,7 +1113,7 @@ intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             }
             if (A == reinterpret_cast<uintptr_t>(TradeButton))
             {
-                return static_cast<unsigned char>(HudPostCommand(0xca, 0));
+                return static_cast<unsigned char>(HudPostCommand(USER_TRADE_REQUEST, 0));
             }
         }
     }
@@ -1169,7 +1168,7 @@ void HudTarget::Update()
             CObject const* const Object = Gameobj->cobject();
             bool bClear = false;
             // A NaN cloak counts as cloaked.
-            if (Object != nullptr && IsClass(Object, 0x503) &&
+            if (Object != nullptr && IsClass(Object, CObject::ClassShip) &&
                 !(static_cast<CEqObj const*>(Object)->CloakPercent < kOne))
             {
                 bClear = true;
@@ -1213,7 +1212,7 @@ void HudTarget::Update()
         unsigned char bFormation = 0;
         IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
         CObject* const PlayerObject = CObjectOfObjRw(Player);
-        if (PlayerObject != nullptr && IsClass(PlayerObject, 0x503))
+        if (PlayerObject != nullptr && IsClass(PlayerObject, CObject::ClassShip))
         {
             CShip* const Ship = static_cast<CShip*>(PlayerObject);
             IBehaviorManager* const Behavior = Ship->get_behavior_interface();
@@ -1274,7 +1273,7 @@ void HudTarget::Update()
     CShip* PlayerShip = nullptr;
     {
         CObject* const TargetObject = CObjectOfObjRw(WatchedObjRw(HUDItem::Target));
-        if (TargetObject != nullptr && IsClass(TargetObject, 0x503))
+        if (TargetObject != nullptr && IsClass(TargetObject, CObject::ClassShip))
         {
             PlayerShip = static_cast<CShip*>(TargetObject);
             IObjRW* const Current = SyncPlayerTarget();
@@ -1299,7 +1298,7 @@ void HudTarget::Update()
     if (WatchedObjRw(ViewObject) == nullptr && bClearPlayerTarget != 0)
     {
         bClearPlayerTarget = 0;
-        HudPostCommand(0x26, 0);
+        HudPostCommand(USER_CLOSEST_ENEMY, 0);
         if (SyncPlayerTarget() != nullptr)
         {
             PlayOrRewindUiSoundSlot(0x23);
@@ -1371,16 +1370,16 @@ bool HudTarget::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // FUN_004e4af0: a release (-1) hides the tool tip; with a picked sub-target and button 2 it
     // plays UI sound 0x18 and routes command 0x1c {view id, SubTargetId} to the camera.
-    if (Event->Field0 == -1)
+    if (Event->Button == kWin3DMouseLeft)
     {
         NnToolTipHideGlobal();
         IObjRW* const View = WatchedObjRw(ViewObject);
-        if (SubTargetId != SUBOBJ_ID_NONE && Event->Field1 == 2 && View != nullptr)
+        if (SubTargetId != SUBOBJ_ID_NONE && Event->Action == kWin3DMousePress && View != nullptr)
         {
             PlayOrRewindUiSoundSlot(0x18);
             FSpaceCommand Command = {};
             Command.Byte26 = 1;
-            Command.Id = 0x1c;
+            Command.Id = USER_SET_TARGET;
             Command.ObjectId = View->get_id();
             Command.SubObjectId = SubTargetId;
             SpaceSendCommand(&Command);
@@ -1536,7 +1535,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         return false;
     }
     CObject* const PlayerObject = CObjectOfObjRw(Player);
-    if (PlayerObject == nullptr || !IsClass(PlayerObject, 0x503))
+    if (PlayerObject == nullptr || !IsClass(PlayerObject, CObject::ClassShip))
     {
         return false;
     }
@@ -1546,15 +1545,15 @@ bool HudTarget::OnEvent(unsigned MsgId)
 
     switch (MsgId)
     {
-    case 0xbb:
+    case USER_FIRE_FORWARD:
         static_cast<IObjAffect*>(Player)->fire_weapons(nullptr, 0, nullptr,
                                                   static_cast<int>(GetPlayerConnectionId()));
         return true;
 
-    case 0x25:
-    case 0x24:
+    case USER_PREV_ENEMY:
+    case USER_NEXT_ENEMY:
     {
-        IObjRW* const Enemy = (MsgId == 0x25) ? PlayerShipObject->previous_enemy()
+        IObjRW* const Enemy = (MsgId == USER_PREV_ENEMY) ? PlayerShipObject->previous_enemy()
                                               : PlayerShipObject->next_enemy();
         if (Enemy != nullptr)
         {
@@ -1563,7 +1562,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0x26:
+    case USER_CLOSEST_ENEMY:
     {
         IObjRW* const Next =
             PlayerShip->PickNextTarget(static_cast<int>(GetPlayerConnectionId()));
@@ -1574,15 +1573,16 @@ bool HudTarget::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0x8b:
+    case USER_TRACTOR_BEAM:
     {
-        // The result is not read.
+        // The result is not read. Retail: no null test of the ship (null when the watched
+        // object is not a ship; 0x004e2aa5).
         CShip* const Ship = HudShipOfObjRw(WatchedObjRw(HUDItem::Target));
         PlayerShip->RequestTractor(Ship->get_target());
         return true;
     }
 
-    case 0x8a:
+    case USER_SCAN_CARGO:
     {
         LabelRefreshTimer = kOne;
         Win3D* const Scanner = Win3DFindByName("NN_Scanner");
@@ -1608,19 +1608,19 @@ bool HudTarget::OnEvent(unsigned MsgId)
         LabelRefreshTimer = kOne;
         return false;
 
-    case 0x21:
+    case USER_NEXT_SUBTARGET:
         SelectNextSubTarget();
         UpdateLabels();
         SubtargetName->SetProperty(0x50, 1, 0x14);
         return true;
 
-    case 0x22:
+    case USER_PREV_SUBTARGET:
         SelectPreviousSubTarget();
         UpdateLabels();
         SubtargetName->SetProperty(0x50, 1, 0x14);
         return true;
 
-    case 0x54:
+    case USER_CONTACT_LIST:
         Mode = 0;
         if (bExpanded == 0)
         {
@@ -1628,7 +1628,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         }
         return true;
 
-    case 0x59:
+    case USER_FORMATION_LIST:
         Mode = 2;
         if (bExpanded == 0)
         {
@@ -1636,13 +1636,13 @@ bool HudTarget::OnEvent(unsigned MsgId)
         }
         return true;
 
-    case 0x6d:
-    case 0x5f:
+    case USER_MINIMIZE_HUD:
+    case USER_TARGET:
         // Retail's jump table sends these into the ToggleExpanded calls of 0x54 / 0x59.
         ToggleExpanded();
         return true;
 
-    case 0x58:
+    case USER_SWITCH_TO_TARGET:
         Mode = 1;
         if (bExpanded == 0)
         {
@@ -1651,14 +1651,15 @@ bool HudTarget::OnEvent(unsigned MsgId)
         LabelRefreshTimer = kOne;
         return true;
 
-    case 0xc9:
+    case USER_GROUP_INVITE:
     {
+        // Retail: no null test of the ship (0x004e2c6d).
         CShip* const Ship = HudShipOfObjRw(WatchedObjRw(HUDItem::Target));
         IObjRW* const ShipTarget = Ship->get_target();
         if (ShipTarget != nullptr)
         {
             CObject const* const TargetObject = ShipTarget->cobject();
-            if (TargetObject != nullptr && IsClass(TargetObject, 0x503) &&
+            if (TargetObject != nullptr && IsClass(TargetObject, CObject::ClassShip) &&
                 static_cast<CSimple const*>(TargetObject)->OwnerPlayer != 0)
             {
                 // The group invite (opcode 0) to the target's owner.
@@ -1670,7 +1671,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0xca:
+    case USER_TRADE_REQUEST:
     {
         if (G_bTradeRequested != 0)
         {
@@ -1704,7 +1705,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0x23:
+    case USER_CLEAR_TARGET:
         if (WatchedObjRw(HUDItem::Target) != nullptr)
         {
             ClearTargetOf(WatchedObjRw(HUDItem::Target));
@@ -1812,7 +1813,7 @@ void HudTarget::UpdateButtons(bool bFull)
 
     CObject* const ViewCObject = CObjectOfObjRw(WatchedObjRw(ViewObject));
     CShip* const ViewShip =
-        (ViewCObject != nullptr && IsClass(ViewCObject, 0x503)) ? static_cast<CShip*>(ViewCObject)
+        (ViewCObject != nullptr && IsClass(ViewCObject, CObject::ClassShip)) ? static_cast<CShip*>(ViewCObject)
                                                                 : nullptr;
 
     // The sub-target arrows: a view with live sub-targets, and a ship only with type bit
@@ -1872,7 +1873,7 @@ RankDone:
         // A loot-like view (class 0x803) takes the tractor button, anything else in
         // cargo scanner range the scan button.
         CObject* const LootObject = CObjectOfObjRw(WatchedObjRw(ViewObject));
-        bool const bLoot = LootObject != nullptr && IsClass(LootObject, 0x803);
+        bool const bLoot = LootObject != nullptr && IsClass(LootObject, CObject::ClassLoot);
         float Distance = kScanDefaultDistance;
         IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
         if (!bLoot && ViewShip != nullptr && Player != nullptr)
@@ -1887,7 +1888,7 @@ RankDone:
             if (!bLoot && ViewShip != nullptr && Player != nullptr)
             {
                 CObject* const PlayerObject = CObjectOfObjRw(Player);
-                if (PlayerObject != nullptr && IsClass(PlayerObject, 0x503))
+                if (PlayerObject != nullptr && IsClass(PlayerObject, CObject::ClassShip))
                 {
                     CEqObj* const PlayerEq = static_cast<CEqObj*>(PlayerObject);
                     CEScanner const* const Scanner =
@@ -1942,7 +1943,7 @@ void HudTarget::UpdateTradeButton()
 {
     // FUN_004e27e0.
     CObject* const ViewCObject = CObjectOfObjRw(WatchedObjRw(ViewObject));
-    CSimple* const ViewShip = (ViewCObject != nullptr && IsClass(ViewCObject, 0x503))
+    CSimple* const ViewShip = (ViewCObject != nullptr && IsClass(ViewCObject, CObject::ClassShip))
                                   ? static_cast<CSimple*>(ViewCObject)
                                   : nullptr;
     float Distance = kScanDefaultDistance;
@@ -1981,6 +1982,7 @@ IObjRW* HudTarget::SyncPlayerTarget()
     {
         return nullptr;
     }
+    // Retail: no null test of the ship (FUN_00543320's result goes straight to VerifyTarget).
     CShip* const Ship = HudShipOfObjRw(PlayerRw);
     Ship->VerifyTarget();
     IObjRW* const View = WatchedObjRw(ViewObject);
@@ -2034,7 +2036,7 @@ void HudTarget::SelectNextSubTarget()
     }
     FSpaceCommand Command = {};
     Command.Byte26 = 1;
-    Command.Id = 0x1c;
+    Command.Id = USER_SET_TARGET;
     Command.ObjectId = WatchedObjRw(ViewObject)->get_id();
     Command.SubObjectId = Key;
     SpaceSendCommand(&Command);
@@ -2077,7 +2079,7 @@ void HudTarget::SelectPreviousSubTarget()
     }
     FSpaceCommand Command = {};
     Command.Byte26 = 1;
-    Command.Id = 0x1c;
+    Command.Id = USER_SET_TARGET;
     Command.ObjectId = WatchedObjRw(ViewObject)->get_id();
     Command.SubObjectId = Key;
     SpaceSendCommand(&Command);
@@ -2088,7 +2090,7 @@ int HudTarget::RebuildSubTargets(std::map<unsigned short, long>* Map)
     // FUN_004e4dd0; retail inlines CArchGroup::GetID.
     Map->clear();
     CObject* const Object = CObjectOfObjRw(WatchedObjRw(ViewObject));
-    if (Object != nullptr && IsClass(Object, 0x103))
+    if (Object != nullptr && IsClass(Object, CObject::ClassEqObj))
     {
         CEqObj* const EqObj = static_cast<CEqObj*>(Object);
         CArchGrpTraverser GroupWalk;
@@ -2123,7 +2125,7 @@ void HudTarget::GetSubTargetName(wchar_t* Out)
         return;
     }
     CObject* const Object = CObjectOfObjRw(WatchedObjRw(ViewObject));
-    if (Object == nullptr || !IsClass(Object, 0x103))
+    if (Object == nullptr || !IsClass(Object, CObject::ClassEqObj))
     {
         return;
     }

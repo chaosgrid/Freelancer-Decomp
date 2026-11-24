@@ -107,7 +107,7 @@ static void SendShipTargets(unsigned int PlayerId, CShip* Ship)
 
     // The ship's CEquipManager (+0xe4) with mask 0x80. The loop ends on the first null
     // CEGun::cast (end of traversal or a non-gun), it does not skip and keep walking.
-    CEquipTraverser Walk(0x80);
+    CEquipTraverser Walk(EquipTypeGun);
     for (;;) {
         CEGun* const Gun = CEGun::cast(Ship->EquipManager.Traverse(Walk));
         if (Gun == nullptr)
@@ -446,7 +446,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         CObject* const Raw = Obj->cobj();
         CShip* const Ship =
             (Raw != nullptr &&
-             (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+             (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CShip*>(Raw) : nullptr;
         if (Ship != nullptr) {
             Msg.Throttle = Ship->Throttle;   // CShip+0x29c
@@ -497,10 +497,9 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         // +0x14 = 0, +0x18 = 0.
         DamageList Damage;
         Damage.set_destroyed(false);
-        // 0x19 has no name: retail's DmgCauseToString returns "???" for every cause
-        // (.text:062bbce0), and 0x19 is the only non-zero cause either DLL writes (here
-        // and .text:06d07f8a). See the note above the enum in common_misc.h.
-        Damage.set_cause(static_cast<DamageCause>(0x19));
+        // Retail's DmgCauseToString returns "???" for every cause (.text:062bbce0); the
+        // enumerator name is the port's (common_misc.h).
+        Damage.set_cause(DamageCause::InitialSync);
         Damage.set_inflictor_id(0u);
         Damage.set_inflictor_owner_player(0u);
 
@@ -517,11 +516,14 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         View->PendingDamageIds.erase(Obj->get_id());
     }
 
-    // Open question: FUN_06d07690 builds a DamageList of every equipment item's hit
-    // points and destroys it without storing it, so CEqObjCreateInfo's list<DamageEntry>
-    // (+0x8c) crosses the wire empty from all three callers (.text:06cf588a,
-    // .text:06d0843e, .text:06d0d256). Faithful to retail; where the receiver's
-    // per-equipment damage on creation comes from is unresolved.
+    // Retail: FUN_06d07690 builds a DamageList of every shield's hit points
+    // (CEquipTraverser 0x100, CEquip vt+0x3c) and destroys it without storing it, so
+    // CEqObjCreateInfo's DamageList (+0x8c) crosses the wire empty from all three callers
+    // (.text:06cf588a, .text:06d0843e, .text:06d0d256). A joining client gets item health
+    // from the record's EquipDesc vector (+0x70, get_equip_desc_list) and group health
+    // from its CollisionGroupDesc list (+0x80); shield hit points arrive only with the
+    // object's next DAMAGEOBJECT. Solars are re-synced by StarSystem::add_player
+    // (cause 0x19, .text:06d07f56) and by the deferred-damage retry above.
 }
 
 // ===========================================================================
@@ -571,7 +573,7 @@ void StarSystem_DamageObject(StarSystem* Sys, GameObject* Obj, DamageList* Damag
     // ClassAsteroid: "is a CEqObj".
     CEqObj* const EqObj =
         (Raw != nullptr &&
-         (static_cast<unsigned int>(Raw->ObjectClass) & 0x103u) == 0x103u)
+         (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             ? static_cast<CEqObj*>(Raw) : nullptr;
 
     bool const bMirror =
@@ -635,7 +637,7 @@ void StarSystem_DamageObject(StarSystem* Sys, GameObject* Obj, DamageList* Damag
     // sub-object was actually destroyed or separated.
     bool const bIsSolar =
         Raw != nullptr &&
-        (static_cast<unsigned int>(Raw->ObjectClass) & 0x303u) == 0x303u;
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar;
     if (bIsSolar) {
         for (std::list<DamageEntry>::const_iterator It = Damage->Entries.begin();
              It != Damage->Entries.end(); ++It) {

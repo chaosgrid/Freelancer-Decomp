@@ -8,7 +8,7 @@
 
 #include "common_idea.h"
 #include "common_aisteer.h"   // BearingAngleToPoint, GetIfacePositionOrZero
-#include "common_behavior.h"  // Behavior_InvokeManagerSlotD4 / D8, Behavior_QueryRadiusEffect / ...
+#include "common_behavior.h"  // Behavior_GetProjectedThrottle / D8, Behavior_GetTimeToAccelerate / ...
 #include "common_cequip.h"    // ThrustEquipType (IObjInspect::get_speed's 2nd argument)
 #include "common_csys.h"      // Matrix / Transform
 #include "common_iface.h"     // IObjInspect / IObjRW / IBehaviorManager / ObjRwFromWatchable
@@ -89,14 +89,14 @@ bool MatchThrottle2Idea::SetContext(void* InObject, void* InHandle, void* InCont
     // Retail shares one argument frame between the two calls: get_speed's result is
     // stored over a pushed dword and reused as FUN_062e5850's third argument.
     // 300.0f is .rdata:0639fe30.
-    float const CruiseSpeed = Behavior_InvokeManagerSlotD8(Owner, 1.0f, ThrustEquipCruise);
+    float const CruiseSpeed = Behavior_GetSpeed(Owner, 1.0f, ThrustEquipCruise);
     Speed4c = static_cast<float>(
-        static_cast<double>(Behavior_QueryRadiusEffect(Owner, 0.0f, CruiseSpeed, 0.0f, ThrustEquipCruise)) + 300.0f);
+        static_cast<double>(Behavior_GetTimeToAccelerate(Owner, 0.0f, CruiseSpeed, 0.0f, ThrustEquipCruise)) + 300.0f);
 
     // Same pair for Engine; 50.0f is .rdata:0639e6d4.
-    float const EngineSpeed = Behavior_InvokeManagerSlotD8(Owner, 1.0f, ThrustEquipEngine);
+    float const EngineSpeed = Behavior_GetSpeed(Owner, 1.0f, ThrustEquipEngine);
     Speed50 = static_cast<float>(
-        static_cast<double>(Behavior_QueryRadiusEffect(Owner, 0.0f, EngineSpeed, 0.0f, ThrustEquipEngine)) + 50.0f);
+        static_cast<double>(Behavior_GetTimeToAccelerate(Owner, 0.0f, EngineSpeed, 0.0f, ThrustEquipEngine)) + 50.0f);
     return true;
 }
 
@@ -225,7 +225,7 @@ int MatchThrottle2Idea::Update(float DeltaTime)
     // The throttle that matches the watched speed: cruise only when cruising and not
     // in a lane, engine otherwise.
     ThrustEquipType const MatchType = (bWatchedCruise && !bWatchedLane) ? ThrustEquipCruise : ThrustEquipEngine;
-    float const MatchThrottle = Behavior_InvokeManagerSlotD4(Owner, WatchedSpeed, MatchType);
+    float const MatchThrottle = Behavior_GetProjectedThrottle(Owner, WatchedSpeed, MatchType);
 
     // The aim vector, relative to the own centre.
     Vector Aim;
@@ -312,13 +312,13 @@ int MatchThrottle2Idea::Update(float DeltaTime)
         // the matching cached speed.
         if (bWatchedCruise)
         {
-            (void)Behavior_InvokeManagerSlotD8(Owner, 1.0f, ThrustEquipCruise);
+            (void)Behavior_GetSpeed(Owner, 1.0f, ThrustEquipCruise);
             Speed2c = Speed4c;
             Mode = 4;
         }
         else
         {
-            (void)Behavior_InvokeManagerSlotD8(Owner, 1.0f, ThrustEquipEngine);
+            (void)Behavior_GetSpeed(Owner, 1.0f, ThrustEquipEngine);
             Speed2c = Speed50;
             Mode = 1;
         }
@@ -333,8 +333,8 @@ int MatchThrottle2Idea::Update(float DeltaTime)
                 // Time to slow from the own speed to the watched one, and the
                 // distance covered meanwhile (stored to +0x2c).
                 ThrustEquipType const Type = static_cast<ThrustEquipType>(Mode);
-                float const SlowTime = Behavior_QueryRadiusEffect(Owner, 0.0f, OwnSpeed, WatchedSpeed, Type);
-                float const SlowDistance = Behavior_QueryFalloffEffect(Owner, 0.0f, OwnSpeed, SlowTime, Type);
+                float const SlowTime = Behavior_GetTimeToAccelerate(Owner, 0.0f, OwnSpeed, WatchedSpeed, Type);
+                float const SlowDistance = Behavior_GetDistanceTravelled(Owner, 0.0f, OwnSpeed, SlowTime, Type);
                 Speed2c = SlowDistance;
                 if (Closing <= SlowDistance && static_cast<double>(SlowDistance) > 0.01)
                     ThrottleBias30 = 0.0f;
@@ -387,9 +387,9 @@ int MatchThrottle2Idea::Update(float DeltaTime)
         Sys->Thrust.SetThrottle(Throttle, Mode);
     }
 
-    // No nudge matching while PathfindManager::Field_214 bit 0 is set or Flag3a is
+    // No nudge matching while PathfindManager::AvoidRecordKind bit 0 is set or Flag3a is
     // clear.
-    if ((MatchPathfindOf(Context)->Field_214 & 1) != 0 || Flag3a == 0)
+    if ((MatchPathfindOf(Context)->AvoidRecordKind & 1) != 0 || Flag3a == 0)
         return 0;
 
     // The watched ship's nudge vector (slot 21); its length is compared unrounded.

@@ -178,8 +178,8 @@ namespace
 
     static_assert(sizeof(FFlmMaterialParamDesc) == sizeof(FShadingPropertyRecord), "shared property descriptor size");
     static_assert(offsetof(FFlmMaterialParamDesc, Type0) == offsetof(FShadingPropertyRecord, Current), "current value boundary");
-    static_assert(offsetof(FFlmMaterialParamDesc, Type1) == offsetof(FShadingPropertyRecord, Default), "default value boundary");
-    static_assert(offsetof(FFlmMaterialParamDesc, Type2) == offsetof(FShadingPropertyRecord, Saved), "saved value boundary");
+    static_assert(offsetof(FFlmMaterialParamDesc, Type1) == offsetof(FShadingPropertyRecord, Minimum), "minimum value boundary");
+    static_assert(offsetof(FFlmMaterialParamDesc, Type2) == offsetof(FShadingPropertyRecord, Maximum), "maximum value boundary");
 
     void FlmSetDescriptorEntry(FFlmMaterialParamDesc* Entry, int Type,
                                 unsigned long Flags, const char* Tag, const char* Name,
@@ -350,7 +350,8 @@ namespace
     }
 
     // Each material family owns its contiguous declared-property schema.
-    const void* FlmGlassParamsBase(EMaterialKind Kind)
+    template <class TOwner>
+    const void* FlmGenericParamsBase()
     {
         const unsigned long kZero = 0;
         const unsigned long kOne = 0x3f800000ul;
@@ -383,47 +384,11 @@ namespace
             {0x40000ul, "Dt_flags", "Texture V Address Mode", "",
              9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
         };
-        switch (Kind)
-        {
-        case KindEngineGlow:
-        {
-            static FFlmOwnedParameterTable<10> Table;
-            Table.InitializeDefaults(kParams);
-            return &Table.Descriptors[0].Entry;
-        }
-        case KindHudIcon:
-        {
-            static FFlmOwnedParameterTable<10> Table;
-            Table.InitializeDefaults(kParams);
-            return &Table.Descriptors[0].Entry;
-        }
-        case KindPlanetWater:
-        {
-            static FFlmOwnedParameterTable<10> Table;
-            Table.InitializeDefaults(kParams);
-            return &Table.Descriptors[0].Entry;
-        }
-        case KindHudAnim:
-        {
-            static FFlmOwnedParameterTable<10> Table;
-            Table.InitializeDefaults(kParams);
-            return &Table.Descriptors[0].Entry;
-        }
-        case KindGlass:
-        {
-            // Glass/HighGlass/GFGlass factories use 066f7190 / 06705300;
-            // Exclusion uses the independent 066f66e0 / 06705600 table.
-            static FFlmOwnedParameterTable<10> Table;
-            Table.InitializeDefaults(kParams);
-            return &Table.Descriptors[0].Entry;
-        }
-        default: // Exclusion inherits the base Glass Slot27.
-        {
-            static FFlmOwnedParameterTable<10> Table;
-            Table.InitializeDefaults(kParams);
-            return &Table.Descriptors[0].Entry;
-        }
-        }
+        // One table per material class, as in retail: EngineGlow 066f5370, Exclusion 066f66e0,
+        // Glass 066f7190 (/ 06705300), HUDIcon 066f7c10, PlanetWater 066f9890, HUDAnim 066ffb70.
+        static FFlmOwnedParameterTable<10> Table;
+        Table.InitializeDefaults(kParams);
+        return &Table.Descriptors[0].Entry;
     }
 
     const void* FlmNomadParamsBase()
@@ -1291,15 +1256,17 @@ namespace
         }
     }
 
-    // Each state becomes armed after its Set call (retail unwind states 3 and 4).
-    struct FNomadRenderStateRestore
+    // FUN_066f3080: restore the saved value through the stored pipeline.
+    // Active marks the retail EH lifetime, not whether GetRenderState succeeded; each
+    // state becomes armed after its Set call (retail unwind states 3 and 4 in Nomad).
+    struct FFlmRenderStateRestore
     {
         IRenderPipeline* Pipeline;
         D3DRENDERSTATETYPE State;
         int SavedValue;
         bool bActive;
 
-        FNomadRenderStateRestore(IRenderPipeline* InPipeline, D3DRENDERSTATETYPE InState)
+        FFlmRenderStateRestore(IRenderPipeline* InPipeline, D3DRENDERSTATETYPE InState)
             : Pipeline(InPipeline), State(InState), bActive(false)
         {
             Pipeline->GetRenderState(State, &SavedValue);
@@ -1309,7 +1276,7 @@ namespace
             bActive = false;
             Pipeline->SetRenderState(State, SavedValue);
         }
-        ~FNomadRenderStateRestore() noexcept(false)
+        ~FFlmRenderStateRestore() noexcept(false)
         {
             if (bActive)
                 Restore();
@@ -1356,7 +1323,7 @@ namespace
         return Value;
     }
 
-    GENRESULT SubmitNomadGeometry(const unsigned char& bSecondTexture, const float& Live6C,
+    GENRESULT SubmitNomadGeometry(const unsigned char& bSecondTexture, const float& Elapsed,
                           const unsigned long& Stage, IVertexBufferManager* const& VbMgr,
                           IRenderPipeline* const& Pipeline, void* Context,
                           unsigned long Prim, unsigned long Start, unsigned long Count,
@@ -1377,8 +1344,8 @@ namespace
         {
             const int Byte = (int)(Fade * kNomadColorScale);
             Color = ((unsigned long)(Byte) << 24) | 0x00ffffff;
-            // _CIfmod receives ST1=Live6C, ST0=period; division stays wide until FSTP.
-            Phase = (float)(1.0 - std::fmod((double)(Live6C),
+            // _CIfmod receives ST1=Elapsed, ST0=period; division stays wide until FSTP.
+            Phase = (float)(1.0 - std::fmod((double)(Elapsed),
                 (double)(kNomadPeriod)) / kNomadPeriod);
         }
 
@@ -1404,10 +1371,10 @@ namespace
         NomadCopyMesh(Submit->Mesh, Start, Count, PositionOut, ColorOut, TextureOut, Stage, Color, Phase, Light);
         VbMgr->UnlockVertexMemory(&LockOut);
 
-        FNomadRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE);
+        FFlmRenderStateRestore DepthWrite(Pipeline, D3DRS_ZWRITEENABLE);
         DepthWrite.Pipeline->SetRenderState(DepthWrite.State, 0);
         DepthWrite.bActive = true;
-        FNomadRenderStateRestore CullMode(Pipeline, D3DRS_CULLMODE);
+        FFlmRenderStateRestore CullMode(Pipeline, D3DRS_CULLMODE);
         CullMode.Pipeline->SetRenderState(CullMode.State, 1);
         CullMode.bActive = true;
         Pipeline->DrawIndexedPrimitiveVb(Prim, LockOut.Listing.VertexBuffer, LockOut.Listing.BaseVertex,
@@ -1498,32 +1465,6 @@ namespace
 
     // Restore the shared material render-state table after the draw.
     const unsigned long kEnvGlassDrawTailRs[] = {0x89, 1, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
-
-    // FUN_066f3080: restore the saved value through the stored pipeline.
-    // Active marks the retail EH lifetime, not whether GetRenderState succeeded.
-    struct FFlmRenderStateRestore
-    {
-        IRenderPipeline* Pipeline;
-        D3DRENDERSTATETYPE State;
-        int SavedValue;
-        bool bActive;
-
-        FFlmRenderStateRestore(IRenderPipeline* InPipeline, D3DRENDERSTATETYPE InState)
-            : Pipeline(InPipeline), State(InState), bActive(false)
-        {
-            Pipeline->GetRenderState(State, &SavedValue);
-        }
-        void Restore()
-        {
-            bActive = false;
-            Pipeline->SetRenderState(State, SavedValue);
-        }
-        ~FFlmRenderStateRestore() noexcept(false)
-        {
-            if (bActive)
-                Restore();
-        }
-    };
 
     // FUN_066f9ea0: normal and EH paths restore 0x17 before 0x0e.
     GENRESULT SubmitPlanetWaterGeometry(IRenderPipeline* Pipeline, IRPDraw* RpDraw, IVertexBufferManager* VbMgr, void* Context,
@@ -1753,7 +1694,7 @@ namespace
         {
             if (StartArg == 0)
             {
-                FScopedWireRenderState Specular(Pipeline, D3DRS_LIGHTING, 1);
+                FScopedWireRenderState Lighting(Pipeline, D3DRS_LIGHTING, 1);
                 FScopedWireRenderState Color(Pipeline, D3DRS_AMBIENT, WireColor);
                 ((IVMeshWire*)WireReference.Object)->Draw();
             }
@@ -1900,155 +1841,143 @@ namespace
     }
 }
 
-FMaterialImpl::FMaterialImpl(const FMaterialSpec& Spec)
-    : Inner_(this),
-      ControllingOuter_(&Inner_),
-      Kind_(Spec.Kind),
-      FactoryName_(Spec.Name),
-      Outer_(nullptr),
-      Pipeline_(nullptr),
+FMaterialImpl::FMaterialImpl()
+    : Pipeline_(nullptr),
       TextureLibrary_(nullptr),
       VertexBufferManager_(nullptr),
       RpDraw_(nullptr),
-      MaterialLibrary_(nullptr),
+      InstanceName_(nullptr),
       TextureBlock_(nullptr),
-      Flag64_(0),
-      Flag65_(0),
-      bBackdrop_(0),
-      bBackdropNameMatchCopy_(0),
-      bNomadRegular_(0),
-      bSecondTexture_(0),
-      Pad71_(0),
-      NomadDead68_(0.0f),
-      NomadLive6C_(0.0f),
-      HudAnimFlag_(0),
-      MatAnim_(nullptr),
-      EnvMapFlag_(0),
-      EnvMapResolvedHandle_(0),
-      ShadowHandle_(0),
-      ShadowTextureLibrary_(nullptr),
-      ShadowTextureRecord_(nullptr),
-      ShadowResolvedHandle_(0),
-      ShadowLayerCount_(0),
-      bShadowTextureInitialized_(false),
-      EnvMapTexNameCrc_(0),
-      StageCounter_(0),
-      WireColorR_(0.0f),
-      WireColorG_(0.0f),
-      WireColorB_(0.0f),
-      WireColorA_(0.0f),
-      WireColorArgb_(0),
-      WireColorRgb555_(0),
-      WireGroupIndex_(0),
-      Exclusion68_(0),
-      ColorizeExtraW_(0.0f),
-      ColorizeOptionsFlags_(0),
-      bInstanceNameSet_(false),
-      TextureVerifyCount_(0)
+      TextureVerifyCount_(0),
+      bAlphaBlend_(0),
+      bOneBitAlpha_(0)
 {
-    for (int Index = 0; Index < 3; ++Index)
-        NomadDiffuseColor_[Index] = 0.0f;
     for (int Index = 0; Index < 17; ++Index)
         MaterialBlock_[Index] = 0.0f;
     MaterialBlock_[0] = 1.0f;
     MaterialBlock_[5] = 1.0f;
     MaterialBlock_[10] = 1.0f;
-    // The Colorize (066f45bd), Wire (066fafc1) and Wire2 (066fbc51) factories clear all
-    // 17 words, then seed only Diffuse and Ambient RGBA to white.
-    if (Kind_ == KindColorize || Kind_ == KindWire || Kind_ == KindWire2 || Kind_ == KindShadow)
-    {
-        for (int Index = 0; Index < 17; ++Index)
-            MaterialBlock_[Index] = Index < 8 ? 1.0f : 0.0f;
-    }
-    // The EngineGlow (066f529b) and HUDAnim (066ffa98) factories seed the same white block;
-    // every later material-block word stays zero.
-    if (Kind_ == KindEngineGlow || Kind_ == KindHudAnim)
-    {
-        for (int Index = 0; Index < 17; ++Index)
-            MaterialBlock_[Index] = Index < 8 ? 1.0f : 0.0f;
-    }
-    InstanceName_ = nullptr;
 }
 
+// The Colorize (066f45bd), Wire (066fafc1), Wire2 (066fbc51), Shadow, EngineGlow (066f529b) and
+// HUDAnim (066ffa98) factories clear all 17 words, then seed only Diffuse and Ambient RGBA to
+// white.
+void FMaterialImpl::SeedWhiteMaterialBlock()
+{
+    for (int Index = 0; Index < 17; ++Index)
+        MaterialBlock_[Index] = Index < 8 ? 1.0f : 0.0f;
+}
+
+FBackdropMaterial::FBackdropMaterial() : bBackdrop_(0), bBackdropNameMatchCopy_(0) {}
+
+FColorizeMaterial::FColorizeMaterial() : ColorizeExtraW_(0.0f), ColorizeOptionsFlags_(0)
+{
+    SeedWhiteMaterialBlock();
+}
+
+FEngineGlowMaterial::FEngineGlowMaterial() : Unread68_(0), Pad6C_(0)
+{
+    SeedWhiteMaterialBlock();
+}
+
+FEnvMapMaterial::FEnvMapMaterial()
+    : EnvMapTextureRecord_(0), EnvMapFlag_(0), EnvMapResolvedHandle_(0), EnvMapTexNameCrc_(0)
+{
+}
+
+FExclusionZoneMaterial::FExclusionZoneMaterial() : Unread68_(0) {}
+
+FNomadMaterial::FNomadMaterial()
+    : NomadBendElapsed_(0.0f),
+      NomadElapsed_(0.0f),
+      Pad70_(0),
+      bNomadRegular_(0),
+      bSecondTexture_(0),
+      StageCounter_(0)
+{
+    for (int Index = 0; Index < 3; ++Index)
+        NomadDiffuseColor_[Index] = 0.0f;
+}
+
+FPlanetWaterMaterial::FPlanetWaterMaterial() : MatAnim_(nullptr) {}
+
+FShadowMaterial::FShadowMaterial()
+    : ShadowLayerCount_(0),
+      ShadowTextureLibrary_(nullptr),
+      ShadowResolvedHandle_(0),
+      ShadowTextureRecord_(nullptr),
+      bShadowTextureInitialized_(false)
+{
+    SeedWhiteMaterialBlock();
+}
+
+FWireMaterial::FWireMaterial()
+    : WireColorR_(0.0f), WireColorG_(0.0f), WireColorB_(0.0f), WireColorA_(0.0f), WireColorArgb_(0),
+      WireGroupIndex_(0)
+{
+    SeedWhiteMaterialBlock();
+}
+
+FWire2Material::FWire2Material()
+    : WireColorR_(0.0f), WireColorG_(0.0f), WireColorB_(0.0f), WireColorA_(0.0f), WireColorArgb_(0),
+      WireColorRgb555_(0), WireGroupIndex_(0)
+{
+    SeedWhiteMaterialBlock();
+}
+
+FHudAnimMaterial::FHudAnimMaterial() : MatAnim_(nullptr), HudAnimFlag_(0), MaterialLibrary_(nullptr)
+{
+    SeedWhiteMaterialBlock();
+}
+
+// The base part is destroyed after the class's own destructor, also when that one throws
+// (retail's unwind funclets 06700c30 / 06700d30 / 06700eb0 call 066f6ec0 for the same reason).
 FMaterialImpl::~FMaterialImpl() noexcept(false)
 {
-    if (Kind_ == KindShadow)
-    {
-        // 066faad0 / unwind06700d30: base cleanup is owed even if ReleaseTextureRecord throws.
-        struct FShadowBaseCleanup
-        {
-            FMaterialImpl* Owner;
-            void (FMaterialImpl::*Cleanup)();
-            ~FShadowBaseCleanup() noexcept(false) { (Owner->*Cleanup)(); }
-        } BaseCleanup{this, &FMaterialImpl::ReleaseMaterialResources};
-        if (ShadowTextureRecord_ != nullptr)
-        {
-            ShadowTextureLibrary_->ReleaseTextureRecord(ShadowTextureRecord_);
-            ShadowResolvedHandle_ = 0;
-            ShadowTextureRecord_ = nullptr;
-        }
-        return;
-    }
+    ReleaseMaterialResources();
+}
 
-    if (Kind_ == KindPlanetWater)
+FShadowMaterial::~FShadowMaterial() noexcept(false)
+{
+    // 066faad0.
+    if (ShadowTextureRecord_ != nullptr)
     {
-        // 066fa160: the base lifetime covers held animation Release.
-        struct FPlanetWaterBaseCleanup
-        {
-            FMaterialImpl* Owner;
-            void (FMaterialImpl::*Cleanup)();
-            ~FPlanetWaterBaseCleanup() noexcept(false) { (Owner->*Cleanup)(); }
-        } BaseCleanup{this, &FMaterialImpl::ReleaseMaterialResources};
-        if (MatAnim_ != nullptr)
-        {
-            MatAnim_->Release();
-            MatAnim_ = nullptr;
-        }
-        return;
+        ShadowTextureLibrary_->ReleaseTextureRecord(ShadowTextureRecord_);
+        ShadowResolvedHandle_ = 0;
+        ShadowTextureRecord_ = nullptr;
     }
+}
 
-    // EnvMap FUN_066f6450: release its separately retained texture before base teardown.
-    if (Kind_ == KindEnvMap)
-    {
-        // 06700c30 -> 066f6ec0: the base survives an exception from ReleaseTextureRecord.
-        struct FEnvMapBaseCleanup
-        {
-            FMaterialImpl* Owner;
-            void (FMaterialImpl::*Cleanup)();
-            ~FEnvMapBaseCleanup() noexcept(false) { (Owner->*Cleanup)(); }
-        } BaseCleanup{this, &FMaterialImpl::ReleaseMaterialResources};
-        if (TextureLibrary_ != nullptr && ShadowHandle_ != 0)
-        {
-            TextureLibrary_->ReleaseTextureRecord(
-                (void*)(ShadowHandle_));
-        }
-        ShadowHandle_ = 0;
-        EnvMapTexNameCrc_ = 0;
-        return;
-    }
-    if (Kind_ == KindHudAnim)
-    {
-        // 06700eb0 -> 066f6ec0: the base survives an exception from animation Release.
-        struct FHudAnimBaseCleanup
-        {
-            FMaterialImpl* Owner;
-            void (FMaterialImpl::*Cleanup)();
-            ~FHudAnimBaseCleanup() noexcept(false) { (Owner->*Cleanup)(); }
-        } BaseCleanup{this, &FMaterialImpl::ReleaseMaterialResources};
-        if (MatAnim_ != nullptr)
-        {
-            MatAnim_->Release();
-            MatAnim_ = nullptr;
-        }
-        return;
-    }
-    // Remaining material kinds have no derived animation cleanup in retail.
+FPlanetWaterMaterial::~FPlanetWaterMaterial() noexcept(false)
+{
+    // 066fa160.
     if (MatAnim_ != nullptr)
     {
         MatAnim_->Release();
         MatAnim_ = nullptr;
     }
-    ReleaseMaterialResources();
+}
+
+FEnvMapMaterial::~FEnvMapMaterial() noexcept(false)
+{
+    // FUN_066f6450: the separately retained texture is released before the base teardown.
+    if (TextureLibrary_ != nullptr && EnvMapTextureRecord_ != 0)
+    {
+        TextureLibrary_->ReleaseTextureRecord(
+            (void*)(EnvMapTextureRecord_));
+    }
+    EnvMapTextureRecord_ = 0;
+    EnvMapTexNameCrc_ = 0;
+}
+
+FHudAnimMaterial::~FHudAnimMaterial() noexcept(false)
+{
+    // 06700590.
+    if (MatAnim_ != nullptr)
+    {
+        MatAnim_->Release();
+        MatAnim_ = nullptr;
+    }
 }
 
 void FMaterialImpl::ReleaseMaterialResources()
@@ -2083,35 +2012,6 @@ void FMaterialImpl::ReleaseMaterialResources()
     VertexBufferManager_ = nullptr;
     std::free(InstanceName_); // 06700661: owned name, after texture-array destruction.
     InstanceName_ = nullptr;
-    // MaterialLibrary_ is borrowed from the outer container, just like Pipeline_.
-}
-
-void FMaterialImpl::ConfigureAggregation(FMaterialAggregateDesc* Desc)
-{
-    // 066f52cb: the controller is installed before Slot22.
-    ControllingOuter_ = Desc->OuterAt8;
-    if (ControllingOuter_ == nullptr)
-        ControllingOuter_ = &Inner_;
-    else
-        *Desc->InnerOutAtC = &Inner_;
-}
-
-GENRESULT DACOM_API FMaterialImpl::QueryInterface(const char* Iid, void** Out)
-{
-    // LAB_066f51c0: the public face always delegates to its controlling outer.
-    return ControllingOuter_->QueryInterface(Iid, Out);
-}
-
-unsigned long DACOM_API FMaterialImpl::AddRef()
-{
-    // LAB_066f58f0: no local counter operation on the public face.
-    return ControllingOuter_->AddRef();
-}
-
-unsigned long DACOM_API FMaterialImpl::Release()
-{
-    // LAB_066f5900: the controller owns destruction of this material.
-    return ControllingOuter_->Release();
 }
 
 GENRESULT DACOM_API FMaterialImpl::FInner::QueryInterface(const char* Iid, void** Out)
@@ -2148,28 +2048,12 @@ unsigned long DACOM_API FMaterialImpl::FInner::Release()
     return Remaining;
 }
 
-GENRESULT DACOM_API FMaterialImpl::InnerQueryInterface(const char* Iid, void** Out)
-{
-    return Inner_.QueryInterface(Iid, Out);
-}
-
-unsigned long DACOM_API FMaterialImpl::InnerAddRef()
-{
-    return Inner_.AddRef();
-}
-
-unsigned long DACOM_API FMaterialImpl::InnerRelease()
-{
-    return Inner_.Release();
-}
-
 GENRESULT DACOM_API FMaterialImpl::Initialize(IDAComponent* Outer)
 {
     // FUN_066F1210 — QI then Release (container holds the objects).
     if (Outer == nullptr)
         return GR_GENERIC;
 
-    Outer_ = Outer;
     GENRESULT Result = Outer->QueryInterface(Iids::TextureLibraryA, (void**)(&TextureLibrary_));
     if (Result < 0)
     {
@@ -2242,13 +2126,17 @@ GENRESULT DACOM_API FMaterialImpl::Initialize(IDAComponent* Outer)
         StoreParameterValue(Index, Entry, Entry + 0x10);
     }
 
-    if (Kind_ == KindHudAnim)
-    {
-        // LAB_066ffee0: common success, then QI/Release; its HRESULT is ignored.
-        Outer->QueryInterface(Iids::MaterialLibrary, (void**)(&MaterialLibrary_));
-        MaterialLibrary_->Release(); // The outer container owns the object.
-    }
+    return GR_OK;
+}
 
+GENRESULT DACOM_API FHudAnimMaterial::Initialize(IDAComponent* Outer)
+{
+    // LAB_066ffee0: common success, then QI/Release; its HRESULT is ignored.
+    const GENRESULT Result = FMaterialImpl::Initialize(Outer);
+    if (Result != GR_OK)
+        return Result;
+    Outer->QueryInterface(Iids::MaterialLibrary, (void**)(&MaterialLibrary_));
+    MaterialLibrary_->Release(); // The outer container owns the object.
     return GR_OK;
 }
 
@@ -2266,7 +2154,7 @@ GENRESULT DACOM_API FMaterialImpl::LoadFromFileSystem(void* FileSystem)
         if (!FlmLoadDeclaredParameter(this, FileSystem, Entry, Index) &&
             (*(const unsigned long*)(Entry) & 4) != 0)
         {
-            const char* Instance = bInstanceNameSet_ ? InstanceName_ : "(Unnamed)";
+            const char* Instance = InstanceName_ != nullptr ? InstanceName_ : "(Unnamed)";
             const char* Class = ClassName();
             const char* Description = *(const char* const*)(Entry + 8);
             char Message[0x2000];
@@ -2293,7 +2181,7 @@ GENRESULT DACOM_API FMaterialImpl::SaveProperties(void* FileSystem)
             continue;
         if (!FlmSaveParameterToFileSystem(this, FileSystem, Entry, Index))
         {
-            const char* Instance = bInstanceNameSet_ ? InstanceName_ : "(Unnamed)";
+            const char* Instance = InstanceName_ != nullptr ? InstanceName_ : "(Unnamed)";
             const char* Class = ClassName();
             const char* Description = *(const char* const*)(Entry + 8);
             char Message[0x2000];
@@ -2306,91 +2194,105 @@ GENRESULT DACOM_API FMaterialImpl::SaveProperties(void* FileSystem)
     return Result;
 }
 
-GENRESULT DACOM_API FMaterialImpl::ApplyVerify(void* Context, void* Extra)
+GENRESULT DACOM_API FMaterialImpl::ApplyVerify(void* /*Context*/, void* /*Extra*/)
 {
-    if (Kind_ == KindCloak || Kind_ == KindColorize)
-        return GR_OK;
+    // 066f15d0.
+    Setup();
+    Bind(nullptr);
+    const GENRESULT Verify = PipelineVerifyState(Pipeline_);
+    Teardown(nullptr);
+    return Verify;
+}
 
-    if (Kind_ == KindWire2)
+GENRESULT DACOM_API FCloakMaterial::ApplyVerify(void* /*Context*/, void* /*Extra*/)
+{
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FColorizeMaterial::ApplyVerify(void* /*Context*/, void* /*Extra*/)
+{
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FWire2Material::ApplyVerify(void* /*Context*/, void* /*Extra*/)
+{
+    ApplyInitialRenderStates(nullptr);
+    PipelineVerifyState(Pipeline_);
+    const GENRESULT Verify = PipelineVerifyState(Pipeline_);
+    if (Verify != GR_OK)
     {
-        ApplyInitialRenderStates(nullptr);
-        PipelineVerifyState(Pipeline_);
-        const GENRESULT Verify = PipelineVerifyState(Pipeline_);
-        if (Verify != GR_OK)
-        {
-            char Message[0x2000];
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kWire2File, 0x78,
-                FlmFormatMessage(Message, "failed to verify material %s", InstanceName_));
-        }
-        return Verify;
+        char Message[0x2000];
+        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kWire2File, 0x78,
+            FlmFormatMessage(Message, "failed to verify material %s", InstanceName_));
     }
+    return Verify;
+}
 
-    if (Kind_ == KindPlanetWater)
+GENRESULT DACOM_API FPlanetWaterMaterial::ApplyVerify(void* /*Context*/, void* /*Extra*/)
+{
+    struct FAnimationLibraryReference
     {
-        struct FAnimationLibraryReference
+        IMatAnimLibrary* Object = nullptr;
+        ~FAnimationLibraryReference() noexcept(false)
         {
-            IMatAnimLibrary* Object = nullptr;
-            ~FAnimationLibraryReference() noexcept(false)
+            if (Object != nullptr)
             {
-                if (Object != nullptr)
-                {
-                    Object->Release();
-                    Object = nullptr;
-                }
+                Object->Release();
+                Object = nullptr;
             }
-        } AnimLib;
-        if (Pipeline_->QueryInterface(Iids::MatAnimLibrary, (void**)&AnimLib.Object) >= 0)
-        {
-            struct FAnimationNameQuery { const char* Name; unsigned long Crc; };
-            FAnimationNameQuery Query = {InstanceName_, DACOM_CRC::GetCRC32(InstanceName_)};
-            if (MatAnim_ != nullptr)
-            {
-                MatAnim_->Release();
-                MatAnim_ = nullptr;
-            }
-            AnimLib.Object->CreateAnimationInstance(-1, &Query, &MatAnim_);
         }
-        Setup();
+    } AnimLib;
+    if (Pipeline_->QueryInterface(Iids::MatAnimLibrary, (void**)&AnimLib.Object) >= 0)
+    {
+        struct FAnimationNameQuery { const char* Name; unsigned long Crc; };
+        FAnimationNameQuery Query = {InstanceName_, DACOM_CRC::GetCRC32(InstanceName_)};
+        if (MatAnim_ != nullptr)
+        {
+            MatAnim_->Release();
+            MatAnim_ = nullptr;
+        }
+        AnimLib.Object->CreateAnimationInstance(-1, &Query, &MatAnim_);
+    }
+    Setup();
+    Bind(nullptr);
+    const GENRESULT Verify = PipelineVerifyState(Pipeline_);
+    Teardown(nullptr);
+    return Verify;
+}
+
+GENRESULT DACOM_API FNomadMaterial::ApplyVerify(void* /*Context*/, void* /*Extra*/)
+{
+    // 066f8c02: enable the second texture before the first bind.
+    Setup();
+    bSecondTexture_ = 1;
+    GENRESULT BindResult = Bind(nullptr);
+    GENRESULT VerifyResult = BindResult;
+    bool bFailed = (long)(BindResult) < 0;
+    if (!bFailed)
+    {
+        VerifyResult = PipelineVerifyState(Pipeline_);
+        bFailed = (long)(VerifyResult) < 0;
+    }
+    bSecondTexture_ = bFailed ? 0 : 1;
+    if (bFailed)
+    {
         Bind(nullptr);
-        const GENRESULT Verify = PipelineVerifyState(Pipeline_);
-        Teardown(nullptr);
-        return Verify;
+        VerifyResult = PipelineVerifyState(Pipeline_);
     }
+    Teardown(nullptr);
+    return VerifyResult;
+}
 
-    if (Kind_ == KindNomad)
-    {
-        // 066f8c02: enable the second texture before the first bind.
-        Setup();
-        bSecondTexture_ = 1;
-        GENRESULT BindResult = Bind(nullptr);
-        GENRESULT VerifyResult = BindResult;
-        bool bFailed = (long)(BindResult) < 0;
-        if (!bFailed)
-        {
-            VerifyResult = PipelineVerifyState(Pipeline_);
-            bFailed = (long)(VerifyResult) < 0;
-        }
-        bSecondTexture_ = bFailed ? 0 : 1;
-        if (bFailed)
-        {
-            Bind(nullptr);
-            VerifyResult = PipelineVerifyState(Pipeline_);
-        }
-        Teardown(nullptr);
-        return VerifyResult;
-    }
-
-    if (Kind_ == KindEngineGlow)
-    {
-        // Reset the material block before EnvMap setup.
-        for (int Index = 0; Index < 17; ++Index)
-            MaterialBlock_[Index] = 0.0f;
-        MaterialBlock_[3] = 1.0f;
-        MaterialBlock_[12] = 0.75f;
-        MaterialBlock_[13] = 0.7f;
-        MaterialBlock_[14] = 0.7f;
-        MaterialBlock_[15] = 1.0f;
-    }
+GENRESULT DACOM_API FEngineGlowMaterial::ApplyVerify(void* /*Context*/, void* /*Extra*/)
+{
+    // Reset the material block before EnvMap setup.
+    for (int Index = 0; Index < 17; ++Index)
+        MaterialBlock_[Index] = 0.0f;
+    MaterialBlock_[3] = 1.0f;
+    MaterialBlock_[12] = 0.75f;
+    MaterialBlock_[13] = 0.7f;
+    MaterialBlock_[14] = 0.7f;
+    MaterialBlock_[15] = 1.0f;
 
     Setup();
     Bind(nullptr);
@@ -2399,70 +2301,71 @@ GENRESULT DACOM_API FMaterialImpl::ApplyVerify(void* Context, void* Extra)
     return Verify;
 }
 
-GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float Delta)
+GENRESULT DACOM_API FNomadMaterial::ResolveTextures(float Delta)
 {
-    if (Kind_ == KindNomad)
+    if (bNomadRegular_ != 0)
+        NomadBendElapsed_ = (float)((double)(Delta) + NomadBendElapsed_);
+    NomadElapsed_ = (float)((double)(Delta) + NomadElapsed_);
+    return FMaterialImpl::ResolveTextures(Delta);
+}
+
+GENRESULT DACOM_API FHudAnimMaterial::ResolveTextures(float /*Delta*/)
+{
+    // LAB_066fff20 resolves texture records before its HUD animation tail.
+    for (unsigned long Index = 0; Index < TextureVerifyCount_; ++Index)
     {
-        if (bNomadRegular_ != 0)
-            NomadDead68_ = (float)((double)(Delta) + NomadDead68_);
-        NomadLive6C_ = (float)((double)(Delta) + NomadLive6C_);
+        unsigned char* Entry = (unsigned char*)(TextureBlock_) +
+                               Index * kFlmTextureVerifyEntrySize;
+        const int PlaybackGroupId = *(const int*)(Entry + 4);
+        unsigned long* Handle = (unsigned long*)(Entry + 8);
+        if (PlaybackGroupId == -1)
+            *Handle = 0;
+        else if (Entry[0x28] == 0)
+            TextureLibrary_->GetFrame(PlaybackGroupId, -1, Handle);
     }
 
-    if (Kind_ == KindHudAnim)
+    if (MaterialLibrary_ != nullptr)
     {
-        // LAB_066fff20 resolves texture records before its HUD animation tail.
-        for (unsigned long Index = 0; Index < TextureVerifyCount_; ++Index)
-        {
-            unsigned char* Entry = (unsigned char*)(TextureBlock_) +
-                                   Index * kFlmTextureVerifyEntrySize;
-            const int PlaybackGroupId = *(const int*)(Entry + 4);
-            unsigned long* Handle = (unsigned long*)(Entry + 8);
-            if (PlaybackGroupId == -1)
-                *Handle = 0;
-            else if (Entry[0x28] == 0)
-                TextureLibrary_->GetFrame(PlaybackGroupId, -1, Handle);
-        }
+        unsigned long OutValue = 0;
+        const GENRESULT Got =
+            MaterialLibrary_->GetGlobalRecordValue(4, &OutValue);
+        if (Got >= 0)
+            HudAnimFlag_ = (OutValue >= 1) ? 1 : 0;
+    }
 
-        if (MaterialLibrary_ != nullptr)
+    // FUN_066FFF80: the pipeline (+4) is QI'd with no null test.
+    FScopedComponentReference AnimLib;
+    if (Pipeline_->QueryInterface(Iids::MatAnimLibrary, &AnimLib.Object) >= 0)
+    {
+        if (HudAnimFlag_ != 0)
         {
-            unsigned long OutValue = 0;
-            const GENRESULT Got =
-                MaterialLibrary_->GetGlobalRecordValue(4, &OutValue);
-            if (Got >= 0)
-                HudAnimFlag_ = (OutValue >= 1) ? 1 : 0;
-        }
-
-        // FUN_066FFF80: the pipeline (+4) is QI'd with no null test.
-        FScopedComponentReference AnimLib;
-        if (Pipeline_->QueryInterface(Iids::MatAnimLibrary, &AnimLib.Object) >= 0)
-        {
-            if (HudAnimFlag_ != 0)
+            // Only while +0x68 is still empty; the inner release is dead code in retail too.
+            if (MatAnim_ == nullptr)
             {
-                // Only while +0x68 is still empty; the inner release is dead code in retail too.
-                if (MatAnim_ == nullptr)
+                const char* Name = InstanceName_;
+                unsigned long CrcStruct[2];
+                CrcStruct[0] = (unsigned long)(Name);
+                CrcStruct[1] = DACOM_CRC::GetCRC32(Name);
+                if (MatAnim_ != nullptr)
                 {
-                    const char* Name = InstanceName_;
-                    unsigned long CrcStruct[2];
-                    CrcStruct[0] = (unsigned long)(Name);
-                    CrcStruct[1] = DACOM_CRC::GetCRC32(Name);
-                    if (MatAnim_ != nullptr)
-                    {
-                        MatAnim_->Release();
-                        MatAnim_ = nullptr;
-                    }
-                    ((IMatAnimLibrary*)(AnimLib.Object))->CreateAnimationInstance(-1, CrcStruct, &MatAnim_);
+                    MatAnim_->Release();
+                    MatAnim_ = nullptr;
                 }
-            }
-            else if (MatAnim_ != nullptr)
-            {
-                MatAnim_->Release();
-                MatAnim_ = nullptr;
+                ((IMatAnimLibrary*)(AnimLib.Object))->CreateAnimationInstance(-1, CrcStruct, &MatAnim_);
             }
         }
-        // Held library is released on normal and EH exit (06700e90).
-        return GR_OK;
+        else if (MatAnim_ != nullptr)
+        {
+            MatAnim_->Release();
+            MatAnim_ = nullptr;
+        }
     }
+    // Held library is released on normal and EH exit (06700e90).
+    return GR_OK;
+}
 
+GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float /*Delta*/)
+{
     // LAB_066f1610: mandatory storage/library, unsigned count re-read each iteration.
     for (unsigned long Index = 0; Index < TextureVerifyCount_; ++Index)
     {
@@ -2478,207 +2381,196 @@ GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float Delta)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialImpl::Bind(void* Context)
+GENRESULT DACOM_API FMaterialImpl::Teardown(void* Context)
 {
-    switch (Kind_)
-    {
-    case KindGlass:
-        BindGlass(Context);
-        break;
-    case KindNomad:
-        BindNomad();
-        break;
-    case KindBackdrop:
-        BindBackdrop(Context);
-        break;
-    case KindHudIcon:
-        BindHudIcon(Context);
-        break;
-    case KindHudAnim:
-        BindHudAnim(Context);
-        break;
-    case KindColorize:
-        return BindColorize(Context);
-    case KindCloak:
-        BindCloak(Context);
-        break;
-    case KindWire:
-        BindWire();
-        break;
-    case KindWire2:
-        BindWire2(Context);
-        break;
-    case KindExclusion:
-        BindExclusion();
-        break;
-    case KindEnvMap:
-        BindEnvMap(Context);
-        break;
-    case KindShadow:
-        return BindShadow(Context);
-    case KindEngineGlow:
-        BindEngineGlow(Context);
-        break;
-    case KindVisibleCounter:
-        BindVisibleCounter();
-        break;
-    case KindPlanetWater:
-        BindPlanetWater(Context);
-        break;
-    default:
-        BindUnknown(FactoryName_);
-        break;
-    }
-    if (Kind_ == KindBackdrop)
-        return (GENRESULT)(-1);
+    // 066f3330: per-vertex colour is reset only when the context enabled it. The pipeline (+0x4)
+    // is never null-tested in flmaterials.dll: a failed QI in Initialize fails the creation.
+    if (ContextWantsColorVertex(Context))
+        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 0);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialImpl::Teardown(void* Context)
+GENRESULT DACOM_API FBackdropMaterial::Teardown(void* Context)
 {
-    if (Kind_ == KindBackdrop)
-        return TeardownBackdrop(Context);
+    return TeardownBackdrop(Context);
+}
 
-    if (Kind_ == KindShadow)
-        return ShadowCandidateDispatch(Context);
+GENRESULT DACOM_API FShadowMaterial::Teardown(void* Context)
+{
+    return ShadowCandidateDispatch(Context);
+}
 
-    if (Kind_ == KindCloak || Kind_ == KindColorize)
+GENRESULT DACOM_API FCloakMaterial::Teardown(void* Context)
+{
+    // LAB_066f42e0.
+    TeardownCandidateIgnoringResult(Context);
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FColorizeMaterial::Teardown(void* Context)
+{
+    // LAB_066f5010.
+    TeardownCandidateIgnoringResult(Context);
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FEnvMapMaterial::Teardown(void* Context)
+{
+    // EnvMap restores its dynamic stage state using the retained texture handle.
+    if (EnvMapTextureRecord_ != 0)
     {
-        // LAB_066f42e0 (Cloak) / LAB_066f5010 (Colorize) -- see TeardownCandidateIgnoringResult.
-        TeardownCandidateIgnoringResult(Context);
-        return GR_OK;
+        PipelineSetRenderState(Pipeline_, D3DRS_NORMALIZENORMALS, 0);
+        PipelineSetRenderState(Pipeline_, D3DRS_LOCALVIEWER, 0);
+        PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXCOORDINDEX, 0);
+        PipelineSetTextureStageState(Pipeline_, 1, D3DTSS_TEXCOORDINDEX, 1);
     }
+    TeardownCandidateIgnoringResult(Context);
+    return GR_OK;
+}
 
-    if (Kind_ == KindEnvMap)
-    {
-        // EnvMap restores its dynamic stage state using the retained texture handle.
-        if (ShadowHandle_ != 0)
-        {
-            PipelineSetRenderState(Pipeline_, D3DRS_NORMALIZENORMALS, 0);
-            PipelineSetRenderState(Pipeline_, D3DRS_LOCALVIEWER, 0);
-            PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXCOORDINDEX, 0);
-            PipelineSetTextureStageState(Pipeline_, 1, D3DTSS_TEXCOORDINDEX, 1);
-        }
-        TeardownCandidateIgnoringResult(Context);
-        return GR_OK;
-    }
+GENRESULT DACOM_API FNomadMaterial::Teardown(void* /*Context*/)
+{
+    // 066f8bd0: unconditional.
+    PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 0);
+    return GR_OK;
+}
 
-    // The material's pipeline (+0x4) is never null-tested in flmaterials.dll: it is set by
-    // Initialize's QI, and a failed QI fails the material's creation.
-    if (Kind_ == KindNomad)
-        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 0);
-
-    if (Kind_ == KindPlanetWater && MatAnim_ != nullptr)
+GENRESULT DACOM_API FPlanetWaterMaterial::Teardown(void* Context)
+{
+    // 066f9e50.
+    if (MatAnim_ != nullptr)
         PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
+    return FMaterialImpl::Teardown(Context);
+}
 
-    if (Kind_ == KindHudAnim && HudAnimFlag_ != 0)
+GENRESULT DACOM_API FHudAnimMaterial::Teardown(void* Context)
+{
+    // 06700200: nothing is reset unless the animated bind ran.
+    if (HudAnimFlag_ != 0)
     {
         if (MatAnim_ != nullptr)
             PipelineSetTextureStageState(Pipeline_, 0, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
         if (ContextWantsColorVertex(Context))
             PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 0);
     }
-
-    // Reset per-vertex color only for materials and contexts that enabled it.
-    if ((Kind_ == KindEngineGlow || Kind_ == KindExclusion || Kind_ == KindGlass ||
-         Kind_ == KindHudIcon || Kind_ == KindWire || Kind_ == KindWire2 ||
-         Kind_ == KindPlanetWater) &&
-        ContextWantsColorVertex(Context))
-    {
-        PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 0);
-    }
-
-    if (Kind_ == KindVisibleCounter)
-        return GR_OK;
-
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType, unsigned long Start, unsigned long Count, unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags)
+GENRESULT DACOM_API FVisibleCounterMaterial::Teardown(void* /*Context*/)
 {
-    if (Kind_ == KindVisibleCounter)
-    {
-        // LAB_066FADC0: counters at +0xB4 / +0xB8 / +0xBC.
-        G_VisibleCounterA += 1;
-        G_VisibleCounterB += IndexSpan;
-        G_VisibleCounterC += Count;
-        return GR_OK;
-    }
-
-    if (Kind_ == KindShadow)
-        return DrawShadow(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
-
-    if (Kind_ == KindNomad)
-    {
-        return SubmitNomadGeometry(bSecondTexture_, NomadLive6C_, StageCounter_, VertexBufferManager_,
-                           Pipeline_, Context, PrimType, Start, Count, IbStart, IndexSpan);
-    }
-
-    if (Kind_ == KindHudAnim)
-    {
-        // LAB_06700260.
-        return SubmitHudAnimatedGeometry(HudAnimFlag_, RpDraw_, Pipeline_, VertexBufferManager_, Context, PrimType, Start, Count,
-                             IbStart, IndexSpan, Flags);
-    }
-
-    if (Kind_ == KindPlanetWater)
-    {
-        // FUN_066f9ea0.
-        return SubmitPlanetWaterGeometry(Pipeline_, RpDraw_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
-    }
-
-    if (Kind_ == KindWire)
-    {
-        return SubmitWireGeometry(WireColorArgb_, Pipeline_, VertexBufferManager_, &WireGroupIndex_, Context, Start,
-                          Count, IndexSpan);
-    }
-
-    if (Kind_ == KindWire2)
-    {
-        // 066fc150: Color0 for original points, Color1 for shifted duplicates.
-        return SubmitWire2Geometry(WireColorArgb_, WireColorRgb555_, Pipeline_, VertexBufferManager_,
-                           &WireGroupIndex_, Context, Count, IndexSpan);
-    }
-
-    if (Kind_ == KindBackdrop)
-        return DrawBackdrop(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
-
-    if (Kind_ == KindCloak)
-    {
-        // 066f4258 reads the material's +64 flag, not the context.
-        if (Context == nullptr || ((FNomadContext*)(Context))->Candidate == nullptr)
-            return GR_OK;
-        unsigned long ForwardFlags = Flags;
-        if (Flag64_ != 0)
-            ForwardFlags |= 0x400;
-        return SubmitCandidateGeometry(Context, PrimType, Start, Count, IbStart, IndexSpan,
-                                      ForwardFlags);
-    }
-
-    if (Kind_ == KindEngineGlow || Kind_ == KindColorize || Kind_ == KindHudIcon)
-    {
-        // LAB_066f3370: the shared Slot10 draw (vtable +0x28) of these three kinds.
-        return SubmitRpDrawGeometry(RpDraw_, Pipeline_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
-    }
-
-    if (Kind_ == KindEnvMap)
-    {
-        return SubmitEnvMapGeometry(Pipeline_, RpDraw_, VertexBufferManager_, EnvMapFlag_,
-                               EnvMapResolvedHandle_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
-    }
-
-    if (Kind_ == KindExclusion)
-    {
-        return SubmitExclusionGeometry(Pipeline_, RpDraw_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags,
-                                  MaterialBlock_);
-    }
-
-    if (Kind_ == KindGlass)
-    {
-        return SubmitGlassGeometry(Pipeline_, RpDraw_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
-    }
-
     return GR_OK;
+}
+
+GENRESULT DACOM_API FMaterialImpl::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                          unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                          unsigned long Flags)
+{
+    // LAB_066f3370: the shared draw of Colorize, EngineGlow and HUDIcon.
+    return SubmitRpDrawGeometry(RpDraw_, Pipeline_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
+}
+
+GENRESULT DACOM_API FVisibleCounterMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                                    unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                                    unsigned long Flags)
+{
+    // LAB_066FADC0: counters at +0xB4 / +0xB8 / +0xBC.
+    G_VisibleCounterA += 1;
+    G_VisibleCounterB += IndexSpan;
+    G_VisibleCounterC += Count;
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FShadowMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                            unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                            unsigned long Flags)
+{
+    return DrawShadow(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
+}
+
+GENRESULT DACOM_API FNomadMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                           unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                           unsigned long Flags)
+{
+    return SubmitNomadGeometry(bSecondTexture_, NomadElapsed_, StageCounter_, VertexBufferManager_,
+                       Pipeline_, Context, PrimType, Start, Count, IbStart, IndexSpan);
+}
+
+GENRESULT DACOM_API FHudAnimMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                             unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                             unsigned long Flags)
+{
+    // LAB_06700260.
+    return SubmitHudAnimatedGeometry(HudAnimFlag_, RpDraw_, Pipeline_, VertexBufferManager_, Context, PrimType, Start, Count,
+                         IbStart, IndexSpan, Flags);
+}
+
+GENRESULT DACOM_API FPlanetWaterMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                                 unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                                 unsigned long Flags)
+{
+    // FUN_066f9ea0.
+    return SubmitPlanetWaterGeometry(Pipeline_, RpDraw_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
+}
+
+GENRESULT DACOM_API FWireMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                          unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                          unsigned long Flags)
+{
+    return SubmitWireGeometry(WireColorArgb_, Pipeline_, VertexBufferManager_, &WireGroupIndex_, Context, Start,
+                      Count, IndexSpan);
+}
+
+GENRESULT DACOM_API FWire2Material::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                           unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                           unsigned long Flags)
+{
+    // 066fc150: Color0 for original points, Color1 for shifted duplicates.
+    return SubmitWire2Geometry(WireColorArgb_, WireColorRgb555_, Pipeline_, VertexBufferManager_,
+                       &WireGroupIndex_, Context, Count, IndexSpan);
+}
+
+GENRESULT DACOM_API FBackdropMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                              unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                              unsigned long Flags)
+{
+    return DrawBackdrop(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
+}
+
+GENRESULT DACOM_API FCloakMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                           unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                           unsigned long Flags)
+{
+    // 066f4258 reads the material's +64 flag, not the context.
+    if (Context == nullptr || ((FNomadContext*)(Context))->Candidate == nullptr)
+        return GR_OK;
+    unsigned long ForwardFlags = Flags;
+    if (bAlphaBlend_ != 0)
+        ForwardFlags |= 0x400;
+    return SubmitCandidateGeometry(Context, PrimType, Start, Count, IbStart, IndexSpan,
+                                  ForwardFlags);
+}
+
+GENRESULT DACOM_API FEnvMapMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                            unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                            unsigned long Flags)
+{
+    return SubmitEnvMapGeometry(Pipeline_, RpDraw_, VertexBufferManager_, EnvMapFlag_,
+                           EnvMapResolvedHandle_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
+}
+
+GENRESULT DACOM_API FExclusionZoneMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                                   unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                                   unsigned long Flags)
+{
+    return SubmitExclusionGeometry(Pipeline_, RpDraw_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags,
+                              MaterialBlock_);
+}
+
+GENRESULT DACOM_API FGlassMaterial::Submit(void* Context, unsigned long PrimType, unsigned long Start,
+                                           unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
+                                           unsigned long Flags)
+{
+    return SubmitGlassGeometry(Pipeline_, RpDraw_, VertexBufferManager_, Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
 }
 
 GENRESULT DACOM_API FMaterialImpl::SetName(const char* Name)
@@ -2686,7 +2578,6 @@ GENRESULT DACOM_API FMaterialImpl::SetName(const char* Name)
     // LAB_066f1670: at most 64 bytes, lowercased.
     std::free(InstanceName_);
     InstanceName_ = nullptr;
-    bInstanceNameSet_ = false;
     if (Name != nullptr)
     {
         size_t NameBytes = std::strlen(Name) + 1;
@@ -2698,7 +2589,6 @@ GENRESULT DACOM_API FMaterialImpl::SetName(const char* Name)
         std::strncpy(InstanceName_, Name, NameBytes);
         InstanceName_[NameBytes - 1] = '\0';
         _strlwr(InstanceName_);
-        bInstanceNameSet_ = true;
     }
     return GR_OK;
 }
@@ -2732,27 +2622,77 @@ GENRESULT DACOM_API FMaterialImpl::GetPassCount(int* Out)
 
 GENRESULT DACOM_API FMaterialImpl::GetRenderFlags(unsigned long* Out)
 {
+    *Out = 8; // 066f2d80: Backdrop / Starsphere, Glass, PlanetWater and Shadow; no alpha bit
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FColorizeMaterial::GetRenderFlags(unsigned long* Out)
+{
+    // 066f4a90: >= 1.0 and unordered skip the extra bit.
     unsigned long Mask = 8;
-    if (Kind_ == KindColorize)
-    {
-        // 066f4a90: >= 1.0 and unordered skip the extra bit.
-        if (Flag64_ != 0 || (double)(ColorizeExtraW_) < 1.0)
-            Mask |= 2;
-    }
-    else if (Kind_ == KindCloak)
-        Mask = 0x2a; // 066f3ff0
-    else if (Kind_ == KindWire || Kind_ == KindWire2)
-        Mask = 0xa0; // 066fb1e0
-    else if (Kind_ == KindNomad)
-        Mask = 0xa2; // 066f8930
-    else if (Kind_ == KindExclusion || Kind_ == KindHudIcon)
-        Mask = Flag64_ != 0 ? 0x2a : 0x28; // 066f8010
-    else if (Kind_ == KindEngineGlow || Kind_ == KindEnvMap ||
-             Kind_ == KindVisibleCounter || Kind_ == KindHudAnim)
-        Mask = Flag64_ != 0 ? 0x0a : 0x08; // 066f56e0
-    // 066f2d80 discards the Flag64 mask: Backdrop/Starsphere, Glass, PlanetWater and
-    // Shadow always answer 8.
+    if (bAlphaBlend_ != 0 || (double)(ColorizeExtraW_) < 1.0)
+        Mask |= 2;
     *Out = Mask;
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FCloakMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = 0x2a; // 066f3ff0
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FWireMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = 0xa0; // 066fb1e0
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FWire2Material::GetRenderFlags(unsigned long* Out)
+{
+    *Out = 0xa0; // 066fb1e0
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FNomadMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = 0xa2; // 066f8930
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FExclusionZoneMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = bAlphaBlend_ != 0 ? 0x2a : 0x28; // 066f8010
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FHudIconMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = bAlphaBlend_ != 0 ? 0x2a : 0x28; // 066f8010
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FEngineGlowMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = bAlphaBlend_ != 0 ? 0x0a : 0x08; // 066f56e0
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FEnvMapMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = bAlphaBlend_ != 0 ? 0x0a : 0x08; // 066f56e0
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FVisibleCounterMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = bAlphaBlend_ != 0 ? 0x0a : 0x08; // 066f56e0
+    return GR_OK;
+}
+
+GENRESULT DACOM_API FHudAnimMaterial::GetRenderFlags(unsigned long* Out)
+{
+    *Out = bAlphaBlend_ != 0 ? 0x0a : 0x08; // 066f56e0
     return GR_OK;
 }
 
@@ -2780,8 +2720,8 @@ GENRESULT DACOM_API FMaterialImpl::GetParameterDescriptor(unsigned long Index, v
     Out->Callback = Entry->Callback;
 
     FlmAssignTypedValue(&Out->Current, &Entry->Current);
-    FlmAssignTypedValue(&Out->Default, &Entry->Default);
-    FlmAssignTypedValue(&Out->Saved, &Entry->Saved);
+    FlmAssignTypedValue(&Out->Minimum, &Entry->Minimum);
+    FlmAssignTypedValue(&Out->Maximum, &Entry->Maximum);
     return GR_OK;
 }
 
@@ -2854,77 +2794,95 @@ GENRESULT DACOM_API FMaterialImpl::SetParameterValue(unsigned long Index, void* 
     return GR_OK; // Independent of Slot26's result, as in retail.
 }
 
-const char* __thiscall FMaterialImpl::ClassName()
+// Slot 20. The Glass and Nomad classes answer one name for all of their factory names.
+const char* __thiscall FBackdropMaterial::ClassName()
 {
-    if (Kind_ == KindGlass)
-        return G_NameGlassMaterial;
-    if (Kind_ == KindNomad)
-        return G_NameNomadMaterial;
-    if (Kind_ == KindPlanetWater)
-        return G_NamePlanetWaterMaterial;
-    if (Kind_ == KindShadow)
-        return G_NameShadowMaterial;
-    if (Kind_ == KindVisibleCounter)
-        return G_NameVisibleCounterMaterial;
-    if (Kind_ == KindBackdrop)
-        return (bBackdrop_ != 0) ? G_NameBackdropMaterial : G_NameStarsphereMaterial;
-    return FactoryName_;
+    return (bBackdrop_ != 0) ? G_NameBackdropMaterial : G_NameStarsphereMaterial;
 }
+const char* __thiscall FCloakMaterial::ClassName() { return G_NameCloakMaterial; }
+const char* __thiscall FColorizeMaterial::ClassName() { return G_NameColorizeMaterial; }
+const char* __thiscall FEngineGlowMaterial::ClassName() { return G_NameEngineGlowMaterial; }
+const char* __thiscall FEnvMapMaterial::ClassName() { return G_NameEnvMapMaterial; }
+const char* __thiscall FExclusionZoneMaterial::ClassName() { return G_NameExclusionZoneMaterial; }
+const char* __thiscall FGlassMaterial::ClassName() { return G_NameGlassMaterial; }
+const char* __thiscall FHudIconMaterial::ClassName() { return G_NameHudIconMaterial; }
+const char* __thiscall FNomadMaterial::ClassName() { return G_NameNomadMaterial; }
+const char* __thiscall FPlanetWaterMaterial::ClassName() { return G_NamePlanetWaterMaterial; }
+const char* __thiscall FShadowMaterial::ClassName() { return G_NameShadowMaterial; }
+const char* __thiscall FVisibleCounterMaterial::ClassName() { return G_NameVisibleCounterMaterial; }
+const char* __thiscall FWireMaterial::ClassName() { return G_NameWireMaterial; }
+const char* __thiscall FWire2Material::ClassName() { return G_NameWireMaterial2; }
+const char* __thiscall FHudAnimMaterial::ClassName() { return G_NameHudAnimMaterial; }
 
-void* __thiscall FMaterialImpl::ScalarDeletingDestructor(unsigned char bDelete)
+GENRESULT __thiscall FMaterialImpl::InitializeFromDescriptor(void* /*Arg*/)
 {
-    // Destruction runs once; bit 0 selects deallocation. Return the original address.
-    void* Storage = this;
-    this->~FMaterialImpl();
-    if ((bDelete & 1) != 0)
-        ::operator delete(Storage);
-    return Storage;
-}
-
-GENRESULT __thiscall FMaterialImpl::InitializeFromDescriptor(void* Arg)
-{
-    if (Kind_ == KindNomad)
-    {
-        // Both accumulators are reset before the required name lookup.
-        NomadLive6C_ = 0.0f;
-        NomadDead68_ = 0.0f;
-        const FMaterialAggregateDesc* Agg = (const FMaterialAggregateDesc*)(Arg);
-        bNomadRegular_ = std::strcmp(Agg->NameAt4, G_NameNomadNoBendy) == 0 ? 0 : 1;
-        bSecondTexture_ = 1;
-        return GR_OK;
-    }
-
-    if (Kind_ == KindBackdrop)
-    {
-        const FMaterialAggregateDesc* Agg = (const FMaterialAggregateDesc*)(Arg);
-        bBackdrop_ = std::strcmp(Agg->NameAt4, G_NameBackdropMaterial) == 0 ? 1 : 0;
-        bBackdropNameMatchCopy_ = bBackdrop_; // Retail stores the same predicate twice.
-        return GR_OK;
-    }
-
-    if (Kind_ == KindWire || Kind_ == KindWire2)
-    {
-        // Reset the Wire-family color to white.
-        WireColorR_ = 1.0f;
-        WireColorG_ = 1.0f;
-        WireColorB_ = 1.0f;
-        WireColorA_ = 1.0f;
-        WireColorArgb_ = 0xFFFFFFFFu;
-        if (Kind_ == KindWire2)
-            WireColorRgb555_ = 0xFFFFFFFFu;
-        return GR_OK;
-    }
-
-    if (Kind_ == KindExclusion || Kind_ == KindEngineGlow)
-        Exclusion68_ = 0;
-
     return GR_OK;
 }
 
-GENRESULT __thiscall FMaterialImpl::ApplyInitialRenderStates(void* Arg)
+GENRESULT __thiscall FNomadMaterial::InitializeFromDescriptor(void* Arg)
 {
-    if (Kind_ != KindWire2)
-        return GR_OK;
+    // Both accumulators are reset before the required name lookup.
+    NomadElapsed_ = 0.0f;
+    NomadBendElapsed_ = 0.0f;
+    const FMaterialAggregateDesc* Agg = (const FMaterialAggregateDesc*)(Arg);
+    bNomadRegular_ = std::strcmp(Agg->NameAt4, G_NameNomadNoBendy) == 0 ? 0 : 1;
+    bSecondTexture_ = 1;
+    return GR_OK;
+}
+
+GENRESULT __thiscall FBackdropMaterial::InitializeFromDescriptor(void* Arg)
+{
+    const FMaterialAggregateDesc* Agg = (const FMaterialAggregateDesc*)(Arg);
+    bBackdrop_ = std::strcmp(Agg->NameAt4, G_NameBackdropMaterial) == 0 ? 1 : 0;
+    bBackdropNameMatchCopy_ = bBackdrop_; // Retail stores the same predicate twice.
+    return GR_OK;
+}
+
+GENRESULT __thiscall FWireMaterial::InitializeFromDescriptor(void* /*Arg*/)
+{
+    // 066fb1b0: the colour starts white.
+    WireColorR_ = 1.0f;
+    WireColorG_ = 1.0f;
+    WireColorB_ = 1.0f;
+    WireColorA_ = 1.0f;
+    WireColorArgb_ = 0xFFFFFFFFu;
+    return GR_OK;
+}
+
+GENRESULT __thiscall FWire2Material::InitializeFromDescriptor(void* /*Arg*/)
+{
+    // 066fbe60: the colour starts white.
+    WireColorR_ = 1.0f;
+    WireColorG_ = 1.0f;
+    WireColorB_ = 1.0f;
+    WireColorA_ = 1.0f;
+    WireColorArgb_ = 0xFFFFFFFFu;
+    WireColorRgb555_ = 0xFFFFFFFFu;
+    return GR_OK;
+}
+
+GENRESULT __thiscall FExclusionZoneMaterial::InitializeFromDescriptor(void* /*Arg*/)
+{
+    // 066f6a40.
+    Unread68_ = 0;
+    return GR_OK;
+}
+
+GENRESULT __thiscall FEngineGlowMaterial::InitializeFromDescriptor(void* /*Arg*/)
+{
+    // 066f6a40.
+    Unread68_ = 0;
+    return GR_OK;
+}
+
+GENRESULT __thiscall FMaterialImpl::ApplyInitialRenderStates(void* /*Arg*/)
+{
+    return GR_OK;
+}
+
+GENRESULT __thiscall FWire2Material::ApplyInitialRenderStates(void* /*Arg*/)
+{
+    // 066fc060.
     PipelineApplyRsTable(Pipeline_, kWire2Rs);
     PipelineSetTextureStageTexture(Pipeline_, 0, 0);
     PipelineApplyTssTable(Pipeline_, 0, kWire2Tss0);
@@ -2981,7 +2939,7 @@ GENRESULT __thiscall FMaterialImpl::Setup()
                 (const unsigned char*)(TextureBlock_) +
                 Index * kFlmTextureVerifyEntrySize);
             FlmFormatMessage(Message, "texture verify failed: %s: %s",
-                         bInstanceNameSet_ ? InstanceName_ : nullptr, Name);
+                         InstanceName_, Name);
             FlmFdump(kFdumpNotice, kImplFile, 0x23F, "NOTICE", Message);
         }
     }
@@ -2993,10 +2951,10 @@ GENRESULT __thiscall FMaterialImpl::Setup()
 bool __thiscall FMaterialImpl::ValueWithinDeclaredRange(unsigned long Index, void* Entry, void* Value)
 {
     // Require the declared type, then check the type-specific range.
-    const unsigned char* EntryBytes = (const unsigned char*)(Entry);
-    const unsigned long* ValueWords = (const unsigned long*)(Value);
-    const unsigned long EntryType = *(const unsigned long*)(EntryBytes + 0x10);
-    if (EntryType != ValueWords[0])
+    const FShadingPropertyRecord* Record = (const FShadingPropertyRecord*)(Entry);
+    const FShadingPropertyValue* Typed = (const FShadingPropertyValue*)(Value);
+    const unsigned long EntryType = Record->Current.Type; // +0x10
+    if (EntryType != Typed->Type)
         return false;
 
     unsigned long ComponentCount = 0;
@@ -3009,9 +2967,9 @@ bool __thiscall FMaterialImpl::ValueWithinDeclaredRange(unsigned long Index, voi
     else
         return true; // non-range types: retail always accepts
 
-    const float* Lo = (const float*)(EntryBytes + 0x28); // sub-block 2 ("default")
-    const float* Hi = (const float*)(EntryBytes + 0x3C); // sub-block 3 ("range")
-    const float* Val = (const float*)(ValueWords + 1);  // Value+4
+    const float* Lo = (const float*)(&Record->Minimum.Payload0); // +0x28
+    const float* Hi = (const float*)(&Record->Maximum.Payload0); // +0x3C
+    const float* Val = (const float*)(&Typed->Payload0);         // Value+4
 
     for (unsigned long Component = 0; Component < ComponentCount; ++Component)
     {
@@ -3026,174 +2984,234 @@ bool __thiscall FMaterialImpl::ValueWithinDeclaredRange(unsigned long Index, voi
     return true;
 }
 
-GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, void* Entry, void* Value)
+GENRESULT __thiscall FWireMaterial::StoreParameterValue(unsigned long Index, void* Entry, void* Value)
 {
-    // Wire families additionally update the packed colors after storing RGBA.
-    if (Kind_ == KindWire || Kind_ == KindWire2)
-    {
-        void* Raw = GetParameterAddress(Index);
-        if (Raw != nullptr)
-        {
-            const unsigned long* SrcWords = (const unsigned long*)(Value);
-            unsigned long* DestWords = (unsigned long*)(Raw);
-            switch (SrcWords[0])
-            {
-            case 3:
-                DestWords[2] = SrcWords[3];
-                DestWords[1] = SrcWords[2];
-                DestWords[0] = SrcWords[1];
-                break;
-            case 4:
-                DestWords[3] = SrcWords[4];
-                DestWords[2] = SrcWords[3];
-                DestWords[1] = SrcWords[2];
-                DestWords[0] = SrcWords[1];
-                break;
-            case 1:
-            case 2:
-            case 8:
-            case 9:
-            case 10:
-                DestWords[0] = SrcWords[1];
-                break;
-            case 5:
-            case 7:
-                FlmAssignStringRaw((void**)(Raw), SrcWords);
-                break;
-            case 6:
-                FlmAssignInterfaceRaw((void**)(Raw),
-                                      (IDAComponent*)(SrcWords[1]));
-                break;
-            default:
-                break;
-            }
-        }
-
-        const char* ShortTag = *(const char* const*)(
-            (const unsigned char*)(Entry) + 4);
-        if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
-        {
-            MaterialBlock_[4] = MaterialBlock_[0];
-            MaterialBlock_[5] = MaterialBlock_[1];
-            MaterialBlock_[6] = MaterialBlock_[2];
-            MaterialBlock_[7] = MaterialBlock_[3];
-        }
-        else if (ShortTag[0] == 'O' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
-            RecomputeOpacityFlags(); // FUN_066fb3e0, called before color writeback
-
-        if (Index == 0)
-        {
-            const float* Components = (const float*)(
-                (const unsigned long*)(Value) + 1);
-            unsigned long Red;
-            unsigned long Green;
-            unsigned long Blue;
-            unsigned long Alpha;
-            if (Kind_ == KindWire)
-            {
-                // 066fb30e: Wire overwrites RGBA for every type.
-                WireColorR_ = Components[0];
-                WireColorG_ = Components[1];
-                WireColorB_ = Components[2];
-                WireColorA_ = Components[3];
-                Alpha = FlmWireColorByte(WireColorA_);
-                Red = FlmWireColorByte(WireColorR_);
-                Green = FlmWireColorByte(WireColorG_);
-                Blue = FlmWireColorByte(WireColorB_);
-                WireColorArgb_ = (Alpha << 24) | (Red << 16) | (Green << 8) | Blue;
-                MaterialBlock_[4] = WireColorR_;
-                MaterialBlock_[5] = WireColorG_;
-                MaterialBlock_[6] = WireColorB_;
-                MaterialBlock_[3] = WireColorA_;
-            }
-            else
-            {
-                // 066fbfaf: Wire2 packs incoming values without a second RGBA/material
-                // writeback. Reduced RGB keeps 5 bits per byte.
-                Red = FlmWireColorByte(Components[0]);
-                Green = FlmWireColorByte(Components[1]);
-                Blue = FlmWireColorByte(Components[2]);
-                Alpha = FlmWireColorByte(Components[3]);
-                WireColorArgb_ = (Alpha << 24) | (Red << 16) | (Green << 8) | Blue;
-                WireColorRgb555_ = ((Red & 0xf8) << 13) | ((Green & 0xf8) << 5) | (Blue >> 3);
-            }
-            WireGroupIndex_ = 0; // retail Wire+0x7c / Wire2+0x80
-        }
-        return GR_OK;
-    }
-
-    // Colorize has separate color and option-flag storage.
-    if (Kind_ == KindColorize)
+    // 066fb1f0: the packed colour is updated after the RGBA store.
+    void* Raw = GetParameterAddress(Index);
+    if (Raw != nullptr)
     {
         const unsigned long* SrcWords = (const unsigned long*)(Value);
-        if (Index == 0)
+        unsigned long* DestWords = (unsigned long*)(Raw);
+        switch (SrcWords[0])
         {
-            MaterialBlock_[4] = *(const float*)(&SrcWords[1]);
-            MaterialBlock_[5] = *(const float*)(&SrcWords[2]);
-            MaterialBlock_[6] = *(const float*)(&SrcWords[3]);
-            MaterialBlock_[7] = 1.0f;
-            if (SrcWords[0] == 4)
-                ColorizeExtraW_ = *(const float*)(&SrcWords[4]);
-            return GR_OK;
+        case 3:
+            DestWords[2] = SrcWords[3];
+            DestWords[1] = SrcWords[2];
+            DestWords[0] = SrcWords[1];
+            break;
+        case 4:
+            DestWords[3] = SrcWords[4];
+            DestWords[2] = SrcWords[3];
+            DestWords[1] = SrcWords[2];
+            DestWords[0] = SrcWords[1];
+            break;
+        case 1:
+        case 2:
+        case 8:
+        case 9:
+        case 10:
+            DestWords[0] = SrcWords[1];
+            break;
+        case 5:
+        case 7:
+            FlmAssignStringRaw((void**)(Raw), SrcWords);
+            break;
+        case 6:
+            FlmAssignInterfaceRaw((void**)(Raw),
+                                  (IDAComponent*)(SrcWords[1]));
+            break;
+        default:
+            break;
         }
-        if (Index == 0xA)
-        {
-            // this+0x6C, a raw dword copy.
-            ColorizeOptionsFlags_ = SrcWords[1];
-            return GR_OK;
-        }
+    }
 
-        void* Raw = GetParameterAddress(Index);
-        if (Raw != nullptr)
-        {
-            unsigned long* DestWords = (unsigned long*)(Raw);
-            switch (SrcWords[0])
-            {
-            case 3:
-                DestWords[2] = SrcWords[3];
-                DestWords[1] = SrcWords[2];
-                DestWords[0] = SrcWords[1];
-                break;
-            case 4:
-                DestWords[3] = SrcWords[4];
-                DestWords[2] = SrcWords[3];
-                DestWords[1] = SrcWords[2];
-                DestWords[0] = SrcWords[1];
-                break;
-            case 1:
-            case 2:
-            case 8:
-            case 9:
-            case 10:
-                DestWords[0] = SrcWords[1];
-                break;
-            case 5:
-            case 7:
-                FlmAssignStringRaw((void**)(Raw), SrcWords);
-                break;
-            case 6:
-                FlmAssignInterfaceRaw((void**)(Raw), (IDAComponent*)(SrcWords[1]));
-                break;
-            default:
-                break;
-            }
-        }
+    const char* ShortTag = *(const char* const*)(
+        (const unsigned char*)(Entry) + 4);
+    if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
+    {
+        MaterialBlock_[4] = MaterialBlock_[0];
+        MaterialBlock_[5] = MaterialBlock_[1];
+        MaterialBlock_[6] = MaterialBlock_[2];
+        MaterialBlock_[7] = MaterialBlock_[3];
+    }
+    else if (ShortTag[0] == 'O' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
+        RecomputeOpacityFlags(); // FUN_066fb3e0, called before color writeback
 
-        const char* ShortTag = *(const char* const*)(
-            (const unsigned char*)(Entry) + 4);
-        if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
+    if (Index == 0)
+    {
+        const float* Components = (const float*)(
+            (const unsigned long*)(Value) + 1);
+        unsigned long Red;
+        unsigned long Green;
+        unsigned long Blue;
+        unsigned long Alpha;
+        // 066fb30e: Wire overwrites RGBA for every type.
+        WireColorR_ = Components[0];
+        WireColorG_ = Components[1];
+        WireColorB_ = Components[2];
+        WireColorA_ = Components[3];
+        Alpha = FlmWireColorByte(WireColorA_);
+        Red = FlmWireColorByte(WireColorR_);
+        Green = FlmWireColorByte(WireColorG_);
+        Blue = FlmWireColorByte(WireColorB_);
+        WireColorArgb_ = (Alpha << 24) | (Red << 16) | (Green << 8) | Blue;
+        MaterialBlock_[4] = WireColorR_;
+        MaterialBlock_[5] = WireColorG_;
+        MaterialBlock_[6] = WireColorB_;
+        MaterialBlock_[3] = WireColorA_;
+        WireGroupIndex_ = 0;
+    }
+    return GR_OK;
+}
+
+GENRESULT __thiscall FWire2Material::StoreParameterValue(unsigned long Index, void* Entry, void* Value)
+{
+    // 066fbe90: the packed colours are updated after the RGBA store.
+    void* Raw = GetParameterAddress(Index);
+    if (Raw != nullptr)
+    {
+        const unsigned long* SrcWords = (const unsigned long*)(Value);
+        unsigned long* DestWords = (unsigned long*)(Raw);
+        switch (SrcWords[0])
         {
-            MaterialBlock_[4] = MaterialBlock_[0];
-            MaterialBlock_[5] = MaterialBlock_[1];
-            MaterialBlock_[6] = MaterialBlock_[2];
-            MaterialBlock_[7] = MaterialBlock_[3];
-            return GR_OK;
+        case 3:
+            DestWords[2] = SrcWords[3];
+            DestWords[1] = SrcWords[2];
+            DestWords[0] = SrcWords[1];
+            break;
+        case 4:
+            DestWords[3] = SrcWords[4];
+            DestWords[2] = SrcWords[3];
+            DestWords[1] = SrcWords[2];
+            DestWords[0] = SrcWords[1];
+            break;
+        case 1:
+        case 2:
+        case 8:
+        case 9:
+        case 10:
+            DestWords[0] = SrcWords[1];
+            break;
+        case 5:
+        case 7:
+            FlmAssignStringRaw((void**)(Raw), SrcWords);
+            break;
+        case 6:
+            FlmAssignInterfaceRaw((void**)(Raw),
+                                  (IDAComponent*)(SrcWords[1]));
+            break;
+        default:
+            break;
         }
-        if (ShortTag[0] == 'O' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
-            RecomputeOpacityFlags();
+    }
+
+    const char* ShortTag = *(const char* const*)(
+        (const unsigned char*)(Entry) + 4);
+    if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
+    {
+        MaterialBlock_[4] = MaterialBlock_[0];
+        MaterialBlock_[5] = MaterialBlock_[1];
+        MaterialBlock_[6] = MaterialBlock_[2];
+        MaterialBlock_[7] = MaterialBlock_[3];
+    }
+    else if (ShortTag[0] == 'O' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
+        RecomputeOpacityFlags(); // FUN_066fb3e0, called before color writeback
+
+    if (Index == 0)
+    {
+        const float* Components = (const float*)(
+            (const unsigned long*)(Value) + 1);
+        unsigned long Red;
+        unsigned long Green;
+        unsigned long Blue;
+        unsigned long Alpha;
+        // 066fbfaf: Wire2 packs incoming values without a second RGBA/material
+        // writeback. Reduced RGB keeps 5 bits per byte.
+        Red = FlmWireColorByte(Components[0]);
+        Green = FlmWireColorByte(Components[1]);
+        Blue = FlmWireColorByte(Components[2]);
+        Alpha = FlmWireColorByte(Components[3]);
+        WireColorArgb_ = (Alpha << 24) | (Red << 16) | (Green << 8) | Blue;
+        WireColorRgb555_ = ((Red & 0xf8) << 13) | ((Green & 0xf8) << 5) | (Blue >> 3);
+        WireGroupIndex_ = 0;
+    }
+    return GR_OK;
+}
+
+GENRESULT __thiscall FColorizeMaterial::StoreParameterValue(unsigned long Index, void* Entry, void* Value)
+{
+    // 066f4ad0: separate colour and option-flag storage.
+    const unsigned long* SrcWords = (const unsigned long*)(Value);
+    if (Index == 0)
+    {
+        MaterialBlock_[4] = *(const float*)(&SrcWords[1]);
+        MaterialBlock_[5] = *(const float*)(&SrcWords[2]);
+        MaterialBlock_[6] = *(const float*)(&SrcWords[3]);
+        MaterialBlock_[7] = 1.0f;
+        if (SrcWords[0] == 4)
+            ColorizeExtraW_ = *(const float*)(&SrcWords[4]);
+        return GR_OK;
+    }
+    if (Index == 0xA)
+    {
+        // this+0x6C, a raw dword copy.
+        ColorizeOptionsFlags_ = SrcWords[1];
         return GR_OK;
     }
 
+    void* Raw = GetParameterAddress(Index);
+    if (Raw != nullptr)
+    {
+        unsigned long* DestWords = (unsigned long*)(Raw);
+        switch (SrcWords[0])
+        {
+        case 3:
+            DestWords[2] = SrcWords[3];
+            DestWords[1] = SrcWords[2];
+            DestWords[0] = SrcWords[1];
+            break;
+        case 4:
+            DestWords[3] = SrcWords[4];
+            DestWords[2] = SrcWords[3];
+            DestWords[1] = SrcWords[2];
+            DestWords[0] = SrcWords[1];
+            break;
+        case 1:
+        case 2:
+        case 8:
+        case 9:
+        case 10:
+            DestWords[0] = SrcWords[1];
+            break;
+        case 5:
+        case 7:
+            FlmAssignStringRaw((void**)(Raw), SrcWords);
+            break;
+        case 6:
+            FlmAssignInterfaceRaw((void**)(Raw), (IDAComponent*)(SrcWords[1]));
+            break;
+        default:
+            break;
+        }
+    }
+
+    const char* ShortTag = *(const char* const*)(
+        (const unsigned char*)(Entry) + 4);
+    if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
+    {
+        MaterialBlock_[4] = MaterialBlock_[0];
+        MaterialBlock_[5] = MaterialBlock_[1];
+        MaterialBlock_[6] = MaterialBlock_[2];
+        MaterialBlock_[7] = MaterialBlock_[3];
+        return GR_OK;
+    }
+    if (ShortTag[0] == 'O' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
+        RecomputeOpacityFlags();
+    return GR_OK;
+}
+
+GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, void* Entry, void* Value)
+{
     void* Raw = GetParameterAddress(Index);
     if (Raw != nullptr)
     {
@@ -3251,9 +3269,9 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(unsigned long Index, voi
 void FMaterialImpl::RecomputeOpacityFlags()
 {
     // Shared 066f2bf5 and Colorize 066f4c43. Equal/greater/unordered clear the flag.
-    Flag64_ = MaterialBlock_[3] < (float)(kCloakColorizeThreshold) ? 1 : 0;
-    Flag65_ = 0;
-    if (Flag64_ != 0)
+    bAlphaBlend_ = MaterialBlock_[3] < (float)(kCloakColorizeThreshold) ? 1 : 0;
+    bOneBitAlpha_ = 0;
+    if (bAlphaBlend_ != 0)
         return;
     int ActualFormat = FlmFindPixelFormatIndex(0);
     const unsigned long Handle = TextureBlock_[2];
@@ -3262,141 +3280,193 @@ void FMaterialImpl::RecomputeOpacityFlags()
     if (Pipeline_->GetTextureFormat((void*)(Handle), &ActualFormat) < 0)
         return;
     const unsigned long* ActualDescriptor = FlmPixelFormatDescriptor(ActualFormat);
-    Flag65_ = ActualDescriptor[0x38 / 4] == 1 ? 1 : 0;
+    bOneBitAlpha_ = ActualDescriptor[0x38 / 4] == 1 ? 1 : 0;
     if ((ActualFormat >= 10 && ActualFormat <= 14) ||
         (FlmPixelFormatDescriptor(ActualFormat)[0x48 / 4] & 0xff) != 0)
-        Flag64_ = Flag65_ == 0 ? 1 : 0;
+        bAlphaBlend_ = bOneBitAlpha_ == 0 ? 1 : 0;
     else
-        Flag64_ = 0;
+        bAlphaBlend_ = 0;
 }
 
 unsigned long __thiscall FMaterialImpl::GetParameterTable(void** OutBase)
 {
-    // FUN_066F2CD0 is the zero-property base; the per-kind Slot27 overrides supply their
-    // own tables.
-    if (Kind_ == KindWire || Kind_ == KindWire2)
-    {
-        void* Table = FlmWireColorDescBase(Kind_ == KindWire2);
-        if (OutBase != nullptr)
-            *OutBase = Table;
-        return 1;
-    }
-    // Colorize uses its own eleven-property schema.
-    if (Kind_ == KindColorize)
-    {
-        const void* Table = FlmColorizeParamsBase(false);
-        if (OutBase != nullptr)
-            *OutBase = const_cast<void*>(Table);
-        return 11;
-    }
-    // Cloak DAT_066f37d0 builds the first ten Colorize descriptors: Ambient
-    // is type 4, including its fourth component; no Colorize Options entry.
-    if (Kind_ == KindCloak)
-    {
-        const void* Table = FlmColorizeParamsBase(true);
-        if (OutBase != nullptr)
-            *OutBase = const_cast<void*>(Table);
-        return 10;
-    }
-    if (Kind_ == KindGlass || Kind_ == KindHudIcon || Kind_ == KindExclusion ||
-        Kind_ == KindPlanetWater || Kind_ == KindHudAnim || Kind_ == KindEngineGlow)
-    {
-        const void* Table = FlmGlassParamsBase(Kind_);
-        if (OutBase != nullptr)
-            *OutBase = const_cast<void*>(Table);
-        return 10;
-    }
-    if (Kind_ == KindNomad)
-    {
-        const void* Table = FlmNomadParamsBase();
-        if (OutBase != nullptr)
-            *OutBase = const_cast<void*>(Table);
-        return 9;
-    }
+    // FUN_066F2CD0: the zero-property base.
     if (OutBase != nullptr)
         *OutBase = nullptr;
     return 0;
 }
 
-void* __thiscall FMaterialImpl::GetParameterAddress(unsigned long Index)
+unsigned long __thiscall FWireMaterial::GetParameterTable(void** OutBase)
 {
-    // Wire families expose their RGBA storage only at index zero.
-    if (Kind_ == KindWire || Kind_ == KindWire2)
-    {
-        if (Index != 0)
-            return nullptr;
-        return &WireColorR_;
-    }
-    // Colorize maps each property index to its live storage.
-    if (Kind_ == KindColorize)
-    {
-        void* Result = nullptr;
-        switch (Index)
-        {
-        case 0: Result = &MaterialBlock_[4]; break;   // this+0x30 ("Diffuse" slot)
-        case 1: Result = &MaterialBlock_[0]; break;   // this+0x20 ("Ambient" slot)
-        case 2: Result = &MaterialBlock_[12]; break;  // this+0x50 (Emissive)
-        case 3: Result = &MaterialBlock_[8]; break;   // this+0x40 (Specular Color)
-        case 4: Result = &MaterialBlock_[16]; break;  // this+0x60 (Specular Power)
-        case 5: Result = &MaterialBlock_[3]; break;   // this+0x2C (Ambient alpha / Opacity)
-        case 6: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
-        case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-        case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-        case 9: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
-        case 10: Result = &ColorizeOptionsFlags_; break; // this+0x6C
-        default: Result = nullptr; break;
-        }
-        return Result;
-    }
-    // Nomad uses its own property-to-storage map.
-    if (Kind_ == KindNomad)
-    {
-        void* Result = nullptr;
-        switch (Index)
-        {
-        case 0: Result = &NomadDiffuseColor_[0]; break;
-        case 1: Result = TextureBlock_; break;
-        case 2: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-        case 3: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-        case 4: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
-        case 5: Result = (void*)((uintptr_t)(TextureBlock_) + 0x2c); break;
-        case 6: Result = (void*)((uintptr_t)(TextureBlock_) + 0x48); break;
-        case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x4c); break;
-        case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x50); break;
-        default: Result = nullptr; break;
-        }
-        return Result;
-    }
-    // These families share the generic property-to-storage map.
-    if (Kind_ == KindCloak || Kind_ == KindEngineGlow || Kind_ == KindExclusion ||
-        Kind_ == KindGlass || Kind_ == KindHudIcon || Kind_ == KindPlanetWater ||
-        Kind_ == KindHudAnim)
-    {
-        void* Result = nullptr;
-        switch (Index)
-        {
-        case 0: Result = &MaterialBlock_[4]; break;   // this+0x30
-        case 1: Result = &MaterialBlock_[0]; break;   // this+0x20
-        case 2: Result = &MaterialBlock_[12]; break;  // this+0x50
-        case 3: Result = &MaterialBlock_[8]; break;   // this+0x40
-        case 4: Result = &MaterialBlock_[16]; break;  // this+0x60
-        case 5: Result = &MaterialBlock_[3]; break;   // this+0x2C
-        case 6: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
-        case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-        case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-        case 9: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
-        default: Result = nullptr; break;
-        }
-        return Result;
-    }
+    void* Table = FlmWireColorDescBase(false);
+    if (OutBase != nullptr)
+        *OutBase = Table;
+    return 1;
+}
+
+unsigned long __thiscall FWire2Material::GetParameterTable(void** OutBase)
+{
+    void* Table = FlmWireColorDescBase(true);
+    if (OutBase != nullptr)
+        *OutBase = Table;
+    return 1;
+}
+
+unsigned long __thiscall FColorizeMaterial::GetParameterTable(void** OutBase)
+{
+    // The eleven-property schema.
+    const void* Table = FlmColorizeParamsBase(false);
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 11;
+}
+
+unsigned long __thiscall FCloakMaterial::GetParameterTable(void** OutBase)
+{
+    // DAT_066f37d0 builds the first ten Colorize descriptors: Ambient is type 4, including its
+    // fourth component; no Colorize Options entry.
+    const void* Table = FlmColorizeParamsBase(true);
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 10;
+}
+
+unsigned long __thiscall FNomadMaterial::GetParameterTable(void** OutBase)
+{
+    const void* Table = FlmNomadParamsBase();
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 9;
+}
+
+unsigned long __thiscall FGlassMaterial::GetParameterTable(void** OutBase)
+{
+    const void* Table = FlmGenericParamsBase<FGlassMaterial>();
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 10;
+}
+
+unsigned long __thiscall FHudIconMaterial::GetParameterTable(void** OutBase)
+{
+    const void* Table = FlmGenericParamsBase<FHudIconMaterial>();
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 10;
+}
+
+unsigned long __thiscall FExclusionZoneMaterial::GetParameterTable(void** OutBase)
+{
+    const void* Table = FlmGenericParamsBase<FExclusionZoneMaterial>();
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 10;
+}
+
+unsigned long __thiscall FPlanetWaterMaterial::GetParameterTable(void** OutBase)
+{
+    const void* Table = FlmGenericParamsBase<FPlanetWaterMaterial>();
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 10;
+}
+
+unsigned long __thiscall FHudAnimMaterial::GetParameterTable(void** OutBase)
+{
+    const void* Table = FlmGenericParamsBase<FHudAnimMaterial>();
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 10;
+}
+
+unsigned long __thiscall FEngineGlowMaterial::GetParameterTable(void** OutBase)
+{
+    const void* Table = FlmGenericParamsBase<FEngineGlowMaterial>();
+    if (OutBase != nullptr)
+        *OutBase = const_cast<void*>(Table);
+    return 10;
+}
+
+void* __thiscall FMaterialImpl::GetParameterAddress(unsigned long /*Index*/)
+{
     return nullptr;
 }
 
-void FMaterialImpl::BindUnknown(const char* Why)
+void* __thiscall FWireMaterial::GetParameterAddress(unsigned long Index)
 {
-    FDUMP(kFdumpError, "flmaterials: minimal bind (undocumented type) %s",
-          Why != nullptr ? Why : "?");
-    SetMaterialBlock(Pipeline_, MaterialBlock_);
+    // 066fbe40: only index zero, the RGBA storage.
+    if (Index != 0)
+        return nullptr;
+    return &WireColorR_;
+}
+
+void* __thiscall FWire2Material::GetParameterAddress(unsigned long Index)
+{
+    // 066fbe40: only index zero, the RGBA storage.
+    if (Index != 0)
+        return nullptr;
+    return &WireColorR_;
+}
+
+void* __thiscall FColorizeMaterial::GetParameterAddress(unsigned long Index)
+{
+    void* Result = nullptr;
+    switch (Index)
+    {
+    case 0: Result = &MaterialBlock_[4]; break;   // this+0x30 ("Diffuse" slot)
+    case 1: Result = &MaterialBlock_[0]; break;   // this+0x20 ("Ambient" slot)
+    case 2: Result = &MaterialBlock_[12]; break;  // this+0x50 (Emissive)
+    case 3: Result = &MaterialBlock_[8]; break;   // this+0x40 (Specular Color)
+    case 4: Result = &MaterialBlock_[16]; break;  // this+0x60 (Specular Power)
+    case 5: Result = &MaterialBlock_[3]; break;   // this+0x2C (Ambient alpha / Opacity)
+    case 6: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
+    case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
+    case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
+    case 9: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
+    case 10: Result = &ColorizeOptionsFlags_; break; // this+0x6C
+    default: Result = nullptr; break;
+    }
+    return Result;
+}
+
+void* __thiscall FNomadMaterial::GetParameterAddress(unsigned long Index)
+{
+    void* Result = nullptr;
+    switch (Index)
+    {
+    case 0: Result = &NomadDiffuseColor_[0]; break;
+    case 1: Result = TextureBlock_; break;
+    case 2: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
+    case 3: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
+    case 4: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
+    case 5: Result = (void*)((uintptr_t)(TextureBlock_) + 0x2c); break;
+    case 6: Result = (void*)((uintptr_t)(TextureBlock_) + 0x48); break;
+    case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x4c); break;
+    case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x50); break;
+    default: Result = nullptr; break;
+    }
+    return Result;
+}
+
+void* __thiscall FGenericPropertyMaterial::GetParameterAddress(unsigned long Index)
+{
+    // 066f7f70.
+    void* Result = nullptr;
+    switch (Index)
+    {
+    case 0: Result = &MaterialBlock_[4]; break;   // this+0x30
+    case 1: Result = &MaterialBlock_[0]; break;   // this+0x20
+    case 2: Result = &MaterialBlock_[12]; break;  // this+0x50
+    case 3: Result = &MaterialBlock_[8]; break;   // this+0x40
+    case 4: Result = &MaterialBlock_[16]; break;  // this+0x60
+    case 5: Result = &MaterialBlock_[3]; break;   // this+0x2C
+    case 6: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
+    case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
+    case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
+    case 9: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
+    default: Result = nullptr; break;
+    }
+    return Result;
 }
 
 // Apply this texture entry's coordinates and wrapping to the selected stage.
@@ -3425,14 +3495,14 @@ bool FMaterialImpl::ContextWantsColorVertex(void* Context) const
     return Source->Diffuse.Base != nullptr;
 }
 
-float FMaterialImpl::CompareField2C() const
+float FMaterialImpl::GetDiffuseAlpha() const
 {
     return MaterialBlock_[3];
 }
 
-void FMaterialImpl::BindGlass(void* Context)
+GENRESULT DACOM_API FGlassMaterial::Bind(void* Context)
 {
-    if (CompareField2C() < kGlassRaiseThreshold)
+    if (GetDiffuseAlpha() < kGlassRaiseThreshold)
     {
         MaterialBlock_[3] = kGlassRaiseThreshold;
         MaterialBlock_[7] = kGlassRaiseThreshold;
@@ -3445,9 +3515,10 @@ void FMaterialImpl::BindGlass(void* Context)
     PipelineApplyTssTable(Pipeline_, 0, kGlassTss0);
     PipelineApplyTssTable(Pipeline_, 1, kGlassTss1);
     PipelineApplyRsTable(Pipeline_, kGlassRs);
+    return GR_OK;
 }
 
-void FMaterialImpl::BindNomad()
+GENRESULT DACOM_API FNomadMaterial::Bind(void* /*Context*/)
 {
     StageCounter_ = 0;
     PipelineApplyRsTable(Pipeline_, kNomadRs);
@@ -3471,9 +3542,10 @@ void FMaterialImpl::BindNomad()
         StageCounter_ += 1;
     }
     PipelineApplyTssTable(Pipeline_, StageCounter_, kNomadTssTail);
+    return GR_OK;
 }
 
-void FMaterialImpl::BindHudIcon(void* Context)
+GENRESULT DACOM_API FHudIconMaterial::Bind(void* Context)
 {
     PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
     ApplyTssFromTextureBlock(0, TextureBlock_);
@@ -3491,18 +3563,19 @@ void FMaterialImpl::BindHudIcon(void* Context)
         }
     }
     SetMaterialBlock(Pipeline_, MaterialBlock_);
-    // Unordered follows opaque when Flag64 is clear, like equal/greater.
-    if (!((double)(CompareField2C()) < 1.0) && Flag64_ == 0)
+    // Unordered follows opaque when bAlphaBlend is clear, like equal/greater.
+    if (!((double)(GetDiffuseAlpha()) < 1.0) && bAlphaBlend_ == 0)
         PipelineApplyRsTable(Pipeline_, kHudIconRsOpaque);
     else
         PipelineApplyRsTable(Pipeline_, kHudIconRsBlend);
+    return GR_OK;
 }
 
-void FMaterialImpl::BindHudAnim(void* Context)
+GENRESULT DACOM_API FHudAnimMaterial::Bind(void* Context)
 {
     // LAB_06700070: the enabled flag gates the entire bind, including COLORVERTEX.
     if (HudAnimFlag_ == 0)
-        return;
+        return GR_OK;
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
         PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 1);
@@ -3510,7 +3583,7 @@ void FMaterialImpl::BindHudAnim(void* Context)
     ApplyTssFromTextureBlock(0, TextureBlock_);
     PipelineApplyTssTable(Pipeline_, 0, kGlassTss0); // DAT_067030c4
     PipelineApplyTssTable(Pipeline_, 1, kHudAnimTss1); // DAT_067030fc
-    PipelineApplyRsTable(Pipeline_, Flag64_ != 0 ? kHudIconRsBlend : kHudIconRsOpaque);
+    PipelineApplyRsTable(Pipeline_, bAlphaBlend_ != 0 ? kHudIconRsBlend : kHudIconRsOpaque);
     if (MatAnim_ != nullptr)
     {
         float UvTransform[16];
@@ -3520,9 +3593,10 @@ void FMaterialImpl::BindHudAnim(void* Context)
             PipelineSetTextureStageTransform(Pipeline_, 0, UvTransform);
         }
     }
+    return GR_OK;
 }
 
-GENRESULT FMaterialImpl::BindColorize(void* Context)
+GENRESULT DACOM_API FColorizeMaterial::Bind(void* Context)
 {
     // FUN_066f4d20: preserve the separately stored Ac.W through either branch.
     float Opacity = ColorizeExtraW_;
@@ -3580,7 +3654,7 @@ GENRESULT FMaterialImpl::BindColorize(void* Context)
         }
     }
 
-    // Bind does not modify the cached Flag64/Flag65.
+    // Bind does not modify the cached bAlphaBlend/bOneBitAlpha.
     MaterialBlock_[3] = Opacity;
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     // Equal/greater/unordered take the plain table.
@@ -3589,7 +3663,7 @@ GENRESULT FMaterialImpl::BindColorize(void* Context)
     return GR_OK;
 }
 
-void FMaterialImpl::BindCloak(void* Context)
+GENRESULT DACOM_API FCloakMaterial::Bind(void* Context)
 {
     // Cloak inherits opacity from the root-instance value and candidate material.
     float Base = FlmRootInstanceValue(Context, 1.0f); // 0x3f800000
@@ -3631,17 +3705,18 @@ void FMaterialImpl::BindCloak(void* Context)
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if ((double)(Base) < kCloakColorizeThreshold)
     {
-        Flag64_ = 1;
+        bAlphaBlend_ = 1;
         PipelineApplyRsTable(Pipeline_, kCloakRsBlend);
     }
     else
     {
-        Flag64_ = 0;
+        bAlphaBlend_ = 0;
         PipelineApplyRsTable(Pipeline_, kCloakRsPlain);
     }
+    return GR_OK;
 }
 
-void FMaterialImpl::BindWire()
+GENRESULT DACOM_API FWireMaterial::Bind(void* /*Context*/)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if ((double)(WireColorA_) < kWireBlendThreshold)
@@ -3650,25 +3725,28 @@ void FMaterialImpl::BindWire()
         PipelineApplyRsTable(Pipeline_, kWireRsPlain);
     PipelineSetTextureStageTexture(Pipeline_, 0, 0);
     PipelineApplyTssTable(Pipeline_, 0, kWireTss0);
+    return GR_OK;
 }
 
-void FMaterialImpl::BindWire2(void* Context)
+GENRESULT DACOM_API FWire2Material::Bind(void* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
         PipelineSetRenderState(Pipeline_, D3DRS_COLORVERTEX, 1);
+    return GR_OK;
 }
 
-void FMaterialImpl::BindExclusion()
+GENRESULT DACOM_API FExclusionZoneMaterial::Bind(void* /*Context*/)
 {
     PipelineSetTextureStageTexture(Pipeline_, 0, TextureHandleAt(TextureBlock_));
     ApplyTssFromTextureBlock(0, TextureBlock_);
     PipelineApplyTssTable(Pipeline_, 0, kExclusionTss0);
     PipelineApplyTssTable(Pipeline_, 1, kExclusionTss1);
     PipelineApplyRsTable(Pipeline_, kExclusionRs);
+    return GR_OK;
 }
 
-void FMaterialImpl::BindEnvMap(void* Context)
+GENRESULT DACOM_API FEnvMapMaterial::Bind(void* Context)
 {
     // 066f5af0: HRESULTs are tested only for QI and Slot22.
     EnvMapFlag_ = 0;
@@ -3714,10 +3792,10 @@ void FMaterialImpl::BindEnvMap(void* Context)
     EnvMapResolvedHandle_ = 0;
     if (Name == nullptr)
     {
-        if (TextureLibrary_ != nullptr && ShadowHandle_ != 0)
+        if (TextureLibrary_ != nullptr && EnvMapTextureRecord_ != 0)
             TextureLibrary_->ReleaseTextureRecord(
-                (void*)(ShadowHandle_));
-        ShadowHandle_ = 0;
+                (void*)(EnvMapTextureRecord_));
+        EnvMapTextureRecord_ = 0;
         EnvMapTexNameCrc_ = 0;
     }
     else
@@ -3725,10 +3803,10 @@ void FMaterialImpl::BindEnvMap(void* Context)
         const unsigned long NameCrc = DACOM_CRC::GetCRC32(Name);
         if (NameCrc != EnvMapTexNameCrc_)
         {
-            if (TextureLibrary_ != nullptr && ShadowHandle_ != 0)
+            if (TextureLibrary_ != nullptr && EnvMapTextureRecord_ != 0)
                 TextureLibrary_->ReleaseTextureRecord(
-                    (void*)(ShadowHandle_));
-            ShadowHandle_ = 0;
+                    (void*)(EnvMapTextureRecord_));
+            EnvMapTextureRecord_ = 0;
             EnvMapTexNameCrc_ = NameCrc;
             if (NameCrc != 0)
             {
@@ -3738,15 +3816,15 @@ void FMaterialImpl::BindEnvMap(void* Context)
                     unsigned long Crc;
                 } Query = {Name, DACOM_CRC::GetCRC32(Name)};
                 TextureLibrary_->FindTextureByCrc(&Query,
-                    (void**)(&ShadowHandle_));
+                    (void**)(&EnvMapTextureRecord_));
             }
         }
     }
-    if (ShadowHandle_ != 0)
+    if (EnvMapTextureRecord_ != 0)
     {
         unsigned long Out[5];
         if (TextureLibrary_->GetTextureFrame(
-                (void*)(ShadowHandle_), 0, Out) >= 0)
+                (void*)(EnvMapTextureRecord_), 0, Out) >= 0)
             EnvMapResolvedHandle_ = Out[0];
     }
     if (EnvMapFlag_ == 0 && EnvMapResolvedHandle_ != 0)
@@ -3759,7 +3837,7 @@ void FMaterialImpl::BindEnvMap(void* Context)
             Stage = 1;
             PipelineGetTextureStageState(Pipeline_, 1, 1, &Probe);
             if (Probe != 1)
-                return;
+                return GR_OK;
         }
         PipelineApplyTssTable(Pipeline_, Stage, kEnvMapTss0);
         PipelineApplyTssTable(Pipeline_, Stage + 1, kEnvMapTss1);
@@ -3768,6 +3846,7 @@ void FMaterialImpl::BindEnvMap(void* Context)
         PipelineSetRenderState(Pipeline_, D3DRS_LOCALVIEWER, 1);
         PipelineSetRenderState(Pipeline_, D3DRS_NORMALIZENORMALS, 1);
     }
+    return GR_OK;
 }
 
 namespace
@@ -3786,7 +3865,7 @@ namespace
     };
 }
 
-GENRESULT FMaterialImpl::BindShadow(void* Context)
+GENRESULT DACOM_API FShadowMaterial::Bind(void* Context)
 {
     // LAB_066fa3f0: cache only on the first bind; failure does not reset the latch.
     if (!bShadowTextureInitialized_)
@@ -3828,13 +3907,13 @@ GENRESULT FMaterialImpl::BindShadow(void* Context)
     return (GENRESULT)(-1);
 }
 
-GENRESULT FMaterialImpl::DrawShadow(void* Context, unsigned long Prim, unsigned long Start,
+GENRESULT FShadowMaterial::DrawShadow(void* Context, unsigned long Prim, unsigned long Start,
                                     unsigned long Count, unsigned long IbStart,
                                     unsigned long IndexSpan, unsigned long Flags)
 {
     // FUN_066fa5c0. Only the held batched reference is EH-owned; state resets are normal-path work.
-    int SavedCull;
-    Pipeline_->GetRenderState(D3DRS_ZFUNC, &SavedCull);
+    int SavedZFunc;
+    Pipeline_->GetRenderState(D3DRS_ZFUNC, &SavedZFunc);
     const unsigned long Stage = ShadowLayerCount_ < 2 ? 1 : 0;
     Pipeline_->SetTextureStageTexture((int)(Stage), (void*)(ShadowResolvedHandle_));
     if (Stage == 1)
@@ -3905,12 +3984,12 @@ GENRESULT FMaterialImpl::DrawShadow(void* Context, unsigned long Prim, unsigned 
     }
     Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXCOORDINDEX, Stage);
     Pipeline_->SetTextureStageState(Stage, D3DTSS_TEXTURETRANSFORMFLAGS, 0);
-    Pipeline_->SetRenderState(D3DRS_ZFUNC, SavedCull);
+    Pipeline_->SetRenderState(D3DRS_ZFUNC, SavedZFunc);
     Pipeline_->SetRenderState(D3DRS_LIGHTING, 1);
     return Result;
 }
 
-GENRESULT FMaterialImpl::ShadowCandidateDispatch(void* Context)
+GENRESULT FShadowMaterial::ShadowCandidateDispatch(void* Context)
 {
     if (Context == nullptr)
         return (GENRESULT)(-1);
@@ -3954,7 +4033,7 @@ GENRESULT FMaterialImpl::SubmitCandidateGeometry(void* Context, unsigned long Pr
         Count, IbStart, IndexSpan, Flags);
 }
 
-void FMaterialImpl::BindEngineGlow(void* Context)
+GENRESULT DACOM_API FEngineGlowMaterial::Bind(void* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
@@ -3962,27 +4041,30 @@ void FMaterialImpl::BindEngineGlow(void* Context)
     PipelineApplyTssTable(Pipeline_, 0, kEngineGlowTss);
     PipelineApplyRsTable(Pipeline_, kEngineGlowRs);
     SetMaterialBlock(Pipeline_, MaterialBlock_);
+    return GR_OK;
 }
 
-void FMaterialImpl::BindVisibleCounter()
+GENRESULT DACOM_API FVisibleCounterMaterial::Bind(void* /*Context*/)
 {
+    return GR_OK;
 }
 
-void FMaterialImpl::BindBackdrop(void* Context)
+GENRESULT DACOM_API FBackdropMaterial::Bind(void* Context)
 {
     if (Context == nullptr)
-        return;
+        return (GENRESULT)(-1);
     FNomadContext* Submit = (FNomadContext*)(Context);
     if (Submit->Candidate == nullptr)
-        return;
+        return (GENRESULT)(-1);
     FShadowBatchedReference Batched;
     if (((IDAComponent*)(Submit->Candidate))->QueryInterface(Iids::BatchedMaterial, &Batched.Object) >= 0)
         ((IBatchedMaterial*)(Batched.Object))->Bind(Context);
     else
         ((IMaterial*)(Submit->Candidate))->Bind(Context);
+    return (GENRESULT)(-1);
 }
 
-GENRESULT FMaterialImpl::TeardownBackdrop(void* Context)
+GENRESULT FBackdropMaterial::TeardownBackdrop(void* Context)
 {
     // FUN_066f2e30 has no Context/Candidate null checks.
     FNomadContext* Submit = (FNomadContext*)(Context);
@@ -3992,7 +4074,7 @@ GENRESULT FMaterialImpl::TeardownBackdrop(void* Context)
     return ((IMaterial*)(Submit->Candidate))->Teardown(Context);
 }
 
-GENRESULT FMaterialImpl::DrawBackdrop(void* Context, unsigned long Prim, unsigned long Start,
+GENRESULT FBackdropMaterial::DrawBackdrop(void* Context, unsigned long Prim, unsigned long Start,
                                       unsigned long Count, unsigned long IbStart,
                                       unsigned long IndexSpan, unsigned long Flags)
 {
@@ -4029,7 +4111,7 @@ GENRESULT FMaterialImpl::DrawBackdrop(void* Context, unsigned long Prim, unsigne
     return Result;
 }
 
-void FMaterialImpl::BindPlanetWater(void* Context)
+GENRESULT DACOM_API FPlanetWaterMaterial::Bind(void* Context)
 {
     SetMaterialBlock(Pipeline_, MaterialBlock_);
     if (ContextWantsColorVertex(Context))
@@ -4038,7 +4120,7 @@ void FMaterialImpl::BindPlanetWater(void* Context)
     ApplyTssFromTextureBlock(0, TextureBlock_);
     PipelineApplyTssTable(Pipeline_, 0, kPlanetTss0);
     PipelineApplyTssTable(Pipeline_, 1, kPlanetTss1);
-    if (Flag64_ != 0)
+    if (bAlphaBlend_ != 0)
         PipelineApplyRsTable(Pipeline_, kPlanetRsBlend);
     else
         PipelineApplyRsTable(Pipeline_, kPlanetRsPlain);
@@ -4053,9 +4135,5 @@ void FMaterialImpl::BindPlanetWater(void* Context)
             PipelineSetTextureStageTransform(Pipeline_, 0, UvTransform);
         }
     }
-}
-
-IMaterial* FlmCreateMaterial(const FMaterialSpec& Spec)
-{
-    return new (std::nothrow) FMaterialImpl(Spec);
+    return GR_OK;
 }

@@ -124,7 +124,7 @@ IVP_Friction_Solver::IVP_Friction_Solver(IVP_ListManager* FrictionSystem, const 
     DistChangeMat.AlignedRowLen = (Columns + 3) & ~3;
 
     // Three arena allocations, in this order.
-    IVP_U_Memory* Mem = Environment->vector_cores_active;
+    IVP_U_Memory* Mem = Environment->short_term_mem;
     DistChangeMat.MatrixValues = static_cast<float*>(Mem->GetMem(DistChangeMat.Columns * DistChangeMat.AlignedRowLen * 4 + 0xc));
     DistChangeMat.DesiredVector = static_cast<float*>(Mem->GetMem(DistChangeMat.AlignedRowLen * 4));
     DistChangeMat.ResultVector = static_cast<float*>(Mem->GetMem(DistChangeMat.AlignedRowLen * 4));
@@ -176,13 +176,13 @@ int IVP_Friction_Solver::CalcSolverPSI(IVP_ListManager* FrictionSystem, int* Act
 
         // Relative normal speed of the two cores at the contact.
         float RelSpeed = 0.0f;
-        IVP_Core* CoreA = LongTerm->ChildCandidate[0];
+        IVP_Core* CoreA = LongTerm->ContactCores[0];
         if (CoreA != nullptr)
         {
             const float RotPart = (float)(IVP_Dot(CoreA->RotSpeed, LongTerm->CoordOSCrossNormal[0]));
             RelSpeed = (float)(IVP_Dot(CoreA->Speed, LongTerm->ContactNormalWS) + (double)(RotPart));
         }
-        IVP_Core* CoreB = LongTerm->ChildCandidate[1];
+        IVP_Core* CoreB = LongTerm->ContactCores[1];
         if (CoreB != nullptr)
         {
             const float RotPart = (float)(IVP_Dot(CoreB->RotSpeed, LongTerm->CoordOSCrossNormal[1]));
@@ -208,7 +208,7 @@ int IVP_Friction_Solver::CalcSolverPSI(IVP_ListManager* FrictionSystem, int* Act
         }
 
         // Core A's column entries, with the arms negated.
-        CoreA = LongTerm->ChildCandidate[0];
+        CoreA = LongTerm->ContactCores[0];
         if (CoreA != nullptr)
         {
             Vector RotArm;
@@ -219,7 +219,7 @@ int IVP_Friction_Solver::CalcSolverPSI(IVP_ListManager* FrictionSystem, int* Act
             IVP_SetMultiple(LinArm, LongTerm->ContactNormalWS, LinScale);
 
             IVP_Friction_Info_For_Core* Info = LongTerm->FrictionInfos[0];
-            IVP_Core* ThisCore = LongTerm->ChildCandidate[0];
+            IVP_Core* ThisCore = LongTerm->ContactCores[0];
             for (int J = 0; J < static_cast<int>(Info->FrDists.n_elems); ++J)
             {
                 const int Row = static_cast<int>(Info->FrDists.elems[J]->Owner->IndexInFs);
@@ -230,12 +230,12 @@ int IVP_Friction_Solver::CalcSolverPSI(IVP_ListManager* FrictionSystem, int* Act
                 IVP_Impact_Solver_Long_Term* Other = DistsOfSystem.elems[Row];
                 int Side = 1;
                 float Sign = 1.0f;
-                if (Other->ChildCandidate[0] == ThisCore)
+                if (Other->ContactCores[0] == ThisCore)
                 {
                     Side = 0;
                     Sign = -1.0f;
                 }
-                if (Other->ChildCandidate[Side] == nullptr)
+                if (Other->ContactCores[Side] == nullptr)
                 {
                     continue;
                 }
@@ -247,7 +247,7 @@ int IVP_Friction_Solver::CalcSolverPSI(IVP_ListManager* FrictionSystem, int* Act
         }
 
         // Core B's column entries.
-        CoreB = LongTerm->ChildCandidate[1];
+        CoreB = LongTerm->ContactCores[1];
         if (CoreB != nullptr)
         {
             Vector RotArm;
@@ -256,7 +256,7 @@ int IVP_Friction_Solver::CalcSolverPSI(IVP_ListManager* FrictionSystem, int* Act
             IVP_SetMultiple(LinArm, LongTerm->ContactNormalWS, CoreB->InvMass);
 
             IVP_Friction_Info_For_Core* Info = LongTerm->FrictionInfos[1];
-            IVP_Core* ThisCore = LongTerm->ChildCandidate[1];
+            IVP_Core* ThisCore = LongTerm->ContactCores[1];
             for (int J = 0; J < static_cast<int>(Info->FrDists.n_elems); ++J)
             {
                 const int Row = static_cast<int>(Info->FrDists.elems[J]->Owner->IndexInFs);
@@ -267,12 +267,12 @@ int IVP_Friction_Solver::CalcSolverPSI(IVP_ListManager* FrictionSystem, int* Act
                 IVP_Impact_Solver_Long_Term* Other = DistsOfSystem.elems[Row];
                 int Side = 1;
                 float Sign = 1.0f;
-                if (Other->ChildCandidate[0] == ThisCore)
+                if (Other->ContactCores[0] == ThisCore)
                 {
                     Side = 0;
                     Sign = -1.0f;
                 }
-                if (Other->ChildCandidate[Side] == nullptr)
+                if (Other->ContactCores[Side] == nullptr)
                 {
                     continue;
                 }
@@ -377,7 +377,7 @@ int IVP_Friction_Solver::TestGaussSolutionSuggestion(const float* Values, const 
     {
         const int Index = Indices[I];
         const double Value = (double)(Values[I]);
-        const double Threshold = (double)(Environment->field_c4) * (double)(0.01f); // DAT_063a5404
+        const double Threshold = (double)(Environment->gravity_length) * (double)(0.01f); // DAT_063a5404
         const double Push = (double)(DistsOfSystem.elems[Index]->EffectiveMassDenom) *
                             (double)(ImpulseScale) * Value;
         // Below threshold or unordered flags it.
@@ -520,7 +520,7 @@ void IVP_Friction_Solver::DoResultingPushes(IVP_ListManager* FrictionSystem)
                 IVP_Impact_Solver_Long_Term* LongTerm = Dist->Owner;
 
                 // Core A gets the negative push.
-                IVP_Core* CoreA = LongTerm->ChildCandidate[0];
+                IVP_Core* CoreA = LongTerm->ContactCores[0];
                 if (CoreA != nullptr)
                 {
                     Vector RotArm;
@@ -534,7 +534,7 @@ void IVP_Friction_Solver::DoResultingPushes(IVP_ListManager* FrictionSystem)
 
                 // Core B gets the positive push, inline. The x product stays
                 // unrounded; y and z go through float locals.
-                IVP_Core* CoreB = LongTerm->ChildCandidate[1];
+                IVP_Core* CoreB = LongTerm->ContactCores[1];
                 if (CoreB != nullptr)
                 {
                     const double ArmX = (double)(LongTerm->CoordOSCrossNormal[1].x) * (double)(CoreB->InvRotInertia.x);
@@ -705,7 +705,7 @@ void IVP_ListManager::RecheckFrDistsBeforeSolve()
             if (!(Limit >= (double)(Dist->GapDistance)))
             {
                 // Both original cores share Flags bit 0 or 1: move to the head.
-                const unsigned Shared = Dist->Object2->original_core->Flags & Dist->Object1->original_core->Flags;
+                const unsigned Shared = Dist->Object2->friction_core->Flags & Dist->Object1->friction_core->Flags;
                 if ((Shared & 0x3) != 0)
                 {
                     RemoveCtx(Dist); // 0634b8d0
@@ -758,7 +758,7 @@ void IVP_ListManager::StaticFrOversizedMatrixPanic()
 // 06368f60
 void IVP_ListManager::DoPushesDistanceKeepers(const IVP_Event_Sim* EventSim)
 {
-    IVP_U_Memory* Mem = Environment->vector_cores_active;
+    IVP_U_Memory* Mem = Environment->short_term_mem;
     ++Mem->State;                                         // transaction depth (word +0x10)
     ++G_IVP_FrictionPassCount;
 
@@ -888,7 +888,7 @@ void IVP_ListManager::RecalcAllContactPoints()
         }
         if (Sum > 0.0f)
         {
-            Pair->_field24 = (float)((double)(Sum) + (double)(Pair->_field24));
+            Pair->IntegratedAntiEnergy = (float)((double)(Sum) + (double)(Pair->IntegratedAntiEnergy));
         }
     }
 }
@@ -965,7 +965,8 @@ void IVP_Friction_Sys_Static::do_simulation_controller(IVP_Event_Sim* EventSim, 
 
 // FUN_06356560: FUN_06353f10 on the single dist with friction_dist
 // (DAT_0658ab1c) and 1.0f. A gap >= max_distance_for_friction (ordered) is
-// removed outright; otherwise only when ([Owner+0x54] & 0x300) == 0x100.
+// removed outright; otherwise only when ([Owner+0x54] & 0x300) == 0x100, i.e.
+// the friction-broken bits of Owner+0x55 are 1.
 void IVP_Friction_Sys_Static::DoSimulationSingleFriction(IVP_Event_Sim* EventSim)
 {
     IVP_Contact_Point* Dist = FrictionSystem->CtxListHead;
@@ -973,9 +974,7 @@ void IVP_Friction_Sys_Static::DoSimulationSingleFriction(IVP_Event_Sim* EventSim
 
     if (!(Dist->GapDistance >= G_IVP_MindistSettings.max_distance_for_friction))
     {
-        const uint32_t OwnerState = *reinterpret_cast<const uint32_t*>(
-            reinterpret_cast<const char*>(Dist->Owner) + offsetof(IVP_Impact_Solver_Long_Term, StateProcessed));
-        if ((OwnerState & 0x300u) != 0x100u)
+        if ((Dist->Owner->FrictionIsBroken & 3u) != 1u)
         {
             return;
         }

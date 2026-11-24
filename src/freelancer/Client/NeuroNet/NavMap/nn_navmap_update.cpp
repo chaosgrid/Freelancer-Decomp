@@ -22,7 +22,7 @@
 #include "NeuroNet/nn_inventory.h"           // IsPlayerDockedRetail (FUN_004c4810)
 #include "NeuroNet/nn_text_scratch.h"        // G_NnTextScratchB (DAT_0066fc60), capacity DAT_006119f8
 #include "NeuroNet/nn_tooltip.h"             // FUN_004be2d0 / FUN_004be2f0 / FUN_004be370
-#include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteArgb_679bb0 / _679b80
+#include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteCyan / _679b80
 #include "Space/player_spawn.h"           // waypoints (FUN_004c4690 / 46a0), GetPlayerConnectionId
 #include "Space/Cameras/space_camera.h"           // FSpaceCamera, AsCamera, FUN_0040f8c0 / FUN_0040fb80
 #include "Interface/tooltip_hover.h"
@@ -968,7 +968,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
             Item->Variant = Index + 1;
             Item->Ordinal = Index + 1;
             Item->bShown = 1;
-            NavMapTintFromPalette(Item, G_NnPaletteArgb_679b80);
+            NavMapTintFromPalette(Item, G_NnPaletteViolet);
         }
 
         FNavMapItem* const Item = WaypointItems[Index];
@@ -1024,7 +1024,7 @@ bool NeuroNetNavMap::RefreshWaypointItems()
             BestPathItems[Index] = Item;
             Item->bShown = 0;
             bPathChanged = 1;
-            NavMapTintFromPalette(Item, G_NnPaletteArgb_679b80);
+            NavMapTintFromPalette(Item, G_NnPaletteViolet);
         }
 
         FNavMapItem* const Item = BestPathItems[Index];
@@ -1320,13 +1320,13 @@ namespace
     // labels, then -- from a second copy of the same colour -- on the sixteen grid labels.
     void NavMapTintTexts(NeuroNetNavMap* Map, unsigned char Alpha, uintptr_t bFlag)
     {
-        unsigned long Colour = G_NnPaletteArgb_679bb0;
+        unsigned long Colour = G_NnPaletteCyan;
         reinterpret_cast<unsigned char*>(&Colour)[3] = Alpha;
         Map->SystemNameText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), bFlag);
         for (int Index = 0; Index < 4; ++Index)
             Map->FactionLabels[Index]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour),
                                                    bFlag);
-        unsigned long GridColour = G_NnPaletteArgb_679bb0;
+        unsigned long GridColour = G_NnPaletteCyan;
         reinterpret_cast<unsigned char*>(&GridColour)[3] = Alpha;
         for (int Index = 0; Index < 8; ++Index)
             Map->GridLetters[Index]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&GridColour),
@@ -1339,7 +1339,7 @@ namespace
     // DAT_00679bb0's own alpha byte (the colour copied unchanged at the end of a switch).
     unsigned char NavMapPaletteAlpha()
     {
-        return reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679bb0)[3];
+        return reinterpret_cast<unsigned char const*>(&G_NnPaletteCyan)[3];
     }
 
     // The fade's alpha: ftol((1 - Ease) * the palette's alpha byte).

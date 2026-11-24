@@ -88,13 +88,13 @@ FContentPlayerState::FContentPlayerState(unsigned int InPlayerId)
     : PlayerId(InPlayerId)
     , bCanDock(1)
     , bCanTradelane(1)
-    , ValueD0(0)
-    , ValueD4(-1.0f)
-    , ValueD8(0)
+    , EncounterFlags(0)
+    , MissionAreaTimeout(-1.0f)
+    , LiveMissionId(0)
     , MissionNumber(0)
     , NextVendorOfferId(1)
-    , ValueE4(0)
-    , ValueE8(0)
+    , ManeuverBehaviorId(0)
+    , ManeuverTargetId(0)
 {
     pub::Player::GetRep(PlayerId, Reputation);
 }
@@ -240,15 +240,15 @@ void FContentPlayerState::UpdateTime(float DeltaTime)
     Stats.TotalTimePlayed = DeltaTime + Stats.TotalTimePlayed;
 
     // -1.0f means idle; NaN goes on.
-    if (ValueD4 == -1.0f)
+    if (MissionAreaTimeout == -1.0f)
         return;
 
     // Greater (or unordered) keeps counting; less or equal resets the countdown and bit 2.
-    ValueD4 = ValueD4 - DeltaTime;
-    if (ValueD4 <= 0.0f)
+    MissionAreaTimeout = MissionAreaTimeout - DeltaTime;
+    if (MissionAreaTimeout <= 0.0f)
     {
-        ValueD4 = -1.0f;
-        ValueD0 &= 0xfffffffbu;
+        MissionAreaTimeout = -1.0f;
+        EncounterFlags &= ~static_cast<unsigned int>(PLAYER_FLAG_MISSION_AREA);
     }
 }
 
@@ -267,16 +267,16 @@ void FContentPlayerState::Save(FILE* File)
         FVnpcRecord const& Record = Vnpcs[Index];
         // Retail passes the uninitialized 0x40 stack buffer on a lookup miss too.
         char BaseNickname[0x40];
-        pub::GetBaseNickname(BaseNickname, 0x40, Record.Values[0]);
+        pub::GetBaseNickname(BaseNickname, 0x40, Record.BaseId);
         ID_String VnpcId;
-        VnpcId.Id = Record.Values[1];
-        fprintf(File, "%s = %u, %u, %u, %u ; %s, %s\n", "vnpc", Record.Values[0],
-                Record.Values[1], Record.Values[2], Record.Values[3], BaseNickname,
+        VnpcId.Id = Record.NpcId;
+        fprintf(File, "%s = %u, %u, %u, %u ; %s, %s\n", "vnpc", Record.BaseId,
+                Record.NpcId, Record.TalkCount, Record.MissionState, BaseNickname,
                 VnpcId.get_string());
     }
 
     for (int Index = 0; Index < static_cast<int>(Rumors.size()); ++Index)
-        fprintf(File, "%s = %u, %u\n", "rumor", Rumors[Index].Values[0], Rumors[Index].Values[1]);
+        fprintf(File, "%s = %u, %u\n", "rumor", Rumors[Index].RumorId, Rumors[Index].Count);
 
     fprintf(File, "%s = %d\n", "can_dock", bCanDock != 0 ? 1 : 0);
     for (int Index = 0; Index < static_cast<int>(DockExceptions.size()); ++Index)
@@ -285,8 +285,8 @@ void FContentPlayerState::Save(FILE* File)
     fprintf(File, "%s = %d\n", "can_tl", bCanTradelane != 0 ? 1 : 0);
     for (int Index = 0; Index < static_cast<int>(TradelaneExceptions.size()); ++Index)
     {
-        fprintf(File, "%s = %u, %u\n", "tlr_exception", TradelaneExceptions[Index].Values[0],
-                TradelaneExceptions[Index].Values[1]);
+        fprintf(File, "%s = %u, %u\n", "tlr_exception", TradelaneExceptions[Index].FirstRingId,
+                TradelaneExceptions[Index].SecondRingId);
     }
 
     SaveContentPlayerStats(Stats, File);
@@ -375,8 +375,8 @@ unsigned int FContentPlayerState::FindRumor(unsigned int Id) const
 {
     for (std::vector<FRumorRecord>::const_iterator It = Rumors.begin(); It != Rumors.end(); ++It)
     {
-        if (It->Values[0] == Id)
-            return It->Values[1];
+        if (It->RumorId == Id)
+            return It->Count;
     }
     return 0;
 }
@@ -386,19 +386,19 @@ void FContentPlayerState::AddRumor(unsigned int Id)
 {
     for (std::vector<FRumorRecord>::iterator It = Rumors.begin(); It != Rumors.end(); ++It)
     {
-        if (It->Values[0] == Id)
+        if (It->RumorId == Id)
         {
-            ++It->Values[1];
+            ++It->Count;
             return;
         }
     }
     FRumorRecord Record;
-    Record.Values[0] = Id;
-    Record.Values[1] = 1;
+    Record.RumorId = Id;
+    Record.Count = 1;
     Rumors.push_back(Record);
 }
 
-// FUN_06f48ca0 (06f48ca0-06f48d7c, RET 8). Both searches compare Values[0] and Values[1]
+// FUN_06f48ca0 (06f48ca0-06f48d7c, RET 8). Both searches compare BaseId and NpcId
 // (the first through FUN_06f50140), so they find the same record.
 void FContentPlayerState::RecordVnpcTalk(unsigned int BaseId, unsigned int NpcId)
 {
@@ -407,22 +407,22 @@ void FContentPlayerState::RecordVnpcTalk(unsigned int BaseId, unsigned int NpcId
     std::vector<FVnpcRecord>::iterator It = Vnpcs.begin();
     for (; It != Vnpcs.end(); ++It)
     {
-        if (It->Values[0] == BaseId && It->Values[1] == NpcId)
+        if (It->BaseId == BaseId && It->NpcId == NpcId)
             break;
     }
-    if (It == Vnpcs.end() || It->Values[2] == 0)
+    if (It == Vnpcs.end() || It->TalkCount == 0)
     {
         FVnpcRecord Record;
-        Record.Values[0] = BaseId;
-        Record.Values[1] = NpcId;
-        Record.Values[2] = 1;
-        Record.Values[3] = 0;
+        Record.BaseId = BaseId;
+        Record.NpcId = NpcId;
+        Record.TalkCount = 1;
+        Record.MissionState = VNPC_MISSION_NONE;
         Vnpcs.push_back(Record);
         return;
     }
-    if (It->Values[3] != 1)
-        It->Values[3] = 0;
-    ++It->Values[2];
+    if (It->MissionState != VNPC_MISSION_ACTIVE)
+        It->MissionState = VNPC_MISSION_NONE;
+    ++It->TalkCount;
 }
 
 // FUN_06f48c50 (06f48c50-06f48c5f).
@@ -448,15 +448,15 @@ double FContentPlayerState::GetWorth() const
 // FUN_06f487d0 (06f487d0-06f488ab). A member without a state is skipped.
 unsigned int FContentPlayerState::GetGroupLiveMission() const
 {
-    if (ValueD8 != 0)
-        return ValueD8;
+    if (LiveMissionId != 0)
+        return LiveMissionId;
     std::vector<unsigned int> Members;
     pub::Player::GetGroupMembers(PlayerId, Members);
     for (std::vector<unsigned int>::const_iterator It = Members.begin(); It != Members.end(); ++It)
     {
         FContentPlayerState* Member = FindContentPlayerState(*It);
-        if (Member != nullptr && Member->ValueD8 != 0)
-            return Member->ValueD8;
+        if (Member != nullptr && Member->LiveMissionId != 0)
+            return Member->LiveMissionId;
     }
     return 0;
 }
@@ -541,9 +541,9 @@ int FContentPlayerState::CheckTradelaneRoute(unsigned int RingA, unsigned int Ri
         for (std::vector<FTlrException>::const_iterator Pair = TradelaneExceptions.begin();
              Pair != TradelaneExceptions.end(); ++Pair)
         {
-            if (Lane->ObjectId != Pair->Values[0] || RingA != Pair->Values[0])
+            if (Lane->ObjectId != Pair->FirstRingId || RingA != Pair->FirstRingId)
                 continue;
-            if (RingB == Pair->Values[0] || RingB == Pair->Values[1])
+            if (RingB == Pair->FirstRingId || RingB == Pair->SecondRingId)
             {
                 Result = bCanTradelane != 0 ? 1 : 0;
                 continue;
@@ -552,7 +552,7 @@ int FContentPlayerState::CheckTradelaneRoute(unsigned int RingA, unsigned int Ri
             bool bHit = false;
             for (std::vector<FTradeLaneRing>::const_iterator Ring = Rings.begin(); Ring != Rings.end(); ++Ring)
             {
-                if (Ring->ObjectId == Pair->Values[0] || Ring->ObjectId == Pair->Values[1])
+                if (Ring->ObjectId == Pair->FirstRingId || Ring->ObjectId == Pair->SecondRingId)
                     bInside = !bInside;
                 if (Ring->ObjectId == RingB && bInside)
                 {
@@ -595,7 +595,7 @@ FContentPlayerState* FindContentPlayerStateByLiveMission(unsigned int const* Con
              GContentPlayerStates.begin();
          It != GContentPlayerStates.end(); ++It)
     {
-        if (It->second->ValueD8 == *ControllerId)
+        if (It->second->LiveMissionId == *ControllerId)
             return It->second.get();
     }
     return nullptr;
@@ -677,7 +677,7 @@ unsigned int FContentPlayerState::GetGroupSize() const
 // FUN_06f487c0.
 unsigned int FContentPlayerState::GetLiveMission() const
 {
-    return ValueD8;
+    return LiveMissionId;
 }
 
 namespace
@@ -686,11 +686,11 @@ namespace
     // for the player alone).
     void LeaveLiveMission(FContentPlayerState* State)
     {
-        State->ValueD8 = 0;
+        State->LiveMissionId = 0;
         unsigned int const Message[2] = {0, State->PlayerId};
         unsigned int const NoController = 0;
         pub::Controller::_SendMessage(NoController, pub::Controller::EMessage::PlayerMissionChanged, Message);
-        pub::Player::SetMsnID(State->PlayerId, State->ValueD8, State->PlayerId, false, 0);
+        pub::Player::SetMsnID(State->PlayerId, State->LiveMissionId, State->PlayerId, false, 0);
     }
 }
 
@@ -700,8 +700,8 @@ void FContentPlayerState::EndLiveMission(unsigned int Unused, int VnpcState, boo
     (void)Unused;
     for (int Index = 0; Index < static_cast<int>(Vnpcs.size()); ++Index)
     {
-        if (Vnpcs[Index].Values[3] == 1)
-            Vnpcs[Index].Values[3] = static_cast<unsigned int>(VnpcState);
+        if (Vnpcs[Index].MissionState == VNPC_MISSION_ACTIVE)
+            Vnpcs[Index].MissionState = static_cast<unsigned int>(VnpcState);
     }
     if (!bGroup)
     {
@@ -734,19 +734,19 @@ void UpdateAllContentPlayerTimes(float DeltaTime)
 // FUN_06f471a0 (06f471a0-06f471a6).
 unsigned int FContentPlayerState::GetFlags() const
 {
-    return ValueD0;
+    return EncounterFlags;
 }
 
 // FUN_06f471b0 (06f471b0-06f471ba, RET 4).
 void FContentPlayerState::SetFlags(unsigned int Flags)
 {
-    ValueD0 = Flags;
+    EncounterFlags = Flags;
 }
 
 // FUN_06f471c0 (06f471c0-06f471ca, RET 4).
 void FContentPlayerState::SetCountdown(float Countdown)
 {
-    ValueD4 = Countdown;
+    MissionAreaTimeout = Countdown;
 }
 
 // FUN_06f480e0 (06f480e0-06f4818d, RET 4): the name goes into a local first (GetName's result
@@ -781,13 +781,13 @@ void FContentPlayerState::GetGroupMembers(std::vector<unsigned int>* Out) const
 void FContentPlayerState::JoinMission(unsigned int const* ControllerId, unsigned int SubId,
                                       bool bNotify, unsigned int NotifyArg)
 {
-    ValueD8 = *ControllerId;
+    LiveMissionId = *ControllerId;
     unsigned int const Message[2] = {*ControllerId, PlayerId};
     unsigned int const NoController = 0;
     pub::Controller::_SendMessage(NoController, pub::Controller::EMessage::PlayerMissionChanged, Message);
     if (SubId == 0)
         SubId = PlayerId;
-    pub::Player::SetMsnID(PlayerId, ValueD8, SubId, bNotify, NotifyArg);
+    pub::Player::SetMsnID(PlayerId, LiveMissionId, SubId, bNotify, NotifyArg);
 }
 
 // FUN_06f49090 (06f49090-06f49100, RET 4).
@@ -831,9 +831,9 @@ void FContentPlayerState::JoinMissionAsGroup(unsigned int ControllerId, unsigned
     {
         for (std::vector<FVnpcRecord>::iterator It = Vnpcs.begin(); It != Vnpcs.end(); ++It)
         {
-            if (It->Values[0] == VnpcOwner && It->Values[1] == Vnpc->Id)
+            if (It->BaseId == VnpcOwner && It->NpcId == Vnpc->Id)
             {
-                It->Values[3] = 1;
+                It->MissionState = VNPC_MISSION_ACTIVE;
                 break;
             }
         }
@@ -848,26 +848,26 @@ void FContentPlayerState::JoinMissionAsGroup(unsigned int ControllerId, unsigned
         if (Entry == GContentPlayerStates.end() || Entry->second == nullptr)
             continue;
         FContentPlayerState* Member = Entry->second.get();
-        Member->ValueD8 = ControllerId;
+        Member->LiveMissionId = ControllerId;
         unsigned int const Message[2] = {ControllerId, Member->PlayerId};
         unsigned int const NoController = 0;
         pub::Controller::_SendMessage(NoController, pub::Controller::EMessage::PlayerMissionChanged, Message);
         unsigned int SubId = PlayerId;
         if (SubId == 0)
             SubId = Member->PlayerId;
-        pub::Player::SetMsnID(Member->PlayerId, Member->ValueD8, SubId, bNotify, NotifyArg);
+        pub::Player::SetMsnID(Member->PlayerId, Member->LiveMissionId, SubId, bNotify, NotifyArg);
     }
 }
 
 // FUN_06f48770 (06f48770-06f487b6, RET 0xc).
-bool FContentPlayerState::FindVnpcValue3(unsigned int BaseId, unsigned int const* NpcId,
+bool FContentPlayerState::FindVnpcMissionState(unsigned int BaseId, unsigned int const* NpcId,
                                          unsigned int* OutValue) const
 {
     for (std::vector<FVnpcRecord>::const_iterator It = Vnpcs.begin(); It != Vnpcs.end(); ++It)
     {
-        if (It->Values[0] == BaseId && It->Values[1] == *NpcId)
+        if (It->BaseId == BaseId && It->NpcId == *NpcId)
         {
-            *OutValue = It->Values[3];
+            *OutValue = It->MissionState;
             return true;
         }
     }
@@ -875,38 +875,38 @@ bool FContentPlayerState::FindVnpcValue3(unsigned int BaseId, unsigned int const
 }
 
 // FUN_06f48c60 (06f48c60-06f48c9d, RET 8).
-unsigned int FContentPlayerState::GetVnpcValue2(unsigned int BaseId, unsigned int NpcId) const
+unsigned int FContentPlayerState::GetVnpcTalkCount(unsigned int BaseId, unsigned int NpcId) const
 {
     for (std::vector<FVnpcRecord>::const_iterator It = Vnpcs.begin(); It != Vnpcs.end(); ++It)
     {
-        if (It->Values[0] == BaseId && It->Values[1] == NpcId)
-            return It->Values[2];
+        if (It->BaseId == BaseId && It->NpcId == NpcId)
+            return It->TalkCount;
     }
     return 0;
 }
 
 // FUN_06f48c20 (06f48c20-06f48c2a, RET 4).
-void FContentPlayerState::SetValueE4(unsigned int Value)
+void FContentPlayerState::SetManeuverBehaviorId(unsigned int Value)
 {
-    ValueE4 = Value;
+    ManeuverBehaviorId = Value;
 }
 
 // FUN_06f48c40 (06f48c40-06f48c4a, RET 4).
-void FContentPlayerState::SetValueE8(unsigned int Value)
+void FContentPlayerState::SetManeuverTargetId(unsigned int Value)
 {
-    ValueE8 = Value;
+    ManeuverTargetId = Value;
 }
 
 // FUN_06f48c10 (06f48c10-06f48c16).
-unsigned int FContentPlayerState::GetValueE4() const
+unsigned int FContentPlayerState::GetManeuverBehaviorId() const
 {
-    return ValueE4;
+    return ManeuverBehaviorId;
 }
 
 // FUN_06f48c30 (06f48c30-06f48c36).
-unsigned int FContentPlayerState::GetValueE8() const
+unsigned int FContentPlayerState::GetManeuverTargetId() const
 {
-    return ValueE8;
+    return ManeuverTargetId;
 }
 
 // FUN_06f48fb0 (06f48fb0-06f49020, RET 4).
@@ -1032,7 +1032,7 @@ void FContentPlayerShip::UpdateHostileContacts(float DeltaTime)
         HostileContactCount = 0;
         FSystemInfo* CalmSystem = GetSystem();
         if (CalmSystem != nullptr)
-            CalmSystem->SetNpcShipsField1b1(true);                            // FUN_06f73bb0
+            CalmSystem->SetNpcShipsCommEnabled(true);                            // FUN_06f73bb0
         return;
     }
 
@@ -1042,5 +1042,5 @@ void FContentPlayerShip::UpdateHostileContacts(float DeltaTime)
     CalmSince = static_cast<double>(-1.0f);
     FSystemInfo* HostileSystem = GetSystem();
     if (HostileSystem != nullptr)
-        HostileSystem->SetNpcShipsField1b1(false);                            // FUN_06f73bb0
+        HostileSystem->SetNpcShipsCommEnabled(false);                            // FUN_06f73bb0
 }

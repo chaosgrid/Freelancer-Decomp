@@ -4,61 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "common_physys.h"
-
-#include "common_archetype.h"
-#include "common_cobject.h"
-#include "common_cobjdb.h"
-#include "common_id.h"
-#include "common_universe.h"
-#include "common_net.h"
-#include "common_phyarch.h"
-#include "common_misc.h"
-#include "common_server.h"
-
-#include "dacom.h"
-#include "DALib.h"
-#include "x86math.h"  // FQuaternion, FMatrix
-#include "ivp_collision/ivp_collision.h"
-#include "ivp_physics/ivp_core.h"
-#include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_environment.h"
-#include "ivp_physics/ivp_controller.h"
-#include "ivp_physics/ivp_material.h"
-#include "ivp_physics/ivp_listener.h"
-#include "ivp_physics/ivp_mindist_settings.h"
-#include "ivp_physics/ivp_mindist.h"
-#include "common_csys.h"  // Acquire3DMathEngine
-#include "x87_trig.h"     // X87SinF / X87CosF (PhySys_UpdateJointedChildren)
-#include "ivp_compact_builder/ivp_compact_ledge.h"
-#include "ivp_compact_builder/ivp_surface_builder_pointsoup.h" // the default part's hull
-#include "ivp_compact_builder/ivp_surface_builder_ledge_soup.h" // the default part's surface
-#include "ivp_physics/ivp_surman_polygon.h"
-#include "ivp_collision/ivp_ray_solver.h"
-#include "ivp_collision/ivp_sphere_query.h"
-
-#include <assert.h>
-#include <float.h>
-#include <math.h>
-#include <new>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <map>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <mmsystem.h>
-
-// Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
-#ifdef GetCurrentTime
-#undef GetCurrentTime
-#endif
-
 #include "Physics/common_physys_internal.h"
+#include "x87_trig.h"     // X87SinF / X87CosF (PhySys_UpdateJointedChildren)
 
 using namespace CmnPhySys;
 
@@ -328,25 +275,26 @@ float __cdecl Collision::GetImpactDamageFromType(unsigned TypeId)
     return 0.0f;
 }
 
-// FUN_06302ba0. x87: the length stays unrounded; AbsDot and Ratio are stored as floats.
-// Returns 0 for a zero or NaN Normal length. Note the ratio uses |Normal| (not |RelVel|) over
-// max_impact_speed.
-float __cdecl Collision::CalcCollisionDamage(unsigned TypeId, Vector const& RelVel,
-                                              Vector const& Normal)
+// FUN_06302ba0: type damage * (|RelVel| / max_impact_speed) * |Normal . unit(RelVel)|. No
+// retail binary calls it; the third argument is the velocity (its length is the one divided by
+// max_impact_speed). x87: the length stays unrounded; AbsDot and Ratio are stored as floats.
+// Returns 0 for a zero or NaN RelVel length.
+float __cdecl Collision::CalcCollisionDamage(unsigned TypeId, Vector const& Normal,
+                                              Vector const& RelVel)
 {
-    const double NormalX = (double)(Normal.x);
-    const double NormalY = (double)(Normal.y);
-    const double NormalZ = (double)(Normal.z);
-    const double Len = sqrt((NormalX * NormalX + NormalY * NormalY) + NormalZ * NormalZ);
+    const double RelVelX = (double)(RelVel.x);
+    const double RelVelY = (double)(RelVel.y);
+    const double RelVelZ = (double)(RelVel.z);
+    const double Len = sqrt((RelVelX * RelVelX + RelVelY * RelVelY) + RelVelZ * RelVelZ);
     if (!(Len > 0.0))
     {
         return 0.0f;
     }
 
     const double Inv = 1.0 / Len;
-    const double Dot = ((NormalZ * Inv) * (double)(RelVel.z) +
-                        (NormalY * Inv) * (double)(RelVel.y)) +
-                       (NormalX * Inv) * (double)(RelVel.x);
+    const double Dot = ((RelVelZ * Inv) * (double)(Normal.z) +
+                        (RelVelY * Inv) * (double)(Normal.y)) +
+                       (RelVelX * Inv) * (double)(Normal.x);
     const float AbsDot = (float)(fabs(Dot));
     const float Ratio = (float)(Len / (double)(G_CollisionMaxImpactSpeed));
 
@@ -359,14 +307,15 @@ float __cdecl Collision::CalcCollisionDamage(unsigned TypeId, Vector const& RelV
     return (float)(Damage * ((double)(Ratio) * (double)(AbsDot)));
 }
 
-// FUN_06302cb0: the speed ratio applies only when MaxSpeed > ActualSpeed (NaN takes 1.0).
-// x87: Scaled stays unrounded.
-float __cdecl Collision::CalcCollisionDamage(float DamageFactor, float MaxSpeed, float ActualSpeed)
+// FUN_06302cb0: COLLISION_DAMAGE_FACTOR * Speed, scaled by OtherMass / Mass only when
+// Mass > OtherMass (NaN takes 1.0). Every retail caller passes the relative speed and two
+// get_mass results. x87: Scaled stays unrounded.
+float __cdecl Collision::CalcCollisionDamage(float Speed, float Mass, float OtherMass)
 {
-    const double Scaled = (double)(COLLISION_DAMAGE_FACTOR) * (double)(DamageFactor);
-    if (MaxSpeed > ActualSpeed)
+    const double Scaled = (double)(COLLISION_DAMAGE_FACTOR) * (double)(Speed);
+    if (Mass > OtherMass)
     {
-        return (float)(Scaled * ((double)(ActualSpeed) / (double)(MaxSpeed)));
+        return (float)(Scaled * ((double)(OtherMass) / (double)(Mass)));
     }
     return (float)(Scaled * 1.0);
 }

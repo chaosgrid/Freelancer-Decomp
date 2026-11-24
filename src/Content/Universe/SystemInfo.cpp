@@ -668,9 +668,9 @@ bool FSystemInfo::IsSeenByPlayerShip(Vector const* Point, float const* MaxDistan
     return false;
 }
 
-// FUN_06f73130. Both ring outputs reuse the argument slots in retail; only the +0x124 id is
+// FUN_06f73130. Both ring outputs reuse the argument slots in retail; only the end ring is
 // read.
-bool FSystemInfo::IsNearPlayerField124Object(Vector const* Point, float const* Radius)
+bool FSystemInfo::IsNearPlayerTradeLaneEndRing(Vector const* Point, float const* Radius)
 {
     float const RadiusSq = static_cast<float>(static_cast<double>(*Radius) * *Radius);
     for (std::vector<FContentPlayerState*>::iterator It = Players.begin(); It != Players.end(); ++It)
@@ -678,12 +678,12 @@ bool FSystemInfo::IsNearPlayerField124Object(Vector const* Point, float const* R
         FContentPlayerShip* Ship = (*It)->ShipObject;
         if (Ship == nullptr || !Ship->IsInTradeLane())                      // FUN_06f57710
             continue;
-        unsigned int Id120;
-        unsigned int Id124;
-        Ship->GetTradeLaneRings(&Id120, &Id124);                                // FUN_06f57720
+        unsigned int EntryRing;
+        unsigned int EndRing;
+        Ship->GetTradeLaneRings(&EntryRing, &EndRing);                                // FUN_06f57720
         Vector Position;
         Matrix Orientation;
-        pub::SpaceObj::GetLocation(Id124, Position, Orientation);         // result ignored
+        pub::SpaceObj::GetLocation(EndRing, Position, Orientation);         // result ignored
         if (DistanceSquaredBetween(Point, &Position) <= RadiusSq)
             return true;
     }
@@ -691,7 +691,7 @@ bool FSystemInfo::IsNearPlayerField124Object(Vector const* Point, float const* R
 }
 
 // FUN_06f73210.
-bool FSystemInfo::IsNearPlayerField120Segment(Vector const* Point, float const* Radius)
+bool FSystemInfo::IsNearPlayerTradeLaneSegment(Vector const* Point, float const* Radius)
 {
     float const RadiusSq = static_cast<float>(static_cast<double>(*Radius) * *Radius);
     for (std::vector<FContentPlayerState*>::iterator It = Players.begin(); It != Players.end(); ++It)
@@ -699,14 +699,14 @@ bool FSystemInfo::IsNearPlayerField120Segment(Vector const* Point, float const* 
         FContentPlayerShip* Ship = (*It)->ShipObject;
         if (Ship == nullptr || !Ship->IsInTradeLane())                      // FUN_06f57710
             continue;
-        unsigned int Id120;
-        unsigned int Id124;
-        Ship->GetTradeLaneRings(&Id120, &Id124);                                // FUN_06f57720
+        unsigned int EntryRing;
+        unsigned int EndRing;
+        Ship->GetTradeLaneRings(&EntryRing, &EndRing);                                // FUN_06f57720
         Vector Start;
         Vector End;
         Matrix Orientation;
-        pub::SpaceObj::GetLocation(Id120, Start, Orientation);
-        pub::SpaceObj::GetLocation(Id124, End, Orientation);
+        pub::SpaceObj::GetLocation(EntryRing, Start, Orientation);
+        pub::SpaceObj::GetLocation(EndRing, End, Orientation);
         Vector Closest;
         if (DistanceSquaredToSegment(Point, &Start, &End, &Closest) <= RadiusSq)
             return true;
@@ -768,9 +768,9 @@ void FSystemInfo::AddJumpingInSpaceObj(FContentSpaceObj* Object, unsigned int Ga
 }
 
 // FUN_06f73bb0: every object of SpaceObjs is taken as an NPC ship (no type check).
-void FSystemInfo::SetNpcShipsField1b1(bool bClear)
+void FSystemInfo::SetNpcShipsCommEnabled(bool bEnabled)
 {
-    bool const bValue = !bClear;
+    bool const bValue = !bEnabled;
     for (std::list<FContentSpaceObj*>::iterator It = SpaceObjs.begin(); It != SpaceObjs.end(); ++It)
         static_cast<FContentNpcShip*>(*It)->SetCommMuted(bValue);
 }
@@ -809,7 +809,7 @@ double FSystemInfo::GetNpcShipLifeRate(FContentNpcShip* Ship)
 
         Radius = 4000.0f;
         Ship->GetPosition(&Position);
-        if (IsNearPlayerField124Object(&Position, &Radius))
+        if (IsNearPlayerTradeLaneEndRing(&Position, &Radius))
             return PlayerNear;
     }
     else
@@ -820,13 +820,13 @@ double FSystemInfo::GetNpcShipLifeRate(FContentNpcShip* Ship)
             return PlayerNear;
         Radius = 4000.0f;
         Ship->GetPosition(&Position);
-        if (IsNearPlayerField124Object(&Position, &Radius))
+        if (IsNearPlayerTradeLaneEndRing(&Position, &Radius))
             return PlayerNear;
     }
 
     Radius = 2500.0f;
     Ship->GetPosition(&Position);
-    if (IsNearPlayerField120Segment(&Position, &Radius))
+    if (IsNearPlayerTradeLaneSegment(&Position, &Radius))
         return PlayerNear;
 
     // 6250000.0f is DAT_06fb6054, 15.0f DAT_06fbbf08; unordered gives 15.
@@ -1405,7 +1405,7 @@ void FSystemInfo::SpawnTradeLaneAttack(FContentPlayerShip* PlayerShip, int const
 {
     // The player state is not null-tested.
     unsigned int ShipId = PlayerShip->SpaceObjId;
-    if ((FindContentPlayerStateByShip(&ShipId)->GetFlags() & 8) != 0)
+    if ((FindContentPlayerStateByShip(&ShipId)->GetFlags() & PLAYER_FLAG_MISSION_DEST_SYSTEM) != 0)
         return;
 
     // 180.0 is DAT_06fbbf90; otherwise only a LastAttackTime equal to 0 goes on (NaN returns).
@@ -1894,23 +1894,23 @@ bool __cdecl IsPointInViewCone(Vector const* Point, FSpaceObjPlacement const* Vi
 
 // FUN_06f72930.
 int FSystemInfo::SendComm(unsigned int SenderId, unsigned int TargetId, unsigned int TextId,
-                          unsigned int VoiceId, unsigned int CommType,
+                          unsigned int VoiceId, unsigned int CaptionIds,
                           Costume const* CommCostume, float Duration)
 {
     int TextCount = 1;
-    return SendSpaceComm(this, SenderId, TargetId, &TextId, &TextCount, VoiceId, CommType,
+    return SendSpaceComm(this, SenderId, TargetId, &TextId, &TextCount, VoiceId, CaptionIds,
                          CommCostume, 0, Duration, true);
 }
 
 // TU53 FUN_06f60dd0: argument 1 is never read.
 int __cdecl SendSpaceComm(void const* Unused, unsigned int SenderId, unsigned int TargetId,
                           unsigned int* TextIds, int const* TextCount, unsigned int VoiceId,
-                          unsigned int CommType, Costume const* CommCostume, unsigned int Mood,
+                          unsigned int CaptionIds, Costume const* CommCostume, unsigned int PermutationIds,
                           float Duration, bool bInterrupt)
 {
     (void)Unused;
-    return pub::SpaceObj::SendComm(SenderId, TargetId, VoiceId, CommCostume, CommType,
-                                   TextIds, *TextCount, Mood, Duration, bInterrupt);
+    return pub::SpaceObj::SendComm(SenderId, TargetId, VoiceId, CommCostume, CaptionIds,
+                                   TextIds, *TextCount, PermutationIds, Duration, bInterrupt);
 }
 
 // FUN_06f75f20.

@@ -9,6 +9,7 @@
 
 #include "ivp_vhash.h"
 
+#include "ivp_core_trap.h"
 #include "ivp_crc32.h"
 
 #include <cstdlib>
@@ -74,15 +75,15 @@ namespace
     }
 }
 
-// FUN_06352320: grows to exactly param_1 buckets and re-inserts every entry
+// FUN_06352320: grows to exactly NewSize buckets and re-inserts every entry
 // through AddElem (which bumps the count), then restores the pre-rehash count
 // and frees the old array unless the "not owned" flag is set.
-void IVP_VHash::Rehash(int param_1)
+void IVP_VHash::Rehash(int NewSize)
 {
     int oldMask = SizeMm;
     FVHashElem* oldBuckets = static_cast<FVHashElem*>(Elems);
-    SizeMm = param_1 - 1;
-    Elems = calloc(static_cast<size_t>(param_1), 0x8); // FUN_06343f80
+    SizeMm = NewSize - 1;
+    Elems = calloc(static_cast<size_t>(NewSize), 0x8); // FUN_06343f80
     unsigned preRehashCount = NElemsAndFlags;
 
     if (oldMask >= 0)
@@ -111,8 +112,8 @@ void IVP_VHash::Rehash(int param_1)
 // FUN_063523d0: doubles the table (to 2*mask+2) at 50% load, then the Robin
 // Hood insert: at each occupied slot the incoming entry displaces a resident
 // that sits closer to its ideal bucket, and the resident is carried forward.
-// param_1 = value, param_2 = hash (already | 0x80000000).
-void IVP_VHash::AddElem(void* param_1, unsigned param_2)
+// HashIndex is already | 0x80000000.
+void IVP_VHash::AddElem(void* Elem, unsigned HashIndex)
 {
     int mask = SizeMm;
     int doubledCount = static_cast<int>((NElemsAndFlags & 0xffffffu)) * 2;
@@ -121,8 +122,8 @@ void IVP_VHash::AddElem(void* param_1, unsigned param_2)
         Rehash(mask * 2 + 2);
     }
 
-    void* value = param_1;
-    unsigned hash = param_2;
+    void* value = Elem;
+    unsigned hash = HashIndex;
 
     unsigned mask2 = static_cast<unsigned>(SizeMm);
     unsigned idx = mask2 & hash;
@@ -155,12 +156,11 @@ void IVP_VHash::AddElem(void* param_1, unsigned param_2)
     slot->hashTag = hash;
 }
 
-// FUN_06352480: probe from hash & mask, calling Compare(stored, param_1) on
-// each tag match, then backward-shift deletion. param_1 = query, param_2 =
-// hash.
-void* IVP_VHash::RemoveElem(void* param_1, unsigned param_2)
+// FUN_06352480: probe from HashIndex & mask, calling Compare(stored, Elem) on
+// each tag match, then backward-shift deletion.
+void* IVP_VHash::RemoveElem(void* Elem, unsigned HashIndex)
 {
-    unsigned idx = param_2 & static_cast<unsigned>(SizeMm);
+    unsigned idx = HashIndex & static_cast<unsigned>(SizeMm);
     FVHashElem* slot;
     for (;;)
     {
@@ -168,12 +168,12 @@ void* IVP_VHash::RemoveElem(void* param_1, unsigned param_2)
         slot = &buckets[idx];
         if (slot->value == nullptr)
         {
-            // Retail writes to address 0 when the element is absent.
-            *reinterpret_cast<volatile int*>(0) = 0;
+            // Retail writes to address 0 when the element is absent (063524a0).
+            IVP_CoreTrap();
         }
-        if (((slot->hashTag | 0x80000000u) == param_2))
+        if (((slot->hashTag | 0x80000000u) == HashIndex))
         {
-            if (Compare(slot->value, param_1) == 1)
+            if (Compare(slot->value, Elem) == 1)
             {
                 break;
             }
@@ -236,9 +236,9 @@ void* IVP_VHash::RemoveElem(void* param_1, unsigned param_2)
 }
 
 // FUN_06352580: the same probe as RemoveElem, returning null at an empty slot.
-void* IVP_VHash::FindElem(void* param_1, unsigned param_2)
+void* IVP_VHash::FindElem(void* Elem, unsigned HashIndex)
 {
-    unsigned idx = param_2 & static_cast<unsigned>(SizeMm);
+    unsigned idx = HashIndex & static_cast<unsigned>(SizeMm);
     FVHashElem* buckets = static_cast<FVHashElem*>(Elems);
     FVHashElem* slot = &buckets[idx];
     void* value = slot->value;
@@ -249,9 +249,9 @@ void* IVP_VHash::FindElem(void* param_1, unsigned param_2)
         {
             return nullptr;
         }
-        if ((slot->hashTag | 0x80000000u) == param_2)
+        if ((slot->hashTag | 0x80000000u) == HashIndex)
         {
-            if (Compare(value, param_1) != 0)
+            if (Compare(value, Elem) != 0)
             {
                 break;
             }
@@ -272,9 +272,9 @@ void* IVP_VHash::FindElem(void* param_1, unsigned param_2)
 // FUN_0635d4d0: the called copy of the CRC-32-over-4-bytes hash IVP_VHash_Store
 // inlines, | 0x80000000. Caller: IVP_Cluster_Manager (ivp_cluster_manager.cpp),
 // feeding IVP_VHash::FindElem.
-unsigned __fastcall IVP_VHash_HashPointer(unsigned param_1)
+unsigned __fastcall IVP_VHash_HashPointer(unsigned Key)
 {
-    return HashKey_063edcdc(param_1) | 0x80000000u;
+    return HashKey_063edcdc(Key) | 0x80000000u;
 }
 
 // ============================================================================
@@ -297,13 +297,13 @@ namespace
 
 // FUN_063525f0. The array must be zeroed (FUN_06343f80 = calloc): an empty
 // slot is value == 0.
-IVP_VHash_Store::IVP_VHash_Store(int param_1)
+IVP_VHash_Store::IVP_VHash_Store(int InSize)
 {
-    SizeMm = param_1 - 1;
-    Size = param_1;
+    SizeMm = InSize - 1;
+    Size = InSize;
     NElems = 0;
     Field_0x10 = nullptr;
-    ElemsStore = calloc(static_cast<size_t>(param_1), 0xc);
+    ElemsStore = calloc(static_cast<size_t>(InSize), 0xc);
 }
 
 // FUN_06352620 (also reached through thunk_FUN_06352620).
@@ -318,13 +318,13 @@ IVP_VHash_Store::~IVP_VHash_Store()
 
 // FUN_06352650: regrow and re-insert through the raw insert, then free the
 // old array. Called from the raw insert at 50% load.
-void IVP_VHash_Store::Rehash(int param_1)
+void IVP_VHash_Store::Rehash(int NewSize)
 {
     FVHashStoreElem* oldBuckets = static_cast<FVHashStoreElem*>(ElemsStore);
     int oldCapacity = Size;
-    Size = param_1;
-    SizeMm = param_1 - 1;
-    ElemsStore = calloc(static_cast<size_t>(param_1), 0xc); // FUN_06343f80
+    Size = NewSize;
+    SizeMm = NewSize - 1;
+    ElemsStore = calloc(static_cast<size_t>(NewSize), 0xc); // FUN_06343f80
     int savedCount = NElems;
     if (oldCapacity > 0)
     {
@@ -344,74 +344,75 @@ void IVP_VHash_Store::Rehash(int param_1)
 }
 
 // FUN_063526d0
-void IVP_VHash_Store::AddElem(void* param_1, void* param_2)
+void IVP_VHash_Store::AddElem(void* Key, void* Value)
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
-    AddElem(param_1, param_2, hash);
+    unsigned hash = HashKey_063edcdc((unsigned)Key) | 0x80000000;
+    AddElem(Key, Value, hash);
 }
 
-// FUN_06352720: raw Robin Hood insert. param_1 = key, param_2 = value,
-// param_3 = hash (top bit already set).
-void IVP_VHash_Store::AddElem(void* param_1, void* param_2, unsigned param_3)
+// FUN_06352720: raw Robin Hood insert (HashIndex has its top bit set). The
+// carried entry starts as (Key, Value, HashIndex) and is swapped with each
+// resident that sits closer to its ideal bucket.
+void IVP_VHash_Store::AddElem(void* Key, void* Value, unsigned HashIndex)
 {
     if (Size <= NElems * 2)
     {
         Rehash(Size * 2);
     }
-    FVHashStoreElem* base = static_cast<FVHashStoreElem*>(ElemsStore);
-    unsigned uVar7 = static_cast<unsigned>(SizeMm);
-    unsigned uVar5 = uVar7 & param_3;
-    FVHashStoreElem* puVar1 = &base[uVar5];
+    FVHashStoreElem* buckets = static_cast<FVHashStoreElem*>(ElemsStore);
+    unsigned mask = static_cast<unsigned>(SizeMm);
+    unsigned idx = mask & HashIndex;
+    FVHashStoreElem* slot = &buckets[idx];
     NElems = NElems + 1;
-    void* uVar2 = puVar1->key;
-    unsigned uVar6 = uVar5;
-    void* uVar4 = param_2;
-    while (uVar2 != nullptr)
+    void* residentKey = slot->key;
+    unsigned carryIdeal = idx;
+    void* carryValue = Value;
+    while (residentKey != nullptr)
     {
-        unsigned uVar3 = puVar1->hash;
-        uVar7 = uVar3 & uVar7;
-        param_2 = uVar4;
-        if (static_cast<int>(uVar6) < static_cast<int>(uVar7))
+        unsigned residentHash = slot->hash;
+        unsigned residentIdeal = residentHash & mask;
+        void* nextCarryValue = carryValue;
+        if (static_cast<int>(carryIdeal) < static_cast<int>(residentIdeal))
         {
-            param_2 = puVar1->value;
-            puVar1->key = param_1;
-            puVar1->value = uVar4;
-            puVar1->hash = param_3;
-            uVar6 = uVar7;
-            param_1 = uVar2;
-            param_3 = uVar3;
+            nextCarryValue = slot->value;
+            slot->key = Key;
+            slot->value = carryValue;
+            slot->hash = HashIndex;
+            carryIdeal = residentIdeal;
+            Key = residentKey;
+            HashIndex = residentHash;
         }
-        uVar7 = static_cast<unsigned>(SizeMm);
-        uVar5 = (uVar5 + 1) & uVar7;
-        base = static_cast<FVHashStoreElem*>(ElemsStore);
-        puVar1 = &base[uVar5];
-        uVar4 = param_2;
-        uVar2 = puVar1->key;
+        mask = static_cast<unsigned>(SizeMm);
+        idx = (idx + 1) & mask;
+        buckets = static_cast<FVHashStoreElem*>(ElemsStore);
+        slot = &buckets[idx];
+        carryValue = nextCarryValue;
+        residentKey = slot->key;
     }
-    puVar1->key = param_1;
-    puVar1->value = uVar4;
-    puVar1->hash = param_3;
+    slot->key = Key;
+    slot->value = carryValue;
+    slot->hash = HashIndex;
 }
 
 // FUN_063527e0: returns the removed value (the raw erase's EAX).
-void* IVP_VHash_Store::RemoveElem(void* param_1)
+void* IVP_VHash_Store::RemoveElem(void* Key)
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
-    return RemoveElem(param_1, hash);
+    unsigned hash = HashKey_063edcdc((unsigned)Key) | 0x80000000;
+    return RemoveElem(Key, hash);
 }
 
 // FUN_06352830: raw backward-shift erase; returns the removed value. No
 // not-found exit: the probe loops until the key is found.
-void* IVP_VHash_Store::RemoveElem(void* param_1, unsigned param_2)
+void* IVP_VHash_Store::RemoveElem(void* Key, unsigned HashIndex)
 {
     FVHashStoreElem* buckets = static_cast<FVHashStoreElem*>(ElemsStore);
     unsigned mask = static_cast<unsigned>(SizeMm);
-    unsigned probe = param_2;
+    unsigned probe = HashIndex;
     unsigned foundIdx;
     for (;;)
     {
         probe = mask & probe;
-        if (((buckets[probe].hash | 0x80000000) == param_2) && (buckets[probe].key == param_1))
+        if (((buckets[probe].hash | 0x80000000) == HashIndex) && (buckets[probe].key == Key))
         {
             foundIdx = probe;
             break;
@@ -421,70 +422,68 @@ void* IVP_VHash_Store::RemoveElem(void* param_1, unsigned param_2)
     void* removedValue = buckets[foundIdx].value;
     NElems = NElems - 1;
 
-    unsigned uVar7 = foundIdx;
-    unsigned uVar5 = mask;
-    unsigned refDist = uVar5;
-    if (buckets[uVar5].key != nullptr)
+    unsigned vacant = foundIdx;
+    unsigned refDist = mask;
+    if (buckets[mask].key != nullptr)
     {
-        refDist = buckets[uVar5].hash & uVar5;
+        refDist = buckets[mask].hash & mask;
     }
-    unsigned uVar8 = (uVar7 + 1) & uVar5;
-    FVHashStoreElem* puVar2 = &buckets[uVar8];
-    while (puVar2->key != nullptr)
+    unsigned scan = (vacant + 1) & mask;
+    FVHashStoreElem* scanSlot = &buckets[scan];
+    while (scanSlot->key != nullptr)
     {
-        unsigned uVar9 = puVar2->hash & uVar5;
+        unsigned scanIdeal = scanSlot->hash & mask;
         bool doShift = false;
-        if (static_cast<int>(uVar7) < static_cast<int>(uVar8))
+        if (static_cast<int>(vacant) < static_cast<int>(scan))
         {
-            if (((static_cast<int>(refDist) <= static_cast<int>(uVar9)) &&
-                 (uVar9 != refDist || static_cast<int>(uVar8) < static_cast<int>(uVar9))) ||
-                (static_cast<int>(uVar9) <= static_cast<int>(uVar7)))
+            if (((static_cast<int>(refDist) <= static_cast<int>(scanIdeal)) &&
+                 (scanIdeal != refDist || static_cast<int>(scan) < static_cast<int>(scanIdeal))) ||
+                (static_cast<int>(scanIdeal) <= static_cast<int>(vacant)))
             {
                 doShift = true;
             }
         }
         else
         {
-            if (uVar7 != uVar5)
+            if (vacant != mask)
             {
                 break;
             }
-            if (static_cast<int>(refDist) <= static_cast<int>(uVar9))
+            if (static_cast<int>(refDist) <= static_cast<int>(scanIdeal))
             {
                 doShift = true;
             }
         }
         if (doShift)
         {
-            buckets[uVar7] = *puVar2;
-            uVar7 = uVar8;
+            buckets[vacant] = *scanSlot;
+            vacant = scan;
         }
         mask = static_cast<unsigned>(SizeMm);
-        uVar5 = mask;
         buckets = static_cast<FVHashStoreElem*>(ElemsStore);
-        uVar8 = (uVar8 + 1) & uVar5;
-        puVar2 = &buckets[uVar8];
+        scan = (scan + 1) & mask;
+        scanSlot = &buckets[scan];
     }
-    buckets[uVar7].key = nullptr;
-    buckets[uVar7].hash = 0;
+    buckets[vacant].key = nullptr;
+    buckets[vacant].hash = 0;
     return removedValue;
 }
 
 // FUN_06352930
-void* IVP_VHash_Store::FindElem(void* param_1)
+void* IVP_VHash_Store::FindElem(void* Key)
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
-    return FindElem(param_1, hash);
+    unsigned hash = HashKey_063edcdc((unsigned)Key) | 0x80000000;
+    return FindElem(Key, hash);
 }
 
 // FUN_06352980: raw find. The probe count is bounded by the capacity, as in
 // retail.
-void* IVP_VHash_Store::FindElem(void* param_1, unsigned param_2)
+void* IVP_VHash_Store::FindElem(void* Key, unsigned HashIndex)
 {
     int probes = 0;
     if (Size > 0)
     {
-        unsigned idx = param_2;
+        unsigned idx = HashIndex;
         do
         {
             idx = static_cast<unsigned>(SizeMm) & idx;
@@ -495,7 +494,7 @@ void* IVP_VHash_Store::FindElem(void* param_1, unsigned param_2)
             {
                 return nullptr;
             }
-            if (((slot->hash | 0x80000000) == param_2) && (slot->key == param_1))
+            if (((slot->hash | 0x80000000) == HashIndex) && (slot->key == Key))
             {
                 return slot->value;
             }
@@ -507,9 +506,9 @@ void* IVP_VHash_Store::FindElem(void* param_1, unsigned param_2)
 
 // FUN_063529e0: update-only (no insert when the key is absent). Used by
 // IVP_Controller_Phantom to bump a per-pair reference count.
-void IVP_VHash_Store::ChangeElem(void* param_1, void* param_2)
+void IVP_VHash_Store::ChangeElem(void* Key, void* NewValue)
 {
-    unsigned crc = HashKey_063edcdc((unsigned)param_1);
+    unsigned crc = HashKey_063edcdc((unsigned)Key);
     if (Size > 0)
     {
         unsigned hash = crc | 0x80000000;
@@ -525,9 +524,9 @@ void IVP_VHash_Store::ChangeElem(void* param_1, void* param_2)
             {
                 return;
             }
-            if (((slot->hash | 0x80000000) == hash) && (slot->key == param_1))
+            if (((slot->hash | 0x80000000) == hash) && (slot->key == Key))
             {
-                slot->value = param_2;
+                slot->value = NewValue;
                 return;
             }
             idx = idx + 1;

@@ -154,7 +154,7 @@ void SystemManagerGunGroupManager::RandomizeSlotTiming(FGunGroupSlot* Slot)
     case FGunGroupSlot::KindSeeker:
         Result = JitterAround(MissileLaunchIntervalVariance, MissileLaunchIntervalTime);
         break;
-    case FGunGroupSlot::KindHpType10:
+    case FGunGroupSlot::KindTorpedo:
     case FGunGroupSlot::KindMineDropper:
         // The doubles at .rdata:063a07f0 / 063a07e8 are (double)0.40000004f and (double)0.8f.
         Slot->BurstTime = 0.0f;
@@ -234,7 +234,7 @@ int SystemManagerGunGroupManager::PopulateSlots(unsigned short const* SourceIds,
                 {
                 case 0: NewKind = FGunGroupSlot::KindPlain; break;
                 case 1: NewKind = FGunGroupSlot::KindSeeker; break;
-                case 2: NewKind = FGunGroupSlot::KindHpType10; break;
+                case 2: NewKind = FGunGroupSlot::KindTorpedo; break;
                 case 3: NewKind = FGunGroupSlot::KindCruiseDisruptor; break;
                 default: break; // retail's own jump table has exactly 4 entries; anything else leaves the field untouched
                 }

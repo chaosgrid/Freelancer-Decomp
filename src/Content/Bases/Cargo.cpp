@@ -483,11 +483,11 @@ void __cdecl GenerateCargo(FSystemInfo* Unused, FContentNpcShipParams* Params,
     // +0xfc taken as an FGuideDesc without a type check, as retail does: this path only runs
     // for encounter ships.
     FGuideDesc* const Desc = static_cast<FGuideDesc*>(Params->GuideDesc.Pointer);  // +0xfc
-    unsigned int Id54;
-    unsigned int Id58;
+    unsigned int FromTargetId;                                             // +0x54, unused
+    unsigned int ToTargetId;                                               // +0x58, unused
     FContentBase* FromBase = nullptr;                                      // +0x5c
     FContentBase* ToBase = nullptr;                                        // +0x60
-    Desc->GetTargets(&Id54, &Id58, &FromBase, &ToBase);                    // FUN_06f062d0
+    Desc->GetTargets(&FromTargetId, &ToTargetId, &FromBase, &ToBase);      // FUN_06f062d0
 
     int Attempt = 0;
     do

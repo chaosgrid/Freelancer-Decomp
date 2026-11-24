@@ -85,15 +85,7 @@ void NnNetworkOperation::Close()
     if (ResultFn != nullptr)
         ResultFn(ResultArg, 0);
     ReleaseMouse();
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child);
-        Child = Next;
-    }
-    Destroy();
-    delete this;
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
 }
 
 void NnNetworkOperation::Draw()

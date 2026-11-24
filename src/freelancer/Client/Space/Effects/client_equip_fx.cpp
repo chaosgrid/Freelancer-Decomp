@@ -145,30 +145,28 @@ namespace
     // EquippedObj+0xb8 list node (FUN_0042a7e0 operator_new(0xc)), published as FEquipFxListNode.
     using FCliEquipFxListNode = FEquipFxListNode;
 
+    // EquippedObj +0xb8 / +0xbc.
     FCliEquipFxListNode*& EquipFxSentinelRef(FClientGameobj* Host)
     {
-        unsigned char* Base = reinterpret_cast<unsigned char*>(Host);
-        return *reinterpret_cast<FCliEquipFxListNode**>(Base + 0xb8);
+        return reinterpret_cast<FCliEquipFxListNode*&>(
+            static_cast<FClientEquippedObj*>(Host)->EquipFx.Head);
     }
 
     int& EquipFxCountRef(FClientGameobj* Host)
     {
-        unsigned char* Base = reinterpret_cast<unsigned char*>(Host);
-        return *reinterpret_cast<int*>(Base + 0xbc);
+        return static_cast<FClientEquippedObj*>(Host)->EquipFx.Count;
     }
 
-    // Host+0xc4 — retail std::list of FFuseBurnNode (FUN_00534240 Ignite /
-    // FUN_00534010 Burn). Sentinel allocated in FClientGameobj ctor.
+    // EquippedObj +0xc4 / +0xc8 -- the std::list of FFuseBurnNode (FUN_00534240 Ignite /
+    // FUN_00534010 Burn). Sentinel allocated in the EquippedObj ctor.
     FFuseBurnNode*& HostFuseSentinelRef(FClientGameobj* Host)
     {
-        unsigned char* Base = reinterpret_cast<unsigned char*>(Host);
-        return *reinterpret_cast<FFuseBurnNode**>(Base + 0xc4);
+        return reinterpret_cast<FFuseBurnNode*&>(static_cast<FClientEquippedObj*>(Host)->Fuses.Head);
     }
 
     int& HostFuseCountRef(FClientGameobj* Host)
     {
-        unsigned char* Base = reinterpret_cast<unsigned char*>(Host);
-        return *reinterpret_cast<int*>(Base + 0xc8);
+        return static_cast<FClientEquippedObj*>(Host)->Fuses.Count;
     }
 
     // FUN_00534240 — the host's Ignite slot (+0x1c0; NOT FUN_005340b0 at +0x1a0). Published as
@@ -1094,7 +1092,6 @@ namespace
         FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
         if (Effect != nullptr)
         {
-            typedef void(__thiscall * FSetIntensity)(FEffectBase*, float);
             Effect->SetIntensity(Equip->GetRelativeHealth());
         }
         CliEffectCompanionClear(Companion);
@@ -1130,7 +1127,6 @@ namespace
         FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
         if (Effect != nullptr)
         {
-            typedef void(__thiscall * FSetIntensity)(FEffectBase*, float);
             Effect->SetIntensity(Equip->GetRelativeHealth());
         }
         // A random live effect of the munition archetype's companion (FUN_00408a70).
@@ -2079,7 +2075,7 @@ namespace
             CliEffectListRemove(&Host->EffectList, OperatingCompanion);
             break;
         }
-        case Event_0x14:
+        case TractorTargetRejected:
         {
             // The player's host with no arm active: failure code 2 -> "target_out_of_range",
             // 3..6 -> "nnv_tractor_failure".
@@ -2095,7 +2091,7 @@ namespace
                 NnVoiceEnqueue(G_TractorFailureVoiceId, 0);
             break;
         }
-        case Event_0x15:
+        case TractorArmFailed:
         {
             // The same with exactly one arm active and the arm's own error code (Param is the
             // TractorArm).
@@ -2187,7 +2183,6 @@ namespace
             FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
             if (Effect != nullptr)
             {
-                typedef void(__thiscall * FSetIntensity)(FEffectBase*, float);
                 Effect->SetIntensity(Code == EquipActivating ? 1.0f : 0.0f);
             }
             break;
@@ -2286,7 +2281,6 @@ namespace
             {
                 CShip const* const Ship = static_cast<CShip const*>(Host->Object);
                 FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
-                typedef void(__thiscall * FSetIntensity)(FEffectBase*, float);
                 Effect->SetIntensity(Ship->Throttle);
             }
         }
@@ -2498,8 +2492,6 @@ namespace
 
     // DAT_006753e8, filled by the static initializer LAB_005298a0.
     unsigned const G_EngineDestroyedId = CreateID("engine_destroyed");
-
-    typedef void(__thiscall * FCliEngineParticleKill)(FParticleEffect*);
 
     // Vtable +4 (the effect's kill) on a nozzle effect.
     void CliEngineKillParticle(FParticleEffect* Effect)
@@ -2948,7 +2940,6 @@ namespace
             }
 
             // Every nozzle particle gets the intensity, floored at 0 (NaN gives 0).
-            typedef void(__thiscall * FSetIntensity)(FParticleEffect*, float);
             for (FCliEngineNozzleSlot* Slot = Nozzles.First(); Slot != Nozzles.Last(); ++Slot)
             {
                 if (Slot->TrailFx != nullptr)

@@ -292,17 +292,6 @@ namespace AlchemyImpl
             return FloatFromBits(0x3f5db3d7u);
         }
 
-        // The streak's inline reciprocal square root; single precision, in this operand order.
-        float RetailInverseSqrt(float Value)
-        {
-            long Bits = 0;
-            std::memcpy(&Bits, &Value, sizeof(Bits));
-            const long GuessBits = 0x5f3759dfL - (Bits >> 1);
-            float Guess = 0.0f;
-            std::memcpy(&Guess, &GuessBits, sizeof(Guess));
-            return (1.5f - ((Guess * Guess) * Value) * 0.5f) * Guess;
-        }
-
         // Math engine vt+0x28 TransformXform / vt+0x2c TransformMatrix, the calls both fills
         // make through the lazily cached engine DAT_06257a28.
         void CameraSpacePoint(const float* ViewWorld12, const float* Point, float* Out)
@@ -310,155 +299,6 @@ namespace AlchemyImpl
             Acquire3DMath()->TransformXform(*reinterpret_cast<FVector*>(Out),
                                             *reinterpret_cast<const FTransform*>(ViewWorld12),
                                             *reinterpret_cast<const FVector*>(Point));
-        }
-
-        // ---- List bounds: basic FUN_06216090, perp FUN_06232cc0, rect FUN_06238280,
-        // oriented FUN_0622bed0, beam FUN_062050c0 -- one body in five copies that differ
-        // only where FListBoundsShape says ----
-
-        // How a copy computes the per-particle radius.
-        //   Primary (basic, perp): P+0x78 * Scale.
-        //   Side lengths (rect, oriented): evaluated in the order +0x78, +0x7c, +0x80; the max
-        //     is picked differently (the two differ only for NaN): rect B > C ? B : C,
-        //     oriented C > B ? C : B.
-        //   Beam: no scale ramp at all; radius = (B * A) * 0.5f (DAT_0624bab8).
-        const unsigned long kBoundsRadiusPrimary = 0;
-        const unsigned long kBoundsRadiusRectSides = 1;
-        const unsigned long kBoundsRadiusOrientedSides = 2;
-        const unsigned long kBoundsRadiusBeam = 3;
-
-        struct FListBoundsShape
-        {
-            unsigned long RadiusKind;
-            // The peeled tail pass reads the tail's own t (basic) instead of the first's.
-            bool bTailOwnAge;
-            // Merge length through FUN_06206ad0, (x*x + y*y) + z*z, instead of the inline
-            // (y*y + z*z) + x*x -- separately for the peeled pass and for the loop.
-            bool bPeelLengthXyz;
-            bool bLoopLengthXyz;
-        };
-
-        float ListBoundsRadius(const FAppearanceRampDescriptor* Descriptor, float OuterTime,
-                               float InnerTime, float Scale, unsigned long RadiusKind)
-        {
-            if (RadiusKind == kBoundsRadiusBeam)
-            {
-                const float A =
-                    Descriptor->PrimarySizeRamp->Eval(OuterTime, InnerTime);
-                const float B =
-                    Descriptor->TexFrameRamp->Eval(OuterTime, InnerTime);
-                return (B * A) * 0.5f;
-            }
-            const float Primary =
-                Descriptor->PrimarySizeRamp->Eval(OuterTime, InnerTime) *
-                Scale;
-            if (RadiusKind == kBoundsRadiusPrimary)
-                return Primary;
-            const float SideB =
-                Descriptor->TexFrameRamp->Eval(OuterTime, InnerTime);
-            const float SideC =
-                Descriptor->AxisOverrideRamp->Eval(OuterTime, InnerTime);
-            float Side = 0.0f;
-            if (RadiusKind == kBoundsRadiusRectSides)
-                Side = SideB > SideC ? SideB : SideC;
-            else
-                Side = SideC > SideB ? SideC : SideB;
-            return Side * Primary;
-        }
-
-        // The merge each copy inlines. The length is the inline (y*y + z*z) + x*x times
-        // FUN_06206b30's rsqrt, or FUN_06206ad0 with (x*x + y*y) + z*z (bLengthXyz): basic
-        // and perp use FUN_06206ad0 in both places, rect and oriented inline in both, beam
-        // FUN_06206ad0 in the peeled pass and inline in the loop. Both containment tests are
-        // ordered only; Dist > 1e-06 (DAT_0624baa8) and unordered both shift the centre
-        // (0.5 = DAT_0624bab0).
-        void MergeListBoundsSphere(float* Sphere, const float* Center, float Radius,
-                                   bool bLengthXyz)
-        {
-            float D[3];
-            D[0] = Center[0] - Sphere[0];
-            D[1] = Center[1] - Sphere[1];
-            D[2] = Center[2] - Sphere[2];
-            float LenSq = 0.0f;
-            if (bLengthXyz)
-                LenSq = (D[0] * D[0] + D[1] * D[1]) + D[2] * D[2];
-            else
-                LenSq = (D[1] * D[1] + D[2] * D[2]) + D[0] * D[0];
-            const float Dist = RetailInverseSqrt(LenSq) * LenSq;
-            if (Dist + Sphere[3] < Radius)
-            {
-                Sphere[0] = Center[0];
-                Sphere[1] = Center[1];
-                Sphere[2] = Center[2];
-                Sphere[3] = Radius;
-                return;
-            }
-            if (Radius + Dist < Sphere[3])
-                return;
-            const float NewRadius = static_cast<float>(
-                ((static_cast<double>(Radius) + Sphere[3]) + Dist) * 0.5);
-            if (!(static_cast<double>(Dist) <= 1e-06))
-            {
-                const float Inv = 1.0f / Dist;
-                D[0] = D[0] * Inv;
-                D[1] = D[1] * Inv;
-                D[2] = D[2] * Inv;
-                const float Step = NewRadius - Sphere[3];
-                Sphere[0] = D[0] * Step + Sphere[0];
-                Sphere[1] = D[1] * Step + Sphere[1];
-                Sphere[2] = D[2] * Step + Sphere[2];
-            }
-            Sphere[3] = NewRadius;
-        }
-
-        // The shared body. An empty list returns -1 with Out untouched; beam does not
-        // evaluate Scale. One peeled pass merges the TAIL's centre second; its radius: basic
-        // reads the tail's own t (bTailOwnAge), the others read the iterator, which still
-        // points at the first particle, so the tail is merged with t0 (retail quirk kept).
-        // The particles in between follow in list order; the centre is then transformed
-        // by node+0x4c.
-        GENRESULT ListBoundsSphere(const FPooledParticle* Head, const FPooledParticle* Tail,
-                                   const FAppearanceRampDescriptor* Descriptor, float OuterTime,
-                                   float LodInput, const float* NodeXform12,
-                                   const FListBoundsShape& Shape, float* OutSphere)
-        {
-            if (Head == nullptr)
-                return GR_GENERIC;
-            float Scale = 1.0f;
-            if (Shape.RadiusKind != kBoundsRadiusBeam)
-                Scale = Descriptor->EffectScaleRamp->Eval(OuterTime, LodInput);
-            const float FirstInnerTime = Head->InvDuration * Head->Age;
-            OutSphere[0] = Head->PosX;
-            OutSphere[1] = Head->PosY;
-            OutSphere[2] = Head->PosZ;
-            OutSphere[3] =
-                ListBoundsRadius(Descriptor, OuterTime, FirstInnerTime, Scale, Shape.RadiusKind);
-            if (Head != Tail)
-            {
-                const float TailInnerTime =
-                    Shape.bTailOwnAge ? Tail->InvDuration * Tail->Age : FirstInnerTime;
-                const float TailCenter[3] = { Tail->PosX, Tail->PosY, Tail->PosZ };
-                MergeListBoundsSphere(
-                    OutSphere, TailCenter,
-                    ListBoundsRadius(Descriptor, OuterTime, TailInnerTime, Scale, Shape.RadiusKind),
-                    Shape.bPeelLengthXyz);
-                const FPooledParticle* Particle = Head->Next;
-                for (; Particle != Tail; Particle = Particle->Next)
-                {
-                    const float InnerTime = Particle->InvDuration * Particle->Age;
-                    const float Center[3] = { Particle->PosX, Particle->PosY, Particle->PosZ };
-                    MergeListBoundsSphere(
-                        OutSphere, Center,
-                        ListBoundsRadius(Descriptor, OuterTime, InnerTime, Scale, Shape.RadiusKind),
-                        Shape.bLoopLengthXyz);
-                }
-            }
-            float WorldCenter[3];
-            TransformPoint(NodeXform12, OutSphere[0], OutSphere[1], OutSphere[2], WorldCenter);
-            OutSphere[0] = WorldCenter[0];
-            OutSphere[1] = WorldCenter[1];
-            OutSphere[2] = WorldCenter[2];
-            return GR_OK;
         }
 
         void CameraSpaceVector(const float* ViewWorld12, const float* Vector, float* Out)
@@ -1062,8 +902,9 @@ namespace AlchemyImpl
     {
     }
 
-    // Outer +0x14 -> FUN_06216420. See FGenericFxObjectBase::UpdateListAppearance.
-    GENRESULT DACOM_API FxBasicAppearance::Pad5(float Dt)
+    // Outer +0x14 -> FUN_06216420. Rect, perp, oriented and dust repeat this body with
+    // their own draw counters, frame ramp and pool.
+    GENRESULT DACOM_API FxBasicAppearance::UpdateNode(float Dt)
     {
         G_BasicDrawContext.Field_0xA = 0;
         G_BasicDrawContext.PrimCount = 0;
@@ -1146,7 +987,7 @@ namespace AlchemyImpl
     }
 
     // Outer +0xBC -> FUN_06215f40 (thunk LAB_06219640): SpawnListParticle unchanged.
-    GENRESULT DACOM_API FxBasicAppearance::Pad47(const float* Six, float Age, float Duration)
+    GENRESULT DACOM_API FxBasicAppearance::SpawnParticle(const float* Six, float Age, float Duration)
     {
         SpawnListParticle(&G_PoolBasic, Six, Age, Duration);
         return GR_OK;
@@ -1631,8 +1472,8 @@ namespace AlchemyImpl
     {
     }
 
-    // Outer +0x14 -> FUN_06238780. See FGenericFxObjectBase::UpdateListAppearance.
-    GENRESULT DACOM_API FxRectAppearance::Pad5(float Dt)
+    // Outer +0x14 -> FUN_06238780: the basic update body (FxBasicAppearance::UpdateNode).
+    GENRESULT DACOM_API FxRectAppearance::UpdateNode(float Dt)
     {
         G_RectDrawContext.Field_0xA = 0;
         G_RectDrawContext.PrimCount = 0;
@@ -1738,7 +1579,7 @@ namespace AlchemyImpl
 
     // Outer +0xBC -> FUN_0623b410 -> FUN_0623a2e0. See
     // FGenericFxObjectBase::SpawnListParticle.
-    GENRESULT DACOM_API FxRectAppearance::Pad47(const float* Six, float Age, float Duration)
+    GENRESULT DACOM_API FxRectAppearance::SpawnParticle(const float* Six, float Age, float Duration)
     {
         SpawnListParticle(&G_PoolRect, Six, Age, Duration);
         return GR_OK;
@@ -2140,8 +1981,8 @@ namespace AlchemyImpl
     {
     }
 
-    // Outer +0x14 -> FUN_06233040. See FGenericFxObjectBase::UpdateListAppearance.
-    GENRESULT DACOM_API FxPerpAppearance::Pad5(float Dt)
+    // Outer +0x14 -> FUN_06233040: the basic update body (FxBasicAppearance::UpdateNode).
+    GENRESULT DACOM_API FxPerpAppearance::UpdateNode(float Dt)
     {
         G_PerpDrawContext.Field_0xA = 0;
         G_PerpDrawContext.PrimCount = 0;
@@ -2228,7 +2069,7 @@ namespace AlchemyImpl
     // SpawnListParticle), then seed the new tail's axis at +0x30.
     // A velocity within DAT_0624eb68 (~1.0e-6, per squared component) of +X gets axis
     // (0, 0, 1); any other gets (1, 0, 0).
-    GENRESULT DACOM_API FxPerpAppearance::Pad47(const float* Six, float Age, float Duration)
+    GENRESULT DACOM_API FxPerpAppearance::SpawnParticle(const float* Six, float Age, float Duration)
     {
         SpawnListParticle(&G_PoolPerp, Six, Age, Duration);
         const float Epsilon = PerpAxisParallelEpsilon();
@@ -2657,8 +2498,8 @@ namespace AlchemyImpl
     {
     }
 
-    // Outer +0x14 -> FUN_0622c3d0. See FGenericFxObjectBase::UpdateListAppearance.
-    GENRESULT DACOM_API FxOrientedAppearance::Pad5(float Dt)
+    // Outer +0x14 -> FUN_0622c3d0: the basic update body (FxBasicAppearance::UpdateNode).
+    GENRESULT DACOM_API FxOrientedAppearance::UpdateNode(float Dt)
     {
         G_OrientedDrawContext.Field_0xA = 0;
         G_OrientedDrawContext.PrimCount = 0;
@@ -2689,7 +2530,8 @@ namespace AlchemyImpl
     }
 
     // Outer +0x8C -> FUN_0622eca0 -> FUN_0622bed0: rect's FUN_06238280 with the oriented
-    // max (see ListBoundsRadius), the peeled tail pass at t0 and math engine DAT_06257ac0.
+    // max (C > B ? C : B; differs from rect only for NaN), the peeled tail pass at t0 and
+    // math engine DAT_06257ac0.
     GENRESULT DACOM_API FxOrientedAppearance::GetBoundingSphere(float* OutSphere)
     {
         const FPooledParticle* const Head = InstanceListHead_;
@@ -2761,7 +2603,7 @@ namespace AlchemyImpl
 
     // Outer +0xBC -> FUN_0622ee90 -> FUN_0622bd80. See
     // FGenericFxObjectBase::SpawnListParticle.
-    GENRESULT DACOM_API FxOrientedAppearance::Pad47(const float* Six, float Age, float Duration)
+    GENRESULT DACOM_API FxOrientedAppearance::SpawnParticle(const float* Six, float Age, float Duration)
     {
         SpawnListParticle(&G_PoolOriented, Six, Age, Duration);
         return GR_OK;
@@ -3095,7 +2937,7 @@ namespace AlchemyImpl
     // stored at node+0x11c; field walk FUN_062114c0, integrate FUN_06211600 (Age <= Duration
     // or NaN keeps a particle).
 #pragma float_control(except, on, push)
-    GENRESULT DACOM_API FLDustAppearance::Pad5(float Dt)
+    GENRESULT DACOM_API FLDustAppearance::UpdateNode(float Dt)
     {
         // The initial retail FLD precedes both counter stores. A float is exact
         // in double; this native spill keeps the load and later float store apart.
@@ -3151,11 +2993,61 @@ namespace AlchemyImpl
     }
 #pragma float_control(pop)
 
+    // FUN_0620f830: the basic bounds body (FxBasicAppearance::GetBoundingSphere) with no
+    // Appearance_LODCurve scale, the radius being the +0x78 ramp alone. As in perp, the
+    // peeled tail merge evaluates the head's t (retail).
+    GENRESULT DACOM_API FLDustAppearance::GetBoundingSphere(float* OutSphere)
+    {
+        const FPooledParticle* const Head = InstanceListHead_;
+        if (Head == nullptr)
+            return GR_GENERIC;
+        const float FirstInnerTime = static_cast<float>(static_cast<double>(Head->InvDuration) * Head->Age);
+        const double FirstRadius = ForwardAppearanceSingleEval(
+            Descriptor_->PrimarySizeRamp, AppearanceOuterTime_, FirstInnerTime);
+        std::memcpy(OutSphere, &Head->PosX, sizeof(float) * 2);
+        OutSphere[3] = static_cast<float>(FirstRadius);
+        std::memcpy(OutSphere + 2, &Head->PosZ, sizeof(float));
+        const FPooledParticle* const Tail = InstanceListTail_;
+        if (Head != Tail)
+        {
+            const float TailInnerTime = static_cast<float>(static_cast<double>(Head->InvDuration) * Head->Age);
+            const double TailRadius = ForwardAppearanceSingleEval(
+                Descriptor_->PrimarySizeRamp, AppearanceOuterTime_, TailInnerTime);
+            float TailSphere[4];
+            std::memcpy(TailSphere, &Tail->PosX, sizeof(float) * 2);
+            TailSphere[3] = static_cast<float>(TailRadius);
+            std::memcpy(TailSphere + 2, &Tail->PosZ, sizeof(float));
+            MergePerpRectBoundsSphere(OutSphere, TailSphere, TailSphere[3],
+                EPerpRectBoundsDistance::PerpUnroundedXyz);
+            const FPooledParticle* Particle = Head->Next;
+            for (; Particle != Tail; Particle = Particle->Next)
+            {
+                const float InnerTime = static_cast<float>(static_cast<double>(Particle->InvDuration) * Particle->Age);
+                const double Radius = ForwardAppearanceSingleEval(
+                    Descriptor_->PrimarySizeRamp, AppearanceOuterTime_, InnerTime);
+                float Sphere[4];
+                std::memcpy(Sphere, &Particle->PosX, sizeof(float) * 2);
+                Sphere[3] = static_cast<float>(Radius);
+                std::memcpy(Sphere + 2, &Particle->PosZ, sizeof(float));
+                MergePerpRectBoundsSphere(OutSphere, Sphere, Sphere[3],
+                    EPerpRectBoundsDistance::PerpUnroundedXyz);
+            }
+        }
+        FVector WorldCenter;
+        TransformPerpBoundsCenter(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
+            WorldCenter, *reinterpret_cast<const FVector*>(OutSphere));
+        float WorldSphere[4];
+        std::memcpy(WorldSphere, &WorldCenter, sizeof(WorldCenter));
+        std::memcpy(WorldSphere + 3, OutSphere + 3, sizeof(float));
+        std::memcpy(OutSphere, WorldSphere, sizeof(WorldSphere));
+        return GR_OK;
+    }
+
     // FUN_06212700: a full pool (DAT_062579b4 == 0) first evicts the oldest particle
     // (FUN_062121d0); then FUN_06211440 spawns, and the tail's +0x30 gets the spawn point
     // in camera space (node+0xec). A failed allocation stores through null in retail and
     // does here too.
-    GENRESULT DACOM_API FLDustAppearance::Pad47(const float* Six, float Age, float Duration)
+    GENRESULT DACOM_API FLDustAppearance::SpawnParticle(const float* Six, float Age, float Duration)
     {
         if (G_PoolDust.FreeCount == 0)
             EvictOldestListParticle(&G_PoolDust);
@@ -3527,7 +3419,7 @@ namespace AlchemyImpl
     // the new item (unlike the billboards) with +0x30 = node+0xdc (zero from the node
     // ctors), and node+0xe1 toggles. The prepend is unconditional in retail even when the
     // allocation failed.
-    GENRESULT DACOM_API FLBeamAppearance::Pad47(const float* Six, float Age, float Duration)
+    GENRESULT DACOM_API FLBeamAppearance::SpawnParticle(const float* Six, float Age, float Duration)
     {
         if (G_PoolBeam.FreeCount == 0)
             EvictOldestListParticle(&G_PoolBeam);
@@ -3554,11 +3446,12 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    // FUN_0620de30 (node twin LAB_062054d0), the beam's per-node update: the basic update
-    // without a frame step; fields FUN_0620bc30, integrate FUN_0620bda0. Dt is not clamped
-    // here. No caller of this slot is known in alchemy.dll.
+    // FUN_0620de30 (outer +0x14 of PTR_FUN_0624b7d0; node twin LAB_062054d0), the beam's
+    // per-node update, reached from IAlchemy's update walk FUN_06201810 like every other
+    // node's: the basic update without a frame step; fields FUN_0620bc30, integrate
+    // FUN_0620bda0. Dt is not clamped here.
     #pragma float_control(except, on, push)
-    GENRESULT DACOM_API FLBeamAppearance::Pad5(float Dt)
+    GENRESULT DACOM_API FLBeamAppearance::UpdateNode(float Dt)
     {
         const double Delta = LoadAppearanceScalar(Dt);
         G_BeamDrawContext.Field_0xA = 0;
@@ -3678,8 +3571,8 @@ namespace AlchemyImpl
         #pragma optimize("", on)
     }
 
-    // FUN_062050c0 (outer +0x8C through FUN_0620e1b0): the billboard walk (see
-    // ListBoundsSphere) over node+0xe4 with the beam radius, the peeled tail pass at the
+    // FUN_062050c0 (outer +0x8C through FUN_0620e1b0): the billboard bounds walk (see
+    // FxBasicAppearance::GetBoundingSphere) over node+0xe4 with the beam radius, the peeled tail pass at the
     // first particle's t, and math engine DAT_06257978.
     #pragma float_control(except, on, push)
     GENRESULT DACOM_API FLBeamAppearance::GetBoundingSphere(float* OutSphere)
@@ -4562,7 +4455,7 @@ namespace AlchemyImpl
     // tick their IFxMesh (slot 5, Dt); dead ones go through FUN_062257f0. Retail keeps no
     // count on this list; LiveInstanceCount_ is the port's. Last, the bounds (FUN_06225000)
     // are computed into an unused local, kept for their math-engine side effects.
-    GENRESULT DACOM_API FxMeshAppearance::Pad5(float Dt)
+    GENRESULT DACOM_API FxMeshAppearance::UpdateNode(float Dt)
     {
         Age_ += Dt;
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
@@ -4584,7 +4477,7 @@ namespace AlchemyImpl
                 AsFxNode(*Field)->ApplyFieldToVel(&FieldParticle->PosX, &FieldParticle->Age, 0.0f);
                 FieldParticle = FieldParticle->Next;
             }
-            AsFxNode(*Field)->Pad40();
+            AsFxNode(*Field)->EndField();
             ++Field;
         }
 
@@ -4831,7 +4724,7 @@ namespace AlchemyImpl
             return reinterpret_cast<FParticleAppRecord*>(Record);
         }
 
-        // FUN_062306c0, used by Pad47's Child and Held unwind scopes.
+        // FUN_062306c0, used by SpawnParticle's Child and Held unwind scopes.
         struct FParticleEffectReference
         {
             FParticleEffectReference() : Value(nullptr), bReleaseOnDestruction(true) {}
@@ -4851,7 +4744,7 @@ namespace AlchemyImpl
 
             void Reset()
             {
-                // Pad47 disarms its unwind state before the normal Release call.
+                // SpawnParticle disarms its unwind state before the normal Release call.
                 bReleaseOnDestruction = false;
                 if (Value != nullptr)
                 {
@@ -5161,7 +5054,7 @@ namespace AlchemyImpl
     // IAlchemy (DAT_06257b98) spawns nothing; DAT_06257b90 (the effect library) is not
     // tested. FUN_06231470 appends the record even when the allocation failed. The child
     // gets slot 6 / slot 14 only when node+0x8c != 0 / node+0x90 != 1.
-    GENRESULT DACOM_API FxParticleAppearance::Pad47(const float* Six, float Age, float Duration)
+    GENRESULT DACOM_API FxParticleAppearance::SpawnParticle(const float* Six, float Age, float Duration)
     {
         if (G_PoolParticle.FreeCount == 0)
         {
@@ -5239,7 +5132,7 @@ namespace AlchemyImpl
     // A record that just ran out stops its life effect (slot 13(1)) unless slot 11(7)
     // reports it finished; an expired record is erased (FUN_062306e0) only once both its
     // life and death effects report finished.
-    GENRESULT DACOM_API FxParticleAppearance::Pad5(float Dt)
+    GENRESULT DACOM_API FxParticleAppearance::UpdateNode(float Dt)
     {
         Age_ = static_cast<float>(static_cast<double>(Dt) + Age_);
         if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)

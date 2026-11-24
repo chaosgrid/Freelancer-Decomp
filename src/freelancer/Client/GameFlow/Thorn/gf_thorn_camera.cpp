@@ -19,8 +19,6 @@ namespace
     char const* const GInvalidCameraReference =
         "%s(%d) : *** ERROR: Using invalid camera reference %s\n";
 
-    GENRESULT const kThornReferenceMissing = static_cast<GENRESULT>(-1);
-
     // The pool slot is indexed without a range check by every body below. A slot of -1 --
     // Allocate found the 256 slots full -- would reach the 0x40 bytes before the pool, exactly
     // as retail does.

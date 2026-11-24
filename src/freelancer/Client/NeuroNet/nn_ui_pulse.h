@@ -59,14 +59,14 @@ extern unsigned char G_HudChromeColorRgba[4];
 // 0xAABBGGRR -- which is how most retail readers load them. None of them has a
 // writer in the PE besides its initializer. LAB_00561c80 and LAB_00561d20 seed two more
 // slots that nothing reads; they are not declared.
-extern unsigned long G_NnPaletteArgb_679bb0; // LAB_00561c00  87,C3,E0,FF  idle cyan
-extern unsigned long G_NnPaletteArgb_679bac; // LAB_00561c20  3B,BF,1D,FF
-extern unsigned long G_NnPaletteArgb_679ba8; // LAB_00561c40  BF,1D,1D,FF
-extern unsigned long G_NnPaletteArgb_679ba4; // LAB_00561c60  F5,EA,52,FF  pulse amber
-extern unsigned long G_NnPaletteArgb_679b9c; // LAB_00561ca0  88,00,C2,FF
-extern unsigned long G_NnPaletteArgb_679b98; // LAB_00561cc0  48,48,E0,FF
-extern unsigned long G_NnPaletteArgb_679b94; // LAB_00561ce0  80,80,80,FF  grey
-extern unsigned long G_NnPaletteArgb_679b90; // LAB_00561d00  A8,FB,C5,FF
-extern unsigned long G_NnPaletteArgb_679b88; // LAB_00561d40  FF,7E,FD,FF
-extern unsigned long G_NnPaletteArgb_679b84; // LAB_00561d60  FF,FF,FF,FF  white
-extern unsigned long G_NnPaletteArgb_679b80; // LAB_00561d80  CE,5A,FF,FF
+extern unsigned long G_NnPaletteCyan;      // DAT_00679bb0 LAB_00561c00  87,C3,E0,FF  idle
+extern unsigned long G_NnPaletteGreen;     // DAT_00679bac LAB_00561c20  3B,BF,1D,FF  friendly attitude
+extern unsigned long G_NnPaletteRed;       // DAT_00679ba8 LAB_00561c40  BF,1D,1D,FF  hostile attitude
+extern unsigned long G_NnPaletteAmber;     // DAT_00679ba4 LAB_00561c60  F5,EA,52,FF  pulse
+extern unsigned long G_NnPalettePurple;    // DAT_00679b9c LAB_00561ca0  88,00,C2,FF
+extern unsigned long G_NnPaletteBlue;      // DAT_00679b98 LAB_00561cc0  48,48,E0,FF
+extern unsigned long G_NnPaletteGrey;      // DAT_00679b94 LAB_00561ce0  80,80,80,FF
+extern unsigned long G_NnPalettePaleGreen; // DAT_00679b90 LAB_00561d00  A8,FB,C5,FF
+extern unsigned long G_NnPalettePink;      // DAT_00679b88 LAB_00561d40  FF,7E,FD,FF
+extern unsigned long G_NnPaletteWhite;     // DAT_00679b84 LAB_00561d60  FF,FF,FF,FF  neutral attitude
+extern unsigned long G_NnPaletteViolet;    // DAT_00679b80 LAB_00561d80  CE,5A,FF,FF

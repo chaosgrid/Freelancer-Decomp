@@ -1037,9 +1037,6 @@
     <ClInclude Include="..\IVP\ivp_utility\ivp_u_vector.h">
       <Filter>IVP\ivp_utility</Filter>
     </ClInclude>
-    <ClInclude Include="..\IVP\ivp_utility\ivp_vector_math.h">
-      <Filter>IVP\ivp_utility</Filter>
-    </ClInclude>
     <ClInclude Include="Core\msvcrt_atof.h">
       <Filter>Core</Filter>
     </ClInclude>

@@ -109,7 +109,7 @@ FBatchRecord::FBatchRecord()
     Context.View = MatrixDataB;
 }
 
-FBatchBin::FBatchBin() : Pad0(0), SortKind(0), RecordCount(0) {}
+FBatchBin::FBatchBin() : OrderKey(0), SortKind(0), RecordCount(0) {}
 
 // Dispatch layout consumed by FUN_06ec9f10; the face is borrowed after flattening.
 struct FBatchDispatch
@@ -176,7 +176,7 @@ static float ComputeBatchDepth(const FBatchRecord& Record)
 {
     if ((Record.Flags & 0x20) != 0)
     {
-        const unsigned long Bits = (unsigned long)Record.Unused;
+        const unsigned long Bits = (unsigned long)Record.SortDepth;
         float Depth;
         std::memcpy(&Depth, &Bits, sizeof(Depth));
         return -Depth;
@@ -399,7 +399,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
     if (ParserResult < 0)
     {
         FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
-              R"(C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp)",
+              "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
               0x1AA, "Unable to acquire IID_IProfileParser, cannot continue");
         if (Parser != nullptr)
             Parser->Release();
@@ -413,7 +413,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
     if (PipelineResult < 0)
     {
         FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
-              R"(C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp)",
+              "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
               0x1AF, "Unable to acquire IID_IRenderPipeline, cannot continue");
         if (Parser != nullptr)
             Parser->Release();
@@ -424,7 +424,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
                                                             (void**)&RpVertexBuffer);
     if (VertexResult < 0)
         FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
-              R"(C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp)",
+              "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
               0x1B5, "Unable to acquire IID_IRPVertexBuffer........");
     else
         RpVertexBuffer->Release();
@@ -432,7 +432,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
                                                            (void**)&RpIndexBuffer);
     if (IndexResult < 0)
         FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
-              R"(C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp)",
+              "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
               0x1BC, "Unable to acquire IID_IRPIndexBuffer........");
     else
         RpIndexBuffer->Release();
@@ -455,14 +455,14 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
     Bins[0].release();
     Bins[0].reset(FirstBin);
     Bins[0]->RecordCount = 0;
-    Bins[0]->Pad0 = -1;
+    Bins[0]->OrderKey = -1;
     Bins[0]->SortKind = 1;
     BinOrder[1] = 1;
     FBatchBin* SecondBin = new FBatchBin();
     Bins[1].release();
     Bins[1].reset(SecondBin);
     Bins[1]->RecordCount = 0;
-    Bins[1]->Pad0 = 1;
+    Bins[1]->OrderKey = 1;
     Bins[1]->SortKind = Bin1SortOrder;
     SelectedBin = Bins[0].get();
     PendingFrameValue = FrameValue;
@@ -588,12 +588,12 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
         FBatchRecord& Record = *Item.Record;
         if (bSortTriangles)
         {
-            const unsigned long TriangleCount = Record.Field / 3;
+            const unsigned long TriangleCount = Record.IndexSpan / 3;
             const FRpVertexSrcDesc& Source = *Record.Context.SourceVertices;
             const float* Positions = (const float*)Source.Position.Base;
             const unsigned long* Remap = Source.Position.IndexArray;
             FBatchTriangle* Triangles = (FBatchTriangle*)AllocateScratch(TriangleCount * sizeof(FBatchTriangle));
-            const unsigned short* Indices = Record.Context.Indices + Record.Zero;
+            const unsigned short* Indices = Record.Context.Indices + Record.IbStart;
             for (unsigned long TriangleIndex = 0; TriangleIndex < TriangleCount; ++TriangleIndex)
             {
                 FBatchTriangle& Triangle = Triangles[TriangleIndex];
@@ -616,9 +616,9 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
             if ((Record.InternalFlags & 1) == 0)
             {
                 Record.Context.Indices = (unsigned short*)AllocateScratch(TriangleCount * 6);
-                Record.Zero = 0;
+                Record.IbStart = 0;
             }
-            unsigned short* Destination = Record.Context.Indices + Record.Zero;
+            unsigned short* Destination = Record.Context.Indices + Record.IbStart;
             for (unsigned long TriangleIndex = 0; TriangleIndex < TriangleCount; ++TriangleIndex)
             {
                 Destination[TriangleIndex * 3] = Triangles[TriangleIndex].Indices[0];
@@ -656,7 +656,7 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
         }
         PreviousContext = &Record.Context;
         Active->Submit(PreviousContext, Record.PrimType, Record.Start, Record.Count,
-                      Record.Zero, Record.Field, Record.Flags);
+                      Record.IbStart, Record.IndexSpan, Record.Flags);
         if (CachedInterface != nullptr)
             CachedInterface->EndRecord(Item.Material, Record.RecordTag, Record.RecordTagContext);
     }
@@ -715,24 +715,34 @@ GENRESULT DACOM_API FMaterialBatcher::SetBinOrder(unsigned long Index, long Key)
     if (Index >= 2)
         return (GENRESULT)-1;
 
-    Bins[Index]->Pad0 = Key;
+    Bins[Index]->OrderKey = Key;
     BinOrder[0] = (unsigned long)-1;
     BinOrder[1] = (unsigned long)-1;
 
+    // FUN_06ec9190. Retail compares every candidate with the key of the bin just
+    // set (Bins[Index]), and an insert moves BinOrder[Slot + 1] down into the slot
+    // named by the entry it displaces without counting the inserted bin.
     unsigned long Count = 0;
     for (unsigned long Candidate = 0; Candidate < 2; ++Candidate)
     {
-        if (Bins[Candidate]->Pad0 < 0)
+        if (Bins[Candidate]->OrderKey < 0)
             continue;
         unsigned long Position = 0;
-        while (Position < Count &&
-               Bins[BinOrder[Position]]->Pad0 <=
-                   Bins[Index]->Pad0)
-            ++Position;
-        for (unsigned long Move = Count; Move > Position; --Move)
-            BinOrder[Move] = BinOrder[Move - 1];
-        BinOrder[Position] = Candidate;
-        ++Count;
+        for (; Position < Count; ++Position)
+        {
+            const unsigned long Slot = BinOrder[Position];
+            if (Bins[Index]->OrderKey < Bins[Slot]->OrderKey)
+            {
+                std::memmove(&BinOrder[Slot], &BinOrder[Slot + 1], (1 - Slot) * sizeof(BinOrder[0]));
+                BinOrder[Slot] = Candidate;
+                break;
+            }
+        }
+        if (Position == Count)
+        {
+            BinOrder[Count] = Candidate;
+            ++Count;
+        }
     }
     return GR_OK;
 }
@@ -776,24 +786,24 @@ GENRESULT DACOM_API FMaterialBatcher::FlushAll(unsigned char Clear)
 
 GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context, unsigned long PrimType,
                                               unsigned long Start, unsigned long Count,
-                                              unsigned long Zero, unsigned long Field,
-                                              void* Unused, unsigned long Flags)
+                                              unsigned long IbStart, unsigned long IndexSpan,
+                                              void* SortDepth, unsigned long Flags)
 {
     // LAB_06ec9570: mandatory selected descriptor, material and queued context.
-    if (SelectedBin->Pad0 < 0)
+    if (SelectedBin->OrderKey < 0)
     {
         IBatchedMaterial* Batched = nullptr;
         if (Material->QueryInterface(Iids::BatchedMaterial,
                                      (void**)&Batched) >= 0)
         {
             Batched->Bind(Context);
-            Batched->Submit(Context, PrimType, Start, Count, Zero, Field, Flags);
+            Batched->Submit(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
             const GENRESULT Result = Batched->Teardown(Context);
             if (Batched != nullptr)
                 Batched->Release();
             return Result;
         }
-        return Material->Submit(Context, PrimType, Start, Count, Zero, Field, Flags);
+        return Material->Submit(Context, PrimType, Start, Count, IbStart, IndexSpan, Flags);
     }
 
     ++SelectedBin->RecordCount;
@@ -805,9 +815,9 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     const FMaterialSubmitContext* Source = (const FMaterialSubmitContext*)Context;
     Record.PrimType = PrimType;
     Record.Flags = Flags;
-    Record.Unused = Unused;
-    Record.Zero = Zero;
-    Record.Field = Field;
+    Record.SortDepth = SortDepth;
+    Record.IbStart = IbStart;
+    Record.IndexSpan = IndexSpan;
     Record.InternalFlags = 0;
     Record.Start = Start;
     Record.Count = Count;
@@ -858,10 +868,9 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
         Record.Context.Indices = IndexSource;
     else
     {
-        const uintptr_t IndexAddress = (uintptr_t)IndexSource + Count * 2;
-        Record.Context.Indices = CloneIndices((const unsigned short*)IndexAddress, Zero);
+        Record.Context.Indices = CloneIndices(IndexSource + IbStart, IndexSpan);
         Record.InternalFlags |= 1;
-        Record.Zero = 0;
+        Record.IbStart = 0;
     }
     return GR_OK;
 }

@@ -906,9 +906,8 @@ public:
     // +0xec multimap (ctor FUN_06f1f4f0): mission label id -> SpaceObj id of each object
     // carrying it. Filled by message 0x1010 (the NPC's +0x17c ids, from the ship slot's labels),
     // the loot spawn FUN_06f16fa0 and the solar spawn FUN_06f169a0; read by FUN_06f14e80 (the
-    // random-encounter arm ids) and the Cnd_/Act_ label queries. Misnamed: it holds every
-    // labelled object, not only formation members.
-    std::multimap<unsigned int, unsigned int> FormationMembers;
+    // random-encounter arm ids) and the Cnd_/Act_ label queries.
+    std::multimap<unsigned int, unsigned int> LabelObjects;
     // +0x100 map (ctor FUN_06f2d2f0): [ObjList] nickname id -> its directives (insert
     // FUN_06f1e9f0).
     std::map<unsigned int, FMissionDirectiveList> ObjLists;

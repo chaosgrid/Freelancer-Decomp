@@ -457,7 +457,6 @@ namespace
                 }
                 if (Nebula != nullptr)
                 {
-                    using FLoad = void(__thiscall*)(FNebulaEffect*, char const*, char const*);
                     Nebula->Load(File, Zone); // slot 0
 #ifdef FREELANCER_RP9
                     // Port-only: the file name for volumetric.ini [NebulaOverride] file=.
@@ -747,7 +746,6 @@ std::list<FNebulaEffect*>& StarSysNebulaList()
 FNebulaEffect* StarSysFindNebula(Vector const* Pos, float* OutFactor, FNebulaEffect* Hint)
 {
     // FUN_005553b0.
-    using FFactor = float(__thiscall*)(FNebulaEffect*, float*);
     float* const PosFloats = const_cast<float*>(reinterpret_cast<float const*>(Pos));
     if (GetGameOption(0x25) != 0 && GetGameOption(0x27) != 0)
     {
@@ -787,7 +785,6 @@ void StarSysGetFogColor(Vector const* Pos, unsigned char* OutRgb)
     if (Nebula != nullptr && Factor >= 1.0f)
     {
         float Rgb[3] = {0.0f, 0.0f, 0.0f};
-        using FFill = void(__thiscall*)(FNebulaEffect*, float*);
         Nebula->FillFogRgb(Rgb); // slot 13 (+0x34)
         OutRgb[0] = FloatToByte(Rgb[0] * 255.0f);
         OutRgb[1] = FloatToByte(Rgb[1] * 255.0f);
@@ -960,7 +957,6 @@ void StarSysUpdate(float Dt)
         // Every nebula through its vtable slot 2 with (camera, dt).
         if (GetGameOption(0x27) != 0 && !G_Nebulae.empty())
         {
-            using FNebulaUpdateSlot = void(__thiscall*)(FNebulaEffect*, void*, float);
             for (std::list<FNebulaEffect*>::iterator It = G_Nebulae.begin();
                  It != G_Nebulae.end(); ++It)
                 (*It)->Update(Camera, Dt);
@@ -1018,10 +1014,10 @@ void StarSysUpdate(float Dt)
     bool bPlayerFlag = false;
     {
         void* const Player = GetPlayerObjRW();
-        // The client Gameobj's +0x158 word (the jump / dock arm state read by
-        // space_scene_obj_draw.cpp GameobjJumpArmState); FClientGameobj keeps it in OpaqueTail.
+        // The player ship Gameobj's jump state (+0x158), read with no class test.
         if (Player != nullptr)
-            bPlayerFlag = *reinterpret_cast<int*>(static_cast<unsigned char*>(Player) + 0x158) != 0;
+            bPlayerFlag = static_cast<FClientShipGameobj const*>(
+                              static_cast<IObjRW const*>(Player))->JumpState != 0;
     }
 
     // x87: the sum is stored as a float but the unrounded value is compared with
@@ -1149,15 +1145,15 @@ void StarSysClearMusicOverride()
     G_MusicOverrideNoFade = 1;
 }
 
-void StarSysNoteDamage(IObjRW* Victim, void const* DamageRecord)
+void StarSysNoteDamage(IObjRW* Victim, DamageList const* Damage)
 {
-    // FUN_00553250.
+    // FUN_00553250. The inflictor is read inline (+0x14), not through get_inflictor_id.
     IObjRW* const Player = PlayerObjRW();
     if (Player == nullptr)
         return;
     unsigned const PlayerId = Player->get_id();
-    unsigned const InflictorId =
-        *reinterpret_cast<unsigned const*>(static_cast<unsigned char const*>(DamageRecord) + 0x14);
+    unsigned const InflictorId = Damage->InflictorId;
+
 
     bool bFlag = false;
     if (Victim->get_id() == PlayerId)

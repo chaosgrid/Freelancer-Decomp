@@ -93,7 +93,7 @@ void IVP_Controller_Wake_Or_Refresh_Associated_Sim_Unit(IVP_Controller* Controll
 // pointer not traced).
 //
 // Walks every core associated with Controller (backward). Cores with
-// (Flags & 0xC) != 0 are skipped entirely (no register_controller call
+// (Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0 are skipped entirely (no register_controller call
 // either). For every OTHER core: AND-accumulates its MovementState low byte
 // into MovementByteAcc (init 8); tracks the previous iteration's
 // OwningSimUnit as PrevSimUnit, and whenever two consecutive valid cores
@@ -116,7 +116,7 @@ void IVP_Controller_Reconcile_Associated_Cores(IVP_Environment* const* Environme
     for (int i = static_cast<int>(Cores->n_elems) - 1; i >= 0; --i)
     {
         IVP_Core* Core = Cores->ElementAt(i);
-        if ((Core->Flags & 0xc) != 0)
+        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
         {
             continue; // dying/invalid core -- skipped entirely, not even re-registered
         }

@@ -17,7 +17,6 @@
 #include "common_ini.h"
 #include "common_async.h"      // Async::Startup
 #include "common_dataconfig.h" // DataConfig::startup, DataConfig::ProgressCB
-#include "common_misc.h"       // GetFileSysPath, DAEngine_create_filesystem
 #include "common_timing.h"     // Timing::init
 #include "dacom.h"
 #include "Core/dataconfig_progress.h"
@@ -944,26 +943,4 @@ I3DMathEngine* __cdecl Acquire3DMathEngine()
     void* Instance = nullptr;
     DACOM_Acquire()->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Instance);
     return static_cast<I3DMathEngine*>(Instance);
-}
-
-// Port-only helper (retail has no such function): DAEngine_create_filesystem(RelPath); on a
-// miss, resolve through GetFileSysPath against DALib::Data and retry when the resolved path
-// differs. NOT retail's mechanism: retail's callers (e.g. texture_shapes' [Texture] file=)
-// strncpy the path (FUN_00417c50) and CreateInstance a "FileSystem" DACOMDESC inline.
-IFileSystem* DAEngine_open_filesystem(char const* RelPath)
-{
-    IFileSystem* Filesys = nullptr;
-    if (RelPath == nullptr || RelPath[0] == '\0')
-        return nullptr;
-
-    DAEngine_create_filesystem(RelPath, &Filesys, nullptr);
-    if (Filesys != nullptr)
-        return Filesys;
-
-    char FullPath[0x104];
-    FullPath[0] = '\0';
-    GetFileSysPath(FullPath, RelPath, DALib::Data);
-    if (FullPath[0] != '\0' && DACOM_CRC::CompareStringsI(FullPath, RelPath) != 0)
-        DAEngine_create_filesystem(FullPath, &Filesys, nullptr);
-    return Filesys;
 }

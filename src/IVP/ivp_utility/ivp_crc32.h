@@ -14,8 +14,8 @@
 // static initialisation, so the order does not matter.
 //
 // Users: IVP_VHash_Store and IVP_VHash_HashPointer (ivp_vhash.cpp), IVP_Hash
-// (ivp_hash.cpp), IVP_U_Active_Value_Hash::GetHashIndex (ivp_active_value.cpp).
-// ivp_ov_element.cpp builds its own identical copy (g_OvCrc32Table).
+// (ivp_hash.cpp), IVP_U_Active_Value_Hash::GetHashIndex (ivp_active_value.cpp),
+// IVP_OV_HashNodeKey (ivp_ov_element.cpp).
 // ============================================================================
 
 extern unsigned g_Crc32Table_063edcdc[256];

@@ -11,7 +11,7 @@
 #include "Space/HUD/hud_element_list.h"  // HudVec3ScaleByInverse (FUN_004c8b10)
 #include "Space/HUD/hud_target.h"        // HudTransformPoint (FUN_004e7090)
 #include "Common/input_manager.h"     // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
-#include "NeuroNet/nn_ui_pulse.h"       // G_NnPaletteArgb_679bb0
+#include "NeuroNet/nn_ui_pulse.h"       // G_NnPaletteCyan
 #include "Space/Cameras/space_camera.h"      // AsCamera, FSpaceCamera
 #include "Space/star_sphere.h"       // Win3DIdentityRotation3x3 (FUN_004215b0)
 #include "Interface/win3d.h"
@@ -937,7 +937,7 @@ void ScrollControl::Draw()
         return;
 
     // The idle colour DAT_00679bb0 and the hot colour.
-    unsigned long const Idle = G_NnPaletteArgb_679bb0;
+    unsigned long const Idle = G_NnPaletteCyan;
     unsigned char const HotBytes[4] = {0xf5, 0xea, 0x52, 0xff};
     unsigned long Hot = 0;
     memcpy(&Hot, HotBytes, sizeof(Hot));
@@ -1024,8 +1024,9 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
     if (bThumbValid == 0)
         return false;
 
-    // A held part lets go on {-1, 1} (the button release).
-    bool const bRelease = Event->Field0 == -1 && Event->Field1 == 1;
+    // A held part lets go on the left-button release.
+    bool const bRelease =
+        Event->Button == kWin3DMouseLeft && Event->Action == kWin3DMouseRelease;
     if (bDragging != 0)
     {
         if (bRelease)
@@ -1065,7 +1066,7 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
     }
 
     // Only {-1, 2} (the press) goes on.
-    if (Event->Field0 != -1 || Event->Field1 != 2)
+    if (Event->Button != kWin3DMouseLeft || Event->Action != kWin3DMousePress)
         return true;
 
     // The cursor ray: the pixel onto the near plane of the Win3D camera DAT_0067dbf8 through a

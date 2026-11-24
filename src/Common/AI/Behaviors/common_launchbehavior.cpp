@@ -39,23 +39,11 @@ static void RotateBasisRowsXZ(Vector* Rows, double Angle)
     }
 }
 
-// FUN_062cd640. SubObjectA is a MoveIdea (FUN_062d4e60), SubObjectB a FaceIdea (FUN_062d6750).
+// FUN_062cd640. Move is a MoveIdea (FUN_062d4e60), Face a FaceIdea (FUN_062d6750).
 LaunchBehavior::LaunchBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , ThreatSourcePtr14(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime1c(0.0f)
-    , BehaviorMgrPtr20(nullptr)
-    , NavHelperPtr24(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
-    , SubObjectA()
-    , SubObjectB()
+    : Behavior(InTypeId)
+    , Move()
+    , Face()
     , ModeState164(0)
     , Watcher168()
     , CachedSystemId170(0)
@@ -78,16 +66,15 @@ LaunchBehavior::LaunchBehavior(int InTypeId)
     , bHalfThrottleOnExit(0)
     , bFlipHeadingOnExit(0)
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
 }
 
-// FUN_062cd700 (scalar deleting FUN_062cd6e0): clears +0x168, then SubObjectB's watcher
-// (+0xb8), then SubObjectA's (+0x40); ~Behavior (FUN_062d2080) chains after.
+// FUN_062cd700 (scalar deleting FUN_062cd6e0): clears +0x168, then Face's watcher
+// (+0xb8), then Move's (+0x40); ~Behavior (FUN_062d2080) chains after.
 LaunchBehavior::~LaunchBehavior()
 {
     Watcher168.set(nullptr);
-    SubObjectB.Watcher.set(nullptr);
-    SubObjectA.Watcher.set(nullptr);
+    Face.Watcher.set(nullptr);
+    Move.Watcher.set(nullptr);
 }
 
 // Slot 1, LAB_062cd790.
@@ -97,12 +84,12 @@ bool LaunchBehavior::SetContext(void* Param1, void* Param2, void* Param3)
         return false;
 
     // Both ideas get the raw incoming Param2 as the manager argument.
-    SubObjectA.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);
+    Move.SetContext(OwnerContext, SysMgr, Param2);
 
-    // FUN_062d5980(&SubObjectA, 0), MoveIdea::SetMode(0).
+    // FUN_062d5980(&Move, 0), MoveIdea::SetMode(0).
     ReleaseApproachStep(0);
 
-    SubObjectB.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);
+    Face.SetContext(OwnerContext, SysMgr, Param2);
 
     // A player-flown ship gets a 15-second launch timeout, an NPC 60.
     LaunchTimeout = NestedNavQuery0xbc() ? 15.0f : 60.0f;
@@ -123,60 +110,60 @@ void LaunchBehavior::Engage()
     void const* RawBlock = Watched168 ? (reinterpret_cast<unsigned char const*>(Watched168) - 8) : nullptr;
     TargetType174 = GetObjectTypeOrZero(ObjInspectOf(RawBlock));
 
-    ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(0); // FUN_062e9a60
+    SysMgr->GunGroups.SetShieldActive(0); // FUN_062e9a60
 
     ModeState164 = 1;
     bStraightLaunch = 0;
     LaunchDwellElapsed = 0.0f;
     TotalLaunchElapsed = 0.0f;
 
-    SetCruiseLock(0, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(0, 3);                                            // FUN_062d21d0
 }
 
-// Slot 4, FUN_062cd8b0. SubObjectA commits before SubObjectB here.
+// Slot 4, FUN_062cd8b0. Move commits before Face here.
 void LaunchBehavior::Disengage()
 {
-    ReleaseSubObject(&SubObjectA);
-    ReleaseSubObject(&SubObjectB);
+    ReleaseSubObject(&Move);
+    ReleaseSubObject(&Face);
 
     Behavior::OnDisengage();
 
-    ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(1);
+    SysMgr->GunGroups.SetShieldActive(1);
 
-    SetCruiseLock(1, 3);
+    SetAvoidanceAllowed(1, 3);
 
     Flags28 = static_cast<unsigned char>((Flags28 & ~0x2) | 0x1);
 
-    static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->SetDirectiveResult(8, 0);
+    BehaviorMgr->SetDirectiveResult(8, 0);
 }
 
 // Slot 5, LAB_062cd910.
 int LaunchBehavior::SetModeFromFlags()
 {
     int Mode = (Flags28 & 0x2) ? 0 : 2;
-    if (UpdateResult10 == 2 || UpdateResult10 == 3)
+    if (UpdateResult == 2 || UpdateResult == 3)
         Mode = 2;
     if (Flag29 != 0)
     {
-        ModeSelector0xc = 3;
+        Readiness = 3;
         return 3;
     }
-    ModeSelector0xc = Mode;
+    Readiness = Mode;
     return Mode;
 }
 
 // Slot 10, FUN_062cdf30.
 bool LaunchBehavior::ApplyDirective(void const* Param)
 {
-    // FUN_062e74a0 on Param+0xc; set_pointer only when the Watchable differs.
-    void* Found = FindLaunchHardpoint(NavHelperPtr24, Param);
+    // FUN_062e74a0 on the op's LaunchObjectId; set_pointer only when the Watchable differs.
+    void* Found = FindLaunchObject(SysMgr, Param);
     void* Adjusted = Found ? (static_cast<unsigned char*>(Found) + 8) : nullptr;
     Watchable const* AdjustedWatchable = static_cast<Watchable const*>(Adjusted);
 
     if (AdjustedWatchable != Watcher168.target())
         Watcher168.set(AdjustedWatchable);
 
-    DockPortIndex = *reinterpret_cast<int const*>(static_cast<unsigned char const*>(Param) + 0x10);
+    DockPortIndex = static_cast<pub::AI::DirectiveLaunchOp const*>(Param)->DockPortIndex;
 
     Watchable const* Watched168 = Watcher168.target();
     void const* RawBlock = Watched168 ? (reinterpret_cast<unsigned char const*>(Watched168) - 8) : nullptr;
@@ -184,7 +171,7 @@ bool LaunchBehavior::ApplyDirective(void const* Param)
     if (RawBlock != nullptr)
     {
         Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
-        UpdateResult10 = 1;
+        UpdateResult = 1;
         return true;
     }
 
@@ -200,32 +187,32 @@ bool LaunchBehavior::ApplyDirective(void const* Param)
 // unchanged); Ghidra shows it with the same label text as case 6's entry 062cdea8.
 int LaunchBehavior::Update()
 {
-    if (ThreatSourcePtr14 == nullptr)
+    if (OwnerContext == nullptr)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
     Watchable const* Watched168 = Watcher168.target();
     if (Watched168 == nullptr || (reinterpret_cast<unsigned char const*>(Watched168) - 8) == nullptr)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
 
     // A system change since Engage() aborts with 2.
     if (CachedSystemId170 != FetchSystemId())
     {
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
     // Launch timeout. Strictly greater aborts.
     if (TotalLaunchElapsed > LaunchTimeout)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
-    TotalLaunchElapsed += DeltaTime1c;
+    TotalLaunchElapsed += DeltaTime;
 
     switch (ModeState164)
     {
@@ -234,8 +221,8 @@ int LaunchBehavior::Update()
         // Strictly greater advances.
         if (LaunchDwellElapsed > LaunchDwellDuration)
             ModeState164 = 2;
-        LaunchDwellElapsed += DeltaTime1c;
-        UpdateResult10 = 0;
+        LaunchDwellElapsed += DeltaTime;
+        UpdateResult = 0;
         return 0;
     }
     case 2:
@@ -252,22 +239,22 @@ int LaunchBehavior::Update()
         {
             StartLaunchSequence();                                   // FUN_062cdfa0
             ModeState164 = 4;
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
         if (DockPortIndex == -1)
         {
             ModeState164 = 2;
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
         if (DockPortIndex == -2)
         {
             Disengage();                                             // own slot 4
-            UpdateResult10 = 3;
+            UpdateResult = 3;
             return 3;
         }
-        UpdateResult10 = 0;
+        UpdateResult = 0;
         return 0;
     }
     case 4:
@@ -277,35 +264,35 @@ int LaunchBehavior::Update()
             SetApproachSpeedParam(25.0f);
             ReleaseApproachStep(0);
             ModeState164 = 5;
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
 
         PushApproachBasisToSubObjectB(&ApproachBasis2[0]);
-        TickSubObject(&SubObjectB, DeltaTime1c);
+        TickSubObject(&Face, DeltaTime);
         SetApproachOffset(&DockPointB);
         SetApproachSpeedParam(5.0f);
         ReleaseApproachStep(1);
         SetApproachThrottleScale(LaunchThrottleScale);
         SetApproachMode(2);
-        int TickResult = TickSubObject(&SubObjectA, DeltaTime1c);
+        int TickResult = TickSubObject(&Move, DeltaTime);
         if (TickResult != 1)
         {
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
         SetApproachSpeedParam(15.0f);
         ModeState164 = 5;
-        UpdateResult10 = 0;
+        UpdateResult = 0;
         return 0;
     }
     case 5:
     {
         PushApproachBasisToSubObjectB(&LaunchBasis[0]);
-        TickSubObject(&SubObjectB, DeltaTime1c);
+        TickSubObject(&Face, DeltaTime);
         SetApproachOffset(&DockPointC);
         SetApproachMode(2);
-        int TickResult = TickSubObject(&SubObjectA, DeltaTime1c);
+        int TickResult = TickSubObject(&Move, DeltaTime);
 
         // Delta1 is stored to float.
         float const Delta1X = DockPointC.x - DockPointB.x;
@@ -313,7 +300,7 @@ int LaunchBehavior::Update()
         float const Delta1Z = DockPointC.z - DockPointB.z;
 
         // The inlined FUN_062e6d40 cache refresh.
-        SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+        SystemManager* const Sys = SysMgr;
         if (Sys->SelfTarget.bPosValid == 0)
             EnsureNestedNavPositionCached();
 
@@ -328,13 +315,13 @@ int LaunchBehavior::Update()
             double const Dot = (Delta1Z * Delta2Z + Delta1Y * Delta2Y) + Delta1X * Delta2X;
             if (!(Dot > 0.0))
             {
-                UpdateResult10 = 0;
+                UpdateResult = 0;
                 return 0;
             }
         }
 
-        ReleaseSubObject(&SubObjectA);
-        ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(1);
+        ReleaseSubObject(&Move);
+        SysMgr->GunGroups.SetShieldActive(1);
 
         if (bHalfThrottleOnExit != 0)
             AdjustNavHelperThrottle(0.5f);
@@ -346,12 +333,12 @@ int LaunchBehavior::Update()
             RotateBasisRowsXZ(LaunchBasis, 3.1415927410125732);
 
             ModeState164 = 6;
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
 
         Flags28 = static_cast<unsigned char>((Flags28 & ~0x2) | 0x1);
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
     case 6:
@@ -359,18 +346,18 @@ int LaunchBehavior::Update()
         // pi/8 as an immediate (0x3ec90fdb), not from .rdata.
         SetHardpointCone(0.39269909f);
         PushApproachBasisToSubObjectB(&LaunchBasis[0]);
-        int TickResult = TickSubObject(&SubObjectB, DeltaTime1c);
+        int TickResult = TickSubObject(&Face, DeltaTime);
         if (TickResult != 1)
         {
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
         Flags28 = static_cast<unsigned char>((Flags28 & ~0x2) | 0x1);
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
     default:
-        UpdateResult10 = 0;
+        UpdateResult = 0;
         return 0;
     }
 }
@@ -386,11 +373,11 @@ unsigned LaunchBehavior::FetchSystemId() const
     return System->GetId();
 }
 
-// FUN_062e74a0 on Param+0xc.
-void* LaunchBehavior::FindLaunchHardpoint(void* NavHelper, void const* Param)
+// FUN_062e74a0 on the op's LaunchObjectId.
+void* LaunchBehavior::FindLaunchObject(SystemManager* SysMgr, void const* Param)
 {
-    return static_cast<SystemManager*>(NavHelper)->Timers.FindVerifiedObject(
-        (unsigned const*)(static_cast<unsigned char const*>(Param) + 0xc));
+    return SysMgr->Timers.FindVerifiedObject(
+        &static_cast<pub::AI::DirectiveLaunchOp const*>(Param)->LaunchObjectId);
 }
 
 // SetContext()'s LaunchTimeout selector: is_player() on SystemManager+0x1580 (retail spells
@@ -398,15 +385,15 @@ void* LaunchBehavior::FindLaunchHardpoint(void* NavHelper, void const* Param)
 // has the identical chain (062c8e0a, 062c92d8).
 bool LaunchBehavior::NestedNavQuery0xbc()
 {
-    SystemManager const* const Sys = static_cast<SystemManager const*>(NavHelperPtr24);
+    SystemManager const* const Sys = SysMgr;
     return Sys->SelfTarget.Iface->is_player();
 }
 
 // ----------------------------------------------------------------------------
 // Update() case 2's payload (062cda2f-062cdbdd). The three get_dock_hardpoints out-buffers
 // are disjoint 0x30-byte frame slots. A successful get_hardpoint("hpmount") on
-// ThreatSourcePtr14 skips the tail; the tail runs only on failure. FUN_062d5a80 stores
-// LaunchOffset into SubObjectA+0x4c (MoveIdea::Offset4c).
+// OwnerContext skips the tail; the tail runs only on failure. FUN_062d5a80 stores
+// LaunchOffset into Move+0x4c (MoveIdea::Offset4c).
 void LaunchBehavior::ComputeLaunchApproachTransform()
 {
     // Unguarded: Update()'s entry gate already proved both halves non-null.
@@ -429,11 +416,11 @@ void LaunchBehavior::ComputeLaunchApproachTransform()
 
     Vector HardpointPos;
     Matrix HardpointOrient;
-    if (ObjInspectOf(ThreatSourcePtr14)->get_hardpoint("hpmount", &HardpointPos,
+    if (ObjInspectOf(OwnerContext)->get_hardpoint("hpmount", &HardpointPos,
                                                        &HardpointOrient) != 0)
         return;  // non-zero skips the tail
 
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    SystemManager* const Sys = SysMgr;
 
     // The same inlined cache refresh case 5 uses (latch +0x157a).
     if (Sys->SelfTarget.bPosValid == 0)
@@ -454,7 +441,7 @@ void LaunchBehavior::ComputeLaunchApproachTransform()
                              reinterpret_cast<FVector const&>(LaunchOffset));
     LaunchOffset = Rotated;
 
-    SubObjectA.Offset4c = LaunchOffset;                              // FUN_062d5a80
+    Move.Offset4c = LaunchOffset;                              // FUN_062d5a80
 }
 
 // FUN_062cdfa0, called only from Update() case 3, which ignores the result. Re-reads the
@@ -569,40 +556,40 @@ bool LaunchBehavior::StartLaunchSequence()
 // speed, despite the method name.
 void LaunchBehavior::SetApproachSpeedParam(float Value)
 {
-    SubObjectA.SetRange3c(Value);
+    Move.SetRange3c(Value);
 }
 
 // FUN_062d5980, MoveIdea::SetMode.
 void LaunchBehavior::ReleaseApproachStep(int Flag)
 {
-    SubObjectA.SetMode(Flag);
+    Move.SetMode(Flag);
 }
 
 // FUN_062d5840, MoveIdea::SetPosition.
 void LaunchBehavior::SetApproachOffset(void const* OffsetVector)
 {
-    SubObjectA.SetPosition(*static_cast<Vector const*>(OffsetVector));
+    Move.SetPosition(*static_cast<Vector const*>(OffsetVector));
 }
 
 // FUN_062d75c0: FaceIdea+0xa0 = 4 and nine dwords copied from the caller's basis into
 // FaceIdea+0x34 (the data flows into the idea, not out of it).
 void LaunchBehavior::PushApproachBasisToSubObjectB(void const* SrcVectorBlock)
 {
-    SubObjectB.TargetKind = 4;
-    std::memcpy(SubObjectB.ZeroBlock34, SrcVectorBlock, sizeof(SubObjectB.ZeroBlock34));
+    Face.TargetKind = 4;
+    std::memcpy(Face.ZeroBlock34, SrcVectorBlock, sizeof(Face.ZeroBlock34));
 }
 
 // FUN_062d5a20, MoveIdea::SetThrottleScale (also called from DockBehavior::AdvancePreamble).
 // The value is the throttle scale handed to get_projected_throttle, not a radius.
 void LaunchBehavior::SetApproachThrottleScale(float Scale)
 {
-    SubObjectA.SetThrottleScale(Scale);
+    Move.SetThrottleScale(Scale);
 }
 
 // FUN_062d88b0: MoveIdea+0x44 (StopStyle).
 void LaunchBehavior::SetApproachMode(int Mode)
 {
-    SubObjectA.StopStyle = Mode;
+    Move.StopStyle = Mode;
 }
 
 // BaseIdea slot 1 (Update) / slot 4 (Commit).
@@ -613,7 +600,7 @@ void LaunchBehavior::ReleaseSubObject(BaseIdea* SubObject) { SubObject->Commit()
 // latch (+0x157a) is clear. The latch is set BEFORE the call.
 void LaunchBehavior::EnsureNestedNavPositionCached()
 {
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    SystemManager* const Sys = SysMgr;
     Sys->SelfTarget.bPosValid = 1;
     Sys->SelfTarget.Iface->get_physical_radius(Sys->SelfTarget.CachedRadius,
                                                          Sys->SelfTarget.CachedPos);
@@ -622,11 +609,11 @@ void LaunchBehavior::EnsureNestedNavPositionCached()
 // FUN_062d93c0: FaceIdea+0x8c (FacingTolerance).
 void LaunchBehavior::SetHardpointCone(float Angle)
 {
-    SubObjectB.FacingTolerance = Angle;
+    Face.FacingTolerance = Angle;
 }
 
 // FUN_062e89a0, ThrustManager::SetThrottle.
 void LaunchBehavior::AdjustNavHelperThrottle(float Value)
 {
-    ((SystemManager*)NavHelperPtr24)->Thrust.SetThrottle(Value, 0);
+    SysMgr->Thrust.SetThrottle(Value, 0);
 }

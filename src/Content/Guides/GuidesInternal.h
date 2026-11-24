@@ -39,6 +39,9 @@ extern float GGuideLaneEntryRangeSquared;
 extern float GPatrolScanMinAttitude;
 extern float GPatrolScanMaxAttitude;
 
+// Guides.cpp: the ship's position (FUN_06eb70f0), as the guide bodies fetch it.
+Vector GetShipPosition(FContentNpcShip* Ship);
+
 // ---------------------------------------------------------------------------------------
 // Target guide (retail vtable 06fb81d8): the two targets of the description.
 // ---------------------------------------------------------------------------------------
@@ -94,7 +97,7 @@ public:
 
     FContentGuide* Clone() override;                                   // FUN_06f06ed0
     void Start() override;                                             // FUN_06f06fa0
-    void OnDirectivesDone(int ResultWord11c, int ResultWord118) override;   // LAB_06f0af30
+    void OnDirectivesDone(int CompletedBehavior, int DirectiveResult) override;   // LAB_06f0af30
 
     TRefHandle<FObjListDirective> DelayDirective;   // +0x24 ref-holding member
 };
@@ -175,7 +178,7 @@ public:
     FContentGuide* Clone() override;                                   // FUN_06f07180
     void Start() override;                                             // FUN_06f07240
     void Reset() override;                                             // LAB_06f061a0
-    void OnDirectivesDone(int ResultWord11c, int ResultWord118) override;   // LAB_06f0af30
+    void OnDirectivesDone(int CompletedBehavior, int DirectiveResult) override;   // LAB_06f0af30
     void SetShip(FContentNpcShip* InShip) override;                    // LAB_06f07120
     bool RequestFleeDestination(pub::AI::ContentCallback::FleeDestinationType& OutType,
                                 Vector& OutPosition, unsigned int& OutParam,
@@ -314,7 +317,7 @@ public:
     FContentGuide* Clone() override;                                   // FUN_06f0adb0
     void Start() override;                                             // LAB_06f0af40
     void Reset() override;                                             // LAB_06f0aa10
-    void OnDirectivesDone(int ResultWord11c, int ResultWord118) override;   // LAB_06f0af30
+    void OnDirectivesDone(int CompletedBehavior, int DirectiveResult) override;   // LAB_06f0af30
     void HandleEvent(pub::Controller::EMessage MsgId, void const* Parms) override;           // FUN_06f0aee0
     void SetShip(FContentNpcShip* InShip) override;                    // FUN_06f0ad60
     void OnScanStateChange(bool bScanning) override;                   // LAB_06f0aeb0
@@ -349,7 +352,7 @@ public:
     FContentGuide* Clone() override;                                   // FUN_06f0b350
     void Start() override;                                             // LAB_06f0b410
     void Reset() override;                                             // LAB_06f061a0
-    void OnDirectivesDone(int ResultWord11c, int ResultWord118) override;   // LAB_06f0af30
+    void OnDirectivesDone(int CompletedBehavior, int DirectiveResult) override;   // LAB_06f0af30
 
     int State = 0;                               // +0x24 set to 1 by Start
     // +0x28: the directive Start hands out (ref-holding member).
@@ -389,7 +392,7 @@ public:
     FContentGuide* Clone() override;                                   // FUN_06f08140
     void Start() override;                                             // FUN_06f099f0
     void Reset() override;                                             // LAB_06f087e0
-    void OnDirectivesDone(int ResultWord11c, int ResultWord118) override;   // 06ea1490
+    void OnDirectivesDone(int CompletedBehavior, int DirectiveResult) override;   // 06ea1490
     void HandleEvent(pub::Controller::EMessage MsgId, void const* Parms) override;           // FUN_06f08c70
     void SetShip(FContentNpcShip* InShip) override;                    // LAB_06f07de0
     bool RequestFleeDestination(pub::AI::ContentCallback::FleeDestinationType& OutType,
@@ -421,7 +424,7 @@ public:
     unsigned int TargetId = 0;                   // +0x168 FindObjectIdByName(TargetName)
     unsigned char bCruise = 0;                   // +0x16c desc +0x174 -> SetGuide bCruise
     unsigned char bNoCruise = 0;                 // +0x16d desc +0x175 -> SetGuide bNoCruise
-    unsigned char bStartFollowing = 1;               // +0x16e desc +0x176 -> SetGuide FieldA0
+    unsigned char bStartFollowing = 1;               // +0x16e desc +0x176 -> SetGuide bStartFollowing
     // +0x170: the last directive handed out; a ref-holding member, released after +0x180 and
     // +0x1a0 (member order).
     TRefHandle<FObjListDirective> Directive;

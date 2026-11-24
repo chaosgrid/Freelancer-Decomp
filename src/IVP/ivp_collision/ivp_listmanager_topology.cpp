@@ -11,6 +11,7 @@
 #include "../ivp_physics/ivp_environment.h"
 #include "../ivp_utility/ivp_math.h"    // IVP_U_Matrix3::vmult/vimult
 #include "../ivp_compact_builder/ivp_compact_ledge.h" // IVP_Compact_Edge::GetCompactLedge
+#include "../ivp_utility/ivp_core_trap.h"
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -113,15 +114,15 @@ IVP_Core* IVP_ListManager_FindDisconnectedCore(IVP_ListManager* Manager)
         Manager->RegisteredCores.ElementAt(i)->MergedCoreWhichReplacedIt = nullptr;
 
     // Phase 2: rebuild groups from CorePairEntries, skipping entries with a
-    // kinematic side (Flags & 0xc).
+    // kinematic side (Flags & IVP_CORE_PHYSICAL_UNMOVEABLE).
     for (int i = Manager->CorePairEntries.Len() - 1; i >= 0; --i)
     {
         IVP_ListManager_CorePairEntry* Entry = Manager->CorePairEntries.ElementAt(i);
         IVP_Core* CoreA = Entry->CoreA;
         IVP_Core* CoreB = Entry->CoreB;
-        if ((CoreA->Flags & 0xc) != 0)
+        if ((CoreA->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
             continue;
-        if ((CoreB->Flags & 0xc) != 0)
+        if ((CoreB->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
             continue;
 
         IVP_Core* MasterA = IVP_Core_UnionFindGetFather(CoreA);
@@ -136,7 +137,7 @@ IVP_Core* IVP_ListManager_FindDisconnectedCore(IVP_ListManager* Manager)
     for (int i = Manager->RegisteredCores.Len() - 1; i >= 0; --i)
     {
         IVP_Core* Core = Manager->RegisteredCores.ElementAt(i);
-        if ((Core->Flags & 0xc) == 0)
+        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
             ReferenceMaster = IVP_Core_UnionFindGetFather(Core);
     }
 
@@ -145,7 +146,7 @@ IVP_Core* IVP_ListManager_FindDisconnectedCore(IVP_ListManager* Manager)
     for (int i = Manager->RegisteredCores.Len() - 1; i >= 0; --i)
     {
         IVP_Core* Core = Manager->RegisteredCores.ElementAt(i);
-        if ((Core->Flags & 0xc) != 0)
+        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
             continue;
         IVP_Core* Master = IVP_Core_UnionFindGetFather(Core);
         if (Master != ReferenceMaster)
@@ -209,7 +210,7 @@ void IVP_ListManager_SplitOffCoreGroup(IVP_ListManager* Manager, IVP_Core* Targe
         {
             IVP_Core* Core = Manager->RegisteredCores.ElementAt(i);
 
-            if ((Core->Flags & 0xc) != 0)
+            if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
             {
                 // Kinematic: tracked on NewManager too, regardless of group
                 // (it never enters the union-find graph).
@@ -240,13 +241,13 @@ void IVP_ListManager_SplitOffCoreGroup(IVP_ListManager* Manager, IVP_Core* Targe
             // PickA ends up as the non-kinematic union-find probe.
             bool EitherKinematic = false;
             IVP_Core* KinematicSide = nullptr;
-            if ((PickA->Flags & 0xc) != 0)
+            if ((PickA->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
             {
                 EitherKinematic = true;
                 KinematicSide = PickA;
                 std::swap(PickA, PickB); // PickA (probe) = old PickB
             }
-            else if ((PickB->Flags & 0xc) != 0)
+            else if ((PickB->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
             {
                 EitherKinematic = true;
                 KinematicSide = PickB;
@@ -280,8 +281,7 @@ void IVP_ListManager_SplitOffCoreGroup(IVP_ListManager* Manager, IVP_Core* Targe
                 }
                 if (!bFound)
                 {
-                    volatile int* Trap = nullptr;
-                    *Trap = 0;
+                    IVP_CoreTrap();
                 }
 
                 Manager->RemoveCtx(Node);    // FUN_0634b8d0
@@ -300,7 +300,7 @@ void IVP_ListManager_SplitOffCoreGroup(IVP_ListManager* Manager, IVP_Core* Targe
         for (int i = Manager->RegisteredCores.Len() - 1; i >= 0; --i)
         {
             IVP_Core* Core = Manager->RegisteredCores.ElementAt(i);
-            if ((Core->Flags & 0xc) == 0)
+            if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
                 continue;
 
             IVP_Friction_Info_For_Core* NewManagerHandle = IVP_FindFrictionInfo(Core, NewManager);
@@ -363,7 +363,7 @@ void IVP_ListManager_TickAllCorePairBudgets(IVP_ListManager* Manager)
 void IVP_ListManager_ClearAllCorePairBudgets(IVP_ListManager* Manager)
 {
     for (int i = Manager->CorePairEntries.Len() - 1; i >= 0; --i)
-        Manager->CorePairEntries.ElementAt(i)->_field24 = 0;
+        Manager->CorePairEntries.ElementAt(i)->IntegratedAntiEnergy = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,9 +373,9 @@ void IVP_ListManager_TickCorePairBudget(IVP_ListManager_CorePairEntry* Entry)
 {
     IVP_Environment* Env = Entry->CoreA->Environment;
     // The product stays on the x87 stack; both stores are rounded copies.
-    const double ScaledBudget = (double)(Env->field_120) * Entry->_field24;
+    const double ScaledBudget = (double)(Env->integrated_energy_damp) * Entry->IntegratedAntiEnergy;
     const float ScaledBudgetF = (float)(ScaledBudget);
-    Entry->_field24 = ScaledBudgetF;
+    Entry->IntegratedAntiEnergy = ScaledBudgetF;
 
     // Unrounded compare; less or unordered returns.
     if (!(ScaledBudget >= 0.0))
@@ -391,7 +391,7 @@ void IVP_ListManager_TickCorePairBudget(IVP_ListManager_CorePairEntry* Entry)
 
     float* EnvTickAccumulator = reinterpret_cast<float*>(&Env->manager_context_68[0]); // IVP_Environment+0x68
     *EnvTickAccumulator += Consumed;
-    Entry->_field24 -= Consumed;
+    Entry->IntegratedAntiEnergy -= Consumed;
 }
 
 // ---------------------------------------------------------------------------
@@ -422,13 +422,13 @@ double IVP_SolveContactAxisEnergySplit(float A, float B, float C, float D, float
 // ---------------------------------------------------------------------------
 // FUN_06355db0, thiscall on the 0x6c-byte scratch, RET 8.
 // ---------------------------------------------------------------------------
-//   1. A kinematic CoreB argument ((Flags & 0xc) or (Flags & 0x300)) is
-//      swapped into slot +0x60.
-//   2. Field[0..2] = normalised (CY.Speed - CX.Speed) (FUN_06347e90),
-//      Field[0x0c] = its length.
-//   3-4. Field[0x11] = length of the normalised world spin delta
+//   1. A kinematic CoreB argument ((Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) or (Flags & IVP_CORE_PINNED)) is
+//      swapped into CoreA (+0x60).
+//   2. LinearAxis = normalised (CY.Speed - CX.Speed) (FUN_06347e90),
+//      LinearSpeed = its length.
+//   3-4. SpinSpeed = length of the normalised world spin delta
 //      (MWorldFCore vmult RotSpeed, FUN_06348580).
-//   5. Field[4..6] = CX vimult delta; Field[8..10] = CY vimult -delta
+//   5. SpinAxisA = CX vimult delta; SpinAxisB = CY vimult -delta
 //      (FUN_06366010).
 //   6. Per side, the length of RotInertia * axis; below 1e-10f (DAT_063a53d8)
 //      or unordered, both the length and its inverse slot become 1.0f.
@@ -443,29 +443,29 @@ void IVP_PopulateContactAxisSetup(IVP_PairContactAxisSetup* Setup, IVP_Core* Cor
     constexpr float kSmallScale = 1e-4f;     // DAT_063a547c (0x38d1b717)
 
     // Step 1. Retail tests `AL & 0xc` and `AH & 0x3` separately.
-    if ((CoreB->Flags & 0xc) != 0 || (CoreB->Flags & 0x300) != 0)
+    if ((CoreB->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0 || (CoreB->Flags & IVP_CORE_PINNED) != 0)
     {
-        Setup->CoreA() = CoreB;
-        Setup->CoreB() = CoreA;
+        Setup->CoreA = CoreB;
+        Setup->CoreB = CoreA;
     }
     else
     {
-        Setup->CoreA() = CoreA;
-        Setup->CoreB() = CoreB;
+        Setup->CoreA = CoreA;
+        Setup->CoreB = CoreB;
     }
-    IVP_Core* CX = Setup->CoreA();
-    IVP_Core* CY = Setup->CoreB();
+    IVP_Core* CX = Setup->CoreA;
+    IVP_Core* CY = Setup->CoreB;
 
-    // Step 2. Field[3] is not written.
+    // Step 2. Pad03 is not written.
     IVP_U_Point SpeedDelta{};
     SpeedDelta.k[0] = CY->Speed.x - CX->Speed.x;
     SpeedDelta.k[1] = CY->Speed.y - CX->Speed.y;
     SpeedDelta.k[2] = CY->Speed.z - CX->Speed.z;
     const double SpeedDeltaLength = SpeedDelta.real_length_plus_normize();
-    Setup->Field[0] = SpeedDelta.k[0];
-    Setup->Field[1] = SpeedDelta.k[1];
-    Setup->Field[2] = SpeedDelta.k[2];
-    Setup->Field[0x0c] = (float)(SpeedDeltaLength);
+    Setup->LinearAxis[0] = SpeedDelta.k[0];
+    Setup->LinearAxis[1] = SpeedDelta.k[1];
+    Setup->LinearAxis[2] = SpeedDelta.k[2];
+    Setup->LinearSpeed = (float)(SpeedDeltaLength);
 
     // Step 3.
     IVP_U_Point RotSpeedX{};
@@ -483,7 +483,7 @@ void IVP_PopulateContactAxisSetup(IVP_PairContactAxisSetup* Setup, IVP_Core* Cor
     SpinDelta.k[1] = WorldSpinY.k[1] - WorldSpinX.k[1];
     SpinDelta.k[2] = WorldSpinY.k[2] - WorldSpinX.k[2];
     const double SpinDeltaLength = SpinDelta.real_length_plus_normize();
-    Setup->Field[0x11] = (float)(SpinDeltaLength);
+    Setup->SpinSpeed = (float)(SpinDeltaLength);
 
     // Step 5. The negation is a multiply by DAT_063a5498 (-1.0f).
     IVP_U_Point SpinAxisX{};
@@ -493,57 +493,57 @@ void IVP_PopulateContactAxisSetup(IVP_PairContactAxisSetup* Setup, IVP_Core* Cor
     SpinDelta.k[2] = SpinDelta.k[2] * kNegOne;
     IVP_U_Point SpinAxisY{};
     CY->MWorldFCore.vimult(&SpinDelta, &SpinAxisY);
-    Setup->Field[4] = SpinAxisX.k[0]; Setup->Field[5] = SpinAxisX.k[1]; Setup->Field[6] = SpinAxisX.k[2];
-    Setup->Field[8] = SpinAxisY.k[0]; Setup->Field[9] = SpinAxisY.k[1]; Setup->Field[10] = SpinAxisY.k[2];
+    Setup->SpinAxisA[0] = SpinAxisX.k[0]; Setup->SpinAxisA[1] = SpinAxisX.k[1]; Setup->SpinAxisA[2] = SpinAxisX.k[2];
+    Setup->SpinAxisB[0] = SpinAxisY.k[0]; Setup->SpinAxisB[1] = SpinAxisY.k[1]; Setup->SpinAxisB[2] = SpinAxisY.k[2];
 
     // Step 6. The weighted components are floats; L (FUN_06347e60) stays
     // unrounded for the compare and the inverse.
     IVP_U_Point WeightedX{};
-    WeightedX.k[0] = CX->RotInertia.x * Setup->Field[4];
-    WeightedX.k[1] = CX->RotInertia.y * Setup->Field[5];
-    WeightedX.k[2] = CX->RotInertia.z * Setup->Field[6];
+    WeightedX.k[0] = CX->RotInertia.x * Setup->SpinAxisA[0];
+    WeightedX.k[1] = CX->RotInertia.y * Setup->SpinAxisA[1];
+    WeightedX.k[2] = CX->RotInertia.z * Setup->SpinAxisA[2];
     const double LengthX = WeightedX.real_length();
-    Setup->Field[0x12] = (float)(LengthX);
+    Setup->AxisInertiaA = (float)(LengthX);
     if (!(LengthX >= kLengthEpsilon))
     {
-        Setup->Field[0x12] = 1.0f;
-        Setup->Field[0x14] = 1.0f;
+        Setup->AxisInertiaA = 1.0f;
+        Setup->InvAxisInertiaA = 1.0f;
     }
     else
     {
-        Setup->Field[0x14] = (float)(1.0 / LengthX);
+        Setup->InvAxisInertiaA = (float)(1.0 / LengthX);
     }
 
     IVP_U_Point WeightedY{};
-    WeightedY.k[0] = Setup->Field[8] * CY->RotInertia.x;
-    WeightedY.k[1] = CY->RotInertia.y * Setup->Field[9];
-    WeightedY.k[2] = CY->RotInertia.z * Setup->Field[10];
+    WeightedY.k[0] = Setup->SpinAxisB[0] * CY->RotInertia.x;
+    WeightedY.k[1] = CY->RotInertia.y * Setup->SpinAxisB[1];
+    WeightedY.k[2] = CY->RotInertia.z * Setup->SpinAxisB[2];
     const double LengthY = WeightedY.real_length();
-    Setup->Field[0x13] = (float)(LengthY);
+    Setup->AxisInertiaB = (float)(LengthY);
     if (!(LengthY >= kLengthEpsilon))
     {
-        Setup->Field[0x13] = 1.0f;
-        Setup->Field[0x15] = 1.0f;
+        Setup->AxisInertiaB = 1.0f;
+        Setup->InvAxisInertiaB = 1.0f;
     }
     else
     {
-        Setup->Field[0x15] = (float)(1.0 / LengthY);
+        Setup->InvAxisInertiaB = (float)(1.0 / LengthY);
     }
 
     // Step 7.
-    Setup->Field[0x0e] = CY->Mass;
-    Setup->Field[0x10] = CY->InvMass;
-    if ((CX->Flags & 0xc) == 0 && (CX->Flags & 0x300) == 0)
+    Setup->MassB = CY->Mass;
+    Setup->InvMassB = CY->InvMass;
+    if ((CX->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0 && (CX->Flags & IVP_CORE_PINNED) == 0)
     {
-        Setup->Field[0x0d] = CX->Mass;
-        Setup->Field[0x0f] = CX->InvMass;
+        Setup->MassA = CX->Mass;
+        Setup->InvMassA = CX->InvMass;
     }
     else
     {
-        Setup->Field[0x0d] = Setup->Field[0x0e] * kTenThousand;
-        Setup->Field[0x0f] = Setup->Field[0x10] * kSmallScale;
-        Setup->Field[0x12] = Setup->Field[0x13] * kTenThousand;
-        Setup->Field[0x14] = Setup->Field[0x15] * kSmallScale;
+        Setup->MassA = Setup->MassB * kTenThousand;
+        Setup->InvMassA = Setup->InvMassB * kSmallScale;
+        Setup->AxisInertiaA = Setup->AxisInertiaB * kTenThousand;
+        Setup->InvAxisInertiaA = Setup->InvAxisInertiaB * kSmallScale;
     }
 }
 
@@ -552,59 +552,59 @@ void IVP_PopulateContactAxisSetup(IVP_PairContactAxisSetup* Setup, IVP_Core* Cor
 // ---------------------------------------------------------------------------
 void IVP_ComputeContactAxisEnergies(IVP_PairContactAxisSetup* Setup)
 {
-    Setup->Field[0x16] = (float)(IVP_SolveContactAxisEnergySplit(
-        Setup->Field[0x11], Setup->Field[0x12], Setup->Field[0x13], Setup->Field[0x14], Setup->Field[0x15]));
+    Setup->SpinEnergy = (float)(IVP_SolveContactAxisEnergySplit(
+        Setup->SpinSpeed, Setup->AxisInertiaA, Setup->AxisInertiaB, Setup->InvAxisInertiaA, Setup->InvAxisInertiaB));
 
     const double Result2 = IVP_SolveContactAxisEnergySplit(
-        Setup->Field[0x0c], Setup->Field[0x0d], Setup->Field[0x0e], Setup->Field[0x0f], Setup->Field[0x10]);
-    Setup->Field[0x17] = (float)(Result2);
+        Setup->LinearSpeed, Setup->MassA, Setup->MassB, Setup->InvMassA, Setup->InvMassB);
+    Setup->LinearEnergy = (float)(Result2);
 
-    Setup->Field[0x1a] = (float)(Result2 + Setup->Field[0x16]);
+    Setup->EnergySum = (float)(Result2 + Setup->SpinEnergy);
 }
 
 // ---------------------------------------------------------------------------
 // FUN_06356050, thiscall on the scratch, RET 4. Only CX (+0x60) is gated on
-// (Flags & 0xc); the CY block always runs.
+// (Flags & IVP_CORE_PHYSICAL_UNMOVEABLE); the CY block always runs.
 // ---------------------------------------------------------------------------
 void IVP_ApplyContactAxisImpulses(IVP_PairContactAxisSetup* Setup, float Scale)
 {
     // Each root's fourth argument and each result is rounded to float.
     const float Temp1 = (float)(IVP_SolveContactAxisRoot(
-        Setup->Field[0x11], Setup->Field[0x14], Setup->Field[0x15], Scale * Setup->Field[0x16]));
+        Setup->SpinSpeed, Setup->InvAxisInertiaA, Setup->InvAxisInertiaB, Scale * Setup->SpinEnergy));
     const float Temp2 = (float)(IVP_SolveContactAxisRoot(
-        Setup->Field[0x0c], Setup->Field[0x0f], Setup->Field[0x10], Scale * Setup->Field[0x17]));
+        Setup->LinearSpeed, Setup->InvMassA, Setup->InvMassB, Scale * Setup->LinearEnergy));
 
-    IVP_Core* CoreA = Setup->CoreA();
-    if ((CoreA->Flags & 0xc) == 0)
+    IVP_Core* CoreA = Setup->CoreA;
+    if ((CoreA->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         // X stays on the x87 stack.
-        const double X = (double)(Temp2) * Setup->Field[0x0f];
-        CoreA->SpeedChange.z = (float)(X * Setup->Field[2] + CoreA->SpeedChange.z);
-        CoreA->SpeedChange.x = (float)(X * Setup->Field[0] + CoreA->SpeedChange.x);
-        CoreA->SpeedChange.y = (float)(X * Setup->Field[1] + CoreA->SpeedChange.y);
+        const double X = (double)(Temp2) * Setup->InvMassA;
+        CoreA->SpeedChange.z = (float)(X * Setup->LinearAxis[2] + CoreA->SpeedChange.z);
+        CoreA->SpeedChange.x = (float)(X * Setup->LinearAxis[0] + CoreA->SpeedChange.x);
+        CoreA->SpeedChange.y = (float)(X * Setup->LinearAxis[1] + CoreA->SpeedChange.y);
 
-        const double Y = (double)(Temp1) * Setup->Field[0x14];
-        CoreA->RotSpeedChange.z = (float)(Y * Setup->Field[6] + CoreA->RotSpeedChange.z);
-        CoreA->RotSpeedChange.x = (float)(Y * Setup->Field[4] + CoreA->RotSpeedChange.x);
-        CoreA->RotSpeedChange.y = (float)(Y * Setup->Field[5] + CoreA->RotSpeedChange.y);
+        const double Y = (double)(Temp1) * Setup->InvAxisInertiaA;
+        CoreA->RotSpeedChange.z = (float)(Y * Setup->SpinAxisA[2] + CoreA->RotSpeedChange.z);
+        CoreA->RotSpeedChange.x = (float)(Y * Setup->SpinAxisA[0] + CoreA->RotSpeedChange.x);
+        CoreA->RotSpeedChange.y = (float)(Y * Setup->SpinAxisA[1] + CoreA->RotSpeedChange.y);
     }
 
     // The linear axis is negated in place (DAT_063a5498 = -1.0f).
-    Setup->Field[0] = Setup->Field[0] * -1.0f;
-    Setup->Field[1] = Setup->Field[1] * -1.0f;
-    Setup->Field[2] = Setup->Field[2] * -1.0f;
+    Setup->LinearAxis[0] = Setup->LinearAxis[0] * -1.0f;
+    Setup->LinearAxis[1] = Setup->LinearAxis[1] * -1.0f;
+    Setup->LinearAxis[2] = Setup->LinearAxis[2] * -1.0f;
 
-    IVP_Core* CoreB = Setup->CoreB();
+    IVP_Core* CoreB = Setup->CoreB;
     // Unlike X, X2 is spilled as float.
-    const float X2 = Temp2 * Setup->Field[0x10];
-    CoreB->SpeedChange.z = (float)((double)(Setup->Field[2]) * X2 + CoreB->SpeedChange.z);
-    CoreB->SpeedChange.x = (float)((double)(Setup->Field[0]) * X2 + CoreB->SpeedChange.x);
-    CoreB->SpeedChange.y = (float)((double)(Setup->Field[1]) * X2 + CoreB->SpeedChange.y);
+    const float X2 = Temp2 * Setup->InvMassB;
+    CoreB->SpeedChange.z = (float)((double)(Setup->LinearAxis[2]) * X2 + CoreB->SpeedChange.z);
+    CoreB->SpeedChange.x = (float)((double)(Setup->LinearAxis[0]) * X2 + CoreB->SpeedChange.x);
+    CoreB->SpeedChange.y = (float)((double)(Setup->LinearAxis[1]) * X2 + CoreB->SpeedChange.y);
 
-    const double Y2 = (double)(Temp1) * Setup->Field[0x15];
-    CoreB->RotSpeedChange.z = (float)(Y2 * Setup->Field[10] + CoreB->RotSpeedChange.z);
-    CoreB->RotSpeedChange.x = (float)(Y2 * Setup->Field[8] + CoreB->RotSpeedChange.x);
-    CoreB->RotSpeedChange.y = (float)(Y2 * Setup->Field[9] + CoreB->RotSpeedChange.y);
+    const double Y2 = (double)(Temp1) * Setup->InvAxisInertiaB;
+    CoreB->RotSpeedChange.z = (float)(Y2 * Setup->SpinAxisB[2] + CoreB->RotSpeedChange.z);
+    CoreB->RotSpeedChange.x = (float)(Y2 * Setup->SpinAxisB[0] + CoreB->RotSpeedChange.x);
+    CoreB->RotSpeedChange.y = (float)(Y2 * Setup->SpinAxisB[1] + CoreB->RotSpeedChange.y);
 }
 
 // ---------------------------------------------------------------------------
@@ -620,7 +620,7 @@ float IVP_ComputeAndApplyContactAxisImpulse(IVP_ListManager_CorePairEntry* Entry
     IVP_ComputeContactAxisEnergies(&Setup);
 
     // Cap stays unrounded; not-greater or unordered keeps the budget.
-    const float EnergySum = Setup.Field[0x1a];
+    const float EnergySum = Setup.EnergySum;
     const double Cap = (double)(EnergySum) * kBudgetCapFraction;
     if (Budget > Cap)
         Budget = (float)(Cap);

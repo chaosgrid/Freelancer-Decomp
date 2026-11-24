@@ -29,13 +29,13 @@ class LargeShipBehavior : public Behavior
 {
 public:
     // Retail's ctor argument is the behavior type id (11, "Large Ship (move)"), pushed by the factory out of
-    // the descriptor's +0x04 -- see Behavior::GetTypeId() in common_behavior.h.
+    // the descriptor's +0x04 -- see Behavior::TypeId in common_behavior.h.
     explicit LargeShipBehavior(int InTypeId);
     ~LargeShipBehavior() override;
 
     // ------------------------------------------------------------------
     // Vtable (.rdata:0x0639ff24, 27 slots). Own entries:
-    //   0  FUN_062cfea0  dtor wrapper -> FUN_062cfec0 (unwatches SubObjectB/SubObjectA)
+    //   0  FUN_062cfea0  dtor wrapper -> FUN_062cfec0 (unwatches Face/Move)
     //   1  LAB_062cff40  SetContext
     //   3  LAB_062cffa0  OnEngage
     //   4  FUN_062d09e0  OnDisengage
@@ -62,8 +62,8 @@ public:
     //     candidate's (radius + 500) sphere via RaySphereIntersect and pulls the
     //     goal back to the nearest hit -- or latches "blocked" and commits both ideas instead
     //     if we are already inside somebody's envelope.
-    // SubObjectA.SetRange3c(250.0f) / SetMode(0) / SetScale40(0.6f) / SetPosition(AvoidanceGoalPos)
-    // and SubObjectB.SetPosition(AvoidanceGoalPos) then steer toward the goal.
+    // Move.SetRange3c(250.0f) / SetMode(0) / SetScale40(0.6f) / SetPosition(AvoidanceGoalPos)
+    // and Face.SetPosition(AvoidanceGoalPos) then steer toward the goal.
     //
     // The byte the ThreatCooldown clamp writes at .text:062d0098/062d00b6 (`[ESP+0x27]`) is
     // read at .text:062d0274 as `[ESP+0x2b]` (`PUSH EBP` at .text:062d0177 shifts the frame by
@@ -86,12 +86,12 @@ public:
     void OnDisengage() override;
 
     // Slot 5, LAB_062cfff0:
-    //   uint Type = 0; ThreatSourcePtr14->get_type(Type);       // .text:062d0004
+    //   uint Type = 0; OwnerContext->get_type(Type);       // .text:062d0004
     //   int Mode = 2;
     //   if (Type & 0x80000)                                      // .text:062d000a
     //       if (Sys->Targeting.GetTarget()) Mode = 1;
-    //   if (Flag29) { ModeSelector0xc = 3; return 3; }
-    //   ModeSelector0xc = Mode; return Mode;
+    //   if (Flag29) { Readiness = 3; return 3; }
+    //   Readiness = Mode; return Mode;
     // Note the 0x80000 test is on get_type's OUT-PARAMETER, not on its int return value --
     // retail discards the return entirely (`TEST dword ptr [ESP+8], 0x80000`).
     int OnEvaluateReadiness(float Value) override;
@@ -109,30 +109,16 @@ private:
 
 public:
     // ------------------------------------------------------------------
-    // Fields; +0x04..+0x29 is Behavior's shared prefix. Retail size 0x180.
+    // Fields; +0x04..+0x29 is Behavior's. Retail size 0x180.
     // ------------------------------------------------------------------
-    int TypeId;                 // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
-    unsigned CachedHandle08;    // +0x08, the binder's Owner->get_id() (an object id)
-    int ModeSelector0xc;        // +0x0c. OnEngage (=1), OnEvaluateReadiness (1/2/3).
-    int UpdateResult10;         // +0x10. Update()'s result (1/2/3).
-    void* ThreatSourcePtr14;    // +0x14. SetContext() Param1; get_type is called on it.
-    IObjDB* ObjectDb;
-    float DeltaTime1c;           // +0x1c. Zeroed by Behavior::OnEngage (FUN_062d20d0).
-    // +0x20. SetContext() Param2. Left void*: no LargeShipBehavior method
-    // (.text:062cfe20..062d0a10) reads it back.
-    void* BehaviorMgrPtr20;
-    SystemManager* NavHelperPtr24; // +0x24. SetContext() Param3; its +0x142c (Targeting) and
-                                 // +0x12c are read.
-    unsigned char Flags28;      // +0x28. Bit 0x1 cleared by OnEngage.
-    unsigned char Flag29;       // +0x29. Read by OnEvaluateReadiness().
-    unsigned char Pad2a[0x2c - 0x2a];
 
-    float Field2c;               // +0x2c. Ctor 1500.0f; OnEngage refreshes it from
-                                  // ComputeWeaponSlotStat's OutAverage when that succeeds.
-    MoveIdea SubObjectA;             // +0x30, ends +0xa8.
-    FaceIdea SubObjectB;             // +0xa8, ends +0x168.
+    float AverageGunRange;       // +0x2c. Ctor 1500.0f; OnEngage refreshes it from
+                                  // GunGroups.ComputeGunRangeStats's average when that succeeds.
+                                  // No reader found.
+    MoveIdea Move;             // +0x30, ends +0xa8.
+    FaceIdea Face;             // +0xa8, ends +0x168.
 
-    // +0x168. Ctor-zeroed cooldown: Update() subtracts DeltaTime1c; once negative the
+    // +0x168. Ctor-zeroed cooldown: Update() subtracts DeltaTime; once negative the
     // avoidance scan runs and resets it to 5.0f (DAT_0639f54c).
     float AvoidanceScanCooldown;
     // +0x16c. Ctor-zeroed cooldown: decremented and clamped to 0.0f; the immediate-threat
@@ -143,18 +129,9 @@ public:
     Vector AvoidanceGoalPos;
 };
 
-static_assert(offsetof(LargeShipBehavior, CachedHandle08) == 0x08, "LargeShipBehavior::CachedHandle08 offset");
-static_assert(offsetof(LargeShipBehavior, ModeSelector0xc) == 0x0c, "LargeShipBehavior::ModeSelector0xc offset");
-static_assert(offsetof(LargeShipBehavior, UpdateResult10) == 0x10, "LargeShipBehavior::UpdateResult10 offset");
-static_assert(offsetof(LargeShipBehavior, ThreatSourcePtr14) == 0x14, "LargeShipBehavior::ThreatSourcePtr14 offset");
-static_assert(offsetof(LargeShipBehavior, DeltaTime1c) == 0x1c, "LargeShipBehavior::DeltaTime1c offset");
-static_assert(offsetof(LargeShipBehavior, BehaviorMgrPtr20) == 0x20, "LargeShipBehavior::BehaviorMgrPtr20 offset");
-static_assert(offsetof(LargeShipBehavior, NavHelperPtr24) == 0x24, "LargeShipBehavior::NavHelperPtr24 offset");
-static_assert(offsetof(LargeShipBehavior, Flags28) == 0x28, "LargeShipBehavior::Flags28 offset");
-static_assert(offsetof(LargeShipBehavior, Flag29) == 0x29, "LargeShipBehavior::Flag29 offset");
-static_assert(offsetof(LargeShipBehavior, Field2c) == 0x2c, "LargeShipBehavior::Field2c offset");
-static_assert(offsetof(LargeShipBehavior, SubObjectA) == 0x30, "LargeShipBehavior::SubObjectA offset");
-static_assert(offsetof(LargeShipBehavior, SubObjectB) == 0xa8, "LargeShipBehavior::SubObjectB offset");
+static_assert(offsetof(LargeShipBehavior, AverageGunRange) == 0x2c, "LargeShipBehavior::AverageGunRange offset");
+static_assert(offsetof(LargeShipBehavior, Move) == 0x30, "LargeShipBehavior::Move offset");
+static_assert(offsetof(LargeShipBehavior, Face) == 0xa8, "LargeShipBehavior::Face offset");
 static_assert(offsetof(LargeShipBehavior, AvoidanceScanCooldown) == 0x168, "LargeShipBehavior::AvoidanceScanCooldown offset");
 static_assert(offsetof(LargeShipBehavior, ThreatCooldown) == 0x16c, "LargeShipBehavior::ThreatCooldown offset");
 static_assert(offsetof(LargeShipBehavior, AvoidanceGoalPos) == 0x170, "LargeShipBehavior::AvoidanceGoalPos offset");

@@ -357,12 +357,12 @@ namespace
         Parms.AtmosphereRange = 0.0f;
         Parms.DockWithBaseId = 0;
 
-        // HitPts is an integer in the record; DockingBaseId goes into both DockingCount and
+        // HitPts is an integer in the record; DockingBaseId goes into both the DockingBaseId and
         // DockWithBaseId.
         Parms.HitPts = static_cast<float>(Info->HitPts);
         Parms.Id = Info->ObjId;
         Parms.ObjDb = GetClientObjDb();
-        Parms.DockingCount = Info->DockingBaseId;
+        Parms.DockingBaseId = Info->DockingBaseId;
         Parms.DockWithBaseId = Info->DockingBaseId;
         Parms.Pos = Info->Position;
         Parms.OwnerPlayer = 0;
@@ -502,7 +502,7 @@ namespace
         // them, and CShip::init reads neither.
         CShip::CreateParms Parms{};
         InitCreateParmsScratchRetail(&Parms);
-        Parms.DockingCount = 0;
+        Parms.DockingBaseId = 0;
         Parms.VibeId = 0xffffffffu;
         Parms.SpaceCostume.PartIds[0] = 0;
         Parms.SpaceCostume.PartIds[1] = 0;
@@ -545,7 +545,7 @@ namespace
 
         // A marked record puts this connection's id into +0x58.
         Parms.GroupNameId = Info->GroupNameId;
-        Parms.DockingCount = Info->DockingBaseId;
+        Parms.DockingBaseId = Info->DockingBaseId;
         if (Info->bMarkedBy != 0)
         {
             Parms.Pad58 = GetPlayerConnectionId();
@@ -1317,12 +1317,12 @@ void IClientImpl::SendServerUseItem(unsigned int /*ClientId*/, const FPayloadSer
 // parts, eight accessories, the count -- 13 of the 23 dwords), TextIds the text-id array.
 // hud_comm.cpp ClientSendComm.
 void IClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderId, unsigned int ReceiverId,
-                                     unsigned int VoiceId, Costume CommCostume, unsigned int CommType,
-                                     const unsigned int* TextIds, int TextCount, unsigned int Mood,
+                                     unsigned int VoiceId, Costume CommCostume, unsigned int CaptionIds,
+                                     const unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
                                      float Duration, bool bReceiverIsOwnShip)
 {
-    ClientSendComm(ClientId, SenderId, ReceiverId, VoiceId, CommCostume, CommType, TextIds, TextCount,
-                   Mood, Duration, bReceiverIsOwnShip);
+    ClientSendComm(ClientId, SenderId, ReceiverId, VoiceId, CommCostume, CaptionIds, TextIds, TextCount,
+                   PermutationIds, Duration, bReceiverIsOwnShip);
 }
 
 // LAB_0053c2a0 -- ch2 SENDNNMESSAGE: the NeuroNet voice queue.
@@ -1623,12 +1623,12 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
     {
         pub::AI::DirectiveDockOp Op;
         Op.DockObjectId = Info.DockObjectId;
-        Op.Field_10 = Info.DockSecondaryObjectId;
-        Op.Field_14 = Info.bDockApproachCleared;
+        Op.NextRingId = Info.DockSecondaryObjectId;
+        Op.bHasDockPortIndex = Info.bDockApproachCleared;
         Op.DockPortIndex = Info.DockPortIndex;
-        Op.Field_1C = static_cast<int32_t>(Info.ProxTargetId);
-        Op.Field_20 = Info.ProxNearDist;
-        Op.Field_24 = Info.ProxFarDist;
+        Op.TetherObjectId = static_cast<int32_t>(Info.ProxTargetId);
+        Op.TetherNearRange = Info.ProxNearDist;
+        Op.TetherFarRange = Info.ProxFarDist;
         Behavior->set_current_directive(MakeDirectiveInfo(1u, 7u), &Op);
         break;
     }
@@ -1637,41 +1637,41 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
         pub::AI::DirectiveFollowOp Op;
         Op.TargetId = Info.FollowTargetId;
         Op.FollowDistance = Info.FollowDistance;
-        Op.Field_14 = Info.FollowOffset.x;
-        Op.Field_18 = Info.FollowOffset.y;
-        Op.Field_1C = Info.FollowOffset.z;
-        Op.Field_20 = Info.Field_0x3c;
+        Op.FollowOffsetX = Info.FollowOffset.x;
+        Op.FollowOffsetY = Info.FollowOffset.y;
+        Op.FollowOffsetZ = Info.FollowOffset.z;
+        Op.EngageRange = Info.FollowEngageRange;
         Behavior->set_current_directive(MakeDirectiveInfo(1u, 0x11u), &Op);
         break;
     }
     case 4:
     {
         pub::AI::DirectiveGotoOp Op;
-        Op.Field_0C = Info.GotoMode;
+        Op.GotoKind = Info.GotoMode;
         Op.Destination = Info.GotoDestination;
-        Op.Field_1C = Info.GotoTargetId;
-        Op.Field_20 = Info.SplineP1.Field_0x00;
-        Op.Field_24 = Info.SplineP1.Field_0x04;
-        Op.Field_28 = Info.SplineP1.Field_0x08;
-        Op.Field_2C = Info.SplineP2.Field_0x00;
-        Op.Field_30 = Info.SplineP2.Field_0x04;
-        Op.Field_34 = Info.SplineP2.Field_0x08;
-        Op.Field_38 = Info.SplineP0.Field_0x00;
-        Op.Field_3C = Info.SplineP0.Field_0x04;
-        Op.Field_40 = Info.SplineP0.Field_0x08;
-        Op.Field_44 = Info.SplineP3.Field_0x00;
-        Op.Field_48 = Info.SplineP3.Field_0x04;
-        Op.Field_4C = Info.SplineP3.Field_0x08;
-        Op.Field_50 = Info.GotoRange;
-        Op.Field_54 = Info.GotoSpeed;
-        Op.Field_58 = Info.Field_0x8c;
+        Op.TargetId = Info.GotoTargetId;
+        Op.SplineP1X = Info.SplineP1.Field_0x00;
+        Op.SplineP1Y = Info.SplineP1.Field_0x04;
+        Op.SplineP1Z = Info.SplineP1.Field_0x08;
+        Op.SplineP2X = Info.SplineP2.Field_0x00;
+        Op.SplineP2Y = Info.SplineP2.Field_0x04;
+        Op.SplineP2Z = Info.SplineP2.Field_0x08;
+        Op.SplineP0X = Info.SplineP0.Field_0x00;
+        Op.SplineP0Y = Info.SplineP0.Field_0x04;
+        Op.SplineP0Z = Info.SplineP0.Field_0x08;
+        Op.SplineP3X = Info.SplineP3.Field_0x00;
+        Op.SplineP3Y = Info.SplineP3.Field_0x04;
+        Op.SplineP3Z = Info.SplineP3.Field_0x08;
+        Op.ArrivalRange = Info.GotoRange;
+        Op.MaxSpeed = Info.GotoSpeed;
+        Op.bFlyThrough = Info.bGotoFlyThrough;
         Op.Field_59 = Info.Field_0x8d;
-        Op.Field_5A = Info.bGotoCruise;
-        Op.Field_5B = Info.bGotoNoCruise;
-        Op.Field_5C = Info.ProxTargetId;
-        Op.Field_60 = Info.ProxNearDist;
-        Op.Field_64 = Info.ProxFarDist;
-        Op.Field_6C = Info.bGotoAllowCruise;
+        Op.bGotoCruise = Info.bGotoCruise;
+        Op.bGotoNoCruise = Info.bGotoNoCruise;
+        Op.TetherObjectId = Info.ProxTargetId;
+        Op.TetherNearRange = Info.ProxNearDist;
+        Op.TetherFarRange = Info.ProxFarDist;
+        Op.bDisableAvoidance = Info.bGotoDisableAvoidance;
         Behavior->set_current_directive(MakeDirectiveInfo(1u, 2u), &Op);
         break;
     }
@@ -1761,7 +1761,7 @@ void IClientImpl::SendServerMiscObjUpdateAffiliation(unsigned int /*ClientId*/, 
     {
         return;
     }
-    int const PlayerVibe = GetPlayerSpawnSystemIdRetail(); // FUN_004c4670 -> DAT_0061226c
+    int const PlayerVibe = GetPlayerRepVibeRetail(); // FUN_004c4670 -> DAT_0061226c
     Reputation::Vibe::SetAffiliation(PlayerVibe, Affiliation, true);
 }
 
@@ -1771,7 +1771,7 @@ void IClientImpl::SendServerMiscObjUpdateRank(unsigned int ClientId, unsigned in
     ChatSetPlayerRank(PlayerId, static_cast<unsigned>(Rank)); // FUN_0046add0
     if (ClientId == PlayerId)
     {
-        int const PlayerVibe = GetPlayerSpawnSystemIdRetail(); // FUN_004c4670
+        int const PlayerVibe = GetPlayerRepVibeRetail(); // FUN_004c4670
         Reputation::Vibe::SetRank(PlayerVibe, static_cast<unsigned>(Rank));
     }
     if (SinglePlayer())

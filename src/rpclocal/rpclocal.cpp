@@ -57,16 +57,8 @@ static HMODULE g_hSelfModule = nullptr;
 // SETTARGET 0x06d8ea30 vs 0x06d8bd50).
 // ============================================================================
 
-// Bare operator new(N) and a copy; the packet owns the block. Where retail tests the source
+// Packet-owned blocks come from RpcCopyBlock (rpc_payloads.h). Where retail tests the source
 // or the length first (CHATMSG), the caller carries that test.
-static void* RpcServerCopyBlock(const void* Source, unsigned int InSize) {
-    unsigned char* Block = static_cast<unsigned char*>(::operator new(InSize, std::nothrow));
-    const unsigned char* Src = static_cast<const unsigned char*>(Source);
-    for (unsigned int i = 0; i < InSize; ++i) {
-        Block[i] = Src[i];
-    }
-    return Block;
-}
 
 // The argument arrays carry raw dwords, as retail's stack frame does, so a float argument
 // travels as its bit pattern.
@@ -109,8 +101,8 @@ static bool MarshalServerObjUpdate(FPacketBase* Packet, const unsigned int* Args
     RpcPayloadWrite(Packet, 0, Wire);
     // payload+0x28 is a plain dword copy in retail; the wire field is typed float only
     // because the other direction's receiver reads it with FLD.
-    const unsigned int RawField28 = Info->ThrottleBits;
-    return RpcPayloadWrite(Packet, 0x28, RawField28);
+    const unsigned int ThrottleBits = Info->ThrottleBits;
+    return RpcPayloadWrite(Packet, 0x28, ThrottleBits);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +128,7 @@ static bool MarshalServerChatMsg(FPacketBase* Packet, const unsigned int* Args,
     Wire.Buffer = nullptr;
     if (Args[2] != 0 && Args[1] != 0) {
         Wire.Size = Args[1];
-        Wire.Buffer = RpcServerCopyBlock(reinterpret_cast<const void*>(Args[2]), Args[1]);
+        Wire.Buffer = RpcCopyBlock(reinterpret_cast<const void*>(Args[2]), Args[1]);
     }
     return RpcPayloadWrite(Packet, 0, Wire);
 }
@@ -153,7 +145,7 @@ static bool MarshalServerChatMsg(FPacketBase* Packet, const unsigned int* Args,
 static bool MarshalServerBufferCopy(FPacketBase* Packet, const unsigned int* Args,
                                     unsigned int ArgCount) {
     FPayloadCommonBuffer Wire;
-    Wire.Buffer = RpcServerCopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
+    Wire.Buffer = RpcCopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
     Wire.Size = Args[2];
     Wire.bOwnsBuffer = (unsigned char)1;
     Wire.Pad_0x09[0] = 0;
@@ -285,9 +277,9 @@ void IServerImpl::GoTradelane(unsigned int player_id, const XGoTradelane& info) 
     const unsigned int Args[2] = { player_id, reinterpret_cast<unsigned int>(&info) };
     RpcSendToServer(this, 1u, 0x0fu, Args, 2u);
 }
-void IServerImpl::StopTradelane(unsigned int session_id, unsigned int arg1, unsigned int arg2, unsigned int arg3) {
+void IServerImpl::StopTradelane(unsigned int session_id, unsigned int ship_id, unsigned int entrance_ring_id, unsigned int exit_ring_id) {
     // retail 0x06d8e770: ch1 op 0x10. Serializes the three arguments after the session id.
-    const unsigned int Args[4] = { session_id, arg1, arg2, arg3 };
+    const unsigned int Args[4] = { session_id, ship_id, entrance_ring_id, exit_ring_id };
     RpcSendToServer(this, 1u, 0x10u, Args, 4u, MarshalServerStopTradelane);
 }
 void IServerImpl::JettisonCargo(unsigned int player_id, const XJettisonCargo& info) {
@@ -466,9 +458,9 @@ void IServerImpl::Login(const SLoginInfo& info, unsigned int session_id) {
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
     RpcSendToServer(this, 3u, 0x01u, Args, 2u);
 }
-void IServerImpl::CharacterInfoReq(unsigned int session_id, bool full_info) {
+void IServerImpl::CharacterInfoReq(unsigned int session_id, bool bSendEmpty) {
     // retail 0x06d8cd00: ch3 op 0x05, payload 0 -- the flag is not serialized
-    const unsigned int Args[2] = { session_id, full_info ? 1u : 0u };
+    const unsigned int Args[2] = { session_id, bSendEmpty ? 1u : 0u };
     RpcSendToServer(this, 3u, 0x05u, Args, 2u);
 }
 void IServerImpl::CharacterSelect(const CHARACTER_ID& char_id, unsigned int session_id) {
@@ -603,10 +595,10 @@ void IServerImpl::GFGoodVaporized(const SGFGoodVaporizedInfo& info, unsigned int
     const unsigned int Args[2] = { reinterpret_cast<unsigned int>(&info), session_id };
     RpcSendToServer(this, 3u, 0x3cu, Args, 2u);
 }
-void IServerImpl::MissionResponse(unsigned int Arg0, unsigned long MissionId, unsigned char bAccepted, unsigned int SessionId) {
+void IServerImpl::MissionResponse(unsigned int OfferId, unsigned long OfferKind, unsigned char bAccepted, unsigned int SessionId) {
     // retail 0x06d8da80: ch3 op 0x14
     const unsigned int Args[4] = {
-        Arg0, static_cast<unsigned int>(MissionId), bAccepted, SessionId
+        OfferId, static_cast<unsigned int>(OfferKind), bAccepted, SessionId
     };
     RpcSendToServer(this, 3u, 0x14u, Args, 4u);
 }
@@ -629,9 +621,9 @@ void IServerImpl::GFGoodSell(const SGFGoodSellInfo& info, unsigned int session_i
 }
 
 // === Slots 47-51: system and launch ===
-void IServerImpl::SystemSwitchOutComplete(unsigned int gate_object_id, unsigned int session_id) {
+void IServerImpl::SystemSwitchOutComplete(unsigned int ship_object_id, unsigned int session_id) {
     // retail 0x06d8d6a0: ch3 op 0x0b
-    const unsigned int Args[2] = { gate_object_id, session_id };
+    const unsigned int Args[2] = { ship_object_id, session_id };
     RpcSendToServer(this, 3u, 0x0bu, Args, 2u);
 }
 void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
@@ -639,19 +631,19 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
     const unsigned int Args[2] = { ship_id, session_id };
     RpcSendToServer(this, 3u, 0x04u, Args, 2u);
 }
-void IServerImpl::LaunchComplete(unsigned int arg0, unsigned int object_id) {
+void IServerImpl::LaunchComplete(unsigned int base_obj_id, unsigned int ship_id) {
     // retail 0x06d8d8e0: ch3 op 0x3e, serializes BOTH arguments
-    const unsigned int Args[2] = { arg0, object_id };
+    const unsigned int Args[2] = { base_obj_id, ship_id };
     RpcSendToServer(this, 3u, 0x3eu, Args, 2u);
 }
-void IServerImpl::JumpInComplete(unsigned int arg0, unsigned int object_id) {
+void IServerImpl::JumpInComplete(unsigned int system_id, unsigned int ship_id) {
     // retail 0x06d8d930: ch3 op 0x43, serializes BOTH arguments
-    const unsigned int Args[2] = { arg0, object_id };
+    const unsigned int Args[2] = { system_id, ship_id };
     RpcSendToServer(this, 3u, 0x43u, Args, 2u);
 }
-void IServerImpl::Hail(unsigned int object_id, unsigned int arg1, unsigned int arg2) {
+void IServerImpl::Hail(unsigned int ship_id, unsigned int target_id, unsigned int system_id) {
     // retail 0x06d8d980: ch3 op 0x3f, serializes all three
-    const unsigned int Args[3] = { object_id, arg1, arg2 };
+    const unsigned int Args[3] = { ship_id, target_id, system_id };
     RpcSendToServer(this, 3u, 0x3fu, Args, 3u);
 }
 
@@ -707,19 +699,19 @@ void IServerImpl::MissionSaveB(unsigned int session_id, unsigned long mission_id
 }
 
 // === Slots 60-63: events and mining ===
-void IServerImpl::RequestEvent(int event_type, unsigned int arg1, unsigned int arg2, unsigned int arg3,
-                  unsigned long arg4, unsigned int session_id) {
+void IServerImpl::RequestEvent(int event_type, unsigned int ship_id, unsigned int target_id, unsigned int second_id,
+                  unsigned long b_flag, unsigned int session_id) {
     // retail 0x06d8eaf0: ch3 op 0x31
     const unsigned int Args[6] = {
-        (unsigned int)event_type, arg1, arg2, arg3, (unsigned int)arg4, session_id
+        (unsigned int)event_type, ship_id, target_id, second_id, (unsigned int)b_flag, session_id
     };
     RpcSendToServer(this, 3u, 0x31u, Args, 6u);
 }
-void IServerImpl::RequestCancel(int event_type, unsigned int arg1, unsigned int arg2, unsigned long arg3,
+void IServerImpl::RequestCancel(int event_type, unsigned int ship_id, unsigned int target_id, unsigned long arg3,
                    unsigned int session_id) {
     // retail 0x06d8eb60: ch3 op 0x32
     const unsigned int Args[5] = {
-        (unsigned int)event_type, arg1, arg2, (unsigned int)arg3, session_id
+        (unsigned int)event_type, ship_id, target_id, (unsigned int)arg3, session_id
     };
     RpcSendToServer(this, 3u, 0x32u, Args, 5u);
 }
@@ -732,9 +724,9 @@ void IServerImpl::MineAsteroid(unsigned int system_id, const Vector& position, u
     };
     RpcSendToServer(this, 3u, 0x20u, Args, 6u);
 }
-void IServerImpl::CommComplete(unsigned int arg0, unsigned int arg1, unsigned int arg2, CommResult result) {
+void IServerImpl::CommComplete(unsigned int sender_id, unsigned int receiver_id, unsigned int msg_id, CommResult result) {
     // retail 0x06d8dd70: ch3 op 0x37
-    const unsigned int Args[4] = { arg0, arg1, arg2, (unsigned int)result };
+    const unsigned int Args[4] = { sender_id, receiver_id, msg_id, (unsigned int)result };
     RpcSendToServer(this, 3u, 0x37u, Args, 4u);
 }
 
@@ -811,9 +803,9 @@ void IServerImpl::RequestPlayerStats(unsigned int session_id, unsigned char* dat
     };
     RpcSendToServer(this, 1u, 0x18u, Args, 3u);
 }
-void IServerImpl::PopUpDialog(unsigned int session_id, unsigned int arg1) {
+void IServerImpl::PopUpDialog(unsigned int session_id, unsigned int button) {
     // retail 0x06d8e180: ch1 op 0x1b -- one dword at payload+0x10 and nothing else
-    const unsigned int Args[2] = { session_id, arg1 };
+    const unsigned int Args[2] = { session_id, button };
     RpcSendToServer(this, 1u, 0x1bu, Args, 2u, MarshalServerPopUpDialog);
 }
 void IServerImpl::RequestGroupPositions(unsigned int session_id, unsigned char* data, int size) {
@@ -931,10 +923,9 @@ void IServerImpl::PushToServer(CDAPacket* packet) {
 
 // IChatServer::SubmitChat -- retail 0x06d8ecd0 sends ch1 op 0x05 FLPACKET_COMMON_CHATMSG
 // through the same serializer and PushToServer, reached from the IChatServer sub-object.
-void IServerImpl::SubmitChat(CHAT_ID sender_id, unsigned long msg_type, const void* msg_data, CHAT_ID target_id, int system_id) {
-    // msg_type is misnamed: retail uses it as the byte count of msg_data.
+void IServerImpl::SubmitChat(CHAT_ID sender_id, unsigned long size, const void* msg_data, CHAT_ID target_id, int system_id) {
     const unsigned int Args[5] = {
-        sender_id.Id, (unsigned int)msg_type, reinterpret_cast<unsigned int>(msg_data),
+        sender_id.Id, (unsigned int)size, reinterpret_cast<unsigned int>(msg_data),
         target_id.Id, (unsigned int)system_id
     };
     RpcSendToServer(this, 1u, 0x05u, Args, 5u, MarshalServerChatMsg);

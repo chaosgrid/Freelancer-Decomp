@@ -5,18 +5,19 @@
 // Author: Giperion.
 
 // Common.dll -- Behavior (the AI behavior base class) and the Behavior_* helpers; also the two
-// shared follower helpers FollowerExternalIfaceIsPlayer / FollowerPlayerShipOrNull, declared for
+// shared follower helpers OwnerIsPlayer / ShipOrNull, declared for
 // the follower/formation TUs in common_behavior_internal.h.
 
 #include "common_behavior.h"
 #include "AI/common_behavior_internal.h" // CmnBehavior:: -- the shared follower helpers defined here
 #include "common_aisteer.h" // GetIfacePositionOrZero, IsWithinInterceptRangeOfIface
-#include "common_systemmanager.h" // SystemManager -- BaseFollowerBehavior::NavHelper's real type
+#include "common_systemmanager.h" // SystemManager -- BaseFollowerBehavior::SysMgr's real type
+#include "common_cobject.h" // CObject::ObjectClass, CShip -- CmnBehavior::ShipOrNull
 #include "common_misc.h" // FastInvSqrt
 #include "common_csys.h"  // Matrix, Transform, MatrixSetIdentity, Acquire3DMathEngine
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
 #include "x86math.h"      // I3DMathEngine::TransformMatrix (+0x2c), FVector, FMatrix
-#include "common_pathfind.h" // PathfindManager -- Behavior::OnDisengage / Behavior::SetCruiseLock
+#include "common_pathfind.h" // PathfindManager -- Behavior::OnDisengage / Behavior::SetAvoidanceAllowed
 
 #include <cmath>
 #include <cstdint>
@@ -24,7 +25,7 @@
 
 // FUN_062e5b70. Null-guarded IObjInspect slot 0xd4 (get_projected_throttle) trampoline. See
 // common_behavior.h.
-float Behavior_InvokeManagerSlotD4(IObjInspect const* Obj, float Value, ThrustEquipType Type)
+float Behavior_GetProjectedThrottle(IObjInspect const* Obj, float Value, ThrustEquipType Type)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
@@ -34,14 +35,13 @@ float Behavior_InvokeManagerSlotD4(IObjInspect const* Obj, float Value, ThrustEq
 
 // FUN_062d21c0. See common_behavior.h for the receiver. No null test, as retail: every call
 // site has already called through the same pointer.
-void Behavior_ReleaseDirectiveTarget(void* Target)
+void Behavior_ReleaseDirectiveTarget(Behavior* Target)
 {
-    unsigned char* const Flags28 = reinterpret_cast<unsigned char*>(Target) + 0x28;
-    *Flags28 = static_cast<unsigned char>((*Flags28 & 0xfd) | 0x01);
+    Target->Flags28 = static_cast<unsigned char>((Target->Flags28 & 0xfd) | 0x01);
 }
 
-// FUN_062e5af0. Same shape as Behavior_InvokeManagerSlotD4, slot 0xd8 (get_speed).
-float Behavior_InvokeManagerSlotD8(IObjInspect const* Obj, float Value, ThrustEquipType Type)
+// FUN_062e5af0. Same shape as Behavior_GetProjectedThrottle, slot 0xd8 (get_speed).
+float Behavior_GetSpeed(IObjInspect const* Obj, float Value, ThrustEquipType Type)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
@@ -78,46 +78,48 @@ float Behavior_GetIfaceMaxScalarAttribute(IObjInspect const* Iface)
 }
 
 // FUN_062e5850. See common_behavior.h.
-float Behavior_QueryRadiusEffect(IObjInspect const* Obj, float Unused2, float Radius, float Falloff, ThrustEquipType Type)
+float Behavior_GetTimeToAccelerate(IObjInspect const* Obj, float Throttle, float FromSpeed, float ToSpeed,
+                                   ThrustEquipType Type)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
 
     // Only a strict less-than clamps (NaN is kept).
-    if (Radius < 0.0f)
-        Radius = 0.0f;
-    if (Falloff < 0.0f)
-        Falloff = 0.0f;
+    if (FromSpeed < 0.0f)
+        FromSpeed = 0.0f;
+    if (ToSpeed < 0.0f)
+        ToSpeed = 0.0f;
 
     // No vtable call when both are exactly 0.0f.
-    if (Radius == 0.0f && Unused2 == 0.0f)
+    if (FromSpeed == 0.0f && Throttle == 0.0f)
         return 0.0f;
 
     // Double 0.001 at DAT_0639c9f0.
-    if ((double)Radius < 0.001)
-        Radius = 0.0f;
+    if ((double)FromSpeed < 0.001)
+        FromSpeed = 0.0f;
 
-    return Obj->get_time_to_accelerate(Unused2, Radius, Falloff, Type);
+    return Obj->get_time_to_accelerate(Throttle, FromSpeed, ToSpeed, Type);
 }
 
 // FUN_062e58f0. See common_behavior.h.
-float Behavior_QueryFalloffEffect(IObjInspect const* Obj, float Unused2, float Radius, float Falloff, ThrustEquipType Type)
+float Behavior_GetDistanceTravelled(IObjInspect const* Obj, float Throttle, float FromSpeed, float Time,
+                                    ThrustEquipType Type)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
 
-    // No vtable call when Falloff is strictly negative (NaN continues).
-    if (Falloff < 0.0f)
+    // No vtable call when Time is strictly negative (NaN continues).
+    if (Time < 0.0f)
         return 0.0f;
 
     // Double 0.001 at DAT_0639c9f0.
-    if ((double)Radius < 0.001)
-        Radius = 0.0f;
+    if ((double)FromSpeed < 0.001)
+        FromSpeed = 0.0f;
 
-    return Obj->get_distance_travelled(Unused2, Radius, Falloff, Type);
+    return Obj->get_distance_travelled(Throttle, FromSpeed, Time, Type);
 }
 
-// FUN_062e59b0. Retail inlines the slot calls of Behavior_InvokeManagerSlotD8 / QueryRadiusEffect / QueryFalloffEffect
+// FUN_062e59b0. Retail inlines the slot calls of Behavior_GetSpeed / GetTimeToAccelerate / GetDistanceTravelled
 // (their null tests and the 0/0 early-out drop away because the arguments are known);
 // the clamps that remain are reproduced in retail's order.
 float Behavior_QueryChainedRadiusEffect(void* Obj, float Radius, int Selector)
@@ -139,7 +141,7 @@ float Behavior_QueryChainedRadiusEffect(void* Obj, float Radius, int Selector)
     if ((double)Radius < 0.001)
         Radius = 0.0f;
 
-    // QueryRadiusEffect's clamps on the inlined arguments.
+    // GetTimeToAccelerate's clamps on the inlined arguments.
     float RadiusCopy = Radius;
     float Falloff = (float)Value;
     if (RadiusCopy < 0.0f)
@@ -154,19 +156,19 @@ float Behavior_QueryChainedRadiusEffect(void* Obj, float Radius, int Selector)
 }
 
 // FUN_062e5ab0. See common_behavior.h.
-float Behavior_QueryFixedFalloffEffect(void* Obj, float Radius)
+float Behavior_GetCoastDistance(void* Obj, float Speed)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
-    if (Radius < 0.001f) // DAT_0639e6c8
+    if (Speed < 0.001f) // DAT_0639e6c8
         return 0.0f;
 
-    // 1000.0f at DAT_063a0760; selector fixed to literal 1.
-    return Behavior_QueryFalloffEffect(ObjInspectOf(Obj), 0.0f, Radius, 1000.0f, ThrustEquipEngine);
+    // Throttle 0, 1000 s (DAT_063a0760); thrust type fixed to literal 1.
+    return Behavior_GetDistanceTravelled(ObjInspectOf(Obj), 0.0f, Speed, 1000.0f, ThrustEquipEngine);
 }
 
 // FUN_062e5bc0. Slot 0xdc (get_initial_speed_to_coast_distance). See common_behavior.h.
-float Behavior_InvokeManagerSlotDC(IObjInspect const* Obj, float Value)
+float Behavior_GetInitialSpeedToCoastDistance(IObjInspect const* Obj, float Value)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
@@ -177,7 +179,7 @@ float Behavior_InvokeManagerSlotDC(IObjInspect const* Obj, float Value)
 }
 
 // FUN_062e5b20. See common_behavior.h.
-float Behavior_InvokeManagerSlotF0(IObjInspect const* Obj, float Speed, float MaxSpeed)
+float Behavior_GetAngularSpeedXY(IObjInspect const* Obj, float Speed, float MaxSpeed)
 {
     if (Obj == nullptr)
         return 0.0f; // DAT_06399408
@@ -185,7 +187,7 @@ float Behavior_InvokeManagerSlotF0(IObjInspect const* Obj, float Speed, float Ma
 }
 
 // FUN_062e5b50, cdecl: IObjInspect::get_angular_speed_Z (slot 0xf4) or 0.0f for a null object.
-float Behavior_InvokeManagerSlotF4(IObjInspect const* Obj, float Speed)
+float Behavior_GetAngularSpeedZ(IObjInspect const* Obj, float Speed)
 {
     if (Obj == nullptr)
         return 0.0f;
@@ -193,7 +195,7 @@ float Behavior_InvokeManagerSlotF4(IObjInspect const* Obj, float Speed)
 }
 
 // FUN_062e5ba0, cdecl: IObjInspect::get_projected_axis_throttle_XY (slot 0xf8) or 0.0f.
-float Behavior_InvokeManagerSlotF8(IObjInspect const* Obj, float Value)
+float Behavior_GetProjectedAxisThrottleXY(IObjInspect const* Obj, float Value)
 {
     if (Obj == nullptr)
         return 0.0f;
@@ -203,97 +205,62 @@ float Behavior_InvokeManagerSlotF8(IObjInspect const* Obj, float Value)
 // FUN_062e61f0: a `Node->vtbl[0xc](Node)` tail-thunk, no null test. Slot 0xc is
 // get_transform(); slots 3 and 4 are COMDAT-folded onto one address, so the pointer this hands
 // back is equally the object's orientation Matrix (common_iface.h).
-Transform const* Behavior_InvokeNodeSlotC(void* Node)
+Transform const* Behavior_GetTransform(void* Node)
 {
     return &ObjInspectOf(Node)->get_transform();
 }
 
 // ============================================================================
-// Behavior -- the base class's own +0x1c per-tick delta.
-//
-// An accessor pair over a raw offset, not a data member: nineteen classes re-declare
-// Behavior's whole +0x04..+0x29 block on themselves, and their offsetof static_asserts depend
-// on sizeof(Behavior) staying 4 (see common_behavior.h). Moving the block into the base is an
-// open TODO that has to touch all of them at once.
-//
-// The offset is retail's: FUN_062d2020 zeroes +0x1c, and IBehaviorManager::UpdateBehaviorTick
-// stores a float there through a bare Behavior* just before dispatching OnUpdate.
+// Behavior -- the base class's own members (+0x04..+0x29, common_behavior.h).
 // ============================================================================
 
-float Behavior::GetTickDelta() const
+// FUN_062d2020, the vptr store aside; stores in retail order. Retail leaves BehaviorMgr and
+// bits 2..7 of Flags28 as operator new left them; the port zeroes them first.
+Behavior::Behavior(int InTypeId)
+    : BehaviorMgr(nullptr)
+    , Flags28(0)
 {
-    return *reinterpret_cast<float const*>(reinterpret_cast<char const*>(this) + 0x1c);
+    TypeId = InTypeId;
+    OwnerId = 0;
+    OwnerContext = nullptr;
+    SysMgr = nullptr;
+    ObjectDb = nullptr;
+    DeltaTime = 0.0f;
+    Flag29 = 0;
+    Flags28 = static_cast<unsigned char>(Flags28 & 0xfc);
+    Readiness = 2;
+    UpdateResult = 1;
 }
 
-void Behavior::SetTickDelta(float Delta)
+// Vtable slot 2 (+0x08), 0x0629afd0.
+void Behavior::SetObjectDb(IObjDB* InObjectDb)
 {
-    *reinterpret_cast<float*>(reinterpret_cast<char*>(this) + 0x1c) = Delta;
-}
-
-// Vtable slot 2 (+0x08), 0x0629afd0. Same raw-offset device as SetTickDelta.
-void Behavior::SetObjectDb(IObjDB* ObjectDb)
-{
-    *reinterpret_cast<IObjDB**>(reinterpret_cast<char*>(this) + 0x18) = ObjectDb;
+    ObjectDb = InObjectDb;
 }
 
 // Vtable slot 23 (+0x5c), LAB_062c2f50, shared by all 21 Behavior vtables. Called from
 // IBehaviorManager::set_current_directive.
 void Behavior::cancel_notify()
 {
-    unsigned char* const Flags28 = reinterpret_cast<unsigned char*>(this) + 0x28;
-    *Flags28 = static_cast<unsigned char>(*Flags28 & 0xfd);
-}
-
-// Same raw-offset device for the type id FUN_062d2020 stores at +0x04. Read-only: the storage
-// is written by whichever derived class declares it.
-int Behavior::GetTypeId() const
-{
-    return *reinterpret_cast<int const*>(reinterpret_cast<char const*>(this) + 0x04);
-}
-
-// Same raw-offset device for the NavHelper pointer at +0x24, written by FUN_062d2090.
-void* Behavior::GetNavHelper() const
-{
-    return *reinterpret_cast<void* const*>(reinterpret_cast<char const*>(this) + 0x24);
+    Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
 }
 
 // Vtable slot 3 (+0x0c), FUN_062d20d0.
 void Behavior::OnEngage()
 {
-    char* const Self = reinterpret_cast<char*>(this);
-    *reinterpret_cast<int*>(Self + 0x0c) = 1;
-    *reinterpret_cast<int*>(Self + 0x10) = 1;
-    unsigned char* const Flags28 = reinterpret_cast<unsigned char*>(Self + 0x28);
-    *Flags28 = static_cast<unsigned char>(*Flags28 & 0xfe);
-    *reinterpret_cast<float*>(Self + 0x1c) = 0.0f;
+    Readiness = 1;
+    UpdateResult = 1;
+    Flags28 = static_cast<unsigned char>(Flags28 & 0xfe);
+    DeltaTime = 0.0f;
 }
 
 // Vtable slot 4 (+0x10), FUN_062d20f0. The manager pointer itself is not null-tested.
 void Behavior::OnDisengage()
 {
-    char* const Self = reinterpret_cast<char*>(this);
-    IBehaviorManager* const Manager = *reinterpret_cast<IBehaviorManager* const*>(Self + 0x20);
-    PathfindManager* const Pathfind = Manager->Pathfind;
+    PathfindManager* const Pathfind = BehaviorMgr->Pathfind;
     if (Pathfind != nullptr)
-        Pathfind->Field_064 = 0;
-    *reinterpret_cast<unsigned char*>(Self + 0x29) = 0;
-}
-
-// FUN_062d2020, the vptr store aside; stores in retail order.
-void Behavior::ConstructBase(int TypeId)
-{
-    char* const Self = reinterpret_cast<char*>(this);
-    *reinterpret_cast<int*>(Self + 0x04) = TypeId;
-    *reinterpret_cast<unsigned int*>(Self + 0x08) = 0;
-    *reinterpret_cast<void**>(Self + 0x14) = nullptr;
-    *reinterpret_cast<void**>(Self + 0x24) = nullptr;
-    *reinterpret_cast<void**>(Self + 0x18) = nullptr;
-    *reinterpret_cast<unsigned int*>(Self + 0x1c) = 0;
-    *reinterpret_cast<unsigned char*>(Self + 0x29) = 0;
-    unsigned char* const Flags28 = reinterpret_cast<unsigned char*>(Self + 0x28);
-    *Flags28 = static_cast<unsigned char>(*Flags28 & 0xfc);
-    *reinterpret_cast<int*>(Self + 0x0c) = 2;
-    *reinterpret_cast<int*>(Self + 0x10) = 1;
+        Pathfind->AvoidExcludeId = 0;
+    Flag29 = 0;
 }
 
 // FUN_062d2090, RET 0xc. get_id is IObjInspect slot 0x20.
@@ -301,38 +268,35 @@ bool Behavior::BindContext(void* Owner, void* Manager, void* Sys)
 {
     if (Owner == nullptr || Sys == nullptr)
         return false;
-    char* const Self = reinterpret_cast<char*>(this);
-    *reinterpret_cast<void**>(Self + 0x14) = Owner;
+    OwnerContext = static_cast<IObjRW*>(Owner);
     unsigned int const Id = ObjInspectOf(Owner)->get_id();
-    *reinterpret_cast<void**>(Self + 0x24) = Sys;
-    *reinterpret_cast<unsigned int*>(Self + 0x08) = Id;
-    *reinterpret_cast<void**>(Self + 0x20) = Manager;
+    SysMgr = static_cast<SystemManager*>(Sys);
+    OwnerId = Id;
+    BehaviorMgr = static_cast<IBehaviorManager*>(Manager);
     return true;
 }
 
 // Vtable slot 9 (+0x24).
 int Behavior::GetStatus()
 {
-    return *reinterpret_cast<int const*>(reinterpret_cast<char const*>(this) + 0x10);
+    return UpdateResult;
 }
 
-// FUN_062d21d0: tail-jump to FUN_062dd3d0 (PathfindManager::SetCruiseLock); no null tests.
-void Behavior::SetCruiseLock(int Value, int Mask)
+// FUN_062d21d0: tail-jump to FUN_062dd3d0 (PathfindManager::SetAvoidanceAllowed); no null tests.
+void Behavior::SetAvoidanceAllowed(int Value, int Mask)
 {
-    IBehaviorManager* const Manager =
-        *reinterpret_cast<IBehaviorManager* const*>(reinterpret_cast<char const*>(this) + 0x20);
-    Manager->Pathfind->SetCruiseLock(Value, static_cast<unsigned int>(Mask));
+    BehaviorMgr->Pathfind->SetAvoidanceAllowed(Value, static_cast<unsigned int>(Mask));
 }
 
 // ----------------------------------------------------------------------------
 // Behavior vtable slot 16 (+0x40) -- FUN_062d2110.
 //
-// Queries is_cruise_active (slot 0x5c) on the object behind NavHelper+0x8 (the Watchable
-// list head, -8 adjusted); does nothing while cruising outside a trade lane. Otherwise toggles
-// ThrustManager (NavHelper+0x18) thrusters and sets throttle 1.0f, mode 2 in a trade lane,
+// Queries is_cruise_active (slot 0x5c) on the object SysMgr->Watcher (+0x8) watches (its
+// Watchable, -8 adjusted); does nothing while cruising outside a trade lane. Otherwise toggles
+// ThrustManager (SysMgr+0x18) thrusters and sets throttle 1.0f, mode 2 in a trade lane,
 // mode 0 otherwise.
 //
-// Retail dereferences [this+0x24] with no null test, and with a null list head it calls
+// Retail dereferences SysMgr with no null test, and with a null list head it calls
 // through a null receiver; both are reproduced as written.
 //
 // NAME CAVEAT: `set_afterburner` is this slot's inherited positional name and was not
@@ -341,9 +305,7 @@ void Behavior::SetCruiseLock(int Value, int Mask)
 // IBehaviorManager and every subclass.
 void Behavior::set_afterburner(bool bOn)
 {
-    void* const NavHelper = GetNavHelper();
-
-    void* const Head = *reinterpret_cast<void* const*>(static_cast<char*>(NavHelper) + 0x8);
+    void* const Head = const_cast<Watchable*>(SysMgr->Watcher.target());
     bool bCruise = false;
     bool bTradeLane = false;
     (void)ObjInspectOf(ObjRwFromWatchable(Head))->is_cruise_active(bCruise, bTradeLane);
@@ -351,7 +313,7 @@ void Behavior::set_afterburner(bool bOn)
     if (bCruise && !bTradeLane)
         return;
 
-    ThrustManager* const Thrust = &((SystemManager*)NavHelper)->Thrust;
+    ThrustManager* const Thrust = &SysMgr->Thrust;
 
     if (!bOn)
     {
@@ -366,10 +328,10 @@ void Behavior::set_afterburner(bool bOn)
 
 // ----------------------------------------------------------------------------
 // Behavior vtable slot 17 (+0x44) -- FUN_062d21b0: a tail JMP to FUN_062e9030,
-// ThrustManager::SetStrafeDir, on NavHelper+0x18. The argument is one dword.
+// ThrustManager::SetStrafeDir, on SysMgr+0x18. The argument is one dword.
 void Behavior::slide_strafe_burst(StrafeDir Dir)
 {
-    ((SystemManager*)GetNavHelper())->Thrust.SetStrafeDir(Dir);
+    SysMgr->Thrust.SetStrafeDir(Dir);
 }
 
 // ============================================================================
@@ -378,21 +340,20 @@ void Behavior::slide_strafe_burst(StrafeDir Dir)
 // CObject.
 // ============================================================================
 
-// Sys+0x1580 -> IObjInspect::is_player (slot 0xbc). Retail tests neither pointer
-// (e.g. .text:062ecb23, 062cb76a).
-bool CmnBehavior::FollowerExternalIfaceIsPlayer(SystemManager* Sys)
+// Sys+0x1580 (SelfTarget.Iface, the owner) -> IObjInspect::is_player (slot 0xbc). Retail
+// tests neither pointer (e.g. .text:062ecb23, 062cb76a).
+bool CmnBehavior::OwnerIsPlayer(SystemManager* Sys)
 {
     return Sys->SelfTarget.Iface->is_player();
 }
 
-// The "[obj+0x4c] & mask == mask" object-class test (common_cobject.h documents the 0x103
-// variant). Used at .text:062cb7bd and 062cb7e2 to reduce a cobject() result to "a
-// player-flavoured ship, else null".
-CObject const* CmnBehavior::FollowerPlayerShipOrNull(CObject const* Object)
+// The `(ObjectClass & ClassShip) == ClassShip` test (0x503 on [obj+0x4c]). Used at
+// .text:062cb7bd and 062cb7e2 to reduce a cobject() result to "a ship, else null".
+CShip const* CmnBehavior::ShipOrNull(CObject const* Object)
 {
     if (Object == nullptr)
         return nullptr;
-    unsigned int const Class = *reinterpret_cast<unsigned int const*>(
-        reinterpret_cast<char const*>(Object) + 0x4c);
-    return ((Class & 0x503u) == 0x503u) ? Object : nullptr;
+    return ((Object->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
+               ? static_cast<CShip const*>(Object)
+               : nullptr;
 }

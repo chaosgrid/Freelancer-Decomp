@@ -700,11 +700,11 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
     Forward[1] = -Orient[5];
     Forward[2] = -Orient[8];
 
-    // The centre of the rock sphere, Float04 ahead of the camera.
+    // The centre of the rock sphere, SphereAhead ahead of the camera.
     float FarCenter[3];
-    FarCenter[0] = static_cast<float>(static_cast<double>(Forward[0]) * Bb->Float04 + CamPos[0]);
-    FarCenter[1] = static_cast<float>(static_cast<double>(Forward[1]) * Bb->Float04 + CamPos[1]);
-    FarCenter[2] = static_cast<float>(static_cast<double>(Forward[2]) * Bb->Float04 + CamPos[2]);
+    FarCenter[0] = static_cast<float>(static_cast<double>(Forward[0]) * Bb->SphereAhead + CamPos[0]);
+    FarCenter[1] = static_cast<float>(static_cast<double>(Forward[1]) * Bb->SphereAhead + CamPos[1]);
+    FarCenter[2] = static_cast<float>(static_cast<double>(Forward[2]) * Bb->SphereAhead + CamPos[2]);
 
     // Right = normalise(Forward x Up).
     float* const Up = Bb->Up;
@@ -767,9 +767,9 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
         return;
 
     // All doubles. The camera byte +0xbc re-scatters every rock.
-    double const RadiusSq = static_cast<double>(Bb->Float00) * Bb->Float00;
+    double const RadiusSq = static_cast<double>(Bb->SphereRadius) * Bb->SphereRadius;
     unsigned char const bScatterAll = Camera->FlagBC;
-    double const FadeSq = static_cast<double>(Bb->Float2C) * Bb->Float2C;
+    double const FadeSq = static_cast<double>(Bb->SphereFadeWidth) * Bb->SphereFadeWidth;
     double const InvFadeSq = 1.0 / FadeSq;
     double const InnerSq = RadiusSq - FadeSq;
 
@@ -817,7 +817,7 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                 if (bScatterAll != 0)
                 {
                     // Anywhere inside the sphere.
-                    Vector const Offset = random_inside_sphere(Bb->Float00);
+                    Vector const Offset = random_inside_sphere(Bb->SphereRadius);
                     Rock->Pos[0] = static_cast<float>(static_cast<double>(FarCenter[0]) + Offset.x);
                     Rock->Pos[1] = static_cast<float>(static_cast<double>(FarCenter[1]) + Offset.y);
                     Rock->Pos[2] = static_cast<float>(static_cast<double>(FarCenter[2]) + Offset.z);
@@ -868,7 +868,7 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                         // Respawned on the sphere's surface, invisible (alpha 0) for this frame.
                         Rock->bVisible = 1;
                         Vector const Dir = random_on_unit_sphere();
-                        float const Radius = Bb->Float00;
+                        float const Radius = Bb->SphereRadius;
                         float const OffsetZ = static_cast<float>(static_cast<double>(Radius) * Dir.z);
                         Rock->Pos[0] = static_cast<float>(static_cast<double>(Radius) * Dir.x + FarCenter[0]);
                         Rock->Pos[1] = static_cast<float>(static_cast<double>(Radius) * Dir.y + FarCenter[1]);
@@ -915,17 +915,17 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                     static_cast<double>(Rock->Pos[1] - CamPos[1]) * Forward[1];
                 float const Depth = static_cast<float>(DepthD);
 
-                if (DepthD > Bb->Float04)
+                if (DepthD > Bb->SphereAhead)
                 {
                     // Beyond the sphere centre the fade band narrows with depth.
-                    double T = 1.0 - (static_cast<double>(Bb->Float00) -
-                                      (static_cast<double>(Depth) - Bb->Float04)) /
-                                         Bb->Float00;
+                    double T = 1.0 - (static_cast<double>(Bb->SphereRadius) -
+                                      (static_cast<double>(Depth) - Bb->SphereAhead)) /
+                                         Bb->SphereRadius;
                     if (T > 1.0)
                         T = 1.0;
                     double const Band =
                         ((1.0 - Bb->FadeDistPercent) * T * 0.5 + Bb->FadeDistPercent) *
-                        Bb->Float00;
+                        Bb->SphereRadius;
                     double const BandSq = Band * Band;
                     if (!(DistSq > RadiusSq - BandSq))
                         Rock->Alpha = 1.0f;
@@ -942,15 +942,15 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
 
                 if (Rock->Alpha < 0.02f) // DAT_005d1fe4
                     continue;
-                // The near fade planes (FUN_0054feb0's Float40/Float44).
-                if (Depth < Bb->Float40)
+                // The near fade planes (FUN_0054feb0's NearFadeEnd/NearFadeStart).
+                if (Depth < Bb->NearFadeEnd)
                 {
-                    if (Depth < Bb->Float44)
+                    if (Depth < Bb->NearFadeStart)
                         Rock->Alpha = 0.0f;
                     else
                         Rock->Alpha = static_cast<float>(
-                            (static_cast<double>(Depth) - Bb->Float44) /
-                            (static_cast<double>(Bb->Float40) - Bb->Float44) * Rock->Alpha);
+                            (static_cast<double>(Depth) - Bb->NearFadeStart) /
+                            (static_cast<double>(Bb->NearFadeEnd) - Bb->NearFadeStart) * Rock->Alpha);
                 }
                 // Translucent rocks wait for the blended pass.
                 if (Rock->Alpha < 1.0f)

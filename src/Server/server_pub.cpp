@@ -70,23 +70,6 @@ GameObject* Server_LookupGameObject(unsigned int ObjId) {
     return Obj;
 }
 
-void* Server_LookupObject(unsigned int obj_id) {
-    return Server_LookupGameObject(obj_id);
-}
-
-// Port-only handle table; nothing calls these helpers any more (pub::Phantom now uses the
-// real phantom records below).
-static std::map<unsigned int, void*> g_PlaceholderHandles;
-
-static void Server_RegisterPlaceholder(unsigned int id, void* obj) {
-    if (id != 0 && obj != nullptr)
-        g_PlaceholderHandles[id] = obj;
-}
-
-static void Server_UnregisterPlaceholder(unsigned int id) {
-    g_PlaceholderHandles.erase(id);
-}
-
 // The guard every pub::Player export opens with (e.g. SetMsnID .text:06d56461):
 // id != 0, id-1 < Players.MaxPlayers (DAT_06d90264), and a non-zero client id at
 // PlayerData+0x348 (stride 0x418). Retail has no "active" flag; occupancy is the client id.
@@ -1103,7 +1086,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
                     CObject const* const Cobj = LiveObj->cobject();
                     CObject const* const Ship =
                         (Cobj != nullptr &&
-                         (static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) == 0x503u)
+                         (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                             ? Cobj
                             : nullptr;
                     IVP_Controller* const Rc =
@@ -1864,7 +1847,7 @@ SERVER_API int __cdecl Destroy(unsigned int obj_id, DestroyType destroy_type) {
 }
 
 // SpaceObj::DrainShields -- retail .text:06cf8930 (0x18930). A stack DamageList with
-// Cause 0x17 (no DamageCause enumerator in common_misc.h), filled by EqObj::drain_shields
+// Cause 0x17 (DamageCause::DrainShields), filled by EqObj::drain_shields
 // (vtable +0x1d8: a -1.0f entry per shield) and applied by apply_damage_list (+0x188) on
 // the object the lookup returned, without re-narrowing after the class test.
 SERVER_API int __cdecl DrainShields(unsigned int obj_id) {
@@ -1873,34 +1856,35 @@ SERVER_API int __cdecl DrainShields(unsigned int obj_id) {
     if (Obj == nullptr) return -2;
     CObject* const Cobj = Obj->Object;
     if (Cobj == nullptr ||
-        (static_cast<unsigned int>(Cobj->ObjectClass) & 0x103u) != 0x103u) return -1;
+        (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj) return -1;
     DamageList Damage;
-    Damage.Cause = static_cast<DamageCause>(0x17);
+    Damage.Cause = DamageCause::DrainShields;
     static_cast< ::EqObj*>(Obj)->drain_shields(Damage);
     Obj->apply_damage_list(Damage);
     return 0;
 }
 
-// SpaceObj::EnumerateCargo -- retail .text:06cf9680.
+// SpaceObj::EnumerateCargo -- retail .text:06cf95f0. A lookup miss and a non-CEqObj both
+// return -2.
 SERVER_API int __cdecl EnumerateCargo(const unsigned int& obj_id, CargoEnumerator& enumerator) {
     if ((obj_id & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id);
-    if (!obj) return -2;
-    ::EqObj* EqRw = dynamic_cast< ::EqObj*>(obj);
-    CEqObj* Ceq = (EqRw != nullptr) ? EqRw->ceqobj() : nullptr;
-    if (Ceq == nullptr) return 0; // nothing that can hold cargo
+    GameObject* const Obj = Server_LookupLiveObject(obj_id);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
+        return -2;
+    CEqObj* const Ceq = static_cast<CEqObj*>(Raw);
 
-    // notify_cargo is the enumerator's own vtable slot 0. An item whose Arch2Good is 0 is
-    // skipped, and the walk never stops early (the slot returns void).
-    CEquipTraverser Walk(EQUIP_TYPE_CARGO);
+    // notify_cargo is the enumerator's own vtable slot 0, fed straight from the CECargo:
+    // its archetype id (+0x0c -> +0x08), Count (+0x28) and Id (+0x08). An item whose
+    // Arch2Good is 0 is skipped, and the walk never stops early (the slot returns void).
+    CEquipTraverser Walk(EquipTypeCargo);
     CEquip* Item = Ceq->EquipManager.Traverse(Walk);
     while (Item != nullptr) {
-        EquipDesc Desc;
-        if (Item->GetEquipDesc(Desc)) {
-            unsigned int const good_id = Arch2Good(Desc.ArchId);
-            if (good_id != 0) {
-                enumerator.notify_cargo(good_id, Desc.Count, Desc.Id);
-            }
+        unsigned int const good_id = Arch2Good(Item->Arch->get_id());
+        if (good_id != 0) {
+            enumerator.notify_cargo(good_id, static_cast<CECargo*>(Item)->Count, Item->Id);
         }
         Item = Ceq->EquipManager.Traverse(Walk);
     }
@@ -1959,7 +1943,7 @@ SERVER_API int __cdecl Dock(const unsigned int& ship_id, const unsigned int& tar
 
         EQInfo DockEquip;
         memset(&DockEquip, 0, sizeof(DockEquip));
-        DockEquip.Type = 3;
+        DockEquip.Type = EQINFO_TYPE_DOCKING_LIGHTS;
         DockEquip.EquipId = (dock_host_response == 4 || dock_host_response == 3) ? 1 : 0; // a byte in retail
         ActivateEquipment(ship_id, &DockEquip);                          // result ignored
 
@@ -1967,7 +1951,7 @@ SERVER_API int __cdecl Dock(const unsigned int& ship_id, const unsigned int& tar
 
         CObject* const Raw = Obj->Object;
         if (Raw != nullptr &&
-            (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u) {
+            (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip) {
             CShip* const Cship = static_cast<CShip*>(Raw);
             for (std::vector<FObjRWWatcher>::const_iterator Entry = Cship->FollowFollowers.begin();
                  Entry != Cship->FollowFollowers.end(); ++Entry) {
@@ -2054,9 +2038,9 @@ static void SpaceObj_InitTransferParms(PhySys::CreateParms& Parms)
     Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
     Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
     Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-    Parms.CollisionGroupId = 0;
+    Parms.SystemId = 0;
     Parms.Type = 2;
-    Parms.bFlag1c = 0;
+    Parms.bPhysicalUnmoveable = 0;
     Parms.bEnableCollisions = 1;
     Parms.Name[0] = 0;
     Parms.bHasInertia = 0;
@@ -2168,7 +2152,7 @@ SERVER_API int __cdecl Relocate(const unsigned int& obj_id, const unsigned int& 
     TargetSystem->add_ship(Obj, &Parms, pos, orient);
     CObject* const ShipRaw = Obj->Object;
     if (ShipRaw != nullptr &&
-        (static_cast<unsigned int>(ShipRaw->ObjectClass) & 0x503u) == 0x503u)
+        (static_cast<unsigned int>(ShipRaw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
         static_cast<CShip*>(ShipRaw)->set_control_exclusion(0);
     return 0;
 }
@@ -2176,11 +2160,11 @@ SERVER_API int __cdecl Relocate(const unsigned int& obj_id, const unsigned int& 
 // SpaceObj::SendComm -- retail .text:06cf9230 (ordinal 401, cdecl). The system comes from
 // the target, else from the sender (it is the system that is kept and tested, not the
 // object). A CEqObj sender supplies the default voice (+0x13c) and costume (+0x108), and
-// whenever that branch is taken comm_type is zeroed. send_comm is FUN_06d0db30.
+// whenever that branch is taken caption_ids is zeroed. send_comm is FUN_06d0db30.
 SERVER_API int __cdecl SendComm(unsigned int sender_id, unsigned int target_id,
                                  unsigned int voice_id, const Costume* costume,
-                                 unsigned int comm_type, unsigned int* text_ids,
-                                 int text_count, unsigned int mood,
+                                 unsigned int caption_ids, unsigned int* text_ids,
+                                 int text_count, unsigned int permutation_ids,
                                  float duration, bool interrupt) {
     if (text_ids == nullptr) return -4;
     if (text_count <= 0) return -4;                                       // signed
@@ -2200,26 +2184,26 @@ SERVER_API int __cdecl SendComm(unsigned int sender_id, unsigned int target_id,
 
     unsigned int Voice = voice_id;
     const Costume* Cost = costume;
-    unsigned int CommType = comm_type;
+    unsigned int CaptionIds = caption_ids;
     if ((sender_id & 0x3fffffffu) != 0) {
         CBase* const SenderBase = Server_LookupLiveObject(sender_id);
         if (SenderBase != nullptr) {
             CObject* const Cobj = SenderBase->Object;
             if (Cobj != nullptr &&
-                (static_cast<unsigned int>(Cobj->ObjectClass) & 0x103u) == 0x103u) {
+                (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj) {
                 CEqObj* const Eq = static_cast<CEqObj*>(Cobj);
                 if (Voice == 0)
                     Voice = Eq->VoiceId;
                 if (costume == nullptr)
                     Cost = &Eq->SpaceCostume;
-                CommType = 0;
+                CaptionIds = 0;
             }
         }
     }
     if (Cost == nullptr) return -2;
 
-    System->send_comm(sender_id, target_id, Voice, *Cost, CommType, text_ids, text_count,
-                      mood, duration, interrupt);
+    System->send_comm(sender_id, target_id, Voice, *Cost, CaptionIds, text_ids, text_count,
+                      permutation_ids, duration, interrupt);
     return 0;
 }
 
@@ -2245,14 +2229,15 @@ SERVER_API int __cdecl GetArchetypeID(const unsigned int& good_id, unsigned int&
 // ((ObjectClass & 0x303) == 0x303).
 SERVER_API int __cdecl GetAtmosphereRange(const unsigned int& obj_id, float& out_range) {
     if ((obj_id & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id);
-    if (!obj) return -2;
-    ::Solar* SolarRw = dynamic_cast< ::Solar*>(obj);
-    CSolar* Cs = (SolarRw != nullptr) ? SolarRw->csolar() : nullptr;
-    if (Cs == nullptr) {
+    GameObject* const Obj = Server_LookupLiveObject(obj_id);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar) {
         out_range = 0.0f;
         return 0;
     }
+    CSolar* const Cs = static_cast<CSolar*>(Raw);
     float atmo = Cs->AtmosphereRange;   // CSolar+0x1ac
     out_range = atmo;
     // A positive range is reported minus the object's radius (EngineObject+0x38).
@@ -2266,13 +2251,15 @@ SERVER_API int __cdecl GetAtmosphereRange(const unsigned int& obj_id, float& out
 // returns -2 like a failed lookup; a destroyed scanner returns -3; outs untouched on both.
 SERVER_API int __cdecl GetScannerRange(unsigned int obj_id, int& radar_range, int& cargo_scan_range) {
     if ((obj_id & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id);
-    if (!obj) return -2;
-    ::Ship* ShipRw = dynamic_cast< ::Ship*>(obj);
-    CShip* Cs = (ShipRw != nullptr) ? ShipRw->cship() : nullptr;
-    if (Cs == nullptr) return -1;
-    CEquip const* Found = Cs->EquipManager.FindFirst(EQUIP_TYPE_SCANNER);
-    CEScanner const* Scanner = dynamic_cast<CEScanner const*>(Found);
+    GameObject* const Obj = Server_LookupLiveObject(obj_id);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
+        return -1;
+    CShip* const Cs = static_cast<CShip*>(Raw);
+    CEScanner const* const Scanner =
+        static_cast<CEScanner const*>(Cs->EquipManager.FindFirst(EquipTypeScanner));
     if (Scanner == nullptr) return -2;
     // Scanner vtable +0x08 is CEquip::IsDestroyed (Common 0x06286d10), not IsFunctioning.
     if (Scanner->IsDestroyed()) return -3;
@@ -2286,7 +2273,7 @@ SERVER_API int __cdecl GetScannerRange(unsigned int obj_id, int& radar_range, in
 SERVER_API int __cdecl GetType(unsigned int obj_id, unsigned int& out_type) {
     out_type = 0;
     if ((obj_id & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id);
+    GameObject* obj = Server_LookupLiveObject(obj_id);
     if (!obj) return -2;
     // csimple() is retail's (ObjectClass & 3) == 3 guard; TypeBits is CSimple+0xe0.
     CSimple* Cs = obj->csimple();
@@ -2310,7 +2297,7 @@ SERVER_API int __cdecl Activate(const unsigned int& obj_id, bool activate, int p
 
 // SpaceObj::ActivateEquipment -- retail .text:06cf93f0 (ordinal 0x193f0, cdecl); switch
 // table at .text:06cf95d8. Type 0 = cruise (IObjAffect +0x50), 1 = scan cargo
-// (IObjInspect +0x120), 2 = first launcher-class item (0x1000), 3 = every docking light
+// (IObjInspect +0x120), 2 = the first cloak (FindFirst(0x1000)), 3 = every docking light
 // (CELightEquip arch +0x71). The EQUIPMENT_RTYPE names are the port's; the values
 // (-5/-2/-1/0) are retail's.
 SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(const unsigned int& obj_id_ref, EQInfo* eq_info) {
@@ -2322,11 +2309,11 @@ SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(const unsigned int& obj_id_
     if (Obj == nullptr) return EQUIPMENT_RTYPE_INVALID;
 
     switch (eq_info->Type) {                                             // unsigned > 3 -> -1
-    case 0:
+    case EQINFO_TYPE_CRUISE:
         if (eq_info->Count != 1) return EQUIPMENT_RTYPE_INVALID;
         return Obj->toggle_cruise(true, true, 0) != 0 ? EQUIPMENT_RTYPE_BAD_TYPE
                                                  : EQUIPMENT_RTYPE_OK;
-    case 1: {
+    case EQINFO_TYPE_SCAN_CARGO: {
         if (eq_info->TargetObjId == 0) return EQUIPMENT_RTYPE_INVALID;
         GameObject* const Other = Server_LookupLiveObject(eq_info->TargetObjId);
         if (Other == nullptr) return EQUIPMENT_RTYPE_BAD_TYPE;
@@ -2334,25 +2321,25 @@ SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(const unsigned int& obj_id_
         return Obj->scan_cargo(Other, Cargo) != 0 ? EQUIPMENT_RTYPE_BAD_TYPE
                                                    : EQUIPMENT_RTYPE_OK;
     }
-    case 2: {
+    case EQINFO_TYPE_CLOAK: {
         CObject* const Raw = Obj->Object;
         if (Raw == nullptr ||
-            (static_cast<unsigned int>(Raw->ObjectClass) & 0x103u) != 0x103u)
+            (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
             return EQUIPMENT_RTYPE_INVALID;
         CEqObj* const Ceq = static_cast<CEqObj*>(Raw);
-        CEquip const* const Launcher = Ceq->EquipManager.FindFirst(0x1000u);
-        if (Launcher == nullptr) return EQUIPMENT_RTYPE_NOT_FOUND;
-        unsigned short const SubObjId = Launcher->Id;
+        CEquip const* const Cloak = Ceq->EquipManager.FindFirst(EquipTypeCloak);
+        if (Cloak == nullptr) return EQUIPMENT_RTYPE_NOT_FOUND;
+        unsigned short const SubObjId = Cloak->Id;
         Obj->toggle_item(&SubObjId, static_cast<unsigned char>(eq_info->EquipId) != 0, 0);
         return EQUIPMENT_RTYPE_OK;
     }
-    case 3: {
+    case EQINFO_TYPE_DOCKING_LIGHTS: {
         CObject* const Raw = Obj->Object;
         if (Raw == nullptr ||
-            (static_cast<unsigned int>(Raw->ObjectClass) & 0x103u) != 0x103u)
+            (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
             return EQUIPMENT_RTYPE_INVALID;
         CEqObj* const Ceq = static_cast<CEqObj*>(Raw);
-        CEquipTraverser Walk(1);
+        CEquipTraverser Walk(EquipTypeLight);
         CEquip* Light = Ceq->EquipManager.Traverse(Walk);
         while (Light != nullptr) {
             if (static_cast<CELightEquip*>(Light)->LightArch()->bDockingLight) {
@@ -2409,12 +2396,13 @@ SERVER_API int __cdecl AddImpulse(const unsigned int& obj_id_ref, const Vector& 
     return 0;
 }
 
-// SpaceObj::GetLocation -- retail 0x18732. The orientation is the Rotation of
-// get_transform (IObjInspect slot 3; slots 3 and 4 are ICF-folded in retail).
+// SpaceObj::GetLocation -- retail .text:06cf8a80 (FUN_06d00670 lookup). The orientation
+// is the Rotation of get_transform (IObjInspect slot 3; slots 3 and 4 are ICF-folded in
+// retail).
 SERVER_API int __cdecl GetLocation(unsigned int obj_id, Vector& out_pos, Matrix& out_orient) {
     out_pos.x = 0.0f; out_pos.y = 0.0f; out_pos.z = 0.0f;
     if ((obj_id & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id);
+    GameObject* obj = Server_LookupLiveObject(obj_id);
     if (!obj) return -2;
     out_pos = obj->get_position();
     out_orient = obj->get_transform().Rotation;
@@ -2437,29 +2425,29 @@ SERVER_API int __cdecl GetSystem(unsigned int obj_id, unsigned int& out_system_i
     return 0;
 }
 
-// SpaceObj::GetHealth -- retail 0x20596 (FUN_06d00670 lookup). One IObjInspect slot 15
+// SpaceObj::GetHealth -- retail .text:06cfab50 (FUN_06d00670 lookup). One IObjInspect slot 15
 // (+0x3c) call fills both outs.
 SERVER_API int __cdecl GetHealth(const unsigned int& obj_id_ref, float& out_current, float& out_max) {
     out_current = 0.0f; out_max = 0.0f;
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
+    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
     if (!obj) return -2;
     obj->get_status(out_current, out_max);
     return 0;
 }
 
-// SpaceObj::GetRelativeHealth -- retail 0x20551 (FUN_06d00670 lookup), IObjInspect slot 16
+// SpaceObj::GetRelativeHealth -- retail .text:06cfaab0 (FUN_06d00670 lookup), IObjInspect slot 16
 // (+0x40). Retail tests the id against 0 unmasked.
 SERVER_API int __cdecl GetRelativeHealth(const unsigned int& obj_id_ref, float& out_ratio) {
     out_ratio = 0.0f;
     if (obj_id_ref == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
+    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
     if (!obj) return -2;
     obj->get_status(out_ratio);
     return 0;
 }
 
-// SpaceObj::ExistsAndAlive -- retail 0x18612. The liveness half of FUN_06d00670 is the
+// SpaceObj::ExistsAndAlive -- retail .text:06cf8870. The liveness half of FUN_06d00670 is the
 // point; a plain lookup hit is not enough.
 SERVER_API int __cdecl ExistsAndAlive(unsigned int obj_id) {
     if ((obj_id & 0x3fffffff) == 0) return -2;
@@ -2468,20 +2456,25 @@ SERVER_API int __cdecl ExistsAndAlive(unsigned int obj_id) {
     return 0;
 }
 
-// SpaceObj::GetTarget -- retail 0x19194 (FUN_06d00670 lookup). Ships only
-// ((ObjectClass & 0x503) == 0x503); get_target is IObjInspect slot 29 (+0x74).
+// SpaceObj::GetTarget -- retail .text:06cf9120 (FUN_06d00670 lookup). Ships only
+// ((ObjectClass & 0x503) == 0x503); CShip::get_target, then the target's get_id (+0x20).
+// Deviation: retail calls CShip::get_target on the zeroed narrowing for a non-ship (null
+// deref at [0x220]); the port returns -1 instead.
 SERVER_API int __cdecl GetTarget(const unsigned int& obj_id_ref, unsigned int& out_target_id) {
     out_target_id = 0;
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
-    if (!obj) return -2;
-    ::Ship* ShipRw = dynamic_cast< ::Ship*>(obj);
-    if (ShipRw == nullptr || ShipRw->cship() == nullptr) return -1;
-    IObjRW* Target = nullptr;
-    obj->get_target(Target);
-    if (Target != nullptr) {
-        out_target_id = Target->get_id();
+    GameObject* const Obj = Server_LookupLiveObject(obj_id_ref);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
+        return -1;
+    IObjRW* const Target = static_cast<CShip*>(Raw)->get_target();
+    if (Target == nullptr) {
+        out_target_id = 0;
+        return 0;
     }
+    out_target_id = Target->get_id();
     return 0;
 }
 
@@ -2539,7 +2532,7 @@ SERVER_API int __cdecl GetMotion(unsigned int obj_id, Vector& out_linear, Vector
     out_linear.x = 0; out_linear.y = 0; out_linear.z = 0;
     out_angular.x = 0; out_angular.y = 0; out_angular.z = 0;
     if ((obj_id & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id);
+    GameObject* obj = Server_LookupLiveObject(obj_id);
     if (!obj) return -2;
     out_linear = obj->get_velocity();
     out_angular = obj->get_angular_velocity();
@@ -2551,12 +2544,13 @@ SERVER_API int __cdecl GetMotion(unsigned int obj_id, Vector& out_linear, Vector
 // Content callers preset it (often -1) and rely on that.
 SERVER_API int __cdecl GetRep(unsigned int obj_id, int& out_rep) {
     if ((obj_id & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id);
-    if (!obj) return -2;
-    ::EqObj* EqRw = dynamic_cast< ::EqObj*>(obj);
-    CEqObj* Ceq = (EqRw != nullptr) ? EqRw->ceqobj() : nullptr;
-    if (Ceq == nullptr) return -1;
-    out_rep = (int)Ceq->VibeId;
+    GameObject* const Obj = Server_LookupLiveObject(obj_id);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
+        return -1;
+    out_rep = (int)static_cast<CEqObj*>(Raw)->VibeId;
     return 0;
 }
 
@@ -2571,18 +2565,17 @@ SERVER_API int __cdecl GetSolarRep(unsigned int vibe_id, int& out_rep) {
 }
 
 // SpaceObj::GetSolarArchetypeID -- retail 0x18c30 (FUN_06d00670 lookup). CEqObj only; the
-// id is the archetype's (CObject+0x88) Root::Nickname.Id.
+// id is the archetype's (CObject+0x88) Root::Nickname.Id; the archetype is not null-tested.
 SERVER_API int __cdecl GetSolarArchetypeID(unsigned int obj_id, unsigned int& out_arch_id) {
     out_arch_id = 0;
     if ((obj_id & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id);
-    if (!obj) return -2;
-    ::EqObj* EqRw = dynamic_cast< ::EqObj*>(obj);
-    CEqObj* Ceq = (EqRw != nullptr) ? EqRw->ceqobj() : nullptr;
-    if (Ceq == nullptr) return -1;
-    if (Ceq->Archetype != nullptr) {
-        out_arch_id = Ceq->Archetype->get_id();
-    }
+    GameObject* const Obj = Server_LookupLiveObject(obj_id);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
+        return -1;
+    out_arch_id = Raw->Archetype->get_id();
     return 0;
 }
 
@@ -2604,19 +2597,22 @@ SERVER_API int __cdecl GetSolarArchetypeNickname(char* out_name, int max_len, un
 }
 
 // SpaceObj::GetSolarParent -- retail 0x18d00 (FUN_06d00670 lookup). Solars only
-// ((ObjectClass & 0x303) == 0x303); the id test is unmasked. The parent nickname id is
-// the object id, so a second lookup doubles as the existence check.
+// ((ObjectClass & 0x303) == 0x303 on IObjInspect::cobject, +0x150); the id test is
+// unmasked. The parent nickname id is the object id, so a second live lookup doubles as
+// the existence check.
 SERVER_API int __cdecl GetSolarParent(const unsigned int& obj_id_ref, unsigned int& out_parent_id) {
     out_parent_id = 0;
     if (obj_id_ref == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
-    if (!obj) return -2;
-    ::Solar* SolarRw = dynamic_cast< ::Solar*>(obj);
-    CSolar* Cs = (SolarRw != nullptr) ? SolarRw->csolar() : nullptr;
-    if (Cs == nullptr) return -1;
+    GameObject* const Obj = Server_LookupLiveObject(obj_id_ref);
+    if (Obj == nullptr) return -2;
+    CObject const* const Raw = Obj->cobject();
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
+        return -1;
+    CSolar const* const Cs = static_cast<CSolar const*>(Raw);
     ID_String const& Parent = Cs->GetParentNickname();
     if (Parent.IsEmpty()) return -3;
-    GameObject* ParentObj = Server_LookupGameObject(Parent.Id);
+    GameObject* const ParentObj = Server_LookupLiveObject(Parent.Id);
     if (ParentObj == nullptr) return -3;
     out_parent_id = ParentObj->get_id();
     return 0;
@@ -2627,7 +2623,7 @@ SERVER_API int __cdecl GetSolarParent(const unsigned int& obj_id_ref, unsigned i
 SERVER_API int __cdecl GetHardpoint(const unsigned int& obj_id_ref, const char* hp_name,
                                      Vector* out_pos, Matrix* out_orient) {
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
+    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
     if (!obj) return -2;
     bool bOk = HardpointPosition(obj->get_index(), hp_name, out_pos, out_orient);
     return bOk ? 0 : -3;
@@ -2639,7 +2635,7 @@ SERVER_API int __cdecl GetRadius(const unsigned int& obj_id_ref, float& out_radi
     out_radius = 0.0f;
     out_center.x = 0; out_center.y = 0; out_center.z = 0;
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
+    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
     if (!obj) return -2;
     obj->get_physical_radius(out_radius, out_center);
     return 0;
@@ -2651,7 +2647,7 @@ SERVER_API int __cdecl GetBurnRadius(const unsigned int& obj_id_ref, float& out_
     out_radius = 0.0f;
     out_center.x = 0; out_center.y = 0; out_center.z = 0;
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
+    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
     if (!obj) return -2;
     out_center = obj->get_position();
     obj->get_atmosphere_range(out_radius);
@@ -2661,7 +2657,7 @@ SERVER_API int __cdecl GetBurnRadius(const unsigned int& obj_id_ref, float& out_
 // SpaceObj::GetMass -- retail 0x19000 (FUN_06d00670 lookup), IObjInspect slot 12.
 SERVER_API int __cdecl GetMass(const unsigned int& obj_id_ref, float& out_mass) {
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
+    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
     if (!obj) return -2;
     out_mass = obj->get_mass();
     return 0;
@@ -2673,7 +2669,7 @@ SERVER_API int __cdecl GetCenterOfMass(const unsigned int& obj_id_ref, Vector& o
 
     out_center.x = 0; out_center.y = 0; out_center.z = 0;
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
+    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
     if (!obj) return -2;
     // Deviation: retail calls through the CObject even when the (& 3) check zeroed it
     // (null deref); the port returns -2 instead.
@@ -2683,16 +2679,21 @@ SERVER_API int __cdecl GetCenterOfMass(const unsigned int& obj_id_ref, Vector& o
     return 0;
 }
 
-// SpaceObj::GetVoiceID -- retail 0x191a0 (FUN_06d00670 lookup). The id test is unmasked.
-// CEqObj only; voice at +0x13c.
+// SpaceObj::GetVoiceID -- retail .text:06cf91a0. The id test is unmasked. A plain lookup
+// (FUN_06d006c0) miss is -2; then FUN_06d00670, whose reject of a destroyed object is -3;
+// a non-CEqObj is -4 (EDI keeps its initial 0xfffffffc, .text:06cf91bf). Voice at +0x13c.
 SERVER_API int __cdecl GetVoiceID(const unsigned int& obj_id_ref, unsigned int& out_voice_id) {
     if (obj_id_ref == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
-    if (!obj) return -2;
-    ::EqObj* EqRw = dynamic_cast< ::EqObj*>(obj);
-    CEqObj* Ceq = (EqRw != nullptr) ? EqRw->ceqobj() : nullptr;
-    if (Ceq == nullptr) return -3;
-    out_voice_id = Ceq->VoiceId;    // CEqObj+0x13c
+    GameObject* Found = nullptr;
+    StarSystem* System = nullptr;
+    if (!Server_FindObject(obj_id_ref, Found, System) || Found == nullptr) return -2;
+    GameObject* const Obj = Server_LookupLiveObject(obj_id_ref);
+    if (Obj == nullptr) return -3;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
+        return -4;
+    out_voice_id = static_cast<CEqObj*>(Raw)->VoiceId;    // CEqObj+0x13c
     return 0;
 }
 
@@ -2706,7 +2707,7 @@ SERVER_API int __cdecl GetInvincible(unsigned int ObjId, unsigned char& OutFromP
     if (System == nullptr) return -2;
     OutFromPlayers = Obj->get_invincible_flag();  // +0x198 -> raw byte +0x39
     OutProtect = Obj->is_invincible();            // +0x19c -> raw byte +0x38
-    OutMaxHpLoss = Obj->get_invincible_timer();   // +0x1a0 -> float +0x3c
+    OutMaxHpLoss = Obj->get_max_hp_loss();   // +0x1a0 -> float +0x3c
     return 0;
 }
 
@@ -2721,7 +2722,7 @@ SERVER_API int __cdecl GetCargoSpaceOccupied(const unsigned int& obj_id_ref, uns
     if (Obj == nullptr) return -2;
     CObject* const Raw = Obj->cobj();
     CShip* const ShipObj =
-        (Raw != nullptr && ((unsigned int)Raw->ObjectClass & 0x503u) == 0x503u) ? (CShip*)Raw : nullptr;
+        (Raw != nullptr && ((unsigned int)Raw->ObjectClass & CObject::ClassShip) == CObject::ClassShip) ? (CShip*)Raw : nullptr;
     Archetype::Ship const* const Arch = (Archetype::Ship const*)ShipObj->Archetype;
     double const Remaining = ShipObj->get_cargo_hold_remaining();
     out_occupied = (unsigned int)(long long)(Arch->HoldSize - Remaining);
@@ -2733,11 +2734,15 @@ SERVER_API int __cdecl GetCargoSpaceOccupied(const unsigned int& obj_id_ref, uns
 SERVER_API int __cdecl GetDockingTarget(const unsigned int& obj_id_ref, unsigned int& out_target) {
     out_target = 0;
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    void* obj_raw = Server_LookupObject(obj_id_ref);
-    if (!obj_raw) return -2;
-    ::EqObj* EqRw = dynamic_cast< ::EqObj*>(Server_LookupGameObject(obj_id_ref));
-    CEqObj* Ceq = (EqRw != nullptr) ? EqRw->ceqobj() : nullptr;
-    if (Ceq == nullptr) return 0;
+    GameObject* const Obj = Server_LookupLiveObject(obj_id_ref);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj) {
+        out_target = 0;
+        return 0;
+    }
+    CEqObj* const Ceq = static_cast<CEqObj*>(Raw);
     unsigned int secondary = Ceq->DockingPointBaseId;
     if ((secondary & 0x3fffffff) != 0) {
         out_target = secondary;
@@ -2764,7 +2769,7 @@ SERVER_API int __cdecl SetRelativeHealth(const unsigned int& obj_id_ref, float r
 SERVER_API int __cdecl GetShieldHealth(const unsigned int& obj_id_ref, float& out_current,
                                         float& out_max, bool& out_active) {
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupGameObject(obj_id_ref);
+    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
     if (!obj) return -2;
     obj->get_shield_status(out_current, out_max, out_active);
     return 0;
@@ -2776,11 +2781,13 @@ SERVER_API int __cdecl GetTradelaneNextAndPrev(const unsigned int& obj_id_ref,
                                                 unsigned int& out_next, unsigned int& out_prev) {
 
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    void* obj_raw = Server_LookupObject(obj_id_ref);
-    if (!obj_raw) return -2;
-    ::Solar* SolarRw = dynamic_cast< ::Solar*>(Server_LookupGameObject(obj_id_ref));
-    CSolar* Cs = (SolarRw != nullptr) ? SolarRw->csolar() : nullptr;
-    if (Cs == nullptr) return -1;
+    GameObject* const Obj = Server_LookupLiveObject(obj_id_ref);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
+        return -1;
+    CSolar* const Cs = static_cast<CSolar*>(Raw);
     out_next = Cs->NextRing;   // CSolar+0x1dc
     out_prev = Cs->PrevRing;   // CSolar+0x1d8
     return 0;
@@ -2810,7 +2817,7 @@ SERVER_API int __cdecl GetTerminalInfo(const unsigned int& obj_id_ref, int index
     if (Obj == nullptr) return -2;
     CObject* const Cobj = Obj->Object;
     if (Cobj == nullptr ||
-        (static_cast<unsigned int>(Cobj->ObjectClass) & 0x103u) != 0x103u) return -2;
+        (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj) return -2;
     Archetype::EqObj const* const Arch =
         static_cast<Archetype::EqObj const*>(Cobj->Archetype);
     if (static_cast<unsigned int>(index) >= Arch->DockingSpheres.size()) return -3;
@@ -2821,15 +2828,16 @@ SERVER_API int __cdecl GetTerminalInfo(const unsigned int& obj_id_ref, int index
 }
 
 // SpaceObj::GetGoodID -- retail 0x199a0. Loot only ((ObjectClass & 0x803) == 0x803); the
-// good comes from CLoot::ContentsArch (CObject+0xec). A zero id returns -2.
+// good comes from CLoot::ContentsArch (CObject+0xec), not null-tested. A zero id returns -2.
 SERVER_API int __cdecl GetGoodID(const unsigned int& obj_id_ref, unsigned int& out_good_id) {
     if ((obj_id_ref & 0x3fffffff) == 0) return -2;
-    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
-    if (!obj) return -2;
-    ::Loot* LootRw = dynamic_cast< ::Loot*>(obj);
-    CLoot* Cl = (LootRw != nullptr) ? LootRw->cloot() : nullptr;
-    if (Cl == nullptr) return -1;
-    if (Cl->ContentsArch == nullptr) return -1;
+    GameObject* const Obj = Server_LookupLiveObject(obj_id_ref);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassLoot) != CObject::ClassLoot)
+        return -1;
+    CLoot* const Cl = static_cast<CLoot*>(Raw);
     out_good_id = Arch2Good(Cl->ContentsArch->get_id());
     return 0;
 }
@@ -2838,11 +2846,13 @@ SERVER_API int __cdecl GetGoodID(const unsigned int& obj_id_ref, unsigned int& o
 // whose TypeBits (+0xe0) lie within 0xc40 (jump gate/hole).
 SERVER_API int __cdecl GetJumpTarget(const unsigned int& obj_id_ref, unsigned int& out_target1, unsigned int& out_target2) {
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
-    GameObject* obj = Server_LookupLiveObject(obj_id_ref);
-    if (!obj) return -2;
-    ::Solar* SolarRw = dynamic_cast< ::Solar*>(obj);
-    CSolar* Cs = (SolarRw != nullptr) ? SolarRw->csolar() : nullptr;
-    if (Cs == nullptr) return -1;
+    GameObject* const Obj = Server_LookupLiveObject(obj_id_ref);
+    if (Obj == nullptr) return -2;
+    CObject* const Raw = Obj->Object;
+    if (Raw == nullptr ||
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
+        return -1;
+    CSolar* const Cs = static_cast<CSolar*>(Raw);
     unsigned int otype = Cs->get_type();
     if ((otype & 0xc40) != otype) return -1;
     out_target1 = Cs->DestSystem;    // CSolar+0x1b4
@@ -2876,14 +2886,14 @@ SERVER_API int __cdecl SetInvincible2(unsigned int obj_id, unsigned char invinci
 // IClient::SendServerRequestSpaceScript (+0xf8) for client_id (Content's Act_CallThorn
 // passes the mission's player id). Neither the client interface nor the name is tested.
 SERVER_API int __cdecl RequestSpaceScript(const unsigned int& obj_id_ref, const Vector& pos,
-                                          const int& priority, unsigned int client_id, const char* script_name) {
+                                          const int& camera_mode, unsigned int client_id, const char* script_name) {
     if ((obj_id_ref & 0x3fffffff) == 0) return -4;
     FServerRequestSpaceScriptInfo Payload;
     Payload.ObjectId = obj_id_ref;
     memcpy(&Payload.PosXBits, &pos.x, sizeof(float));
     memcpy(&Payload.PosYBits, &pos.y, sizeof(float));
     memcpy(&Payload.PosZBits, &pos.z, sizeof(float));
-    Payload.CameraMode = static_cast<unsigned int>(priority);
+    Payload.CameraMode = static_cast<unsigned int>(camera_mode);
     safe_strcpy(Payload.Name, static_cast<int>(kRequestSpaceScriptNameSize), script_name);
     ::g_pClientInterface->SendServerRequestSpaceScript(client_id, Payload);
     return 0;
@@ -3242,7 +3252,7 @@ SERVER_API int __cdecl AddCargo(const unsigned int& player_id, const unsigned in
     unsigned int const ArchId = Good2Arch(good_id);
     PlayerData_AddEquipment(*p, ArchId, EquipDesc::CARGO_BAY_HP_NAME,
                             (int)quantity, health, /*bEquipped*/false,
-                            /*bNoCombine*/mission_flag, /*bNotify*/true);
+                            mission_flag, /*bNotify*/true);
     return 0;
 }
 
@@ -3427,9 +3437,7 @@ SERVER_API int __cdecl SetNumKills(const unsigned int& player_id, int kills) {
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
     if (!p) return -2;
     p->num_kills = kills;
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendServerSetNumKills(p->client_id, kills);
-    }
+    ::g_pClientInterface->SendServerSetNumKills(p->client_id, kills);
     return 0;
 }
 
@@ -3449,9 +3457,7 @@ SERVER_API int __cdecl SetNumMissionSuccesses(const unsigned int& player_id, int
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
     if (!p) return -2;
     p->num_mission_successes = count;
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendServerSetMissionSuccesses(p->client_id, count);
-    }
+    ::g_pClientInterface->SendServerSetMissionSuccesses(p->client_id, count);
     return 0;
 }
 
@@ -3471,9 +3477,7 @@ SERVER_API int __cdecl SetNumMissionFailures(const unsigned int& player_id, int 
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
     if (!p) return -2;
     p->num_mission_failures = count;
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendServerSetMissionFailures(p->client_id, count);
-    }
+    ::g_pClientInterface->SendServerSetMissionFailures(p->client_id, count);
     return 0;
 }
 
@@ -3503,36 +3507,28 @@ SERVER_API int __cdecl DisplayMissionMessage(const unsigned int& player_id, cons
 // the player slot.
 SERVER_API int __cdecl SetStoryCue(const unsigned int& player_id, unsigned int cue_id) {
     if (!IsValidPlayer(player_id)) return -2;
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendServerSetStoryCue(player_id, cue_id);
-    }
+    ::g_pClientInterface->SendServerSetStoryCue(player_id, cue_id);
     return 0;
 }
 
 // Player::PopUpDialog -- retail 0x06d55df0. No player validation; IClient +0x17c
 // (FLPACKET_COMMON_POP_UP_DIALOG); always 0.
 SERVER_API int __cdecl PopUpDialog(unsigned int player_id, const FmtStr& title, const FmtStr& text, unsigned int param) {
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendCommonPopUpDialog(player_id, title, text, param);
-    }
+    ::g_pClientInterface->SendCommonPopUpDialog(player_id, title, text, param);
     return 0;
 }
 
 // Player::ReturnBestPath -- retail 0x06d55e20. IClient +0x174
 // (FLPACKET_COMMON_REQUEST_BEST_PATH). No validation, always 0.
 SERVER_API int __cdecl ReturnBestPath(unsigned int player_id, unsigned char* data, int data_len) {
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendCommonRequestBestPath(player_id, data, (unsigned int)data_len);
-    }
+    ::g_pClientInterface->SendCommonRequestBestPath(player_id, data, (unsigned int)data_len);
     return 0;
 }
 
 // Player::ReturnPlayerStats -- retail 0x06d55e40. IClient +0x178
 // (FLPACKET_COMMON_REQUEST_PLAYER_STATS). No validation, always 0.
 SERVER_API int __cdecl ReturnPlayerStats(unsigned int player_id, unsigned char* data, int data_len) {
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendCommonRequestPlayerStats(player_id, data, (unsigned int)data_len);
-    }
+    ::g_pClientInterface->SendCommonRequestPlayerStats(player_id, data, (unsigned int)data_len);
     return 0;
 }
 
@@ -3568,9 +3564,7 @@ SERVER_API int __cdecl SetCamera(unsigned int player_id, const Transform& transf
 // player id by address.
 SERVER_API int __cdecl RevertCamera(unsigned int player_id) {
     if (!IsValidPlayer(player_id)) return -2;
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendServerRevertCamera(player_id);
-    }
+    ::g_pClientInterface->SendServerRevertCamera(player_id);
     return 0;
 }
 
@@ -3675,9 +3669,7 @@ SERVER_API int __cdecl SetRank(unsigned int player_id, int rank) {
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
     if (!p) return -2;
     p->rank_level = (unsigned int)rank;
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendServerMiscObjUpdateRank(player_id, player_id, rank);
-    }
+    ::g_pClientInterface->SendServerMiscObjUpdateRank(player_id, player_id, rank);
     return 0;
 }
 
@@ -3728,9 +3720,7 @@ SERVER_API int __cdecl SetTrent(unsigned int player_id) {
 SERVER_API int __cdecl SendNNMessage(unsigned int player_id, unsigned int msg_id) {
     if (msg_id == 0) return -4;
     if (!IsValidPlayer(player_id)) return -4;
-    if (::g_pClientInterface) {
-        ::g_pClientInterface->SendServerSendNNMessage(player_id, msg_id);
-    }
+    ::g_pClientInterface->SendServerSendNNMessage(player_id, msg_id);
     return 0;
 }
 
@@ -4737,13 +4727,14 @@ SERVER_API int __cdecl GetProperties(unsigned int zone_id, unsigned long& out_pr
 
 // pub::Zone::GetLootableInfo -- retail 0x1bc10. The string outs are ID_String::clear'd and
 // the ints zeroed first.
-SERVER_API int __cdecl GetLootableInfo(unsigned int zone_id, ID_String& out_archetype, ID_String& out_loot_table,
-                                        int& out_min_level, int& out_max_level, int& field6) {
-    out_archetype.clear();
-    out_loot_table.clear();
-    field6 = 0;
-    out_max_level = 0;
-    out_min_level = 0;
+SERVER_API int __cdecl GetLootableInfo(unsigned int zone_id, ID_String& out_asteroid_loot,
+                                        ID_String& out_dynamic_loot, int& out_difficulty,
+                                        int& out_count_min, int& out_count_max) {
+    out_asteroid_loot.clear();
+    out_dynamic_loot.clear();
+    out_count_max = 0;
+    out_count_min = 0;
+    out_difficulty = 0;
     Universe::IZone const* zone = Universe::get_zone(zone_id);
     if (zone != nullptr) {
         // vtable +0x7c returns IZone::OwnedLootEntry, a CmnAsteroid::LootableZoneEntry
@@ -4751,11 +4742,11 @@ SERVER_API int __cdecl GetLootableInfo(unsigned int zone_id, ID_String& out_arch
         // still returns 0.
         CmnAsteroid::LootableZoneEntry const* const Loot = zone->GetLootableInfo();
         if (Loot != nullptr) {
-            out_archetype = Loot->AsteroidLootCommodityId;   // +0x08
-            out_loot_table = Loot->DynamicLootCommodityId;   // +0x0c
-            out_min_level = Loot->AsteroidLootDifficulty;    // +0x20
-            out_max_level = Loot->AsteroidLootCountMin;      // +0x10
-            field6 = Loot->AsteroidLootCountMax;             // +0x14
+            out_asteroid_loot = Loot->AsteroidLootCommodityId;  // +0x08
+            out_dynamic_loot = Loot->DynamicLootCommodityId;    // +0x0c
+            out_difficulty = Loot->AsteroidLootDifficulty;      // +0x20
+            out_count_min = Loot->AsteroidLootCountMin;         // +0x10
+            out_count_max = Loot->AsteroidLootCountMax;         // +0x14
         }
         return 0;
     }
@@ -5115,8 +5106,8 @@ SERVER_API OP_RTYPE __cdecl SubmitState(unsigned int Flid, BaseOp* Op) {
     if (Op->OpType == OpType_SetFlagParams) {
         SetFlagParams* Params = static_cast<SetFlagParams*>(Op);
         if (Params->FlagId == 0) {
-            // Byte PathfindManager+0x245 (common_pathfind.h Flag245).
-            Behavior->Pathfind->Flag245 = Params->bValue;
+            // Byte PathfindManager+0x245 (common_pathfind.h bObstacleAvoidanceEnabled).
+            Behavior->Pathfind->bObstacleAvoidanceEnabled = Params->bValue;
         } else if (Params->FlagId == 1) {
             // Byte SystemManager+0x11c0 == GunGroups (+0x12c) + 0x1094, the "fire control
             // active" byte common_aifirecontrol.cpp tests.
@@ -5190,52 +5181,52 @@ SERVER_API OP_RTYPE __cdecl SubmitDirective(unsigned int Flid, BaseOp* Op) {
         } else if (Op->OpType == OpType_DirectiveDockOp) {
             DirectiveDockOp* Dock = static_cast<DirectiveDockOp*>(Op);
             Info.DockObjectId = Dock->DockObjectId;
-            Info.DockSecondaryObjectId = Dock->Field_10;
-            Info.bDockApproachCleared = Dock->Field_14;
+            Info.DockSecondaryObjectId = Dock->NextRingId;
+            Info.bDockApproachCleared = Dock->bHasDockPortIndex;
             Info.DockPortIndex = Dock->DockPortIndex;
-            Info.ProxTargetId = static_cast<unsigned int>(Dock->Field_1C);
-            Info.ProxNearDist = Dock->Field_20;
-            Info.ProxFarDist = Dock->Field_24;
+            Info.ProxTargetId = static_cast<unsigned int>(Dock->TetherObjectId);
+            Info.ProxNearDist = Dock->TetherNearRange;
+            Info.ProxFarDist = Dock->TetherFarRange;
             Info.DirectiveKind = 2;
         } else if (Op->OpType == OpType_DirectiveFollowOp) {
             DirectiveFollowOp* Follow = static_cast<DirectiveFollowOp*>(Op);
             Info.FollowTargetId = Follow->TargetId;
             Info.FollowDistance = Follow->FollowDistance;
-            Info.FollowOffset.x = Follow->Field_14;
-            Info.FollowOffset.y = Follow->Field_18;
-            Info.FollowOffset.z = Follow->Field_1C;
-            Info.Field_0x3c = Follow->Field_20;
+            Info.FollowOffset.x = Follow->FollowOffsetX;
+            Info.FollowOffset.y = Follow->FollowOffsetY;
+            Info.FollowOffset.z = Follow->FollowOffsetZ;
+            Info.FollowEngageRange = Follow->EngageRange;
             Info.DirectiveKind = 3;
         } else if (Op->OpType == OpType_DirectiveIdleOp) {
             Info.DirectiveKind = 5;
         } else if (Op->OpType == OpType_DirectiveGotoOp) {
             // The only kind that fills +0x84..+0x90 (the others zero it before the send).
             DirectiveGotoOp* Goto = static_cast<DirectiveGotoOp*>(Op);
-            Info.GotoMode = Goto->Field_0C;
+            Info.GotoMode = Goto->GotoKind;
             Info.GotoDestination = Goto->Destination;
-            Info.GotoTargetId = Goto->Field_1C;
-            Info.SplineP1.Field_0x00 = Goto->Field_20;
-            Info.SplineP1.Field_0x04 = Goto->Field_24;
-            Info.SplineP1.Field_0x08 = Goto->Field_28;
-            Info.SplineP2.Field_0x00 = Goto->Field_2C;
-            Info.SplineP2.Field_0x04 = Goto->Field_30;
-            Info.SplineP2.Field_0x08 = Goto->Field_34;
-            Info.SplineP0.Field_0x00 = Goto->Field_38;
-            Info.SplineP0.Field_0x04 = Goto->Field_3C;
-            Info.SplineP0.Field_0x08 = Goto->Field_40;
-            Info.SplineP3.Field_0x00 = Goto->Field_44;
-            Info.SplineP3.Field_0x04 = Goto->Field_48;
-            Info.SplineP3.Field_0x08 = Goto->Field_4C;
-            Info.GotoRange = Goto->Field_50;
-            Info.GotoSpeed = Goto->Field_54;
-            Info.Field_0x8c = Goto->Field_58;
+            Info.GotoTargetId = Goto->TargetId;
+            Info.SplineP1.Field_0x00 = Goto->SplineP1X;
+            Info.SplineP1.Field_0x04 = Goto->SplineP1Y;
+            Info.SplineP1.Field_0x08 = Goto->SplineP1Z;
+            Info.SplineP2.Field_0x00 = Goto->SplineP2X;
+            Info.SplineP2.Field_0x04 = Goto->SplineP2Y;
+            Info.SplineP2.Field_0x08 = Goto->SplineP2Z;
+            Info.SplineP0.Field_0x00 = Goto->SplineP0X;
+            Info.SplineP0.Field_0x04 = Goto->SplineP0Y;
+            Info.SplineP0.Field_0x08 = Goto->SplineP0Z;
+            Info.SplineP3.Field_0x00 = Goto->SplineP3X;
+            Info.SplineP3.Field_0x04 = Goto->SplineP3Y;
+            Info.SplineP3.Field_0x08 = Goto->SplineP3Z;
+            Info.GotoRange = Goto->ArrivalRange;
+            Info.GotoSpeed = Goto->MaxSpeed;
+            Info.bGotoFlyThrough = Goto->bFlyThrough;
             Info.Field_0x8d = Goto->Field_59;
-            Info.bGotoCruise = Goto->Field_5A;
-            Info.bGotoNoCruise = Goto->Field_5B;
-            Info.ProxTargetId = Goto->Field_5C;
-            Info.ProxNearDist = Goto->Field_60;
-            Info.ProxFarDist = Goto->Field_64;
-            Info.bGotoAllowCruise = Goto->Field_6C;
+            Info.bGotoCruise = Goto->bGotoCruise;
+            Info.bGotoNoCruise = Goto->bGotoNoCruise;
+            Info.ProxTargetId = Goto->TetherObjectId;
+            Info.ProxNearDist = Goto->TetherNearRange;
+            Info.ProxFarDist = Goto->TetherFarRange;
+            Info.bGotoDisableAvoidance = Goto->bDisableAvoidance;
             Info.DirectiveKind = 4;
         } else {
             // Trail, Strafe, Face, Ram, TractorBeam, Evade, DrasticEvade, Launch,
@@ -5427,7 +5418,7 @@ static void Formation_SendIdsToOwner(IObjRW const* Obj, std::vector<unsigned int
     CObject const* const Cobj = Obj->cobject();                    // +0x150
     if (Cobj == nullptr)
         return;
-    if ((static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
     CShip const* const ShipCobj = static_cast<CShip const*>(Cobj);
     if (ShipCobj->bIsPlayer == 0)                                  // +0x2bd
@@ -5514,7 +5505,7 @@ SERVER_API int __cdecl Create(unsigned int SystemId, const Vector& Size, const V
     PhySys::PhantomParms Parms;
     memset(&Parms, 0, sizeof(Parms));
     Parms.SystemId = SystemId;
-    Parms.Flag04 = 1;
+    Parms.bPhysicalUnmoveable = 1;
     Parms.Flag05 = 0;
     Parms.Name[0] = 0;
     Parms.Position = Pos;
@@ -5540,7 +5531,7 @@ SERVER_API int __cdecl Create(unsigned int SystemId, float Radius, const Vector&
     PhySys::PhantomParms Parms;
     memset(&Parms, 0, sizeof(Parms));
     Parms.SystemId = SystemId;
-    Parms.Flag04 = 1;
+    Parms.bPhysicalUnmoveable = 1;
     Parms.Flag05 = 0;
     Parms.Name[0] = 0;
     Parms.Position = Center;
@@ -5610,25 +5601,22 @@ namespace Audio {
 // pub::Audio::SetMusic -- retail 0x06d5eec0. No validation; IClient slot 122 (+0x1e8) with
 // the Tryptich unpacked field by field (the byte at +0x10 zero-extended).
 SERVER_API int __cdecl SetMusic(unsigned int PlayerId, const Tryptich& Track) {
-    if (!g_pClientInterface) return 0;
     // Field14 holds the fade's float bits (retail pushes the dword; the sender FLDs it).
     float Fade = 0.0f;
-    memcpy(&Fade, &Track.Field14, sizeof(Fade));
-    g_pClientInterface->SendServerSetMusic(PlayerId, Track.Field0, Track.Field4, Track.Field8,
-                                           Track.FieldC, Track.Field10 != 0, Fade);
+    memcpy(&Fade, &Track.FadeBits, sizeof(Fade));
+    g_pClientInterface->SendServerSetMusic(PlayerId, Track.SpaceMusic, Track.DangerMusic, Track.BattleMusic,
+                                           Track.OverrideMusic, Track.Field10 != 0, Fade);
     return 0;
 }
 
 // pub::Audio::CancelMusic -- retail 0x06d5ef00. IClient slot 123 (+0x1ec).
 SERVER_API int __cdecl CancelMusic(unsigned int PlayerId) {
-    if (!g_pClientInterface) return 0;
     g_pClientInterface->SendServerCancelMusic(PlayerId);
     return 0;
 }
 
 // pub::Audio::PlaySoundEffect -- retail 0x06d5ef20. IClient slot 124 (+0x1f0).
 SERVER_API int __cdecl PlaySoundEffect(unsigned int PlayerId, unsigned int SoundId) {
-    if (!g_pClientInterface) return 0;
     g_pClientInterface->SendServerPlaySoundEffect(PlayerId, SoundId);
     return 0;
 }

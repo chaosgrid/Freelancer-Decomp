@@ -169,7 +169,7 @@ struct FGateTunnel
     Transform Frame;               // +0x230 the path's world frame (FUN_00503440 sets it)
     FClientShipGameobj* Ship;      // +0x260 FUN_004ff3b0
     float SpeedClock;              // +0x264
-    unsigned Field_0x268;          // +0x268 TODO: no reader or writer found yet
+    unsigned Unused268;            // +0x268 never read or written in retail, not even by the ctor
     int SegmentIndex;              // +0x26c
     float Phase;                   // +0x270 the path position (0..1) the ship is at
     Vector ShipPosition;           // +0x274

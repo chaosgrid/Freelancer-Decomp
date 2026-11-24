@@ -73,27 +73,27 @@ NnTextControl::NnTextControl()
     }
     Width = 0.0f;
     Height = 0.0f;
-    Byte354 = 0;
-    Dword358 = 0;
+    bHighlighted = 0;
+    Justification = 0;
     // DAT_00679bb0 at full alpha.
-    TextColour = (G_NnPaletteArgb_679bb0 & 0x00ffffffUL) | 0xff000000UL;
+    TextColour = (G_NnPaletteCyan & 0x00ffffffUL) | 0xff000000UL;
     Field338 = -1;
     Field33c = -1;
-    Field340 = 0;
+    LineCount = 0;
     Field34c = 0;
     Field350 = 0;
-    Dword344 = 0;
-    Byte35c = 0;
+    TextToolTipIds = 0;
+    bClickable = 0;
     bColourOverride = 0;
     bTypewriter = 0;
     TypedCount = 1;
     TypeElapsed = 0.0f;
     TypeInterval = 0.05f;
-    Byte378 = 0;
+    bTopLeftAnchor = 0;
     bBlink = 0;
     BlinkPhase = 0;
     BlinkElapsed = 0.0f;
-    Byte380 = 1;
+    bHoverPulse = 1;
     bTyping = 0;
     if (G_TextControlTypingCount < 0)
         G_TextControlTypingCount = 0;
@@ -101,8 +101,8 @@ NnTextControl::NnTextControl()
     // operator_new(0x34) + FUN_004144b0.
     FontString = static_cast<FFontString*>(::operator new(sizeof(FFontString)));
     FontStringConstruct(FontString);
-    Byte394 = 0;
-    Byte395 = 0;
+    bCachedPlacementValid = 0;
+    bUseCachedPlacement = 0;
     bInCaptureList = 0;
 }
 
@@ -147,12 +147,12 @@ NnTextControl::~NnTextControl()
 }
 
 void NnTextControl::Init(char const* StyleName, float const* InPosition, char const* Hardpoint,
-                         float InWidth, float InHeight, float Arg6, unsigned Ids, int InDword358,
-                         int InDword344, unsigned char InByte378)
+                         float InWidth, float InHeight, float FontScale, unsigned Ids, int InJustification,
+                         int InTextToolTipIds, unsigned char bInTopLeftAnchor)
 {
-    // FUN_0058a110. Arg6 has no read in the body.
-    (void)Arg6;
-    Byte378 = InByte378;
+    // FUN_0058a110. FontScale has no read in the body.
+    (void)FontScale;
+    bTopLeftAnchor = bInTopLeftAnchor;
 
     if (StyleName != nullptr)
     {
@@ -194,8 +194,8 @@ void NnTextControl::Init(char const* StyleName, float const* InPosition, char co
     Height = InHeight;
     Width = InWidth;
     SetIds(Ids);                    // FUN_0058a5f0
-    Dword358 = InDword358;
-    Dword344 = InDword344;
+    Justification = InJustification;
+    TextToolTipIds = InTextToolTipIds;
 }
 
 bool NnTextControl::Create(Win3D* NewParent, void* Data)
@@ -268,11 +268,11 @@ bool NnTextControl::Create(Win3D* NewParent, void* Data)
             }
             else if (Ini->is_value("justification"))
             {
-                Dword358 = static_cast<long>(Ini->get_value_float(0));
+                Justification = static_cast<long>(Ini->get_value_float(0));
             }
             else if (Ini->is_value("tooltip"))
             {
-                Dword344 = static_cast<long>(Ini->get_value_float(0));
+                TextToolTipIds = static_cast<long>(Ini->get_value_float(0));
             }
         } while (Ini->read_value());
     }
@@ -287,7 +287,7 @@ bool NnTextControl::Create(Win3D* NewParent, void* Data)
 bool NnTextControl::HitTest(float const* Ray)
 {
     // LAB_0058a230 (RET 4).
-    if (Dword344 == 0 && Byte35c == 0)
+    if (TextToolTipIds == 0 && bClickable == 0)
         return false;
 
     // The sums Position + Offset stay at full precision; each half extent is rounded to a float
@@ -307,12 +307,12 @@ bool NnTextControl::HitTest(float const* Ray)
     if (!Win3DRayHitsAabbHalfExtents(HalfExtents, Matrix, Ray)) // FUN_005a1130
         return false;
 
-    if (Dword344 != 0)
+    if (TextToolTipIds != 0)
     {
         FToolTipHoverInfo Info;
         Info.AuxField = 0;                              // +0x44
-        Info.Ids = Dword344;
-        Info.IdsAlt = Dword344;
+        Info.Ids = TextToolTipIds;
+        Info.IdsAlt = TextToolTipIds;
         Info.bLive = 1;
         Info.WorldPos[0] = CentreX;
         Info.WorldPos[1] = CentreY;
@@ -336,10 +336,11 @@ bool NnTextControl::HitTest(float const* Ray)
 bool NnTextControl::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // FUN_0058ad90 (RET 4).
-    if (Byte35c == 0)
+    if (bClickable == 0)
         return false;
 
-    if (Event->Field0 == -1 && Event->Field1 == 3 && Parent != nullptr)
+    if (Event->Button == kWin3DMouseLeft && Event->Action == kWin3DMouseDoubleClick &&
+        Parent != nullptr)
     {
         WinControl* const ParentControl = Parent->AsWinControl();
         if (ParentControl != nullptr)
@@ -350,9 +351,9 @@ bool NnTextControl::MouseEvent(FWin3DMouseEvent const* Event)
     {
         bInCaptureList = 0;
         Win3DRemoveCapture(this);
-        if (Event->Field0 != -1)
+        if (Event->Button != kWin3DMouseLeft)
             return false;
-        if (Event->Field1 == 1)
+        if (Event->Action == kWin3DMouseRelease)
         {
             // True with or without a parent.
             if (Parent != nullptr)
@@ -367,7 +368,7 @@ bool NnTextControl::MouseEvent(FWin3DMouseEvent const* Event)
     }
 
     // Onto the capture stack (FUN_0059d8d0).
-    if (Event->Field0 != -1 || Event->Field1 == 1)
+    if (Event->Button != kWin3DMouseLeft || Event->Action == kWin3DMouseRelease)
         return false;
     bInCaptureList = 1;
     Win3DPushCapture(this);
@@ -589,20 +590,20 @@ void NnTextControl::SetWidth(float NewWidth)
 void NnTextControl::SetCachedDraw(unsigned char bCached, unsigned char bInvalidate)
 {
     // FUN_0058ad70.
-    Byte395 = bCached;
+    bUseCachedPlacement = bCached;
     if (bInvalidate != 0)
-        Byte394 = 0;
+        bCachedPlacementValid = 0;
 }
 
 void NnTextControl::SetPosition(float const* NewPosition)
 {
     // LAB_0058ae70. Keep the requested anchor separately; the base WinControl position is
-    // the rectangle's upper-left corner when Byte378 is clear.
-    memcpy(Field2e0, NewPosition, sizeof(Field2e0));
+    // the rectangle's upper-left corner when bTopLeftAnchor is clear.
+    memcpy(RequestedPosition, NewPosition, sizeof(RequestedPosition));
     bAttached = 1;
     float Attach[3];
     GetAttachPosition(Attach);
-    if (Byte378 == 0)
+    if (bTopLeftAnchor == 0)
     {
         Attach[0] -= Width * 0.5f;
         Attach[1] += Height * 0.5f;
@@ -706,9 +707,9 @@ void NnTextControl::Draw()
         memcpy(&PackedOverride, OverrideColour, sizeof(PackedOverride));
         FontAtlasSetDrawColor(static_cast<unsigned>(PackedOverride));
     }
-    else if (Byte354 != 0)
+    else if (bHighlighted != 0)
     {
-        FontAtlasSetDrawColor(static_cast<unsigned>(G_NnPaletteArgb_679ba4));
+        FontAtlasSetDrawColor(static_cast<unsigned>(G_NnPaletteAmber));
     }
     else if ((Flags & kWin3DActive) == 0)
     {
@@ -717,7 +718,7 @@ void NnTextControl::Draw()
     else
     {
         FontAtlasSetDrawColor(static_cast<unsigned>(TextColour)); // +0x348
-        if (Byte35c != 0)
+        if (bClickable != 0)
         {
             // The cursor (DAT_00616840 / DAT_00616844) onto the near plane of the Win3D camera
             // DAT_0067dbf8, inline.
@@ -746,8 +747,8 @@ void NnTextControl::Draw()
             Ray[0] = static_cast<float>(Dir.X * Inv);
             Ray[1] = static_cast<float>(Dir.Y * Inv);
             Ray[2] = static_cast<float>(Dir.Z * Inv);
-            // A hit with +0x380 set draws in the pulse colour (FUN_00561da0).
-            if (HitTest(Ray) && Byte380 != 0)
+            // A hit with bHoverPulse set draws in the pulse colour (FUN_00561da0).
+            if (HitTest(Ray) && bHoverPulse != 0)
             {
                 unsigned long Pulse = 0;
                 NnUiPulseBlendArgb(&Pulse);
@@ -756,7 +757,7 @@ void NnTextControl::Draw()
         }
     }
 
-    Field340 = FontStringChildCount(FontString); // the line count
+    LineCount = FontStringChildCount(FontString); // the line count
     // Scale / Height from FUN_004176c0.
     FFontStringDrawOrigin Origin;
     Origin.X = 0.0f;
@@ -768,16 +769,16 @@ void NnTextControl::Draw()
     TextWinProjectExtent(Width, Height, World[2], &ScreenWidth, &ScreenHeight);
     Origin.Scale = ScreenWidth;
     Origin.Height = ScreenHeight;
-    if (Byte395 != 0)
+    if (bUseCachedPlacement != 0)
     {
         // A different surface width drops the cache.
         if (CachedSurfaceWidth != G_RenderSurfaceWidth)
-            Byte394 = 0;
-        if (Byte394 == 0)
+            bCachedPlacementValid = 0;
+        if (bCachedPlacementValid == 0)
         {
             // x moves right by half of (box width - text width); the text width (FUN_00414570)
             // is widened as unsigned.
-            Byte394 = 1;
+            bCachedPlacementValid = 1;
             TextWinProjectPoint(World, &CachedX, &CachedY);
             int Extent[2] = {0, 0};
             int const* const TextExtent = FontStringGetExtent(FontString, Extent);
@@ -795,8 +796,8 @@ void NnTextControl::Draw()
     }
     else
     {
-        // Aligned by +0x358 at FUN_00417730(World).
-        Origin.HAlign = static_cast<unsigned>(Dword358);
+        // Aligned by Justification at FUN_00417730(World).
+        Origin.HAlign = static_cast<unsigned>(Justification);
         TextWinProjectPoint(World, &Origin.X, &Origin.Y);
     }
     FontStringDrawChildren(&Origin, FontString,
@@ -820,7 +821,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 0;
         float Local[3];
         GetAttachPosition(Local);   // vt+0xa4
-        if (Byte378 == 0)
+        if (bTopLeftAnchor == 0)
         {
             Local[0] = Local[0] - Width * 0.5f; // DAT_005c75e0
             Local[1] = Height * 0.5f + Local[1];
@@ -840,7 +841,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
     case 0xc:
-        Byte354 = static_cast<unsigned char>(A != 0 ? 1 : 0);
+        bHighlighted = static_cast<unsigned char>(A != 0 ? 1 : 0);
         return 0;
     case 0x1d:
         FontStringSetScale(FontString, Width, TextDepth(this));
@@ -856,7 +857,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             return 0;
         return static_cast<intptr_t>(wcslen(FontString->Text));
     case 0x21:
-        return Field340;
+        return LineCount;
     case 0x22:
         Field33c = static_cast<int>(B);
         Field338 = static_cast<int>(A);
@@ -866,7 +867,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Field350 = static_cast<int>(B);
         return 0;
     case 0x24:
-        Byte35c = static_cast<unsigned char>(A != 0 ? 1 : 0);
+        bClickable = static_cast<unsigned char>(A != 0 ? 1 : 0);
         return 0;
     case 0x33:
         // The override flag is B == 1; the colour is the dword A points at.
@@ -1067,7 +1068,7 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
                 SetText(Copy.Text);
             }
         }
-        // The parent is not tested here (as in retail); nothing left sends a null text.
+        // Retail: Parent is not tested here (0x0058b9b7), unlike Enter.
         WinControl* const Owner = Parent->AsWinControl();
         if (Len - 1 > 0)
         {
@@ -1121,7 +1122,7 @@ bool NnEditControl::KeyEvent(unsigned Key, unsigned char* Modifiers)
     wcsncpy(&Copy.Text[Len], Wide, 1);
     Copy.Text[Len + 1] = L'\0';
 
-    // No parent test, as in retail.
+    // Retail: Parent is not tested here either (0x0058bc5b).
     SetText(Copy.Text);
     WinControl* const Owner = Parent->AsWinControl();
     if (Owner != nullptr)

@@ -36,14 +36,15 @@
 
 #include <list>
 #include <math.h>
+#include <new>
 #include <stdio.h>
 #include <string.h>
 #include <vector>
 #include <windows.h>
 
-// FUN_00524880's inlined AsteroidExclusionZoneMgr::set_max_cliasteroid_exclusion_distance:
-// the unrounded distance is squared and rounded to float once. Befriended by the class
-// (common_net.h).
+// The inlined AsteroidExclusionZoneMgr::set_max_cliasteroid_exclusion_distance of FUN_00524880
+// and FUN_00520850: the unrounded distance is squared and rounded to float once. Befriended by
+// the class (common_net.h).
 struct FCliAsteroidExclusionInline
 {
     static void SetMaxCliDist(Exclusion::AsteroidExclusionZoneMgr* Mgr, double Dist)
@@ -65,6 +66,10 @@ struct FCliAsteroidExclusionInline
     }
 #endif
 };
+
+// DAT_005dc374 / DAT_005dc394, copied from the PE.
+unsigned const kRsAsteroidOpaque[7] = {0x89, 1, 0x1d, 0, 0x1b, 0, 0};
+unsigned const kRsAsteroidBlend[11] = {0x89, 1, 0x1d, 0, 0x1b, 1, 0x13, 5, 0x14, 6, 0};
 
 namespace
 {
@@ -110,88 +115,77 @@ namespace
         return static_cast<int>(V);
     }
 
-    // ---- Band blob dword accessors (FUN_0054c580 / 0054c630 / 0054d970 / 0054dab0) ----
+    // ---- Band (FUN_0054c580 / 0054c630 / 0054d970 / 0054dab0) ----
 
-    float* BandF(unsigned char* Blob, int DwordIndex)
+    // FUN_0054c580 (thiscall on the band), in retail store order. It writes nothing else:
+    // AmbientIntensity, bLit, UpdateCount and the pad bytes after bOffsetPercent keep whatever
+    // the storage held -- BandParseIni sets AmbientIntensity / RenderParts / bLit / UpdateCount
+    // when a section is read.
+    void InitBand(FAsteroidBand* Band)
     {
-        return reinterpret_cast<float*>(Blob) + DwordIndex;
-    }
-
-    unsigned* BandU(unsigned char* Blob, int DwordIndex)
-    {
-        return reinterpret_cast<unsigned*>(Blob) + DwordIndex;
-    }
-
-    // FUN_0054c580 (thiscall on the 0x84 blob), in retail store order. It writes nothing else:
-    // +0x08, +0x7c, +0x80 and the pad bytes +0x75..+0x77 keep whatever the storage held --
-    // BandParseIni sets +0x08 / +0x58 / +0x7c / +0x80 when a section is read.
-    void InitBandBlob(unsigned char* Blob)
-    {
-        *BandF(Blob, 3) = 1.0f;         // +0x0c..+0x2c
-        *BandF(Blob, 4) = 1.0f;
-        *BandF(Blob, 5) = 1.0f;
-        *BandF(Blob, 6) = 1.0f;
-        *BandF(Blob, 7) = 1.0f;
-        *BandF(Blob, 8) = 1.0f;
-        *BandF(Blob, 9) = 1.0f;
-        *BandF(Blob, 10) = 1.0f;
-        *BandF(Blob, 11) = 1.0f;
-        *BandU(Blob, 0xc) = 0;          // +0x30
-        *BandU(Blob, 0xd) = 0;          // +0x34
-        *BandU(Blob, 0xe) = 0;          // +0x38
-        *BandU(Blob, 0) = 0;            // +0x00
-        *BandU(Blob, 1) = 0;            // +0x04
-        *BandU(Blob, 0xf) = 0;          // +0x3c
-        *BandU(Blob, 0x11) = 0;         // +0x44
-        *BandF(Blob, 0x12) = 1000.0f;   // +0x48
-        *BandF(Blob, 0x19) = 1500.0f;   // +0x64
-        *BandF(Blob, 0x1a) = 2500.0f;   // +0x68
-        *BandF(Blob, 0x1b) = 100000.0f; // +0x6c
-        *BandF(Blob, 0x1c) = 130000.0f; // +0x70
-        *BandU(Blob, 0x1e) = 0;         // +0x78
-        Blob[0x1d * 4] = 0;             // byte +0x74
-        *BandF(Blob, 0x10) = 1.0f;      // +0x40
-        *BandU(Blob, 0x13) = 1;         // +0x4c
-        *BandU(Blob, 0x18) = 0;         // +0x60
-        *BandU(Blob, 0x16) = 0;         // +0x58
-        *BandU(Blob, 0x14) = 0;         // +0x50
-        *BandU(Blob, 0x17) = 0;         // +0x5c
-        *BandF(Blob, 0x15) = 1.0f;      // +0x54
+        Band->TintedDiffuse[0] = 1.0f;
+        Band->TintedDiffuse[1] = 1.0f;
+        Band->TintedDiffuse[2] = 1.0f;
+        Band->TintedAmbient[0] = 1.0f;
+        Band->TintedAmbient[1] = 1.0f;
+        Band->TintedAmbient[2] = 1.0f;
+        Band->ColorShift[0] = 1.0f;
+        Band->ColorShift[1] = 1.0f;
+        Band->ColorShift[2] = 1.0f;
+        Band->AmbientIncrease[0] = 0.0f;
+        Band->AmbientIncrease[1] = 0.0f;
+        Band->AmbientIncrease[2] = 0.0f;
+        Band->Shape = nullptr;
+        Band->Zone = nullptr;
+        Band->Particles = nullptr;
+        Band->ParticleCount = 0;
+        Band->Height = 1000.0f;
+        Band->FadeDist[0] = 1500.0f;
+        Band->FadeDist[1] = 2500.0f;
+        Band->FadeDist[2] = 100000.0f;
+        Band->FadeDist[3] = 130000.0f;
+        Band->Offset = 0.0f;
+        Band->bOffsetPercent = 0;
+        Band->TextureAspect = 1.0f;
+        Band->VertIncrease = 1;
+        Band->Pieces = nullptr;
+        Band->RenderParts = 0;
+        Band->CullMode = 0;
+        Band->FirstPiece = 0;
+        Band->MaxAlpha = 1.0f;
     }
 
     // FUN_0054d970(band, diffuse_tint, ambient_tint)
-    void BandApplyTints(unsigned char* Blob, float const* Diffuse, float const* Ambient)
+    void BandApplyTints(FAsteroidBand* Band, float const* Diffuse, float const* Ambient)
     {
-        float* Cs0 = BandF(Blob, 9);
-        float* OutD = BandF(Blob, 3);
-        float* OutA = BandF(Blob, 6);
-        OutD[0] = ClampTintUpper(Cs0[0] * Diffuse[0]);
-        OutD[1] = ClampTintUpper(Cs0[1] * Diffuse[1]);
-        OutD[2] = ClampTintUpper(Cs0[2] * Diffuse[2]);
-        OutA[0] = ClampTintUpper(Cs0[0] * Ambient[0]);
-        OutA[1] = ClampTintUpper(Cs0[1] * Ambient[1]);
-        OutA[2] = ClampTintUpper(Cs0[2] * Ambient[2]);
+        float const* const Cs = Band->ColorShift;
+        Band->TintedDiffuse[0] = ClampTintUpper(Cs[0] * Diffuse[0]);
+        Band->TintedDiffuse[1] = ClampTintUpper(Cs[1] * Diffuse[1]);
+        Band->TintedDiffuse[2] = ClampTintUpper(Cs[2] * Diffuse[2]);
+        Band->TintedAmbient[0] = ClampTintUpper(Cs[0] * Ambient[0]);
+        Band->TintedAmbient[1] = ClampTintUpper(Cs[1] * Ambient[1]);
+        Band->TintedAmbient[2] = ClampTintUpper(Cs[2] * Ambient[2]);
     }
 
     // FUN_0054dab0
-    void BandSetAmbientIncrease(unsigned char* Blob, float const* Rgb)
+    void BandSetAmbientIncrease(FAsteroidBand* Band, float const* Rgb)
     {
-        *BandF(Blob, 0xc) = Rgb[0];
-        *BandF(Blob, 0xd) = Rgb[1];
-        *BandF(Blob, 0xe) = Rgb[2];
+        Band->AmbientIncrease[0] = Rgb[0];
+        Band->AmbientIncrease[1] = Rgb[1];
+        Band->AmbientIncrease[2] = Rgb[2];
     }
 
-    // FUN_0054c8b0 — ExclusionBand / [Band] ring mesh (thiscall on 0x84 blob).
-    void BandBuildExclusionRings(unsigned char* Blob);
+    // FUN_0054c8b0 — the particle ring and its pieces (thiscall on the band).
+    void BandBuildExclusionRings(FAsteroidBand* Band);
 
-    // FUN_0054c630 — [Band] / ExclusionBand value keys into 0x84 blob; `shape` is looked up in
+    // FUN_0054c630 — [Band] / ExclusionBand value keys into the band; `shape` is looked up in
     // the field's own ShapeDB through FUN_00512660 (cmn\ShapeDB.h:0xf2 on a miss).
-    void BandParseIni(unsigned char* Blob, INI_Reader& Reader, FShapeDB* Shapes)
+    void BandParseIni(FAsteroidBand* Band, INI_Reader& Reader, FShapeDB* Shapes)
     {
-        Blob[0x7c] = 0;                 // byte +0x7c (the bytes after it untouched)
-        *BandU(Blob, 0x20) = 0;         // +0x80
-        *BandF(Blob, 2) = 1.0f;         // +0x08
-        *BandU(Blob, 0x16) = 1;         // +0x58
+        Band->bLit = 0; // the pad bytes after it untouched
+        Band->UpdateCount = 0;
+        Band->AmbientIntensity = 1.0f;
+        Band->RenderParts = 1;
 
         if (!Reader.read_value())
             return;
@@ -201,79 +195,77 @@ namespace
             if (Reader.is_value("shape"))
             {
                 char const* Name = Reader.get_value_string();
-                FTexShape const* Shape = Shapes->Find(Name);
-                *reinterpret_cast<FTexShape const**>(Blob) = Shape;
+                Band->Shape = Shapes->Find(Name);
             }
             else if (Reader.is_value("texture_aspect"))
             {
                 // 1.15 as a double (DAT_005e0ac0), rounded to float once.
-                *BandF(Blob, 0x10) =
+                Band->TextureAspect =
                     static_cast<float>(static_cast<double>(Reader.get_value_float(0)) * 1.15);
             }
             else if (Reader.is_value("height"))
             {
-                *BandF(Blob, 0x12) = Reader.get_value_float(0);
+                Band->Height = Reader.get_value_float(0);
             }
             else if (Reader.is_value("offset_dist"))
             {
-                Blob[0x1d * 4] = 0;
-                *BandF(Blob, 0x1e) = Reader.get_value_float(0);
+                Band->bOffsetPercent = 0;
+                Band->Offset = Reader.get_value_float(0);
             }
             else if (Reader.is_value("offset_percent"))
             {
-                Blob[0x1d * 4] = 1;
-                *BandF(Blob, 0x1e) = Reader.get_value_float(0);
+                Band->bOffsetPercent = 1;
+                Band->Offset = Reader.get_value_float(0);
             }
             else if (Reader.is_value("color_shift"))
             {
-                *BandF(Blob, 9) = Reader.get_value_float(0);
-                *BandF(Blob, 10) = Reader.get_value_float(1);
-                *BandF(Blob, 11) = Reader.get_value_float(2);
+                Band->ColorShift[0] = Reader.get_value_float(0);
+                Band->ColorShift[1] = Reader.get_value_float(1);
+                Band->ColorShift[2] = Reader.get_value_float(2);
             }
             else if (Reader.is_value("fade"))
             {
-                *BandF(Blob, 0x19) = Reader.get_value_float(0);
-                *BandF(Blob, 0x1a) = Reader.get_value_float(1);
-                *BandF(Blob, 0x1b) = Reader.get_value_float(2);
-                *BandF(Blob, 0x1c) = Reader.get_value_float(3);
+                Band->FadeDist[0] = Reader.get_value_float(0);
+                Band->FadeDist[1] = Reader.get_value_float(1);
+                Band->FadeDist[2] = Reader.get_value_float(2);
+                Band->FadeDist[3] = Reader.get_value_float(3);
             }
             else if (Reader.is_value("vert_increase"))
             {
                 int V = FloatToIntTrunc(Reader.get_value_float(0));
                 if (V < 1)
                     V = 1;
-                *BandU(Blob, 0x13) = static_cast<unsigned>(V);
+                Band->VertIncrease = V;
             }
             else if (Reader.is_value("render_parts"))
             {
                 int V = FloatToIntTrunc(Reader.get_value_float(0));
                 if (V < 1)
                     V = 1;
-                *BandU(Blob, 0x16) = static_cast<unsigned>(V);
+                Band->RenderParts = V;
             }
             else if (Reader.is_value("cull_mode"))
             {
-                *BandU(Blob, 0x14) = static_cast<unsigned>(FloatToIntTrunc(Reader.get_value_float(0)));
+                Band->CullMode = FloatToIntTrunc(Reader.get_value_float(0));
             }
             else if (Reader.is_value("ambient_intensity"))
             {
-                *BandF(Blob, 2) = Reader.get_value_float(0);
+                Band->AmbientIntensity = Reader.get_value_float(0);
             }
         } while (Reader.read_value());
     }
 
-    // FUN_0054c600 -- free the ring particle (+0x3c) and spoke (+0x60) buffers of a band blob;
-    // +0x3c/+0x44 and +0x60/+0x58 = 0. No null test of the blob, as retail: the callers (the
-    // field destructor and BandVectorClear after a null test, and the embedded +0xfc band) never
-    // pass null.
-    void BandFreeRingMesh(unsigned char* Blob)
+    // FUN_0054c600 -- free the band's particles and pieces; both pointers and both counts
+    // cleared. No null test of the band, as retail: the callers (the field destructor and
+    // BandVectorClear after a null test, and the embedded +0xfc band) never pass null.
+    void BandFreeRingMesh(FAsteroidBand* Band)
     {
-        operator delete(*reinterpret_cast<void**>(Blob + 0x3c));
-        *reinterpret_cast<void**>(Blob + 0x3c) = nullptr;
-        *BandU(Blob, 0x11) = 0;
-        operator delete(*reinterpret_cast<void**>(Blob + 0x60));
-        *reinterpret_cast<void**>(Blob + 0x60) = nullptr;
-        *BandU(Blob, 0x16) = 0;
+        operator delete(Band->Particles);
+        Band->Particles = nullptr;
+        Band->ParticleCount = 0;
+        operator delete(Band->Pieces);
+        Band->Pieces = nullptr;
+        Band->RenderParts = 0;
     }
 
     // Inlined in FUN_00520850: every non-null exclusion band freed, then the vector erased
@@ -282,20 +274,20 @@ namespace
     {
         if (This->BandBegin != nullptr && This->BandEnd - This->BandBegin > 0)
         {
-            for (unsigned char** It = This->BandBegin; It != This->BandEnd; ++It)
+            for (FAsteroidBand** It = This->BandBegin; It != This->BandEnd; ++It)
             {
-                unsigned char* const Blob = *It;
-                if (Blob != nullptr)
+                FAsteroidBand* const Band = *It;
+                if (Band != nullptr)
                 {
-                    BandFreeRingMesh(Blob);
-                    operator delete(Blob);
+                    BandFreeRingMesh(Band);
+                    operator delete(Band);
                 }
             }
             This->BandEnd = This->BandBegin;
         }
     }
 
-    void BandVectorPush(FCliAsteroid* This, unsigned char* Blob)
+    void BandVectorPush(FCliAsteroid* This, FAsteroidBand* Band)
     {
         size_t Count = 0;
         size_t Cap = 0;
@@ -307,16 +299,16 @@ namespace
         if (Count + 1 > Cap)
         {
             size_t NewCap = Cap == 0 ? 4 : Cap * 2;
-            unsigned char** NewBuf =
-                static_cast<unsigned char**>(operator new(sizeof(unsigned char*) * NewCap));
+            FAsteroidBand** NewBuf =
+                static_cast<FAsteroidBand**>(operator new(sizeof(FAsteroidBand*) * NewCap));
             if (This->BandBegin != nullptr && Count != 0)
-                memcpy(NewBuf, This->BandBegin, Count * sizeof(unsigned char*));
+                memcpy(NewBuf, This->BandBegin, Count * sizeof(FAsteroidBand*));
             operator delete(This->BandBegin);
             This->BandBegin = NewBuf;
             This->BandEnd = NewBuf + Count;
             This->BandCap = NewBuf + NewCap;
         }
-        *This->BandEnd = Blob;
+        *This->BandEnd = Band;
         ++This->BandEnd;
     }
 
@@ -371,15 +363,15 @@ namespace
     void CliDynamicAsteroidApplyParentTints(FCliDynamicAsteroid* Dyn, FCliAsteroid* Parent)
     {
         float Diffuse[3];
-        Diffuse[0] = Parent->TintB4 * Dyn->ColorShift0;
-        Diffuse[1] = Dyn->ColorShift1 * Parent->TintB8;
-        Diffuse[2] = Dyn->ColorShift2 * Parent->TintBC;
+        Diffuse[0] = Parent->DiffuseColor0 * Dyn->ColorShift0;
+        Diffuse[1] = Dyn->ColorShift1 * Parent->DiffuseColor1;
+        Diffuse[2] = Dyn->ColorShift2 * Parent->DiffuseColor2;
         Dyn->TintedDiffuse0 = Diffuse[0];
         Dyn->TintedDiffuse1 = Diffuse[1];
         Dyn->TintedDiffuse2 = Diffuse[2];
 
         float Ambient[3];
-        CliAsteroidMulColor(Ambient, &Dyn->ColorShift0, &Parent->TintC0);
+        CliAsteroidMulColor(Ambient, &Dyn->ColorShift0, &Parent->AmbientColor0);
         Dyn->TintedAmbient0 = Ambient[0];
         Dyn->TintedAmbient1 = Ambient[1];
         Dyn->TintedAmbient2 = Ambient[2];
@@ -394,7 +386,7 @@ namespace
 
     // FUN_00550000 — the two quality scalars, then BillboardEnsureRocks, which rebuilds the rock
     // array at the new QualityA / QualityB. Called from the [AsteroidBillboards] header (before
-    // BillboardParseIni, Flag7C still 0, so the rebuild only frees) and from the detail slider
+    // BillboardParseIni, bParsed still 0, so the rebuild only frees) and from the detail slider
     // (CliAsteroidApplyDetail).
     void BillboardSetQuality(FAsteroidBillboardBlock* Bb, float Detail)
     {
@@ -406,23 +398,23 @@ namespace
         BillboardEnsureRocks(Bb);
     }
 
-    // FUN_0054feb0 — Float40 = max(A, B), Float44 = min(A, B). Both callers (the field-ini load
-    // and CliAsteroidApplyDetail) pass A = FillDist*Scale230, B = CubeSize*1.25 + A.
+    // FUN_0054feb0 — NearFadeEnd = max(A, B), NearFadeStart = min(A, B). Both callers (the field-ini load
+    // and CliAsteroidApplyDetail) pass A = FillDist*FillDetailScale, B = CubeSize*1.25 + A.
     void BillboardSetFadePlanes(FAsteroidBillboardBlock* Bb, float A, float B)
     {
         if (A < B)
         {
-            Bb->Float44 = A;
-            Bb->Float40 = B;
+            Bb->NearFadeStart = A;
+            Bb->NearFadeEnd = B;
         }
         else
         {
-            Bb->Float40 = A;
-            Bb->Float44 = B;
+            Bb->NearFadeEnd = A;
+            Bb->NearFadeStart = B;
         }
     }
 
-    // FUN_0054fee0(bb, &TintB4, &TintC0).
+    // FUN_0054fee0(bb, &DiffuseColor0, &AmbientColor0).
     void BillboardApplyTints(FAsteroidBillboardBlock* Bb, float const* Diffuse, float const* Ambient)
     {
         Bb->TintedDiffuse0 = ClampTintUpper(Bb->ColorShift0 * Diffuse[0]);
@@ -438,7 +430,7 @@ namespace
     void BillboardParseIni(FAsteroidBillboardBlock* Bb, INI_Reader& Reader, FShapeDB* Shapes)
     {
         Bb->FadeDistPercent = 0.3f;
-        Bb->Flag7C = 1;
+        Bb->bParsed = 1;
 
         if (!Reader.read_value())
             return;
@@ -505,11 +497,11 @@ namespace
     void BillboardEnsureRocks(FAsteroidBillboardBlock* Bb)
     {
         // The pointer is not cleared, as retail (it is overwritten below, or left alone when
-        // Flag7C is clear).
+        // bParsed is clear).
         if (Bb->Rocks != nullptr)
             operator delete(Bb->Rocks);
 
-        if (Bb->Flag7C == 0)
+        if (Bb->bParsed == 0)
             return;
 
         Bb->RockCount = static_cast<int>(static_cast<double>(Bb->Count) * Bb->QualityA);
@@ -554,9 +546,9 @@ namespace
             double const A = static_cast<double>(Bb->QualityB) * Bb->StartDist;
             double const T = tan(0.6108652353286743);
             double const R = A * T / (1.0 - T);
-            Bb->Float00 = static_cast<float>(R);
-            Bb->Float04 = static_cast<float>(R + A);
-            Bb->Float2C = static_cast<float>(R * Bb->FadeDistPercent);
+            Bb->SphereRadius = static_cast<float>(R);
+            Bb->SphereAhead = static_cast<float>(R + A);
+            Bb->SphereFadeWidth = static_cast<float>(R * Bb->FadeDistPercent);
         }
 
         // A shape whose frame-0 handle IsTexture rejects (non-zero) is dropped.
@@ -575,28 +567,28 @@ namespace
         Out[2] = B * (1.0f / 255.0f);
     }
 
-    // FUN_00524880 — always writes Scale230; the rest only for a loaded field (Flag2C). No null
+    // FUN_00524880 — always writes FillDetailScale; the rest only for a loaded field (bLoaded). No null
     // test of `This`, as retail.
     void CliAsteroidApplyDetail(FCliAsteroid* This, float Detail)
     {
-        // (1 - d) is kept as a float for the dynamic block below, while Scale230 uses the
+        // (1 - d) is kept as a float for the dynamic block below, while FillDetailScale uses the
         // unrounded value; 0.65f at DAT_005db53c.
         double const OneMinusDetail = 1.0 - static_cast<double>(Detail);
         float const OneMinusDetailF = static_cast<float>(OneMinusDetail);
-        This->Scale230 = static_cast<float>(
+        This->FillDetailScale = static_cast<float>(
             OneMinusDetail * static_cast<double>(0.65f) + static_cast<double>(Detail));
-        if (This->Flag2C == 0 || This->CmnField == nullptr)
+        if (This->bLoaded == 0 || This->CmnField == nullptr)
             return;
 
         int const SyncedFill = static_cast<int>(
-            static_cast<double>(This->FillDistAt24) * static_cast<double>(This->Scale230));
+            static_cast<double>(This->FillDist) * static_cast<double>(This->FillDetailScale));
         This->CmnField->set_fill_dist(SyncedFill);
 
-        if (This->Flag198 != 0)
+        if (This->bHasBillboards != 0)
         {
             // FillScaled is rounded to float before the add; 1.25f at DAT_005c9804.
             float const FillScaled = static_cast<float>(
-                static_cast<double>(This->FillDistAt24) * static_cast<double>(This->Scale230));
+                static_cast<double>(This->FillDist) * static_cast<double>(This->FillDetailScale));
             float const FadeFar = static_cast<float>(
                 static_cast<double>(This->CubeSize) * static_cast<double>(1.25f) +
                 static_cast<double>(FillScaled));
@@ -607,8 +599,8 @@ namespace
         if (This->ExclusionMgr != nullptr)
         {
             // Retail inlines the setter; the distance is squared unrounded.
-            double const CliDist = static_cast<double>(This->FillDistAt24) *
-                                   static_cast<double>(This->Scale230) *
+            double const CliDist = static_cast<double>(This->FillDist) *
+                                   static_cast<double>(This->FillDetailScale) *
                                    static_cast<double>(1.25f);
             FCliAsteroidExclusionInline::SetMaxCliDist(This->ExclusionMgr, CliDist);
         }
@@ -641,27 +633,27 @@ namespace
     }
 
     // FUN_005201e0. No null test of `this`: its one caller (CliAsteroidCreateAndLoad) tests
-    // operator new's result. Stores in retail order. Retail writes no byte of +0x00 (Flag00),
-    // +0x30..+0x9f (MeshDesc), +0xb0 (FieldB0) or the pads here; each is written before it is
-    // read: Flag00 by the field-ini load (= 0 before the section loop), MeshDesc and FieldB0 by
+    // operator new's result. Stores in retail order. Retail writes no byte of +0x00 (bTestPlacement),
+    // +0x30..+0x9f (MeshDesc), +0xb0 (PrimitiveType) or the pads here; each is written before it is
+    // read: bTestPlacement by the field-ini load (= 0 before the section loop), MeshDesc and PrimitiveType by
     // the mesh build inside the same load.
     FCliAsteroid* CliAsteroidConstructRetail(FCliAsteroid* This)
     {
         // The cube map at +0x08 (allocator bytes +0x08 / +0x09, byte +0x14, FUN_005274a0).
         CliAsteroidCubeMapConstruct(This);
 
-        This->TintB4 = 1.0f;
-        This->TintB8 = 1.0f;
-        This->TintBC = 1.0f;
-        This->TintC0 = 1.0f;
-        This->TintC4 = 1.0f;
-        This->TintC8 = 1.0f;
+        This->DiffuseColor0 = 1.0f;
+        This->DiffuseColor1 = 1.0f;
+        This->DiffuseColor2 = 1.0f;
+        This->AmbientColor0 = 1.0f;
+        This->AmbientColor1 = 1.0f;
+        This->AmbientColor2 = 1.0f;
 
         // FUN_004a2f10 -- the field's ShapeDB at +0xE0 (its tail store +0xf4 = +0xe4 is part
         // of the container's own construction).
-        ShapeDBConstructAt(This->ShapeDbE0);
+        ShapeDBConstructAt(This->ShapeDbStorage);
 
-        InitBandBlob(This->BandBlob);
+        InitBand(&This->Band);
 
         This->BandBegin = nullptr;
         This->BandEnd = nullptr;
@@ -682,9 +674,9 @@ namespace
         This->Billboard.ColorShift1 = 1.0f;
         This->Billboard.ColorShift2 = 1.0f;
 
-        This->Billboard.Float00 = 2500.0f;
+        This->Billboard.SphereRadius = 2500.0f;
         This->Billboard.StartDist = 1500.0f;
-        This->Billboard.Float04 = 4000.0f;
+        This->Billboard.SphereAhead = 4000.0f;
         This->Billboard.Rocks = nullptr;
         This->Billboard.Count = 100;
         This->Billboard.RockCount = 100;
@@ -693,14 +685,14 @@ namespace
         This->Billboard.Shape = nullptr;
         This->Billboard.SizeMin = 500.0f;
         This->Billboard.SizeMax = 100.0f;
-        This->Billboard.Float2C = 700.0f;
+        This->Billboard.SphereFadeWidth = 700.0f;
         This->Billboard.FadeDistPercent = 0.3f;
-        This->Billboard.Float40 = 2000.0f;
-        This->Billboard.Float44 = 1500.0f;
+        This->Billboard.NearFadeEnd = 2000.0f;
+        This->Billboard.NearFadeStart = 1500.0f;
         This->Billboard.AmbientIntensity = 1.0f;
         This->Billboard.QualityA = 1.0f;
         This->Billboard.QualityB = 1.0f;
-        This->Billboard.Flag7C = 0;
+        This->Billboard.bParsed = 0;
 
         This->DynBegin = nullptr;
         This->DynEnd = nullptr;
@@ -721,15 +713,15 @@ namespace
         }
 
         This->CubeSize = 0x190;
-        This->FillDistAt24 = 0x4b0;
-        This->ScaleCC = 1.0f;
-        This->Scale230 = 1.0f;
-        This->Flag2C = 0;
-        This->FlagD3 = 0;
+        This->FillDist = 0x4b0;
+        This->MaxAlpha = 1.0f;
+        This->FillDetailScale = 1.0f;
+        This->bLoaded = 0;
+        This->bContainsFogZone = 0;
         This->EmptyCubeFreq = 0.0f;
-        This->FlagD0 = 0;
-        This->FlagD1 = 0;
-        This->FlagD2 = 0;
+        This->AmbientIncrease0 = 0;
+        This->AmbientIncrease1 = 0;
+        This->AmbientIncrease2 = 0;
 
         // Retail then erases the just-built (empty) cube map; nothing to port.
         This->ExclusionMgr = nullptr;
@@ -737,18 +729,18 @@ namespace
         This->MeshVerts = nullptr;
         This->MeshIndices = nullptr;
         This->MeshIndexCount = 0;
-        This->ZeroD4 = 0;
-        This->FloatD8 = 100.0f;
+        This->FogNebula = 0;
+        This->ExclusionSortTimer = 100.0f;
 
         // Retail also clears the (empty) band and dynamic vectors here.
-        This->BandVertSum = 0;
+        This->ExclusionPieceCount = 0;
 
         This->Zone = nullptr;
-        This->FlagF8 = 0;
-        This->Flag180 = 0;
-        This->Flag198 = 0;
-        This->Flag234 = 1;
-        This->Flag21C = 1;
+        This->bHasBand = 0;
+        This->bHasExclusionBands = 0;
+        This->bHasBillboards = 0;
+        This->bDrawFarBands = 1;
+        This->bNebulaLookupPending = 1;
 
         return This;
     }
@@ -769,7 +761,7 @@ namespace
             }
             else if (Reader.is_value("fill_dist"))
             {
-                This->FillDistAt24 = FloatToIntTrunc(Reader.get_value_float(0));
+                This->FillDist = FloatToIntTrunc(Reader.get_value_float(0));
             }
             else if (Reader.is_value("LOD"))
             {
@@ -781,30 +773,30 @@ namespace
                 float R = Reader.get_value_float(0) * KInv255;
                 float G = Reader.get_value_float(1) * KInv255;
                 float B = Reader.get_value_float(2) * KInv255;
-                This->TintB4 = R;
-                This->TintB8 = G;
-                This->TintBC = B;
-                This->TintC0 = R;
-                This->TintC4 = G;
-                This->TintC8 = B;
+                This->DiffuseColor0 = R;
+                This->DiffuseColor1 = G;
+                This->DiffuseColor2 = B;
+                This->AmbientColor0 = R;
+                This->AmbientColor1 = G;
+                This->AmbientColor2 = B;
             }
             else if (Reader.is_value("diffuse_color"))
             {
-                This->TintB4 = Reader.get_value_float(0) * KInv255;
-                This->TintB8 = Reader.get_value_float(1) * KInv255;
-                This->TintBC = Reader.get_value_float(2) * KInv255;
+                This->DiffuseColor0 = Reader.get_value_float(0) * KInv255;
+                This->DiffuseColor1 = Reader.get_value_float(1) * KInv255;
+                This->DiffuseColor2 = Reader.get_value_float(2) * KInv255;
             }
             else if (Reader.is_value("ambient_color"))
             {
-                This->TintC0 = Reader.get_value_float(0) * KInv255;
-                This->TintC4 = Reader.get_value_float(1) * KInv255;
-                This->TintC8 = Reader.get_value_float(2) * KInv255;
+                This->AmbientColor0 = Reader.get_value_float(0) * KInv255;
+                This->AmbientColor1 = Reader.get_value_float(1) * KInv255;
+                This->AmbientColor2 = Reader.get_value_float(2) * KInv255;
             }
             else if (Reader.is_value("ambient_increase"))
             {
-                This->FlagD0 = static_cast<unsigned char>(FloatToIntTrunc(Reader.get_value_float(0)));
-                This->FlagD1 = static_cast<unsigned char>(FloatToIntTrunc(Reader.get_value_float(1)));
-                This->FlagD2 = static_cast<unsigned char>(FloatToIntTrunc(Reader.get_value_float(2)));
+                This->AmbientIncrease0 = static_cast<unsigned char>(FloatToIntTrunc(Reader.get_value_float(0)));
+                This->AmbientIncrease1 = static_cast<unsigned char>(FloatToIntTrunc(Reader.get_value_float(1)));
+                This->AmbientIncrease2 = static_cast<unsigned char>(FloatToIntTrunc(Reader.get_value_float(2)));
             }
             else if (Reader.is_value("empty_cube_frequency"))
             {
@@ -812,15 +804,15 @@ namespace
             }
             else if (Reader.is_value("max_alpha"))
             {
-                This->ScaleCC = Reader.get_value_float(0);
+                This->MaxAlpha = Reader.get_value_float(0);
             }
             else if (Reader.is_value("test_asteroid_placement"))
             {
-                This->Flag00 = 1;
+                This->bTestPlacement = 1;
             }
             else if (Reader.is_value("contains_fog_zone"))
             {
-                This->FlagD3 = 1;
+                This->bContainsFogZone = 1;
             }
         } while (Reader.read_value());
     }
@@ -842,11 +834,11 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     This->CubeSize = 0xfa;
     This->EmptyCubeFreq = 0.0f;
     int Lod = 0;
-    This->ScaleCC = 1.0f;
-    This->FlagF8 = 0;
-    This->Flag198 = 0;
-    This->Flag180 = 0;
-    This->Flag00 = 0;
+    This->MaxAlpha = 1.0f;
+    This->bHasBand = 0;
+    This->bHasBillboards = 0;
+    This->bHasExclusionBands = 0;
+    This->bTestPlacement = 0;
 
     // A field with no zone is reported and loading goes on.
     if (This->Zone == nullptr)
@@ -867,7 +859,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     else
     {
         // The reader's state is saved for the common field.
-        This->Flag2C = 1;
+        This->bLoaded = 1;
 
         INI_Reader::State Saved;
         Reader.get_state(Saved);
@@ -882,7 +874,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                         continue;
                     char const* Rel = Reader.get_value_string();
                     char const* Full = GetFullFilename(Rel);
-                    ShapeDBAt(This->ShapeDbE0)->Load(Full, nullptr);
+                    ShapeDBAt(This->ShapeDbStorage)->Load(Full, nullptr);
                 }
             }
             else if (Reader.is_header("Field"))
@@ -892,31 +884,33 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
             else if (Reader.is_header("Band"))
             {
                 // The field's own band (+0xfc).
-                This->FlagF8 = 1;
-                BandParseIni(This->BandBlob, Reader, ShapeDBAt(This->ShapeDbE0));
-                float Diffuse[3] = {This->TintB4, This->TintB8, This->TintBC};
-                float Ambient[3] = {This->TintC0, This->TintC4, This->TintC8};
-                BandApplyTints(This->BandBlob, Diffuse, Ambient);
+                This->bHasBand = 1;
+                BandParseIni(&This->Band, Reader, ShapeDBAt(This->ShapeDbStorage));
+                float Diffuse[3] = {This->DiffuseColor0, This->DiffuseColor1, This->DiffuseColor2};
+                float Ambient[3] = {This->AmbientColor0, This->AmbientColor1, This->AmbientColor2};
+                BandApplyTints(&This->Band, Diffuse, Ambient);
                 float Inc[3];
-                ScaleRgb255(Inc, static_cast<float>(This->FlagD0),
-                            static_cast<float>(This->FlagD1), static_cast<float>(This->FlagD2));
-                BandSetAmbientIncrease(This->BandBlob, Inc);
+                ScaleRgb255(Inc, static_cast<float>(This->AmbientIncrease0),
+                            static_cast<float>(This->AmbientIncrease1),
+                            static_cast<float>(This->AmbientIncrease2));
+                BandSetAmbientIncrease(&This->Band, Inc);
             }
             else if (Reader.is_header("ExclusionBand"))
             {
                 INI_Reader::State ExState;
                 Reader.get_state(ExState);
 
-                unsigned char* Blob = static_cast<unsigned char*>(operator new(0x84));
-                if (Blob != nullptr)
-                    InitBandBlob(Blob);
-                BandVectorPush(This, Blob);
+                FAsteroidBand* Band =
+                    static_cast<FAsteroidBand*>(operator new(sizeof(FAsteroidBand)));
+                if (Band != nullptr)
+                    InitBand(Band);
+                BandVectorPush(This, Band);
 
                 // The vector's last element, no null test, as retail.
-                unsigned char* const Last = This->BandEnd[-1];
-                BandParseIni(Last, Reader, ShapeDBAt(This->ShapeDbE0));
+                FAsteroidBand* const Last = This->BandEnd[-1];
+                BandParseIni(Last, Reader, ShapeDBAt(This->ShapeDbStorage));
 
-                // The section again: every "zone" into +4.
+                // The section again: every "zone" into the band's Zone.
                 Reader.set_state(ExState);
                 while (Reader.read_value())
                 {
@@ -935,17 +929,17 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                     }
                     else
                     {
-                        *reinterpret_cast<Universe::IZone const**>(Last + 4) = Z;
+                        Last->Zone = const_cast<Universe::IZone*>(Z);
                     }
                 }
             }
             else if (Reader.is_header("AsteroidBillboards"))
             {
-                This->Flag198 = 1;
+                This->bHasBillboards = 1;
                 BillboardSetQuality(&This->Billboard, AsteroidDetailScalar());
-                BillboardParseIni(&This->Billboard, Reader, ShapeDBAt(This->ShapeDbE0));
-                float Diffuse[3] = {This->TintB4, This->TintB8, This->TintBC};
-                float Ambient[3] = {This->TintC0, This->TintC4, This->TintC8};
+                BillboardParseIni(&This->Billboard, Reader, ShapeDBAt(This->ShapeDbStorage));
+                float Diffuse[3] = {This->DiffuseColor0, This->DiffuseColor1, This->DiffuseColor2};
+                float Ambient[3] = {This->AmbientColor0, This->AmbientColor1, This->AmbientColor2};
                 BillboardApplyTints(&This->Billboard, Diffuse, Ambient);
             }
             else if (Reader.is_header("DynamicAsteroids"))
@@ -1009,7 +1003,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
             Reader.set_state(Saved);
             This->CmnField->load(Reader, This->CubeSize);
             This->CmnField->set_fill_dist(static_cast<int>(
-                static_cast<double>(This->FillDistAt24) * static_cast<double>(This->Scale230)));
+                static_cast<double>(This->FillDist) * static_cast<double>(This->FillDetailScale)));
             This->CmnField->set_empty_freq(This->EmptyCubeFreq);
             This->ExclusionMgr = This->CmnField->ExclusionMgr;
         }
@@ -1023,7 +1017,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
 
         // With billboards, the count raised to the exclusion manager's maximum and
         // DensityScale = old count / new count (no zero test).
-        if (This->Flag198 != 0)
+        if (This->bHasBillboards != 0)
         {
             int Use = This->Billboard.Count;
             if (This->ExclusionMgr != nullptr)
@@ -1044,58 +1038,61 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
         }
     }
 
-    // The field's own band gets the zone (+0x100) and its rings; the spoke cursor starts at its
-    // spoke count (+0x154).
-    int BandSpokeCursor = 0;
-    if (This->FlagF8 != 0)
+    // The field's own band gets the zone (+0x100) and its rings; the piece cursor starts at its
+    // piece count (+0x154).
+    int PieceCursor = 0;
+    if (This->bHasBand != 0)
     {
-        *reinterpret_cast<Universe::IZone**>(This->BandBlob + 4) = This->Zone;
-        BandBuildExclusionRings(This->BandBlob);
-        BandSpokeCursor = static_cast<int>(*BandU(This->BandBlob, 0x16));
+        This->Band.Zone = This->Zone;
+        BandBuildExclusionRings(&This->Band);
+        PieceCursor = This->Band.RenderParts;
     }
-    // Every exclusion band gets the tints, the ambient increase, its rings and its spoke base
-    // (+0x5c), and adds its spoke count (+0x58) to BandVertSum. No null test of the band, as
+    // Every exclusion band gets the tints, the ambient increase, its rings and its first piece
+    // index, and adds its piece count to ExclusionPieceCount. No null test of the band, as
     // retail.
-    This->BandVertSum = 0;
+    This->ExclusionPieceCount = 0;
     if (This->BandBegin != nullptr && This->BandEnd != This->BandBegin)
     {
-        This->Flag180 = 1;
-        for (unsigned char** It = This->BandBegin; It != This->BandEnd; ++It)
+        This->bHasExclusionBands = 1;
+        for (FAsteroidBand** It = This->BandBegin; It != This->BandEnd; ++It)
         {
-            unsigned char* const Blob = *It;
-            float Diffuse[3] = {This->TintB4, This->TintB8, This->TintBC};
-            float Ambient[3] = {This->TintC0, This->TintC4, This->TintC8};
-            BandApplyTints(Blob, Diffuse, Ambient);
+            FAsteroidBand* const Band = *It;
+            float Diffuse[3] = {This->DiffuseColor0, This->DiffuseColor1, This->DiffuseColor2};
+            float Ambient[3] = {This->AmbientColor0, This->AmbientColor1, This->AmbientColor2};
+            BandApplyTints(Band, Diffuse, Ambient);
             float Inc[3];
-            ScaleRgb255(Inc, static_cast<float>(This->FlagD0), static_cast<float>(This->FlagD1),
-                        static_cast<float>(This->FlagD2));
-            BandSetAmbientIncrease(Blob, Inc);
-            BandBuildExclusionRings(Blob);
-            *BandU(Blob, 0x17) = static_cast<unsigned>(BandSpokeCursor);
-            int const SpokeN = static_cast<int>(*BandU(Blob, 0x16));
-            BandSpokeCursor += SpokeN;
-            This->BandVertSum += static_cast<unsigned>(SpokeN);
+            ScaleRgb255(Inc, static_cast<float>(This->AmbientIncrease0),
+                        static_cast<float>(This->AmbientIncrease1),
+                        static_cast<float>(This->AmbientIncrease2));
+            BandSetAmbientIncrease(Band, Inc);
+            BandBuildExclusionRings(Band);
+            Band->FirstPiece = PieceCursor;
+            int const PieceCount = Band->RenderParts;
+            PieceCursor += PieceCount;
+            This->ExclusionPieceCount += static_cast<unsigned>(PieceCount);
         }
     }
 
     // FillScaled is rounded to float before the add.
-    if (This->Flag198 != 0)
+    if (This->bHasBillboards != 0)
     {
         This->Billboard.ZoneRef = This->Zone;
         BillboardEnsureRocks(&This->Billboard);
         float const FillScaled = static_cast<float>(
-            static_cast<double>(This->FillDistAt24) * static_cast<double>(This->Scale230));
+            static_cast<double>(This->FillDist) * static_cast<double>(This->FillDetailScale));
         float const FadeFar = static_cast<float>(
             static_cast<double>(This->CubeSize) * 1.25 + static_cast<double>(FillScaled));
         BillboardSetFadePlanes(&This->Billboard, FillScaled, FadeFar);
     }
 
-    // Retail inlines the two setters (CliAsteroid distance squared into +0x14, DynamicAsteroid
-    // distance 100^2 into +0x18).
+    // Retail inlines the two setters: the CliAsteroid distance squared unrounded into +0x14, and
+    // the constant 10000.0f into +0x18 (what the exported setter stores for 100).
     if (This->ExclusionMgr != nullptr)
     {
-        This->ExclusionMgr->set_max_cliasteroid_exclusion_distance(static_cast<float>(
-            static_cast<double>(This->FillDistAt24) * static_cast<double>(This->Scale230) * 1.25));
+        FCliAsteroidExclusionInline::SetMaxCliDist(
+            This->ExclusionMgr, static_cast<double>(This->FillDist) *
+                                    static_cast<double>(This->FillDetailScale) *
+                                    static_cast<double>(1.25f));
         This->ExclusionMgr->set_max_dynamicasteroid_exclusion_distance(100.0f);
     }
 
@@ -1190,14 +1187,14 @@ void CliAsteroidDestruct(FCliAsteroid* This)
     This->MeshVerts = nullptr;
     operator delete(This->MeshIndices);
     This->MeshIndices = nullptr;
-    ShapeDBAt(This->ShapeDbE0)->Clear();
-    for (unsigned char** It = This->BandBegin; It != This->BandEnd; ++It)
+    ShapeDBAt(This->ShapeDbStorage)->Clear();
+    for (FAsteroidBand** It = This->BandBegin; It != This->BandEnd; ++It)
     {
-        unsigned char* const Blob = *It;
-        if (Blob != nullptr)
+        FAsteroidBand* const Band = *It;
+        if (Band != nullptr)
         {
-            BandFreeRingMesh(Blob);
-            operator delete(Blob);
+            BandFreeRingMesh(Band);
+            operator delete(Band);
         }
     }
     This->BandEnd = This->BandBegin;
@@ -1224,8 +1221,8 @@ void CliAsteroidDestruct(FCliAsteroid* This)
     This->BandBegin = nullptr;
     This->BandEnd = nullptr;
     This->BandCap = nullptr;
-    BandFreeRingMesh(This->BandBlob);
-    ShapeDBDestructAt(This->ShapeDbE0);
+    BandFreeRingMesh(&This->Band);
+    ShapeDBDestructAt(This->ShapeDbStorage);
     CliAsteroidCubeMapDestruct(This);
 }
 
@@ -1270,38 +1267,32 @@ void CliAsteroidApplyGlobalDetail(float Detail)
 int CliAsteroidPieceCount(FCliAsteroid* Field)
 {
     // No null test, as retail.
-    int const Primary =
-        static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x58)); // dword 0x16
-    return Primary + static_cast<int>(Field->BandVertSum);
+    return Field->Band.RenderParts + static_cast<int>(Field->ExclusionPieceCount);
 }
 
 namespace
 {
-    // FUN_0054d920 (thiscall on the band) — piece XYZ from the band's spoke table (+0x60,
-    // stride 0x18, XYZ at +8). Index - base (+0x5c), a negative result clamped to 0; nothing is
-    // tested for null.
-    float* BandGetPiecePos(unsigned char* Blob, int PieceIndex, float* OutXYZ)
+    // FUN_0054d920 (thiscall on the band) — a piece's centre. Index - FirstPiece, a negative
+    // result clamped to 0; nothing is tested for null.
+    float* BandGetPiecePos(FAsteroidBand* Band, int PieceIndex, float* OutXYZ)
     {
-        int Rel = PieceIndex - static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x5c));
+        int Rel = PieceIndex - Band->FirstPiece;
         if (Rel < 0)
             Rel = 0;
-        unsigned char* const Table = *reinterpret_cast<unsigned char**>(Blob + 0x60);
-        float const* const Entry = reinterpret_cast<float const*>(Table + Rel * 0x18 + 8);
-        OutXYZ[0] = Entry[0];
-        OutXYZ[1] = Entry[1];
-        OutXYZ[2] = Entry[2];
+        float const* const Center = Band->Pieces[Rel].Center;
+        OutXYZ[0] = Center[0];
+        OutXYZ[1] = Center[1];
+        OutXYZ[2] = Center[2];
         return OutXYZ;
     }
 
-    // FUN_0054d950 (thiscall on the band) — the radius float at spoke entry +0x14, same
-    // index clamp, no null test.
-    float BandGetPieceRadius(unsigned char* Blob, int PieceIndex)
+    // FUN_0054d950 (thiscall on the band) — a piece's radius, same index clamp, no null test.
+    float BandGetPieceRadius(FAsteroidBand* Band, int PieceIndex)
     {
-        int Rel = PieceIndex - static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x5c));
+        int Rel = PieceIndex - Band->FirstPiece;
         if (Rel < 0)
             Rel = 0;
-        unsigned char* const Table = *reinterpret_cast<unsigned char**>(Blob + 0x60);
-        return *reinterpret_cast<float const*>(Table + Rel * 0x18 + 0x14);
+        return Band->Pieces[Rel].Radius;
     }
 } // namespace
 
@@ -1309,146 +1300,112 @@ namespace
 {
     // DAT_006140a4 — two-sided band light soft threshold.
     constexpr float kBandLightSoft = 0.75f;
+    // DAT_005c7f68 (0x3b808081), 1/255 as a float.
+    constexpr float kBandInv255 = 0.003921569f;
 
-    // FUN_00410960 (EngineLightSample) as an int.
-    int BandSampleDirectionalLight(FEngineLight* Light, float const* ZonePos, float* OutDir3,
-                                   float* InOutAmbient3, float* OutColor3)
+    // FUN_0054cfb0 (thiscall on the band) — bake each particle's two lit colours from up to four
+    // directional lights near the zone. Nothing is tested for null; with no light at all bLit
+    // stays clear. x87 intermediates are modelled as doubles where retail keeps them unrounded.
+    void BandBakeLighting(FAsteroidBand* Band)
     {
-        return EngineLightSample(Light, ZonePos, OutDir3, InOutAmbient3, OutColor3) ? 1 : 0;
-    }
-
-    // FUN_0054cfb0 — bake per-particle lit RGB into +0x1c / +0x28 from nearby lights.
-    void BandBakeLighting(unsigned char* Blob)
-    {
-        if (Blob == nullptr)
+        Vector const& ZoneVec = Band->Zone->GetPos();
+        float ZonePos[3] = {ZoneVec.x, ZoneVec.y, ZoneVec.z};
+        void* LightSlots[16];
+        int const LightCount = SpaceCollectNearbyLights(LightSlots, 16, ZonePos, 100.0f, 0);
+        if (LightCount == 0)
             return;
 
-        Universe::IZone* Zone = *reinterpret_cast<Universe::IZone**>(Blob + 4);
-        if (Zone == nullptr)
-            return;
+        // (system ambient / 255 + ambient_increase) * the tinted ambient. Red is rounded to float
+        // at every step; green keeps the scaled byte and the sum unrounded, blue the sum.
+        unsigned char const* const AmbientBytes = StarSysAmbientColor();
+        double const Green255 = static_cast<double>(AmbientBytes[1]) * kBandInv255;
+        float const Blue255 = static_cast<float>(AmbientBytes[2]) * kBandInv255;
+        float Ambient[3];
+        Ambient[0] = (static_cast<float>(AmbientBytes[0]) * kBandInv255 + Band->AmbientIncrease[0]) *
+                     Band->TintedAmbient[0];
+        Ambient[1] = static_cast<float>((Green255 + Band->AmbientIncrease[1]) *
+                                        Band->TintedAmbient[1]);
+        Ambient[2] = static_cast<float>(
+            (static_cast<double>(Blue255) + Band->AmbientIncrease[2]) * Band->TintedAmbient[2]);
 
-        float ZonePos[3] = {Zone->Pos.x, Zone->Pos.y, Zone->Pos.z};
-        void* LightSlots[16] = {};
-        int const LightCount =
-            SpaceCollectNearbyLights(LightSlots, 16, ZonePos, 100.0f, 0);
-        if (LightCount <= 0)
-            return;
-
-        unsigned char const* AmbientBytes = StarSysAmbientColor();
-        float const AmbScale = *reinterpret_cast<float*>(Blob + 0x08);
-        float AmbR =
-            (static_cast<float>(AmbientBytes[0]) * 0.003921569f +
-             *reinterpret_cast<float*>(Blob + 0x30)) *
-            *reinterpret_cast<float*>(Blob + 0x18);
-        float AmbG =
-            (static_cast<float>(AmbientBytes[1]) * 0.003921569f +
-             *reinterpret_cast<float*>(Blob + 0x34)) *
-            *reinterpret_cast<float*>(Blob + 0x1c);
-        float AmbB =
-            (static_cast<float>(AmbientBytes[2]) * 0.003921569f +
-             *reinterpret_cast<float*>(Blob + 0x38)) *
-            *reinterpret_cast<float*>(Blob + 0x20);
-
-        float LightPack[4 * 6] = {};
+        // Type 3 lights only, at most four: direction (normalised, no zero guard) then colour.
+        // The sample's result is not read, and every sample adds to Ambient.
+        float Lights[4][6];
         int DirCount = 0;
-        float AmbWork[3] = {AmbR, AmbG, AmbB};
         for (int I = 0; I < LightCount && DirCount < 4; ++I)
         {
-            FEngineLight* Light = static_cast<FEngineLight*>(LightSlots[I]);
-            if (Light == nullptr || Light->Type != 3)
+            FEngineLight* const Light = static_cast<FEngineLight*>(LightSlots[I]);
+            if (Light->Type != 3)
                 continue;
-            float* Slot = LightPack + DirCount * 6;
-            float Color[3] = {};
-            if (BandSampleDirectionalLight(Light, ZonePos, Slot, AmbWork, Color) == 0)
-                continue;
-            float LenSq = Slot[0] * Slot[0] + Slot[1] * Slot[1] + Slot[2] * Slot[2];
-            if (LenSq > 0.0f)
-            {
-                float const Inv = 1.0f / sqrtf(LenSq);
-                Slot[0] *= Inv;
-                Slot[1] *= Inv;
-                Slot[2] *= Inv;
-            }
-            Slot[3] = Color[0];
-            Slot[4] = Color[1];
-            Slot[5] = Color[2];
+            float* const Dir = Lights[DirCount];
+            EngineLightSample(Light, ZonePos, Dir, Ambient, Dir + 3);
             ++DirCount;
+            double const Inv =
+                1.0 / sqrt((static_cast<double>(Dir[0]) * Dir[0] + static_cast<double>(Dir[1]) * Dir[1]) +
+                           static_cast<double>(Dir[2]) * Dir[2]);
+            Dir[0] = static_cast<float>(Dir[0] * Inv);
+            Dir[1] = static_cast<float>(Dir[1] * Inv);
+            Dir[2] = static_cast<float>(Dir[2] * Inv);
         }
 
-        AmbR = AmbWork[0] * AmbScale;
-        AmbG = AmbWork[1] * AmbScale;
-        AmbB = AmbWork[2] * AmbScale;
+        float const Scale = Band->AmbientIntensity;
+        Ambient[0] = Ambient[0] * Scale;
+        Ambient[1] = Ambient[1] * Scale;
+        Ambient[2] = Ambient[2] * Scale;
 
-        int const PointCount = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x44));
-        float* Particles = *reinterpret_cast<float**>(Blob + 0x3c);
-        if (Particles == nullptr || PointCount <= 0)
+        double const SoftDenom = static_cast<double>(kBandLightSoft) + 1.0f;
+        for (int P = 0; P < Band->ParticleCount; ++P)
         {
-            Blob[0x7c] = 1;
-            return;
-        }
-
-        float const DiffR = *reinterpret_cast<float*>(Blob + 0x0c);
-        float const DiffG = *reinterpret_cast<float*>(Blob + 0x10);
-        float const DiffB = *reinterpret_cast<float*>(Blob + 0x14);
-
-        for (int P = 0; P < PointCount; ++P)
-        {
-            float* Nrm = Particles + P * 15 + 5;
-            float SideA[3] = {AmbR, AmbG, AmbB};
-            float SideB[3] = {AmbR, AmbG, AmbB};
+            FAsteroidBandParticle* const Part = &Band->Particles[P];
+            float Front[3] = {Ambient[0], Ambient[1], Ambient[2]};
+            float Back[3] = {Ambient[0], Ambient[1], Ambient[2]};
             for (int L = 0; L < DirCount; ++L)
             {
-                float const* Pack = LightPack + L * 6;
-                float const Dot =
-                    Pack[0] * Nrm[0] + Pack[1] * Nrm[1] + Pack[2] * Nrm[2];
+                float const* const Dir = Lights[L];
+                float const* const Color = Lights[L] + 3;
+                float const* const N = Part->Normal;
+                // Summed x, z, then y. The first test reads the unrounded dot, everything after
+                // it the float copy.
+                double const Dot = (static_cast<double>(Dir[0]) * N[0] + static_cast<double>(Dir[2]) * N[2]) +
+                                   static_cast<double>(Dir[1]) * N[1];
+                float const DotF = static_cast<float>(Dot);
                 if (-kBandLightSoft < Dot)
                 {
-                    float const T = (kBandLightSoft + Dot) / (kBandLightSoft + 1.0f);
-                    SideB[0] += Pack[3] * DiffR * T;
-                    SideB[1] += Pack[4] * DiffG * T;
-                    SideB[2] += Pack[5] * DiffB * T;
+                    double const T = (static_cast<double>(kBandLightSoft) + DotF) / SoftDenom;
+                    for (int C = 0; C < 3; ++C)
+                        Back[C] = Back[C] + static_cast<float>(
+                                                static_cast<double>(Color[C]) * Band->TintedDiffuse[C] * T);
                 }
-                if (-kBandLightSoft < -Dot)
+                if (-kBandLightSoft < -DotF)
                 {
-                    float const T = (-Dot + kBandLightSoft) / (kBandLightSoft + 1.0f);
-                    SideA[0] += Pack[3] * DiffR * T;
-                    SideA[1] += Pack[4] * DiffG * T;
-                    SideA[2] += Pack[5] * DiffB * T;
+                    double const T = (static_cast<double>(-DotF) + kBandLightSoft) / SoftDenom;
+                    for (int C = 0; C < 3; ++C)
+                        Front[C] = Front[C] + static_cast<float>(
+                                                  static_cast<double>(Color[C]) * Band->TintedDiffuse[C] * T);
                 }
             }
+            // Capped from above only; 1.0 and NaN become 1.0.
             for (int C = 0; C < 3; ++C)
             {
-                if (SideA[C] > 1.0f)
-                    SideA[C] = 1.0f;
-                if (SideB[C] > 1.0f)
-                    SideB[C] = 1.0f;
+                Part->ColorFront[C] = ClampTintUpper(Front[C]);
+                Part->ColorBack[C] = ClampTintUpper(Back[C]);
             }
-            float* Dst = Particles + P * 15;
-            Dst[7] = SideA[0];
-            Dst[8] = SideA[1];
-            Dst[9] = SideA[2];
-            Dst[10] = SideB[0];
-            Dst[11] = SideB[1];
-            Dst[12] = SideB[2];
         }
-        Blob[0x7c] = 1;
+        Band->bLit = 1;
     }
 
-    // FUN_0054c420 (thiscall on one 0x3c-byte spoke) -- the spoke's fade (+0x34) and facing
-    // flag (+0x38) from the camera position and the band's four squared distances. Spoke:
-    // position +0x00, axis +0x10. No null tests.
-    void BandUpdateSpokeFade(unsigned char* Spoke, Vector const* CamPos, float InnerSq,
-                             float NearSq, float FarSq, float OuterSq)
+    // FUN_0054c420 (thiscall on one particle) -- the particle's fade and facing flag from the
+    // camera position and the band's four squared fade distances. No null tests.
+    void BandUpdateParticleFade(FAsteroidBandParticle* Part, Vector const* CamPos, float InnerSq,
+                                float NearSq, float FarSq, float OuterSq)
     {
-        float* const Pos = reinterpret_cast<float*>(Spoke);
-        float* const Axis = reinterpret_cast<float*>(Spoke + 0x10);
-        float* const Fade = reinterpret_cast<float*>(Spoke + 0x34);
+        float* const Fade = &Part->Fade;
 
         // Only the offsets are rounded to float; the squared length (x*x + z*z, then + y*y)
         // stays unrounded.
-        float const Dx = CamPos->x - Pos[0];
-        float const Dy = CamPos->y - Pos[1];
-        float const Dz = CamPos->z - Pos[2];
+        float const Dx = CamPos->x - Part->Pos[0];
+        float const Dy = CamPos->y - Part->Pos[1];
+        float const Dz = CamPos->z - Part->Pos[2];
         double const DistSq = (static_cast<double>(Dx) * Dx + static_cast<double>(Dz) * Dz) +
                               static_cast<double>(Dy) * Dy;
 
@@ -1483,10 +1440,11 @@ namespace
         if (!(*Fade > 0.0f) && !bInside)
             return;
 
-        // The unit offset dotted with the axis, summed z, y, then x.
+        // The unit offset dotted with the normal, summed z, y, then x.
+        float const* const N = Part->Normal;
         double const Inv = 1.0 / sqrt(DistSq);
-        double const Dot = (Dz * Inv * Axis[2] + Dy * Inv * Axis[1]) + Dx * Inv * Axis[0];
-        Spoke[0x38] = (Dot > 0.0) ? 1 : 0;
+        double const Dot = (Dz * Inv * N[2] + Dy * Inv * N[1]) + Dx * Inv * N[0];
+        Part->bFacing = (Dot > 0.0) ? 1 : 0;
         // |Dot| rounded to float; 0.3 at DAT_005d3e08, 0.5 at DAT_005c75e0, 5 at DAT_005e0a60.
         float const AbsDot = static_cast<float>(fabs(Dot));
         if (AbsDot < 0.3f)
@@ -1499,69 +1457,67 @@ namespace
     }
 
     // FUN_0054d410 (thiscall on the band) -- the band's per-frame update from CliAsteroidUpdate:
-    // the lighting baked on the second call (+0x80 counts up while +0x7c is clear), then, unless
-    // the fraction (+0x54) is below 0.001 (DAT_005c75f8), every spoke's fade against the squares
-    // of the four distances +0x64..+0x70.
-    void BandUpdate(unsigned char* Blob, Vector const* CamPos)
+    // the lighting baked on the second call (UpdateCount counts up while bLit is clear), then,
+    // unless MaxAlpha is below 0.001 (DAT_005c75f8), every particle's fade against the squares
+    // of the four fade distances.
+    void BandUpdate(FAsteroidBand* Band, Vector const* CamPos)
     {
-        if (Blob[0x7c] == 0)
+        if (Band->bLit == 0)
         {
-            int* const Calls = reinterpret_cast<int*>(Blob + 0x80);
-            *Calls = *Calls + 1;
-            if (*Calls > 1)
-                BandBakeLighting(Blob);
+            Band->UpdateCount = Band->UpdateCount + 1;
+            if (Band->UpdateCount > 1)
+                BandBakeLighting(Band);
         }
 
-        if (*BandF(Blob, 0x54 / 4) < 0.001)
+        if (Band->MaxAlpha < 0.001)
             return;
 
-        float const A = *BandF(Blob, 0x64 / 4);
-        float const B = *BandF(Blob, 0x68 / 4);
-        float const C = *BandF(Blob, 0x6c / 4);
-        float const D = *BandF(Blob, 0x70 / 4);
+        float const A = Band->FadeDist[0];
+        float const B = Band->FadeDist[1];
+        float const C = Band->FadeDist[2];
+        float const D = Band->FadeDist[3];
         float const ASq = A * A;
         float const BSq = B * B;
         float const CSq = C * C;
         float const DSq = D * D;
-        int const SpokeCount = *reinterpret_cast<int*>(Blob + 0x44);
-        unsigned char* const Spokes = *reinterpret_cast<unsigned char**>(Blob + 0x3c);
-        for (int Index = 0; Index < SpokeCount; ++Index)
-            BandUpdateSpokeFade(Spokes + Index * 0x3c, CamPos, ASq, BSq, CSq, DSq);
+        int const ParticleCount = Band->ParticleCount;
+        FAsteroidBandParticle* const Particles = Band->Particles;
+        for (int Index = 0; Index < ParticleCount; ++Index)
+            BandUpdateParticleFade(&Particles[Index], CamPos, ASq, BSq, CSq, DSq);
     }
 
-    // FUN_0054d4e0 (thiscall on the band) — Win3D triangle-pair quads for one spoke piece index.
+    // FUN_0054d4e0 (thiscall on the band) — Win3D triangle-pair quads for one piece index.
     // Retail's first stack argument (the camera position CliAsteroidDrawFarPiece passes) is
     // never read, so the port drops it. Nothing is tested for null.
-    void BandDrawPiece(unsigned char* Blob, int PieceIndex)
+    void BandDrawPiece(FAsteroidBand* Band, int PieceIndex)
     {
-        if (Blob[0x7c] == 0)
-            BandBakeLighting(Blob);
+        if (Band->bLit == 0)
+            BandBakeLighting(Band);
 
-        // Rel = piece - base (+0x5c); >= count (+0x58) or < 0 -> 0.
-        int Rel = PieceIndex - static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x5c));
-        int const RenderParts = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x58));
+        // Rel = piece - FirstPiece; >= RenderParts or < 0 -> 0.
+        int Rel = PieceIndex - Band->FirstPiece;
+        int const RenderParts = Band->RenderParts;
         if (Rel >= RenderParts || Rel < 0)
             Rel = 0;
 
         // 0.01f at DAT_005c99c8; NaN goes on.
-        float const MaxAlpha = *reinterpret_cast<float*>(Blob + 0x54);
+        float const MaxAlpha = Band->MaxAlpha;
         if (MaxAlpha < 0.01f)
             return;
 
-        int const VertInc = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x4c));
+        int const VertInc = Band->VertIncrease;
         float const InvVertInc = static_cast<float>(1.0 / static_cast<double>(VertInc));
-        int const PointCount = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x44));
-        int const CullMode = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x50));
-        float* Particles = *reinterpret_cast<float**>(Blob + 0x3c);
-        unsigned char* Spokes = *reinterpret_cast<unsigned char**>(Blob + 0x60);
+        int const PointCount = Band->ParticleCount;
+        int const CullMode = Band->CullMode;
+        FAsteroidBandParticle* const Particles = Band->Particles;
 
-        // A shape at +0 binds its frame-0 handle, null included.
-        FTexShape const* Shape = *reinterpret_cast<FTexShape const**>(Blob);
+        // A shape binds its frame-0 handle, null included.
+        FTexShape const* Shape = Band->Shape;
         if (Shape != nullptr)
             Win3DBindTexture(TexShapeGetGpuHandle(Shape, 0));
 
-        int const EndIdx = *reinterpret_cast<int*>(Spokes + Rel * 0x18 + 4);
-        int const StartIdx = *reinterpret_cast<int*>(Spokes + Rel * 0x18);
+        int const EndIdx = Band->Pieces[Rel].EndParticle;
+        int const StartIdx = Band->Pieces[Rel].FirstParticle;
         int UCursor = 0;
         int UNext = 1;
         Win3DBegin(kWin3DTriangles);
@@ -1574,9 +1530,10 @@ namespace
             if (StartIdx >= EndIdx)
                 continue;
 
+            // A walks the piece's particles unwrapped; B is the next one, wrapped.
             int Idx = StartIdx;
             int Remaining = EndIdx - StartIdx;
-            int PartOff = Idx * 0x3c;
+            int AIdx = Idx;
             do
             {
                 ++Idx;
@@ -1589,9 +1546,10 @@ namespace
                 if (WrapIdx >= PointCount)
                     WrapIdx -= PointCount;
 
-                unsigned char* PartBase = reinterpret_cast<unsigned char*>(Particles);
-                unsigned char const FlagA = PartBase[PartOff + 0x38];
-                unsigned char const FlagB = PartBase[WrapIdx * 0x3c + 0x38];
+                FAsteroidBandParticle* const PartA = &Particles[AIdx];
+                FAsteroidBandParticle* const PartB = &Particles[WrapIdx];
+                unsigned char const FlagA = PartA->bFacing;
+                unsigned char const FlagB = PartB->bFacing;
 
                 bool bDraw = false;
                 if (Pass == 0)
@@ -1606,35 +1564,33 @@ namespace
 
                 if (bDraw)
                 {
-                    float* PartA = reinterpret_cast<float*>(PartBase + PartOff);
-                    float* PartB = Particles + WrapIdx * 15;
-                    float AlphaA = PartA[13];
-                    float AlphaB = PartB[13];
+                    float AlphaA = PartA->Fade;
+                    float AlphaB = PartB->Fade;
                     float* ColorA = nullptr;
                     float* ColorB = nullptr;
                     if (FlagA == 0)
                     {
                         if (CullMode == 1)
                             AlphaA = 0.0f;
-                        ColorA = PartA + 10;
+                        ColorA = PartA->ColorBack;
                     }
                     else
                     {
                         if (CullMode == 2)
                             AlphaA = 0.0f;
-                        ColorA = PartA + 7;
+                        ColorA = PartA->ColorFront;
                     }
                     if (FlagB == 0)
                     {
                         if (CullMode == 1)
                             AlphaB = 0.0f;
-                        ColorB = PartB + 10;
+                        ColorB = PartB->ColorBack;
                     }
                     else
                     {
                         if (CullMode == 2)
                             AlphaB = 0.0f;
-                        ColorB = PartB + 7;
+                        ColorB = PartB->ColorFront;
                     }
 
                     // Skipped only when both alphas are strictly below 0.01f (NaN draws).
@@ -1647,13 +1603,13 @@ namespace
 
                         float const U0 = static_cast<float>(UCursor) * InvVertInc;
                         float const U1 = static_cast<float>(UNext) * InvVertInc;
-                        float const HalfH = PartA[3];
-                        float const Ax = PartA[0];
-                        float const Ay = PartA[1];
-                        float const Az = PartA[2];
-                        float const Bx = PartB[0];
-                        float const By = PartB[1];
-                        float const Bz = PartB[2];
+                        float const HalfH = PartA->HalfHeight;
+                        float const Ax = PartA->Pos[0];
+                        float const Ay = PartA->Pos[1];
+                        float const Az = PartA->Pos[2];
+                        float const Bx = PartB->Pos[0];
+                        float const By = PartB->Pos[1];
+                        float const Bz = PartB->Pos[2];
 
                         Win3DColor4f(ColorA[0], ColorA[1], ColorA[2], AlphaA);
                         Win3DTexCoord2f(U0, 1.0f);
@@ -1675,7 +1631,7 @@ namespace
                     }
                 }
 
-                PartOff += 0x3c;
+                ++AIdx;
                 ++UCursor;
                 ++UNext;
                 --Remaining;
@@ -1687,14 +1643,14 @@ namespace
 
 void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
 {
-    // Once (Flag21C, set by the constructor), with a zone: the nebula at the zone's position
+    // Once (bNebulaLookupPending, set by the constructor), with a zone: the nebula at the zone's position
     // into +0xd4. The flag is cleared either way.
-    if (This->Flag21C != 0 && This->Zone != nullptr)
+    if (This->bNebulaLookupPending != 0 && This->Zone != nullptr)
     {
-        This->ZeroD4 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(
+        This->FogNebula = static_cast<unsigned>(reinterpret_cast<uintptr_t>(
             StarSysFindNebula(&This->Zone->GetPos(), nullptr, nullptr)));
     }
-    This->Flag21C = 0;
+    This->bNebulaLookupPending = 0;
 
     float const* const Pos3 = AsCamera(Cam)->GetPosition();
     Vector CamPos;
@@ -1707,10 +1663,10 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
 
     // The exclusion timer (+0xd8): above 0.5 (DAT_00613848) or on a camera cut (the camera's
     // +0xbc byte), the exclusion manager is re-sorted around the camera.
-    This->FloatD8 += Dt;
-    if (This->FloatD8 > 0.5f || Cam->FlagBC != 0)
+    This->ExclusionSortTimer += Dt;
+    if (This->ExclusionSortTimer > 0.5f || Cam->FlagBC != 0)
     {
-        This->FloatD8 = 0.0f;
+        This->ExclusionSortTimer = 0.0f;
         if (This->ExclusionMgr != nullptr)
             This->ExclusionMgr->sort(&CamPos);
     }
@@ -1776,16 +1732,16 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
     if (GetGameOption(kGameOptAsteroidExt) >= 3)
         return;
 
-    if (This->FlagF8 != 0)
-        BandUpdate(This->BandBlob, &CamPos);
+    if (This->bHasBand != 0)
+        BandUpdate(&This->Band, &CamPos);
 
-    // Exclusion bands: one near-field fraction into every band's +0x54.
-    if (This->Flag180 == 0)
+    // Exclusion bands: one near-field fraction into every band's MaxAlpha.
+    if (This->bHasExclusionBands == 0)
         return;
     float const Fraction = This->CmnField->near_field_fraction(CamPos, 1000.0f);
-    for (unsigned char** It = This->BandBegin; It != This->BandEnd; ++It)
+    for (FAsteroidBand** It = This->BandBegin; It != This->BandEnd; ++It)
     {
-        *BandF(*It, 0x15) = Fraction;
+        (*It)->MaxAlpha = Fraction;
         BandUpdate(*It, &CamPos);
     }
 }
@@ -1793,19 +1749,18 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
 float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ)
 {
     // A piece in [0, band count +0x154) comes from the field's own band.
-    int const Primary = static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x58));
+    int const Primary = Field->Band.RenderParts;
     if (PieceIndex < Primary && PieceIndex >= 0)
-        return BandGetPiecePos(Field->BandBlob, PieceIndex, OutXYZ);
+        return BandGetPiecePos(&Field->Band, PieceIndex, OutXYZ);
 
-    // Otherwise the first exclusion band with base (+0x5c) <= piece < base + count (+0x58);
+    // Otherwise the first exclusion band with FirstPiece <= piece < FirstPiece + RenderParts;
     // entries are read unchecked.
-    for (unsigned char** It = Field->BandBegin; It != Field->BandEnd; ++It)
+    for (FAsteroidBand** It = Field->BandBegin; It != Field->BandEnd; ++It)
     {
-        unsigned char* const Blob = *It;
-        int const Base = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x5c));
-        if (PieceIndex >= Base &&
-            PieceIndex < Base + static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x58)))
-            return BandGetPiecePos(Blob, PieceIndex, OutXYZ);
+        FAsteroidBand* const Band = *It;
+        int const Base = Band->FirstPiece;
+        if (PieceIndex >= Base && PieceIndex < Base + Band->RenderParts)
+            return BandGetPiecePos(Band, PieceIndex, OutXYZ);
     }
 
     FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
@@ -1820,17 +1775,16 @@ float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ
 float CliAsteroidGetPieceRadius(FCliAsteroid* Field, int PieceIndex)
 {
     // Same band lookup as CliAsteroidGetPiecePos.
-    int const Primary = static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x58));
+    int const Primary = Field->Band.RenderParts;
     if (PieceIndex < Primary && PieceIndex >= 0)
-        return BandGetPieceRadius(Field->BandBlob, PieceIndex);
+        return BandGetPieceRadius(&Field->Band, PieceIndex);
 
-    for (unsigned char** It = Field->BandBegin; It != Field->BandEnd; ++It)
+    for (FAsteroidBand** It = Field->BandBegin; It != Field->BandEnd; ++It)
     {
-        unsigned char* const Blob = *It;
-        int const Base = static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x5c));
-        if (PieceIndex >= Base &&
-            PieceIndex < Base + static_cast<int>(*reinterpret_cast<unsigned*>(Blob + 0x58)))
-            return BandGetPieceRadius(Blob, PieceIndex);
+        FAsteroidBand* const Band = *It;
+        int const Base = Band->FirstPiece;
+        if (PieceIndex >= Base && PieceIndex < Base + Band->RenderParts)
+            return BandGetPieceRadius(Band, PieceIndex);
     }
 
     FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
@@ -1851,7 +1805,7 @@ void CliAsteroidForEach(FCliAsteroidVisitFn Fn, void* Ctx)
 void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIndex)
 {
     // Nothing is tested for null.
-    if (Field->FlagF8 == 0 && Field->Flag180 == 0)
+    if (Field->bHasBand == 0 && Field->bHasExclusionBands == 0)
         return;
     if (GetGameOption(kGameOptAsteroidExt) == 0)
         return;
@@ -1859,7 +1813,7 @@ void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIn
         return;
     if (GetGameOption(kGameOptAsteroidExt) >= 3)
         return;
-    if (Field->Flag234 == 0)
+    if (Field->bDrawFarBands == 0)
         return;
 
     // Retail also fetches the camera orientation and position and the zone position; they are
@@ -1890,25 +1844,21 @@ void CliAsteroidDrawFarPiece(FCliAsteroid* Field, FSpaceCamera* Cam, int PieceIn
 
         // The own band when piece < count (+0x154) + base (+0x158); otherwise the first
         // exclusion band that holds it, read unchecked. No band -- nothing drawn.
-        int const PrimaryCount =
-            static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x58));
-        int const PrimaryBase =
-            static_cast<int>(*reinterpret_cast<unsigned*>(Field->BandBlob + 0x5c));
+        int const PrimaryCount = Field->Band.RenderParts;
+        int const PrimaryBase = Field->Band.FirstPiece;
         if (PieceIndex < PrimaryCount + PrimaryBase)
         {
-            BandDrawPiece(Field->BandBlob, PieceIndex);
+            BandDrawPiece(&Field->Band, PieceIndex);
         }
         else
         {
-            for (unsigned char** It = Field->BandBegin; It != Field->BandEnd; ++It)
+            for (FAsteroidBand** It = Field->BandBegin; It != Field->BandEnd; ++It)
             {
-                unsigned char* const ExBlob = *It;
-                int const ExBase =
-                    static_cast<int>(*reinterpret_cast<unsigned*>(ExBlob + 0x5c));
-                if (PieceIndex >= ExBase &&
-                    PieceIndex < ExBase + static_cast<int>(*reinterpret_cast<unsigned*>(ExBlob + 0x58)))
+                FAsteroidBand* const ExBand = *It;
+                int const ExBase = ExBand->FirstPiece;
+                if (PieceIndex >= ExBase && PieceIndex < ExBase + ExBand->RenderParts)
                 {
-                    BandDrawPiece(ExBlob, PieceIndex);
+                    BandDrawPiece(ExBand, PieceIndex);
                     break;
                 }
             }
@@ -1939,7 +1889,7 @@ namespace
             return true;
 
         // Stored as a float.
-        float const Margin = (Bb->Float04 + Bb->Float00) * kBillboardMarginScale;
+        float const Margin = (Bb->SphereAhead + Bb->SphereRadius) * kBillboardMarginScale;
 
         Vector const& ZonePos = Zone->GetPos();
         Vector Dir;
@@ -1985,18 +1935,17 @@ namespace
         // inside it (DAT_0067524c) becomes +0xd4 and its value the fog factor; otherwise
         // +0xd4 = 0. Without the flag +0xd4 is left as it is.
         float FogFactor = 1.0f;
-        if (Field->FlagD3 != 0)
+        if (Field->bContainsFogZone != 0)
         {
             void* const Controller = GetSpaceFieldController();
             if (Controller != nullptr && GetSpaceFieldEnclosure() != 0)
             {
-                Field->ZeroD4 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Controller));
-                using FControllerFloatFn = float(__thiscall*)(void*);
-                FogFactor = ((FNebulaEffect*)Controller)->GetFloat294();
+                Field->FogNebula = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Controller));
+                FogFactor = ((FNebulaEffect*)Controller)->GetInsideFade();
             }
             else
             {
-                Field->ZeroD4 = 0;
+                Field->FogNebula = 0;
             }
         }
 
@@ -2010,13 +1959,13 @@ namespace
         Point[2] = AxisZ + CamPos[2];
         unsigned FogBits = 0;
         memcpy(&FogBits, &FogFactor, sizeof(FogBits));
-        SpaceApplyObjectLighting(Point, 250.0f, Cam, Field->ZeroD4, FogBits, 1);
+        SpaceApplyObjectLighting(Point, 250.0f, Cam, Field->FogNebula, FogBits, 1);
 
         unsigned char Ambient[3];
         EngineLightGetAmbientRgbBytes(Ambient);
-        int R = static_cast<int>(Field->FlagD0) + static_cast<int>(Ambient[0]);
-        int G = static_cast<int>(Field->FlagD1) + static_cast<int>(Ambient[1]);
-        int B = static_cast<int>(Field->FlagD2) + static_cast<int>(Ambient[2]);
+        int R = static_cast<int>(Field->AmbientIncrease0) + static_cast<int>(Ambient[0]);
+        int G = static_cast<int>(Field->AmbientIncrease1) + static_cast<int>(Ambient[1]);
+        int B = static_cast<int>(Field->AmbientIncrease2) + static_cast<int>(Ambient[2]);
         if (R > 0xff)
             R = 0xff;
         if (G > 0xff)
@@ -2137,7 +2086,7 @@ namespace
                     Mesh->OpenFaceGroup(0, 1);
                     if (Field->Material == nullptr)
                         Mesh->GetFaceGroupMaterial(&Field->Material);
-                    Mesh->GetFaceGroupPrimitiveType(&Field->FieldB0);
+                    Mesh->GetFaceGroupPrimitiveType(&Field->PrimitiveType);
                     Mesh->CloseFaceGroup();
 
                     // The LOD clamped to [0, count - 1] and kept for the next archetype.
@@ -2265,17 +2214,10 @@ namespace
     unsigned G_AsteroidCubesVisited = 0;
     unsigned G_AsteroidCubesDrawn = 0;
 
-    // DAT_005dc3c4 / DAT_005dc394 / DAT_005dc374 -- {state, value} tables, copied from the PE.
-    unsigned long const kRsAsteroidCull[] = {0x8d, 0, 0};
-    unsigned long const kRsAsteroidBlend[] = {0x89, 1, 0x1d, 0, 0x1b, 1, 0x13, 5, 0x14, 6, 0};
-    unsigned long const kRsAsteroidOpaque[] = {0x89, 1, 0x1d, 0, 0x1b, 0, 0};
-
-    // The inlined {state, value} walk.
-    void AsteroidApplyRs(IRenderPipeline* Pipe, unsigned long const* Table)
-    {
-        for (unsigned long const* Pair = Table; Pair[0] != 0; Pair += 2)
-            Pipe->SetRenderState((D3DRENDERSTATETYPE)Pair[0], static_cast<int>(Pair[1]));
-    }
+    // DAT_005dc3c4 -- a {state, value} table, copied from the PE: CULLMODE (0x8d) 0. The
+    // blend and opaque tables are shared with the dynamic asteroids (cli_asteroid.h).
+    unsigned const kRsAsteroidCull[] = {0x8d, 0, 0};
+    // The inlined {state, value} walk is BillboardApplyRenderStates (asteroid_billboard.h).
 
     // MSVCRT _ftol (FUN_005b7ec0): truncation toward zero; the callers keep the low dword.
     int AsteroidFtol(double X)
@@ -2356,15 +2298,15 @@ namespace
             Field->Material->Bind(nullptr);
         }
         IRenderPipeline* const Pipe = DALib::Pipeline;
-        AsteroidApplyRs(Pipe, kRsAsteroidCull);
-        if (Field->ScaleCC < 1.0f)
+        BillboardApplyRenderStates(Pipe, kRsAsteroidCull);
+        if (Field->MaxAlpha < 1.0f)
         {
-            AsteroidApplyRs(Pipe, kRsAsteroidBlend);
+            BillboardApplyRenderStates(Pipe, kRsAsteroidBlend);
             Pipe->SetRenderState(D3DRS_ALPHAREF, 5);
         }
         else
         {
-            AsteroidApplyRs(Pipe, kRsAsteroidOpaque);
+            BillboardApplyRenderStates(Pipe, kRsAsteroidOpaque);
             Pipe->SetRenderState(D3DRS_ALPHAREF, 0x7f);
         }
         return true;
@@ -2405,14 +2347,14 @@ namespace
             {
                 if (*bBlendState == 0)
                 {
-                    AsteroidApplyRs(Pipe, kRsAsteroidBlend);
+                    BillboardApplyRenderStates(Pipe, kRsAsteroidBlend);
                     Pipe->SetRenderState(D3DRS_ALPHAREF, 5);
                     *bBlendState = 1;
                 }
             }
             else
             {
-                AsteroidApplyRs(Pipe, kRsAsteroidOpaque);
+                BillboardApplyRenderStates(Pipe, kRsAsteroidOpaque);
                 Pipe->SetRenderState(D3DRS_ALPHAREF, 0x7f);
                 *bBlendState = 0;
             }
@@ -2420,7 +2362,7 @@ namespace
         Pipe->SetMaterial((const D3DMATERIAL8*)Material);
         if (G_AsteroidSkipDraw == 0)
         {
-            Pipe->DrawIndexedPrimitiveVb(Field->FieldB0, Desc->Listing.VertexBuffer,
+            Pipe->DrawIndexedPrimitiveVb(Field->PrimitiveType, Desc->Listing.VertexBuffer,
                                          static_cast<unsigned int>(Desc->Listing.BaseVertex),
                                          Field->MeshDesc.SrcCount, Field->MeshIndices,
                                          Field->MeshIndexCount, 0);
@@ -2442,7 +2384,7 @@ namespace
     {
         if (Field->CmnField == nullptr)
             return;
-        if (Field->Flag00 != 0)
+        if (Field->bTestPlacement != 0)
             return;
         ICamera* const Camera = AsCamera(Cam);
         CmnAsteroid::CAsteroidField* const Cmn = Field->CmnField;
@@ -2526,9 +2468,9 @@ namespace
 #ifdef FREELANCER_RP9
         double const Fill = FillOverride > 0.0
                                 ? FillOverride
-                                : static_cast<double>(Field->FillDistAt24) * Field->Scale230;
+                                : static_cast<double>(Field->FillDist) * Field->FillDetailScale;
 #else
-        double const Fill = static_cast<double>(Field->FillDistAt24) * Field->Scale230;
+        double const Fill = static_cast<double>(Field->FillDist) * Field->FillDetailScale;
 #endif
         int const ExtX = AsteroidFtol(TanX * Fill);
         int const ExtY = AsteroidFtol(TanY * Fill);
@@ -2579,8 +2521,8 @@ namespace
         unsigned Visited = 0;
 
         // max_alpha (+0xcc) below 1.0f (NaN not) sets both bytes.
-        unsigned char bBlendState = Field->ScaleCC < 1.0f ? 1 : 0;
-        unsigned char bFading = Field->ScaleCC < 1.0f ? 1 : 0;
+        unsigned char bBlendState = Field->MaxAlpha < 1.0f ? 1 : 0;
+        unsigned char bFading = Field->MaxAlpha < 1.0f ? 1 : 0;
 
         // A fading field turns z-writes off, clears the registered lights and sets a white
         // ambient.
@@ -2598,14 +2540,14 @@ namespace
         // alpha included (still 0 here).
         float Material[17];
         memset(Material, 0, sizeof(Material));
-        Material[0] = Field->TintB4;
-        Material[1] = Field->TintB8;
-        Material[2] = Field->TintBC;
+        Material[0] = Field->DiffuseColor0;
+        Material[1] = Field->DiffuseColor1;
+        Material[2] = Field->DiffuseColor2;
         if (GetGameOption(kGameOptLighting) != 0 && bFading == 0)
         {
-            Material[4] = Field->TintC0;
-            Material[5] = Field->TintC4;
-            Material[6] = Field->TintC8;
+            Material[4] = Field->AmbientColor0;
+            Material[5] = Field->AmbientColor1;
+            Material[6] = Field->AmbientColor2;
         }
         else
         {
@@ -2627,7 +2569,7 @@ namespace
         float const FadeStart = static_cast<float>(ReachD - FadeWidth);
 #else
         double const ReachD =
-            static_cast<double>(Field->FillDistAt24) * Field->Scale230 + Margin;
+            static_cast<double>(Field->FillDist) * Field->FillDetailScale + Margin;
         float const Reach = static_cast<float>(ReachD);
         float const FadeStart = static_cast<float>(ReachD - HalfCube);
 #endif
@@ -2742,13 +2684,13 @@ namespace
                     {
 #ifdef FREELANCER_RP9
                         double Alpha =
-                            ((static_cast<double>(Reach) - Depth) / FadeWidth) * Field->ScaleCC;
+                            ((static_cast<double>(Reach) - Depth) / FadeWidth) * Field->MaxAlpha;
 #else
                         double Alpha =
-                            ((static_cast<double>(Reach) - Depth) / HalfCube) * Field->ScaleCC;
+                            ((static_cast<double>(Reach) - Depth) / HalfCube) * Field->MaxAlpha;
 #endif
-                        if (Alpha > Field->ScaleCC)
-                            Alpha = Field->ScaleCC;
+                        if (Alpha > Field->MaxAlpha)
+                            Alpha = Field->MaxAlpha;
                         else if (Alpha < 0.0)
                             Alpha = 0.0f;
                         Material[3] = static_cast<float>(Alpha);
@@ -2757,7 +2699,7 @@ namespace
                     }
                     else
                     {
-                        Material[3] = Field->ScaleCC;
+                        Material[3] = Field->MaxAlpha;
                     }
 
                     AsteroidDrawCube(Field, Material, &bBlendState, &Desc);
@@ -2798,7 +2740,7 @@ namespace
                     CubeXform.Translation.Y = PlayerPos.y;
                     CubeXform.Translation.Z = PlayerPos.z;
                     AsteroidBindCubeTransform(CubeXform, ViewXform);
-                    Material[3] = Field->ScaleCC;
+                    Material[3] = Field->MaxAlpha;
                     AsteroidDrawCube(Field, Material, &bBlendState, &Desc);
                     ++Drawn;
                 }
@@ -2866,7 +2808,7 @@ namespace
         double ExtFadeBand = 0.0;
         if (SpawnReach > 0.0f)
         {
-            double const RetailFill = static_cast<double>(Field->FillDistAt24) * Field->Scale230;
+            double const RetailFill = static_cast<double>(Field->FillDist) * Field->FillDetailScale;
             double const Margin =
                 static_cast<double>(static_cast<float>(static_cast<double>(Field->CubeSize) * 1.25f));
             double const HalfCube = static_cast<double>(Field->CubeSize) * 0.5;
@@ -2881,7 +2823,7 @@ namespace
 #endif
 
         // Each gate is read only when the one before passed; ASTEROID_EXT is a signed compare.
-        if (Field->Flag198 != 0 && GetGameOption(kGameOptAsteroidExt) > 1 &&
+        if (Field->bHasBillboards != 0 && GetGameOption(kGameOptAsteroidExt) > 1 &&
             GetGameOption(kGameOptEffectsGroup) != 0 &&
             BillboardNearCamera(&Field->Billboard, CamPos))
         {
@@ -2893,13 +2835,13 @@ namespace
                 // Port-only: the billboards fade in over the cubes' extended fade band (retail:
                 // from the fill distance to the reach, BillboardSetFadePlanes), then the planes
                 // go back.
-                float const SavedFar = Field->Billboard.Float40;
-                float const SavedNear = Field->Billboard.Float44;
-                Field->Billboard.Float40 = SpawnReach;
-                Field->Billboard.Float44 = static_cast<float>(SpawnReach - ExtFadeBand);
+                float const SavedFar = Field->Billboard.NearFadeEnd;
+                float const SavedNear = Field->Billboard.NearFadeStart;
+                Field->Billboard.NearFadeEnd = SpawnReach;
+                Field->Billboard.NearFadeStart = static_cast<float>(SpawnReach - ExtFadeBand);
                 BillboardDraw(&Field->Billboard, Cam, Field->ExclusionMgr, 2);
-                Field->Billboard.Float40 = SavedFar;
-                Field->Billboard.Float44 = SavedNear;
+                Field->Billboard.NearFadeEnd = SavedFar;
+                Field->Billboard.NearFadeStart = SavedNear;
             }
             else
 #endif
@@ -2949,7 +2891,7 @@ namespace
 #else
             CliAsteroidDrawNearField(Field, Cam);
 #endif
-            if (Field->ScaleCC < 1.0f)
+            if (Field->MaxAlpha < 1.0f)
                 bAmbientDone = 0;
         }
 
@@ -2985,93 +2927,74 @@ void CliAsteroidTickFields(FSpaceCamera* Cam)
 
 namespace
 {
-    // FUN_00422b80.
-    void BandSetVec3(float* Dst, float X, float Y, float Z)
-    {
-        Dst[0] = X;
-        Dst[1] = Y;
-        Dst[2] = Z;
-    }
-
-    // MSVC's signed `n % 2 == 0` idiom (mask 0x80000001), as in FUN_0054c8b0.
+    // MSVC's signed `n % 2 == 0` idiom, as in FUN_0054c8b0: mask 0x80000001, and for a
+    // negative value dec / or 0xfffffffe / inc.
     bool BandDiffIsEven(int Diff)
     {
         unsigned U = static_cast<unsigned>(Diff) & 0x80000001u;
         if (static_cast<int>(U) < 0)
-            U = (U - 1u) | 0xfffffffeu;
+            U = ((U - 1u) | 0xfffffffeu) + 1u;
         return U == 0;
     }
 
-    // FUN_0054c8b0 (thiscall on the 0x84 band blob) — builds an elliptical particle ring around
-    // the zone (+4): count from zone size * pi / (texture_aspect * height), positions in the
-    // zone's XZ plane rotated by its orientation, per-particle normals, then render_parts
-    // spokes (+0x60).
-    void BandBuildExclusionRings(unsigned char* Blob)
+    // FUN_0054c8b0 (thiscall on the band) — builds the particle ring around the zone: the count
+    // from zone size * pi / (texture_aspect * height), positions on an ellipse in the zone's XZ
+    // plane rotated by its orientation, per-particle normals, then render_parts pieces. Nothing
+    // is tested for null. x87 intermediates are modelled as doubles where retail keeps them
+    // unrounded. Both allocations use the nothrow form: VC6's operator new returns null on
+    // failure (a negative count) instead of throwing.
+    void BandBuildExclusionRings(FAsteroidBand* Band)
     {
-        if (Blob == nullptr)
-            return;
+        if (Band->Particles != nullptr)
+            operator delete(Band->Particles);
 
-        void* OldParticles = *reinterpret_cast<void**>(Blob + 0x3c);
-        if (OldParticles != nullptr)
-            operator delete(OldParticles);
+        Band->bLit = 0;
+        Band->UpdateCount = 0;
 
-        Blob[0x7c] = 0;
-        *BandU(Blob, 0x20) = 0;
+        Universe::IZone* const Zone = Band->Zone;
+        Vector Size = Zone->GetSize();
+        // A z extent below 0.1 (NaN not) takes the x extent.
+        if (Size.z < 0.1f)
+            Size.z = Size.x;
 
-        Universe::IZone* Zone = *reinterpret_cast<Universe::IZone**>(Blob + 4);
-        if (Zone == nullptr)
-            return;
+        // ((x + z) * pi) / (aspect * height) + 0.5, truncated, times vert_increase.
+        double const CountD = (static_cast<double>(Size.x) + Size.z) * 3.14159274f /
+                                  (static_cast<double>(Band->TextureAspect) * Band->Height) +
+                              0.5f;
+        int const PointCount = AsteroidFtol(CountD) * Band->VertIncrease;
+        Band->ParticleCount = PointCount;
 
-        // Retail calls GetSize (IZone vt+0x28).
-        float SizeX = Zone->Size.x;
-        float SizeY = Zone->Size.y;
-        float SizeZ = Zone->Size.z;
-        if (SizeZ < 0.1f)
-            SizeZ = SizeX;
-
-        float const Aspect = *BandF(Blob, 0x10); // +0x40 texture_aspect
-        float Height = *BandF(Blob, 0x12);       // +0x48 height
-        int VertInc = static_cast<int>(*BandU(Blob, 0x13)); // +0x4c vert_increase
-
-        float const CountF =
-            ((SizeX + SizeZ) * 3.14159274f) / (Aspect * Height) + 0.5f;
-        int PointCount = FloatToIntTrunc(CountF) * VertInc;
-        *BandU(Blob, 0x11) = static_cast<unsigned>(PointCount); // +0x44
-
-        float* Particles = nullptr;
-        if (PointCount > 0)
+        FAsteroidBandParticle* const Particles = static_cast<FAsteroidBandParticle*>(
+            operator new(static_cast<size_t>(static_cast<unsigned>(PointCount) * 0x3cu),
+                         std::nothrow));
+        if (Particles != nullptr)
         {
-            Particles = static_cast<float*>(operator new(static_cast<size_t>(PointCount) * 0x3c));
-            if (Particles != nullptr)
+            for (int I = 0; I < PointCount; ++I)
             {
-                float* Cursor = Particles;
-                for (int I = 0; I < PointCount; ++I)
-                {
-                    BandSetVec3(Cursor + 7, 1.0f, 1.0f, 1.0f);           // +0x1C
-                    BandSetVec3(Cursor + 10, 0.2f, 0.2f, 0.2f);          // +0x28
-                    Cursor[13] = 1.0f;                                   // +0x34
-                    Cursor[3] = 1000.0f;                                 // +0x0C
-                    *reinterpret_cast<unsigned char*>(Cursor + 14) = 1; // +0x38
-                    Cursor += 15; // 0x3c-byte particle
-                }
+                FAsteroidBandParticle* const Part = &Particles[I];
+                // Two FUN_00422b80 vectors, then three single stores.
+                Part->ColorFront[0] = 1.0f;
+                Part->ColorFront[1] = 1.0f;
+                Part->ColorFront[2] = 1.0f;
+                Part->ColorBack[0] = 0.2f;
+                Part->ColorBack[1] = 0.2f;
+                Part->ColorBack[2] = 0.2f;
+                Part->Fade = 1.0f;
+                Part->HalfHeight = 1000.0f;
+                Part->bFacing = 1;
             }
         }
-        *reinterpret_cast<float**>(Blob + 0x3c) = Particles;
+        Band->Particles = Particles;
 
-        *BandF(Blob, 0x19) = *BandF(Blob, 0x19) * Height;
-        *BandF(Blob, 0x1a) = *BandF(Blob, 0x1a) * Height;
-        *BandF(Blob, 0x1b) = *BandF(Blob, 0x1b) * Height;
-        *BandF(Blob, 0x1c) = *BandF(Blob, 0x1c) * Height;
-        Height = Height * 0.5f;
-        *BandF(Blob, 0x12) = Height;
+        // The fade distances scale with the full height, then the height is halved.
+        Band->FadeDist[0] = Band->FadeDist[0] * Band->Height;
+        Band->FadeDist[1] = Band->FadeDist[1] * Band->Height;
+        Band->FadeDist[2] = Band->FadeDist[2] * Band->Height;
+        Band->FadeDist[3] = Band->FadeDist[3] * Band->Height;
+        Band->Height = Band->Height * 0.5f;
 
-        // Retail calls GetSize a second time.
-        SizeX = Zone->Size.x;
-        SizeY = Zone->Size.y;
-        SizeZ = Zone->Size.z;
-        if (SizeZ < 0.1f)
-            SizeZ = SizeX;
-
+        // GetSize again, then the orientation and the position.
+        Size = Zone->GetSize();
         Matrix const& Orient = Zone->GetOrientation();
         FMatrix MathOrient;
         for (int R = 0; R < 3; ++R)
@@ -3079,195 +3002,185 @@ namespace
             for (int C = 0; C < 3; ++C)
                 MathOrient.D[R][C] = Orient.E[R][C];
         }
-        float const PosX = Zone->Pos.x;
-        float const PosY = Zone->Pos.y;
-        float const PosZ = Zone->Pos.z;
+        Vector const ZonePos = Zone->GetPos();
+        if (Size.z < 0.1f)
+            Size.z = Size.x;
 
-        float const Offset = *BandF(Blob, 0x1e); // +0x78
+        // The ring radii, each rounded to float. Retail also computes the y radius and never
+        // reads it.
+        float const Offset = Band->Offset;
         float RadiusX = 0.0f;
-        float RadiusY = 0.0f;
         float RadiusZ = 0.0f;
-        if (Blob[0x74] == 0)
+        if (Band->bOffsetPercent != 0)
         {
-            // offset_dist
-            RadiusX = SizeX - Offset;
-            RadiusY = SizeY - Offset;
-            RadiusZ = SizeZ - Offset;
+            RadiusX = Size.x * Offset;
+            RadiusZ = Offset * Size.z;
         }
         else
         {
-            // offset_percent
-            RadiusX = SizeX * Offset;
-            RadiusY = SizeY * Offset;
-            RadiusZ = SizeZ * Offset;
+            RadiusX = Size.x - Offset;
+            RadiusZ = Size.z - Offset;
         }
-        (void)RadiusY;
 
-        float* P = Particles;
-        if (P != nullptr && PointCount > 0)
+        // The count is re-read from the band on every pass.
+        FAsteroidBandParticle* Part = Particles;
+        for (int I = 0; I < Band->ParticleCount; ++I, ++Part)
         {
-            for (int I = 0; I < PointCount; ++I)
+            // (I / count) * 2pi, unrounded; cos and sin of the same angle (6.2831855f at
+            // DAT_005da774).
+            double const Angle =
+                (static_cast<double>(I) / Band->ParticleCount) * 6.28318548f;
+            FVector Local;
+            Local.X = static_cast<float>(cos(Angle) * RadiusX);
+            Local.Y = 0.0f;
+            Local.Z = static_cast<float>(sin(Angle) * RadiusZ);
+            Part->Pos[0] = Local.X;
+            Part->Pos[1] = Local.Y;
+            Part->Pos[2] = Local.Z;
+            // Retail tests DAT_00679860 inside the loop and acquires it when still null.
+            if (G_CloudsMath == nullptr)
+                G_CloudsMath = Acquire3DMathEngine();
+            FVector World;
+            G_CloudsMath->TransformMatrix(World, MathOrient, Local);
+            Part->Pos[0] = World.X + ZonePos.x;
+            Part->Pos[1] = World.Y + ZonePos.y;
+            Part->Pos[2] = World.Z + ZonePos.z;
+            Part->HalfHeight = Band->Height;
+        }
+
+        // Each normal: up x (next - this) plus up x (this - previous), each normalised, then the
+        // sum normalised (no zero guards). Retail keeps the products with its 0.0 constant
+        // (DAT_005c7474), so a NaN offset stays NaN; the roundings follow its stores.
+        for (int I = 1; I <= Band->ParticleCount; ++I)
+        {
+            int const Count = Band->ParticleCount;
+            int Prev = I - 2;
+            if (Prev < 0)
+                Prev += Count;
+            int Next = I;
+            if (Next >= Count)
+                Next -= Count;
+
+            FAsteroidBandParticle* const Cur = &Band->Particles[I - 1];
+            float const* const NextPos = Band->Particles[Next].Pos;
+            float const* const PrevPos = Band->Particles[Prev].Pos;
+
+            double const DxN = static_cast<double>(NextPos[0]) - Cur->Pos[0];
+            double const DyN = static_cast<double>(NextPos[1]) - Cur->Pos[1];
+            double const DzN = static_cast<double>(NextPos[2]) - Cur->Pos[2];
+            float const DxP = Cur->Pos[0] - PrevPos[0];
+            float const DyP = Cur->Pos[1] - PrevPos[1];
+            float const DzP = Cur->Pos[2] - PrevPos[2];
+
+            double const ZeroN = DyN * 0.0;
+            float const N1x = static_cast<float>(DzN - ZeroN);
+            double const N1y = DxN * 0.0 - DzN * 0.0;
+            float const N1z = static_cast<float>(static_cast<double>(static_cast<float>(ZeroN)) - DxN);
+            float const Inv1 = static_cast<float>(
+                1.0 / sqrt((static_cast<double>(N1x) * N1x + static_cast<double>(N1z) * N1z) +
+                           N1y * N1y));
+            float const N1xU = N1x * Inv1;
+            double const N1yU = N1y * Inv1;
+            double const N1zU = static_cast<double>(N1z) * Inv1;
+
+            double const ZeroP = static_cast<double>(DyP) * 0.0;
+            double const N2x = static_cast<double>(DzP) - ZeroP;
+            float const N2y =
+                static_cast<float>(static_cast<double>(DxP) * 0.0 - static_cast<double>(DzP) * 0.0);
+            float const N2z = static_cast<float>(ZeroP - DxP);
+            float const Inv2 = static_cast<float>(
+                1.0 / sqrt((N2x * N2x + static_cast<double>(N2z) * N2z) +
+                           static_cast<double>(N2y) * N2y));
+            double const N2xU = N2x * Inv2;
+            double const N2yU = static_cast<double>(N2y) * Inv2;
+            float const N2zU = static_cast<float>(static_cast<double>(N2z) * Inv2);
+
+            float const Sx = static_cast<float>(N2xU + N1xU);
+            float const Sy = static_cast<float>(N2yU + N1yU);
+            double const Sz = static_cast<double>(N2zU) + N1zU;
+            double const InvN =
+                1.0 / sqrt((static_cast<double>(Sx) * Sx + Sz * Sz) + static_cast<double>(Sy) * Sy);
+            Cur->Normal[0] = static_cast<float>(Sx * InvN);
+            Cur->Normal[1] = static_cast<float>(Sy * InvN);
+            Cur->Normal[2] = static_cast<float>(Sz * InvN);
+        }
+
+        // render_parts capped at half the particle count: an unrounded compare (NaN and equal
+        // keep it), truncated.
+        double const Half = static_cast<double>(Band->ParticleCount) * 0.5f;
+        if (static_cast<double>(Band->RenderParts) > Half)
+            Band->RenderParts = AsteroidFtol(Half);
+
+        Band->Pieces = static_cast<FAsteroidBandPiece*>(operator new(
+            static_cast<size_t>(static_cast<unsigned>(Band->RenderParts) * 0x18u), std::nothrow));
+
+        // Even pieces: count / render_parts rounded to float once (no zero test), the running sum
+        // unrounded; each end is the sum + 0.0001f (DAT_005db098), truncated.
+        float const Step =
+            static_cast<float>(static_cast<double>(Band->ParticleCount) / Band->RenderParts);
+        double Acc = 0.0;
+        int Start = 0;
+        for (int I = 0; I < Band->RenderParts; ++I)
+        {
+            Acc += Step;
+            Band->Pieces[I].FirstParticle = Start;
+            Start = AsteroidFtol(Acc + 0.0001f);
+            Band->Pieces[I].EndParticle = Start;
+        }
+
+        // Each piece's centre and radius.
+        for (int I = 0; I < Band->RenderParts; ++I)
+        {
+            FAsteroidBandPiece* const Piece = &Band->Pieces[I];
+            int First = Piece->FirstParticle;
+            int End = Piece->EndParticle;
+            int const Diff = End - First;
+            int Mid = First - AsteroidFtol(static_cast<double>(Diff) * -0.5f);
+            int const Count = Band->ParticleCount;
+            if (Mid >= Count)
+                Mid -= Count;
+
+            if (BandDiffIsEven(Diff))
             {
-                float const Angle =
-                    (static_cast<float>(I) / static_cast<float>(PointCount)) * 6.28318548f;
-                float const LocalX = cosf(Angle) * RadiusX;
-                float const LocalZ = sinf(Angle) * RadiusZ;
-                FVector Local;
-                Local.X = LocalX;
-                Local.Y = 0.0f;
-                Local.Z = LocalZ;
-                FVector World;
-                // Retail tests DAT_00679860 inside the loop and acquires it when still null.
-                if (G_CloudsMath == nullptr)
-                    G_CloudsMath = Acquire3DMathEngine();
-                G_CloudsMath->TransformMatrix(World, MathOrient, Local);
-                P[0] = World.X + PosX;
-                P[1] = World.Y + PosY;
-                P[2] = World.Z + PosZ;
-                P[3] = Height;
-                P += 15;
+                // The two middle particles, summed then halved, each step rounded to float.
+                float const* const A = Band->Particles[Mid].Pos;
+                int Mid2 = Mid + 1;
+                if (Mid2 >= Count)
+                    Mid2 -= Count;
+                float const* const B = Band->Particles[Mid2].Pos;
+                Piece->Center[0] = A[0] + B[0];
+                Piece->Center[1] = A[1] + B[1];
+                Piece->Center[2] = A[2] + B[2];
+                Piece->Center[0] = Piece->Center[0] * 0.5f;
+                Piece->Center[1] = Piece->Center[1] * 0.5f;
+                Piece->Center[2] = Piece->Center[2] * 0.5f;
             }
-        }
-
-        // Per-particle normals from neighbour tangents. Retail multiplies several terms by
-        // DAT_005c7474 (0.0); kept verbatim.
-        PointCount = static_cast<int>(*BandU(Blob, 0x11));
-        unsigned char* Base = *reinterpret_cast<unsigned char**>(Blob + 0x3c);
-        if (Base != nullptr && PointCount > 0)
-        {
-            float* NrmAt = reinterpret_cast<float*>(Base + 8);
-            for (int I = 1; I <= PointCount; ++I)
+            else
             {
-                int Prev = I - 2;
-                if (Prev < 0)
-                    Prev += PointCount;
-                int Next = I;
-                if (Next >= PointCount)
-                    Next -= PointCount;
-
-                float* Cur = NrmAt - 2; // particle pos at -8 bytes from +8
-                float* NextP = reinterpret_cast<float*>(Base + Next * 0x3c);
-                float* PrevP = reinterpret_cast<float*>(Base + Prev * 0x3c);
-
-                float DxNext = NextP[0] - Cur[0];
-                float DyNext = NextP[1] - Cur[1];
-                float DzNext = NextP[2] - Cur[2];
-                float DxPrev = Cur[0] - PrevP[0];
-                float DyPrev = Cur[1] - PrevP[1];
-                float DzPrev = Cur[2] - PrevP[2];
-
-                float N1y0 = DyNext * 0.0f;
-                float N1z = DzNext - N1y0;
-                float N1x = DxNext * 0.0f - DzNext * 0.0f;
-                float N1y = N1y0 - DxNext;
-                float Inv1 = 1.0f / sqrtf(N1x * N1x + N1y * N1y + N1z * N1z);
-                N1z *= Inv1;
-                N1x *= Inv1;
-                N1y *= Inv1;
-
-                float N2z = DzPrev - DyPrev * 0.0f;
-                float N2x = DxPrev * 0.0f - DzPrev * 0.0f;
-                float N2y = DyPrev * 0.0f - DxPrev;
-                float Inv2 = 1.0f / sqrtf(N2x * N2x + N2y * N2y + N2z * N2z);
-                N2z *= Inv2;
-                N2x *= Inv2;
-                N2y *= Inv2;
-
-                float Nx = N2z + N1z;
-                float Ny = N2x + N1x;
-                float Nz = N2y + N1y;
-                float InvN = 1.0f / sqrtf(Nx * Nx + Ny * Ny + Nz * Nz);
-                NrmAt[2] = Nx * InvN; // +0x10
-                NrmAt[3] = Ny * InvN; // +0x14
-                NrmAt[4] = Nz * InvN; // +0x18
-
-                NrmAt += 15;
+                float const* const A = Band->Particles[Mid].Pos;
+                Piece->Center[0] = A[0];
+                Piece->Center[1] = A[1];
+                Piece->Center[2] = A[2];
             }
-        }
 
-        int RenderParts = static_cast<int>(*BandU(Blob, 0x16)); // +0x58
-        float const HalfCount = static_cast<float>(PointCount) * 0.5f;
-        if (static_cast<float>(RenderParts) > HalfCount)
-        {
-            RenderParts = FloatToIntTrunc(HalfCount);
-            *BandU(Blob, 0x16) = static_cast<unsigned>(RenderParts);
-        }
+            if (First >= Count)
+                First -= Count;
+            if (End >= Count)
+                End -= Count;
 
-        void* Spokes = operator new(static_cast<size_t>(RenderParts) * 0x18);
-        *reinterpret_cast<void**>(Blob + 0x60) = Spokes;
-
-        if (Spokes != nullptr && RenderParts > 0 && PointCount > 0)
-        {
-            float const Step = static_cast<float>(PointCount) / static_cast<float>(RenderParts);
-            float Acc = 0.0f;
-            int StartIdx = 0;
-            unsigned char* SpokeBytes = static_cast<unsigned char*>(Spokes);
-            for (int I = 0; I < RenderParts; ++I)
-            {
-                Acc += Step;
-                *reinterpret_cast<int*>(SpokeBytes) = StartIdx;
-                int const EndIdx = FloatToIntTrunc(Acc + 0.0001f);
-                *reinterpret_cast<int*>(SpokeBytes + 4) = EndIdx;
-                StartIdx = EndIdx;
-                SpokeBytes += 0x18;
-            }
-        }
-
-        if (Spokes != nullptr && RenderParts > 0)
-        {
-            unsigned char* SpokeBytes = static_cast<unsigned char*>(Spokes);
-            float* PartBase = *reinterpret_cast<float**>(Blob + 0x3c);
-            for (int I = 0; I < RenderParts; ++I)
-            {
-                int I0 = *reinterpret_cast<int*>(SpokeBytes);
-                int I1 = *reinterpret_cast<int*>(SpokeBytes + 4);
-                int Diff = I1 - I0;
-                int MidOff = FloatToIntTrunc(static_cast<float>(Diff) * -0.5f);
-                int Idx = I0 - MidOff;
-                if (Idx >= PointCount)
-                    Idx -= PointCount;
-
-                float* OutPos = reinterpret_cast<float*>(SpokeBytes + 8);
-                if (BandDiffIsEven(Diff))
-                {
-                    float* A = PartBase + Idx * 15;
-                    int Idx2 = Idx + 1;
-                    if (Idx2 >= PointCount)
-                        Idx2 -= PointCount;
-                    float* B = PartBase + Idx2 * 15;
-                    OutPos[0] = (A[0] + B[0]) * 0.5f;
-                    OutPos[1] = (A[1] + B[1]) * 0.5f;
-                    OutPos[2] = (A[2] + B[2]) * 0.5f;
-                }
-                else
-                {
-                    float* A = PartBase + Idx * 15;
-                    OutPos[0] = A[0];
-                    OutPos[1] = A[1];
-                    OutPos[2] = A[2];
-                }
-
-                if (I0 >= PointCount)
-                    I0 -= PointCount;
-                if (I1 >= PointCount)
-                    I1 -= PointCount;
-
-                float* P0 = PartBase + I0 * 15;
-                float* P1 = PartBase + I1 * 15;
-                float D0x = OutPos[0] - P0[0];
-                float D0y = OutPos[1] - P0[1];
-                float D0z = OutPos[2] - P0[2];
-                float Dist0 = sqrtf(D0x * D0x + D0y * D0y + D0z * D0z);
-                float D1x = OutPos[0] - P1[0];
-                float D1y = OutPos[1] - P1[1];
-                float D1z = OutPos[2] - P1[2];
-                float Dist1 = sqrtf(D1x * D1x + D1y * D1y + D1z * D1z);
-                if (Dist0 < Dist1)
-                    Dist0 = Dist1;
-                *reinterpret_cast<float*>(SpokeBytes + 0x14) = Dist0;
-
-                SpokeBytes += 0x18;
-            }
+            // The distances to the two end particles, (z*z + y*y) + x*x, unrounded; the larger
+            // one is kept (the first on a tie or NaN).
+            float const* const P0 = Band->Particles[First].Pos;
+            float const* const P1 = Band->Particles[End].Pos;
+            double const D0x = static_cast<double>(Piece->Center[0]) - P0[0];
+            double const D0y = static_cast<double>(Piece->Center[1]) - P0[1];
+            double const D0z = static_cast<double>(Piece->Center[2]) - P0[2];
+            double const Dist0 = sqrt((D0z * D0z + D0y * D0y) + D0x * D0x);
+            double const D1x = static_cast<double>(Piece->Center[0]) - P1[0];
+            double const D1y = static_cast<double>(Piece->Center[1]) - P1[1];
+            double const D1z = static_cast<double>(Piece->Center[2]) - P1[2];
+            double const Dist1 = sqrt((D1z * D1z + D1y * D1y) + D1x * D1x);
+            Piece->Radius = static_cast<float>(Dist1 > Dist0 ? Dist1 : Dist0);
         }
     }
 }

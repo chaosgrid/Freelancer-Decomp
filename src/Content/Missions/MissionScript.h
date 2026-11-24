@@ -72,20 +72,21 @@ struct FMissionTimer
 // The 0x54-byte object FUN_06eb8a20 news for a started RTC script (TU23, RtcScripts.h).
 struct FCharacterEncounter;
 
-// The value of the mission's +0x2f0 and +0x310 lists (0x90 bytes at node+8, node 0x98,
-// FUN_06ed0f20): +0 path length, +4 char[0x80] path, +0x84 handle (-1), +0x88 object,
-// +0x8c/+0x8d flags. Built on the stack by Mission_01b and copied in (0x24 dwords). The
-// offset comments below are node offsets (value offset + 8).
-struct FStoryMissionListNode_0x2f4
+// One RTC script of the mission's +0x2f0 list (0x90 bytes at node+8, node 0x98, FUN_06ed0f20;
+// the +0x310 list shares the node allocator): +0 path length, +4 char[0x80] path, +0x84 bar
+// scene handle (-1), +0x88 the started script, +0x8c/+0x8d flags. Built on the stack by
+// Mission_01b and copied in (0x24 dwords). The offset comments below are node offsets
+// (value offset + 8).
+struct FMissionRtc
 {
     unsigned int PathLength;
     char Path[0x80];
-    int BarSceneHandle;                     // handle: RTC location slot / ambient script (-1 none)
-    FCharacterEncounter* Encounter;    // +0x90 the started script (0x2f0 list) / room (0x310)
-    unsigned char bFinished;           // +0x94 finished (0x2f0 list)
-    unsigned char bRepeatable;           // +0x95 "rtc = %s, true/false" (FUN_06ebabb0)
+    int BarSceneHandle;                // +0x8c bar scene of the RTC location slot (-1 none)
+    FCharacterEncounter* Encounter;    // +0x90 the started script
+    unsigned char bFinished;           // +0x94
+    unsigned char bRepeatable;         // +0x95 "rtc = %s, true/false" (FUN_06ebabb0)
 
-    FStoryMissionListNode_0x2f4()
+    FMissionRtc()
         : PathLength(0)
         , BarSceneHandle(-1)
         , Encounter(nullptr)
@@ -164,12 +165,15 @@ struct FMissionScript : FMissionObject
     void OnSystemEnter(void const* MessageParms);
     // FUN_06eb8f50 case 0x3b -> FUN_06eba1f0: the reputation offer pop-up.
     void OnSystemEnterPopUp(void const* MessageParms);
-    // FUN_06eb8f50 case 0x24 -> FUN_06eb9cd0.
-    void OnMessage24(void const* MessageParms);
-    // FUN_06eb8f50 case 0x1005 -> FUN_06eb99a0: attitude of a killer towards a victim.
-    void OnMessage1005(void const* MessageParms);
-    // FUN_06eb8f50 case 0x100b -> FUN_06eba8f0.
-    void OnMessage100b(void const* MessageParms);
+    // FUN_06eb8f50 case 0x24 -> FUN_06eb9cd0: the player aborts the live mission (state
+    // message shown, bPendingDestroy set).
+    void OnAbortMission(void const* MessageParms);
+    // FUN_06eb8f50 case 0x1005 -> FUN_06eb99a0: the player's ship provoked a victim; the mission
+    // fails unless the victim was hostile or carries a friendly-fire-off label.
+    void CheckFriendlyFire(void const* MessageParms);
+    // FUN_06eb8f50 case 0x100b -> FUN_06eba8f0: restart an unfinished RTC script, resend the
+    // first objective.
+    void OnPlayerMissionChanged(void const* MessageParms);
     // FUN_06ebabb0: the [MissionState] body of the save (message 4).
     void SaveMissionState(FILE* File);
     // FUN_06ebae10: the save load (message 5).
@@ -180,9 +184,9 @@ struct FMissionScript : FMissionObject
     void ReleaseRtcScripts();
     // FUN_06eb8a20: load Rtc->Path as a TU23 script; when the player is docked at the script's
     // base, start its bar scene (Rtc->BarSceneHandle) and keep it in Rtc->Encounter, otherwise
-    // free it. Act_AddRTC, Mission_01b, OnBaseEnter, OnMessage100b.
-    void StartRtcScript(FStoryMissionListNode_0x2f4* Rtc);
-    // FUN_06eb8d10: undo Act_StaticCam -- +0x2c8 = 0, the player ship vulnerable
+    // free it. Act_AddRTC, Mission_01b, OnBaseEnter, OnPlayerMissionChanged.
+    void StartRtcScript(FMissionRtc* Rtc);
+    // FUN_06eb8d10: undo Act_StaticCam -- bCutsceneActive = 0, the player ship vulnerable
     // again, NagClamp = 0, every NPC's +0x1b1 cleared, the ship handed one Avoidance(true)
     // directive, the GCS clamp off. Act_RevertCam.
     void RevertStaticCam();
@@ -214,7 +218,9 @@ struct FMissionScript : FMissionObject
     int StoryCue;                                             // +0x2bc "story_cue" (ctor 0)
     unsigned int Field_0x2c0;                                 // +0x2c0 TODO: meaning (mission ctor)
     unsigned int AcceptedObjectiveIds;                                 // +0x2c4 objective ids of the accepted offer
-    unsigned char Field_0x2c8;                                // +0x2c8 TODO: meaning (ctor 0)
+    // +0x2c8 (ctor 0): set with the cutscene clamps by Act_CallThorn / Act_StaticCam, cleared
+    // by RevertStaticCam. No reader in TU21.
+    unsigned char bCutsceneActive;
     // +0x2cc: the reputation pop-up is up (FUN_06eba1f0 sets it, message 0x30 answers it).
     unsigned char bRepPopUpShown;
     // +0x2cd: the reputation pop-up is armed (cleared by the answer and the acceptance).
@@ -231,7 +237,7 @@ struct FMissionScript : FMissionObject
     unsigned char bNeedsObjectiveRenumber;
     // +0x2f0 (head +0x2f4, size +0x2f8): started RTC scripts. Pushed by Mission_01b and
     // FUN_06eb8a20's callers; walked by FUN_06eb8b70, FUN_06eb9ef0 and Cnd_RTCDone.
-    std::list<FStoryMissionListNode_0x2f4> List_0x2f4;
+    std::list<FMissionRtc> RtcScripts;
     // +0x2fc (ctor FUN_06ed0440, node 0x3c; size +0x304): labels named by Act_DisableFriendlyFire
     // (LAB_06ec8270 appends each one not yet listed).
     std::list<TString<0x30>> FriendlyFireOffLabels;
@@ -282,7 +288,7 @@ void DeactivateMissionTrigger(FMissionScript* Script, unsigned int const* Trigge
 void DispatchMissionTriggerEvent(FMissionScript* Script, pub::Controller::EMessage const* EventId,
                                  void const* EventParms);
 
-// FUN_06eba430 (thiscall): every started script of +0x2f4 whose path equals Path->Data
+// FUN_06eba430 (thiscall): every script of RtcScripts whose path equals Path->Data
 // is marked finished (+0x94 of the node); when the player stands in the mission's location
 // (+0x308) of their base, the bar character named by the script's role gets its behavior
 // cleared (-1). Act_RemoveRTC, Mission_01b.

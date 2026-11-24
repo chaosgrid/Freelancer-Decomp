@@ -166,8 +166,10 @@ struct PlayerData {
     // CharacterSelect zeroes it.
     unsigned int save_failure_count;   // +0x344
 
-    // +0x414: the save record's `starting_ring` (record+0x2b8), copied by CharacterSelect.
-    unsigned int starting_ring;        // +0x414
+    // +0x414: the save record's `starting_ring` (record+0x2b8), copied by CharacterSelect: the
+    // ring solar's nickname id. Retail treats it as an ID_String (Server_GetLaunchPosition calls
+    // ID_String::IsEmpty on it; the slot reset stores CreateID("NO WHERE")); held as its one dword.
+    unsigned int starting_ring;        // +0x414  ID_String
 
     // +0x64: the CHARACTER_ID this session has selected (CharacterSelect worker FUN_06d4a5d0
     // assigns it with CHARACTER_ID::operator=; slot init/reset and deselect store "").
@@ -356,16 +358,17 @@ PlayerSlot* __cdecl PlayerDB_GetPlayer(unsigned int session_id);
 
 // FUN_06d4efc0. Appends one EquipDesc to the slot's list and returns the sub-object id it
 // was given (SUBOBJ_ID_NONE when the MP gate refuses).
-//   bNoCombine -- when clear and arch_is_combinable(ArchId), reuses the Id of an existing
-//     stack found with find_matching_cargo(ArchId, 0, 1.0f); otherwise mints a fresh id
-//     from equip_id_maker. Retail then reuses that stack slot for the combinable flag it
+//   bMission -- stored in EquipDesc::bMission (+0x18). When clear and
+//     arch_is_combinable(ArchId), reuses the Id of an existing stack found with
+//     find_matching_cargo(ArchId, 0, 1.0f); otherwise mints a fresh id from
+//     equip_id_maker. Retail then reuses that stack slot for the combinable flag it
 //     passes to add_equipment_item (1 on the combining path, 0 otherwise).
 //   bNotify -- fires IClient slot 26 (+0x68) with (client_id, add_equipment_item's
 //     return, &Desc).
 unsigned short __cdecl PlayerData_AddEquipment(PlayerSlot& Slot, unsigned int ArchId,
                                                CacheString const& Hardpoint, int Count,
                                                float Health, unsigned char bEquipped,
-                                               bool bNoCombine, bool bNotify);
+                                               bool bMission, bool bNotify);
 
 // FUN_06d4f100. remove_equipment_item(Id, Count); IClient slot 27 (+0x6c) with
 // (client_id, result, Id, Count) when bNotify.

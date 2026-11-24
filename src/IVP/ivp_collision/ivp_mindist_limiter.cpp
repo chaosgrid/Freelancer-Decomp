@@ -18,7 +18,6 @@
 #include "../ivp_physics/ivp_ov_element.h" // IVP_Mindist_Manager (IVP_Environment::mindist_manager, +0x10) -- DetachMindist is defined in this file.
 #include "../ivp_physics/ivp_material.h"
 #include "ivp_listmanager_topology.h" // declarations of the functions defined here (FUN_06355c10, FUN_063562d0)
-#include "../ivp_utility/ivp_vector_math.h"
 #include "../ivp_utility/ivp_core_trap.h" // IVP_CoreTrap (retail's `MOV dword ptr [0],0`)
 #include "../ivp_utility/ivp_signed_byte.h" // IVP_SignedLowByte (insert_exact_mindist)
 #include "../../include/common_physys.h"
@@ -56,8 +55,8 @@
 
 namespace
 {
-    // DAT_0658aa18[Index] -- retail's unclamped ramp index, see
-    // FIVP_MindistSettingsStorage for the out-of-range tail.
+    // DAT_0658aa18[Index] -- retail's unclamped ramp index (<= 0x3f, see
+    // IVP_MindistSettingsRamp).
     float IVP_ToleranceRamp(uint32_t Index) { return IVP_MindistSettingsRamp(Index); }
     float IVP_ToleranceBase() { return G_IVP_MindistSettings.real_coll_dist; } // DAT_0658aa10
     float IVP_ToleranceMinRate() { return G_IVP_MindistSettings.speed_after_keeper_dist; } // DAT_0658ab24
@@ -87,7 +86,7 @@ namespace
         M->StateFlags = (M->StateFlags & 0xfffdf7ffu) | 0x10400u;
         for (int32_t I = 0; I < 2; ++I)
         {
-            IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(M->synapse[I].l_obj->first_child);
+            IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(M->synapse[I].l_obj->controller_phantom);
             if (Phantom != nullptr)
                 Phantom->mindist_entered_volume(M); // FUN_06344400
         }
@@ -102,7 +101,7 @@ namespace
         M->StateFlags &= 0xfffcf3ffu;
         for (int32_t I = 0; I < 2; ++I)
         {
-            IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(M->synapse[I].l_obj->first_child);
+            IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(M->synapse[I].l_obj->controller_phantom);
             if (Phantom != nullptr)
                 Phantom->mindist_left_volume(M); // FUN_06344580
         }
@@ -116,7 +115,7 @@ namespace
 
     // FUN_06356740: thiscall(this = one record side's node, Record+8 or
     // Record+0x1c; arg = one of the mindist's synapse slots). The node's kind
-    // byte (node+0xE, the low byte of _hash1/_hash2) is read as a SIGNED
+    // byte (node+0xE, the low byte of Status1/Status2) is read as a SIGNED
     // int8_t and compared with the slot's shape type, then:
     //   0 (Vertex): same owning ledge AND same start point index.
     //   1 (Edge): same edge, or the node's opposite edge is the slot's.
@@ -158,14 +157,14 @@ namespace
         const IVP_Synapse_Real& SynB = Mindist->synapse[1];
         if (Record->Object1 == SynA.l_obj && Record->Object2 == SynB.l_obj)
         {
-            if (IVP_CompareSideFeature(Record->_hash1, Record->Feature1, SynA.status, SynA.edge)
-             && IVP_CompareSideFeature(Record->_hash2, Record->Feature2, SynB.status, SynB.edge))
+            if (IVP_CompareSideFeature(Record->Status1, Record->Feature1, SynA.status, SynA.edge)
+             && IVP_CompareSideFeature(Record->Status2, Record->Feature2, SynB.status, SynB.edge))
                 return true;
         }
         if (Record->Object2 == SynA.l_obj && Record->Object1 == SynB.l_obj)
         {
-            if (IVP_CompareSideFeature(Record->_hash2, Record->Feature2, SynA.status, SynA.edge)
-             && IVP_CompareSideFeature(Record->_hash1, Record->Feature1, SynB.status, SynB.edge))
+            if (IVP_CompareSideFeature(Record->Status2, Record->Feature2, SynA.status, SynA.edge)
+             && IVP_CompareSideFeature(Record->Status1, Record->Feature1, SynB.status, SynB.edge))
                 return true;
         }
         return false;
@@ -214,20 +213,15 @@ namespace
         return Fresh;
     }
 
-namespace
-{
-    // ---------------------------------------------------------------------
-    // IVP_ListManager (the friction system; layout in ivp_mindist.h).
-    // ---------------------------------------------------------------------
-} // namespace -- IVP_ListManager's out-of-line members must be outside the
-  // anonymous namespace (C2888).
+// ---------------------------------------------------------------------
+// IVP_ListManager (the friction system; layout in ivp_mindist.h).
+// ---------------------------------------------------------------------
 
 // FUN_0634b600, RET 4. Vtables: system 063a54c8 (+0x00), static handle
 // 063a5500 (+0x08), energy handle 063a54e4 (+0x10); the handles' back
 // pointers (+0x0c, +0x14) = this.
-//   `AND [+0x44],0xffffff00` clears only the low byte in retail; this port
-//     zeroes the whole dword (readers only use the low byte, :06356615,
-//     :063554d0).
+//   `AND [+0x44],0xffffff00` clears only the low byte (union_find_necessary
+//     is an 8-bit bit-field, so the port does the same).
 //   +0x18..+0x1f, +0x40 and +0x48 are not written.
 IVP_ListManager::IVP_ListManager(IVP_Environment* EnvironmentIn)
     : Environment(EnvironmentIn)
@@ -315,13 +309,13 @@ IVP_ListManager::IVP_ListManager(IVP_Environment* EnvironmentIn)
         Entry->AttachedCtx.Add(Ctx); // FUN_063556b0
     }
 
-    // FUN_0634b9d0, RET 4. Kinematic cores (Flags & 0xc) are only added to
+    // FUN_0634b9d0, RET 4. Kinematic cores (Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) are only added to
     // RegisteredCores; RegisterCoreCallCount counts both paths.
     void IVP_ListManager::RegisterCore(IVP_Core* Core)
     {
         RegisteredCores.Add(Core);
 
-        if ((Core->Flags & 0xc) == 0)
+        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
         {
             RegisteredDynamicCores.Add(Core);
             Core->register_controller(&StaticFsHandle);
@@ -338,7 +332,7 @@ IVP_ListManager::IVP_ListManager(IVP_Environment* EnvironmentIn)
     // in the reverse order of RegisterCore.
     void IVP_ListManager::UnregisterCore(IVP_Core* Core)
     {
-        if ((Core->Flags & 0xc) == 0)
+        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
         {
             RegisteredDynamicCores.RemoveElement(Core);
             Core->detach_controller(&EnergyFsHandle);
@@ -362,8 +356,7 @@ IVP_ListManager::IVP_ListManager(IVP_Environment* EnvironmentIn)
         IVP_ListManager_CorePairEntry* Entry = FindCorePairEntry(CoreA, CoreB);
         if (Entry == nullptr)
         {
-            volatile int* Trap = nullptr;
-            *Trap = 0;
+            IVP_CoreTrap();
         }
 
         Entry->AttachedCtx.RemoveElement(Dist);   // FUN_06355310
@@ -524,7 +517,7 @@ namespace
         static_assert(((sizeof(IVP_Impact_Solver_Long_Term) + 0x1fu) & ~size_t(0x1f)) == 0xe0u,
                       "Contact frame must retain the listing's rounded arena stride");
         IVP_Environment* const Environment = Candidate->Object1->environment;
-        void* const Storage = Environment->vector_cores_frozen->GetMem(
+        void* const Storage = Environment->sim_unit_mem->GetMem(
             static_cast<int>(sizeof(IVP_Impact_Solver_Long_Term)));
         IVP_Impact_Solver_Long_Term* const Owner = ::new (Storage) IVP_Impact_Solver_Long_Term;
         uint32_t PackedState;
@@ -533,16 +526,16 @@ namespace
         PackedState &= 0xfffffc00u;
         std::memcpy(&Owner->StateProcessed, &PackedState, sizeof(PackedState));
         Candidate->Owner = Owner;
-        ++Environment->counter_80;
+        ++Environment->long_term_solver_count;
         return Owner;
     }
 
     // Offsets this cluster's three contact-frame builders reach through raw
     // casts or read as a wider type than the header declares. Pinned here
     // rather than in ivp_mindist.h because this file is the only consumer.
-    static_assert(offsetof(IVP_Contact_Point, _field4c) == 0x4C, "IVP_Contact_Point+0x4C");
+    static_assert(offsetof(IVP_Contact_Point, InvFaceNormalLength) == 0x4C, "IVP_Contact_Point+0x4C");
     static_assert(offsetof(IVP_Contact_Point, GapDistance) == 0x58, "IVP_Contact_Point+0x58");
-    static_assert(offsetof(IVP_Contact_Point, _flags60) == 0x60, "IVP_Contact_Point+0x60");
+    static_assert(offsetof(IVP_Contact_Point, RecheckFeatureFlags) == 0x60, "IVP_Contact_Point+0x60");
     static_assert(offsetof(IVP_Impact_Solver_Long_Term, ContactNormalWS) == 0x00, "IVP_Impact_Solver_Long_Term+0x00");
     static_assert(offsetof(IVP_Impact_Solver_Long_Term, StateProcessed) == 0x54, "IVP_Impact_Solver_Long_Term+0x54");
 
@@ -633,9 +626,9 @@ namespace
         IVP_U_Point LocalPoint;
         IVP_TransformWorldToSlotSpace(CacheF->cache_object, Point, &LocalPoint); // FUN_0634d860
 
-        if (static_cast<uint8_t>(Candidate->_flags60) == 1)
+        if (static_cast<uint8_t>(Candidate->RecheckFeatureFlags) == 1)
         {
-            Candidate->_flags60 &= 0xFFFFFF00u;
+            Candidate->RecheckFeatureFlags &= 0xFFFFFF00u;
             IVP_Unscaled_QR_Result Qr;
             IVP_Compact_Ledge_Solver::calc_unscaled_qr_vals_F_space(CacheF->compact_ledge, F, &LocalPoint, &Qr);
             const uint32_t SignBits = (IVP_ContactFrameFloatBits(Qr.Checks[1]) | IVP_ContactFrameFloatBits(Qr.Checks[2])) |
@@ -646,7 +639,7 @@ namespace
 
         IVP_U_Point Normal;
         IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(F, CacheF->compact_ledge, &Normal);
-        const double InvNormalLength = Candidate->_field4c;
+        const double InvNormalLength = Candidate->InvFaceNormalLength;
         Normal.y = (float)((double)(Normal.y) * InvNormalLength);
         Normal.z = (float)((double)(Normal.z) * InvNormalLength);
         Normal.x = (float)((double)(Normal.x) * InvNormalLength);
@@ -740,9 +733,9 @@ namespace
         Owner->TangentAxis0.y = Perp.y;
         Owner->TangentAxis0.z = Perp.z;
 
-        if (static_cast<uint8_t>(Candidate->_flags60) == 1)
+        if (static_cast<uint8_t>(Candidate->RecheckFeatureFlags) == 1)
         {
-            Candidate->_flags60 &= 0xFFFFFF00u;
+            Candidate->RecheckFeatureFlags &= 0xFFFFFF00u;
             // FUN_0628be40 (this = &EdgeDir, arg = &ToPoint): (t.z*e.z + t.y*e.y) + t.x*e.x.
             const double Dot = ((double)(ToPoint.z) * EdgeDir.z + (double)(ToPoint.y) * EdgeDir.y) +
                                (double)(ToPoint.x) * EdgeDir.x;
@@ -781,8 +774,8 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
 {
     IVP_Impact_Solver_Long_Term* const Owner = IVP_AllocatePairRecordOwner(Candidate);
 
-    const int32_t ShapeTag1 = static_cast<int8_t>(static_cast<uint8_t>(Candidate->_hash1 & 0xFFu));
-    const int32_t ShapeTag2 = static_cast<int8_t>(static_cast<uint8_t>(Candidate->_hash2 & 0xFFu));
+    const int32_t ShapeTag1 = static_cast<int8_t>(static_cast<uint8_t>(Candidate->Status1 & 0xFFu));
+    const int32_t ShapeTag2 = static_cast<int8_t>(static_cast<uint8_t>(Candidate->Status2 & 0xFFu));
     Vector Situation = { 0.0f, 0.0f, 0.0f };
 
     IVP_Compact_Edge* const Edge2 = static_cast<IVP_Compact_Edge*>(Candidate->Feature2);
@@ -818,7 +811,7 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
         PointA.x = Cache1.cache_object->WorldTransform.vv.x;
         PointA.y = Cache1.cache_object->WorldTransform.vv.y;
         PointA.z = Cache1.cache_object->WorldTransform.vv.z;
-        Candidate->_flags60 = (Candidate->_flags60 & 0xFFFFFF01u) | 0x1u;
+        Candidate->RecheckFeatureFlags = (Candidate->RecheckFeatureFlags & 0xFFFFFF01u) | 0x1u;
         break;
     default:
         // The library's CORE trap; retail then runs the tail.
@@ -851,13 +844,13 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
     }
 
     // FUN_0628be60(dst = base = &SolverContactPointWS, dir = &ContactNormalWS, r1).
-    const float Radius1 = Candidate->Object1->field_94;
+    const float Radius1 = Candidate->Object1->extra_radius;
     Owner->SolverContactPointWS.y = (float)((double)(Radius1) * Owner->ContactNormalWS.y + Owner->SolverContactPointWS.y);
     Owner->SolverContactPointWS.z = (float)((double)(Radius1) * Owner->ContactNormalWS.z + Owner->SolverContactPointWS.z);
     Owner->SolverContactPointWS.x = (float)((double)(Radius1) * Owner->ContactNormalWS.x + Owner->SolverContactPointWS.x);
 
     const double SurfaceGap = (double)(Candidate->GapDistance) -
-                              ((double)(Candidate->Object2->field_94) + Radius1);
+                              ((double)(Candidate->Object2->extra_radius) + Radius1);
     Candidate->GapDistance = (float)(SurfaceGap);
     if (!(SurfaceGap >= 0.0))
         Candidate->GapDistance = 0.0f;
@@ -890,7 +883,7 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
         Owner->CoordOSCrossNormal[0].x = 0.0f;
         Owner->CoordOSCrossNormal[0].y = 0.0f;
         Owner->CoordOSCrossNormal[0].z = 0.0f;
-        Owner->ChildCandidate[0] = nullptr;
+        Owner->ContactCores[0] = nullptr;
     }
     else
     {
@@ -926,7 +919,7 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
               (double)(Cross.y) * Core0->InvRotInertia.y * Cross.y) +
              (double)(Cross.x) * Core0->InvRotInertia.x * Cross.x) +
             Core0->InvMass);
-        Owner->ChildCandidate[0] = Core0;
+        Owner->ContactCores[0] = Core0;
     }
 
     // ---- side 2, object2's core: the same with its own operand order ----
@@ -939,7 +932,7 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
         Owner->CoordOSCrossNormal[1].x = 0.0f;
         Owner->CoordOSCrossNormal[1].y = 0.0f;
         Owner->CoordOSCrossNormal[1].z = 0.0f;
-        Owner->ChildCandidate[1] = nullptr;
+        Owner->ContactCores[1] = nullptr;
     }
     else
     {
@@ -980,17 +973,17 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
               (double)(Core1->InvRotInertia.x) * Cross.x * Cross.x) +
              Core1->InvMass) +
             Owner->EffectiveMassDenom);
-        Owner->ChildCandidate[1] = Core1;
+        Owner->ContactCores[1] = Core1;
     }
 
     Owner->EffectiveMassDenomRecip = (float)(1.0 / (double)(Owner->EffectiveMassDenom)); // DAT_063a53d0 = 1.0f
 
     IVP_Environment* const Env = Candidate->Object1->environment;
-    const float NowBase = *reinterpret_cast<const float*>(&Env->current_time.time_base);
-    const float NowOffset = *reinterpret_cast<const float*>(&Env->current_time.time_offset);
-    const double DeltaTime = (((double)(NowBase) - Candidate->_envTick68) + NowOffset) - Candidate->_envTick6c;
-    Candidate->_envTick68 = NowBase;
-    Candidate->_envTick6c = NowOffset;
+    const float NowBase = Env->current_time.time_base;
+    const float NowOffset = Env->current_time.time_offset;
+    const double DeltaTime = (((double)(NowBase) - Candidate->LastRecalcTimeBase) + NowOffset) - Candidate->LastRecalcTimeOffset;
+    Candidate->LastRecalcTimeBase = NowBase;
+    Candidate->LastRecalcTimeOffset = NowOffset;
 
     const double Slip0 = ((double)(RelativeSpeed.z) * Owner->TangentAxis0.z + (double)(RelativeSpeed.y) * Owner->TangentAxis0.y) +
                          (double)(RelativeSpeed.x) * Owner->TangentAxis0.x;
@@ -1015,22 +1008,22 @@ void IVP_Ledge_Mindist::do_impact()
     IVP_Real_Object* const ObjB = synapse[1].l_obj;
     IVP_Environment* const Env = ObjA->environment;
 
-    ObjA->ReviveOriginalCoreIfSleeping();
-    ObjB->ReviveOriginalCoreIfSleeping();
+    ObjA->ReviveFrictionCoreIfSleeping();
+    ObjB->ReviveFrictionCoreIfSleeping();
 
-    ++Env->vector_cores_frozen->State;
+    ++Env->sim_unit_mem->State;
 
-    if (int8_t(ObjA->core->MovementState & 0xff) < 8 && (ObjA->core->Flags & 0x300) == 0)
+    if (int8_t(ObjA->core->MovementState & 0xff) < 8 && (ObjA->core->Flags & IVP_CORE_PINNED) == 0)
         ObjA->core->recalc_interpolated_frame();
-    if (int8_t(ObjB->core->MovementState & 0xff) < 8 && (ObjB->core->Flags & 0x300) == 0)
+    if (int8_t(ObjB->core->MovementState & 0xff) < 8 && (ObjB->core->Flags & IVP_CORE_PINNED) == 0)
         ObjB->core->recalc_interpolated_frame();
 
-    ++Env->field_114;
+    ++Env->mindist_event_stamp;
 
     IVP_Mindist_Do_Impact(this, ObjA, ObjB);
 
-    --Env->vector_cores_frozen->State;
-    Env->vector_cores_frozen->reset_chunks(); // FUN_06344070
+    --Env->sim_unit_mem->State;
+    Env->sim_unit_mem->reset_chunks(); // FUN_06344070
 }
 
 namespace
@@ -1325,8 +1318,8 @@ static void IVP_DistributeHullSlack(IVP_Ledge_Mindist* M, float Slack)
 
     // Both extents stay on the x87 stack. DAT_063a53d8 = 1e-10f, DAT_063a5464
     // = 0.1f.
-    const double ExtentA = ((double)(CoreA->BoundingRadius) + CoreA->Margin) + 1.0e-10f;
-    const double ExtentB = ((double)(CoreB->BoundingRadius) + CoreB->Margin) + 1.0e-10f;
+    const double ExtentA = ((double)(CoreA->MaxSurfaceRotSpeed) + CoreA->CurrentSpeed) + 1.0e-10f;
+    const double ExtentB = ((double)(CoreB->MaxSurfaceRotSpeed) + CoreB->CurrentSpeed) + 1.0e-10f;
 
     // WeightA is spilled as float, WeightB stays extended.
     const float WeightA = (float)(ExtentB * 0.1f + ExtentA);
@@ -1385,8 +1378,8 @@ static void IVP_InsertHullMindist(IVP_Ledge_Mindist* M, float Slack)
 
     const IVP_Core* const CoreA = ObjA->core;
     const IVP_Core* const CoreB = ObjB->core;
-    const double ExtentA = ((double)(CoreA->BoundingRadius) + CoreA->Margin) + 1.0e-10f;
-    const double ExtentB = ((double)(CoreB->BoundingRadius) + CoreB->Margin) + 1.0e-10f;
+    const double ExtentA = ((double)(CoreA->MaxSurfaceRotSpeed) + CoreA->CurrentSpeed) + 1.0e-10f;
+    const double ExtentB = ((double)(CoreB->MaxSurfaceRotSpeed) + CoreB->CurrentSpeed) + 1.0e-10f;
     const float WeightA = (float)(ExtentB * 0.1f + ExtentA);
     const double WeightB = ExtentA * 0.1f + ExtentB;
     const double ScaleExt = (double)(Slack) / (WeightB + WeightA);
@@ -1540,9 +1533,9 @@ void IVP_Mindist_Manager::insert_lazy_mindist(IVP_Ledge_Mindist* Mindist)
     }
 
     int32_t PhantomFlag = 0;
-    const IVP_Controller_Phantom* Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[0].l_obj->first_child);
+    const IVP_Controller_Phantom* Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[0].l_obj->controller_phantom);
     if (Phantom == nullptr)
-        Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[1].l_obj->first_child);
+        Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[1].l_obj->controller_phantom);
     if (Phantom != nullptr)
     {
         PhantomFlag = static_cast<int32_t>(reinterpret_cast<intptr_t>(Phantom->client_data));
@@ -1685,16 +1678,16 @@ void IVP_Mindist_Manager::recalc_exact_mindist(IVP_Ledge_Mindist* Mindist)
         Value = -Mindist->SeparationGap;
     }
 
-    const IVP_Controller_Phantom* const Phantom0 = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[0].l_obj->first_child);
+    const IVP_Controller_Phantom* const Phantom0 = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[0].l_obj->controller_phantom);
     const IVP_Controller_Phantom* Phantom = Phantom0;
     if (Phantom0 != nullptr)
     {
-        if (Mindist->synapse[1].l_obj->first_child != nullptr)
+        if (Mindist->synapse[1].l_obj->controller_phantom != nullptr)
             return;
     }
     else
     {
-        Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[1].l_obj->first_child); // no null test
+        Phantom = static_cast<const IVP_Controller_Phantom*>(Mindist->synapse[1].l_obj->controller_phantom); // no null test
     }
 
     const float Slack = (float)((double)(Value) + Phantom->exit_policy_extra_radius);
@@ -1746,7 +1739,7 @@ namespace
             return;
         }
 
-        ++Object->environment->vector_cores_frozen->State;
+        ++Object->environment->sim_unit_mem->State;
         IVP_ListManager* FrictionSystem = nullptr;
         int32_t HavingNew = 0;
         IVP_Contact_Point* const Cp =
@@ -1755,24 +1748,24 @@ namespace
         {
             IVP_Contact_Point* const Old = reinterpret_cast<IVP_Contact_Point*>(
                 Node + *reinterpret_cast<const int16_t*>(Node + 0xc));
-            const float SavedTick68 = Old->_envTick68;
-            const float SavedTick6c = Old->_envTick6c;
+            const float SavedRecalcTimeBase = Old->LastRecalcTimeBase;
+            const float SavedRecalcTimeOffset = Old->LastRecalcTimeOffset;
             IVP_Environment* const Env = Object->environment;
-            std::memcpy(&Old->_envTick68, &Env->current_time.time_base, sizeof(float));   // raw dword copy
-            std::memcpy(&Old->_envTick6c, &Env->current_time.time_offset, sizeof(float));
+            std::memcpy(&Old->LastRecalcTimeBase, &Env->current_time.time_base, sizeof(float));   // raw dword copy
+            std::memcpy(&Old->LastRecalcTimeOffset, &Env->current_time.time_offset, sizeof(float));
             IVP_UpdatePairRecordContactFrame(Old); // FUN_0635a1e0
 
             Cp->NowFrictionPressure = Old->NowFrictionPressure;
             Old->NowFrictionPressure = 0.0f;
-            Cp->_envTick68 = SavedTick68;
+            Cp->LastRecalcTimeBase = SavedRecalcTimeBase;
             Cp->GapDistance = Gap;
-            Cp->_envTick6c = SavedTick6c;
+            Cp->LastRecalcTimeOffset = SavedRecalcTimeOffset;
 
             const IVP_Impact_Solver_Long_Term* const OldOwner = Old->Owner;
             const double S0 = (double)(Old->SpanFrictionS[0]);
             const double S1 = (double)(Old->SpanFrictionS[1]);
-            Old->_envTick68 = SavedTick68;
-            Old->_envTick6c = SavedTick6c;
+            Old->LastRecalcTimeBase = SavedRecalcTimeBase;
+            Old->LastRecalcTimeOffset = SavedRecalcTimeOffset;
 
             const float X0 = (float)(S0 * OldOwner->TangentAxis0.x);
             const float Y0 = (float)(S0 * OldOwner->TangentAxis0.y);
@@ -1789,7 +1782,7 @@ namespace
             Cp->SpanFrictionS[1] = (float)(Span1);
         }
 
-        IVP_U_Memory* const Arena = Object->environment->vector_cores_frozen;
+        IVP_U_Memory* const Arena = Object->environment->sim_unit_mem;
         --Arena->State;
         Arena->reset_chunks(); // FUN_06344070
     }
@@ -1876,9 +1869,9 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
     IVP_Environment* const Env = This->synapse[0].l_obj->environment; // retail EBP -- slot 0, NOT SideI
 
     // 2. Each sum rounded once. DAT_063a561c = 2e-10f.
-    const float RadiusSum = (float)((double)(CoreI->BoundingRadius) + CoreJ->BoundingRadius);
-    const float MarginSpan = (float)(
-        (((double)(CoreJ->Margin) + CoreI->Margin) + RadiusSum) + 2.0e-10f);
+    const float SurfaceRotSpeedSum = (float)((double)(CoreI->MaxSurfaceRotSpeed) + CoreJ->MaxSurfaceRotSpeed);
+    const float MaxSpeedSum = (float)(
+        (((double)(CoreJ->CurrentSpeed) + CoreI->CurrentSpeed) + SurfaceRotSpeedSum) + 2.0e-10f);
 
     // 3. De-queue whatever slot this pair holds (env+0x04, FUN_063609f0).
     if (This->EventQueueHandle != 0xffff)
@@ -1892,7 +1885,7 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
     const uint32_t FlagsAfterDequeue = This->StateFlags; // re-read
     const uint32_t ToleranceIndex = (FlagsAfterDequeue >> 22) & 0xffu;
     const float ToleranceValue = IVP_ToleranceRamp(ToleranceIndex);
-    const double CoarseThreshold = (((double)(Env->delta_time) * MarginSpan) * 2.1f) + ToleranceValue;
+    const double CoarseThreshold = (((double)(Env->delta_time) * MaxSpeedSum) * 2.1f) + ToleranceValue;
     const float Gap = This->SeparationGap;
 
     if (!(CoarseThreshold >= (double)(Gap)))
@@ -1915,13 +1908,13 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
                              (double)(N.x) * CoreI->Speed.x;
     const float RelativeSpeed = (float)(DotSpeedJ - DotSpeedI);
 
-    const double SpinI = ((double)(CoreI->RotAxisOS.z) * N.z + (double)(CoreI->RotAxisOS.y) * N.y) +
-                         (double)(CoreI->RotAxisOS.x) * N.x;
+    const double SpinI = ((double)(CoreI->RotAxisWS.z) * N.z + (double)(CoreI->RotAxisWS.y) * N.y) +
+                         (double)(CoreI->RotAxisWS.x) * N.x;
     const float SpinJ = (float)(
-        ((double)(CoreJ->RotAxisOS.z) * N.z + (double)(CoreJ->RotAxisOS.y) * N.y) +
-        (double)(CoreJ->RotAxisOS.x) * N.x);
-    const double RotTermI = sqrt(1.001f - SpinI * SpinI) * CoreI->BoundingRadius;
-    const double RotTermJ = sqrt(1.001f - (double)(SpinJ) * SpinJ) * CoreJ->BoundingRadius;
+        ((double)(CoreJ->RotAxisWS.z) * N.z + (double)(CoreJ->RotAxisWS.y) * N.y) +
+        (double)(CoreJ->RotAxisWS.x) * N.x);
+    const double RotTermI = sqrt(1.001f - SpinI * SpinI) * CoreI->MaxSurfaceRotSpeed;
+    const double RotTermJ = sqrt(1.001f - (double)(SpinJ) * SpinJ) * CoreJ->MaxSurfaceRotSpeed;
     const float ClosingBound = (float)((RotTermI + RotTermJ) + RelativeSpeed);
 
     // 7. HORIZON TEST. The four time words are dword copies. DAT_063a53d8 = 1e-10f.
@@ -1973,10 +1966,10 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
 
     // The context on retail's frame at ESP+0x20.
     IVP_Sweep_Estimator_Context Ctx;
-    Ctx.RadiusSum = RadiusSum;
+    Ctx.SurfaceRotSpeedSum = SurfaceRotSpeedSum;
     Ctx.RelativeSpeed = RelativeSpeed;
     Ctx.ClosingBound = ClosingBound;
-    Ctx.MarginSpan = MarginSpan;
+    Ctx.MaxSpeedSum = MaxSpeedSum;
     Ctx.Mindist = This;
     Ctx.Env = Env;
     Ctx.NowBase = NowHi;
@@ -2036,9 +2029,9 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
         float Offset;
         if (Slack >= 1.0e-6f) // less or unordered skips the gap term
         {
-            // Fine ladder: slack * 0.1f / MarginSpan; coarse: slack / MarginSpan.
-            double FirstOffset = (CoarseLadder ? ((double)(Slack) / Ctx.MarginSpan)
-                                               : (((double)(Slack) * 0.1f) / Ctx.MarginSpan))
+            // Fine ladder: slack * 0.1f / MaxSpeedSum; coarse: slack / MaxSpeedSum.
+            double FirstOffset = (CoarseLadder ? ((double)(Slack) / Ctx.MaxSpeedSum)
+                                               : (((double)(Slack) * 0.1f) / Ctx.MaxSpeedSum))
                                  + Env->current_time.time_offset;
             IVP_RenormalizeSplitTime(Base, FirstOffset);
             Offset = (float)(FirstOffset);
@@ -2185,8 +2178,7 @@ void IVP_Complex_Mindist::do_impact()
     if (ShapeTypeA < 0 || ShapeTypeA > 3)
     {
         // Retail's release IVP_ASSERT: a deliberate store to address zero.
-        volatile int32_t* Trap = nullptr;
-        *Trap = 0;
+        IVP_CoreTrap();
     }
     else if (ShapeTypeA == 2)
     {
@@ -2197,8 +2189,7 @@ void IVP_Complex_Mindist::do_impact()
     {
         if (ShapeTypeB < 0 || ShapeTypeB > 3)
         {
-            volatile int32_t* Trap = nullptr;
-            *Trap = 0;
+            IVP_CoreTrap();
         }
         else if (ShapeTypeB == 0 || ShapeTypeB == 3)
         {
@@ -2244,8 +2235,7 @@ void IVP_Complex_Mindist::do_impact()
         else
         {
             // Any other ShapeTypeB: the same null-store trap (:063626e7).
-            volatile int32_t* Trap = nullptr;
-            *Trap = 0;
+            IVP_CoreTrap();
         }
     }
 
@@ -2579,7 +2569,7 @@ namespace
 //   otherwise (<= or unordered) the mindist is re-filed: remove_hull_mindist,
 //   then insert_lazy_mindist when (StateFlags & 0x3000) == 0x1000, else
 //   insert_exact_mindist.
-//   r_i = (BoundingRadius + Margin) + 1e-10f; r0 rounded, r1 rounded but
+//   r_i = (MaxSurfaceRotSpeed + CurrentSpeed) + 1e-10f; r0 rounded, r1 rounded but
 //   summed extended.
 // ---------------------------------------------------------------------------
 void IVP_Ledge_Mindist::hull_limit_exceeded_event(float HullIntrusionValue)
@@ -2613,8 +2603,8 @@ void IVP_Ledge_Mindist::hull_limit_exceeded_event(float HullIntrusionValue)
     const double Dy = (double)(Pos0.y) - Pos1.y;
     const double Dz = (double)(Pos0.z) - Pos1.z;
 
-    const float R0 = (float)(((double)(Core0->BoundingRadius) + Core0->Margin) + 1.0e-10f);
-    const double R1Ext = ((double)(Core1->BoundingRadius) + Core1->Margin) + 1.0e-10f;
+    const float R0 = (float)(((double)(Core0->MaxSurfaceRotSpeed) + Core0->CurrentSpeed) + 1.0e-10f);
+    const double R1Ext = ((double)(Core1->MaxSurfaceRotSpeed) + Core1->CurrentSpeed) + 1.0e-10f;
     const float R1 = (float)(R1Ext);
     const float SumR = (float)(R1Ext + R0);
 
@@ -2732,11 +2722,11 @@ void IVP_Ledge_Mindist::init_mindist(IVP_Real_Object* Object0, IVP_Real_Object* 
     Syn0->mindist_offset = static_cast<int16_t>(reinterpret_cast<char*>(this) - reinterpret_cast<char*>(Syn0));
     Syn1->mindist_offset = static_cast<int16_t>(reinterpret_cast<char*>(this) - reinterpret_cast<char*>(Syn1));
 
-    CombinedRadius = Object0->field_94 + Object1->field_94;
+    CombinedRadius = Object0->extra_radius + Object1->extra_radius;
 
     // Without phantoms the mindist goes straight to the exact list.
     IVP_Mindist_Manager* Manager = Object0->environment->mindist_manager;
-    if (Object0->first_child == nullptr && Object1->first_child == nullptr)
+    if (Object0->controller_phantom == nullptr && Object1->controller_phantom == nullptr)
     {
         Manager->insert_exact_mindist(this);                  // FUN_0634e9f0
         return;
@@ -2805,13 +2795,13 @@ void IVP_ComputePairRecordMassFactor(IVP_Contact_Point* Record)
     IVP_Core* Core1 = Record->Object1->core;
     IVP_Core* Core2 = Record->Object2->core;
 
-    if ((Core1->Flags & 0xc) != 0 || (Core1->Flags & 0x300) != 0)
+    if ((Core1->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0 || (Core1->Flags & IVP_CORE_PINNED) != 0)
     {
         const double EffMass = Core2->calc_conservative_effective_mass(&Record->Owner->CoordOS[1]);
         Record->MassFactor = (float)(1.0 / EffMass);
         return;
     }
-    if ((Core2->Flags & 0xc) != 0 || (Core2->Flags & 0x300) != 0)
+    if ((Core2->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0 || (Core2->Flags & IVP_CORE_PINNED) != 0)
     {
         const double EffMass = Core1->calc_conservative_effective_mass(&Record->Owner->CoordOS[0]);
         Record->MassFactor = (float)(1.0 / EffMass);

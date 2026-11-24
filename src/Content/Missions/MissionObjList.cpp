@@ -25,7 +25,8 @@
 namespace
 {
     // The ops declare some fields as integers where the directives store floats (spline
-    // points, Field_68, the face point, the zone sphere): the bits are stored as they are.
+    // points, TetherCruiseRatio, the face point, the zone sphere): the bits are stored as they
+    // are.
     template <typename T>
     void StoreFloatBits(T* Destination, float Value)
     {
@@ -93,8 +94,8 @@ namespace
         }
     }
 
-    // Value 0 of the goto keys: "goto" leaves both flags, "goto_no_cruise" sets Field_5B,
-    // "goto_cruise" Field_5A.
+    // Value 0 of the goto keys: "goto" leaves both flags, "goto_no_cruise" sets bGotoNoCruise,
+    // "goto_cruise" bGotoCruise.
     void ParseGotoKind(char const* Kind, uint8_t* NoCruise, uint8_t* Cruise)
     {
         if (_stricmp(Kind, "goto") == 0)
@@ -126,30 +127,30 @@ bool __cdecl CreateObjListDirective(int Type, FObjListDirective** Out)
     FObjListDirective* Directive = nullptr;
     switch (Type)
     {
-    case 0x0:  Directive = new FObjListAvoidance(); break;
-    case 0x1:  Directive = new FObjListDelay(); break;
-    case 0x2:  Directive = new FObjListIdle(); break;
-    case 0x3:  Directive = new FObjListGotoShip(); break;
-    case 0x4:  Directive = new FObjListGotoSpline(); break;
-    case 0x5:  Directive = new FObjListGotoVec(); break;
-    case 0x6:  Directive = new FObjListTrail(); break;
-    case 0x7:  Directive = new FObjListFollow(); break;
-    case 0x8:  Directive = new FObjListGuide(); break;
-    case 0x9:  Directive = new FObjListGuideShip(); break;
-    case 0xa:  Directive = new FObjListFace(); break;
-    case 0xb:  Directive = new FObjListSetLifeTime(); break;
-    case 0xc:  Directive = new FObjListSetPriority(); break;
-    case 0xd:  Directive = new FObjListStayInRange(); break;
-    case 0xe:  Directive = new FObjListStayOutOfRange(); break;
-    case 0xf:  Directive = new FObjListMakeNewFormation(); break;
-    case 0x10: Directive = new FObjListFollowPlayer(); break;
-    case 0x11: Directive = new FObjListBreakFormation(); break;
-    case 0x12: Directive = new FObjListCancelObjective(); break;
-    case 0x13: Directive = new FObjListDock(); break;
-    case 0x14: Directive = new FObjListInstantTradelane(); break;
-    case 0x15: Directive = new FObjListLaunch(); break;
-    case 0x16: Directive = new FObjListWaitForPlayerManeuver(); break;
-    case 0x19: Directive = new FObjListTractorBeam(); break;
+    case OBJLIST_AVOIDANCE: Directive = new FObjListAvoidance(); break;
+    case OBJLIST_DELAY: Directive = new FObjListDelay(); break;
+    case OBJLIST_IDLE: Directive = new FObjListIdle(); break;
+    case OBJLIST_GOTO_SHIP: Directive = new FObjListGotoShip(); break;
+    case OBJLIST_GOTO_SPLINE: Directive = new FObjListGotoSpline(); break;
+    case OBJLIST_GOTO_VEC: Directive = new FObjListGotoVec(); break;
+    case OBJLIST_TRAIL: Directive = new FObjListTrail(); break;
+    case OBJLIST_FOLLOW: Directive = new FObjListFollow(); break;
+    case OBJLIST_GUIDE: Directive = new FObjListGuide(); break;
+    case OBJLIST_GUIDE_SHIP: Directive = new FObjListGuideShip(); break;
+    case OBJLIST_FACE: Directive = new FObjListFace(); break;
+    case OBJLIST_SET_LIFE_TIME: Directive = new FObjListSetLifeTime(); break;
+    case OBJLIST_SET_PRIORITY: Directive = new FObjListSetPriority(); break;
+    case OBJLIST_STAY_IN_RANGE: Directive = new FObjListStayInRange(); break;
+    case OBJLIST_STAY_OUT_OF_RANGE: Directive = new FObjListStayOutOfRange(); break;
+    case OBJLIST_MAKE_NEW_FORMATION: Directive = new FObjListMakeNewFormation(); break;
+    case OBJLIST_FOLLOW_PLAYER: Directive = new FObjListFollowPlayer(); break;
+    case OBJLIST_BREAK_FORMATION: Directive = new FObjListBreakFormation(); break;
+    case OBJLIST_CANCEL_OBJECTIVE: Directive = new FObjListCancelObjective(); break;
+    case OBJLIST_DOCK: Directive = new FObjListDock(); break;
+    case OBJLIST_INSTANT_TRADELANE: Directive = new FObjListInstantTradelane(); break;
+    case OBJLIST_LAUNCH: Directive = new FObjListLaunch(); break;
+    case OBJLIST_WAIT_FOR_PLAYER_MANEUVER: Directive = new FObjListWaitForPlayerManeuver(); break;
+    case OBJLIST_TRACTOR_BEAM: Directive = new FObjListTractorBeam(); break;
     default: break;
     }
     *Out = Directive;
@@ -167,29 +168,29 @@ namespace
     // The is_value chain of FUN_06f25260, in retail order.
     FObjListKey const GObjListKeys[] =
     {
-        {"Avoidance", 0x0},
-        {"BreakFormation", 0x11},
-        {"CancelObjective", 0x12},
-        {"Delay", 0x1},
-        {"Idle", 0x2},
-        {"Dock", 0x13},
-        {"InstantTradelane", 0x14},
-        {"Follow", 0x7},
-        {"Guide", 0x8},
-        {"GuideShip", 0x9},
-        {"GotoShip", 0x3},
-        {"GotoSpline", 0x4},
-        {"GotoVec", 0x5},
-        {"Face", 0xa},
-        {"Launch", 0x15},
-        {"MakeNewFormation", 0xf},
-        {"FollowPlayer", 0x10},
-        {"SetPriority", 0xc},
-        {"SetLifeTime", 0xb},
-        {"StayInRange", 0xd},
-        {"StayOutOfRange", 0xe},
-        {"Trail", 0x6},
-        {"WaitForPlayerManeuver", 0x16},
+        {"Avoidance", OBJLIST_AVOIDANCE},
+        {"BreakFormation", OBJLIST_BREAK_FORMATION},
+        {"CancelObjective", OBJLIST_CANCEL_OBJECTIVE},
+        {"Delay", OBJLIST_DELAY},
+        {"Idle", OBJLIST_IDLE},
+        {"Dock", OBJLIST_DOCK},
+        {"InstantTradelane", OBJLIST_INSTANT_TRADELANE},
+        {"Follow", OBJLIST_FOLLOW},
+        {"Guide", OBJLIST_GUIDE},
+        {"GuideShip", OBJLIST_GUIDE_SHIP},
+        {"GotoShip", OBJLIST_GOTO_SHIP},
+        {"GotoSpline", OBJLIST_GOTO_SPLINE},
+        {"GotoVec", OBJLIST_GOTO_VEC},
+        {"Face", OBJLIST_FACE},
+        {"Launch", OBJLIST_LAUNCH},
+        {"MakeNewFormation", OBJLIST_MAKE_NEW_FORMATION},
+        {"FollowPlayer", OBJLIST_FOLLOW_PLAYER},
+        {"SetPriority", OBJLIST_SET_PRIORITY},
+        {"SetLifeTime", OBJLIST_SET_LIFE_TIME},
+        {"StayInRange", OBJLIST_STAY_IN_RANGE},
+        {"StayOutOfRange", OBJLIST_STAY_OUT_OF_RANGE},
+        {"Trail", OBJLIST_TRAIL},
+        {"WaitForPlayerManeuver", OBJLIST_WAIT_FOR_PLAYER_MANEUVER},
     };
 }
 
@@ -322,7 +323,7 @@ namespace
         if (ObjectName->Length != 0)
         {
             unsigned int Id = FindTargetId(Ship, ObjectName);
-            Op->Field_5C = Id;
+            Op->TetherObjectId = Id;
             if ((Id & 0x3fffffff) == 0)
             {
                 Ship->AdvanceDirective();
@@ -348,7 +349,7 @@ bool FObjListGotoShip::Execute(FContentShipBase* Ship)
     if (TargetName.Length != 0)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
-        Op.Field_1C = static_cast<int32_t>(Id);
+        Op.TargetId = static_cast<int32_t>(Id);
         if ((Id & 0x3fffffff) == 0)
         {
             Ship->AdvanceDirective();
@@ -358,7 +359,7 @@ bool FObjListGotoShip::Execute(FContentShipBase* Ship)
     if (ObjectName.Length != 0)
     {
         unsigned int Id = FindTargetId(Ship, &ObjectName);
-        Op.Field_5C = Id;
+        Op.TetherObjectId = Id;
         if ((Id & 0x3fffffff) == 0)
         {
             Ship->AdvanceDirective();
@@ -374,20 +375,20 @@ bool FObjListGotoShip::Execute(FContentShipBase* Ship)
 void FObjListGotoShip::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
-    ParseGotoKind(Reader->get_value_string(0), &Op.Field_5B, &Op.Field_5A);
-    Op.Field_0C = 0;
+    ParseGotoKind(Reader->get_value_string(0), &Op.bGotoNoCruise, &Op.bGotoCruise);
+    Op.GotoKind = 0;
     TargetName = Reader->get_value_string(1);
-    Op.Field_50 = Reader->get_value_float(2);
-    Op.Field_58 = _stricmp(Reader->get_value_string(3), "true") == 0 ? 1 : 0;
+    Op.ArrivalRange = Reader->get_value_float(2);
+    Op.bFlyThrough = _stricmp(Reader->get_value_string(3), "true") == 0 ? 1 : 0;
     if (!Reader->is_value_empty(4))
-        Op.Field_54 = static_cast<float>(Reader->get_value_int(4));
+        Op.MaxSpeed = static_cast<float>(Reader->get_value_int(4));
     if (Reader->is_value_empty(5))
         return;
     ObjectName = Reader->get_value_string(5);
-    Op.Field_60 = static_cast<float>(Reader->get_value_int(6));
-    Op.Field_64 = static_cast<float>(Reader->get_value_int(7));
+    Op.TetherNearRange = static_cast<float>(Reader->get_value_int(6));
+    Op.TetherFarRange = static_cast<float>(Reader->get_value_int(7));
     if (!Reader->is_value_empty(8))
-        StoreFloatBits(&Op.Field_68, Reader->get_value_float(8));
+        StoreFloatBits(&Op.TetherCruiseRatio, Reader->get_value_float(8));
     if (!Reader->is_value_empty(9))
         bNoFailOnTimeout = Reader->get_value_int(9);
 }
@@ -401,11 +402,11 @@ int FObjListGotoShip::GetType()
 // FUN_06f26150.
 void FObjListGotoShip::SetTarget(unsigned int const* TargetId, float Range, float Param3)
 {
-    Op.Field_0C = 0;
-    Op.Field_1C = static_cast<int32_t>(*TargetId);
-    Op.Field_58 = 0;
-    Op.Field_50 = Range;
-    Op.Field_54 = Param3;
+    Op.GotoKind = 0;
+    Op.TargetId = static_cast<int32_t>(*TargetId);
+    Op.bFlyThrough = 0;
+    Op.ArrivalRange = Range;
+    Op.MaxSpeed = Param3;
 }
 
 // Inlined in factory case 4.
@@ -419,39 +420,39 @@ bool FObjListGotoSpline::Execute(FContentShipBase* Ship)
     return ExecuteGotoToObject(Ship, &Op, &ObjectName);
 }
 
-// FUN_06f26e60. Field_0C = 2 (a spline); the four points come in the
+// FUN_06f26e60. GotoKind = 2 (a spline); the four points come in the
 // value order 2, 0, 1, 3 (values 1-3 -> +0x144, 4-6 -> +0x12c, 7-9 -> +0x138, 10-12 ->
-// +0x150); Field_50 is a float here.
+// +0x150); ArrivalRange is a float here.
 void FObjListGotoSpline::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
-    ParseGotoKind(Reader->get_value_string(0), &Op.Field_5B, &Op.Field_5A);
-    Op.Field_0C = 2;
+    ParseGotoKind(Reader->get_value_string(0), &Op.bGotoNoCruise, &Op.bGotoCruise);
+    Op.GotoKind = 2;
 
-    StoreFloatBits(&Op.Field_38, Reader->get_value_float(1));
-    StoreFloatBits(&Op.Field_3C, Reader->get_value_float(2));
-    StoreFloatBits(&Op.Field_40, Reader->get_value_float(3));
-    StoreFloatBits(&Op.Field_20, Reader->get_value_float(4));
-    StoreFloatBits(&Op.Field_24, Reader->get_value_float(5));
-    StoreFloatBits(&Op.Field_28, Reader->get_value_float(6));
-    StoreFloatBits(&Op.Field_2C, Reader->get_value_float(7));
-    StoreFloatBits(&Op.Field_30, Reader->get_value_float(8));
-    StoreFloatBits(&Op.Field_34, Reader->get_value_float(9));
-    StoreFloatBits(&Op.Field_44, Reader->get_value_float(10));
-    StoreFloatBits(&Op.Field_48, Reader->get_value_float(11));
-    StoreFloatBits(&Op.Field_4C, Reader->get_value_float(12));
+    StoreFloatBits(&Op.SplineP0X, Reader->get_value_float(1));
+    StoreFloatBits(&Op.SplineP0Y, Reader->get_value_float(2));
+    StoreFloatBits(&Op.SplineP0Z, Reader->get_value_float(3));
+    StoreFloatBits(&Op.SplineP1X, Reader->get_value_float(4));
+    StoreFloatBits(&Op.SplineP1Y, Reader->get_value_float(5));
+    StoreFloatBits(&Op.SplineP1Z, Reader->get_value_float(6));
+    StoreFloatBits(&Op.SplineP2X, Reader->get_value_float(7));
+    StoreFloatBits(&Op.SplineP2Y, Reader->get_value_float(8));
+    StoreFloatBits(&Op.SplineP2Z, Reader->get_value_float(9));
+    StoreFloatBits(&Op.SplineP3X, Reader->get_value_float(10));
+    StoreFloatBits(&Op.SplineP3Y, Reader->get_value_float(11));
+    StoreFloatBits(&Op.SplineP3Z, Reader->get_value_float(12));
 
-    Op.Field_50 = Reader->get_value_float(13);
-    Op.Field_58 = Reader->get_value_bool(14) ? 1 : 0;
+    Op.ArrivalRange = Reader->get_value_float(13);
+    Op.bFlyThrough = Reader->get_value_bool(14) ? 1 : 0;
     if (!Reader->is_value_empty(15))
-        Op.Field_54 = static_cast<float>(Reader->get_value_int(15));
+        Op.MaxSpeed = static_cast<float>(Reader->get_value_int(15));
     if (Reader->is_value_empty(16))
         return;
     ObjectName = Reader->get_value_string(16);
-    Op.Field_60 = static_cast<float>(Reader->get_value_int(17));
-    Op.Field_64 = static_cast<float>(Reader->get_value_int(18));
+    Op.TetherNearRange = static_cast<float>(Reader->get_value_int(17));
+    Op.TetherFarRange = static_cast<float>(Reader->get_value_int(18));
     if (!Reader->is_value_empty(19))
-        StoreFloatBits(&Op.Field_68, Reader->get_value_float(19));
+        StoreFloatBits(&Op.TetherCruiseRatio, Reader->get_value_float(19));
     if (!Reader->is_value_empty(20))
         bNoFailOnTimeout = Reader->get_value_int(20);
 }
@@ -473,26 +474,26 @@ bool FObjListGotoVec::Execute(FContentShipBase* Ship)
     return ExecuteGotoToObject(Ship, &Op, &ObjectName);
 }
 
-// FUN_06f264d0. Field_0C = 1 (a point); the point and Field_50 are read as ints.
+// FUN_06f264d0. GotoKind = 1 (a point); the point and ArrivalRange are read as ints.
 void FObjListGotoVec::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
-    ParseGotoKind(Reader->get_value_string(0), &Op.Field_5B, &Op.Field_5A);
-    Op.Field_0C = 1;
+    ParseGotoKind(Reader->get_value_string(0), &Op.bGotoNoCruise, &Op.bGotoCruise);
+    Op.GotoKind = 1;
     Op.Destination.x = static_cast<float>(Reader->get_value_int(1));
     Op.Destination.y = static_cast<float>(Reader->get_value_int(2));
     Op.Destination.z = static_cast<float>(Reader->get_value_int(3));
-    Op.Field_50 = static_cast<float>(Reader->get_value_int(4));
-    Op.Field_58 = Reader->get_value_bool(5) ? 1 : 0;
+    Op.ArrivalRange = static_cast<float>(Reader->get_value_int(4));
+    Op.bFlyThrough = Reader->get_value_bool(5) ? 1 : 0;
     if (!Reader->is_value_empty(6))
-        Op.Field_54 = static_cast<float>(Reader->get_value_int(6));
+        Op.MaxSpeed = static_cast<float>(Reader->get_value_int(6));
     if (Reader->is_value_empty(7))
         return;
     ObjectName = Reader->get_value_string(7);
-    Op.Field_60 = static_cast<float>(Reader->get_value_int(8));
-    Op.Field_64 = static_cast<float>(Reader->get_value_int(9));
+    Op.TetherNearRange = static_cast<float>(Reader->get_value_int(8));
+    Op.TetherFarRange = static_cast<float>(Reader->get_value_int(9));
     if (!Reader->is_value_empty(10))
-        StoreFloatBits(&Op.Field_68, Reader->get_value_float(10));
+        StoreFloatBits(&Op.TetherCruiseRatio, Reader->get_value_float(10));
     if (!Reader->is_value_empty(11))
         bNoFailOnTimeout = Reader->get_value_int(11);
 }
@@ -507,15 +508,15 @@ int FObjListGotoVec::GetType()
 void FObjListGotoVec::SetDestination(Vector const* Destination, float Range, float MaxSpeed,
                                      unsigned int ObjectId, bool bNoCruise, bool bCruise)
 {
-    Op.Field_0C = 1;
+    Op.GotoKind = 1;
     Op.Destination = *Destination;
-    Op.Field_50 = Range;
-    Op.Field_54 = MaxSpeed;
-    Op.Field_58 = 0;
-    Op.Field_5A = bCruise ? 1 : 0;
+    Op.ArrivalRange = Range;
+    Op.MaxSpeed = MaxSpeed;
+    Op.bFlyThrough = 0;
+    Op.bGotoCruise = bCruise ? 1 : 0;
     if ((ObjectId & 0x3fffffff) != 0)
-        Op.Field_5C = ObjectId;
-    Op.Field_5B = bNoCruise ? 1 : 0;
+        Op.TetherObjectId = ObjectId;
+    Op.bGotoNoCruise = bNoCruise ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -601,12 +602,12 @@ void FObjListFollow::Parse(INI_Reader* Reader)
         Op.FollowDistance = 2500.0f;
     if (!Reader->is_value_empty(2))
     {
-        Op.Field_14 = static_cast<float>(Reader->get_value_int(2));
-        Op.Field_18 = static_cast<float>(Reader->get_value_int(3));
-        Op.Field_1C = static_cast<float>(Reader->get_value_int(4));
+        Op.FollowOffsetX = static_cast<float>(Reader->get_value_int(2));
+        Op.FollowOffsetY = static_cast<float>(Reader->get_value_int(3));
+        Op.FollowOffsetZ = static_cast<float>(Reader->get_value_int(4));
     }
     if (!Reader->is_value_empty(5))
-        Op.Field_20 = static_cast<float>(Reader->get_value_int(5));
+        Op.EngageRange = static_cast<float>(Reader->get_value_int(5));
 }
 
 // 06f250d0.
@@ -633,14 +634,14 @@ bool FObjListGuide::Execute(FContentShipBase* Ship)
     if (TargetName.Length != 0)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
-        Op.GotoParams.Field_5C = Id;
+        Op.GotoParams.TetherObjectId = Id;
         if ((Id & 0x3fffffff) == 0)
         {
             Ship->AdvanceDirective();
             return true;
         }
     }
-    Op.FollowParams.TargetId = Op.GotoParams.Field_5C;
+    Op.FollowParams.TargetId = Op.GotoParams.TetherObjectId;
     DefaultPriority(&Op, Ship);
     MuteNpcShip(Ship);
     return Ship->SubmitDirective(&Op);
@@ -651,31 +652,31 @@ void FObjListGuide::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
     TargetName = Reader->get_value_string(0);
-    Op.FollowParams.Field_14 = static_cast<float>(Reader->get_value_int(1));
-    Op.FollowParams.Field_18 = static_cast<float>(Reader->get_value_int(2));
-    Op.FollowParams.Field_1C = static_cast<float>(Reader->get_value_int(3));
-    Op.GotoParams.Field_0C = 1;
-    ParseGotoKind(Reader->get_value_string(4), &Op.GotoParams.Field_5B, &Op.GotoParams.Field_5A);
+    Op.FollowParams.FollowOffsetX = static_cast<float>(Reader->get_value_int(1));
+    Op.FollowParams.FollowOffsetY = static_cast<float>(Reader->get_value_int(2));
+    Op.FollowParams.FollowOffsetZ = static_cast<float>(Reader->get_value_int(3));
+    Op.GotoParams.GotoKind = 1;
+    ParseGotoKind(Reader->get_value_string(4), &Op.GotoParams.bGotoNoCruise, &Op.GotoParams.bGotoCruise);
     Op.GotoParams.Destination.x = static_cast<float>(Reader->get_value_int(5));
     Op.GotoParams.Destination.y = static_cast<float>(Reader->get_value_int(6));
     Op.GotoParams.Destination.z = static_cast<float>(Reader->get_value_int(7));
-    Op.GotoParams.Field_50 = static_cast<float>(Reader->get_value_int(8));
-    Op.GotoParams.Field_58 = Reader->get_value_bool(9) ? 1 : 0;
-    Op.GotoParams.Field_54 = static_cast<float>(Reader->get_value_int(10));
-    Op.GotoParams.Field_60 = static_cast<float>(Reader->get_value_int(11));
-    Op.GotoParams.Field_64 = static_cast<float>(Reader->get_value_int(12));
+    Op.GotoParams.ArrivalRange = static_cast<float>(Reader->get_value_int(8));
+    Op.GotoParams.bFlyThrough = Reader->get_value_bool(9) ? 1 : 0;
+    Op.GotoParams.MaxSpeed = static_cast<float>(Reader->get_value_int(10));
+    Op.GotoParams.TetherNearRange = static_cast<float>(Reader->get_value_int(11));
+    Op.GotoParams.TetherFarRange = static_cast<float>(Reader->get_value_int(12));
     if (!Reader->is_value_empty(13))
-        Op.Field_A0 = Reader->get_value_bool(13) ? 1 : 0;
+        Op.bStartFollowing = Reader->get_value_bool(13) ? 1 : 0;
     if (!Reader->is_value_empty(14))
         Op.Field_AC = Reader->get_value_int(14);
     if (!Reader->is_value_empty(15))
-        Op.Field_A4 = Reader->get_value_float(15);
+        Op.SampleInterval = Reader->get_value_float(15);
     if (!Reader->is_value_empty(16))
-        Op.Field_B0 = Reader->get_value_float(16);
+        Op.ProgressHighThreshold = Reader->get_value_float(16);
     if (!Reader->is_value_empty(17))
-        Op.Field_B4 = Reader->get_value_float(17);
+        Op.ProgressLowThreshold = Reader->get_value_float(17);
     if (!Reader->is_value_empty(18))
-        Op.Field_A8 = Reader->get_value_float(18);
+        Op.CourseAngleThreshold = Reader->get_value_float(18);
     if (!Reader->is_value_empty(19))
         bNoFailOnTimeout = Reader->get_value_int(19);
 }
@@ -689,22 +690,22 @@ int FObjListGuide::GetType()
 // FUN_06f26770.
 void FObjListGuide::SetGuide(unsigned int const* TargetId, Vector const* FollowOffset,
                              Vector const* Destination, float Range, bool bNoCruise,
-                             bool bCruise, bool bStartFollowing, bool Field58)
+                             bool bCruise, bool bStartFollowing, bool bFlyThrough)
 {
-    Op.GotoParams.Field_0C = 1;
+    Op.GotoParams.GotoKind = 1;
     Op.GotoParams.Destination = *Destination;
-    Op.GotoParams.Field_58 = Field58 ? 1 : 0;
-    Op.GotoParams.Field_50 = Range;
-    Op.GotoParams.Field_5C = *TargetId;
-    Op.GotoParams.Field_5B = bNoCruise ? 1 : 0;
-    Op.GotoParams.Field_5A = bCruise ? 1 : 0;
-    Op.GotoParams.Field_60 = 200.0f;
-    Op.GotoParams.Field_64 = 500.0f;
+    Op.GotoParams.bFlyThrough = bFlyThrough ? 1 : 0;
+    Op.GotoParams.ArrivalRange = Range;
+    Op.GotoParams.TetherObjectId = *TargetId;
+    Op.GotoParams.bGotoNoCruise = bNoCruise ? 1 : 0;
+    Op.GotoParams.bGotoCruise = bCruise ? 1 : 0;
+    Op.GotoParams.TetherNearRange = 200.0f;
+    Op.GotoParams.TetherFarRange = 500.0f;
     Op.FollowParams.TargetId = *TargetId;
-    Op.FollowParams.Field_14 = FollowOffset->x;
-    Op.FollowParams.Field_18 = FollowOffset->y;
-    Op.FollowParams.Field_1C = FollowOffset->z;
-    Op.Field_A0 = bStartFollowing ? 1 : 0;
+    Op.FollowParams.FollowOffsetX = FollowOffset->x;
+    Op.FollowParams.FollowOffsetY = FollowOffset->y;
+    Op.FollowParams.FollowOffsetZ = FollowOffset->z;
+    Op.bStartFollowing = bStartFollowing ? 1 : 0;
 }
 
 // Inlined in factory case 9.
@@ -720,57 +721,57 @@ bool FObjListGuideShip::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
     unsigned int TargetId = FindTargetId(Ship, &TargetName);
-    Op.GotoParams.Field_5C = TargetId;
+    Op.GotoParams.TetherObjectId = TargetId;
     if ((TargetId & 0x3fffffff) == 0)
     {
         Ship->AdvanceDirective();
         return true;
     }
     unsigned int ObjectId = FindTargetId(Ship, &ObjectName);
-    Op.GotoParams.Field_1C = static_cast<int32_t>(ObjectId);
+    Op.GotoParams.TargetId = static_cast<int32_t>(ObjectId);
     if ((ObjectId & 0x3fffffff) == 0)
     {
         Ship->AdvanceDirective();
         return true;
     }
-    Op.FollowParams.TargetId = Op.GotoParams.Field_5C;
+    Op.FollowParams.TargetId = Op.GotoParams.TetherObjectId;
     DefaultPriority(&Op, Ship);
     Vector Position;
     Matrix Orientation;
-    pub::SpaceObj::GetLocation(static_cast<unsigned int>(Op.GotoParams.Field_1C), Position,
+    pub::SpaceObj::GetLocation(static_cast<unsigned int>(Op.GotoParams.TargetId), Position,
                                Orientation);
     MuteNpcShip(Ship);
     return Ship->SubmitDirective(&Op);
 }
 
-// FUN_06f26bb0. Field_0C = 0 (the goto target is an object).
+// FUN_06f26bb0. GotoKind = 0 (the goto target is an object).
 void FObjListGuideShip::Parse(INI_Reader* Reader)
 {
     bNoFailOnTimeout = 1;
     TargetName = Reader->get_value_string(0);
-    Op.FollowParams.Field_14 = static_cast<float>(Reader->get_value_int(1));
-    Op.FollowParams.Field_18 = static_cast<float>(Reader->get_value_int(2));
-    Op.FollowParams.Field_1C = static_cast<float>(Reader->get_value_int(3));
-    Op.GotoParams.Field_0C = 0;
-    ParseGotoKind(Reader->get_value_string(4), &Op.GotoParams.Field_5B, &Op.GotoParams.Field_5A);
+    Op.FollowParams.FollowOffsetX = static_cast<float>(Reader->get_value_int(1));
+    Op.FollowParams.FollowOffsetY = static_cast<float>(Reader->get_value_int(2));
+    Op.FollowParams.FollowOffsetZ = static_cast<float>(Reader->get_value_int(3));
+    Op.GotoParams.GotoKind = 0;
+    ParseGotoKind(Reader->get_value_string(4), &Op.GotoParams.bGotoNoCruise, &Op.GotoParams.bGotoCruise);
     ObjectName = Reader->get_value_string(5);
-    Op.GotoParams.Field_50 = static_cast<float>(Reader->get_value_int(6));
-    Op.GotoParams.Field_58 = Reader->get_value_bool(7) ? 1 : 0;
-    Op.GotoParams.Field_54 = static_cast<float>(Reader->get_value_int(8));
-    Op.GotoParams.Field_60 = static_cast<float>(Reader->get_value_int(9));
-    Op.GotoParams.Field_64 = static_cast<float>(Reader->get_value_int(10));
+    Op.GotoParams.ArrivalRange = static_cast<float>(Reader->get_value_int(6));
+    Op.GotoParams.bFlyThrough = Reader->get_value_bool(7) ? 1 : 0;
+    Op.GotoParams.MaxSpeed = static_cast<float>(Reader->get_value_int(8));
+    Op.GotoParams.TetherNearRange = static_cast<float>(Reader->get_value_int(9));
+    Op.GotoParams.TetherFarRange = static_cast<float>(Reader->get_value_int(10));
     if (!Reader->is_value_empty(11))
-        Op.Field_A0 = Reader->get_value_bool(11) ? 1 : 0;
+        Op.bStartFollowing = Reader->get_value_bool(11) ? 1 : 0;
     if (!Reader->is_value_empty(12))
         Op.Field_AC = Reader->get_value_int(12);
     if (!Reader->is_value_empty(13))
-        Op.Field_A4 = Reader->get_value_float(13);
+        Op.SampleInterval = Reader->get_value_float(13);
     if (!Reader->is_value_empty(14))
-        Op.Field_B0 = Reader->get_value_float(14);
+        Op.ProgressHighThreshold = Reader->get_value_float(14);
     if (!Reader->is_value_empty(15))
-        Op.Field_B4 = Reader->get_value_float(15);
+        Op.ProgressLowThreshold = Reader->get_value_float(15);
     if (!Reader->is_value_empty(16))
-        Op.Field_A8 = Reader->get_value_float(16);
+        Op.CourseAngleThreshold = Reader->get_value_float(16);
     if (!Reader->is_value_empty(17))
         bNoFailOnTimeout = Reader->get_value_int(17);
 }
@@ -822,7 +823,7 @@ void FObjListFace::Parse(INI_Reader* Reader)
     {
         TargetName = Reader->get_value_string(1);
         if (!Reader->is_value_empty(2))
-            Op.Field_44 = Reader->get_value_bool(2) ? 1 : 0;
+            Op.bKillEngine = Reader->get_value_bool(2) ? 1 : 0;
         return;
     }
     if (Op.Mode != 2)
@@ -831,7 +832,7 @@ void FObjListFace::Parse(INI_Reader* Reader)
     Op.FacePoint.y = Reader->get_value_float(2);
     Op.FacePoint.z = Reader->get_value_float(3);
     if (!Reader->is_value_empty(4))
-        Op.Field_44 = Reader->get_value_bool(4) ? 1 : 0;
+        Op.bKillEngine = Reader->get_value_bool(4) ? 1 : 0;
 }
 
 // 06f25070.
@@ -1147,9 +1148,9 @@ bool FObjListFollowPlayer::Execute(FContentShipBase* Ship)
         FVector LeaderPosition = Formation->GetSlotPosition(static_cast<unsigned int>(LeaderSlot));
         FVector MemberPosition = Formation->GetSlotPosition(MemberSlot);
         ++MemberSlot;
-        FollowOp.Field_14 = MemberPosition.X - LeaderPosition.X;
-        FollowOp.Field_18 = MemberPosition.Y - LeaderPosition.Y;
-        FollowOp.Field_1C = MemberPosition.Z - LeaderPosition.Z;
+        FollowOp.FollowOffsetX = MemberPosition.X - LeaderPosition.X;
+        FollowOp.FollowOffsetY = MemberPosition.Y - LeaderPosition.Y;
+        FollowOp.FollowOffsetZ = MemberPosition.Z - LeaderPosition.Z;
 
         Member->CancelDirectives();
         DefaultPriority(&FollowOp, Member);
@@ -1230,7 +1231,7 @@ bool FObjListDock::Execute(FContentShipBase* Ship)
     if (ObjectName.Length != 0)
     {
         unsigned int Id = FindTargetId(Ship, &ObjectName);
-        Op.Field_1C = static_cast<int32_t>(Id);
+        Op.TetherObjectId = static_cast<int32_t>(Id);
         if ((Id & 0x3fffffff) == 0)
         {
             Ship->AdvanceDirective();
@@ -1247,18 +1248,18 @@ void FObjListDock::Parse(INI_Reader* Reader)
     Op.DockObjectId = pub::GetNicknameId(Reader->get_value_string(0));
     if (Reader->is_value_empty(1))
     {
-        Op.Field_10 = 0;
+        Op.NextRingId = 0;
         return;
     }
     if (_stricmp(Reader->get_value_string(1), "NONE") == 0)
-        Op.Field_10 = 0;
+        Op.NextRingId = 0;
     else
-        Op.Field_10 = static_cast<int32_t>(pub::GetNicknameId(Reader->get_value_string(1)));
+        Op.NextRingId = static_cast<int32_t>(pub::GetNicknameId(Reader->get_value_string(1)));
     if (Reader->is_value_empty(2))
         return;
     ObjectName = Reader->get_value_string(2);
-    Op.Field_20 = static_cast<float>(Reader->get_value_int(3));
-    Op.Field_24 = static_cast<float>(Reader->get_value_int(4));
+    Op.TetherNearRange = static_cast<float>(Reader->get_value_int(3));
+    Op.TetherFarRange = static_cast<float>(Reader->get_value_int(4));
 }
 
 // 06f250a0.
@@ -1271,7 +1272,7 @@ int FObjListDock::GetType()
 void FObjListDock::SetTarget(unsigned int const* DockObjectId, unsigned int const* NextRingId)
 {
     Op.DockObjectId = *DockObjectId;
-    Op.Field_10 = static_cast<int32_t>(*NextRingId);
+    Op.NextRingId = static_cast<int32_t>(*NextRingId);
 }
 
 // LAB_06f27830. Retail calls vtbl +4 and drops the result.
@@ -1288,10 +1289,10 @@ void FObjListInstantTradelane::Parse(INI_Reader* Reader)
     Op.TradeLaneId = pub::GetNicknameId(Reader->get_value_string(0));
     if (Reader->is_value_empty(1))
     {
-        Op.Field_10 = 0;
+        Op.ExitRingId = 0;
         return;
     }
-    Op.Field_10 = static_cast<int32_t>(pub::GetNicknameId(Reader->get_value_string(1)));
+    Op.ExitRingId = static_cast<int32_t>(pub::GetNicknameId(Reader->get_value_string(1)));
 }
 
 // 06f250a0 (Dock's body, so InstantTradelane reports 0x13).
@@ -1305,8 +1306,8 @@ void FObjListInstantTradelane::SetLane(unsigned int const* TradeLaneId, unsigned
                                        unsigned int const* NextRingId)
 {
     Op.TradeLaneId = *TradeLaneId;
-    Op.Field_10 = static_cast<int32_t>(*NextRingId);
-    Op.Field_14 = static_cast<int32_t>(OffsetBits);
+    Op.ExitRingId = static_cast<int32_t>(*NextRingId);
+    Op.LaneSpeed = static_cast<int32_t>(OffsetBits);
 }
 
 // LAB_06f27970. Retail calls vtbl +4 and drops the result. Without a launch object (or dock
@@ -1314,41 +1315,41 @@ void FObjListInstantTradelane::SetLane(unsigned int const* TradeLaneId, unsigned
 bool FObjListLaunch::Execute(FContentShipBase* Ship)
 {
     Ship->IsNpcShip();
-    if (Op.Field_10 == -1 || Op.LaunchObjectId == 0)
+    if (Op.DockPortIndex == -1 || Op.LaunchObjectId == 0)
     {
         unsigned int ShipId = Ship->SpaceObjId;
-        unsigned int TerminalType = static_cast<unsigned int>(Op.Field_14);
-        if (!GetShipDockingTarget(&ShipId, &Op.LaunchObjectId, &Op.Field_10, &TerminalType))
+        unsigned int TerminalType = static_cast<unsigned int>(Op.TerminalType);
+        if (!GetShipDockingTarget(&ShipId, &Op.LaunchObjectId, &Op.DockPortIndex, &TerminalType))
             return false;
-        Op.Field_14 = static_cast<int32_t>(TerminalType);
+        Op.TerminalType = static_cast<int32_t>(TerminalType);
     }
     DefaultPriority(&Op, Ship);
     SetDockEquipment(Ship->SpaceObjId, false, false, nullptr);
     return Ship->SubmitDirective(&Op);
 }
 
-// LAB_06f27a40. An unknown terminal type leaves Field_14.
+// LAB_06f27a40. An unknown terminal type leaves TerminalType.
 void FObjListLaunch::Parse(INI_Reader* Reader)
 {
     Op.LaunchObjectId = pub::GetNicknameId(Reader->get_value_string(0));
-    Op.Field_10 = Reader->get_value_int(1);
+    Op.DockPortIndex = Reader->get_value_int(1);
     char const* Kind = Reader->get_value_string(2);
     if (_stricmp(Kind, "NONE") == 0)
-        Op.Field_14 = 0;
+        Op.TerminalType = 0;
     else if (_stricmp(Kind, "BERTH") == 0)
-        Op.Field_14 = 1;
+        Op.TerminalType = 1;
     else if (_stricmp(Kind, "PAD") == 0)
-        Op.Field_14 = 2;
+        Op.TerminalType = 2;
     else if (_stricmp(Kind, "MOOR_SMALL") == 0)
-        Op.Field_14 = 3;
+        Op.TerminalType = 3;
     else if (_stricmp(Kind, "MOOR_MEDIUM") == 0)
-        Op.Field_14 = 4;
+        Op.TerminalType = 4;
     else if (_stricmp(Kind, "MOOR_LARGE") == 0)
-        Op.Field_14 = 5;
+        Op.TerminalType = 5;
     else if (_stricmp(Kind, "RING") == 0)
-        Op.Field_14 = 6;
+        Op.TerminalType = 6;
     else if (_stricmp(Kind, "JUMP_GATE") == 0)
-        Op.Field_14 = 7;
+        Op.TerminalType = 7;
 }
 
 // 06f25090.
@@ -1361,8 +1362,8 @@ int FObjListLaunch::GetType()
 void FObjListLaunch::SetLaunch(unsigned int const* LaunchObjectId, int DockIndex, int TerminalType)
 {
     Op.LaunchObjectId = *LaunchObjectId;
-    Op.Field_10 = DockIndex;
-    Op.Field_14 = TerminalType;
+    Op.DockPortIndex = DockIndex;
+    Op.TerminalType = TerminalType;
 }
 
 // ---------------------------------------------------------------------------------------

@@ -52,12 +52,12 @@ namespace
     void ResetNewsDescription(NewsBroadcastDescription& Desc)
     {
         Desc.BaseId = 0;
-        Desc.bFlag1 = false;
-        Desc.bFlag2 = false;
-        Desc.Category = 0;
+        Desc.bBreaking = false;
+        Desc.bAutoselect = false;
+        Desc.Icon = 0;
+        ResetNewsFmtStr(Desc.CategoryName);
         ResetNewsFmtStr(Desc.Headline);
         ResetNewsFmtStr(Desc.Text);
-        ResetNewsFmtStr(Desc.Audio);
         Desc.LogoTexture = nullptr;
         Desc.AudioName = nullptr;
         Desc.Filter = 0;
@@ -103,41 +103,41 @@ namespace
             }
             else if (Reader->is_value("breaking"))
             {
-                Item->Desc.bFlag1 = true;
+                Item->Desc.bBreaking = true;
             }
             else if (Reader->is_value("autoselect"))
             {
-                Item->Desc.bFlag2 = true;
+                Item->Desc.bAutoselect = true;
             }
             else if (Reader->is_value("icon"))
             {
                 // Each compare re-reads the value; no match leaves Category alone.
                 if (_stricmp(Reader->get_value_string(), "critical") == 0)
-                    Item->Desc.Category = 1;
+                    Item->Desc.Icon = 1;
                 else if (_stricmp(Reader->get_value_string(), "world") == 0)
-                    Item->Desc.Category = 2;
+                    Item->Desc.Icon = 2;
                 else if (_stricmp(Reader->get_value_string(), "mission") == 0)
-                    Item->Desc.Category = 3;
+                    Item->Desc.Icon = 3;
                 else if (_stricmp(Reader->get_value_string(), "system") == 0)
-                    Item->Desc.Category = 4;
+                    Item->Desc.Icon = 4;
                 else if (_stricmp(Reader->get_value_string(), "faction") == 0)
-                    Item->Desc.Category = 5;
+                    Item->Desc.Icon = 5;
                 else if (_stricmp(Reader->get_value_string(), "universe") == 0)
-                    Item->Desc.Category = 6;
+                    Item->Desc.Icon = 6;
             }
             else if (Reader->is_value("category"))
+            {
+                Item->Desc.CategoryName.begin_mad_lib(Reader->get_value_int(0));
+                Item->Desc.CategoryName.end_mad_lib();
+            }
+            else if (Reader->is_value("headline"))
             {
                 Item->Desc.Headline.begin_mad_lib(Reader->get_value_int(0));
                 Item->Desc.Headline.end_mad_lib();
             }
-            else if (Reader->is_value("headline"))
-            {
-                Item->Desc.Text.begin_mad_lib(Reader->get_value_int(0));
-                Item->Desc.Text.end_mad_lib();
-            }
             else if (Reader->is_value("text"))
             {
-                FmtStr& Text = Item->Desc.Audio;
+                FmtStr& Text = Item->Desc.Text;
                 Text.begin_mad_lib(Reader->get_value_int(0));
                 for (unsigned int Index = 1; !Reader->is_value_empty(Index); ++Index)
                     Text.append_string(Reader->get_value_int(Index));
@@ -171,9 +171,9 @@ FNewsItem::FNewsItem()
 // FUN_06eb4680 (06eb4680-06eb471f). The StringAlloc'd strings are not freed.
 FNewsItem::~FNewsItem()
 {
+    Desc.CategoryName.destroy();
     Desc.Headline.destroy();
     Desc.Text.destroy();
-    Desc.Audio.destroy();
 }
 
 // FUN_06eb44c0 (06eb44c0-06eb4677).
@@ -387,7 +387,7 @@ namespace
             if (!Msg->bAccepted)
                 break;
             FContentPlayerState* State = FindContentPlayerState(Msg->PlayerId);
-            if (Msg->Kind == 2)
+            if (Msg->Kind == pub::Controller::MissionOfferVendor)
             {
                 // A vendor offer. The visit lookup is not tested for end(), nor State for
                 // null.
@@ -438,7 +438,7 @@ namespace
                     }
                 }
             }
-            else if (Msg->Kind == 1)
+            else if (Msg->Kind == pub::Controller::MissionOfferBarCharacter)
             {
                 // A bar character's offer. Base and room are not null-tested here.
                 FContentBase* Base = State->GetBaseRecord();

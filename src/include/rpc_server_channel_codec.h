@@ -744,10 +744,10 @@ public:
     unsigned int ReceiverId;      // +0x24
     unsigned int VoiceId;      // +0x28
     Costume Body;                 // +0x2c  SendServerSendComm CommCostume (13 dwords by value)
-    unsigned int CommType;      // +0x60  SendServerSendComm CommType. TODO: meaning
+    unsigned int CaptionIds;      // +0x60  SendServerSendComm CaptionIds
     unsigned int* TextIds;     // +0x64  owned array (operator new / operator delete), TextIds
     signed char TextCount;       // +0x68  its count, signed (MOVSX everywhere), TextCount
-    unsigned int Mood;      // +0x6c  Mood; the wire carries the low word
+    unsigned int PermutationIds;      // +0x6c  PermutationIds; the wire carries the low word
     float Duration;             // +0x70  Duration; one quantized byte on the wire
     // TODO: meaning. bReceiverIsOwnShip's byte, raw; the codec sends the costume only when it is not 0.
     unsigned char bReceiverIsOwnShip;     // +0x74
@@ -758,7 +758,7 @@ static_assert(sizeof(FRpcServerSendCommPacket) == 0x78, "SERVER 0x4f size 0x78")
 // dtor 06b45810 (body 06b457a0), RS 06be7c90 / 06be7cd0 / 06be7d40 (body 06bfa600). One packet
 // type for the eight IClient slots 113..120; each sender sets one or two flag bits through the
 // setters below (RC 06b45830..06b45a60). The ctor zeroes Flags and every scalar, sets
-// Field_0x54 to -1 and leaves the string and the vector empty. VC6 layout: wstring +0x40
+// Affiliation to -1 and leaves the string and the vector empty. VC6 layout: wstring +0x40
 // (_Ptr +0x44, _Len +0x48), +0x50 (ctor 0, never coded), vector +0x58 (_First +0x5c), byte
 // +0x68; the port's std containers have their own layout, so only the scalar offsets before
 // +0x40 are retail's. Wire: Flags, then per set bit in this order: 0x08 +0x28, 0x04 +0x24,
@@ -768,14 +768,14 @@ static_assert(sizeof(FRpcServerSendCommPacket) == 0x78, "SERVER 0x4f size 0x78")
 class FRpcServerMiscObjUpdatePacket : public FPacketBase {
 public:
     FRpcServerMiscObjUpdatePacket();
-    void SetField0x28(unsigned int Value);
-    void SetField0x24(unsigned int Value);
-    void SetField0x54(unsigned int Value);
-    void SetField0x34(unsigned int Value);
-    void SetFields0x38(unsigned int Value0x38, unsigned int Value0x3c);
+    void SetObjectId(unsigned int Value);
+    void SetPlayerId(unsigned int Value);
+    void SetAffiliation(unsigned int Value);
+    void SetGroupId(unsigned int Value);
+    void SetMission(unsigned int InMissionId, unsigned int InMissionSetBy);
     void SetText(const std::wstring& Source);
-    void SetField0x30(unsigned int Value);
-    void SetField0x2c(unsigned short Value);
+    void SetSystemId(unsigned int Value);
+    void SetRank(unsigned short Value);
     void AddId(unsigned int Id);
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
         unsigned int* OutLength) override;

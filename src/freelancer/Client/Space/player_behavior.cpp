@@ -402,18 +402,18 @@ bool IsMouseFlightHoldThresholdReached()
 
 namespace
 {
-    float G_UnknownFloat673568 = 0.0f; // .data:00673568
-    float G_UnknownFloat67356c = 0.0f; // .data:0067356c
+    float G_TargetWindowNotification = 0.0f; // .data:00673568
+    float G_StatusWindowNotification = 0.0f; // .data:0067356c
 }
 
-void SetUnknownFloat673568(float Value)
+void SetTargetWindowNotification(float Value)
 {
     // FUN_004c83a0
-    G_UnknownFloat673568 = Value;
+    G_TargetWindowNotification = Value;
 }
 
-void SetUnknownFloat67356c(float Value)
+void SetStatusWindowNotification(float Value)
 {
     // FUN_004c83b0
-    G_UnknownFloat67356c = Value;
+    G_StatusWindowNotification = Value;
 }

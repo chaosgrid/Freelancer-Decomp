@@ -656,7 +656,8 @@ namespace
         }
         case EMessage::TradelaneEnter:
         {
-            // Parms = {ship, entry ring, target ring, system}.
+            // Parms = {ship, entry ring, target ring, system}. Retail tests neither System nor
+            // the lane.
             unsigned int const* Message = static_cast<unsigned int const*>(Parms);
             FSystemInfo* System = FindSystemInfo(&Message[3]);                  // FUN_06f75f30
             FContentShipBase* Ship =
@@ -707,6 +708,7 @@ namespace
             FSystemInfo* System = FindSystemInfo(&Message[3]);                  // FUN_06f75f30
             FContentShipBase* Ship =
                 static_cast<FContentShipBase*>(System->FindShip(Message[0]));   // FUN_06f73930
+            // Retail: System is tested only after FindShip used it (06efed1e-06efed2d).
             if (Ship == nullptr || System == nullptr)
                 break;
             unsigned int const NoRing = 0;                                      // DAT_06fb7d60

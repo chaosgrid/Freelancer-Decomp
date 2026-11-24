@@ -889,7 +889,7 @@ namespace AlchemyImpl
         while (Index < Last && !(OuterTime < Keys_.At(Index + 1).Time))
             ++Index;
 
-        if (Mode_ == 0)
+        if (Mode_ == RampModeStep)
             return TTraits::EvalChild(Keys_.At(Index).Value, InnerTime);
 
         // Next is stored to the Inner argument slot as a float; Floor, U and W stay on the
@@ -905,22 +905,22 @@ namespace AlchemyImpl
         double W = U;
         switch (Mode_)
         {
-        case 2:
+        case RampModeEaseIn:
             W = U * U;
             break;
-        case 3:
+        case RampModeEaseOut:
             W = One - (One - U) * (One - U);
             break;
-        case 4:
+        case RampModeEaseInOut:
             W = U * ((static_cast<double>(kRampThree) - (U + U)) * U);
             break;
-        case 5:
+        case RampModeEaseInWhenFalling:
             if (NextValue < FloorValue)
                 W = U * U;
             else
                 W = One - (One - U) * (One - U);
             break;
-        case 6:
+        case RampModeEaseInWhenRising:
             if (FloorValue < NextValue)
                 W = U * U;
             else
@@ -1175,7 +1175,7 @@ namespace AlchemyImpl
         while (Index < Last && !(OuterTime < Keys_.At(Index + 1).Time))
             ++Index;
 
-        if (Mode_ == 0)
+        if (Mode_ == RampModeStep)
         {
             Keys_.At(Index).Value->EvalRgb(Out, InnerTime);
             return Out;
@@ -1195,16 +1195,16 @@ namespace AlchemyImpl
         double W = U;
         switch (Mode_)
         {
-        case 2:
+        case RampModeEaseIn:
             W = U * U;
             break;
-        case 3:
+        case RampModeEaseOut:
             W = One - (One - U) * (One - U);
             break;
-        case 4:
+        case RampModeEaseInOut:
             W = U * ((static_cast<double>(kRampThree) - (U + U)) * U);
             break;
-        case 5:
+        case RampModeEaseInWhenFalling:
         {
             // Ease-in only when SumFloor > SumNext (unordered takes ease-out).
             const double SumNext = (static_cast<double>(Next[0]) + Next[1]) + Next[2];
@@ -1215,7 +1215,7 @@ namespace AlchemyImpl
                 W = One - (One - U) * (One - U);
             break;
         }
-        case 6:
+        case RampModeEaseInWhenRising:
         {
             // The sums pushed the other way: ease-in only when SumNext > SumFloor.
             const double SumFloor = (static_cast<double>(Floor[0]) + Floor[1]) + Floor[2];
@@ -1262,7 +1262,7 @@ namespace AlchemyImpl
         while (Index < Last && !(OuterTime < Keys_.At(Index + 1).Time))
             ++Index;
 
-        if (Mode_ == 0)
+        if (Mode_ == RampModeStep)
             return Keys_.At(Index).Value->EvalPacked(InnerTime);
 
         const unsigned long Next = Keys_.At(Index + 1).Value->EvalPacked(InnerTime);
@@ -1739,32 +1739,32 @@ namespace AlchemyImpl
             const double Half = static_cast<double>(Dv) / (static_cast<double>(Dt) * 0.5f);
             switch (Mode)
             {
-            case 0:
+            case RampModeStep:
             {
                 const unsigned long StepBits = 0xFFFFFFFFu;
                 std::memcpy(&Prev.OutSlope, &StepBits, sizeof(StepBits));
                 break;
             }
-            case 1:
+            case RampModeLinear:
             {
                 const float Slope = static_cast<float>(static_cast<double>(Dv) / Dt);
                 Cur.InSlope = Slope;
                 Prev.OutSlope = Slope;
                 break;
             }
-            case 2:
+            case RampModeEaseIn:
                 Prev.OutSlope = 0.0f;
                 Cur.InSlope = static_cast<float>(Half);
                 break;
-            case 3:
+            case RampModeEaseOut:
                 Prev.OutSlope = static_cast<float>(Half);
                 Cur.InSlope = 0.0f;
                 break;
-            case 4:
+            case RampModeEaseInOut:
                 Prev.OutSlope = 0.0f;
                 Cur.InSlope = 0.0f;
                 break;
-            case 5:
+            case RampModeEaseInWhenFalling:
                 if (Prev.Value > Cur.Value)
                 {
                     Prev.OutSlope = 0.0f;
@@ -1776,7 +1776,7 @@ namespace AlchemyImpl
                     Cur.InSlope = 0.0f;
                 }
                 break;
-            case 6:
+            case RampModeEaseInWhenRising:
                 if (Prev.Value < Cur.Value)
                 {
                     Prev.OutSlope = 0.0f;

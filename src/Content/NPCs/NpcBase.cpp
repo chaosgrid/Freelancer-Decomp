@@ -54,7 +54,7 @@ FContentSpaceObj::FContentSpaceObj(FContentSpaceObjParams const* Params)
     for (int Index = 0; Index < 8; ++Index)
     {
         FSpaceObjAttacker& Slot = Attackers[Index];
-        Slot.AttackerId = 0;
+        Slot.VictimId = 0;
         Slot.Hostility = 0.0f;
         Slot.FirstTime = 0.0f;
         Slot.LastTime = 0.0f;
@@ -143,7 +143,7 @@ void FContentSpaceObj::GetMotion(Vector& OutLinear, Vector& OutAngular) const
 
 // FUN_06eb7280 (FLT_MAX = DAT_06fb4650). The last free slot wins over the oldest; x87:
 // unordered times are skipped.
-bool FContentSpaceObj::FindOrAllocAttacker(unsigned int AttackerId, FSpaceObjAttacker** Out)
+bool FContentSpaceObj::FindOrAllocAttacker(unsigned int VictimId, FSpaceObjAttacker** Out)
 {
     float MinTime = 3.40282347e+38f;
     int OldestIndex = -1;
@@ -151,12 +151,12 @@ bool FContentSpaceObj::FindOrAllocAttacker(unsigned int AttackerId, FSpaceObjAtt
     for (int Index = 0; Index < 8; ++Index)
     {
         FSpaceObjAttacker& Slot = Attackers[Index];
-        if (Slot.AttackerId == AttackerId)
+        if (Slot.VictimId == VictimId)
         {
             *Out = &Slot;
             return true;
         }
-        if (Slot.AttackerId == 0)
+        if (Slot.VictimId == 0)
             EmptyIndex = Index;
         if (MinTime > Slot.LastTime)
         {
@@ -170,7 +170,7 @@ bool FContentSpaceObj::FindOrAllocAttacker(unsigned int AttackerId, FSpaceObjAtt
         Chosen = OldestIndex;
     FSpaceObjAttacker* Slot = &Attackers[0] + Chosen;
     *Out = Slot;
-    Slot->AttackerId = 0;
+    Slot->VictimId = 0;
     Slot->Hostility = 0.0f;
     Slot->FirstTime = 0.0f;
     Slot->LastTime = 0.0f;

@@ -157,7 +157,7 @@ namespace
 
     struct FPanelVertexBatcher
     {
-        unsigned long Field00;     // +0x00  primitive type: ctor 1, DrawPiece writes 5
+        unsigned long PrimitiveType; // +0x00  ctor 1, DrawPiece writes 5 (triangle strip)
         FPanelVert20* Verts;       // +0x04
         int VertCount;             // +0x08
         unsigned long Fvf;         // +0x0c  ctor 0x242 (XYZ|DIFFUSE|TEX2, 0x20-byte vertex)
@@ -169,8 +169,8 @@ namespace
         int VertGrow;              // +0x1c
         unsigned VertCap;          // +0x20
         unsigned IndexCap;         // +0x24
-        unsigned char Flag28;      // +0x28
-        unsigned char Flag29;      // +0x29
+        unsigned char bCloseLoop;  // +0x28  the flush repeats vertex 0 at the end
+        unsigned char bStripMode;  // +0x29  quads as one strip (PushVert's joining copies)
         unsigned char Pad2A[2];
         int QuadCounter;           // +0x2c
         // DrawPiece stores the ring colour * 255 here; PushVert writes it as a D3DCOLOR (BGRA).
@@ -242,8 +242,8 @@ namespace
     void PanelBatcherReset(FPanelVertexBatcher* B)
     {
         B->VertCount = 0;
-        B->Flag29 = 0;
-        B->Flag28 = 0;
+        B->bStripMode = 0;
+        B->bCloseLoop = 0;
         B->QuadCounter = 0;
         B->IndexCount = 0;
         PanelBatcherGrowVerts(B);
@@ -269,7 +269,7 @@ namespace
     // FUN_0050bb60 — push one XYZ vertex from staging color/UV.
     void PanelBatcherPushVert(FPanelVertexBatcher* B, float X, float Y, float Z)
     {
-        if (B->Flag29 != 0)
+        if (B->bStripMode != 0)
         {
             if ((B->QuadCounter & 3) == 3)
             {
@@ -790,9 +790,9 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
 
         // Primitive 5 (triangle strip).
         PanelBatcherReset(&G_PanelBatcher);
-        G_PanelBatcher.Field00 = 5;
-        G_PanelBatcher.Flag28 = 0;
-        G_PanelBatcher.Flag29 = 0;
+        G_PanelBatcher.PrimitiveType = 5;
+        G_PanelBatcher.bCloseLoop = 0;
+        G_PanelBatcher.bStripMode = 0;
         // Double 255.0 (.rdata 0x005c89c0), truncated, low byte kept. No clamp.
         double const K255 = 255.0;
         G_PanelBatcher.ColorR = static_cast<unsigned char>(static_cast<int>(ColorR * K255));
@@ -845,12 +845,12 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
             Twice += 2;
         }
 
-        // Flush. With +0x28 set vertex 0 is copied past the end (no grow). The held pipeline
+        // Flush. With bCloseLoop set vertex 0 is copied past the end (no grow). The held pipeline
         // is released either way.
         int Count = G_PanelBatcher.VertCount;
         if (Count != 0)
         {
-            if (G_PanelBatcher.Flag28 != 0)
+            if (G_PanelBatcher.bCloseLoop != 0)
             {
                 memcpy(&G_PanelBatcher.Verts[Count], &G_PanelBatcher.Verts[0], sizeof(FPanelVert20));
                 Count += 1;
@@ -858,7 +858,7 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
             }
             if (G_PanelBatcher.Pipeline != nullptr)
             {
-                G_PanelBatcher.Pipeline->DrawPrimitive(G_PanelBatcher.Field00,
+                G_PanelBatcher.Pipeline->DrawPrimitive(G_PanelBatcher.PrimitiveType,
                                                        static_cast<unsigned int>(G_PanelBatcher.Fvf),
                                                        G_PanelBatcher.Verts,
                                                        static_cast<unsigned int>(Count), nullptr);
@@ -989,10 +989,10 @@ void FTexturePanels::Load(char const* IniPath,
                     static_cast<FNebulaClouds*>(operator new(sizeof(FNebulaClouds)));
                 NebulaCloudsConstruct(Clouds);
                 NebulaCloudsParseIni(Clouds, Reader, &Shapes);
-                *reinterpret_cast<FTexturePanels**>(Clouds->Raw + 0xc4) = this;
-                *reinterpret_cast<float*>(Clouds->Raw + 0x104) = 0.5f; // 0x3f000000
-                *reinterpret_cast<float*>(Clouds->Raw + 0x108) = 0.9f; // 0x3f666666
-                *reinterpret_cast<float*>(Clouds->Raw + 0x10c) = 1.1f; // 0x3f8ccccd
+                Clouds->Owner = this;
+                Clouds->FullVisibility = 0.5f;   // 0x3f000000
+                Clouds->BudgetVisibility = 0.9f; // 0x3f666666
+                Clouds->AcceptVisibility = 1.1f; // 0x3f8ccccd
                 PushCloudsNode(this, Clouds);
             }
         } while (Reader.read_header());
@@ -1200,18 +1200,17 @@ namespace
 // pipeline, the vertex-buffer manager, the puff table or a puff.
 void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* ExclusionCtx)
 {
-    unsigned char* const B = Clouds->Raw;
     ICamera* const Cam = static_cast<ICamera*>(Camera);
 
     if (static_cast<unsigned char*>(Camera)[0xbc] != 0)
         NebulaCloudsRegenExcluded(Clouds, ExclusionCtx);
 
-    // +0xec, the active count +0x14 and the first shape +0x28.
-    if (B[0xec] == 0)
+    // bLoaded +0xec, the active count +0x14 and the first shape +0x28.
+    if (Clouds->bLoaded == 0)
         return;
-    if (*reinterpret_cast<int*>(B + 0x14) == 0)
+    if (Clouds->ActiveCount == 0)
         return;
-    if (*reinterpret_cast<FTexShape**>(B + 0x28) == nullptr)
+    if (Clouds->PuffShapes[0] == nullptr)
         return;
 
     // Twelve dwords copied from camera slot 4.
@@ -1222,8 +1221,8 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     FVector W;
     CloudsMath()->Rotate(W, CamXform, UnitZ);
 
-    // C1 = N x W (N = +0x6c) through FUN_00422b80, each component stored as a float.
-    float* const N = reinterpret_cast<float*>(B + 0x6c);
+    // C1 = N x W (N = Up, +0x6c) through FUN_00422b80, each component stored as a float.
+    float* const N = Clouds->Up;
     float C1[3];
     C1[0] = static_cast<float>(static_cast<double>(W.Z) * N[1] - static_cast<double>(W.Y) * N[2]);
     C1[1] = static_cast<float>(static_cast<double>(W.X) * N[2] - static_cast<double>(W.Z) * N[0]);
@@ -1250,10 +1249,10 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     }
 
     // DAT_005d8d40 = 0.8f, DAT_005d8e80 = 0.7f.
-    float const Radius = *reinterpret_cast<float*>(B + 0x100);
+    float const Radius = Clouds->CloudRadius;
     float const AheadThreshold =
-        static_cast<float>(static_cast<double>(*reinterpret_cast<float*>(B + 0xb8)) * 0.8f);
-    int const VertTotal = *reinterpret_cast<int*>(B + 0xc) * 6;
+        static_cast<float>(static_cast<double>(Clouds->CentreAhead) * 0.8f);
+    int const VertTotal = Clouds->PuffCount * 6;
     float const InnerRadius = static_cast<float>(static_cast<double>(Radius) * 0.7f);
     int VertCount = 0;
 
@@ -1265,7 +1264,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
 
     // The first shape's alpha probe, cached in its +0x04 while negative (the format query's
     // result is untested).
-    FTexShape* const Shape0 = *reinterpret_cast<FTexShape**>(B + 0x28);
+    FTexShape* const Shape0 = Clouds->PuffShapes[0];
     if (Shape0->AlphaCache < 0)
     {
         int Fmt = PixelFormatFromD3D(0);
@@ -1363,26 +1362,25 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     float const InnerSq = static_cast<float>(static_cast<double>(InnerRadius) * InnerRadius);
     float const InvRing =
         static_cast<float>(1.0f / (static_cast<double>(RadiusSq) - InnerSq));
-    float const NearLo = *reinterpret_cast<float*>(B + 0xe4);
-    float const NearHi = *reinterpret_cast<float*>(B + 0xe8);
+    float const NearLo = Clouds->NearFadeStart;
+    float const NearHi = Clouds->NearFadeEnd;
     float const InvNear = static_cast<float>(1.0f / (static_cast<double>(NearHi) - NearLo));
 
     FVertexMemoryLock Desc = {};
-    unsigned char** const Table = *reinterpret_cast<unsigned char***>(B);
+    FNebulaCloudPuff** const Table = Clouds->PuffTable;
     // The count +0xc is re-read at every iteration's test; the table pointer is read once.
-    for (int I = 0; I < *reinterpret_cast<int*>(B + 0xc); ++I)
+    for (int I = 0; I < Clouds->PuffCount; ++I)
     {
-        // The puff must have +0x50 set and +0x51 clear.
-        float Alpha = static_cast<float>(static_cast<double>(*reinterpret_cast<float*>(B + 0xb4)) *
-                                         *reinterpret_cast<float*>(B + 0xe0));
-        unsigned char* const Puff = Table[I];
-        if (Puff[0x50] == 0 || Puff[0x51] != 0)
+        // The puff must be active (+0x50) and not hidden (+0x51).
+        float Alpha = static_cast<float>(static_cast<double>(Clouds->PuffMaxAlpha) * Clouds->Fade);
+        FNebulaCloudPuff* const Puff = Table[I];
+        if (Puff->bActive == 0 || Puff->bHidden != 0)
             continue;
 
         FVector VP;
-        CloudsMath()->InverseTransform(VP, CamXform, *reinterpret_cast<FVector*>(Puff));
+        CloudsMath()->InverseTransform(VP, CamXform, *reinterpret_cast<FVector*>(Puff->Position));
         double const Depth = -static_cast<double>(VP.Z);
-        *reinterpret_cast<float*>(Puff + 0x54) = static_cast<float>(Depth);
+        Puff->ViewDepth = static_cast<float>(Depth);
 
         // The ordered/unordered outcome of every compare below is retail's.
         if (Depth < NearLo)
@@ -1393,7 +1391,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
             float T[3];
             T[0] = 0.0f;
             T[1] = 0.0f;
-            T[2] = -*reinterpret_cast<float*>(B + 0xb8);
+            T[2] = -Clouds->CentreAhead;
             float D[3];
             Win3DVec3Sub(D, T, &VP.X);
             double const Dist2 = (static_cast<double>(D[2]) * D[2] + static_cast<double>(D[1]) * D[1]) +
@@ -1410,14 +1408,14 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
 
         // FUN_00411d60 twice.
         float Wisp1[3];
-        ScaleVec3(Wisp1, reinterpret_cast<float*>(B + 0x90), *reinterpret_cast<float*>(Puff + 0x3c));
+        ScaleVec3(Wisp1, Clouds->LightningColor, Puff->LightningFlash);
         float Wisp2[3];
-        ScaleVec3(Wisp2, Wisp1, *reinterpret_cast<float*>(B + 0xdc));
+        ScaleVec3(Wisp2, Wisp1, Clouds->LightningIntensity);
 
         // The stored float depth is tested again here.
-        float const Size = *reinterpret_cast<float*>(Puff + 0x18);
+        float const Size = Puff->Size;
         float Alpha2 = Alpha;
-        float const PuffDepth = *reinterpret_cast<float*>(Puff + 0x54);
+        float const PuffDepth = Puff->ViewDepth;
         if (PuffDepth <= NearLo)
             continue;
         if (PuffDepth < NearHi)
@@ -1426,13 +1424,13 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
             continue;
 
         float Col[3];
-        Col[0] = *reinterpret_cast<float*>(Puff + 0xc);
-        Col[1] = *reinterpret_cast<float*>(Puff + 0x10);
-        Col[2] = *reinterpret_cast<float*>(Puff + 0x14);
+        Col[0] = Puff->Color[0];
+        Col[1] = Puff->Color[1];
+        Col[2] = Puff->Color[2];
 
         // The wisp is added (FUN_004d7270) and each channel not ordered-less than 1 is set to 1.0f.
-        if (*reinterpret_cast<int*>(B + 0x124) == 0 && *reinterpret_cast<float*>(B + 0xdc) > 0.0f &&
-            *reinterpret_cast<float*>(Puff + 0x38) >= 0.0f)
+        if (Clouds->DisableLightningFlash == 0 && Clouds->LightningIntensity > 0.0f &&
+            Puff->LightningTimer >= 0.0f)
         {
             Vec3AddInPlace(Col, Wisp2);
             if (!(Col[0] < 1.0f))
@@ -1491,8 +1489,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
             }
         }
 
-        FTexShape const* const Shape =
-            *reinterpret_cast<FTexShape**>(B + 0x28 + *reinterpret_cast<int*>(Puff + 0x1c) * 4);
+        FTexShape const* const Shape = Clouds->PuffShapes[Puff->ShapeIndex];
         if (Shape == nullptr)
             continue;
 
@@ -1573,7 +1570,6 @@ void NebulaDrawCloudsPanels(FNebulaEffect* Nebula, void* Camera)
 {
     if (Nebula->FlagLoaded == 0)
         return;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
 
     // FUN_004101e0 turns every registered light off; FUN_00422190(0).
     DALib::MaterialBatcher->SetBinOrder(1u, -1);
@@ -1585,9 +1581,7 @@ void NebulaDrawCloudsPanels(FNebulaEffect* Nebula, void* Camera)
     Win3DSetDepthWrite(0);
 
     // FUN_00422440.
-    FogApplyColorAndRange(reinterpret_cast<float const*>(B + 0x2a0),
-                          *reinterpret_cast<float*>(B + 0x2ac),
-                          *reinterpret_cast<float*>(B + 0x2b0));
+    FogApplyColorAndRange(Nebula->FogColor, Nebula->FogStart, Nebula->FogEnd);
     G_NebulaCloudsPassWord = 0;
     PipelineSetRenderState(DALib::Pipeline, D3DRS_CULLMODE, 1);
 

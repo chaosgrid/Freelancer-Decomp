@@ -64,8 +64,8 @@ ScriptBehavior::ScriptBehavior(ScriptBehavior const& Other)
     }
     StringArray2Count = Other.StringArray2Count;
     DialogType = Other.DialogType;
-    OfferArg = Other.OfferArg;
-    OfferMissionId = Other.OfferMissionId;
+    OfferId = Other.OfferId;
+    OfferKind = Other.OfferKind;
     RtcId = Other.RtcId;
 }
 
@@ -104,8 +104,8 @@ ScriptBehavior& ScriptBehavior::operator=(ScriptBehavior const& Other)
     }
 
     DialogType = Other.DialogType;
-    OfferArg = Other.OfferArg;
-    OfferMissionId = Other.OfferMissionId;
+    OfferId = Other.OfferId;
+    OfferKind = Other.OfferKind;
     NameFmtStr = Other.NameFmtStr;
     DescFmtStr = Other.DescFmtStr;
     RtcId = Other.RtcId;
@@ -139,8 +139,8 @@ void ScriptBehavior::clear()
     }
     StringArray2Count = 0;
     DialogType = 0;
-    OfferArg = 0;
-    OfferMissionId = 0;
+    OfferId = 0;
+    OfferKind = 0;
     NameFmtStr.destroy();
     memset(&NameFmtStr, 0, sizeof(NameFmtStr));
     DescFmtStr.destroy();
@@ -201,8 +201,8 @@ void ScriptBehavior::init(CharacterBehaviorDescription const& Desc)
     }
 
     DialogType = Desc.DialogType;
-    OfferArg = Desc.OfferArg;
-    OfferMissionId = Desc.OfferMissionId;
+    OfferId = Desc.OfferId;
+    OfferKind = Desc.OfferKind;
     NameFmtStr = Desc.NameFmtStr;
     DescFmtStr = Desc.DescFmtStr;
     RtcId = Desc.RtcId;
@@ -232,8 +232,8 @@ void ScriptBehavior::marshal(MarshalBuffer* Buf) const
         Buf->put_void(&StringArray2Dword[I], 4);
     }
     Buf->put_void(&DialogType, 4);
-    Buf->put_void(&OfferArg, 4);
-    Buf->put_void(&OfferMissionId, 4);
+    Buf->put_void(&OfferId, 4);
+    Buf->put_void(&OfferKind, 4);
     Buf->put_FmtStr(NameFmtStr);
     Buf->put_FmtStr(DescFmtStr);
     Buf->put_void(&RtcId, 4);
@@ -281,9 +281,9 @@ void ScriptBehavior::unmarshal(MarshalBuffer* Buf)
     Buf->get_void(&Scratch, 4);
     DialogType = Scratch;
     Buf->get_void(&Scratch, 4);
-    OfferArg = Scratch;
+    OfferId = Scratch;
     Buf->get_void(&Scratch, 4);
-    OfferMissionId = Scratch;
+    OfferKind = Scratch;
     NameFmtStr = Buf->get_FmtStr();
     DescFmtStr = Buf->get_FmtStr();
     unsigned int TrailingScratch = 0;

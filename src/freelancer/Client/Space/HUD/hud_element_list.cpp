@@ -70,7 +70,7 @@ namespace
             *reinterpret_cast<CEqObj**>(static_cast<unsigned char*>(ObjRW) + 0x10);
         if (EqObj == nullptr)
             return nullptr;
-        if ((static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) != 0x503u)
+        if ((static_cast<unsigned>(EqObj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
             return nullptr;
         return EqObj;
     }

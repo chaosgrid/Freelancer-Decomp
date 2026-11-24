@@ -114,7 +114,7 @@ public:
     virtual ~IVP_U_Active_Float() {}
     // slot 1: _purecall in this class; the terminal returns 0 after printing
     // its type name. PORT-LOCAL NAME.
-    virtual int Slot1() = 0;
+    virtual int PrintTypeName() = 0;
 
     // FUN_06362060: calls every listener, highest index first.
     void FireListeners();
@@ -137,7 +137,7 @@ public:
     // slot 0: FUN_06361f60 (deleting) -> FUN_06361ff0.
     virtual ~IVP_U_Active_Int() {}
     // slot 1: _purecall. PORT-LOCAL NAME.
-    virtual int Slot1() = 0;
+    virtual int PrintTypeName() = 0;
 
     // FUN_06362060 (the same body as the float version, folded by the linker).
     void FireListeners();
@@ -156,7 +156,7 @@ public:
     // slot 0: FUN_063620c0 (deleting) -> FUN_06361f80 directly.
     virtual ~IVP_U_Active_Terminal_Double() {}
     // slot 1: LAB_063621f0.
-    virtual int Slot1() override;
+    virtual int PrintTypeName() override;
     // slot 2: LAB_063621a0 (RET 8). PORT-LOCAL NAME.
     virtual void SetDoubleValue(float Value, int32_t bDelayed);
     // secondary slot 0: LAB_06362160 (this adjusted by -0x20).
@@ -175,7 +175,7 @@ public:
     // slot 0: FUN_06362130 (deleting) -> FUN_06361ff0 directly.
     virtual ~IVP_U_Active_Terminal_Int() {}
     // slot 1: LAB_06362260.
-    virtual int Slot1() override;
+    virtual int PrintTypeName() override;
     // slot 2: LAB_06362210 (RET 8). PORT-LOCAL NAME.
     virtual void SetIntValue(int32_t Value, int32_t bDelayed);
     // secondary slot 0: LAB_06362180.

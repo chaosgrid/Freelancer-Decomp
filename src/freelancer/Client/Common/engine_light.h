@@ -59,10 +59,10 @@ struct FEngineLight
     float Position[3];    // +0x98
     float Color[3];       // +0xA4 mirror of D3d.Diffuse rgb, 1.0 from the ctor
     int Type;             // +0xB0 1/2/3 kept, -2 kept, anything else becomes -1
-    unsigned char Flags;  // +0xB4 bit 0 = unknown caller flag (FUN_004110c0/EngineLightSetType
-                           // sets it verbatim, retail meaning not recovered), bit 2 = registered,
-                           // bit 3 = enabled, bit 4 = linked into the global light list,
-                           // bit 5 = has a D3DLIGHT8
+    unsigned char Flags;  // +0xB4 bit 0 = dynamic light (EngineLightSetType; the nearby-light
+                           // collect FUN_00537f40 passes it over unless asked for dynamic lights),
+                           // bit 1 = has a curve, bit 2 = registered, bit 3 = enabled,
+                           // bit 4 = linked into the global light list, bit 5 = has a D3DLIGHT8
     unsigned char PadB5[3];
     IGraph* AmbientCurve; // +0xB8 "ambient_curve" (FUN_00411690); an ambient light
                            // (Type -2) scales its colour by it over [0, Range]
@@ -110,9 +110,11 @@ void EngineLightPushUpdate(FEngineLight* Light);
 // that order (position first, then orientation) with the pipeline pushed after each half,
 // exactly like calling EngineLightSetPosition then EngineLightSetOrientation back to back.
 void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, float const* Pos3);
-// FUN_004110c0 — set Flags bit 0 to Bit0 (retail meaning not recovered) and the light type via
-// the same switch as EngineLightInit/EngineLightSetLight (StoreType, always touching D3d.Type).
-void EngineLightSetType(FEngineLight* Light, int LightType, bool Bit0);
+// FUN_004110c0 — set Flags bit 0 to bDynamic and the light type via the same switch as
+// EngineLightInit/EngineLightSetLight (StoreType, always touching D3d.Type). Retail callers pass
+// 1 for the lights of effects, explosions, equipment and projectile flashes, 0 for the
+// [LightSource] type key and the scene / HUD / nebula / tunnel lights.
+void EngineLightSetType(FEngineLight* Light, int LightType, bool bDynamic);
 // FUN_004112f0 — raw D3d.Range write, no attenuation recompute and no pipeline push (unlike
 // EngineLightSetRadius below). Retail callers: the nebula directional light (cli_nebula.cpp)
 // and the gate tunnel light (gate_tunnel.cpp), both with 500000.
@@ -357,7 +359,8 @@ struct FGameLight : FEngineLight
     FGameLightAnimSlot Anim;    // +0xD4
     unsigned EngineIndex;       // +0xEC  -1 none
     float LocalXform[12];       // +0xF0
-    float VelocityX;             // +0x120 velocity/offset
+    float VelocityX;             // +0x120 free-motion velocity: FUN_005377a0 sets it,
+                                 // GameLightTick adds Dt * it while EngineIndex is -1
     float VelocityY;             // +0x124
     float VelocityZ;             // +0x128
 };

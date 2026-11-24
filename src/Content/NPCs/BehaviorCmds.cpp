@@ -70,10 +70,10 @@ void FContentShipBase::ReleaseActiveDirective()
 }
 
 // FUN_06f57820; both arguments unused.
-void FContentShipBase::OnDirectiveComplete(int ResultWord11c, int ResultWord118)
+void FContentShipBase::OnDirectiveComplete(int CompletedBehavior, int DirectiveResult)
 {
-    (void)ResultWord11c;
-    (void)ResultWord118;
+    (void)CompletedBehavior;
+    (void)DirectiveResult;
     if (!Directives.Items.empty())
         AdvanceDirective();
 }
@@ -335,7 +335,7 @@ void FContentShipBase::FollowDirectivesOf(FContentShipBase* Leader)
         {
             if (GetShipDockingTarget(&OwnId, &Dock->Op.DockObjectId, &DockIndex, nullptr))
             {
-                Dock->Op.Field_14 = 1;
+                Dock->Op.bHasDockPortIndex = 1;
                 Dock->Op.DockPortIndex = DockIndex;
             }
         }
@@ -344,7 +344,7 @@ void FContentShipBase::FollowDirectivesOf(FContentShipBase* Leader)
             FObjListInstantTradelane* Lane =
                 static_cast<FObjListInstantTradelane*>(Items.front());
             if (GetShipDockingTarget(&OwnId, &Lane->Op.TradeLaneId, &DockIndex, nullptr))
-                reinterpret_cast<unsigned char*>(&Lane->Op.Field_14)[0] = 1;
+                reinterpret_cast<unsigned char*>(&Lane->Op.LaneSpeed)[0] = 1;
         }
     }
 

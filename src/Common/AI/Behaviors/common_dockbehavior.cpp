@@ -44,9 +44,9 @@ static void* HeaderBlockFromWatched(Watchable const* Watched)
 // ----------------------------------------------------------------------------
 // FUN_062c2e60, in retail's order:
 //   FUN_062d2020(TypeId)               Behavior's field initialisation
-//   FUN_062d4e60 on +0x30              MoveIdea        SubObjectA
-//   FUN_062d6750 on +0xa8              FaceIdea        SubObjectB
-//   FUN_062d9bf0 on +0x168             SplineMoveIdea  SubObjectC
+//   FUN_062d4e60 on +0x30              MoveIdea        Move
+//   FUN_062d6750 on +0xa8              FaceIdea        Face
+//   FUN_062d9bf0 on +0x168             SplineMoveIdea  SplineMove
 //   FUN_062da500 on +0x2dc             AfterburnerIdea GotoDirective.Idea
 //   DirectiveDockOp ctor on +0x2f4     DockOp
 //   +0x324 = +0x328 = 0                Watcher324
@@ -56,16 +56,11 @@ static void* HeaderBlockFromWatched(Watchable const* Watched)
 //   +0x320 = 0, +0x32c = 0, byte +0x39b = 0
 // Nothing else is written: GotoDirective.NavPilotPtr (+0x2f0) is first stored by
 // RecomputeApproach, the rest by SetContext / EnterState / RefreshApproachState.
-DockBehaviorFields::DockBehaviorFields(int InTypeId)
-{
-    ConstructBase(InTypeId);   // FUN_062d2020
-}
-
 DockBehavior::DockBehavior(int InTypeId)
-    : DockBehaviorFields(InTypeId)
-    , SubObjectA()
-    , SubObjectB()
-    , SubObjectC()
+    : Behavior(InTypeId)
+    , Move()
+    , Face()
+    , SplineMove()
     , DockOp()
     , ModeState320(0)
     , Watcher324()
@@ -78,7 +73,7 @@ DockBehavior::DockBehavior(int InTypeId)
 }
 
 // FUN_062c30d0 (FUN_062c3020 is the scalar-deleting wrapper). Retail is the member teardown
-// in reverse declaration order (inlined ~BaseWatcher on +0x450, +0x324, SubObjectC's
+// in reverse declaration order (inlined ~BaseWatcher on +0x450, +0x324, SplineMove's
 // +0x208/+0x190, +0xbc, +0x44), then FUN_062d2080; the compiler-generated sequence matches.
 DockBehavior::~DockBehavior()
 {
@@ -90,7 +85,7 @@ int DockBehavior::SetModeFromFlags()
     int Mode = (Flags28 & 0x2) ? 1 : 2;
     if (Flag29 != 0)
         Mode = 3;
-    ModeSelector0xc = Mode;
+    Readiness = Mode;
     return Mode;
 }
 
@@ -144,20 +139,20 @@ int DockBehavior::Update()
 {
     if (Flags28 & 0x1)
     {
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
     // No owner, no watched object, or a watched pointer of exactly 8 -> result 3.
     void const* Watched = Watcher324.target();
-    if (ThreatSourcePtr14 == nullptr || Watched == nullptr ||
+    if (OwnerContext == nullptr || Watched == nullptr ||
         reinterpret_cast<char const*>(Watched) - 8 == nullptr)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
 
-    IObjRW* const Owner = static_cast<IObjRW*>(ThreatSourcePtr14);
+    IObjRW* const Owner = OwnerContext;
 
     // Player owner with StateFlags32c bit 7: a dock target whose status is not strictly
     // positive (unordered included) fires the owner's IObjAffect slot_6c(1, 0) once.
@@ -187,10 +182,10 @@ int DockBehavior::Update()
         if (SpeedSq > static_cast<double>(0.3f))
         {
             // The target is moving: release both Ideas.
-            SubObjectB.Commit();
-            SubObjectA.SetField44(0);     // FUN_062d88b0
-            SubObjectA.Commit();
-            UpdateResult10 = 1;
+            Face.Commit();
+            Move.SetField44(0);     // FUN_062d88b0
+            Move.Commit();
+            UpdateResult = 1;
             return 1;
         }
     }
@@ -198,10 +193,10 @@ int DockBehavior::Update()
     // The target's position is re-read for each call.
     unsigned char* const ProxWatcher = reinterpret_cast<unsigned char*>(&ProxWatcher450);
     ProxWatcherRecomputeZoneFlags(
-        ProxWatcher, NavHelperPtr24,
+        ProxWatcher, SysMgr,
         ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()))->get_position());
     ProxWatcherNotifyZoneChange(
-        ProxWatcher, NavHelperPtr24, BehaviorMgrPtr20,
+        ProxWatcher, SysMgr, BehaviorMgr,
         ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()))->get_position());
 
     return UpdateApproachTail();   // FUN_062c4900
@@ -282,14 +277,14 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     AbortFlag398 = 0;
     Flag39b = 0;
 
-    // Each Idea's slot 0 gets (owner, NavHelper, Param2); retail passes the still-live
-    // Param2, not a reload of BehaviorMgrPtr20 (same value).
-    SubObjectA.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);
-    SubObjectA.SetMode(0);                                          // FUN_062d5980
-    GotoDirective.Idea.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);
-    SubObjectB.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);
+    // Each Idea's slot 0 gets (owner, SysMgr, Param2); retail passes the still-live
+    // Param2, not a reload of BehaviorMgr (same value).
+    Move.SetContext(OwnerContext, SysMgr, Param2);
+    Move.SetMode(0);                                          // FUN_062d5980
+    GotoDirective.Idea.SetContext(OwnerContext, SysMgr, Param2);
+    Face.SetContext(OwnerContext, SysMgr, Param2);
 
-    SubObjectC.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2);
+    SplineMove.SetContext(OwnerContext, SysMgr, Param2);
 
     // Zeroes +0x444..+0x44c only; TerminalType (+0x440) and RequestedDockPortIndex (+0x330)
     // are not touched here.
@@ -301,17 +296,16 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     // get_hardpoint (IObjInspect +0xc0) returns non-zero when there is no such hardpoint;
     // then the +0x430 offset is zeroed.
     Vector HpPos;   // left uninitialised by retail
-    if (ObjInspectOf(ThreatSourcePtr14)->get_hardpoint("hpmount", &HpPos, nullptr) != 0)
+    if (ObjInspectOf(OwnerContext)->get_hardpoint("hpmount", &HpPos, nullptr) != 0)
     {
-        unsigned int* const Offset430 = reinterpret_cast<unsigned int*>(Opaque430);
-        Offset430[0] = 0;
-        Offset430[1] = 0;
-        Offset430[2] = 0;
+        HpMountOffset.x = 0.0f;
+        HpMountOffset.y = 0.0f;
+        HpMountOffset.z = 0.0f;
         return bOk;
     }
 
     // Inlined physical-radius cache refresh (SystemManager+0x14fc block).
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    SystemManager* const Sys = SysMgr;
     if (Sys->SelfTarget.bPosValid == 0)
     {
         Sys->SelfTarget.bPosValid = 1;
@@ -324,18 +318,18 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     Delta.x = HpPos.x - Sys->SelfTarget.CachedPos.x;
     Delta.y = HpPos.y - Sys->SelfTarget.CachedPos.y;
     Delta.z = HpPos.z - Sys->SelfTarget.CachedPos.z;
-    std::memcpy(Opaque430, &Delta, sizeof(Delta));
+    HpMountOffset = Delta;
 
     // Into the own ship's local frame: I3DMathEngine (DAT_063fc528, via FUN_06391cf0)
     // TransposeTransform with +0x430 as source and the local as destination, then copied back.
     Transform const& OwnerXform = Sys->SelfTarget.Iface->get_transform();
     I3DMathEngine* const Math = Acquire3DMathEngine();
     Vector Source;
-    std::memcpy(&Source, Opaque430, sizeof(Source));
+    Source = HpMountOffset;
     Math->TransposeTransform(reinterpret_cast<FVector&>(Delta),
                              reinterpret_cast<FMatrix const&>(OwnerXform.Rotation),
                              reinterpret_cast<FVector const&>(Source));
-    std::memcpy(Opaque430, &Delta, sizeof(Delta));
+    HpMountOffset = Delta;
     return bOk;
 }
 
@@ -365,13 +359,13 @@ void DockBehavior::RecomputeApproach()
     // FUN_062e5af0 (engine speed) rounded to float, FUN_062e5ab0 (coast distance), times
     // 1.4f (DAT_0639f510).
     {
-        float const Speed = Behavior_InvokeManagerSlotD8(ObjInspectOf(ThreatSourcePtr14), 1.0f,
+        float const Speed = Behavior_GetSpeed(ObjInspectOf(OwnerContext), 1.0f,
                                                          IObject::ThrustEquipEngine);
         BrakingDistance = static_cast<float>(
-            static_cast<double>(Behavior_QueryFixedFalloffEffect(ThreatSourcePtr14, Speed)) * 1.4f);
+            static_cast<double>(Behavior_GetCoastDistance(OwnerContext, Speed)) * 1.4f);
     }
 
-    SetCruiseLock(1, 3);   // FUN_062d21d0
+    SetAvoidanceAllowed(1, 3);   // FUN_062d21d0
 
     // Bit 7 of the low byte set.
     if (static_cast<signed char>(StateFlags32c) < 0)
@@ -380,7 +374,7 @@ void DockBehavior::RecomputeApproach()
         IObjInspect const* const WatchedObj = ObjInspectOf(Watched != nullptr
             ? static_cast<void const*>(reinterpret_cast<char const*>(Watched) - 8)
             : nullptr);
-        ObjInspectOf(ThreatSourcePtr14)->get_lane_start(
+        ObjInspectOf(OwnerContext)->get_lane_start(
             WatchedObj, *static_cast<IObjInspect const**>(static_cast<void*>(&LaneNextRing)),
             DestPoint3cc, Facing38c);
         OrientMatrix3d8 = LookMatrixYup(Facing38c);
@@ -390,7 +384,7 @@ void DockBehavior::RecomputeApproach()
         void const* const Obj2 = Watched2 != nullptr
             ? static_cast<void const*>(reinterpret_cast<char const*>(Watched2) - 8)
             : nullptr;
-        SubObjectA.PublishTargetId(ObjInspectOf(Obj2)->get_id());
+        Move.PublishTargetId(ObjInspectOf(Obj2)->get_id());
     }
     else if ((StateFlags32c & 0x40) != 0)
     {
@@ -406,7 +400,7 @@ void DockBehavior::RecomputeApproach()
     float const kApproachRangeSq = 10000.0f * 10000.0f;   // DAT_063fc518 == 1e8f exactly
 
     int NextState = 1;
-    IObjInspect const* const ThreatObject = ObjInspectOf(ThreatSourcePtr14);
+    IObjInspect const* const ThreatObject = ObjInspectOf(OwnerContext);
     if (ThreatObject->is_player())
     {
         // Owner position first, then the object's (target - 8, or null, no test).
@@ -424,7 +418,7 @@ void DockBehavior::RecomputeApproach()
         double const DistSq = Dx * Dx + Dy * Dy + Dz * Dz;
         if (!(DistSq < kApproachRangeSq))
         {
-            ObjAffectOf(ThreatSourcePtr14)->slot_6c(0, 0);
+            ObjAffectOf(OwnerContext)->slot_6c(0, 0);
             NextState = 0xd;
         }
     }
@@ -435,8 +429,8 @@ void DockBehavior::RecomputeApproach()
     Zero.x = 0.0f;
     Zero.y = 0.0f;
     Zero.z = 0.0f;
-    SubObjectA.Offset4c = Zero;
-    SubObjectA.SetAngle38(3.14159274f);
+    Move.Offset4c = Zero;
+    Move.SetAngle38(3.14159274f);
     MaxApproachSpeed46c = 1000.0f;   // DAT_0639f47c
 }
 
@@ -456,7 +450,7 @@ void DockBehavior::Disengage()
         return;
     }
 
-    static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->lock_maneuvers(false);
+    BehaviorMgr->lock_maneuvers(false);
 
     if (GotoDirective.NavPilotPtr != nullptr)
     {
@@ -467,16 +461,14 @@ void DockBehavior::Disengage()
 
     if (static_cast<signed char>(StateFlags32c) < 0)
     {
-        SubObjectA.SetField44(2);                                    // FUN_062d88b0
+        Move.SetField44(2);                                    // FUN_062d88b0
 
         // request_exit_tradelane is called on a possibly-null CShip, as retail.
         if (AbortFlag398 != 0 && Flag399 == 0)
         {
-            CObject const* const Obj = ObjInspectOf(ThreatSourcePtr14)->cobject(); // +0x150
+            CObject const* const Obj = ObjInspectOf(OwnerContext)->cobject(); // +0x150
             CShip* Ship = nullptr;
-            if (Obj != nullptr &&
-                (*reinterpret_cast<unsigned int const*>(reinterpret_cast<char const*>(Obj) + 0x4c) &
-                 0x503) == 0x503)
+            if (Obj != nullptr && (Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
                 Ship = const_cast<CShip*>(static_cast<CShip const*>(Obj));
             Ship->request_exit_tradelane();
         }
@@ -486,9 +478,9 @@ void DockBehavior::Disengage()
     }
     else
     {
-        SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+        SystemManager* const Sys = SysMgr;
         int const Level = (Sys->SelfTarget.Iface->is_player() && ModeState320 == 1) ? 2 : 0;
-        SubObjectA.SetField44(Level);                                // FUN_062d88b0
+        Move.SetField44(Level);                                // FUN_062d88b0
 
         if ((Flags28 & 0x1) == 0)
         {
@@ -503,10 +495,10 @@ void DockBehavior::Disengage()
     Flag39a = 0;
     AbortFlag398 = 0;
     GotoDirective.Idea.Commit();
-    SubObjectB.Commit();
-    SubObjectA.Commit();
-    SetCruiseLock(1, 3);                                             // FUN_062d21d0
-    ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(1);         // FUN_062e9a60
+    Face.Commit();
+    Move.Commit();
+    SetAvoidanceAllowed(1, 3);                                             // FUN_062d21d0
+    SysMgr->GunGroups.SetShieldActive(1);         // FUN_062e9a60
     Behavior::OnDisengage();                                               // FUN_062d20f0
     ModeState320 = 0;
 }
@@ -525,7 +517,7 @@ void DockBehavior::CancelOwnerRequest(int RequestType)
             : nullptr;
         Id = ObjInspectOf(Obj)->get_id();
     }
-    ObjAffectOf(ThreatSourcePtr14)->request_cancel(RequestType, &Id, 0);
+    ObjAffectOf(OwnerContext)->request_cancel(RequestType, &Id, 0);
 }
 
 // Slot 6 (evaluate), LAB_062c35f0. RET 4: the manager's context dword is not read.
@@ -535,7 +527,7 @@ int DockBehavior::CheckClearanceProgress()
         return 1;
 
     IObjRW* Candidate = nullptr;
-    ObjInspectOf(ThreatSourcePtr14)->get_target(Candidate);
+    ObjInspectOf(OwnerContext)->get_target(Candidate);
     if (Candidate == nullptr)
         return 2;
 
@@ -559,7 +551,7 @@ int DockBehavior::CheckClearanceProgress()
         Candidate->get_base(Base);
         if (Base == 0)
             return 2;
-        if (static_cast<SystemManager*>(NavHelperPtr24)->Timers.FindObjectDockingAtBase(Candidate) == nullptr)   // FUN_062e7400
+        if (SysMgr->Timers.FindObjectDockingAtBase(Candidate) == nullptr)   // FUN_062e7400
             return 2;
     }
 
@@ -598,30 +590,30 @@ void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
 
     // A zero direction: send the pilot a goto directive instead.
     pub::AI::DirectiveGotoOp Op;
-    Op.Field_50 = 1000.0f;                       // .data:DAT_063ebdb4
-    Op.Field_58 = 1;
+    Op.ArrivalRange = 1000.0f;                       // .data:DAT_063ebdb4
+    Op.bFlyThrough = 1;
     void* const ProxObj = HeaderBlockFromWatched(ProxWatcher450.Watcher.target());
     if (ProxObj != nullptr)
-        Op.Field_5C = ObjInspectOf(ProxObj)->get_id();
+        Op.TetherObjectId = ObjInspectOf(ProxObj)->get_id();
     else
-        Op.Field_5C = 0;
-    Op.Field_60 = ProxWatcher450.NearDistance;
-    Op.Field_64 = ProxWatcher450.FarDistance;
+        Op.TetherObjectId = 0;
+    Op.TetherNearRange = ProxWatcher450.NearDistance;
+    Op.TetherFarRange = ProxWatcher450.FarDistance;
 
     if ((StateFlags32c & 0xc0) != 0)
     {
-        Op.Field_0C = 1;
+        Op.GotoKind = 1;
         Op.Destination = DestPoint3cc;
     }
     else
     {
         // The watched object (target - 8) is not null-tested.
-        Op.Field_0C = 0;
+        Op.GotoKind = 0;
         Watchable const* const Watched = Watcher324.target();
         void const* const Obj = Watched != nullptr
             ? static_cast<void const*>(reinterpret_cast<char const*>(Watched) - 8)
             : nullptr;
-        Op.Field_1C = static_cast<int32_t>(ObjInspectOf(Obj)->get_id());
+        Op.TargetId = static_cast<int32_t>(ObjInspectOf(Obj)->get_id());
     }
 
     Pilot->OnApplyDirective(&Op);
@@ -639,7 +631,7 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
         // No null test on the payload or on the watched object.
         if (Payload[0] != 0)
             return;
-        if (ObjInspectOf(ThreatSourcePtr14)->get_id() !=
+        if (ObjInspectOf(OwnerContext)->get_id() !=
             *reinterpret_cast<unsigned int const*>(Payload + 0xc))
             return;
         Watchable const* const Watched = Watcher324.target();
@@ -658,7 +650,7 @@ void DockBehavior::OnWatchedObjectDestroyed(void* Message)
         // A null payload is ignored; no Flag399 store on this path.
         if (Payload == nullptr)
             return;
-        SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+        SystemManager* const Sys = SysMgr;
         if (*reinterpret_cast<unsigned int const*>(Payload + 0x8) !=
             Sys->SelfTarget.Iface->get_id())
             return;
@@ -678,7 +670,7 @@ void DockBehavior::EnterState(int NewState)
         static_cast<Behavior*>(GotoDirective.NavPilotPtr)->OnDisengage();
         Behavior_ReleaseDirectiveTarget(GotoDirective.NavPilotPtr);   // FUN_062d21c0
         GotoDirective.NavPilotPtr = nullptr;
-        static_cast<SystemManager*>(NavHelperPtr24)->Thrust.engage_cruise(false);
+        SysMgr->Thrust.engage_cruise(false);
         GotoDirective.Idea.Commit();   // AfterburnerIdea at +0x2dc
     }
 
@@ -690,36 +682,36 @@ void DockBehavior::EnterState(int NewState)
     case 1:
     {
         // Manager+0x17c is BehaviorDispatchTable[2], the Goto behavior; no null test.
-        GotoDirective.NavPilotPtr = static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->BehaviorDispatchTable[2];
+        GotoDirective.NavPilotPtr = BehaviorMgr->BehaviorDispatchTable[2];
 
         pub::AI::DirectiveGotoOp Op;
-        Op.Field_50 = 1000.0f;   // .data:DAT_063ebdb4
-        Op.Field_58 = 1;
+        Op.ArrivalRange = 1000.0f;   // .data:DAT_063ebdb4
+        Op.bFlyThrough = 1;
 
         void* ProxObj = HeaderBlockFromWatched(ProxWatcher450.Watcher.target());
         if (ProxObj != nullptr)
         {
-            Op.Field_5C = ((IObjRW*)ProxObj)->get_id();
+            Op.TetherObjectId = ((IObjRW*)ProxObj)->get_id();
         }
         else
         {
-            Op.Field_5C = 0;
+            Op.TetherObjectId = 0;
         }
 
         // FUN_062c2ad0(this+0x450, 0) is the far threshold unscaled.
-        Op.Field_60 = ProxWatcher450.NearDistance;
-        Op.Field_64 = QueryHandleRange(&ProxWatcher450, 0);
+        Op.TetherNearRange = ProxWatcher450.NearDistance;
+        Op.TetherFarRange = QueryHandleRange(&ProxWatcher450, 0);
 
         if ((StateFlags32c & 0xc0) != 0)
         {
-            Op.Field_0C = 1;
+            Op.GotoKind = 1;
             Op.Destination = DestPoint3cc;
         }
         else
         {
-            Op.Field_0C = 0;
+            Op.GotoKind = 0;
             // The watched object is not null-tested, as retail.
-            Op.Field_1C = static_cast<int32_t>(
+            Op.TargetId = static_cast<int32_t>(
                 ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()))->get_id());
         }
 
@@ -733,13 +725,13 @@ void DockBehavior::EnterState(int NewState)
     }
     case 2:
     {
-        SetCruiseLock(1, 3);   // FUN_062d21d0
+        SetAvoidanceAllowed(1, 3);   // FUN_062d21d0
 
         if ((StateFlags32c & 0xc0) != 0)
         {
             // Each FSTP to a float is a float below; everything kept on the x87 stack is double.
             NavHelperRefreshLeadPoint();
-            SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+            SystemManager* const Sys = SysMgr;
 
             Vector Delta;
             Delta.x = static_cast<float>(static_cast<double>(Sys->SelfTarget.CachedPos.x) - DestPoint3cc.x);
@@ -821,104 +813,104 @@ void DockBehavior::EnterState(int NewState)
         }
 
         // LAB_062c4151, reached from both branches.
-        SubObjectA.SetMode(0);                           // FUN_062d5980
-        SubObjectA.SetRange3c(64.0f);                    // bind_to_dc fold, .rdata:DAT_0639f480
-        SubObjectA.SetPosition(InterceptPoint39c);       // FUN_062d5840
-        SubObjectB.SetPosition(InterceptPoint39c);       // FUN_062d7560
-        SubObjectA.SetField44(0);                        // FUN_062d88b0
+        Move.SetMode(0);                           // FUN_062d5980
+        Move.SetRange3c(64.0f);                    // bind_to_dc fold, .rdata:DAT_0639f480
+        Move.SetPosition(InterceptPoint39c);       // FUN_062d5840
+        Face.SetPosition(InterceptPoint39c);       // FUN_062d7560
+        Move.SetField44(0);                        // FUN_062d88b0
         return;
     }
     case 4:
-        SubObjectA.SetField44(0);                        // FUN_062d88b0
-        SubObjectA.Commit();
-        SubObjectB.Commit();
+        Move.SetField44(0);                        // FUN_062d88b0
+        Move.Commit();
+        Face.Commit();
         return;
     case 6:
         if ((StateFlags32c & 0xc0) != 0)
         {
-            SubObjectB.SetAngleWeight8c(BitsToFloat(0x3ec90fdbu)); // FUN_062d93c0, pi/8
-            SubObjectB.SetPosition(DestPoint3cc);           // FUN_062d7560
-            SubObjectA.SetPosition(DestPoint3cc);           // FUN_062d5840
-            SubObjectA.SetRange3c(10.0f);                   // bind_to_dc fold
-            SubObjectA.SetField44(2);                       // FUN_062d88b0
+            Face.SetAngleWeight8c(BitsToFloat(0x3ec90fdbu)); // FUN_062d93c0, pi/8
+            Face.SetPosition(DestPoint3cc);           // FUN_062d7560
+            Move.SetPosition(DestPoint3cc);           // FUN_062d5840
+            Move.SetRange3c(10.0f);                   // bind_to_dc fold
+            Move.SetField44(2);                       // FUN_062d88b0
             MaxApproachSpeed46c = 10.0f;
             return;
         }
         if ((StateFlags32c & 0x800) != 0)
             break;
 
-        SubObjectB.SetBasis(Orient3a8);                     // FUN_062d75c0
-        SubObjectA.SetPosition(InterceptPoint39c);          // FUN_062d5840
-        SubObjectA.SetRange3c(10.0f);                       // bind_to_dc fold, .data:DAT_063ebdbc
-        SubObjectA.SetMode(1);                              // FUN_062d5980
+        Face.SetBasis(Orient3a8);                     // FUN_062d75c0
+        Move.SetPosition(InterceptPoint39c);          // FUN_062d5840
+        Move.SetRange3c(10.0f);                       // bind_to_dc fold, .data:DAT_063ebdbc
+        Move.SetMode(1);                              // FUN_062d5980
         MaxApproachSpeed46c = 18.0f;                   // .data:DAT_063ebdb8
         // FUN_062d5a80 copies three dwords into MoveIdea::Offset4c.
-        SubObjectA.Offset4c = *static_cast<Vector const*>(RawAt(0x430));
+        Move.Offset4c = HpMountOffset;
         return;
     case 7:
-        SetCruiseLock(0, 3);
-        SubObjectA.SetField44(2);                           // FUN_062d88b0
-        SubObjectA.Offset4c = *static_cast<Vector const*>(RawAt(0x430)); // FUN_062d5a80
+        SetAvoidanceAllowed(0, 3);
+        Move.SetField44(2);                           // FUN_062d88b0
+        Move.Offset4c = HpMountOffset; // FUN_062d5a80
         if (CombatFlag344 != 0)
         {
-            SubObjectB.SetPosition(SavedPosition3fc);       // FUN_062d7560
-            SubObjectA.SetMode(0);                          // FUN_062d5980
-            SubObjectA.SetPosition(SavedPosition3fc);       // FUN_062d5840
-            SubObjectA.SetRange3c(25.0f);                   // bind_to_dc fold, .data:DAT_063ebdc4
+            Face.SetPosition(SavedPosition3fc);       // FUN_062d7560
+            Move.SetMode(0);                          // FUN_062d5980
+            Move.SetPosition(SavedPosition3fc);       // FUN_062d5840
+            Move.SetRange3c(25.0f);                   // bind_to_dc fold, .data:DAT_063ebdc4
             return;
         }
-        SubObjectB.SetBasis(OrientMatrix3d8);               // FUN_062d75c0
-        SubObjectA.SetPosition(DestPoint3cc);               // FUN_062d5840
-        SubObjectA.SetRange3c(15.0f);                       // bind_to_dc fold, .data:DAT_063ebdc0
-        SubObjectA.SetMode(1);                              // FUN_062d5980
+        Face.SetBasis(OrientMatrix3d8);               // FUN_062d75c0
+        Move.SetPosition(DestPoint3cc);               // FUN_062d5840
+        Move.SetRange3c(15.0f);                       // bind_to_dc fold, .data:DAT_063ebdc0
+        Move.SetMode(1);                              // FUN_062d5980
         MaxApproachSpeed46c = 18.0f;                   // .data:DAT_063ebdb8
         return;
     case 8:
         BuildFinalApproachSpline();                         // FUN_062c56d0
-        SetCruiseLock(0, 3);
-        SubObjectC.SetStopStyle(2);                          // FUN_062da400
+        SetAvoidanceAllowed(0, 3);
+        SplineMove.SetStopStyle(2);                          // FUN_062da400
         return;
     case 9:
     {
-        SetCruiseLock(0, 3);
-        SubObjectA.SetPosition(SavedPosition3fc);           // FUN_062d5840
-        SubObjectA.Offset4c = *static_cast<Vector const*>(RawAt(0x430)); // FUN_062d5a80
+        SetAvoidanceAllowed(0, 3);
+        Move.SetPosition(SavedPosition3fc);           // FUN_062d5840
+        Move.Offset4c = HpMountOffset; // FUN_062d5a80
         // Float radius times double DAT_0639f518 (0.6), rounded once.
-        SubObjectA.SetRange3c(static_cast<float>(
+        Move.SetRange3c(static_cast<float>(
             static_cast<double>(DockPointRadius) * kEnterState9RadiusScale));
 
         if ((StateFlags32c & 0xc0) != 0)
         {
-            SubObjectB.SetDirection(Facing38c);             // FUN_062d7590
-            SubObjectA.SetField44(2);                       // FUN_062d88b0
+            Face.SetDirection(Facing38c);             // FUN_062d7590
+            Move.SetField44(2);                       // FUN_062d88b0
             return;
         }
         if ((StateFlags32c & 0x800) != 0)
         {
-            SubObjectA.SetMode(0);                          // FUN_062d5980
+            Move.SetMode(0);                          // FUN_062d5980
             // FUN_062d5a70 writes MoveIdea+0x59, not the +0x58 SetEnabled() writes.
-            SubObjectA.SetField59(0);
-            SubObjectA.SetAngle38(BitsToFloat(0x3eb2b8c3u)); // set_origin_h fold
-            SubObjectA.SetField44(2);                       // FUN_062d88b0
-            SubObjectB.SetPosition(SavedPosition3fc);       // FUN_062d7560
+            Move.SetField59(0);
+            Move.SetAngle38(BitsToFloat(0x3eb2b8c3u)); // set_origin_h fold
+            Move.SetField44(2);                       // FUN_062d88b0
+            Face.SetPosition(SavedPosition3fc);       // FUN_062d7560
             return;
         }
-        // No null test on BehaviorMgrPtr20.
-        static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->lock_maneuvers(true);
-        SubObjectA.SetField44(0);                           // FUN_062d88b0
+        // No null test on BehaviorMgr.
+        BehaviorMgr->lock_maneuvers(true);
+        Move.SetField44(0);                           // FUN_062d88b0
         if (CombatFlag344 != 0)
         {
-            SubObjectB.SetPosition(SavedPosition3fc);       // FUN_062d7560
-            SubObjectA.SetMode(0);                          // FUN_062d5980
+            Face.SetPosition(SavedPosition3fc);       // FUN_062d7560
+            Move.SetMode(0);                          // FUN_062d5980
             return;
         }
         // +0x40c is a 3x3 Matrix: FUN_062d75c0 copies nine dwords.
-        SubObjectB.SetBasis(*static_cast<Matrix const*>(RawAt(0x40c)));
-        SubObjectA.SetMode(1);                              // FUN_062d5980
+        Face.SetBasis(Orient40c);
+        Move.SetMode(1);                              // FUN_062d5980
         MaxApproachSpeed46c = 18.0f;                   // .data:DAT_063ebdb8
         if ((StateFlags32c & 0x20) != 0)
             break;
-        ((SystemManager*)NavHelperPtr24)->GunGroups.SetShieldActive(0);   // FUN_062e9a60
+        SysMgr->GunGroups.SetShieldActive(0);   // FUN_062e9a60
         return;
     }
     case 0xb:
@@ -928,14 +920,14 @@ void DockBehavior::EnterState(int NewState)
         Flags28 = static_cast<unsigned char>(Flags28 | 1);
         Disengage();
         Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-        static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->SetDirectiveResult(7, 0);   // FUN_062d29a0
+        BehaviorMgr->SetDirectiveResult(7, 0);   // FUN_062d29a0
         return;
     case 0xd:
         // Same sequence, result 2.
         Flags28 = static_cast<unsigned char>(Flags28 | 1);
         Disengage();
         Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-        static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->SetDirectiveResult(7, 2);   // FUN_062d29a0
+        BehaviorMgr->SetDirectiveResult(7, 2);   // FUN_062d29a0
         return;
     default:
         // States 3, 5, 0xa and out-of-range values only get the writes above.
@@ -1024,29 +1016,27 @@ void DockBehavior::RefreshApproachState()
 int DockBehavior::UpdateApproachTail()
 {
     // Retail keeps the result in a stack local preset to 1 and stores it on every exit.
-    UpdateResult10 = 1;
+    UpdateResult = 1;
     AdvancePreamble();  // FUN_062c47f0
-
-    float const DeltaTime = GetTickDelta();   // Behavior's own +0x1c
 
     if (ModeState320 == 1)
     {
         // Hand the tick delta to the Goto pilot, then its slot 7; anything but 2 leaves
         // through the default case. NavPilotPtr is never null-tested.
         Behavior* const Pilot = static_cast<Behavior*>(GotoDirective.NavPilotPtr);
-        *reinterpret_cast<float*>(reinterpret_cast<char*>(Pilot) + 0x1c) = DeltaTime;
+        Pilot->DeltaTime = DeltaTime;
         if (Pilot->OnUpdate() != 2)
-            return UpdateResult10;
+            return UpdateResult;
 
         if ((StateFlags32c & 0xc0) != 0)
         {
             EnterState(2);
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            UpdateResult = 1;
+            return UpdateResult;
         }
         EnterState(3);
-        UpdateResult10 = 1;
-        return UpdateResult10;
+        UpdateResult = 1;
+        return UpdateResult;
     }
 
     bool bAborted = false;
@@ -1066,11 +1056,11 @@ int DockBehavior::UpdateApproachTail()
             ((ProxWatched != nullptr) && (ProxWatched != reinterpret_cast<void*>(8)) &&
              ((ProxWatcher450.Flags14 & 2) == 0)))
         {
-            SubObjectA.SetField44(0);     // FUN_062d88b0
-            SubObjectA.Commit();
-            SubObjectB.Commit();
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            Move.SetField44(0);     // FUN_062d88b0
+            Move.Commit();
+            Face.Commit();
+            UpdateResult = 1;
+            return UpdateResult;
         }
     }
 
@@ -1078,22 +1068,22 @@ int DockBehavior::UpdateApproachTail()
     {
         Disengage();
         RecomputeApproach();
-        UpdateResult10 = 1;
-        return UpdateResult10;
+        UpdateResult = 1;
+        return UpdateResult;
     }
 
     switch (ModeState320)
     {
     case 2:
     {
-        // In retail's order; ThreatSourcePtr14 is not null-tested.
+        // In retail's order; OwnerContext is not null-tested.
         if ((LaneNextRing == nullptr) &&
-            !ObjInspectOf(ThreatSourcePtr14)->is_player() &&
+            !ObjInspectOf(OwnerContext)->is_player() &&
             (static_cast<char>(StateFlags32c) < 0))
         {
             EnterState(0xc);
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            UpdateResult = 1;
+            return UpdateResult;
         }
 
         bool bPastDock = false;
@@ -1102,7 +1092,7 @@ int DockBehavior::UpdateApproachTail()
             // ((Dz*Fz + Dy*Fy) + Dx*Fx) on the x87 stack; >= 0 or unordered falls to
             // LAB_062c4c04, < 0 exits to LAB_062c4c35.
             NavHelperRefreshLeadPoint();
-            SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+            SystemManager* const Sys = SysMgr;
             Vector Delta;
             Delta.x = Sys->SelfTarget.CachedPos.x - DestPoint3cc.x;
             Delta.y = Sys->SelfTarget.CachedPos.y - DestPoint3cc.y;
@@ -1118,14 +1108,14 @@ int DockBehavior::UpdateApproachTail()
         if (!bPastDock)
         {
             // The FaceIdea's result is discarded; the MoveIdea's decides.
-            (void)SubObjectB.Update(DeltaTime);
-            if (SubObjectA.Update(DeltaTime) != 1)
+            (void)Face.Update(DeltaTime);
+            if (Move.Update(DeltaTime) != 1)
                 break;
         }
 
         EnterState(((StateFlags32c & 0x8c0) == 0) ? 6 : 3);
-        UpdateResult10 = 1;
-        return UpdateResult10;
+        UpdateResult = 1;
+        return UpdateResult;
     }
     case 3:
     {
@@ -1142,8 +1132,8 @@ int DockBehavior::UpdateApproachTail()
         if (ApproachClearedFlag334 != 0)
         {
             EnterState(6);
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            UpdateResult = 1;
+            return UpdateResult;
         }
 
         EnterState(4);
@@ -1155,69 +1145,69 @@ int DockBehavior::UpdateApproachTail()
 
         // IObjAffect slot 23 (+0x5c) with this+0x2c, our own RequestCB base, last; the shape
         // is fixed by Server.dll's Ship body .text:06d02670. Result unused; no null test on
-        // ThreatSourcePtr14.
-        (void)ObjAffectOf(ThreatSourcePtr14)->request_event(
+        // OwnerContext.
+        (void)ObjAffectOf(OwnerContext)->request_event(
             SlotMode, reinterpret_cast<unsigned const*>(&EngineQuery),
             reinterpret_cast<unsigned const*>(&TargetQuery), 0,
             static_cast<IObjAffect::RequestCB*>(this));
-        UpdateResult10 = 1;
-        return UpdateResult10;
+        UpdateResult = 1;
+        return UpdateResult;
     }
     case 6:
         if ((StateFlags32c & 0x800) != 0)
         {
             EnterState(9);
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            UpdateResult = 1;
+            return UpdateResult;
         }
         {
-            int MoveResult = SubObjectA.Update(DeltaTime);
-            int FaceResult = SubObjectB.Update(DeltaTime);
+            int MoveResult = Move.Update(DeltaTime);
+            int FaceResult = Face.Update(DeltaTime);
             if (((StateFlags32c & 0xc0) != 0) && (FaceResult == 1))
             {
                 EnterState(8);
-                UpdateResult10 = 1;
-                return UpdateResult10;
+                UpdateResult = 1;
+                return UpdateResult;
             }
             if (MoveResult != 1)
                 break;
             EnterState((CombatFlag344 != 0) ? 9 : 7);
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            UpdateResult = 1;
+            return UpdateResult;
         }
     case 7:
         // Only the MoveIdea's result is tested; falls into case 10's tail either way.
-        (void)SubObjectB.Update(DeltaTime);
-        if (SubObjectA.Update(DeltaTime) == 1)
+        (void)Face.Update(DeltaTime);
+        if (Move.Update(DeltaTime) == 1)
             EnterState(9);
         [[fallthrough]];
     case 10:
-        UpdateResult10 = 0;
-        return UpdateResult10;
+        UpdateResult = 0;
+        return UpdateResult;
     case 8:
     {
-        if (SubObjectC.Update(DeltaTime) == 1)
+        if (SplineMove.Update(DeltaTime) == 1)
         {
-            SubObjectC.Commit();
+            SplineMove.Commit();
             EnterState(9);
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            UpdateResult = 1;
+            return UpdateResult;
         }
         // FUN_062da3f0 against .rdata:DAT_0639f534 (pi/16); unordered builds the spline.
-        if (!(SubObjectC.GetFaceAngle() < 0.19634955f))
+        if (!(SplineMove.GetFaceAngle() < 0.19634955f))
         {
             BuildFinalApproachSpline();       // FUN_062c56d0
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            UpdateResult = 1;
+            return UpdateResult;
         }
         break;
     }
     case 9:
     {
         // Retail stores 0 into the result first; exits that do not set it again return 0.
-        UpdateResult10 = 0;
-        (void)SubObjectB.Update(DeltaTime);
-        int MoveResult = SubObjectA.Update(DeltaTime);
+        UpdateResult = 0;
+        (void)Face.Update(DeltaTime);
+        int MoveResult = Move.Update(DeltaTime);
 
         if (static_cast<char>(StateFlags32c) < 0)
         {
@@ -1231,32 +1221,32 @@ int DockBehavior::UpdateApproachTail()
                 float const BackZ = static_cast<float>(static_cast<double>(Facing38c.z) * -25.0);
                 RetreatPoint.z = static_cast<float>(static_cast<double>(BackZ) + SavedPosition3fc.z);
                 // FUN_062e53e0.
-                if (!IsPointOutsideHeadingCone(RetreatPoint, ObjInspectOf(ThreatSourcePtr14), 0.0f))
+                if (!IsPointOutsideHeadingCone(RetreatPoint, ObjInspectOf(OwnerContext), 0.0f))
                     break;
             }
 
-            SubObjectA.Commit();
-            SubObjectB.Commit();
+            Move.Commit();
+            Face.Commit();
             // IObjAffect slot 18.
-            (void)ObjAffectOf(ThreatSourcePtr14)->set_target(nullptr, SUBOBJ_ID_NONE, -1);
+            (void)ObjAffectOf(OwnerContext)->set_target(nullptr, SUBOBJ_ID_NONE, -1);
 
             // IObjAffect slot 25; a non-zero result enters state 0xd.
             void* EngineObj = HeaderBlockFromWatched(Watcher324.target());
-            if (ObjAffectOf(ThreatSourcePtr14)->go_tradelane(
+            if (ObjAffectOf(OwnerContext)->go_tradelane(
                     static_cast<IObjInspect const*>(EngineObj),
                     static_cast<IObjInspect const*>(LaneNextRing), false, 0.0f) != 0)
             {
                 EnterState(0xd);
-                return UpdateResult10;
+                return UpdateResult;
             }
-            // FUN_062d4520 on BehaviorMgrPtr20.
-            static_cast<IBehaviorManager*>(BehaviorMgrPtr20)->QueueNotification(
-                static_cast<IObjRW*>(ThreatSourcePtr14), 0, 0.0f);
-            SubObjectA.SetField44(2);   // FUN_062d88b0
+            // FUN_062d4520 on BehaviorMgr.
+            BehaviorMgr->QueueNotification(
+                OwnerContext, 0, 0.0f);
+            Move.SetField44(2);   // FUN_062d88b0
             EnterState(10);
             AbortFlag398 = 1;
             Flag39a = 1;
-            return UpdateResult10;
+            return UpdateResult;
         }
 
         if (MoveResult != 1)
@@ -1264,22 +1254,22 @@ int DockBehavior::UpdateApproachTail()
         if (TerminalType != 3 && TerminalType != 4 && TerminalType != 5)
         {
             EnterState(0xb);
-            return UpdateResult10;
+            return UpdateResult;
         }
-        SubObjectA.Commit();
-        SubObjectB.Commit();
-        (void)ObjAffectOf(ThreatSourcePtr14)->set_target(nullptr, SUBOBJ_ID_NONE, -1);
+        Move.Commit();
+        Face.Commit();
+        (void)ObjAffectOf(OwnerContext)->set_target(nullptr, SUBOBJ_ID_NONE, -1);
         EnterState(0xc);
-        return UpdateResult10;
+        return UpdateResult;
     }
     case 0xb:
     {
         StateTimer340 += DeltaTime;
         float Threshold = 3.0f;
-        if (!SinglePlayer() && ObjInspectOf(ThreatSourcePtr14)->is_player())
+        if (!SinglePlayer() && ObjInspectOf(OwnerContext)->is_player())
         {
             // .rdata:DAT_0639e884 (00 00 20 41); the listing mis-slices it into a string.
-            // No null test on ThreatSourcePtr14.
+            // No null test on OwnerContext.
             Threshold = 10.0f;
         }
         // Strictly less; unordered stays.
@@ -1287,20 +1277,20 @@ int DockBehavior::UpdateApproachTail()
         {
             Disengage();
             RecomputeApproach();
-            UpdateResult10 = 1;
-            return UpdateResult10;
+            UpdateResult = 1;
+            return UpdateResult;
         }
         break;
     }
     case 0xc:
     case 0xd:
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         break;
     default:
         break;
     }
 
-    return UpdateResult10;
+    return UpdateResult;
 }
 
 // FUN_062c4530. A jump table on ModeState320 - 2:
@@ -1312,7 +1302,7 @@ int DockBehavior::UpdateApproachTail()
 // the watched object with float(1000.0f (.data DAT_063ebdb4) * 1.05 (double DAT_0639f528)).
 bool DockBehavior::CheckCanProceed()
 {
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    SystemManager* const Sys = SysMgr;
     switch (ModeState320)
     {
     case 3:
@@ -1356,14 +1346,14 @@ bool DockBehavior::CheckCanProceed()
 //
 //   LinearCap  = MaxApproachSpeed46c
 //   AngularCap = DAT_0639f47c (1000.0f)
-//   if (ComputeFormationFollowerEnvelope(NavHelperPtr24 + 0x1364, &Envelope))
+//   if (ComputeFormationFollowerEnvelope(SysMgr + 0x1364, &Envelope))
 //   {
 //       LinearCap  = min(LinearCap,  Envelope.Speed);
 //       AngularCap = min(AngularCap, Envelope.AngularSpeed);
 //   }
 //   if (HeaderBlockFromWatched(ProxWatcher450) != null)
 //       LinearCap = min(LinearCap, ProxWatcherComputeSpeedCap(...));
-//   SubObjectA/C get LinearCap, SubObjectB (the FaceIdea) AngularCap.
+//   Move/C get LinearCap, Face (the FaceIdea) AngularCap.
 //
 // The min-clamps keep the incumbent only when it is strictly less (unordered takes the new
 // value). Retail calls ProxWatcherComputeSpeedCap twice with identical arguments (MSVC's
@@ -1383,7 +1373,7 @@ void DockBehavior::AdvancePreamble()
     Envelope.AngularThrottle = 0.0f;
 
     // This caller reads only +0x00 and +0x08; GotoBehavior::Update reads the other three.
-    if (((SystemManager*)NavHelperPtr24)->GunConvergenceStateBytes.ComputeFormationFollowerEnvelope(&Envelope))
+    if (SysMgr->FormationLeaders.ComputeFormationFollowerEnvelope(&Envelope))
     {
         if (!(LinearCap < Envelope.Speed))
             LinearCap = Envelope.Speed;
@@ -1394,25 +1384,25 @@ void DockBehavior::AdvancePreamble()
     if (HeaderBlockFromWatched(ProxWatcher450.Watcher.target()) != nullptr)
     {
         if (!(ProxWatcherComputeSpeedCap(reinterpret_cast<unsigned char*>(&ProxWatcher450),
-                                         ThreatSourcePtr14, NavHelperPtr24, 1, 1.0f) >
+                                         OwnerContext, SysMgr, 1, 1.0f) >
               static_cast<double>(LinearCap)))
         {
             LinearCap = static_cast<float>(ProxWatcherComputeSpeedCap(
-                reinterpret_cast<unsigned char*>(&ProxWatcher450), ThreatSourcePtr14, NavHelperPtr24, 1, 1.0f));
+                reinterpret_cast<unsigned char*>(&ProxWatcher450), OwnerContext, SysMgr, 1, 1.0f));
         }
     }
 
-    SubObjectA.SetThrottleScale(LinearCap);
-    SubObjectB.SetThrottleScale(AngularCap);
-    SubObjectC.SetThrottleScale(LinearCap);
+    Move.SetThrottleScale(LinearCap);
+    Face.SetThrottleScale(AngularCap);
+    SplineMove.SetThrottleScale(LinearCap);
 }
 
 // FUN_062c56d0. Builds the final-approach Catmull-Rom segment at +0x348 and gives it to
-// SubObjectC. Every component is one float operation (FUN_0628b030 Vec3Assign / FUN_062887d0
+// SplineMove. Every component is one float operation (FUN_0628b030 Vec3Assign / FUN_062887d0
 // Vector add); only the two lengths stay on the x87 stack through FSQRT and the scale, so double.
 void DockBehavior::BuildFinalApproachSpline()
 {
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    SystemManager* const Sys = SysMgr;
 
     // Without a formation leader (FUN_062ecab0), the owner's formation offset rotated into
     // world space by the 3DMathEngine's TransformMatrix.
@@ -1420,10 +1410,10 @@ void DockBehavior::BuildFinalApproachSpline()
     FormationOffset.x = 0.0f;
     FormationOffset.y = 0.0f;
     FormationOffset.z = 0.0f;
-    bool const bHasLeader = Sys->GunConvergenceStateBytes.GetFormationLeader() != nullptr;
+    bool const bHasLeader = Sys->FormationLeaders.GetFormationLeader() != nullptr;
     if (!bHasLeader)
     {
-        ObjInspectOf(ThreatSourcePtr14)->get_formation_offset(FormationOffset);
+        ObjInspectOf(OwnerContext)->get_formation_offset(FormationOffset);
         Transform const& ShipXform = Sys->SelfTarget.Iface->get_transform();
         Vector Rotated;
         Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(Rotated),
@@ -1489,14 +1479,14 @@ void DockBehavior::BuildFinalApproachSpline()
     Spline.P3.z = End.z + FormationOffset.z;
 
     Spline.calculate_arclength();
-    SubObjectC.SetSpline(&Spline);                                   // FUN_062da380
+    SplineMove.SetSpline(&Spline);                                   // FUN_062da380
 }
 
 // Inlined in retail (062c4a72, 062c4b0e, 062c3e97): the SystemManager's physical-radius cache,
 // latch +0x157a, centre +0x1508, radius +0x1514. Neither pointer is null-tested.
 void DockBehavior::NavHelperRefreshLeadPoint()
 {
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    SystemManager* const Sys = SysMgr;
     if (Sys->SelfTarget.bPosValid != 0)
         return;
     Sys->SelfTarget.bPosValid = 1;
@@ -1527,7 +1517,7 @@ float DockBehavior::QueryHandleRange(void* HandleField, int Mode)
 // FindVerifiedObject is FUN_062e74a0.
 bool DockBehavior::OnApplyDirective(void* DirectiveOp)
 {
-    SystemManagerTimerTable* const ObjDb = &static_cast<SystemManager*>(NavHelperPtr24)->Timers;
+    SystemManagerTimerTable* const ObjDb = &SysMgr->Timers;
     // REP MOVSD of the whole op, vptr included.
     std::memcpy(static_cast<void*>(&DockOp), DirectiveOp, sizeof(DockOp));
     ModeState320 = 0;
@@ -1549,10 +1539,10 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
 
     StateFlags32c = GetObjectTypeOrZero(   // FUN_062e6200
         ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target())));
-    LaneNextRing = ObjDb->FindVerifiedObject((unsigned const*)&DockOp.Field_10);   // stored raw
-    ApproachClearedFlag334 = DockOp.Field_14;
+    LaneNextRing = ObjDb->FindVerifiedObject((unsigned const*)&DockOp.NextRingId);   // stored raw
+    ApproachClearedFlag334 = DockOp.bHasDockPortIndex;
     DockPointRadius = -1.0f;
-    if (DockOp.Field_14 != 0)
+    if (DockOp.bHasDockPortIndex != 0)
     {
         RequestedDockPortIndex = DockOp.DockPortIndex;
         DockPortIndex = DockOp.DockPortIndex;
@@ -1565,9 +1555,9 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
     }
 
     IObjRW* const Prox = static_cast<IObjRW*>(
-        ObjDb->FindVerifiedObject((unsigned const*)&DockOp.Field_1C));
-    ProxWatcher450.NearDistance = DockOp.Field_20;
-    ProxWatcher450.FarDistance = DockOp.Field_24;
+        ObjDb->FindVerifiedObject((unsigned const*)&DockOp.TetherObjectId));
+    ProxWatcher450.NearDistance = DockOp.TetherNearRange;
+    ProxWatcher450.FarDistance = DockOp.TetherFarRange;
     ProxWatcher450.Watcher.set(Prox != nullptr ? static_cast<Watchable const*>(Prox) : nullptr);
     ProxWatcher450.Flags14 = 0;
     ProxWatcher450.SavedFlags18 = 0;
@@ -1576,7 +1566,7 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
     {
         // Op+0x28 as a float against double 0.0 (DAT_0639c430); not greater (or unordered)
         // derives the ratio from speeds.
-        float const Ratio = *reinterpret_cast<float const*>(&DockOp.Field_28);
+        float const Ratio = *reinterpret_cast<float const*>(&DockOp.TetherCruiseRatio);
         if (Ratio > 0.0)
         {
             ProxWatcher450.CruiseSpeedRatio = Ratio;
@@ -1584,11 +1574,11 @@ bool DockBehavior::OnApplyDirective(void* DirectiveOp)
         else
         {
             // Own cruise speed rounded to float, divided by the prox object's engine speed.
-            SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+            SystemManager* const Sys = SysMgr;
             IObjRW* const Self = ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()));
-            float const OwnSpeed = Behavior_InvokeManagerSlotD8(
+            float const OwnSpeed = Behavior_GetSpeed(
                 ObjInspectOf(Self), 1.0f, IObject::ThrustEquipCruise);
-            double const ProxSpeed = Behavior_InvokeManagerSlotD8(
+            double const ProxSpeed = Behavior_GetSpeed(
                 ObjInspectOf(ProxObj), 1.0f, IObject::ThrustEquipEngine);
             ProxWatcher450.CruiseSpeedRatio = static_cast<float>(OwnSpeed / ProxSpeed);
         }

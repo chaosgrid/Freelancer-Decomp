@@ -549,6 +549,8 @@ void GoodInfoList::load(char const* RelPath)
                       kGoodListSource, 0x1b0, Name.get_string());
             }
             // No zero-key test: a later good with the same key overwrites the earlier one.
+            // Retail: a block cut short by a duplicate nickname is still pushed and keyed here
+            // under whatever ids it had read so far.
             ById[Info->Id] = Info;
             ByArch[Info->ArchId] = Info;
         }

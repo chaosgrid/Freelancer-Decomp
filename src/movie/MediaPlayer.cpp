@@ -12,12 +12,6 @@
 #include <cstring>
 #include <new>
 
-// 0x06acf3db. movie.dll operator new: __nh_malloc(size, 1). Null on failure, does not throw.
-void* __cdecl MovieOperatorNew(unsigned int Size);
-
-// FUN_06acf3d0. movie.dll operator delete: forwards to the CRT heap free.
-void __cdecl MovieOperatorDelete(void* Block);
-
 // Global state variables initialization
 int g_stateFlag = 0;
 FApproach2Player* g_playerObject = nullptr; // DAT_06ae092c

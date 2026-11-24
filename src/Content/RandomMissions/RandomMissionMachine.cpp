@@ -333,7 +333,7 @@ std::map<unsigned int, FContentPlayerState*>* FRmRuntimeMachine::GetMissionPlaye
 
 // Inlined in FUN_06f84f10.
 FRmConversationMessage::FRmConversationMessage(FRmConversationBase* Source)
-    : StateMachineMessage(GRmMsgType06fd3b74)
+    : StateMachineMessage(GRmMsgConversation)
     , Conversation(Source->Clone())
 {
 }
@@ -394,7 +394,7 @@ void FRmOfferComponent::PrepareConversation(FRmConversation* Conversation,
         TString<0x40> const Name = MakeVoiceLineName(Line->Text.Data, "-", Line->VoiceId);
         unsigned int const TextId = pub::GetNicknameId(Name.Data);
         Line->TextIds.push_back(TextId);
-        Line->PermutationIds = 0x4a39;
+        Line->PermutationIds = IDS_COMM_ORDER_1;
         Line->bPrepared = 1;
     }
 }
@@ -541,7 +541,7 @@ StateMachineMessage* FRmShipMessage::clone() const
 
 // FUN_06f87d10.
 FRmCookieMessage::FRmCookieMessage(unsigned int InCookie)
-    : StateMachineMessage(GRmMsgType06fd3b78)
+    : StateMachineMessage(GRmMsgSpawnGroup)
     , Cookie(InCookie)
 {
 }
@@ -647,7 +647,7 @@ bool FRmSolarMachine::OnStateEvent(SMEventData const* Event, int const& State)
     {
         unsigned int const ObjectId = Record->ObjectId;
         Record->State = 3;
-        FRmSolarMessage Message(GRmMsgType06fd3b9c, ObjectId);
+        FRmSolarMessage Message(GRmMsgSolarDestroyed, ObjectId);
         send_immediate_message(&Message, OwnerId);
     }
     return true;
@@ -705,7 +705,7 @@ bool FRmShipMachine::OnStateEvent(SMEventData const* Event, int const& State)
     Record->State = 3;
     // FuncInfo 06fc627c: the destroyed message lives to the exit; the group list and the two
     // later messages nest inside it.
-    FRmShipMessage Destroyed(GRmMsgType06fd3ba8, Group, ObjectId);
+    FRmShipMessage Destroyed(GRmMsgShipDestroyed, Group, ObjectId);
     send_immediate_message(&Destroyed, OwnerId);
 
     FRmRecordList Members = QueryGroup(Record->Group);
@@ -723,12 +723,12 @@ bool FRmShipMachine::OnStateEvent(SMEventData const* Event, int const& State)
     }
     if (DeadCount == Members.Records.size())
     {
-        FRmShipMessage Message(GRmMsgType06fd3ba4, Record->Group, Record->ObjectId);
+        FRmShipMessage Message(GRmMsgGroupDestroyed, Record->Group, Record->ObjectId);
         send_immediate_message(&Message, OwnerId);
     }
     if (bFlagged && bNoFlaggedAlive)
     {
-        FRmShipMessage Message(GRmMsgType06fd3ba0, Record->Group, Record->ObjectId);
+        FRmShipMessage Message(GRmMsgGroupTargetsDestroyed, Record->Group, Record->ObjectId);
         send_immediate_message(&Message, OwnerId);
     }
     return true;
@@ -793,7 +793,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
     {
         StateMachineMessage const* Message = static_cast<SMMessage const*>(Event)->Message;
         if ((Message->DeliveryState == -1 || Message->DeliveryState == get_state()) &&
-            Message->MessageType == GRmMsgType06fd3b6c)
+            Message->MessageType == GRmMsgDropLoot)
         {
             FRmLootMessage const* Drop = static_cast<FRmLootMessage const*>(Message);
             unsigned int const* ShipId = &Drop->Value;
@@ -846,7 +846,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
             Record->Units = static_cast<int>(Info.Units);
             Record->HolderId = 0;
             Record->CargoSlot = SUBOBJ_ID_NONE;
-            FRmLootMessage Reply(GRmMsgType06fd3b84, LootId, *ShipId);
+            FRmLootMessage Reply(GRmMsgLootDropped, LootId, *ShipId);
             send_immediate_message(&Reply, OwnerId);
             return true;
         }
@@ -871,12 +871,12 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
             Record->State = 4;
         if (Cause == 1)
         {
-            FRmLootMessage Message(GRmMsgType06fd3b94, Record->ObjectId, 0);
+            FRmLootMessage Message(GRmMsgLootDestroyed, Record->ObjectId, 0);
             send_immediate_message(&Message, OwnerId);
         }
         else if (Cause == 0)
         {
-            FRmLootMessage Message(GRmMsgType06fd3b80, Record->ObjectId, 0);
+            FRmLootMessage Message(GRmMsgLootLost, Record->ObjectId, 0);
             send_immediate_message(&Message, OwnerId);
         }
         if (Record->Kind == 2)
@@ -888,7 +888,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
             }
             if (bNoneLeft)
             {
-                FRmLootMessage Message(GRmMsgType06fd3b8c, Record->ObjectId, Parms[1]);
+                FRmLootMessage Message(GRmMsgCriticalLootGone, Record->ObjectId, Parms[1]);
                 send_immediate_message(&Message, OwnerId);
             }
         }
@@ -912,7 +912,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
         {
             // FuncInfo 06fc6100: the picked-up message outlives the critical-loot test, the
             // query and the 3b8c message.
-            FRmLootMessage PickedUp(GRmMsgType06fd3b90, Record->ObjectId, *ShipId);
+            FRmLootMessage PickedUp(GRmMsgLootPickedUp, Record->ObjectId, *ShipId);
             send_immediate_message(&PickedUp, OwnerId);
             if (Record->Kind == 2)
             {
@@ -923,7 +923,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
                 }
                 if (bNoneLeft)
                 {
-                    FRmLootMessage Message(GRmMsgType06fd3b8c, Record->ObjectId, *ShipId);
+                    FRmLootMessage Message(GRmMsgCriticalLootGone, Record->ObjectId, *ShipId);
                     send_immediate_message(&Message, OwnerId);
                 }
             }
@@ -945,7 +945,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
             for (std::list<FRmSpawnRecord*>::iterator It = Held.Records.begin();
                  It != Held.Records.end(); ++It)
             {
-                FRmLootPlayerMessage Message(GRmMsgType06fd3b88, (*It)->ObjectId, Parms[0],
+                FRmLootPlayerMessage Message(GRmMsgLootHolderDocked, (*It)->ObjectId, Parms[0],
                                              Parms[1]);
                 send_immediate_message(&Message, OwnerId);
             }
@@ -1153,8 +1153,8 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
             Vector Other;
             (*It)->ShipObject->GetPosition(&Other);
             double const DistanceSq = RmDistanceSq(Other, Center);
-            // Unordered is kept for kind 8 and skipped for kind 9.
-            bool const bKeep = Line->TargetKind == 8 ? !(DistanceSq > 100000000.0)
+            // 1e8 is DAT_06fbc2ac; unordered is skipped by both kinds.
+            bool const bKeep = Line->TargetKind == 8 ? DistanceSq <= 100000000.0
                                                      : DistanceSq > 100000000.0;
             if (bKeep)
                 Line->PlayerIds.push_back((*It)->PlayerId);
@@ -1164,8 +1164,9 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
     case 10:
     case 11:
     {
-        // Retail bug kept: the player index advances only past a player WITHOUT a ship, so
-        // the loop never ends once a mission player has a ship.
+        // Retail: the player index advances only past a player WITHOUT a ship (06f8a191 /
+        // 06f8a129), so the loop never ends once a mission player has a ship. Shipped
+        // vignetteparams.ini never names PLAYERS_IN_SYSTEM / _OUT_OF_SYSTEM, so it is not hit.
         std::vector<FContentPlayerState*>* Players = GetMissionPlayers();
         std::vector<FContentPlayerState*>::iterator It = Players->begin();
         while (It != Players->end())
@@ -1190,7 +1191,8 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
 // LAB_06f8a590.
 bool FRmRuntimeMachine::CanSave()
 {
-    if (get_state() == 5 || get_state() == 6 || get_state() == 7)
+    if (get_state() == RmStateSucceeded || get_state() == RmStateFailed ||
+        get_state() == RmStateDone)
         return false;
     return true;
 }
@@ -1198,9 +1200,9 @@ bool FRmRuntimeMachine::CanSave()
 // LAB_06f71100 (ICF with FRmTrigger::OnIdle).
 bool FRmRuntimeMachine::OnState0(SMEventData const* Event, int const& State)
 {
-    if (State == 0 && Event->get_event_type() < 4 && Event->get_event_type() == 1)
+    if (State == RmStateIdle && Event->get_event_type() < 4 && Event->get_event_type() == 1)
     {
-        set_state(1);
+        set_state(RmStateWaitStart);
         return true;
     }
     return false;
@@ -1209,23 +1211,23 @@ bool FRmRuntimeMachine::OnState0(SMEventData const* Event, int const& State)
 // LAB_06f8a610.
 bool FRmRuntimeMachine::OnState1(SMEventData const* Event, int const& State)
 {
-    if (State != 1 || Event->get_event_type() != 3)
+    if (State != RmStateWaitStart || Event->get_event_type() != 3)
         return false;
     StateMachineMessage const* Message = static_cast<SMMessage const*>(Event)->Message;
     if (Message->DeliveryState != -1 && get_state() != Message->DeliveryState)
         return false;
     if (Message->MessageType != GRmMsgStartMachine)
         return false;
-    set_state(2);
+    set_state(RmStateStarted);
     return true;
 }
 
 // LAB_06f8a670.
 bool FRmRuntimeMachine::OnState2(SMEventData const* Event, int const& State)
 {
-    if (State == 2 && Event->get_event_type() < 4 && Event->get_event_type() == 1)
+    if (State == RmStateStarted && Event->get_event_type() < 4 && Event->get_event_type() == 1)
     {
-        set_state(3);
+        set_state(RmStateStart);
         return true;
     }
     return false;
@@ -1408,11 +1410,11 @@ bool FRmRuntimeMachine::UpdatePathObjectives(FMissionPlayer* Player, bool* bChan
                 bWhere = true;
             std::list<FMissionObjective*>::iterator Where = List->Objectives.begin();
 
-            // Objective key 0xc: the first object found at the target. Retail reads the
+            // RmObjReturnLoot: the first object found at the target. Retail reads the
             // buffer's first word even when nothing was found (stack garbage); the port's
             // buffer is 0.
             unsigned int TargetObjectId = 0;
-            if (First->Key == 0xc)
+            if (First->Key == RmObjReturnLoot)
             {
                 unsigned int ScanSystem = System->SystemId;
                 unsigned int Buffer[0x20] = {};
@@ -1751,7 +1753,7 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
 
         // 2000 is DAT_06fbc2cc.
         TRefHandle<FObjListDirective> StayInRange;
-        CreateObjListDirective(0xd, &StayInRange.Pointer);
+        CreateObjListDirective(OBJLIST_STAY_IN_RANGE, &StayInRange.Pointer);
         static_cast<FObjListStayInRange*>(StayInRange.Pointer)->SetSphere(&Group->Position, 2000.0f);
         {
             FObjListDirective* const Added = StayInRange.Pointer;
@@ -1761,7 +1763,7 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
         if (Ship == Group->Ships.begin())
         {
             TRefHandle<FObjListDirective> GotoGroup;
-            CreateObjListDirective(5, &GotoGroup.Pointer);
+            CreateObjListDirective(OBJLIST_GOTO_VEC, &GotoGroup.Pointer);
             FObjListGotoVec* const Goto = static_cast<FObjListGotoVec*>(GotoGroup.Pointer);
             Goto->SetDestination(&Group->Position, 500.0f, -1.0f, 0, false, false);
             Goto->Op.Priority = 1;
@@ -1911,7 +1913,7 @@ bool FRmRuntimeMachine::SpawnLoot(FRmLootSpawn* InLoot)
         if (InLoot->CriticalLootMode != 1)
             pub::SpaceObj::SetInvincible2(Record.ObjectId, false, true, 1.0f);
         Loot->Records.Records.push_back(new FRmLootRecord(Record));
-        FRmLootMessage Message(GRmMsgType06fd3b98, Record.ObjectId, 0);
+        FRmLootMessage Message(GRmMsgCriticalLootSpawned, Record.ObjectId, 0);
         Loot->SendToOwner(&Message);
     }
     return true;
@@ -2117,7 +2119,7 @@ void FRmVignetteMachine::OnSucceeded()
         }
         if (bNear)
         {
-            Player->SetFlags(4);
+            Player->SetFlags(PLAYER_FLAG_MISSION_AREA);
             Player->SetCountdown(120.0f);
         }
         else
@@ -2182,19 +2184,19 @@ bool __cdecl CreateRmRuntimeMachine(FRmOffer* Offer, FRmRuntimeMachine** Out)
 }
 
 // FUN_06f877c0.
-FRmRecordList FRmLootMachine::Query(int Field6c, int Kind, unsigned int Field60, int InState,
-                                    unsigned int InHolderId)
+FRmRecordList FRmLootMachine::Query(int InCriticalLootMode, int Kind, unsigned int InParentId,
+                                    int InState, unsigned int InHolderId)
 {
     FRmRecordList Result;
     for (std::list<FRmSpawnRecord*>::iterator It = Records.Records.begin();
          It != Records.Records.end(); ++It)
     {
         FRmLootRecord* const Record = static_cast<FRmLootRecord*>(*It);
-        if (Field60 != 0 && Record->ParentId != Field60)
+        if (InParentId != 0 && Record->ParentId != InParentId)
             continue;
         if (InHolderId != 0 && Record->HolderId != InHolderId)
             continue;
-        if (Field6c != 0 && Record->CriticalLootMode != Field6c)
+        if (InCriticalLootMode != 0 && Record->CriticalLootMode != InCriticalLootMode)
             continue;
         if (Kind != 0 && Record->Kind != Kind)
             continue;

@@ -6,6 +6,7 @@
 
 #include "common_fleebehavior.h"
 #include "common_dockbehavior.h"     // DockBehavior::CopyDockOp (FUN_062c3590)
+#include "common_gotobehavior.h"     // GotoBehavior::CopyGotoOp (FUN_062fe940)
 #include "common_aisteer.h"          // HasReadyWeaponSlot (FUN_062eb910)
 #include "common_systemmanager.h"    // SystemManager
 #include "dacom.h"                   // FDUMP
@@ -14,11 +15,8 @@
 
 // FleeBehavior; see common_fleebehavior.h.
 
-// FUN_062ecaf0 is FGunConvergenceStateBlock::GetCurrentLeader: the follow / formation leader
+// FUN_062ecaf0 is FFormationLeaderState::GetCurrentLeader: the follow / formation leader
 // watched at SystemManager+0x1364, or 0.
-// CopyGotoOp (common_gotobehavior.cpp): GotoBehavior's own DirectiveGotoOp copy-out.
-extern "C" bool __fastcall CopyGotoOp(unsigned char* This, void* OutBuffer);
-
 namespace
 {
 // DAT_0639f7a4: 00 40 1c 46 == 10000.0f. Ghidra merges its last byte into the string that
@@ -53,19 +51,7 @@ float FleeHostileRatioThreshold(int Level)
 // +0xbc, +0x2c/+0x38/+0x34 = 0, +0x30 = 4. Retail leaves +0x3c..+0x48 unwritten (slots
 // 3/4/5/22 write the delegate pointers before anything reads them); the port zeroes them.
 FleeBehavior::FleeBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , OwnerContextPtr14(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime1c(0.0f)
-    , BehaviorMgrPtr20(nullptr)
-    , NavHelperPtr24(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
+    : Behavior(InTypeId)
     , bFleeActive(0)
     , Pad2d{}
     , FleeReason(4)
@@ -80,7 +66,6 @@ FleeBehavior::FleeBehavior(int InTypeId)
     , GotoOp()
     , DockOp()
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
 }
 
 // Slot 0 is FUN_062c7090, the scalar-deleting dtor ICF-shared by seven behavior vtables.
@@ -97,9 +82,9 @@ bool FleeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 // The three loads slots 3/4/5/22 each open with (inlined in retail).
 void FleeBehavior::RefreshDelegates()
 {
-    GotoDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[2];    // +0x17c
-    DockDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[7];    // +0x190
-    FormationDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[10];   // +0x19c
+    GotoDelegate = BehaviorMgr->BehaviorDispatchTable[2];    // +0x17c
+    DockDelegate = BehaviorMgr->BehaviorDispatchTable[7];    // +0x190
+    FormationDelegate = BehaviorMgr->BehaviorDispatchTable[10];   // +0x19c
 }
 
 // ============================================================================
@@ -108,7 +93,7 @@ void FleeBehavior::RefreshDelegates()
 int FleeBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
-    SystemManager* const Sys = NavHelperPtr24;
+    SystemManager* const Sys = SysMgr;
     pub::AI::Personality::JobStruct const& Job = Sys->PersonalityData.JobParams;
 
     // 2 is the "do not flee" answer.
@@ -116,7 +101,7 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
     int Result = 2;
     if (Job.bFleeWhenLeaderFleesStyle != 0)                                  // Sys+0x1950
     {
-        IObjRW* const Watched = Sys->GunConvergenceStateBytes.GetCurrentLeader();   // FUN_062ecaf0
+        IObjRW* const Watched = Sys->FormationLeaders.GetCurrentLeader();   // FUN_062ecaf0
         if (Watched != nullptr)
         {
             // GetBehaviorManager(obj)->CurrentBehaviorIndex == 4: the target is fleeing.
@@ -135,10 +120,10 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
     {
         if (Flag29 != 0)
         {
-            ModeSelector0xc = 3;
+            Readiness = 3;
             return 3;
         }
-        ModeSelector0xc = 0;
+        Readiness = 0;
         return 0;
     }
 
@@ -197,20 +182,20 @@ int FleeBehavior::OnEvaluateReadiness(float Unused)
 
     if (Flag29 != 0)
     {
-        ModeSelector0xc = 3;
+        Readiness = 3;
         return 3;
     }
-    ModeSelector0xc = Result;
+    Readiness = Result;
     return Result;
 }
 
 // ============================================================================
-// Slot 7, FleeBehavior::Perform, LAB_062c72c0. NavHelper, ExternalIface and the delegates are
+// Slot 7, FleeBehavior::Perform, LAB_062c72c0. SysMgr, ExternalIface and the delegates are
 // not null-tested.
 // ============================================================================
 int FleeBehavior::Perform()
 {
-    SystemManager* const Sys = NavHelperPtr24;
+    SystemManager* const Sys = SysMgr;
 
     if (bFleeActive == 0)
     {
@@ -223,7 +208,7 @@ int FleeBehavior::Perform()
         uint DestinationId = 0;
         float Radius = 500.0f;
         uint const OwnerId = Sys->SelfTarget.Iface->get_id();
-        if (!BehaviorMgrPtr20->RequestFleeDestination(
+        if (!BehaviorMgr->RequestFleeDestination(
                 OwnerId, static_cast<pub::AI::ContentCallback::FleeReason>(FleeReason),
                 Type, Destination, DestinationId, Radius))
         {
@@ -248,9 +233,9 @@ int FleeBehavior::Perform()
             pub::AI::DirectiveDockOp Op;
             Op.DockObjectId = DestinationId;
             bHasSavedDirective = 0;
-            IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
+            IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
             if (Current != nullptr &&
-                *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 7)
+                Current->GetBehaviorId() == 7)
             {
                 if (static_cast<DockBehavior*>(DockDelegate)->CopyDockOp(&DockOp))
                     bHasSavedDirective = 1;
@@ -263,21 +248,21 @@ int FleeBehavior::Perform()
             pub::AI::DirectiveGotoOp Op;
             if (FleeDestType == 3)
             {
-                Op.Field_0C = 1;
+                Op.GotoKind = 1;
                 Op.Destination = Destination;
             }
             else
             {
-                Op.Field_0C = 0;
-                Op.Field_1C = static_cast<int32_t>(DestinationId);
+                Op.GotoKind = 0;
+                Op.TargetId = static_cast<int32_t>(DestinationId);
             }
-            Op.Field_50 = Radius;
+            Op.ArrivalRange = Radius;
             bHasSavedDirective = 0;
-            IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
+            IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
             if (Current != nullptr &&
-                *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 2)
+                Current->GetBehaviorId() == 2)
             {
-                if (CopyGotoOp(reinterpret_cast<unsigned char*>(GotoDelegate), &GotoOp))
+                if (static_cast<GotoBehavior*>(GotoDelegate)->CopyGotoOp(&GotoOp))
                     bHasSavedDirective = 1;
             }
             GotoDelegate->OnApplyDirective(&Op);
@@ -292,7 +277,7 @@ int FleeBehavior::Perform()
 
         if (bFleeActive == 0)
         {
-            UpdateResult10 = 1;
+            UpdateResult = 1;
             return 1;
         }
     }
@@ -300,9 +285,9 @@ int FleeBehavior::Perform()
     if (bFollowFleeingTarget != 0)
     {
         FormationDelegate->OnEngage();
-        FormationDelegate->SetTickDelta(GetTickDelta());
+        FormationDelegate->DeltaTime = DeltaTime;
         (void)FormationDelegate->OnUpdate();
-        UpdateResult10 = 1;
+        UpdateResult = 1;
         return 1;
     }
 
@@ -310,11 +295,11 @@ int FleeBehavior::Perform()
     if (FleeDestType == 1 || FleeDestType == 2 || FleeDestType == 3)
     {
         Behavior* const Delegate = (FleeDestType == 2) ? DockDelegate : GotoDelegate;
-        Delegate->SetTickDelta(GetTickDelta());
+        Delegate->DeltaTime = DeltaTime;
         int const ChildResult = Delegate->OnUpdate();
         if (ChildResult != 2 && ChildResult != 3)
         {
-            UpdateResult10 = 1;
+            UpdateResult = 1;
             return 1;
         }
     }
@@ -326,8 +311,8 @@ int FleeBehavior::Perform()
     }
 
     bFleeActive = 0;
-    BehaviorMgrPtr20->SetDirectiveResult(4, 0);                              // FUN_062d29a0
-    UpdateResult10 = 2;
+    BehaviorMgr->SetDirectiveResult(4, 0);                              // FUN_062d29a0
+    UpdateResult = 2;
     return 2;
 }
 
@@ -355,7 +340,7 @@ void FleeBehavior::OnEngage()
         return;
     }
     // Retail formats the "deactivate()" message into a stack buffer that is never read.
-    SystemManager* const Sys = NavHelperPtr24;
+    SystemManager* const Sys = SysMgr;
     char Buffer[0x100];
     std::sprintf(Buffer, GDeactivateUninitialized, Sys->SelfTarget.Iface->get_id());
 }
@@ -376,9 +361,9 @@ void FleeBehavior::OnDisengage()
         if (GotoDelegate == nullptr)
             return;
         GotoDelegate->OnDisengage();
-        IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
+        IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
         if (Current != nullptr &&
-            *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 2 &&
+            Current->GetBehaviorId() == 2 &&
             bHasSavedDirective != 0)
         {
             GotoDelegate->OnApplyDirective(&GotoOp);
@@ -391,9 +376,9 @@ void FleeBehavior::OnDisengage()
             return;
         DockDelegate->OnDisengage();
         Behavior_ReleaseDirectiveTarget(DockDelegate);                            // FUN_062d21c0
-        IDirectiveInfo const* const Current = BehaviorMgrPtr20->get_current_directive();
+        IDirectiveInfo const* const Current = BehaviorMgr->get_current_directive();
         if (Current != nullptr &&
-            *reinterpret_cast<int const*>(reinterpret_cast<char const*>(Current) + 0x8) == 7 &&
+            Current->GetBehaviorId() == 7 &&
             bHasSavedDirective != 0)
         {
             DockDelegate->OnApplyDirective(&DockOp);
@@ -401,7 +386,7 @@ void FleeBehavior::OnDisengage()
         return;
     }
     // Formatted into a never-read buffer, as retail.
-    SystemManager* const Sys = NavHelperPtr24;
+    SystemManager* const Sys = SysMgr;
     char Buffer[0x100];
     std::sprintf(Buffer, GDeactivateUninitialized, Sys->SelfTarget.Iface->get_id());
 }

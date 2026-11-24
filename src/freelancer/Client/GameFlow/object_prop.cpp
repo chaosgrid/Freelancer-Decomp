@@ -114,7 +114,7 @@ void FObjectProp::Update(double DeltaSeconds)
 {
     // FUN_00446a60. Flashlights.Update is FUN_00558470.
     float const Delta = static_cast<float>(DeltaSeconds);
-    if (Flag14 != 0)
+    if (bRunningLights != 0)
         Flashlights.Update(Hardpoints, Delta);
     DALib::Anim->MixerWalk(reinterpret_cast<unsigned long>(Instance), Delta);
     DALib::Engine->UpdateInstance(Instance, 2, AsOpaqueDword(Delta));
@@ -149,7 +149,7 @@ void FObjectProp::DrawTranslucent(ICamera* Camera)
         return;
     if (bDetached != 0)
         return;
-    if (Flag14 == 0)
+    if (bRunningLights == 0)
         return;
     Flashlights.Draw(Camera);
 }

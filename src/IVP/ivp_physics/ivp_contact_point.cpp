@@ -13,7 +13,6 @@
 #include "ivp_impact.h"            // FUN_06358c00 (06359380)
 #include "../ivp_collision/ivp_compact_ledge_solver.h" // give_world_coords_AT (FUN_0635bda0), IVP_CalcCrossProduct (06359d10)
 #include "../ivp_collision/ivp_listmanager_topology.h" // IVP_ResolvePairRecordSideMaterialSlots (FUN_06358bb0)
-#include "../ivp_utility/ivp_vector_math.h"
 #include "x87_trig.h"
 #include <cmath>
 #include <cstring>
@@ -428,8 +427,8 @@ namespace
     //
     //   1. Direction = RecomputeTangentDirection(), which in this SolverMode
     //      also returns ClampTangentDirection's refinement scalar.
-    //   2. Cores[0..1] = Object1->original_core and Object2->original_core
-    //      (+0x9c on both, NOT ->core/+0x98). Any core with (Flags & 0xC) != 0
+    //   2. Cores[0..1] = Object1->friction_core and Object2->friction_core
+    //      (+0x9c on both, NOT ->core/+0x98). Any core with (Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0
     //      is kinematic and is skipped everywhere below, contributing nothing.
     //   3. RelativeSpeed = dot(v0 - v1, Direction), with vN the world-space
     //      velocity of each body at its own contact point (Owner->CoordOS[N]).
@@ -456,8 +455,8 @@ namespace
         const float Refinement = Contact->RecomputeTangentDirection(&Direction);
 
         IVP_Core* Cores[2];
-        Cores[0] = Contact->Object1->original_core;
-        Cores[1] = Contact->Object2->original_core;
+        Cores[0] = Contact->Object1->friction_core;
+        Cores[1] = Contact->Object2->friction_core;
 
         IVP_Impact_Solver_Long_Term* Frame = Contact->Owner;
         const Vector* const ContactPointOS[2] = { &Frame->CoordOS[0], &Frame->CoordOS[1] };
@@ -473,7 +472,7 @@ namespace
         Vector PointSpeed[2];
         for (int Side = 0; Side < 2; ++Side)
         {
-            if ((Cores[Side]->Flags & 0xCu) != 0)
+            if ((Cores[Side]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
                 PointSpeed[Side] = Vector{ 0.0f, 0.0f, 0.0f };
             else
                 Cores[Side]->calc_speed_at_object_position(ContactPointOS[Side], &PointSpeed[Side]);
@@ -501,7 +500,7 @@ namespace
             LinearDelta[Side] = Vector{ 0.0f, 0.0f, 0.0f };
             AngularDelta[Side] = Vector{ 0.0f, 0.0f, 0.0f };
 
-            if ((Core->Flags & 0xCu) == 0)
+            if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
             {
                 Vector ImpulseWS;
                 ImpulseWS.x = Direction.x * Sign;
@@ -547,7 +546,7 @@ namespace
         for (int Side = 0; Side < 2; ++Side)
         {
             IVP_Core* Core = Cores[Side];
-            if ((Core->Flags & 0xCu) != 0)
+            if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
                 continue;
 
             Core->Speed.x = (float)(Scale * LinearDelta[Side].x + Core->Speed.x);
@@ -574,8 +573,8 @@ namespace
     //
     // Two paths, chosen by the four-test gate at 063541bb:
     //
-    //  * AXIS-LOCK PATH -- taken only when Owner->ChildCandidate[0] has an
-    //    AxisLock (IVP_Core+0x10, see ivp_core.h), Owner->ChildCandidate[1]
+    //  * AXIS-LOCK PATH -- taken only when Owner->ContactCores[0] has an
+    //    AxisLock (IVP_Core+0x10, see ivp_core.h), Owner->ContactCores[1]
     //    is null, and either the next dist of the system
     //    (ListManagerListNext, +0x00) is null
     //    or its NowFrictionPressure (+0x54) is exactly 0. It replaces Owner's
@@ -589,7 +588,7 @@ namespace
     //    TangentAxis0/TangentAxis1 pair with both cores, clamps the solved
     //    impulse length to the friction limit, applies it, and returns the
     //    per-PSI INCREMENT of TangentWork (+0x50) -- that increment is what
-    //    IVP_ClampFrictionCone accumulates into the pair's _field24.
+    //    IVP_ClampFrictionCone accumulates into the pair's IntegratedAntiEnergy.
     //
     // Retail constants:
     //   DAT_063a53d0 = 1.0f       DAT_063a53d4 = 0.0f
@@ -620,8 +619,8 @@ namespace
             return 0.0f;
 
         IVP_Impact_Solver_Long_Term* Frame = Contact->Owner;
-        IVP_Core* CoreA = Frame->ChildCandidate[0];
-        IVP_Core* CoreB = Frame->ChildCandidate[1];
+        IVP_Core* CoreA = Frame->ContactCores[0];
+        IVP_Core* CoreB = Frame->ContactCores[1];
         const IVP_U_Point* const NormalPt = reinterpret_cast<const IVP_U_Point*>(&Frame->ContactNormalWS);
         const float* const Axis0 = reinterpret_cast<const float*>(&Frame->TangentAxis0);
         const float* const Axis1 = reinterpret_cast<const float*>(&Frame->TangentAxis1);
@@ -1026,7 +1025,7 @@ void IVP_Contact_Point::AccumulateFrameTangent(const Vector& ImpulseChange)
 //                        + Dot(Owner->CoordOSCrossNormal[0], CoreA->RotSpeed)
 //                        - Dot(Owner->ContactNormalWS, CoreB->Speed)
 //                        - Dot(Owner->CoordOSCrossNormal[1], CoreB->RotSpeed)
-//      with CoreA/CoreB = Owner->ChildCandidate[0/1] (either side is skipped
+//      with CoreA/CoreB = Owner->ContactCores[0/1] (either side is skipped
 //      if null -- a one-sided/static-body contact).
 //   2. Depth -= GapDistance (the surface gap); if the result is negative,
 //      Gain is boosted x20.
@@ -1052,7 +1051,7 @@ void IVP_Contact_Point::SolveNormalImpulse(const IVP_Event_Sim* EventSim, float 
     const Vector& N = F->ContactNormalWS;
 
     float RelSpeed = 0.0f;
-    IVP_Core* CoreA = F->ChildCandidate[0];
+    IVP_Core* CoreA = F->ContactCores[0];
     if (CoreA != nullptr)
     {
         const Vector& C0 = F->CoordOSCrossNormal[0];
@@ -1063,7 +1062,7 @@ void IVP_Contact_Point::SolveNormalImpulse(const IVP_Event_Sim* EventSim, float 
         RelSpeed = (float)(Rot + Lin);
     }
 
-    IVP_Core* CoreB = F->ChildCandidate[1];
+    IVP_Core* CoreB = F->ContactCores[1];
     if (CoreB != nullptr)
     {
         const Vector& C1 = F->CoordOSCrossNormal[1];
@@ -1186,7 +1185,7 @@ namespace
 // at Materials[1] and steps back per side.
 //
 // Per side whose material has SecondFrictionXEnabled (+8):
-//   Axis = column 0 of Object->original_core->MWorldFCore (+0xf4/+0x104/+0x114)
+//   Axis = column 0 of Object->friction_core->MWorldFCore (+0xf4/+0x104/+0x114)
 //   Perp = FUN_06347f50(Axis, Owner->ContactNormalWS); PerpLen = float(|Perp|)
 //   K = Other->get_friction_factor() * float(Side->get_second_friction_factor())
 //       (slot 1 on this side first, then slot 0 on the other)
@@ -1223,7 +1222,7 @@ float IVP_Contact_Point::ClampTangentDirection(Vector* InOutDir)
         }
 
         IVP_Real_Object* SideObject = (Side == 0) ? Object1 : Object2;
-        const IVP_U_Matrix& CoreMatrix = SideObject->original_core->MWorldFCore;
+        const IVP_U_Matrix& CoreMatrix = SideObject->friction_core->MWorldFCore;
         Vector Axis;
         Axis.x = CoreMatrix.rows[0].k[0];
         Axis.y = CoreMatrix.rows[1].k[0];
@@ -1347,7 +1346,7 @@ namespace
     //   TangentSq = X*X + Y*Y, stored once as float and kept unrounded for
     //     the compare; the clamp runs only when TangentSq > ConeSq (ordered).
     //   FUN_06347df0(TangentSq as float) = 1.0f / sqrt (extended).
-    //   _flags60 = (_flags60 & 0xffffff01) | 1.
+    //   RecheckFeatureFlags = (RecheckFeatureFlags & 0xffffff01) | 1.
     //   FrictionCorrection = ((InvLen * TangentSqF - Cone) * pressure (+0x54))
     //     * coefficient (+0x44) + FrictionCorrection, one rounding.
     //   Scale = InvLen * Cone; SpanFrictionS[0] = Scale * [0]; [1] likewise.
@@ -1363,7 +1362,7 @@ namespace
         }
 
         const double InvLen = 1.0 / std::sqrt((double)(TangentSqF));
-        Dist->_flags60 = (Dist->_flags60 & 0xffffff01u) | 1u;
+        Dist->RecheckFeatureFlags = (Dist->RecheckFeatureFlags & 0xffffff01u) | 1u;
         Dist->FrictionCorrection = (float)(
             ((InvLen * (double)(TangentSqF) - (double)(Cone)) *
              (double)(Dist->NowFrictionPressure)) *
@@ -1427,7 +1426,7 @@ void IVP_ClampFrictionCone(IVP_ListManager* FrictionSystem, const IVP_Event_Sim*
 
         if (correctionSum > 0.0f)
         {
-            pair->_field24 = (float)((double)(correctionSum) + (double)(pair->_field24));
+            pair->IntegratedAntiEnergy = (float)((double)(correctionSum) + (double)(pair->IntegratedAntiEnergy));
         }
     }
 }
@@ -1442,7 +1441,7 @@ void IVP_AgeAndRemergeContactSets(IVP_ListManager* FrictionSystem)
         IVP_ListManager_CorePairEntry* pair = FrictionSystem->CorePairEntries.elems[s];
         if (--pair->MergeCacheCountdown == 0)
         {
-            IVP_MergeRedundantContacts(pair, FrictionSystem->Environment->vector_cores_active);
+            IVP_MergeRedundantContacts(pair, FrictionSystem->Environment->short_term_mem);
             pair->MergeCacheCountdown = 5;
         }
     }
@@ -1507,8 +1506,8 @@ namespace
 }
 
 //   Obj0 = synapse[(StateFlags >> 8) & 3].l_obj, Obj1 = synapse[((StateFlags
-//     ^ 0x100) >> 8) & 3].l_obj; Core0/Core1 = their +0x9c core (Ipion
-//     friction_core; the port's original_core). When Core0's flags & 0xc is
+//     ^ 0x100) >> 8) & 3].l_obj; Core0/Core1 = their friction_core
+//     (+0x9c). When Core0's flags & 0xc is
 //     non-zero the two cores swap (the objects do not).
 //   Info0 = Core0->+0x5c (FUN_0633ba90); cp = FUN_0635a950(this, &Tag).
 //   Tag != 1 -> *OutFs = Info0->FrictionSystem (no null test), *OutHavingNew
@@ -1522,7 +1521,7 @@ namespace
 //   Info0 / Info1 ->FrDists.Add(cp) (FUN_063556b0); *OutFs = Fs;
 //     FUN_063562d0(cp).
 //   Sim1 = Core1->+0x15c, Sim0 = Core0->+0x15c; when
-//     neither core has (Flags & 0xc) and Sim0 != Sim1: the unit that is
+//     neither core has (Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) and Sim0 != Sim1: the unit that is
 //     SimUnitNotDestroy absorbs the other (FUN_06348c60), and the other is
 //     freed (FUN_06348d80 + operator delete FUN_06391d5a) when non-null.
 // operator new failing is not modelled (retail would store through null).
@@ -1534,9 +1533,9 @@ IVP_Contact_Point* IVP_Try_To_Generate_Managed_Friction(IVP_Ledge_Mindist* Mindi
 {
     IVP_Real_Object* const Obj0 = Mindist->synapse[(Mindist->StateFlags >> 8) & 3u].l_obj;
     IVP_Real_Object* const Obj1 = Mindist->synapse[((Mindist->StateFlags ^ 0x100u) >> 8) & 3u].l_obj;
-    IVP_Core* Core0 = Obj0->original_core;
-    IVP_Core* Core1 = Obj1->original_core;
-    if ((Core0->Flags & 0xcu) != 0)
+    IVP_Core* Core0 = Obj0->friction_core;
+    IVP_Core* Core1 = Obj1->friction_core;
+    if ((Core0->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
     {
         IVP_Core* const Swap = Core0;
         Core0 = Core1;
@@ -1594,7 +1593,7 @@ IVP_Contact_Point* IVP_Try_To_Generate_Managed_Friction(IVP_Ledge_Mindist* Mindi
         if (Info1 == nullptr)
         {
             IVP_Friction_Info_For_Core* const Other =
-                ((Core1->Flags & 0xcu) == 0) ? static_cast<IVP_Friction_Info_For_Core*>(Core1->ObjectHashMap) : nullptr;
+                ((Core1->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0) ? static_cast<IVP_Friction_Info_For_Core*>(Core1->ObjectHashMap) : nullptr;
             if (Other != nullptr)
             {
                 // 06356d51-06356d5c: fuse the other core's system into ours.
@@ -1616,7 +1615,7 @@ IVP_Contact_Point* IVP_Try_To_Generate_Managed_Friction(IVP_Ledge_Mindist* Mindi
         // 06356da1-06356dda.
         Info0 = new IVP_Friction_Info_For_Core;
         IVP_Friction_Info_For_Core* const Other =
-            ((Core1->Flags & 0xcu) == 0) ? static_cast<IVP_Friction_Info_For_Core*>(Core1->ObjectHashMap) : nullptr;
+            ((Core1->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0) ? static_cast<IVP_Friction_Info_For_Core*>(Core1->ObjectHashMap) : nullptr;
         if (Other != nullptr)
         {
             // 06356de7-06356e01: join the other core's system.
@@ -1657,7 +1656,7 @@ IVP_Contact_Point* IVP_Try_To_Generate_Managed_Friction(IVP_Ledge_Mindist* Mindi
     // 06356ebc-06356f10.
     IVP_Simulation_Unit* const Sim1 = Core1->OwningSimUnit;
     IVP_Simulation_Unit* const Sim0 = Core0->OwningSimUnit;
-    if (((Core1->Flags | Core0->Flags) & 0xcu) != 0 || Sim0 == Sim1)
+    if (((Core1->Flags | Core0->Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0 || Sim0 == Sim1)
     {
         return Cp;
     }
@@ -1706,7 +1705,7 @@ namespace
     // FUN_063594d0 (thiscall on the contact point, no arguments, result on the
     // FPU stack). Sum = 0.0f; for side 0
     // then 1 -- core = Cp->Owner->contact core (+0x70 / +0x74), type byte =
-    // Cp+0x16 / Cp+0x2a (low byte of _hash1 / _hash2) -- a non-null core whose
+    // Cp+0x16 / Cp+0x2a (low byte of Status1 / Status2) -- a non-null core whose
     // type byte is not 3 adds
     //   s = ((w.x*w.x + w.y*w.y) + w.z*w.z) * 2.5e-5f   (w = RotSpeed, +0x94)
     //   s > 0.25f -> s = 0.25f   (<= or unordered keeps s)
@@ -1717,12 +1716,12 @@ namespace
         const IVP_Impact_Solver_Long_Term* const LongTerm = Cp->Owner;
         for (int32_t Side = 0; Side < 2; ++Side)
         {
-            const IVP_Core* const Core = LongTerm->ChildCandidate[Side];
+            const IVP_Core* const Core = LongTerm->ContactCores[Side];
             if (Core == nullptr)
             {
                 continue;
             }
-            const uint16_t SideTypeWord = (Side == 0) ? Cp->_hash1 : Cp->_hash2;
+            const uint16_t SideTypeWord = (Side == 0) ? Cp->Status1 : Cp->Status2;
             if (static_cast<uint8_t>(SideTypeWord & 0xffu) == 3)
             {
                 continue;
@@ -1790,7 +1789,7 @@ void IVP_Contact_Point_Calc_Impact_Priority(IVP_Contact_Point* Cp)
     LongTerm->LastImpactTimeStep = (float)(IVP_Contact_Point_Get_Rescue_Speed_Impact(Cp, Env));
 
     float Closing = GImpactZero;
-    const IVP_Core* const Core0 = LongTerm->ChildCandidate[0];
+    const IVP_Core* const Core0 = LongTerm->ContactCores[0];
     if (Core0 != nullptr)
     {
         const double Rot0 = IVP_Impact_Dot(Core0->RotSpeed, LongTerm->CoordOSCrossNormal[0]);
@@ -1799,7 +1798,7 @@ void IVP_Contact_Point_Calc_Impact_Priority(IVP_Contact_Point* Cp)
                             (double)(Core0->Speed.x) * Normal.x;
         Closing = (float)(Rot0 + Lin0);
     }
-    const IVP_Core* const Core1 = LongTerm->ChildCandidate[1];
+    const IVP_Core* const Core1 = LongTerm->ContactCores[1];
     if (Core1 != nullptr)
     {
         const float Rot1 = (float)(IVP_Impact_Dot(Core1->RotSpeed, LongTerm->CoordOSCrossNormal[1]));
@@ -1815,7 +1814,7 @@ void IVP_Contact_Point_Calc_Impact_Priority(IVP_Contact_Point* Cp)
 // FUN_06359380 (RET 4), the impact twin of FUN_06353b50 above. Materials from
 // FUN_06358bb0. Per side:
 //   material +0x8 (SecondFrictionXEnabled) zero -> next side.
-//   Axis = column 0 of Object->original_core (+0x9c)->MWorldFCore.
+//   Axis = column 0 of Object->friction_core (+0x9c)->MWorldFCore.
 //   Perp = FUN_06347f50(Axis, Cp->Owner normal); Len = float(FUN_06347e60(Perp)).
 //   T = float(coef - (coef - Other->slot0() * float(This->slot1())) * Len),
 //     coef = Cp->+0x44.
@@ -1839,7 +1838,7 @@ void IVP_Impact_Solver_Calc_Second_Friction(IVP_Impact_Solver* Solver, IVP_Conta
         }
 
         IVP_Real_Object* const SideObject = (Side == 0) ? Cp->Object1 : Cp->Object2;
-        const IVP_U_Matrix& CoreMatrix = SideObject->original_core->MWorldFCore;
+        const IVP_U_Matrix& CoreMatrix = SideObject->friction_core->MWorldFCore;
         Vector Axis;
         Axis.x = CoreMatrix.rows[0].k[0];
         Axis.y = CoreMatrix.rows[1].k[0];
@@ -1994,11 +1993,11 @@ void IVP_Contact_Point_Calc_Friction_Edge_Edge(IVP_Contact_Point* Cp, const IVP_
     LongTerm->SolverContactPointWS.y = PK.k[1];
     LongTerm->SolverContactPointWS.z = PK.k[2];
 
-    if ((Cp->_flags60 & 0xffu) != 1u)
+    if ((Cp->RecheckFeatureFlags & 0xffu) != 1u)
     {
         return;
     }
-    Cp->_flags60 &= 0xffffff00u;
+    Cp->RecheckFeatureFlags &= 0xffffff00u;
     if (!(TL >= 0.0f) || TL > 1.0f || !(TK >= 0.0f) || TK > 1.0f)
     {
         LongTerm->FrictionIsBroken = (uint8_t)((LongTerm->FrictionIsBroken & 0xfdu) | 0x01u);
@@ -2039,7 +2038,7 @@ IVP_Contact_Point::IVP_Contact_Point(IVP_Ledge_Mindist* Mindist)
     if (OldHead1 != nullptr)
         *reinterpret_cast<void**>(static_cast<char*>(OldHead1) + 0x4) = &Next1; // OldHead1->Prev
     Side1Obj->mindist_list = &Next1;
-    _hash1 = static_cast<uint16_t>((_hash1 & 0xff00u) | (static_cast<uint16_t>(Side1Syn->status) & 0xffu));
+    Status1 = static_cast<uint16_t>((Status1 & 0xff00u) | (static_cast<uint16_t>(Side1Syn->status) & 0xffu));
     Feature1 = Side1Syn->edge;
 
     const IVP_Synapse_Real* const Side2Syn = Mindist->get_sorted_synapse(1);
@@ -2052,19 +2051,19 @@ IVP_Contact_Point::IVP_Contact_Point(IVP_Ledge_Mindist* Mindist)
     if (OldHead2 != nullptr)
         *reinterpret_cast<void**>(static_cast<char*>(OldHead2) + 0x4) = &Next2; // OldHead2->Prev
     Side2Obj->mindist_list = &Next2;
-    _hash2 = static_cast<uint16_t>((_hash2 & 0xff00u) | (static_cast<uint16_t>(Side2Syn->status) & 0xffu));
+    Status2 = static_cast<uint16_t>((Status2 & 0xff00u) | (static_cast<uint16_t>(Side2Syn->status) & 0xffu));
     Feature2 = Side2Syn->edge;
 
     // Raw dword copies of the float time halves (MOV, no FPU).
-    _envTick68 = Mindist->synapse[0].l_obj->environment->current_time.time_base;
-    _envTick6c = Mindist->synapse[0].l_obj->environment->current_time.time_offset;
+    LastRecalcTimeBase = Mindist->synapse[0].l_obj->environment->current_time.time_base;
+    LastRecalcTimeOffset = Mindist->synapse[0].l_obj->environment->current_time.time_offset;
 
     if (Side2Syn->status == 2)
     {
         const IVP_Compact_Edge* const FaceEdge = Side2Syn->edge;
         IVP_U_Point FaceNormal;
         IVP_Compact_Ledge_Solver::calc_hesse_vec_object_not_normized(FaceEdge, FaceEdge->GetCompactLedge(), &FaceNormal);
-        _field4c = (float)(1.0 / FaceNormal.real_length()); // DAT_063a53d0
+        InvFaceNormalLength = (float)(1.0 / FaceNormal.real_length()); // DAT_063a53d0
     }
 
     TangentWork = 0.0f;
@@ -2072,7 +2071,7 @@ IVP_Contact_Point::IVP_Contact_Point(IVP_Ledge_Mindist* Mindist)
     FrictionCorrection = 0.0f;
     SpanFrictionS[0] = 0.0f;
     SpanFrictionS[1] = 0.0f;
-    _flags60 = (_flags60 & 0xffffff01u) | 0x1u;
+    RecheckFeatureFlags = (RecheckFeatureFlags & 0xffffff01u) | 0x1u;
     HasNegativePullSince = 0;
     ListManagerOwner = nullptr;
     SolverMode = 0;
@@ -2090,21 +2089,21 @@ IVP_Contact_Point::IVP_Contact_Point(IVP_Ledge_Mindist* Mindist)
 //   An unordered (NaN) +0x6c never leaves the second loop -- as in retail.
 void IVP_Contact_Point::ShiftTimeStamp(float DeltaBase, float DeltaOffset)
 {
-    _envTick68 = (float)((double)(_envTick68) - DeltaBase);
-    double Value = (double)(_envTick6c) - DeltaOffset;
-    _envTick6c = (float)(Value);
+    LastRecalcTimeBase = (float)((double)(LastRecalcTimeBase) - DeltaBase);
+    double Value = (double)(LastRecalcTimeOffset) - DeltaOffset;
+    LastRecalcTimeOffset = (float)(Value);
     while (Value > 1.0) // DAT_063a53d0
     {
-        _envTick68 = (float)((double)(_envTick68) + 1.0f);
-        Value = (double)(_envTick6c) - 1.0f;
-        _envTick6c = (float)(Value);
+        LastRecalcTimeBase = (float)((double)(LastRecalcTimeBase) + 1.0f);
+        Value = (double)(LastRecalcTimeOffset) - 1.0f;
+        LastRecalcTimeOffset = (float)(Value);
     }
 
-    Value = _envTick6c;
+    Value = LastRecalcTimeOffset;
     while (!(Value >= 0.0)) // DAT_063a53d4
     {
-        _envTick68 = (float)((double)(_envTick68) - 1.0f);
-        Value = (double)(_envTick6c) + 1.0f;
-        _envTick6c = (float)(Value);
+        LastRecalcTimeBase = (float)((double)(LastRecalcTimeBase) - 1.0f);
+        Value = (double)(LastRecalcTimeOffset) + 1.0f;
+        LastRecalcTimeOffset = (float)(Value);
     }
 }

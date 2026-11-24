@@ -40,14 +40,29 @@ struct LinkTree
     T* ChildHead;   // +0x0c
 };
 
-// The two dwords slot 19 receives (FUN_0059d140 cases 6..13 build it on the stack):
-//   Field0 -- -1 - (event - 6) for mouse button events 6..13, else 0
-//   Field1 -- 1, or 2 / 3 when the input record's +0x18 byte is set (3 when +0x1a is set too)
-// UITextMsgButton::MouseEvent treats Field0 == -1 && Field1 == 2 as a click.
+// The two dwords slot 19 receives (FUN_0059d140 cases 6..13 build it on the stack) from the
+// queued mouse event that FUN_0041fd90 polls and FUN_00577680 copies into the input record:
+// record +0x18 is the DirectInput button-down bit, +0x1a the double-click test (same button
+// within the double-click time and 5 pixels).
+//   Button -- -1 - (event - 6) for mouse button events 6..13 (DirectInput button index), else 0
+//   Action -- 1 release; 2 press, 3 when that press is a double click
+enum EWin3DMouseButton : int
+{
+    kWin3DMouseLeft = -1,
+    kWin3DMouseRight = -2
+};
+
+enum EWin3DMouseAction : int
+{
+    kWin3DMouseRelease = 1,
+    kWin3DMousePress = 2,
+    kWin3DMouseDoubleClick = 3
+};
+
 struct FWin3DMouseEvent
 {
-    int Field0;
-    int Field1;
+    int Button;
+    int Action;
 };
 
 struct Win3D : public LinkTree<Win3D>

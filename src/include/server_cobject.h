@@ -14,12 +14,6 @@
 // CObject — base game object in Server.dll. Offsets from GetAtmosphereRange (0x19800),
 // GetType (0x18da0) and the constructor FUN_06cee360.
 
-// CEquip::ClassType masks used by pub::SpaceObj::GetCargo / EnumerateCargo.
-enum EEquipTypeMask {
-    EQUIP_TYPE_CARGO   = 0x10000,
-    EQUIP_TYPE_SCANNER = 0x80000,
-};
-
 // ===========================================================================
 // pub::SpaceObj info structures — input to Create / CreateSolar / CreateLoot
 // ===========================================================================
@@ -179,8 +173,15 @@ static_assert(sizeof(LootInfo) == 0x68, "LootInfo: last field read at +0x64");
 // pub::SpaceObj::Dock (0x1a6e0), which between them read +0x00, +0x04 (a single BYTE,
 // the on/off flag Dock derives from DOCK_HOST_RESPONSE), +0x08, +0x0c and +0x10.
 // The struct is 0x20 bytes: +0x10 is an EquipDescVector-sized block (see CargoOut).
+// Type values, from ActivateEquipment's switch (.text:06cf95d8); the names are the port's.
+enum EQInfoType {
+    EQINFO_TYPE_CRUISE = 0,          // IObjAffect toggle_cruise (+0x50)
+    EQINFO_TYPE_SCAN_CARGO = 1,      // IObjInspect scan_cargo (+0x120)
+    EQINFO_TYPE_CLOAK = 2,           // toggle_item on FindFirst(EquipTypeCloak)
+    EQINFO_TYPE_DOCKING_LIGHTS = 3,  // toggle_item on every light whose archetype is a docking light
+};
 struct EQInfo {
-    unsigned int Type;              // +0x00: 0=shield/scanner, 1=countermeasure, 2=mine, 3=lights
+    unsigned int Type;              // +0x00: EQInfoType
     unsigned short EquipId;         // +0x04: low byte is the on/off flag Dock writes
     unsigned short Pad06;           // +0x06: alignment
     unsigned int Count;             // +0x08: case 0 requires this to be exactly 1

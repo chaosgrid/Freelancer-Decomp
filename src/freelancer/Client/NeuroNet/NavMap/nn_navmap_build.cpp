@@ -10,7 +10,7 @@
 #include "NeuroNet/NavMap/nn_navmap.h"
 #include "Interface/Pages/character_select_equip.h" // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
 #include "Common/client_cliobj.h"          // Archetype::CliSolarShapeName (companion +0x60)
-#include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteArgb_679ba4
+#include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteAmber
 #include "common_archetype.h"       // Archetype::GetSolar, Solar
 #include "common_id.h"              // CreateID
 #include "common_universe.h"
@@ -180,7 +180,7 @@ void NeuroNetNavMap::AddPlayerMarker()
         FClientMeshHolder* const Holder = &DigitMeshes[Index];
         ClientMeshLoadFromPath(Holder, Path, 0, true); // FUN_0059ec80(path, 0, 1)
         ClientMeshHolderSetColor(Holder,
-                                 reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679ba4));
+                                 reinterpret_cast<unsigned char const*>(&G_NnPaletteAmber));
         NavMapScaleMeshRotation(Holder, kNavMapWaypointScale);
     }
 }

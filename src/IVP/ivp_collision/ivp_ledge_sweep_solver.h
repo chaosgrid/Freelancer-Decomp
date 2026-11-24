@@ -145,7 +145,7 @@ public:
     int Field_0x10;           // +0x10 -- unidentified, see comment above
 };
 
-namespace IVP_LedgeSweepEvaluatorsDeferred
+namespace IVP_LedgeSweepEvaluators
 {
     // LAB_0635d6d0: dot(FrameA->vmult(P14), FrameB->vmult(P24)), both through
     // FUN_06348580; retail's association order, returned unrounded.
@@ -468,10 +468,10 @@ static_assert(offsetof(FIVP_Sweep_Ledge_Side, Object) == 0x0c, "FIVP_Sweep_Ledge
 // ----------------------------------------------------------------------------
 struct IVP_Sweep_Estimator_Context
 {
-    float RadiusSum;            // +0x00
-    float RelativeSpeed;        // +0x04
+    float SurfaceRotSpeedSum;   // +0x00: both cores' MaxSurfaceRotSpeed
+    float RelativeSpeed;        // +0x04: closing speed along the separating normal
     float ClosingBound;         // +0x08
-    float MarginSpan;           // +0x0c
+    float MaxSpeedSum;          // +0x0c: SurfaceRotSpeedSum + both CurrentSpeeds + 2e-10f
     void *Mindist;              // +0x10 -- IVP_Ledge_Mindist *
     void *Env;                  // +0x14 -- IVP_Environment *
     float NowBase;              // +0x18
@@ -501,7 +501,7 @@ struct IVP_Sweep_Estimator_Context
                                              FIVP_Sweep_Ledge_Side *SideB);
 
     // FUN_0635f180, thiscall, RET 0x10. From LAB_0635fef0 (:06360045). The
-    // only ledge-ledge driver that reads +0x0c (MarginSpan).
+    // only ledge-ledge driver that reads +0x0c (MaxSpeedSum).
     void EstimateLedgeVertexVsLedgeEdgeContact(const void *FeatureEdgeA,
                                                const void *FeatureEdgeB,
                                                FIVP_Sweep_Ledge_Side *SideA,

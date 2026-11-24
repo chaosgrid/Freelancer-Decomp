@@ -100,7 +100,7 @@ CECounterMeasureDropper::~CECounterMeasureDropper()
 bool CECounterMeasureDropper::Update(float Dt, unsigned Flags)
 {
     // FUN_0629a320: the first scanned missile targeting the owner within AiRangeSq fires
-    // Notify(Event_0x19) and ends the walk. The tail is CELauncher::Update inlined.
+    // Notify(IncomingMissileDetected) and ends the walk. The tail is CELauncher::Update inlined.
     if (IsFunctioning() && (Flags & 0x20) == 0)
     {
         Archetype::CounterMeasureDropper const* CmArch = (Archetype::CounterMeasureDropper const*)Arch;
@@ -140,7 +140,7 @@ bool CECounterMeasureDropper::Update(float Dt, unsigned Flags)
                 double const Dz = (double)TrackedPos.z - ShipPos.z;
                 if (Dz * Dz + Dy * Dy + Dx * Dx < CmArch->AiRangeSq)
                 {
-                    Notify(INotify::Event_0x19, nullptr);
+                    Notify(INotify::IncomingMissileDetected, nullptr);
                     break;
                 }
             }

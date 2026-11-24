@@ -58,7 +58,9 @@ struct IFxEffectArchetype : IDAComponent
                                                  unsigned long NewId) = 0;      // 17 +0x44 LAB_0621ecf0 RET 0xC
     virtual GENRESULT DACOM_API GetHeader16(unsigned char* Out16) = 0;           // 18 +0x48 LAB_0621ed20 RET 8
     virtual GENRESULT DACOM_API SetHeader16(const unsigned char* Header16) = 0;  // 19 +0x4C FUN_0621ed50 RET 8
-    virtual GENRESULT DACOM_API Slot20(void* Arg) = 0;                           // 20 +0x50 LAB_0621e660 RET 8
+    // 20 +0x50 LAB_0621e660 RET 8: ResetRecords, return 0. The factory (06222267) calls it on
+    // every new archetype with the creation descriptor.
+    virtual GENRESULT DACOM_API Initialize(AGGDESC* Desc) = 0;
 };
 
 // Node-library contract shared by the standalone component and IAlchemy.
@@ -89,7 +91,7 @@ struct IAlchemy : IFxNodeLibrary
     virtual GENRESULT DACOM_API UpdateNodes(void* A, void* B) = 0;              // 16 RET 0xC
     virtual GENRESULT DACOM_API DrawNodes(void* A, void* B) = 0;                // 17 RET 0xC
     virtual GENRESULT DACOM_API GetDrawCookie() = 0;                            // 18 RET 4
-    virtual GENRESULT DACOM_API Slot19(const char* Name, void* Unused) = 0;    // 19 +0x4C RET 0xC
+    virtual GENRESULT DACOM_API CreateNamedNode(const char* Name, void* Unused) = 0; // 19 +0x4C RET 0xC
     virtual GENRESULT DACOM_API AttachNode(void* A, void* B) = 0;               // 20 RET 0xC
     virtual GENRESULT DACOM_API AttachNodeFiltered(void* A, void* B) = 0;       // 21 RET 0xC
     virtual GENRESULT DACOM_API DetachNode(void* Node) = 0;                     // 22 RET 8
@@ -171,7 +173,9 @@ struct IFxEffectLibrary : IDAComponent
     virtual GENRESULT DACOM_API MakeUniqueName(const char* Name, const char** Out) = 0; // 12 RET 0xC
     virtual GENRESULT DACOM_API RemapAllRec16FieldD(unsigned long OldId,
                                                     unsigned long NewId) = 0; // 13 FUN_06220950 RET 0xC
-    virtual GENRESULT DACOM_API Slot14(void* Unused) = 0;               // LAB_0621fd20 RET 8 → ClearEffects
+    // 14 LAB_0621fd20 RET 8: ClearEffects, return 0. The factory (062225b8) calls it on every
+    // new library with the creation descriptor.
+    virtual GENRESULT DACOM_API Initialize(AGGDESC* Desc) = 0;
 };
 
 struct IFxEffect : IDAComponent
@@ -190,6 +194,6 @@ struct IFxEffect : IDAComponent
     virtual GENRESULT DACOM_API SetLodInput(float LodInput) = 0;            // LAB_0621f850 RET 8: node +0x88
     virtual GENRESULT DACOM_API GetBoundingSphere(void* Arg) = 0;      // LAB_0621f880 RET 8
     virtual GENRESULT DACOM_API GetBoundComponent(void** Out) = 0;     // 16 LAB_0621fd00 RET 8
-    virtual GENRESULT DACOM_API Slot17() = 0;                          // FUN_06220d70 dtor-with-flag
+    virtual GENRESULT DACOM_API DestructorSlot() = 0;                  // FUN_06220d70 scalar deleting dtor
     virtual GENRESULT DACOM_API Initialize(AGGDESC* Desc) = 0;         // +0x48 FUN_0621eed0 RET 8
 };

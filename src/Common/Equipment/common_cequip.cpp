@@ -49,7 +49,8 @@ namespace
 
     // Deviation: retail keeps the list node in CEquipTraverser+0xc and steps node->next; the
     // port keeps the CEquip* and rescans from begin() past it -- the same element while the
-    // list is unchanged between calls (not if `After` was removed). The filters are retail's.
+    // list is unchanged between calls. If `After` was erased, retail steps through the freed
+    // node; the port ends that list instead. The filters are retail's.
     CEquip* NextMatching(std::list<CEquip*>* List, CEquip* After, unsigned TypeMask,
                          bool bIncludeDestroyed)
     {
@@ -861,7 +862,7 @@ CEquip* CEquipManager::Traverse(CEquipTraverser& Walk)
         case 3:
             break;
         default:
-            Walk.State = 0;
+            // Retail returns without resetting the state.
             return nullptr;
         }
 
@@ -922,7 +923,7 @@ CEquip* CEquipManager::ReverseTraverse(CEquipTraverser& Walk)
         case 1:
             break;
         default:
-            Walk.State = 0;
+            // Retail returns without resetting the state.
             return nullptr;
         }
 

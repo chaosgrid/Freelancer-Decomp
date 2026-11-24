@@ -371,7 +371,7 @@ Personality::JobStruct::JobStruct()
     : Field_00(0)
     , SceneToughnessThreshold(2)
     , TargetToughnessPreference(2)
-    , Field_0C(10000.0f)
+    , CombatDriftDistance(10000.0f)
     , AttackPreferences()
     , AttackSubtargetOrder()
     , bWaitForLeaderTarget(0)
@@ -447,11 +447,11 @@ float Personality::get_toughness_ratio(TOUGHNESS_TYPE Type)
     // RVA 0x48780: a hardcoded switch, not a table lookup.
     switch (Type)
     {
-    case ToughnessDefault: return 0.15f;
-    case ToughnessHull:    return 0.35f;
-    case ToughnessShield:  return 0.65f;
-    case ToughnessMax:     return 0.85f;
-    case 4:                return 1.0f;
+    case ToughnessEasiest: return 0.15f;
+    case ToughnessEasy:    return 0.35f;
+    case ToughnessEqual:   return 0.65f;
+    case ToughnessHard:    return 0.85f;
+    case ToughnessHardest: return 1.0f;
     default:               return 0.5f;
     }
 }
@@ -490,39 +490,39 @@ BaseOp::BaseOp(BaseOp const& Other)
 
 DirectiveGotoOp::DirectiveGotoOp()
     : BaseOp(OpType_DirectiveGotoOp)
-    , Field_0C(3)
+    , GotoKind(3)
     , Destination{0.0f, 0.0f, 0.0f}
-    , Field_1C(0)
-    , Field_20(0), Field_24(0), Field_28(0), Field_2C(0)
-    , Field_30(0), Field_34(0), Field_38(0), Field_3C(0)
-    , Field_40(0), Field_44(0), Field_48(0), Field_4C(0)
-    , Field_50(500.0f)
-    , Field_54(-1.0f)
-    , Field_58(0), Field_59(1), Field_5A(0), Field_5B(0)
-    , Field_5C(0)
-    , Field_60(200.0f)
-    , Field_64(500.0f)
-    , Field_68(0)
-    , Field_6C(0)
+    , TargetId(0)
+    , SplineP1X(0), SplineP1Y(0), SplineP1Z(0), SplineP2X(0)
+    , SplineP2Y(0), SplineP2Z(0), SplineP0X(0), SplineP0Y(0)
+    , SplineP0Z(0), SplineP3X(0), SplineP3Y(0), SplineP3Z(0)
+    , ArrivalRange(500.0f)
+    , MaxSpeed(-1.0f)
+    , bFlyThrough(0), Field_59(1), bGotoCruise(0), bGotoNoCruise(0)
+    , TetherObjectId(0)
+    , TetherNearRange(200.0f)
+    , TetherFarRange(500.0f)
+    , TetherCruiseRatio(0)
+    , bDisableAvoidance(0)
 {
 }
 
 DirectiveGotoOp::DirectiveGotoOp(DirectiveGotoOp const& Other)
     : BaseOp(Other)
-    , Field_0C(Other.Field_0C)
+    , GotoKind(Other.GotoKind)
     , Destination(Other.Destination)
-    , Field_1C(Other.Field_1C)
-    , Field_20(Other.Field_20), Field_24(Other.Field_24), Field_28(Other.Field_28), Field_2C(Other.Field_2C)
-    , Field_30(Other.Field_30), Field_34(Other.Field_34), Field_38(Other.Field_38), Field_3C(Other.Field_3C)
-    , Field_40(Other.Field_40), Field_44(Other.Field_44), Field_48(Other.Field_48), Field_4C(Other.Field_4C)
-    , Field_50(Other.Field_50)
-    , Field_54(Other.Field_54)
-    , Field_58(Other.Field_58), Field_59(Other.Field_59), Field_5A(Other.Field_5A), Field_5B(Other.Field_5B)
-    , Field_5C(Other.Field_5C)
-    , Field_60(Other.Field_60)
-    , Field_64(Other.Field_64)
-    , Field_68(Other.Field_68)
-    , Field_6C(Other.Field_6C)
+    , TargetId(Other.TargetId)
+    , SplineP1X(Other.SplineP1X), SplineP1Y(Other.SplineP1Y), SplineP1Z(Other.SplineP1Z), SplineP2X(Other.SplineP2X)
+    , SplineP2Y(Other.SplineP2Y), SplineP2Z(Other.SplineP2Z), SplineP0X(Other.SplineP0X), SplineP0Y(Other.SplineP0Y)
+    , SplineP0Z(Other.SplineP0Z), SplineP3X(Other.SplineP3X), SplineP3Y(Other.SplineP3Y), SplineP3Z(Other.SplineP3Z)
+    , ArrivalRange(Other.ArrivalRange)
+    , MaxSpeed(Other.MaxSpeed)
+    , bFlyThrough(Other.bFlyThrough), Field_59(Other.Field_59), bGotoCruise(Other.bGotoCruise), bGotoNoCruise(Other.bGotoNoCruise)
+    , TetherObjectId(Other.TetherObjectId)
+    , TetherNearRange(Other.TetherNearRange)
+    , TetherFarRange(Other.TetherFarRange)
+    , TetherCruiseRatio(Other.TetherCruiseRatio)
+    , bDisableAvoidance(Other.bDisableAvoidance)
 {
 }
 
@@ -531,14 +531,14 @@ bool DirectiveGotoOp::validate()
     // Common.dll.c 0x7aea0 — the NaN-safe-squared-magnitude checks in retail
     // collapse to plain "!= 0.0f" comparisons under IEEE-754 (NaN compares
     // unequal to everything, including itself).
-    if (Field_1C != 0 &&
+    if (TargetId != 0 &&
         (Destination.x != 0.0f || Destination.y != 0.0f || Destination.z != 0.0f))
         return false;
-    if (Field_50 < 0.0f)
+    if (ArrivalRange < 0.0f)
         return false;
-    if (Field_5A != 0 && Field_5B != 0)
+    if (bGotoCruise != 0 && bGotoNoCruise != 0)
         return false;
-    if (Field_64 < Field_60)
+    if (TetherFarRange < TetherNearRange)
         return false;
     return true;
 }
@@ -547,10 +547,10 @@ DirectiveFollowOp::DirectiveFollowOp()
     : BaseOp(OpType_DirectiveFollowOp)
     , TargetId(0)
     , FollowDistance(150.0f)
-    , Field_14(0.0f)
-    , Field_18(0.0f)
-    , Field_1C(0.0f)
-    , Field_20(400.0f)
+    , FollowOffsetX(0.0f)
+    , FollowOffsetY(0.0f)
+    , FollowOffsetZ(0.0f)
+    , EngageRange(400.0f)
 {
 }
 
@@ -558,10 +558,10 @@ DirectiveFollowOp::DirectiveFollowOp(DirectiveFollowOp const& Other)
     : BaseOp(Other)
     , TargetId(Other.TargetId)
     , FollowDistance(Other.FollowDistance)
-    , Field_14(Other.Field_14)
-    , Field_18(Other.Field_18)
-    , Field_1C(Other.Field_1C)
-    , Field_20(Other.Field_20)
+    , FollowOffsetX(Other.FollowOffsetX)
+    , FollowOffsetY(Other.FollowOffsetY)
+    , FollowOffsetZ(Other.FollowOffsetZ)
+    , EngageRange(Other.EngageRange)
 {
 }
 
@@ -571,14 +571,14 @@ bool DirectiveFollowOp::validate()
 }
 
 DirectiveFaceOp::DirectiveFaceOp()
-    // .text:062dafb0 stores Mode, TargetId, FacePoint (z, y, x) and Field_44 = 1 only;
+    // .text:062dafb0 stores Mode, TargetId, FacePoint (z, y, x) and bKillEngine = 1 only;
     // Orientation stays as it was. The port zeroes it (over-initialisation).
     : BaseOp(OpType_DirectiveFaceOp)
     , Mode(0)
     , TargetId(0)
     , FacePoint{0.0f, 0.0f, 0.0f}
     , Orientation(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
-    , Field_44(1)
+    , bKillEngine(1)
 {
 }
 
@@ -590,7 +590,7 @@ DirectiveFaceOp::DirectiveFaceOp(DirectiveFaceOp const& Other)
     , TargetId(Other.TargetId)
     , FacePoint(Other.FacePoint)
     , Orientation(Other.Orientation)
-    , Field_44(Other.Field_44)
+    , bKillEngine(Other.bKillEngine)
 {
 }
 
@@ -712,11 +712,11 @@ bool DirectiveEvadeOp::validate()
 
 DirectiveDrasticEvadeOp::DirectiveDrasticEvadeOp()
     : BaseOp(OpType_DirectiveDrasticEvadeOp)
-    , ThreatId(0)
-    , Field_10(0)
-    , Field_14(0)
-    , Field_18(0)
-    , Field_1C(1.0f)
+    , Mode(0)
+    , NudgeX(0)
+    , NudgeY(0)
+    , NudgeZ(0)
+    , Duration(1.0f)
     , Field_20(0)
     , Field_24(0)
     , Field_28(0)
@@ -726,11 +726,11 @@ DirectiveDrasticEvadeOp::DirectiveDrasticEvadeOp()
 
 DirectiveDrasticEvadeOp::DirectiveDrasticEvadeOp(DirectiveDrasticEvadeOp const& Other)
     : BaseOp(Other)
-    , ThreatId(Other.ThreatId)
-    , Field_10(Other.Field_10)
-    , Field_14(Other.Field_14)
-    , Field_18(Other.Field_18)
-    , Field_1C(Other.Field_1C)
+    , Mode(Other.Mode)
+    , NudgeX(Other.NudgeX)
+    , NudgeY(Other.NudgeY)
+    , NudgeZ(Other.NudgeZ)
+    , Duration(Other.Duration)
     , Field_20(Other.Field_20)
     , Field_24(Other.Field_24)
     , Field_28(Other.Field_28)
@@ -746,24 +746,24 @@ bool DirectiveDrasticEvadeOp::validate()
 DirectiveDockOp::DirectiveDockOp()
     : BaseOp(OpType_DirectiveDockOp)
     , DockObjectId(0)
-    , Field_10(0)
-    , Field_14(0)    , DockPortIndex(-1)
-    , Field_1C(0)
-    , Field_20(200.0f)
-    , Field_24(500.0f)
-    , Field_28(0)
+    , NextRingId(0)
+    , bHasDockPortIndex(0)    , DockPortIndex(-1)
+    , TetherObjectId(0)
+    , TetherNearRange(200.0f)
+    , TetherFarRange(500.0f)
+    , TetherCruiseRatio(0)
 {
 }
 
 DirectiveDockOp::DirectiveDockOp(DirectiveDockOp const& Other)
     : BaseOp(Other)
     , DockObjectId(Other.DockObjectId)
-    , Field_10(Other.Field_10)
-    , Field_14(Other.Field_14)    , DockPortIndex(Other.DockPortIndex)
-    , Field_1C(Other.Field_1C)
-    , Field_20(Other.Field_20)
-    , Field_24(Other.Field_24)
-    , Field_28(Other.Field_28)
+    , NextRingId(Other.NextRingId)
+    , bHasDockPortIndex(Other.bHasDockPortIndex)    , DockPortIndex(Other.DockPortIndex)
+    , TetherObjectId(Other.TetherObjectId)
+    , TetherNearRange(Other.TetherNearRange)
+    , TetherFarRange(Other.TetherFarRange)
+    , TetherCruiseRatio(Other.TetherCruiseRatio)
 {
 }
 
@@ -772,9 +772,9 @@ bool DirectiveDockOp::validate()
     // Common.dll.c 0x7b100
     if (DockObjectId == 0)
         return false;
-    if (Field_14 != 0 && DockPortIndex == -1)
+    if (bHasDockPortIndex != 0 && DockPortIndex == -1)
         return false;
-    if (Field_24 < Field_20)
+    if (TetherFarRange < TetherNearRange)
         return false;
     return true;
 }
@@ -782,16 +782,16 @@ bool DirectiveDockOp::validate()
 DirectiveLaunchOp::DirectiveLaunchOp()
     : BaseOp(OpType_DirectiveLaunchOp)
     , LaunchObjectId(0)
-    , Field_10(-1)
-    , Field_14(0)
+    , DockPortIndex(-1)
+    , TerminalType(0)
 {
 }
 
 DirectiveLaunchOp::DirectiveLaunchOp(DirectiveLaunchOp const& Other)
     : BaseOp(Other)
     , LaunchObjectId(Other.LaunchObjectId)
-    , Field_10(Other.Field_10)
-    , Field_14(Other.Field_14)
+    , DockPortIndex(Other.DockPortIndex)
+    , TerminalType(Other.TerminalType)
 {
 }
 
@@ -800,24 +800,24 @@ bool DirectiveLaunchOp::validate()
     // Common.dll.c 0x7b160
     if (LaunchObjectId == 0)
         return false;
-    if (Field_10 == -1)
+    if (DockPortIndex == -1)
         return false;
-    return Field_14 != 0;
+    return TerminalType != 0;
 }
 
 DirectiveInstantTradelaneOp::DirectiveInstantTradelaneOp()
     : BaseOp(OpType_DirectiveInstantTradelaneOp)
     , TradeLaneId(0)
-    , Field_10(0)
-    , Field_14(0)
+    , ExitRingId(0)
+    , LaneSpeed(0)
 {
 }
 
 DirectiveInstantTradelaneOp::DirectiveInstantTradelaneOp(DirectiveInstantTradelaneOp const& Other)
     : BaseOp(Other)
     , TradeLaneId(Other.TradeLaneId)
-    , Field_10(Other.Field_10)
-    , Field_14(Other.Field_14)
+    , ExitRingId(Other.ExitRingId)
+    , LaneSpeed(Other.LaneSpeed)
 {
 }
 
@@ -920,12 +920,12 @@ DirectiveGuideOp::DirectiveGuideOp()
     : BaseOp(OpType_DirectiveGuideOp)
     , GotoParams()
     , FollowParams()
-    , Field_A0(1)    , Field_A4(10.0f)
-    , Field_A8(0.3926991f)
+    , bStartFollowing(1)    , SampleInterval(10.0f)
+    , CourseAngleThreshold(0.3926991f)
     , Field_AC(3)
-    , Field_B0(10.0f)
-    , Field_B4(-10.0f)
-    , Field_B8(400.0f)
+    , ProgressHighThreshold(10.0f)
+    , ProgressLowThreshold(-10.0f)
+    , GuideRange(400.0f)
 {
 }
 
@@ -933,12 +933,12 @@ DirectiveGuideOp::DirectiveGuideOp(DirectiveGuideOp const& Other)
     : BaseOp(Other)
     , GotoParams(Other.GotoParams)
     , FollowParams(Other.FollowParams)
-    , Field_A0(Other.Field_A0)    , Field_A4(Other.Field_A4)
-    , Field_A8(Other.Field_A8)
+    , bStartFollowing(Other.bStartFollowing)    , SampleInterval(Other.SampleInterval)
+    , CourseAngleThreshold(Other.CourseAngleThreshold)
     , Field_AC(Other.Field_AC)
-    , Field_B0(Other.Field_B0)
-    , Field_B4(Other.Field_B4)
-    , Field_B8(Other.Field_B8)
+    , ProgressHighThreshold(Other.ProgressHighThreshold)
+    , ProgressLowThreshold(Other.ProgressLowThreshold)
+    , GuideRange(Other.GuideRange)
 {
 }
 

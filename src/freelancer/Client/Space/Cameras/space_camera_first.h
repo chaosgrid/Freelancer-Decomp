@@ -24,8 +24,8 @@
 #include <stddef.h>
 
 // The three (position, orientation) pairs the ctor plants, at their retail offsets. The loader
-// overwrites the middle one from the engine's cockpit hardpoint; the other two are written by the
-// attach (LAB_005178e0) and the per-frame update (LAB_00517ba0).
+// overwrites the middle one from the cockpit mesh's "cam" part; the attach (LAB_005178e0) writes
+// the first and the eye position, the per-frame update (LAB_00517ba0) the eye position.
 struct FFirstPersonCamera : FHudCamera
 {
     void ScaleEnvironmentEffects() override;
@@ -37,12 +37,13 @@ struct FFirstPersonCamera : FHudCamera
     bool OnEvent(unsigned MsgId) override;
 
 
-    float PositionA[3];              // +0x100  zeroed by the ctor
-    float OrientationA[9];           // +0x10c  identity
+    float CockpitHpPosition[3];      // +0x100  zeroed; the attach writes the "HpCockpit" hardpoint
+    float CockpitHpOrientation[9];   // +0x10c  identity; likewise
     float HeadPosition[3];           // +0x130  zeroed; loader fills it from IEngine slot 0x90
     float HeadOrientation[9];        // +0x13c  identity; loader fills it from IEngine slot 0x98
-    float PositionC[3];              // +0x160  zeroed
-    float OrientationC[9];           // +0x16c  identity
+    float EyePosition[3];            // +0x160  zeroed; the eye point the attach and update place
+    float EyeOrientation[9];         // +0x16c  identity, never written again; the update
+                                     //         multiplies it onto the head orientation
 
     // FUN_00420d40 builds the cockpit mesh holder in place here; FUN_00420dd0
     // loads it from the mesh and material-library names the loader collected, and its +0x04
@@ -50,20 +51,20 @@ struct FFirstPersonCamera : FHudCamera
     // cockpit's camera hardpoint.
     FMeshHolder Mesh;                // +0x190
 
-    unsigned char bFlag1A0;          // +0x1a0  ctor sets 1
+    unsigned char bJustAttached;     // +0x1a0  ctor and attach set 1, the update clears it
     unsigned char Pad1A1[3];
 };
 
 // The third-person camera sits at controller + 0x1b0 and this one at + 0x00c.
 static_assert(sizeof(FFirstPersonCamera) == 0x1a4, "FFirstPersonCamera must be 0x1a4");
-static_assert(offsetof(FFirstPersonCamera, PositionA) == 0x100, "FP +0x100");
-static_assert(offsetof(FFirstPersonCamera, OrientationA) == 0x10c, "FP +0x10c");
+static_assert(offsetof(FFirstPersonCamera, CockpitHpPosition) == 0x100, "FP +0x100");
+static_assert(offsetof(FFirstPersonCamera, CockpitHpOrientation) == 0x10c, "FP +0x10c");
 static_assert(offsetof(FFirstPersonCamera, HeadPosition) == 0x130, "FP +0x130");
 static_assert(offsetof(FFirstPersonCamera, HeadOrientation) == 0x13c, "FP +0x13c");
-static_assert(offsetof(FFirstPersonCamera, PositionC) == 0x160, "FP +0x160");
-static_assert(offsetof(FFirstPersonCamera, OrientationC) == 0x16c, "FP +0x16c");
+static_assert(offsetof(FFirstPersonCamera, EyePosition) == 0x160, "FP +0x160");
+static_assert(offsetof(FFirstPersonCamera, EyeOrientation) == 0x16c, "FP +0x16c");
 static_assert(offsetof(FFirstPersonCamera, Mesh) == 0x190, "FP +0x190");
-static_assert(offsetof(FFirstPersonCamera, bFlag1A0) == 0x1a0, "FP +0x1a0");
+static_assert(offsetof(FFirstPersonCamera, bJustAttached) == 0x1a0, "FP +0x1a0");
 
 // [Cockpit] head_turn, which retail keeps in two globals rather than on the camera --
 // DAT_006135a0 and DAT_006135a4 (.data 30.0f / 25.0f; written by the loader, read by nothing).

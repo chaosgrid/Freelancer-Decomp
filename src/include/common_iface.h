@@ -27,7 +27,7 @@
 class SystemManager;
 class PathfindManager; // common_pathfind.h -- IBehaviorManager+0x0C
 class Behavior;
-COMMON_API Behavior* __cdecl CREATE_BEHAVIOR(int param_1);
+COMMON_API Behavior* __cdecl CREATE_BEHAVIOR(int TypeId);
 
 typedef unsigned int uint; // Convenience typedef for IFACE interfaces
 
@@ -50,6 +50,10 @@ struct IStateGraph;
 struct IDirectiveInfo
 {
     unsigned char Data[12];
+
+    // Word 2 (+0x08): the behavior id the directive selects (Server's SubmitDirective
+    // OpType -> id table; FleeBehavior tests it for 2 = Goto / 7 = Dock).
+    unsigned GetBehaviorId() const { return *reinterpret_cast<unsigned const*>(Data + 8); }
 };
 
 // ============================================================================
@@ -204,7 +208,7 @@ struct IObjInspect
     virtual int get_axis_throttle(Vector& OutThrottle) const = 0;  // 20 +0x050  HAAVVector@@@Z
     virtual int get_nudge_vec(Vector& OutVec) const = 0;  // 21 +0x054  HAAVVector@@@Z
     virtual int get_strafe_dir(StrafeDir& OutDir) const = 0;  // 22 +0x058  HAAW4StrafeDir@@@Z
-    virtual int is_cruise_active(bool& OutCruise, bool& OutTradLane) const = 0;  // 23 +0x05C  HAA_N0@Z
+    virtual int is_cruise_active(bool& OutCruise, bool& OutCharging) const = 0;  // 23 +0x05C  HAA_N0@Z
     virtual int is_cruise_active(bool& OutActive) const = 0;  // 24 +0x060  HAA_N@Z
     virtual int are_thrusters_active(bool& OutActive) const = 0;  // 25 +0x064  HAA_N@Z
     virtual int get_attitude_towards(float& OutAtt, IObjInspect const* Other) const = 0;  // 26 +0x068  HAAMPBUIObjInspect@@@Z
@@ -657,12 +661,13 @@ struct IObjAffect
     // No Server.dll wrapper overrides it: all thirteen tables keep GameObject's
     // .text:06cef350 (`MOV EAX,-3; RET 8`). Common calls it (4, 0), (1, 0) and (0, 0).
 
-    virtual int slot_70(unsigned Id) = 0;  // 28 +0x70
+    virtual int launch_complete(unsigned BaseObjId) = 0;  // 28 +0x70
     // Ship .text:06d02000: clears the one-shot latch at Ship+0xb8, sets invincibility, and
-    // raises controller event 0x28 {Id, get_id()}. Common passes a base object id.
+    // raises controller event 0x28 LaunchComplete {BaseObjId, get_id()}. Common passes a base
+    // object id.
 
-    virtual int slot_74(unsigned Arg) = 0;  // 29 +0x74
-    // Ship .text:06d02070: raises controller event 0x26 {Arg, get_id()} and clears
+    virtual int jump_in_complete(unsigned SystemId) = 0;  // 29 +0x74
+    // Ship .text:06d02070: raises controller event 0x26 JumpInComplete {SystemId, get_id()} and clears
     // invincibility.
 };
 
@@ -706,9 +711,8 @@ static_assert(sizeof(IObjRW) == 0x0C, "IObjRW is two vtable pointers plus Watcha
 // base array .rdata:063a8b24) lists IObjInspectImpl, IObjRW, IObjInspect, IObjAffect,
 // Watchable, CBase -- i.e. `IObjInspectImpl : IObjRW, CBase`.
 //
-// TODO: the AI side still passes this object around as `void*` -- the Behavior family's
-// `OwnerContext`/`ThreatSourcePtr14` fields and the `SetContext(void*, void*, void*)`
-// signatures want `IObjRW*`.
+// TODO: the AI side still passes this object around as `void*` in the Behavior family's
+// `SetContext(void*, void*, void*)` signatures (Behavior::OwnerContext itself is an IObjRW*).
 struct COMMON_API IObjInspectImpl : public IObjRW, public CBase
 {
     IObjInspectImpl();
@@ -758,7 +762,7 @@ struct COMMON_API IObjInspectImpl : public IObjRW, public CBase
     int get_strafe_dir(StrafeDir& OutDir) const override;
     int are_thrusters_active(bool& OutActive) const override;
     int is_cruise_active(bool& OutActive) const override;
-    int is_cruise_active(bool& OutCruise, bool& OutTradLane) const override;
+    int is_cruise_active(bool& OutCruise, bool& OutCharging) const override;
     int get_target(IObjRW*& OutTarget) const override;
     int get_rank(uint& OutRank) const override;
     int get_affiliation(uint& OutAffil) const override;
@@ -879,7 +883,7 @@ COMMON_API IBehaviorManager* __cdecl GetBehaviorManager(IObjRW* Obj);
 //     its own queued node so the SAME op re-enters on expiry.
 //   - +0x0C/+0x14 WatcherA/WatcherB: two BaseWatchers, zeroed then optionally
 //     pointed at a target (the port uses the public BaseWatcher::set()).
-//   - +0x1C Field1C: the "Extra" argument, forwarded verbatim to whichever op
+//   - +0x1C Extra: the "Extra" argument, forwarded verbatim to whichever op
 //     Mode selects. It ends up as the notification code FUN_062d4750's
 //     immediate path switches on (0..3, jump table 062d49b4; > 3 does nothing).
 //   - Only a Duration > 0.0f queues a node at all (both ops: `FCOMP 0.0f;
@@ -897,7 +901,7 @@ struct NotificationNode
     unsigned Mode;               // +0x08  0 -> re-fire QueueNotification, 1 -> re-fire InsertNotification
     BaseWatcher WatcherA;         // +0x0C .. +0x13
     BaseWatcher WatcherB;         // +0x14 .. +0x1B
-    unsigned Field1C;             // +0x1C  Extra (notification code), forwarded verbatim (see notes above)
+    unsigned Extra;             // +0x1C  Extra (notification code), forwarded verbatim (see notes above)
     float Timer;                  // +0x20  countdown; <= 0.0f fires Mode's op and retires the node
 };
 
@@ -905,7 +909,7 @@ static_assert(offsetof(NotificationNode, Prev) == 0x04, "NotificationNode+0x04 P
 static_assert(offsetof(NotificationNode, Mode) == 0x08, "NotificationNode+0x08 Mode");
 static_assert(offsetof(NotificationNode, WatcherA) == 0x0C, "NotificationNode+0x0C WatcherA");
 static_assert(offsetof(NotificationNode, WatcherB) == 0x14, "NotificationNode+0x14 WatcherB");
-static_assert(offsetof(NotificationNode, Field1C) == 0x1C, "NotificationNode+0x1C Field1C");
+static_assert(offsetof(NotificationNode, Extra) == 0x1C, "NotificationNode+0x1C Extra");
 static_assert(offsetof(NotificationNode, Timer) == 0x20, "NotificationNode+0x20 Timer");
 static_assert(sizeof(NotificationNode) == 0x24, "NotificationNode sizeof 0x24");
 
@@ -1088,9 +1092,9 @@ public:
 
     // FUN_062d29a0, `RET 8`, 15 call sites across the behavior family:
     // `MOV [ECX+0x118],param_2; MOV [ECX+0x11c],param_1`. The behavior reports which
-    // behavior index finished (Word11c) and the result word (Word118) that
+    // behavior index finished (CompletedBehavior) and the result word (DirectiveResult) that
     // NotifyDirectiveCallbacks later hands to every DirectiveCallback.
-    void SetDirectiveResult(int Word11c, int Word118);
+    void SetDirectiveResult(int CompletedBehavior, int DirectiveResult);
 
     // FUN_062d35c0, thiscall, `RET 4`, not exported (retail name unknown). While
     // LevelCameraFlag is set and bApply is non-zero: when the watched ship's forward axis
@@ -1150,7 +1154,8 @@ public:
     // +0xD8: BehaviorDirty (byte)
     // +0xDC: BehaviorTimerC (float)
     // +0xF0: WatchablePtr (void*)
-    // +0xF8: Field0xF8 (byte, content-callback flag reconciliation -- see below)
+    // +0xF8: bScanState (byte): the attack/scan state UpdateBehaviorTick last reported through
+    //        ContentCallback::scan_state_change
     // +0xF9: LevelCameraFlag (byte)
     // +0xFC..+0x10F: DirectiveCallbacks[5] (5 pointers)
     // +0x110: ContentCallback* ptr
@@ -1220,7 +1225,7 @@ public:
     // dword == 1); only when the recomputed value differs from the stored
     // byte here does UpdateBehaviorTick store it and fire a notify through
     // ContentCbPtr's own vtable slot 0x18. Real semantic name not recovered.
-    unsigned char Field0xF8;            // +0xF8
+    unsigned char bScanState;            // +0xF8
     unsigned char LevelCameraFlag;      // +0xF9
     unsigned char OpaqueFa[2];          // +0xFA .. +0xFB
     pub::AI::DirectiveCallback* DirectiveCallbacks[5]; // +0xFC .. +0x10F
@@ -1318,8 +1323,8 @@ static_assert(offsetof(IBehaviorManager, BehaviorDirty) == 0xD8,
               "IBehaviorManager+0xD8 BehaviorDirty");
 static_assert(offsetof(IBehaviorManager, BehaviorTimerC) == 0xDC,
               "IBehaviorManager+0xDC BehaviorTimerC");
-static_assert(offsetof(IBehaviorManager, Field0xF8) == 0xF8,
-              "IBehaviorManager+0xF8 Field0xF8");
+static_assert(offsetof(IBehaviorManager, bScanState) == 0xF8,
+              "IBehaviorManager+0xF8 bScanState");
 
 // ============================================================================
 // ScriptBehavior — serializable behavior description
@@ -1337,7 +1342,7 @@ struct CharacterBehaviorDescription
     // bytes) are not written.
     CharacterBehaviorDescription()
         : LocationId(0), bApplySpatial(1), bAutoplay(0), bGenericScript(1), RelocateLocationId(0), StartRoomLocationId(0), bBindSingleCharacter(1),
-          IdArrayCount(0), StringArray2Count(0), DialogType(0), OfferArg(0), OfferMissionId(0),
+          IdArrayCount(0), StringArray2Count(0), DialogType(0), OfferId(0), OfferKind(0),
           RtcId(0), Filter(0)
     {
         for (int Index = 0; Index < 32; ++Index)
@@ -1370,8 +1375,8 @@ struct CharacterBehaviorDescription
     unsigned StringArray2Dword[32]; // +0x198 .. +0x217
     int StringArray2Count;        // +0x218
     unsigned DialogType;          // +0x21C
-    unsigned OfferArg;            // +0x220
-    unsigned OfferMissionId;      // +0x224
+    unsigned OfferId;             // +0x220 echoed by the client in IServer::MissionResponse
+    unsigned OfferKind;           // +0x224 pub::Controller::EMissionOfferKind
     FmtStr NameFmtStr;            // +0x228
     FmtStr DescFmtStr;            // +0x240
     unsigned RtcId;               // +0x258  retail trailing dword, copied into ScriptBehavior::Field25c
@@ -1429,8 +1434,8 @@ public:
                                      // marshal/unmarshal round-trips this; it must not be dropped.
     int StringArray2Count;        // +0x21C
     unsigned DialogType;          // +0x220
-    unsigned OfferArg;            // +0x224
-    unsigned OfferMissionId;      // +0x228
+    unsigned OfferId;             // +0x224
+    unsigned OfferKind;           // +0x228
     FmtStr NameFmtStr;            // +0x22C  (FmtStr is 0x18, common_text.h)
     FmtStr DescFmtStr;            // +0x244
     unsigned RtcId;                // +0x25C retail trailing dword (source: CharacterBehaviorDescription's

@@ -41,8 +41,8 @@ namespace AlchemyImpl
     {
         unsigned long Size;
         const char* NameAt4;
-        void* InnerAt8;
-        void** WritebackAtC;
+        void* OuterUnknown;
+        void** InnerUnknown;
     };
 
     // FxEffect initialization is not a DACOM aggregation descriptor.
@@ -150,7 +150,7 @@ namespace AlchemyImpl
     // and +0x4c float triples, +0x3c / +0x58 quaternions, +0x68 blend, and at
     // +0x6c / +0x70 the record's life and death child EFFECTS (IFxEffect from
     // IFxEffectLibrary::CreateEffect, keyed by ParticleApp_LifeName / DeathName). The
-    // spawn FUN_0622f6a0 (FxParticleAppearance::Pad47) builds them; the record
+    // spawn FUN_0622f6a0 (FxParticleAppearance::SpawnParticle) builds them; the record
     // teardown FUN_06230600 (FreePoolItem's G_PoolParticle branch) calls IFxEffect
     // slot 13(7) on each and releases them.
     struct FPooledParticle
@@ -486,26 +486,11 @@ namespace AlchemyImpl
         IAnimatedTransform* ParticleTransform;
     };
 
-    struct FNodeLibEntry
-    {
-        unsigned long Hash;
-        char Name[256];
-        IDAComponent* Node;
-    };
-
     // FUN_06201e90 / IAlchemy+0x50: parent + child.
     struct FAlchemyAttach
     {
         IDAComponent* Parent;
         IDAComponent* Child;
-    };
-
-    // FUN_0621eed0 rec8 edge after QI. Kind 1 = emitter→appearance, 2 = appearance→field.
-    struct FFxRec8Assoc
-    {
-        IDAComponent* Left;
-        IDAComponent* Right;
-        unsigned long Kind;
     };
 
     // Owning effect record: its node reference has observable copy/assignment calls.
@@ -574,20 +559,13 @@ namespace AlchemyImpl
     {
         IFileSystem* Filesys;
         unsigned long Handle;
-        unsigned char bEntered_;
 
-        FAleChunk() : Filesys(nullptr), Handle(0xFFFFFFFF), bEntered_(0) {}
+        FAleChunk() : Filesys(nullptr), Handle(0xFFFFFFFF) {}
         ~FAleChunk() { CloseChunk(); }
 
         int OpenNode(const char* Name);
 
-        // Enter the named directory and open its same-named data leaf.
-        // The caller owns directory navigation separately from chunk closure.
-        bool OpenNamedChunk(IFileSystem* Fs, const char* Name, unsigned char bWrite);
-
-        void LeaveNamedNode();
-
-        void DeleteNode(const char* Name);
+        void CreateNode(const char* Name);
 
         bool OpenChunk(IFileSystem* Fs, const char* Name, unsigned char bWrite);
 
@@ -628,7 +606,7 @@ namespace AlchemyImpl
         // FUN_0620de30, the emitters LAB_0621b9d0 cone / LAB_0621d360 cube / LAB_0623bcf0
         // sphere (each ends in the shared emitter body FUN_06245bf0). Caller: IAlchemy
         // LAB_06201870 / FUN_06201810, every frame from IFxEffect slot 8 (FUN_0621f730).
-        virtual GENRESULT DACOM_API Pad5(float Dt) = 0;                             // +0x14
+        virtual GENRESULT DACOM_API UpdateNode(float Dt) = 0;                        // +0x14
         // +0x18 -- the per-node draw (IAlchemy LAB_06201910). Shared default FUN_062403f0
         // returns 0 (FxNode's thunk FUN_06202680). Each appearance's draw sits on the outer
         // vtable's +0x18 adjustor thunk (this+0xc -> node vt+0x10): basic FUN_06218dc0
@@ -732,36 +710,45 @@ namespace AlchemyImpl
         // all three; the shared appearance init, the three emitter constructors and the
         // seven field constructors each set one. The effect's Slot11/Slot13 flag bits
         // 4/1/2 select them.
-        virtual GENRESULT DACOM_API GetFlagBit4(unsigned char* Out) = 0;              // +0x90
-        virtual GENRESULT DACOM_API GetFlagBit1(unsigned char* Out) = 0;              // +0x94
-        virtual GENRESULT DACOM_API GetFlagBit2(unsigned char* Out) = 0;              // +0x98
+        virtual GENRESULT DACOM_API GetIsAppearance(unsigned char* Out) = 0;          // +0x90
+        virtual GENRESULT DACOM_API GetIsEmitter(unsigned char* Out) = 0;             // +0x94
+        virtual GENRESULT DACOM_API GetIsField(unsigned char* Out) = 0;               // +0x98
         virtual GENRESULT DACOM_API AssociateAppearance(IDAComponent* Appearance) = 0; // +0x9C FUN_06245b50
-        virtual GENRESULT DACOM_API Pad40() = 0;
+        // +0xA0 on a field: the closing call of a field pass, after Begin (+0x9C) and the
+        // per-particle Apply (+0xA4). Every field's body returns 0 (gravity 06224290, air
+        // 06214ce0, radial 06236f80, beam field 0620ed40). Callers: EndFields
+        // (FUN_06244660) and the appearances' field walks (FUN_06218780).
+        virtual GENRESULT DACOM_API EndField() = 0;                                  // +0xA0
         // +0xA4 on an appearance: fill this appearance's particles into the draw context
         // the batch flush FUN_06201cc0 has already begun (called for every appearance in a
         // batch list, between the head's +0x9C begin and +0xA0 draw). FxBasicAppearance:
         // LAB_062194b0 -> LAB_06217a60 = ++G_DrawCounters[3], then FUN_06216550 or
         // FUN_06216f20 by descriptor flag 2.
         virtual GENRESULT DACOM_API FillBatchedGeometry() = 0;
-        virtual GENRESULT DACOM_API Pad42() = 0;
+        // +0xA8 on an appearance: all eight bodies are `mov eax, 0xfffffff9; ret 4` (basic
+        // 062194f0, rect 0623b2c0, oriented 0622ed40, beam 0620e2a0, perp 06235b60, dust
+        // 062125b0, particle 06232150, mesh 06227210) and alchemy.dll has no caller.
+        // TODO: purpose unknown.
+        virtual GENRESULT DACOM_API Pad42() = 0;                                     // +0xA8
         virtual GENRESULT DACOM_API AssociateField(IDAComponent* Field) = 0;         // +0xAC FUN_062443b0
-        virtual GENRESULT DACOM_API Pad44(IDAComponent* Value) = 0;                // +0xB0 FUN_06244430
+        // +0xB0 -- erase one entry of the associated-field vector (FUN_06244430).
+        virtual GENRESULT DACOM_API RemoveField(IDAComponent* Field) = 0;            // +0xB0
         // +0xB4 -- on every appearance a this+0xc thunk into FUN_06244580: Begin every
         // associated field. Bracketed with +0xC0 (FUN_06244660) around the emitter's spawn
         // loop in FUN_06245bf0.
-        virtual GENRESULT DACOM_API Pad45() = 0;                                     // +0xB4
+        virtual GENRESULT DACOM_API BeginFields() = 0;                               // +0xB4
         // +0xB8 -- on every appearance a this+0xc thunk into FUN_062445c0 (basic
         // LAB_062195b0). The emitter samplers call it with the same (Six, Age, Duration) they
         // then pass to +0xBC, and skip +0xBC when it returns negative.
-        virtual GENRESULT DACOM_API Pad46(const float* Six, float Age,
-                                          float Duration) = 0;                       // +0xB8
+        virtual GENRESULT DACOM_API TestParticleSpawn(const float* Six, float Age,
+                                                      float Duration) = 0;           // +0xB8
         // +0xBC -- the spawn (rect FUN_0623b410). Six = 6 floats (pos+vel); Age lands at
         // item+0x24 and Duration at +0x28, so the caller can seed a non-zero initial Age.
-        virtual GENRESULT DACOM_API Pad47(const float* Six, float Age,
-                                          float Duration) = 0;                       // +0xBC
+        virtual GENRESULT DACOM_API SpawnParticle(const float* Six, float Age,
+                                                  float Duration) = 0;               // +0xBC
         // +0xC0 -- appearance this+0xc thunk into FUN_06244660, the closing half of the
-        // +0xB4 field pass.
-        virtual GENRESULT DACOM_API Pad48() = 0;                                     // +0xC0
+        // +0xB4 field pass: EndField on every associated field.
+        virtual GENRESULT DACOM_API EndFields() = 0;                                 // +0xC0
         // +0xC4 / +0xC8 -- increment / decrement node+0xb0, identical on all eight
         // appearance vtables (basic LAB_062195e0 / LAB_06219600, beam LAB_0620e3d0 /
         // LAB_0620e3f0, rect LAB_0623b3b0 / LAB_0623b3d0 ...). The emitter increments it
@@ -802,11 +789,6 @@ namespace AlchemyImpl
         // the same storage as Get/SetNodeOuterTime (+0x58 / +0x5C).
         virtual float DACOM_API GetAppearanceOuterTime() = 0;
         virtual GENRESULT DACOM_API SetAppearanceOuterTime(float Time) = 0;
-
-        // Port-only: retail FLDustAppearance's [this+0x12C] previous-frame camera distance
-        // (FUN_0620fcb0). FLDustAppearance keeps its own LastCameraStep_ instead.
-        virtual float DACOM_API GetDustPrevCameraDistance() = 0;
-        virtual GENRESULT DACOM_API SetDustPrevCameraDistance(float Distance) = 0;
 
         // Port-only position. Retail has this method -- FUN_06215f40 / FUN_0620e430 /
         // FUN_0620be90 are its three bodies -- but its real slot is not known (not +0x68).

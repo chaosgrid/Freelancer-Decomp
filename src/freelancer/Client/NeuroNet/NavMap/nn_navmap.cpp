@@ -231,7 +231,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     GroupMarkerMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     Field_0x8c4 = 0;
     bViewSwitch = 0;
-    Field_0xb48 = 0;
+    bOutlineTerrainZonesOnly = 0;
     bSidePanelsOpen = 0;
     PulseTimer = 0;
     PulseIndex = -1;
@@ -527,13 +527,13 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
         DebugText = CreateTextControl("NavMapDebugText", "Normal", Position, nullptr, 0.64f,
                                       0.06f, 2.2f, 0x4d2, 1, 0, 1);
     }
-    DebugText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba4), 1);
+    DebugText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteAmber), 1);
     {
         float const Position[3] = {-0.314f, -0.222f, 0.0f};
         NoBestPathText = CreateTextControl("NavMapNoBestPathText", "Normal", Position, nullptr,
                                            0.64f, 0.06f, 2.2f, 0x573, 1, 0, 1);
     }
-    NoBestPathText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba4), 1);
+    NoBestPathText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteAmber), 1);
 
     // The filter toggles along the top edge.
     {
@@ -825,7 +825,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
 
     // The legend labels, hidden, in the idle palette colour (one stack
     // copy of DAT_00679bb0 handed to all five).
-    unsigned long LegendColor = G_NnPaletteArgb_679bb0;
+    unsigned long LegendColor = G_NnPaletteCyan;
     static float const kLegendY[5] = {0.194f, 0.09f, 0.14f, -0.047f, -0.198f};
     static char const* const kLegendNames[5] = {"NavMapHostileLabel", "NavMapFriendlyLabel",
                                                 "NavMapNeutralLabel", "NavMapPlayerShipLabel",

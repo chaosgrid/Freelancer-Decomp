@@ -98,6 +98,44 @@ TString<0x40> __cdecl MakeDockApproachName(unsigned int DockType, char const* Su
 // Conversation lines and conversations.
 // ---------------------------------------------------------------------------------------
 
+// The voice roles a line needs (FGcsLine::HasVoiceRoles), the supports_roles bits of
+// voice_properties.ini (FVoiceProperties::Flags, LoadVoiceProperties FUN_06fa6760).
+enum EVoiceRole : unsigned int
+{
+    VOICE_ROLE_COMBAT_LEV_2 = 0x4,          // "combat_lev_2"
+    VOICE_ROLE_SCAN = 0x8,                  // "scan"
+    VOICE_ROLE_HAIL_HAILEE = 0x10,          // "hail_hailee"
+    VOICE_ROLE_HAIL_DOCK = 0x20,            // "hail_dock"
+    VOICE_ROLE_DOCKREQUEST_DOCK = 0x40,     // "dockrequest_dock"
+    VOICE_ROLE_DOCKREQUEST_DOCKER = 0x80,   // "dockrequest_docker"
+    VOICE_ROLE_BEHAVIOR = 0x100,            // "behavior"
+    VOICE_ROLE_MISC_CHATTER = 0x200,        // "misc_chatter"
+    VOICE_ROLE_FIDGET = 0x400,              // "fidget"
+    VOICE_ROLE_COMBAT_DOCK = 0x800,         // "combat_dock"
+    VOICE_ROLE_RANDOM_MISSION_SHIP = 0x1000, // "random_mission_ship"
+    VOICE_ROLE_MISSION_COMMISSION = 0x2000, // "mission_commission"
+    VOICE_ROLE_COMBAT_LEV_1 = 0x4000,       // "combat_lev_1"
+    VOICE_ROLE_COMBAT_LEV_3 = 0xc004,       // "combat_lev_3" (also sets lev_1 and lev_2)
+};
+
+// FGcsLine::PermutationIds values: resources.dll 19000 reads "Comm STRIDS begin here.  These
+// allow localization to change the ordering of buckets at a later date"; 19001 is "0", 19002
+// "0, 1", ... 19011 "0, 1, ..., 10" -- the in-order list of a line of 1..11 texts.
+enum EGcsPermutationIds : unsigned int
+{
+    IDS_COMM_ORDER_1 = 0x4a39,
+    IDS_COMM_ORDER_2 = 0x4a3a,
+    IDS_COMM_ORDER_3 = 0x4a3b,
+    IDS_COMM_ORDER_4 = 0x4a3c,
+    IDS_COMM_ORDER_5 = 0x4a3d,
+    IDS_COMM_ORDER_6 = 0x4a3e,
+    IDS_COMM_ORDER_7 = 0x4a3f,
+    IDS_COMM_ORDER_8 = 0x4a40,
+    IDS_COMM_ORDER_9 = 0x4a41,
+    IDS_COMM_ORDER_10 = 0x4a42,
+    IDS_COMM_ORDER_11 = 0x4a43,
+};
+
 // One line of a conversation (0x30 bytes, base vtable 06fb6254: FUN_06ed72c0 deleting dtor,
 // FUN_06ed6780, LAB_06ed6a40, LAB_06ed67c0, LAB_06ed69c0). Every line class of TU25 derives
 // from it with its own ctor and a vtable holding the same five slots; the base is never
@@ -130,10 +168,12 @@ public:
     int CostumeId;                      // +0x10 0 = no costume (GetCostumeByID)
     std::vector<unsigned int> TextIds;  // +0x18 (allocator byte +0x14)
     FSystemInfo* System;                // +0x24 null makes the line unplayable
-    // +0x28: SendSpaceComm's Mood argument; the ctors store 0x4a39 / 0x4a41 ...
-    // TODO: meaning of the values. CanPlay needs it non-zero.
+    // +0x28: the IDS of the order the client plays the texts in (EGcsPermutationIds; the
+    // client's hud_comm reads it as an order string). Passed as SendSpaceComm's PermutationIds.
+    // CanPlay needs it non-zero.
     unsigned int PermutationIds;
-    // +0x2c: SendSpaceComm's CommType argument. TODO: meaning.
+    // +0x2c: the IDS of the comm's caption (the client's CaptionIds; 0 here, the random
+    // mission sets 0x32d7 "Mission Commission"). Passed as SendSpaceComm's CaptionIds.
     unsigned int CaptionIds;
 
 protected:
@@ -149,8 +189,8 @@ protected:
     void PushText(char const* Name);
     // The one-name ctor body shared by the twelve lines whose listings differ only in the
     // vtable, the role mask and the name (06ee11c0, 06edc180, ...): HasVoiceRoles(Roles);
-    // rand() / 32768 == 0; +0x28 = 0x4a39; room for one text; the voice line of Name with "-"
-    // (DAT_06fb6064).
+    // rand() / 32768 == 0; +0x28 = IDS_COMM_ORDER_1; room for one text; the voice line of
+    // Name with "-" (DAT_06fb6064).
     void BuildSingleVoiceLine(unsigned int Roles, char const* Name);
 };
 
@@ -981,8 +1021,8 @@ private:
 };
 
 // Type 0x19 (0x24 bytes, vtable 06fb745c: the base's deleting dtor 06ed6db0, IsValid
-// LAB_06ee8870), ctor FUN_06ee7b00 (RET 4): an NPC near a player chatters (FGcsHandler2). By
-// the ship's guide type (slot +0x28: 2 trade, 3 patrol, 4 wander) and the event's Kind (0
+// LAB_06ee8870), ctor FUN_06ee7b00 (RET 4): an NPC near a player chatters
+// (FGcsFidgetHandler). By the ship's guide type (slot +0x28: 2 trade, 3 patrol, 4 wander) and the event's Kind (0
 // simple, 1 formation status, 2 rumour) one line, or the leader's status query and the
 // wingmen's answers. A line that cannot play is deleted and clears System.
 class FGcsFidgetConversation : public FGcsConversation
@@ -1008,6 +1048,38 @@ private:
 // Events handed to the conversation manager. Every event class has a one-slot vtable
 // whose slot 0 returns its type (ICF-shared constant getters).
 // ---------------------------------------------------------------------------------------
+
+// The event types (FGcsEvent::GetType; also the comm categories of IsGcsCommAllowed /
+// RecordGcsComm), named after the message or scan step that queues them and the lines they
+// build. QueueConversation builds nothing for 4.
+enum EGcsEventType
+{
+    GCS_EVENT_DOCK_HAIL = 1,            // dock hail handler: a touched phantom's solar hails
+    GCS_EVENT_DOCK_GRANTED = 2,         // FGcsDockConversation
+    GCS_EVENT_LAUNCH = 3,               // FGcsLaunchConversation
+    GCS_EVENT_UNUSED_4 = 4,
+    GCS_EVENT_PLAYER_HAIL = 5,          // message 0x1f, FGcsPlayerHailConversation
+    GCS_EVENT_DAMAGED = 6,              // ObjectDamaged: inflicting / taking damage
+    GCS_EVENT_KILLED = 7,               // DeathFuseLit / ObjectDestroyed: brag, scream
+    GCS_EVENT_IN_SIGHTS = 8,            // ShipInSights
+    GCS_EVENT_ENGAGE = 9,               // CombatState 0
+    GCS_EVENT_COMBAT_OVER = 0xa,        // CombatState 3 / 4: all clear
+    GCS_EVENT_NO_ENGAGE = 0xb,          // CombatState 1 / 2
+    GCS_EVENT_HELP = 0xc,               // NpcTurnedHostile: offer / ask for help
+    GCS_EVENT_DRIFT = 0xd,              // CombatDrift
+    GCS_EVENT_FLEE = 0xe,               // FleeRequest
+    GCS_EVENT_FRIENDLY_FIRE = 0xf,      // DamageReputation
+    GCS_EVENT_LEADER_CHANGED = 0x10,    // FormationLeaderChanged: taking the lead
+    GCS_EVENT_SCAN_ANNOUNCE = 0x11,     // the scan worker (FCargoScanRoute) steps below
+    GCS_EVENT_SCAN_NOTHING_FOUND = 0x12,
+    GCS_EVENT_SCAN_CONTRABAND = 0x13,   // order to drop
+    GCS_EVENT_SCAN_JETTISONED = 0x14,
+    GCS_EVENT_SCAN_RESPONSE = 0x15,     // an NPC answered (refuses)
+    GCS_EVENT_SCAN_HOSTILE = 0x16,
+    GCS_EVENT_SCAN_UNUSED_17 = 0x17,    // no line; nothing queues it
+    GCS_EVENT_SCAN_LOOT_TAKEN = 0x18,
+    GCS_EVENT_FIDGET = 0x19,            // FGcsFidgetHandler
+};
 
 class FGcsEvent
 {
@@ -1045,8 +1117,8 @@ public:
 };
 
 // Types 6..0x10 (vtable 06fb74d4 = {FUN_06eea860}: the ICF getter returns +0x10), built on
-// the stack by FGcsHandler1 for the combat messages. The four derived classes (own vtables
-// holding the same getter) add a value at +0x14.
+// the stack by FGcsCombatHandler for the combat messages. The four derived classes (own
+// vtables holding the same getter) add a value at +0x14.
 class FGcsCombatEvent : public FGcsEvent
 {
 public:
@@ -1102,7 +1174,7 @@ public:
     unsigned int ScanResponse = 0;      // +0x1c 1; type 0x15: get_scan_response (1 / 2)
 };
 
-// Type 0x19 (vtable 06fb74d8 = {LAB_06eea870}: 0x19), built on the stack by FGcsHandler2.
+// Type 0x19 (vtable 06fb74d8 = {LAB_06eea870}: 0x19), built on the stack by FGcsFidgetHandler.
 class FGcsFidgetEvent : public FGcsEvent
 {
 public:
@@ -1241,7 +1313,7 @@ public:
 };
 
 // Handler 1 (4 bytes, vtable 06fb74a0: FUN_06ee9670, LAB_06eea160, LAB_06ee9e10).
-class FGcsHandler1 : public FGcsHandler
+class FGcsCombatHandler : public FGcsHandler
 {
 public:
     // LAB_06eea160: the combat messages 0xd (damage), 0x38 / 0x39 (a ship died), 0x1001
@@ -1255,12 +1327,12 @@ public:
 };
 
 // DAT_06fcf0dc: 2500^2, the squared range of the fidget chatter (static initializer
-// 06eea880 stores 0x4abebc20; read by FGcsHandler2 06eeab9c / 06eeaccf).
+// 06eea880 stores 0x4abebc20; read by FGcsFidgetHandler 06eeab9c / 06eeaccf).
 extern float GGcsFidgetRangeSquared;
 
 // Handler 2 (4 bytes, vtable 06fb74ac: FUN_06ee9670, LAB_06eea890, LAB_06ee9660): the fidget
 // chatter of NPCs near players.
-class FGcsHandler2 : public FGcsHandler
+class FGcsFidgetHandler : public FGcsHandler
 {
 public:
     // LAB_06eea890: on message 0x20 every player not yet handled this

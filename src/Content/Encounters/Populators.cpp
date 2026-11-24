@@ -601,12 +601,12 @@ namespace
 void __cdecl SpacePopClampBlockAttitudes(FContentPlayerShip* PlayerShip,
                                          FContentNpcShipParams const* Params)
 {
-    // Without the attack clamp only for a player whose flags have bit 2.
+    // Without the attack clamp only for a player in a random mission's area.
     if (GSpacePopAttackClamp == 0)
     {
         unsigned int const ShipId = PlayerShip->SpaceObjId;
         FContentPlayerState* State = FindContentPlayerStateByShip(&ShipId);   // not null-tested
-        if ((State->GetFlags() & 4) == 0)
+        if ((State->GetFlags() & PLAYER_FLAG_MISSION_AREA) == 0)
             return;
     }
 

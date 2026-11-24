@@ -27,9 +27,17 @@
 namespace
 {
     const char kCEqObjSource[] = "E:\\FL\\Scratch\\Source\\Common\\CEqObj.cpp";
+
+    // 0x1ee0: CAttachedEquip's family (0x1fe0) without EquipTypeShield, the walk mask of the
+    // get_total_* family.
+    const int kAttachedNoShieldMask = EquipTypeMineDropper | EquipTypeCmDropper | EquipTypeGun |
+                                      EquipTypeShieldGen | EquipTypeThruster | EquipTypeCargoPod |
+                                      EquipTypeCloak;
+    static_assert(kAttachedNoShieldMask == 0x1ee0, "the 0x1ee0 traverser mask");
 }
 
 CEqObj::CEqObj(Class ObjectClass)
+
     : CSimple(ObjectClass)
 {
     // FUN_062a9010
@@ -581,8 +589,8 @@ void CEqObj::disconnect(IObjRW* Watcher)
 
 void CEqObj::unmake_physical()
 {
-    // FUN_062aa2f0. The shield walk stops at the first non-shield (mask 0x100).
-    CEquipTraverser Trav(0x100);
+    // FUN_062aa2f0. The shield walk stops at the first non-shield.
+    CEquipTraverser Trav(EquipTypeShield);
     for (CEShield* Shield = CEShield::cast(EquipManager.Traverse(Trav)); Shield != nullptr;
          Shield = CEShield::cast(EquipManager.Traverse(Trav)))
     {
@@ -595,7 +603,7 @@ void CEqObj::remake_physical(PhySys::CreateParms const& Parms, float Radius)
 {
     // FUN_062aa360
     CObject::remake_physical(Parms, Radius);
-    CEquipTraverser Trav(0x100);
+    CEquipTraverser Trav(EquipTypeShield);
     for (CEShield* Shield = CEShield::cast(EquipManager.Traverse(Trav)); Shield != nullptr;
          Shield = CEShield::cast(EquipManager.Traverse(Trav)))
     {
@@ -626,7 +634,7 @@ int CEqObj::update(float Dt, unsigned Flags)
     }
 
     // FUN_062d2b10. Retail brackets it with two calls to 062a8920, a bare RET.
-    if (BehaviorMgr != nullptr && !bWeaponsOfflineDestroyed && (Flags & 8) == 0 &&
+    if (BehaviorMgr != nullptr && !bWeaponsOfflineDestroyed && (Flags & NO_BEHAVIOR) == 0 &&
         (ControlExclusion & 1) == 0)
     {
         BehaviorMgr->UpdateBehaviorTick(Dt);
@@ -1107,11 +1115,11 @@ unsigned CEqObj::get_base_name() const
 
 float CEqObj::get_total_hit_pts() const
 {
-    // FUN_062ab4c0. Own hit points + equips of mask 0x1ee0 + living arch groups.
+    // FUN_062ab4c0. Own hit points + the attached equipment but the shield + living arch groups.
     float Total = get_hit_pts();
 
     CEquipManager& MutableEquipManager = const_cast<CEquipManager&>(EquipManager);
-    CEquipTraverser Trav(0x1ee0);
+    CEquipTraverser Trav(kAttachedNoShieldMask);
     for (CEquip const* Eq = MutableEquipManager.Traverse(Trav); Eq != nullptr; Eq = MutableEquipManager.Traverse(Trav))
         Total += Eq->GetHitPoints();
 
@@ -1119,7 +1127,7 @@ float CEqObj::get_total_hit_pts() const
     for (CArchGroup const* Group = ArchGroups.Traverse(GroupTrav); Group != nullptr;
          Group = ArchGroups.Traverse(GroupTrav))
     {
-        if (Group->State != 2 && Group->State != 3)
+        if (Group->State != CArchGroup::STATE_KILLED && Group->State != CArchGroup::STATE_DESTROYED)
             Total += Group->GetHitPoints();
     }
     return Total;
@@ -1131,7 +1139,7 @@ float CEqObj::get_total_max_hit_pts() const
     float Total = get_max_hit_pts();
 
     CEquipManager& MutableEquipManager = const_cast<CEquipManager&>(EquipManager);
-    CEquipTraverser Trav(0x1ee0);
+    CEquipTraverser Trav(kAttachedNoShieldMask);
     for (CEquip const* Eq = MutableEquipManager.Traverse(Trav); Eq != nullptr; Eq = MutableEquipManager.Traverse(Trav))
         Total += Eq->GetMaxHitPoints();
 
@@ -1139,7 +1147,7 @@ float CEqObj::get_total_max_hit_pts() const
     for (CArchGroup const* Group = ArchGroups.Traverse(GroupTrav); Group != nullptr;
          Group = ArchGroups.Traverse(GroupTrav))
     {
-        if (Group->State != 2 && Group->State != 3)
+        if (Group->State != CArchGroup::STATE_KILLED && Group->State != CArchGroup::STATE_DESTROYED)
             Total = (float)(Total + Group->GetMaxHitPoints());
     }
     return Total;
@@ -1152,7 +1160,7 @@ float CEqObj::get_total_relative_health() const
     float Max = get_max_hit_pts();
 
     CEquipManager& MutableEquipManager = const_cast<CEquipManager&>(EquipManager);
-    CEquipTraverser Trav(0x1ee0);
+    CEquipTraverser Trav(kAttachedNoShieldMask);
     for (CEquip const* Eq = MutableEquipManager.Traverse(Trav); Eq != nullptr; Eq = MutableEquipManager.Traverse(Trav))
     {
         Hit += Eq->GetHitPoints();
@@ -1163,7 +1171,7 @@ float CEqObj::get_total_relative_health() const
     for (CArchGroup const* Group = ArchGroups.Traverse(GroupTrav); Group != nullptr;
          Group = ArchGroups.Traverse(GroupTrav))
     {
-        if (Group->State != 2 && Group->State != 3)
+        if (Group->State != CArchGroup::STATE_KILLED && Group->State != CArchGroup::STATE_DESTROYED)
         {
             Hit += Group->GetHitPoints();
             Max = (float)(Max + Group->GetMaxHitPoints());
@@ -1323,10 +1331,10 @@ void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
             if (Equip == nullptr)
                 continue;
 
-            // Cause 0x14 is not named by DamageCause. Event 4 for cargo, else 3, with the
-            // SubObjId as the context.
-            if ((int)Damage.Cause == 0x14)
-                notify((INotify::Event)(Equip->Type == 0x10000 ? 4 : 3), (void*)(unsigned)Entry.SubObjId);
+            // Cause 0x14. Event 4 for cargo, else 3, with the SubObjId as the context.
+            if (Damage.Cause == DamageCause::LootDecay)
+                notify((INotify::Event)(Equip->Type == EquipTypeCargo ? 4 : 3), (void*)(unsigned)Entry.SubObjId);
+
 
             CAttachedEquip* Attached = CAttachedEquip::cast(Equip);
             if (Attached != nullptr)

@@ -17,7 +17,7 @@ namespace AlchemyImpl
     // Every field's properties are ramps held by its property
     // set (tables: gravity .data 0x06256240, air 0x06255af4, radial 0x062569c8,
     // turbulence 0x06256ccc, collide 0x06255d78, dust 0x06255aa8), evaluated once per
-    // frame in the field's own node update (outer +0x14, the port's Pad5) into node floats
+    // frame in the field's own node update (outer +0x14, the port's UpdateNode) into node floats
     // that Begin/Apply read. The sets below hold them (shared with clones); the reader
     // fills the ramps in place through the getters.
 
@@ -115,7 +115,7 @@ namespace AlchemyImpl
             return GravityPropertySet_->ClassName.Buffer;
         }
 
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_062234e0 (outer thunk 06223e50).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
         void DACOM_API BeginField(IDAComponent* Appearance, float Dt) override;
@@ -152,7 +152,7 @@ namespace AlchemyImpl
             return AirPropertySet_->ClassName.Buffer;
         }
 
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_062141c0 (outer thunk 06214870).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
         void DACOM_API BeginField(IDAComponent* Appearance, float Dt) override;
@@ -203,7 +203,7 @@ namespace AlchemyImpl
             return RadialPropertySet_->ClassName.Buffer;
         }
 
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_06236360 (outer thunk 06236a80).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
         void DACOM_API BeginField(IDAComponent* Appearance, float Dt) override;
@@ -246,7 +246,7 @@ namespace AlchemyImpl
             return TurbulencePropertySet_->ClassName.Buffer;
         }
 
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_0623d640 (outer thunk 0623e060).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
         void DACOM_API BeginField(IDAComponent* Appearance, float Dt) override;
@@ -295,7 +295,7 @@ namespace AlchemyImpl
 
         // Retail update LAB_0621a780 (outer +0x14): TickLifetime, node+0xa0 =
         // Eval(CollideField_Reflectivity), node+0xa4 = Dt.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_06219e10 (outer thunk 0621a800).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
         void DACOM_API BeginField(IDAComponent* Appearance, float Dt) override;
@@ -367,7 +367,7 @@ namespace AlchemyImpl
             return DustPropertySet_->ClassName.Buffer;
         }
 
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_06212b00 (outer thunk 062137f0).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
         void DACOM_API BeginField(IDAComponent* Appearance, float Dt) override;

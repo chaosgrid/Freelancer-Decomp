@@ -347,8 +347,7 @@ namespace AlchemyImpl
           EmitterRefCount_(0),
           InstanceListHead_(nullptr), InstanceListTail_(nullptr),
           Age_(0.0f), Duration_(100.0f), AppearanceOuterTime_(0.0f),
-          // +0x12C (FLDustAppearance only); no explicit retail ctor write found.
-          DustPrevCameraDistance_(0.0f), Descriptor_(nullptr)
+          Descriptor_(nullptr)
     {
         // +0x1c (raw) and +0x4c (composed) both start as identity.
         unsigned long Index = 0;
@@ -605,7 +604,7 @@ namespace AlchemyImpl
     }
 
     // FUN_06240180: TickLifetime through the object's own vtable (+0x44).
-    GENRESULT DACOM_API FGenericFxObjectBase::Pad5(float Dt)
+    GENRESULT DACOM_API FGenericFxObjectBase::UpdateNode(float Dt)
     {
         TickLifetime(Dt);
         return GR_OK;
@@ -1074,8 +1073,8 @@ namespace AlchemyImpl
     // FUN_06244580 (appearance +0xB4, through a this+0xc thunk): each field's +0x9c
     // (BeginField) with the appearance. BeginField's Dt is port-only -- retail passes the
     // appearance alone -- so 0.0f; no field's BeginField reads it (the radial blend that
-    // needs Dt is in FxRadialField::Pad5 = LAB_06236450).
-    GENRESULT DACOM_API FGenericFxObjectBase::Pad45()
+    // needs Dt is in FxRadialField::UpdateNode = LAB_06236450).
+    GENRESULT DACOM_API FGenericFxObjectBase::BeginFields()
     {
         IDAComponent** Position = AssociatedFields_;
         IDAComponent** End = Position;
@@ -1092,9 +1091,10 @@ namespace AlchemyImpl
     // FUN_062445c0 (appearance +0xB8, the same this+0xc thunk on all eight appearance
     // vtables). The emitter calls it before the spawn (+0xBC) and spawns only when it is
     // not negative. Duration < 0.01 (DAT_0624fc60) returns -1; unordered continues.
-    // One Six/Age copy lives across the whole field walk. Field +0xa4 is ApplyFieldToVel;
+    // One Six/Age copy lives across the whole field walk; the fields are borrowed from the
+    // vector, no QueryInterface. Field +0xa4 is ApplyFieldToVel;
     // its Dt is port-only (retail passes two arguments), so 0.0f.
-    GENRESULT DACOM_API FGenericFxObjectBase::Pad46(const float* Six, float Age, float Duration)
+    GENRESULT DACOM_API FGenericFxObjectBase::TestParticleSpawn(const float* Six, float Age, float Duration)
     {
         if (static_cast<double>(Duration) < 0.01)
             return GR_GENERIC;
@@ -1106,9 +1106,7 @@ namespace AlchemyImpl
         float AgeCopy = Age;
         for (unsigned long FieldIndex = 0; FieldIndex < FieldCount_; ++FieldIndex)
         {
-            IGenericFx* Field = QueryGenericFx(AssociatedFields_[FieldIndex]);
-            Field->ApplyFieldToVel(SixCopy, &AgeCopy, 0.0f);
-            Field->Release();
+            AsFxNode(AssociatedFields_[FieldIndex])->ApplyFieldToVel(SixCopy, &AgeCopy, 0.0f);
             if (AgeCopy != Age && AgeCopy > Duration)
                 return GR_GENERIC;
         }
@@ -1116,7 +1114,7 @@ namespace AlchemyImpl
     }
 
     // FUN_06244660: borrowed field End calls over a captured vector range.
-    GENRESULT DACOM_API FGenericFxObjectBase::Pad48()
+    GENRESULT DACOM_API FGenericFxObjectBase::EndFields()
     {
         IDAComponent** Position = AssociatedFields_;
         IDAComponent** End = Position;
@@ -1124,7 +1122,7 @@ namespace AlchemyImpl
             End += FieldCount_;
         while (Position != End)
         {
-            AsFxNode(*Position)->Pad40();
+            AsFxNode(*Position)->EndField();
             ++Position;
         }
         return GR_OK;
@@ -1194,50 +1192,6 @@ namespace AlchemyImpl
         return Particle;
     }
 
-    // Shared per-node update of the five list appearances: basic FUN_06216420; rect
-    // FUN_06238780, perp FUN_06233040, oriented FUN_0622c3d0 and dust FUN_0620fb70 have
-    // the same body and differ only in the draw-context counters they zero (basic
-    // DAT_062579e6 / DAT_062579e8), the descriptor ramp FrameRamp names (basic +0x84,
-    // oriented / rect +0x88, perp / dust +0x80) and their field-walk (FUN_06218780) /
-    // integrate (FUN_062188c0) twins. The frame index is (FrameCount - 1) * Pos through
-    // an unsigned 64-bit FILD, then ftol.
-    void FGenericFxObjectBase::UpdateListAppearance(FAlDrawContext& DrawContext,
-                                                    FAppearancePool* Pool, float Dt,
-                                                    INestedSingleRamp* FrameRamp)
-    {
-        DrawContext.Field_0xA = 0;
-        DrawContext.PrimCount = 0;
-        Age_ += Dt;
-        if (EmitterRefCount_ == 0 && InstanceListHead_ == nullptr)
-            NodeFlags_ |= 1;
-
-        FFxTextureKey Key;
-        Key.Name = kTexInfoKeyName;
-        Key.Crc = Descriptor_->TextureCrc;
-        Texture_.SetTexture(&Key);
-        if (Texture_.Handle == -1)
-            Texture_.Resolve();
-        if ((Descriptor_->Flags & 8u) == 8u)
-        {
-            const float Pos = static_cast<float>(FrameRamp->Eval(AppearanceOuterTime_, Age_));
-            if (Texture_.FrameCount != 1 && Texture_.Handle != -1)
-            {
-                const unsigned long Span = static_cast<unsigned long>(Texture_.FrameCount - 1);
-                const long long Frame = static_cast<long long>(
-                    static_cast<double>(Span) * static_cast<double>(Pos));
-                TexInfoLibrary()->GetFrame(Texture_.Handle, static_cast<int>(Frame),
-                                           reinterpret_cast<unsigned long*>(Texture_.Frame));
-            }
-        }
-        else if (Texture_.FrameCount != 1)
-        {
-            Texture_.Advance(Dt);
-        }
-
-        ApplyFieldsToPool(this, false);
-        IntegratePool(this, Pool, Dt);
-    }
-
     // Internal borrowed first-entry convenience, separate from IFxAppearance+0xDC.
     IDAComponent* DACOM_API FGenericFxObjectBase::GetAssociatedField()
     {
@@ -1271,19 +1225,19 @@ namespace AlchemyImpl
         return AssociatedFields_[Index];
     }
 
-    // FUN_06244430 uses &Value as its iterator, even though the captured end is the
+    // FUN_06244430 uses &Field as its iterator, even though the captured end is the
     // associated-field array end (retail bug kept: it walks the caller's stack). Optimizers
     // and Debug /RTC are kept off so the unchecked boundary survives.
 #pragma optimize("", off)
 #pragma runtime_checks("", off)
-    __declspec(noinline) GENRESULT DACOM_API FGenericFxObjectBase::Pad44(IDAComponent* Value)
+    __declspec(noinline) GENRESULT DACOM_API FGenericFxObjectBase::RemoveField(IDAComponent* Field)
     {
-        IDAComponent* FinalValue = Value;
-        if (Value != nullptr)
-            Value->AddRef();
+        IDAComponent* FinalValue = Field;
+        if (Field != nullptr)
+            Field->AddRef();
 
-        FPointerCleanup<IDAComponent> Cleanup(Value);
-        IDAComponent** Cursor = &Value;
+        FPointerCleanup<IDAComponent> Cleanup(Field);
+        IDAComponent** Cursor = &Field;
         IDAComponent** const ShiftEnd = AssociatedFields_ + FieldCount_;
         if (Cursor + 1 != ShiftEnd)
         {
@@ -1299,7 +1253,7 @@ namespace AlchemyImpl
                     (*Cursor)->AddRef();
                 ++Cursor;
             } while (Cursor + 1 != ShiftEnd);
-            FinalValue = Value;
+            FinalValue = Field;
         }
 
         IDAComponent** const TailEnd = AssociatedFields_ + FieldCount_;

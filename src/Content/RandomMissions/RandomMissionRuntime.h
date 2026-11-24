@@ -42,30 +42,33 @@ extern FRmNamedValue const GRmCommTargetNames[12];
 // ---------------------------------------------------------------------------------------
 // TU61 state machine message types. The TU61 static initialisers LAB_06f842a0 ...
 // LAB_06f84520 (one per global, in this order) each inline
-// StateMachineMessage::GenerateUniqueMessageType(). Names come from the DestroyMission
-// handler (LAB_06eef740) where it reads them; the others keep their address.
+// StateMachineMessage::GenerateUniqueMessageType(). Named after their senders and readers
+// (DestroyMission LAB_06eef740, the sub-machines, the vignette machine FUN_06f8c460).
 // ---------------------------------------------------------------------------------------
 extern unsigned int const GRmMsgStartMachine;       // DAT_06fd3bbc: DestroyMission -> a runtime machine
 extern unsigned int const GRmMsgMachineStarted;     // DAT_06fd3bb8: machine -> mission, now running
 extern unsigned int const GRmMsgMachineSucceeded;   // DAT_06fd3bb4: machine done, next one may start
 extern unsigned int const GRmMsgMachineFailed;      // DAT_06fd3bb0: machine failed (reason at +0x1c)
 extern unsigned int const GRmMsgRefreshObjectives;  // DAT_06fd3bac: mission +0x25c = 1, objectives refreshed
-extern unsigned int const GRmMsgType06fd3ba8;       // DAT_06fd3ba8
-extern unsigned int const GRmMsgType06fd3ba4;       // DAT_06fd3ba4
-extern unsigned int const GRmMsgType06fd3ba0;       // DAT_06fd3ba0
-extern unsigned int const GRmMsgType06fd3b9c;       // DAT_06fd3b9c
-extern unsigned int const GRmMsgType06fd3b98;       // DAT_06fd3b98
-extern unsigned int const GRmMsgType06fd3b94;       // DAT_06fd3b94
-extern unsigned int const GRmMsgType06fd3b90;       // DAT_06fd3b90
-extern unsigned int const GRmMsgType06fd3b8c;       // DAT_06fd3b8c
-extern unsigned int const GRmMsgType06fd3b88;       // DAT_06fd3b88
-extern unsigned int const GRmMsgType06fd3b84;       // DAT_06fd3b84
-extern unsigned int const GRmMsgType06fd3b80;       // DAT_06fd3b80
-extern unsigned int const GRmMsgType06fd3b7c;       // DAT_06fd3b7c
-extern unsigned int const GRmMsgType06fd3b78;       // DAT_06fd3b78
-extern unsigned int const GRmMsgType06fd3b74;       // DAT_06fd3b74
-extern unsigned int const GRmMsgPlayerLeft;         // DAT_06fd3b70: DestroyMission, controller message 9
-extern unsigned int const GRmMsgType06fd3b6c;       // DAT_06fd3b6c
+// DAT_06fd3ba8..ba0: ship machine -> runtime machine (FRmShipMessage {group, ship}): a ship
+// destroyed; every member of its group destroyed; the group's last alive flagged member died.
+extern unsigned int const GRmMsgShipDestroyed;          // DAT_06fd3ba8
+extern unsigned int const GRmMsgGroupDestroyed;         // DAT_06fd3ba4
+extern unsigned int const GRmMsgGroupTargetsDestroyed;  // DAT_06fd3ba0
+extern unsigned int const GRmMsgSolarDestroyed;         // DAT_06fd3b9c: solar machine, FRmSolarMessage
+// DAT_06fd3b98..b80: loot machine -> runtime machine (FRmLootMessage {loot, value}).
+extern unsigned int const GRmMsgCriticalLootSpawned;    // DAT_06fd3b98: SpawnLoot, a critical loot created
+extern unsigned int const GRmMsgLootDestroyed;          // DAT_06fd3b94: message 0x39 cause 1
+extern unsigned int const GRmMsgLootPickedUp;           // DAT_06fd3b90: message 0x18, all units taken {loot, ship}
+extern unsigned int const GRmMsgCriticalLootGone;       // DAT_06fd3b8c: no alive critical loot left
+extern unsigned int const GRmMsgLootHolderDocked;       // DAT_06fd3b88: message 0x27 (FRmLootPlayerMessage)
+extern unsigned int const GRmMsgLootDropped;            // DAT_06fd3b84: reply to GRmMsgDropLoot {loot, ship}
+extern unsigned int const GRmMsgLootLost;               // DAT_06fd3b80: message 0x39 cause 0
+extern unsigned int const GRmMsgCountdownTick;          // DAT_06fd3b7c: vignette machine's 5 s "return to battle" tick
+extern unsigned int const GRmMsgSpawnGroup;             // DAT_06fd3b78: FRmCookieMessage, a delayed group (serial)
+extern unsigned int const GRmMsgConversation;           // DAT_06fd3b74: FRmConversationMessage, to the GCS
+extern unsigned int const GRmMsgPlayerLeft;             // DAT_06fd3b70: DestroyMission, controller message 9
+extern unsigned int const GRmMsgDropLoot;               // DAT_06fd3b6c: vignette -> loot machine {loot, holder ship}
 
 // =======================================================================================
 // TU57 (RandomMissionTriggers.cpp): the trigger state machines and the machine group the
@@ -270,6 +273,33 @@ struct FRmParamText
 class FMissionObject;               // MissionObject.h
 class FMissionObjective;            // MissionObject.h
 class FRmRuntimeMachine;            // RandomMissionMachine.h
+
+// The objective keys: FRmObjectiveText::Parse (FUN_06f99560) maps each VignetteParams.ini
+// objective_text name to one; FRandomMissionGenerator::BuildObjectives (FUN_06f9dee0) files
+// them in an offer component's FRmObjectiveMap, folding the pb_ / mb_ ship keys onto
+// 6 / 7 / 8; the runtime machine adds and removes them by key.
+enum ERmObjectiveKey
+{
+    RmObjGuideToPreBattle = 1,              // "guide_to_pre_battle"
+    RmObjGuideToMainBattle = 2,             // "guide_to_main_battle"
+    RmObjGuideToMainFromPre = 3,            // "guide_to_main_from_pre" (shown as key 2)
+    RmObjKillBigSolar = 4,                  // "kill_big_solar"
+    RmObjKillOtherSolars = 5,               // "kill_other_solars"
+    RmObjKillShips = 6,                     // pb_ / mb_ "kill_ships": the defensive ships
+    RmObjKillBigShips = 7,                  // pb_ / mb_ "kill_big_ships"
+    RmObjDontKillShips = 8,                 // pb_ / mb_ "dont_kill_ships"
+    RmObjReturnToBattle = 9,                // "return_to_battle": the countdown
+    RmObjDestroyLoot = 0xa,                 // "destroy_loot"
+    RmObjTractorLoot = 0xb,                 // "tractor_loot"
+    RmObjReturnLoot = 0xc,                  // "return_loot": the dock of the offer base
+    RmObjJettisonLoot = 0xd,                // "jettison_loot"
+    RmObjPbKillShips = 0x13,                // "pb_kill_ships" (target component)
+    RmObjPbKillBigShips = 0x14,             // "pb_kill_big_ships"
+    RmObjPbDontKillShips = 0x15,            // "pb_dont_kill_ships"
+    RmObjMbKillShips = 0x16,                // "mb_kill_ships" (ship component)
+    RmObjMbKillBigShips = 0x17,             // "mb_kill_big_ships"
+    RmObjMbDontKillShips = 0x18,            // "mb_dont_kill_ships"
+};
 
 class FRmObjective : public FRmParamText
 {

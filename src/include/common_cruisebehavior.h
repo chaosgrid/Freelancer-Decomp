@@ -31,7 +31,7 @@ class CruiseBehavior : public Behavior
 {
 public:
     // Retail's ctor argument is the behavior type id (12, "Cruise"), pushed by the factory out of
-    // the descriptor's +0x04 -- see Behavior::GetTypeId() in common_behavior.h.
+    // the descriptor's +0x04 -- see Behavior::TypeId in common_behavior.h.
     explicit CruiseBehavior(int InTypeId);
     ~CruiseBehavior() override;
 
@@ -51,17 +51,17 @@ public:
     bool SetContext(void* Param1, void* Param2, void* Param3);
 
     // Slot 3, FUN_062ce380: FUN_062d20d0 (Behavior::OnEngage), then
-    // ThrustManager::engage_cruise(NavHelperPtr24+0x18, true).
+    // ThrustManager::engage_cruise(SysMgr+0x18, true).
     void Engage();
 
-    // Slot 4, FUN_062ce3a0: ThrustManager::engage_cruise(NavHelperPtr24+0x18, false), then
+    // Slot 4, FUN_062ce3a0: ThrustManager::engage_cruise(SysMgr+0x18, false), then
     // FUN_062d20f0 (Behavior::OnDisengage).
     void Disengage();
 
-    // Slot 5, LAB_062ce3c0: `ModeSelector0xc = Flag29 ? 3 : 1`, returned. RET 4.
+    // Slot 5, LAB_062ce3c0: `Readiness = Flag29 ? 3 : 1`, returned. RET 4.
     int SetModeFromFlags();
 
-    // Slot 7, LAB_062ce3e0: `UpdateResult10 = OwnerContextPtr14 ? 1 : 3`, returned.
+    // Slot 7, LAB_062ce3e0: `UpdateResult = OwnerContext ? 1 : 3`, returned.
     int Update();
 
     // Slot 7: IBehaviorManager::UpdateBehaviorTick dispatches through vtable +0x1c.
@@ -74,37 +74,9 @@ public:
     int OnEvaluateReadiness(float) override { return SetModeFromFlags(); }         // 5 LAB_062ce3c0
     EvaluateResult evaluate(unsigned int) override { return static_cast<EvaluateResult>(1); } // 6
 
-public:
-    // ------------------------------------------------------------------
-    // Fields: only Behavior's shared +0x04..+0x29 prefix; retail size 0x2c.
-    // ------------------------------------------------------------------
-    int TypeId;                // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
-    unsigned CachedHandle08;   // +0x08, the binder's Param1->get_id() (an object id)
-    int ModeSelector0xc;       // +0x0c. Written by Engage() (=1, via the shared
-                               // FUN_062d20d0 effect) and SetModeFromFlags() (1 or 3).
-    int UpdateResult10;        // +0x10. Update()'s own tri-state result (1=active/3=idle)
-                               // and Engage()'s own write (=1, via FUN_062d20d0).
-    void* OwnerContextPtr14;   // +0x14. Set by SetContext() (Param1); null-checked by Update().
-    IObjDB* ObjectDb;
-    float DeltaTime1c;
-    // +0x20, the binder's Param2. Left void*: no CruiseBehavior method reads +0x20 (only the
-    // shared FUN_062d20f0 does), so its type cannot be confirmed for this class.
-    void* BehaviorMgrPtr20;
-    SystemManager* NavHelperPtr24; // +0x24. Set by SetContext() (Param3); its Thrust (+0x18)
-                               // receives engage_cruise.
-    unsigned char Flags28;     // +0x28. Bit 0x1 cleared by FUN_062d20d0.
-    unsigned char Flag29;      // +0x29. Read by SetModeFromFlags(); cleared by FUN_062d20f0.
+    // No fields of its own: Behavior's +0x04..+0x29 only; retail size 0x2c.
 };
 
-static_assert(offsetof(CruiseBehavior, CachedHandle08) == 0x08, "CruiseBehavior::CachedHandle08 offset");
-static_assert(offsetof(CruiseBehavior, ModeSelector0xc) == 0x0c, "CruiseBehavior::ModeSelector0xc offset");
-static_assert(offsetof(CruiseBehavior, UpdateResult10) == 0x10, "CruiseBehavior::UpdateResult10 offset");
-static_assert(offsetof(CruiseBehavior, OwnerContextPtr14) == 0x14, "CruiseBehavior::OwnerContextPtr14 offset");
-static_assert(offsetof(CruiseBehavior, BehaviorMgrPtr20) == 0x20, "CruiseBehavior::BehaviorMgrPtr20 offset");
-static_assert(offsetof(CruiseBehavior, NavHelperPtr24) == 0x24, "CruiseBehavior::NavHelperPtr24 offset");
-static_assert(offsetof(CruiseBehavior, Flags28) == 0x28, "CruiseBehavior::Flags28 offset");
-static_assert(offsetof(CruiseBehavior, Flag29) == 0x29, "CruiseBehavior::Flag29 offset");
 
-// Retail object size from the factory's `PUSH 0x2c` before operator_new. The upper bound
-// catches fields declared past the end of the retail object.
-static_assert(sizeof(CruiseBehavior) <= 0x2c, "CruiseBehavior must not exceed its retail size 0x2c");
+// Retail object size from the factory's `PUSH 0x2c` before operator_new.
+static_assert(sizeof(CruiseBehavior) == 0x2c, "CruiseBehavior size == retail operator_new argument");

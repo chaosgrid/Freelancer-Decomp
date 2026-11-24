@@ -22,6 +22,7 @@
 #include "Guides/Guides.h"                 // FGuideDescBase, FSpawnPlan
 #include "Missions/MissionObjList.h"         // CreateObjListDirective, FObjListGotoVec, FObjListInstantTradelane
 #include "NPCs/NpcShip.h"                // FContentNpcShipParams (TU43)
+#include "Encounters/EncounterParams.h"         // EArrivalMethod
 #include "Encounters/PatrolPaths.h"            // FPatrolPath, FPatrolPathSegment
 #include "Encounters/Populators.h"             // FSpawnRequest, FSpacePopExclusionSphere, SpacePopGetSolarDetection
 #include "Encounters/SpacePaths.h"             // IsSegmentClear (FUN_06f60e10)
@@ -622,7 +623,7 @@ namespace
         if (System->IsSeenByPlayerShip(&End, &MaxDistance, &ConeAngle))             // FUN_06f730c0
             return !bMiddle;
         float ObjectRadius = 4000.0f;
-        if (System->IsNearPlayerField124Object(&End, &ObjectRadius))                // FUN_06f73130
+        if (System->IsNearPlayerTradeLaneEndRing(&End, &ObjectRadius))                // FUN_06f73130
             return !bMiddle;
         return bMiddle;
     }
@@ -859,13 +860,13 @@ namespace
 
         Plan->RingId = RingId;
         Plan->NextRingId = NextRingId;
-        Plan->Kind = 1;
+        Plan->Kind = SPAWN_PLAN_TRADELANE;
         FContentNpcShipParams& Leader = Blocks->front();
         Leader.Position = Position;
         Leader.Orientation = Orientation;
 
         TRefHandle<FObjListDirective> Directive;
-        CreateObjListDirective(0x14, &Directive.Pointer);                           // FUN_06f24870
+        CreateObjListDirective(OBJLIST_INSTANT_TRADELANE, &Directive.Pointer);                           // FUN_06f24870
         // The offset's float bits go to the op's +0x14.
         unsigned int OffsetBits;
         std::memcpy(&OffsetBits, &Offset, sizeof(OffsetBits));
@@ -893,8 +894,10 @@ namespace
             return false;
 
         unsigned char const* Method = Methods->data();
-        unsigned int Mask = (Method[5] != 0 ? 0x100u : 0u) | (Method[6] != 0 ? 0x200000u : 0u) |
-                            (Method[4] != 0 ? 0x40u : 0u) | (Method[3] != 0 ? 0x20u : 0u);
+        unsigned int Mask = (Method[ARRIVAL_OBJECT_STATION] != 0 ? 0x100u : 0u) |
+                            (Method[ARRIVAL_OBJECT_CAPITAL] != 0 ? 0x200000u : 0u) |
+                            (Method[ARRIVAL_OBJECT_JUMP_GATE] != 0 ? 0x40u : 0u) |
+                            (Method[ARRIVAL_OBJECT_DOCKING_RING] != 0 ? 0x20u : 0u);
         FContentNpcShipParams const& Block = Blocks->front();
         if (Request->bArrival)
             Mask &= 0xfffff39fu;
@@ -985,7 +988,7 @@ namespace
                 if (DistanceSq > GDockLaunchDistanceSq)
                     continue;
             }
-            Plan->Kind = 2;
+            Plan->Kind = SPAWN_PLAN_DOCK;
             bFound = true;
         }
         return bFound;
@@ -1020,7 +1023,7 @@ namespace
         Vector SpawnPosition;
         Vector Destination;
         bool bFound;
-        bool const bPathLeader = Blocks->front().GuideDesc->Type == 3;
+        bool const bPathLeader = Blocks->front().GuideDesc->Type == GUIDE_TYPE_PATROL_PATH;
         if (bPathLeader)
         {
             FPatrolPath* Path = Zone->GetPath();                                    // FUN_06fa8130
@@ -1085,7 +1088,7 @@ namespace
             return false;
 
         Plan->Position = SpawnPosition;
-        Plan->Kind = 7;
+        Plan->Kind = SPAWN_PLAN_CRUISE;
         Plan->Destination = Destination;
         Blocks->front().Position = SpawnPosition;
 
@@ -1116,13 +1119,13 @@ namespace
 
         // The leader's GotoVec to the destination.
         TRefHandle<FObjListDirective> Directive;
-        CreateObjListDirective(5, &Directive.Pointer);                              // FUN_06f24870
+        CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);                              // FUN_06f24870
         FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(Directive.Pointer);
         Goto->Op.Priority = 1;                                                      // +0x114
         // The guide type is read again from the leader's description (not null-tested).
-        float const Range = Blocks->front().GuideDesc->Type == 3 ? 500.0f : 100.0f;
+        float const Range = Blocks->front().GuideDesc->Type == GUIDE_TYPE_PATROL_PATH ? 500.0f : 100.0f;
         Goto->SetDestination(&Destination, Range, -1.0f, 0, false, false);          // FUN_06f26460
-        Goto->Op.Field_58 = 1;                                                      // +0x164
+        Goto->Op.bFlyThrough = 1;                                                      // +0x164
         AddLeaderDirective(&Blocks->front(), Directive);
         return true;
     }
@@ -1247,7 +1250,7 @@ namespace
         }
 
         Plan->Position = SpawnPosition;
-        Plan->Kind = 8;
+        Plan->Kind = SPAWN_PLAN_BUZZ;
         Plan->Destination = Destination;
         FContentNpcShipParams& Leader = Blocks->front();
         Leader.Position = SpawnPosition;
@@ -1286,11 +1289,11 @@ namespace
         Leader.Position.z = Leader.Position.z + Lift.z;
 
         TRefHandle<FObjListDirective> Directive;
-        CreateObjListDirective(5, &Directive.Pointer);                              // FUN_06f24870
+        CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);                              // FUN_06f24870
         FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(Directive.Pointer);
         Goto->SetDestination(&Destination, 401.0f, -1.0f, 0, false, false);
         Goto->Op.Priority = 1;                                                      // +0x114
-        Goto->Op.Field_58 = 1;                                                      // +0x164
+        Goto->Op.bFlyThrough = 1;                                                      // +0x164
         AddLeaderDirective(&Leader, Directive);
         return true;
     }
@@ -1308,16 +1311,16 @@ bool __cdecl PlaceSpawnFormation(FSpawnRequest const* Request, FSystemInfo* Syst
     {
         // Arrivals may cruise in; unless the leader is a patrol-path
         // leader they may also buzz the player, but never come out of a trade lane.
-        Methods[7] = 1;
+        Methods[ARRIVAL_CRUISE] = 1;
         FGuideDescBase const* Desc = Blocks->front().GuideDesc;                     // FUN_06f1df30
-        if (Desc == nullptr || Desc->Type != 3)
+        if (Desc == nullptr || Desc->Type != GUIDE_TYPE_PATROL_PATH)
         {
-            Methods[8] = 1;
-            Methods[1] = 0;
+            Methods[ARRIVAL_BUZZ] = 1;
+            Methods[ARRIVAL_TRADELANE] = 0;
         }
     }
 
-    while (Plan->Kind == 0)
+    while (Plan->Kind == SPAWN_PLAN_NONE)
     {
         // No method left -> not placed.
         size_t Index = 0;
@@ -1332,36 +1335,36 @@ bool __cdecl PlaceSpawnFormation(FSpawnRequest const* Request, FSystemInfo* Syst
             ++Pick;
         switch (Pick % static_cast<unsigned int>(Count))
         {
-        case 1:
+        case ARRIVAL_TRADELANE:
             PlaceOnTradeLane(Request, System, Zone, Plan, Blocks);                  // FUN_06f65d20
-            Methods[1] = 0;
+            Methods[ARRIVAL_TRADELANE] = 0;
             break;
-        case 2:
-        case 3:
-        case 4:
-        case 5:
-        case 6:
+        case ARRIVAL_UNNAMED_2:
+        case ARRIVAL_OBJECT_DOCKING_RING:
+        case ARRIVAL_OBJECT_JUMP_GATE:
+        case ARRIVAL_OBJECT_STATION:
+        case ARRIVAL_OBJECT_CAPITAL:
             PlaceAtDock(Request, System, Zone, &Methods, Plan, *Faction, Blocks);   // FUN_06f65900
-            Methods[6] = 0;
-            Methods[5] = 0;
-            Methods[4] = 0;
-            Methods[3] = 0;
-            Methods[2] = 0;
+            Methods[ARRIVAL_OBJECT_CAPITAL] = 0;
+            Methods[ARRIVAL_OBJECT_STATION] = 0;
+            Methods[ARRIVAL_OBJECT_JUMP_GATE] = 0;
+            Methods[ARRIVAL_OBJECT_DOCKING_RING] = 0;
+            Methods[ARRIVAL_UNNAMED_2] = 0;
             break;
-        case 7:
+        case ARRIVAL_CRUISE:
             PlaceCruising(Request, System, Zone, ZoneCreationDistance, Plan, Blocks); // FUN_06f64800
-            Methods[7] = 0;
+            Methods[ARRIVAL_CRUISE] = 0;
             break;
-        case 8:
+        case ARRIVAL_BUZZ:
             PlaceBuzzing(Request, System, Zone, ZoneCreationDistance, Plan, Blocks); // FUN_06f64fc0
-            Methods[8] = 0;
+            Methods[ARRIVAL_BUZZ] = 0;
             break;
         default:
             // Index 0 (never set by the arrival parser) or above 8: nothing; retail loops on.
             break;
         }
     }
-    return Plan->Kind != 0;
+    return Plan->Kind != SPAWN_PLAN_NONE;
 }
 
 namespace
@@ -1398,13 +1401,13 @@ void __cdecl SetLeaderGuideTargets(FSystemInfo* System, FSpawnPlan* Plan,
                                    FContentNpcShipParams* Leader)
 {
     FGuideDesc* Desc = static_cast<FGuideDesc*>(Leader->GuideDesc.Pointer);
-    bool const bWander = Desc->Type == 4;
+    bool const bWander = Desc->Type == GUIDE_TYPE_WANDER;
     Vector Origin;                                                                  // retail zeroes it per pick
     Origin.x = 0.0f;
     Origin.y = 0.0f;
     Origin.z = 0.0f;
 
-    if (Plan->Kind == 2)
+    if (Plan->Kind == SPAWN_PLAN_DOCK)
     {
         // Launched from a dock -- the launcher is the first target.
         unsigned int DockTarget = Plan->DockTarget;
@@ -1437,7 +1440,7 @@ void __cdecl SetLeaderGuideTargets(FSystemInfo* System, FSpawnPlan* Plan,
             std::vector<int> Points;
             Path->GetObjectPointIndices(&Target2, &Points);                         // FUN_06f37d30
             KeepPointsInRange(&Points, First, Last);
-            // Not range-checked (an empty list is read).
+            // Retail: not range-checked; an empty list reads index 0 (06f63e59).
             Plan->PathPoint = Points.data()[RandIndex(static_cast<int>(Points.size()))];
             if (Target2 == 0)
                 Target2 = DockTarget;
@@ -1451,7 +1454,7 @@ void __cdecl SetLeaderGuideTargets(FSystemInfo* System, FSpawnPlan* Plan,
         return;
     }
 
-    if (Plan->Kind == 1)
+    if (Plan->Kind == SPAWN_PLAN_TRADELANE)
     {
         // Out of a trade lane.
         unsigned int Target2 = 0;
@@ -1558,6 +1561,7 @@ void __cdecl SetLeaderGuideTargets(FSystemInfo* System, FSpawnPlan* Plan,
         std::vector<int> Points;
         Path->GetObjectPointIndices(&Target1, &Points);                             // FUN_06f37d30
         KeepPointsInRange(&Points, First, Last);
+        // Retail: not range-checked either (06f6458f).
         Plan->PathPoint = Points.data()[RandIndex(static_cast<int>(Points.size()))];
 
         // The second target's point range.

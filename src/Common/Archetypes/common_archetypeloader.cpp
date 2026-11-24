@@ -8,6 +8,7 @@
 // 0x062fa980 and the per-map teardowns up to 0x062fbe10) plus LoadExplosion 0x0630bd60 /
 // FreeExplosions 0x0630c080. Declared in common_archetype.h (namespace Archetype).
 #include "common_archetype.h"
+#include "Archetypes/common_archetype_internal.h" // ArchetypeSource
 #include "common_cliobj.h" // Archetype::ICliObjFactory
 #include "common_id.h"     // ID_String, CreateID
 #include "common_ini.h"    // INI_Reader
@@ -19,8 +20,6 @@
 
 namespace
 {
-    const char kArchetypeSource[] = "E:\\FL\\Scratch\\Source\\Common\\Archetype.cpp";
-
     // LoadEquipment's equipment sections, in retail's is_header order. FactoryTypeId is the
     // ICliObjFactory kind of each branch and also the record's get_class_type value.
     struct FEquipmentKind
@@ -180,7 +179,7 @@ namespace
         {
             FDUMP(0x100002,
                   "%s(%d) : *** WARNING: [Simple] nickname = %s value is not unique. Aborted second version.",
-                  kArchetypeSource, 0x364, Record->Nickname.get_string());
+                  Archetype::ArchetypeSource, 0x364, Record->Nickname.get_string());
         }
         delete Record;
         return bResult;
@@ -204,7 +203,7 @@ namespace
             } while (Record->EngineIndex != -1);
 
             if (Dangling != 0)
-                FDUMP(0x100002, Format, kArchetypeSource, Line, Record->Nickname.get_string(), Dangling);
+                FDUMP(0x100002, Format, Archetype::ArchetypeSource, Line, Record->Nickname.get_string(), Dangling);
         }
         delete Record;
     }
@@ -296,7 +295,7 @@ namespace
             if (Donor == nullptr)
             {
                 FDUMP(0x100002, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
-                      kArchetypeSource, 0x649, DonorId.get_string());
+                      Archetype::ArchetypeSource, 0x649, DonorId.get_string());
                 continue;
             }
 
@@ -402,7 +401,7 @@ namespace
             if (Donor == nullptr)
             {
                 FDUMP(0x100002, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
-                      kArchetypeSource, 0x125b, DonorId.get_string());
+                      Archetype::ArchetypeSource, 0x125b, DonorId.get_string());
                 continue;
             }
 
@@ -536,7 +535,7 @@ int __cdecl Archetype::LoadSolar(char const* Path, bool bReload, ICliObjFactory*
             // No SUBOBJ_ID_NONE test on the group id here, unlike Ships.
             if (Current == nullptr)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kArchetypeSource, 0x780,
+                FDUMP(0x100001, "%s(%d) : *** ERROR: %s", Archetype::ArchetypeSource, 0x780,
                       "Attempt to load a solar group into a solar that wasn't loaded.\n");
             }
             else
@@ -593,7 +592,7 @@ int __cdecl Archetype::LoadShips(char const* Path, bool bReload, ICliObjFactory*
                 else
                     FDUMP(0x100002,
                           "%s(%d) : *** WARNING: [Ship] nickname = %s value is not unique. Aborted second version.",
-                          kArchetypeSource, 0x66b, Record->Nickname.get_string());
+                          Archetype::ArchetypeSource, 0x66b, Record->Nickname.get_string());
                 delete Record;
                 Current = nullptr;
             }
@@ -609,7 +608,7 @@ int __cdecl Archetype::LoadShips(char const* Path, bool bReload, ICliObjFactory*
                 {
                     FDUMP(0x100002,
                           "%s(%d) : *** WARNING: [Ship] nickname = %s: Exceeds maximum collision group",
-                          kArchetypeSource, 0x67d, Current->Nickname.get_string());
+                          Archetype::ArchetypeSource, 0x67d, Current->Nickname.get_string());
                 }
                 else
                     ReadCollisionGroup(Reader, Current, GroupId);

@@ -33,12 +33,13 @@ struct FQuat
     float Z;
 };
 
-// Retail FUN_06f57de0 stack desc (size + name + unused +8).
+// Retail FUN_06f57de0 stack desc: size, name and the outer unknown (+8, FAGGDESC14's
+// OuterUnknown), which Thorn leaves null.
 struct FAggDescC
 {
     unsigned long Size;
     const char* NameAt4;
-    void* Field8;
+    void* Outer;
 };
 
 // Thorn factories: size 0x14, +4 name, +8 outer, +0xC inner-out (not FAGGDESC14 IID layout).
@@ -116,7 +117,6 @@ private:
 // Its ABI is x86math.dll's published one; FQuat above is layout-identical to FQuaternion.
 
 void ThornFdump(const char* Message);
-void ThornLogStub(const char* What);
 bool ThornNameEqual(const char* Left, const char* Right);
 I3DMathEngine* ThornAcquire3DMathEngine();
 GENRESULT ThornQuatMul(I3DMathEngine* Math, FQuat& Dst, const FQuat& A, const FQuat& B);

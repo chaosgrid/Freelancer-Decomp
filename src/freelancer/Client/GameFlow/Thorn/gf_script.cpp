@@ -508,11 +508,11 @@ void GfScriptCharacterAnimations(IScriptEngine* Script, bool bAcquire)
     // FUN_0044fa90.
     if (Script == nullptr)
         return;
-    int const Count = static_cast<int>(Script->Slot14EventCount());
+    int const Count = static_cast<int>(Script->GetEventCount());
     for (int Index = 0; Index < Count; ++Index)
     {
         FThornMotionEventDesc const* const Desc =
-            static_cast<FThornMotionEventDesc const*>(Script->Slot15EventByIndex(Index));
+            static_cast<FThornMotionEventDesc const*>(Script->GetEventByIndex(Index));
         if (Desc->Common.Type != kThornTypeStartMotion)
             continue;
         // FUN_00435320 (queue) or FUN_00434eb0 (release).
@@ -533,11 +533,11 @@ void GfScriptFindBackgroundAudio(IScriptEngine* Script, unsigned char* OutAmbien
         *OutMusic = 0;
     if (Script == nullptr)
         return;
-    int const Count = static_cast<int>(Script->Slot6EntityCount());
+    int const Count = static_cast<int>(Script->GetEntityCount());
     for (int Index = 0; Index < Count; ++Index)
     {
         FThornEntitySnap const* const Entity =
-            static_cast<FThornEntitySnap const*>(Script->Slot9Entity(Index));
+            static_cast<FThornEntitySnap const*>(Script->GetEntityDesc(Index));
         if (Entity->Type != kThornEntitySound)
             continue;
         unsigned char* Out = nullptr;
@@ -559,7 +559,7 @@ void GfScriptTouchEntities(IScriptEngine* Script, bool bAcquire)
     (void)bAcquire;
     if (Script == nullptr)
         return;
-    int const Count = static_cast<int>(Script->Slot6EntityCount());
+    int const Count = static_cast<int>(Script->GetEntityCount());
     for (int Index = 0; Index < Count; ++Index)
-        Script->Slot9Entity(Index);
+        Script->GetEntityDesc(Index);
 }

@@ -20,37 +20,25 @@
 
 // FaceBehavior, the engine-kill manoeuvre; layout notes are in common_facebehavior.h.
 
-// FUN_062c88e0. FUN_062d2020 (ConstructBase), then the MoveIdea (+0x68, FUN_062d4e60),
+// FUN_062c88e0. FUN_062d2020 (Behavior's ctor), then the MoveIdea (+0x68, FUN_062d4e60),
 // FaceIdea (+0xe0, FUN_062d6750) and AfterburnerIdea (+0x1a0, FUN_062da500) members, then the
 // trailing own fields. Retail stores Flag1b4 (+0x1b4) itself, so the AfterburnerIdea's 0x14
 // bytes end there.
 FaceBehavior::FaceBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , ThreatSourcePtr14(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime1c(0.0f)
-    , BehaviorMgrPtr20(nullptr)
-    , NavHelperPtr24(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
+    : Behavior(InTypeId)
     , TargetKind2c(0)
     , Watcher30()
     , OrientMatrix38()
     , TargetPosition5c{}
-    , SubObjectA()
-    , SubObjectB()
-    , SubObjectC()
+    , Move()
+    , Face()
+    , Afterburner()
     , Flag1b4(0)
     , Pad1b5{}
     , FaceAxisX(0.0f)
     , FaceAxisY(0.0f)
     , FaceAxisZ(0.0f)
-    , Flag1c4(1)
+    , bKillEngine(1)
     , Flag1c5(0)
     , Pad1c6{}
     , EngineKillStateElapsed(0.0f)
@@ -60,7 +48,6 @@ FaceBehavior::FaceBehavior(int InTypeId)
     , Pad1d5{}
     , AfterburnerElapsed(0.0f)
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
     // Retail's `CMP [this+0x30],0` right after the vptr store is dead (Watcher30 was just
     // zeroed) and is not reproduced.
 }
@@ -68,9 +55,9 @@ FaceBehavior::FaceBehavior(int InTypeId)
 // FUN_062c8a30 (FUN_062c8a10 is the scalar deleting destructor).
 FaceBehavior::~FaceBehavior()
 {
-    // Retail's order: +0xf4 (SubObjectB), +0x7c (SubObjectA), +0x30.
-    SubObjectB.Watcher.set(nullptr);
-    SubObjectA.Watcher.set(nullptr);
+    // Retail's order: +0xf4 (Face), +0x7c (Move), +0x30.
+    Face.Watcher.set(nullptr);
+    Move.Watcher.set(nullptr);
     Watcher30.set(nullptr);
 
     // FUN_062d2080 (~Behavior) runs as the base destructor.
@@ -82,13 +69,13 @@ bool FaceBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     if (!BindContext(Param1, Param2, Param3))   // FUN_062d2090
         return false;
 
-    // Unlike DockBehavior, retail does not call SubObjectA's slot 0 here.
-    SubObjectB.SetContext(Param1, Param3, Param2);
+    // Unlike DockBehavior, retail does not call Move's slot 0 here.
+    Face.SetContext(Param1, Param3, Param2);
 
-    SubObjectC.SetContext(Param1, Param3, Param2);
+    Afterburner.SetContext(Param1, Param3, Param2);
 
     // FUN_062e5b20.
-    Field1cc = Behavior_InvokeManagerSlotF0(ObjInspectOf(ThreatSourcePtr14), 0.0f, 1.0f);
+    Field1cc = Behavior_GetAngularSpeedXY(ObjInspectOf(OwnerContext), 0.0f, 1.0f);
 
     return true;
 }
@@ -101,10 +88,10 @@ void FaceBehavior::OnEngage()
     Flag1c5 = 0;
     EngineKillStateElapsed = 0.0f;
 
-    SetCruiseLock(0, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(0, 3);                                            // FUN_062d21d0
 
     // FUN_062e91d0.
-    NavHelperPtr24->Thrust.SetEngineActive(Flag1c4 == 0);
+    SysMgr->Thrust.SetEngineActive(bKillEngine == 0);
 
     Flag1b4 = 0;
     FaceAxisX = 0.0f;
@@ -121,10 +108,10 @@ void FaceBehavior::OnDisengage()
         Watcher30.set(nullptr);
     }
 
-    SubObjectB.Commit();
+    Face.Commit();
 
     // AfterburnerIdea::Commit: afterburner off.
-    SubObjectC.Commit();
+    Afterburner.Commit();
 
     Behavior::OnDisengage();                                              // FUN_062d20f0
 }
@@ -136,17 +123,17 @@ int FaceBehavior::OnEvaluateReadiness(float Unused)
     if ((Flags28 & 0x2) != 0 && TargetKind2c == 1 && GetWatchedRawBlock() != nullptr)
     {
         int const Mode = Flag29 ? 3 : 1;
-        ModeSelector0xc = Mode;
+        Readiness = Mode;
         return Mode;
     }
 
     int Result = 2;
-    SystemManager* const Sys = NavHelperPtr24;
-    if (!Sys->GunConvergenceStateBytes.FollowerDirectiveGateA())     // FUN_062ecb20
+    SystemManager* const Sys = SysMgr;
+    if (!Sys->FormationLeaders.FollowerDirectiveGateA())     // FUN_062ecb20
     {
         // A cached pathfind obstacle skips the scan. Retail also copies CachedObstacleId into
         // a local that nothing reads.
-        PathfindManager* const Pathfind = BehaviorMgrPtr20->Pathfind;
+        PathfindManager* const Pathfind = BehaviorMgr->Pathfind;
         if (!(Pathfind->CachedObstacleId != 0 && Pathfind->bHasCachedObstacle))
         {
             IObjInspect* const Closest = FindClosestHostileTarget(
@@ -176,7 +163,7 @@ int FaceBehavior::OnEvaluateReadiness(float Unused)
 
     if (Flag29)
         Result = 3;
-    ModeSelector0xc = Result;
+    Readiness = Result;
     return Result;
 }
 
@@ -189,8 +176,8 @@ EvaluateResult FaceBehavior::evaluate(unsigned int Context)
 
     // The owner's own target goes to the ship's TargetManager.
     IObjRW* Target = nullptr;
-    static_cast<IObjRW*>(ThreatSourcePtr14)->get_target(Target);
-    NavHelperPtr24->Targeting.RetargetOwner(Target, SUBOBJ_ID_NONE);
+    OwnerContext->get_target(Target);
+    SysMgr->Targeting.RetargetOwner(Target, SUBOBJ_ID_NONE);
     return EvalBlocked;
 }
 
@@ -226,11 +213,11 @@ int FaceBehavior::Update()
     if (Flag1d4 != 0)
     {
         Flag1d4 = 0;
-        UpdateResult10 = 2;
-        return UpdateResult10;
+        UpdateResult = 2;
+        return UpdateResult;
     }
 
-    SystemManager* const Sys = NavHelperPtr24;
+    SystemManager* const Sys = SysMgr;
     pub::AI::Personality::EngineKillUseStruct const& EngineKill =
         Sys->PersonalityData.EngineKillParams;
 
@@ -259,7 +246,7 @@ int FaceBehavior::Update()
                 {
                     // The argument order is the opposite of the second BearingAngleToIface
                     // call below: Self is the owner, Target the watched block.
-                    double const Bearing = BearingAngleToIface(ThreatSourcePtr14, WatchedBlock); // unrounded ST0
+                    double const Bearing = BearingAngleToIface(OwnerContext, WatchedBlock); // unrounded ST0
 
                     // Strictly greater: the ship has not finished rotating yet.
                     bStillTurning = (Bearing > kWideBearingGate);
@@ -270,22 +257,22 @@ int FaceBehavior::Update()
         if (bStillTurning)
         {
             // Keep coasting and steering; returns 0 without reaching the switch.
-            AfterburnerElapsed += DeltaTime1c;
+            AfterburnerElapsed += DeltaTime;
             // AfterburnerIdea::Update holds the afterburner on.
-            SubObjectC.Update(DeltaTime1c);
+            Afterburner.Update(DeltaTime);
 
             // FaceIdea tag 5 ("face an axis") with a zero axis.
             Vector ZeroAxis;
             Vec3Assign(&ZeroAxis, 0.0f, 0.0f, 0.0f);
-            SubObjectB.SetAxis(ZeroAxis);
-            SubObjectB.Update(DeltaTime1c);
+            Face.SetAxis(ZeroAxis);
+            Face.Update(DeltaTime);
 
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
 
         // LAB_062c8f0a: re-validate the watch. AfterburnerIdea::Commit, afterburner off.
-        SubObjectC.Commit();
+        Afterburner.Commit();
 
         if (Flag1c5 != 0)
         {
@@ -293,7 +280,7 @@ int FaceBehavior::Update()
             if (EngineKillStateElapsed < EngineKill.EngineKillFaceTime)
             {
                 Result = 0;
-                EngineKillStateElapsed += DeltaTime1c;
+                EngineKillStateElapsed += DeltaTime;
             }
             else
             {
@@ -315,7 +302,7 @@ int FaceBehavior::Update()
             // each; all of those branches are dead after the guards above (one would
             // reinterpret the integer Result as a float), and only the call survives.
             // Operands are reversed relative to the first call: Self is the watched block.
-            double const Angle = BearingAngleToIface(FreshBlock, ThreatSourcePtr14); // unrounded ST0
+            double const Angle = BearingAngleToIface(FreshBlock, OwnerContext); // unrounded ST0
 
             // An angle within pi/16 is "locked on".
             if (Angle > kFaceLockGate)
@@ -328,7 +315,7 @@ int FaceBehavior::Update()
                 else
                 {
                     Result = 0;
-                    EngineKillStateElapsed += DeltaTime1c;
+                    EngineKillStateElapsed += DeltaTime;
                 }
             }
             else
@@ -365,17 +352,17 @@ int FaceBehavior::Update()
             // FaceIdea tag 5 on FaceAxisX/Y/Z (+0x1b8).
             Vector Axis;
             Vec3Assign(&Axis, FaceAxisX, FaceAxisY, FaceAxisZ);
-            SubObjectB.SetAxis(Axis);
+            Face.SetAxis(Axis);
         }
         else
         {
             // FaceIdea tag 1, "watch an object".
-            SubObjectB.SetWatchObject(GetWatchedRawBlock());
+            Face.SetWatchObject(GetWatchedRawBlock());
 
             // The only case arm with its own RET, skipping the shared tail.
             if (GetWatchedRawBlock() == nullptr)
             {
-                UpdateResult10 = 3;
+                UpdateResult = 3;
                 return 3;
             }
         }
@@ -400,9 +387,9 @@ int FaceBehavior::Update()
 
             // Strictly > 0 uses the explicit axis (tag 5).
             if (MagnitudeSquared > 0.0)
-                SubObjectB.SetAxis(Axis);
+                Face.SetAxis(Axis);
             else
-                SubObjectB.SetDirection(NegCol2);   // FaceIdea tag 3
+                Face.SetDirection(NegCol2);   // FaceIdea tag 3
         }
         else
         {
@@ -440,12 +427,12 @@ int FaceBehavior::Update()
             }
 
             // FaceIdea tag 4, "face along a basis".
-            SubObjectB.SetBasis(OrientMatrix38);
+            Face.SetBasis(OrientMatrix38);
         }
         break;
     }
     case 3:
-        SubObjectB.SetBasis(OrientMatrix38);
+        Face.SetBasis(OrientMatrix38);
         break;
     case 4:
     {
@@ -454,7 +441,7 @@ int FaceBehavior::Update()
             Sys->SelfTarget.Iface->get_transform().Rotation);
         Vector NegCol2;
         VecNegate3(&Col2, &NegCol2);
-        SubObjectB.SetDirection(NegCol2);   // FaceIdea tag 3
+        Face.SetDirection(NegCol2);   // FaceIdea tag 3
         break;
     }
     default:
@@ -463,15 +450,15 @@ int FaceBehavior::Update()
     }
 
     // Shared tail, LAB_062c92ae.
-    Sys->Thrust.SetEngineActive(Flag1c4 == 0);
+    Sys->Thrust.SetEngineActive(bKillEngine == 0);
 
-    SubObjectB.Update(DeltaTime1c);
+    Face.Update(DeltaTime);
 
     // is_player() a second time; a player-flown ship always returns 1.
     if (Sys->SelfTarget.Iface->is_player())
         Result = 1;
 
-    UpdateResult10 = Result;
+    UpdateResult = Result;
     return Result;
 }
 
@@ -484,9 +471,9 @@ bool FaceBehavior::OnApplyDirective(void* Message)
         return false;
     }
 
-    char* M = static_cast<char*>(Message);
-    Flag1c4 = static_cast<unsigned char>(M[0x44]);
-    int const Kind = *reinterpret_cast<int const*>(M + 0xc);
+    pub::AI::DirectiveFaceOp const* const Op = static_cast<pub::AI::DirectiveFaceOp const*>(Message);
+    bKillEngine = Op->bKillEngine;
+    int const Kind = Op->Mode;
     TargetKind2c = Kind;
 
     switch (Kind)
@@ -494,7 +481,7 @@ bool FaceBehavior::OnApplyDirective(void* Message)
     case 1:
     {
         // FUN_062e74a0; then the watch must be live.
-        void* const T = NavHelperPtr24->Timers.FindVerifiedObject((unsigned const*)(M + 0x10));
+        void* const T = SysMgr->Timers.FindVerifiedObject(&Op->TargetId);
         Watcher30.set(T != nullptr ? reinterpret_cast<Watchable const*>(static_cast<char*>(T) + 8)
                                    : nullptr);
         if (GetWatchedRawBlock() == nullptr)
@@ -507,14 +494,13 @@ bool FaceBehavior::OnApplyDirective(void* Message)
     }
     case 2:
     {
-        Vector const& Src = *reinterpret_cast<Vector const*>(M + 0x14);
-        TargetPosition5c = Src;
+        TargetPosition5c = Op->FacePoint;
         Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
         return true;
     }
     case 3:
     {
-        OrientMatrix38 = *reinterpret_cast<Matrix const*>(M + 0x20);
+        OrientMatrix38 = Op->Orientation;
         Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
         return true;
     }
@@ -550,7 +536,7 @@ void FaceBehavior::set_direction(Vector const& Offset)
 
     // FUN_062d4b20. Rescale only for a strictly positive factor; the reciprocal stays on the
     // x87 stack, unrounded, for both products.
-    float const TurnSensitivity = BehaviorMgrPtr20->get_turn_sensitivity_factor();
+    float const TurnSensitivity = BehaviorMgr->get_turn_sensitivity_factor();
     if (TurnSensitivity > 0.0f)
     {
         double const Rescale = 1.0 / static_cast<double>(TurnSensitivity);

@@ -410,6 +410,7 @@ FLodSet* FRenderManager::FindSet(int Id)
     return &Found->second;
 }
 
+// FUN_06c33c50 (thiscall: Id, File).
 int FRenderManager::MultiLevel(int Id, void* FileArg)
 {
     IFileSystem* File = (IFileSystem*)FileArg;
@@ -478,6 +479,8 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
             bFailed = true;
             break;
         }
+        // Retail: no break after a claim (06C33F2A loops on), so the last claimant wins and the
+        // handles of earlier ones leak; WalkPlugins stops at the first.
         for (FPluginNode* Walk = PluginSentinel.Next; Walk != &PluginSentinel; Walk = Walk->Next)
         {
             const int Claimed = Walk->Plugin->Claim(Level);

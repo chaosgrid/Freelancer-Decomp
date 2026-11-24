@@ -38,7 +38,7 @@ class FContentNpcShip;
 // block (see FContentShipParams), then the members below with their ctor values.
 struct FContentNpcShipParams : public FContentShipParams
 {
-    unsigned char Field_0x78 = 0;                        // +0x78 -> ship +0x5a8. TODO: meaning
+    unsigned char bExcludeFromShipCount = 0;             // +0x78 -> ship +0x5a8
     unsigned int Loadout = 0;                            // +0x7c ShipInfo::LoadoutID; arch +8
     std::vector<pub::SpaceObj::CargoDesc> Cargo;         // +0x80 copied into ShipInfo::Cargo
     Matrix Orientation;                                  // +0x90 identity
@@ -53,8 +53,8 @@ struct FContentNpcShipParams : public FContentShipParams
     // object from the mission ship spawn (TU38); the ship ctor hands it to CreateGuide.
     FGuideDescHandle GuideDesc;
     ID_String Pilot;                                     // +0x100 cleared
-    float Longevity = -1.0f;                           // +0x104 DAT_06fb956c -> ship +0x1bc
-    float InitialLifeTime = 24.0f;                           // +0x108 -> ship +0x1c8
+    float Longevity = -1.0f;                             // +0x104 DAT_06fb956c -> ship +0x1bc
+    float InitialLifeTime = 24.0f;                       // +0x108 -> ship +0x1c8
     float Field_0x10c = 500.0f;                          // +0x10c -> ship +0x1c0
     int DockIndex = -1;                                // +0x110 TODO: no reader in TU43
     // +0x114: an object id; when set, the guide starts only if the object's type has a bit
@@ -108,7 +108,7 @@ public:
     virtual int GetScanForCargo(unsigned int* Out, int MaxCount);
 
     // DirectiveCallback slot 0, 06f33f90.
-    void OnDirectiveComplete(int ResultWord11c, int ResultWord118) override;
+    void OnDirectiveComplete(int CompletedBehavior, int DirectiveResult) override;
 
     // ContentCallback. follow_event (06f34240) and information_request (the Common import
     // 06fa8f2a) keep the inline bodies of common_pub.h.
@@ -178,13 +178,19 @@ public:
     // +0x1b8: 5 from the ctor and from the event list's timer; each finished comm line
     // counts it down, at 0 the owning controller gets message 0x1006.
     int CommLinesLeft = 5;
-    float Longevity;                             // +0x1bc params +0x104. TODO: meaning
-    float Field_0x1c0;                             // +0x1c0 params +0x10c. TODO: meaning
+    // +0x1bc params +0x104: the life LifeTime is refilled to while a player is near or the
+    // ship flies in a formation; -1 = never expires (FSystemInfo::UpdateNpcShipLives).
+    float Longevity;
+    float Field_0x1c0;                             // +0x1c0 params +0x10c. TODO: no reader
     unsigned int Loadout;                          // +0x1c4 params +0x7c
-    float LifeTime;                             // +0x1c8 params +0x108. TODO: meaning
-    ID_String PilotId;                         // +0x1cc cleared. TODO: writer
+    // +0x1c8 params +0x108: the remaining life; run down by UpdateNpcShipLives at
+    // GetNpcShipLifeRate, the ship is destroyed when it drops below 0.
+    float LifeTime;
+    ID_String PilotId;                             // +0x1cc cleared. TODO: writer
     pub::AI::Personality Personality;              // +0x1d0
-    unsigned char Field_0x5a8;                     // +0x5a8 params +0x78. TODO: meaning
+    // +0x5a8 params +0x78: when set, CountNpcShipsNear (FUN_06f67440, the encounter density
+    // count) skips the ship. Only the params ctor writes it in the port (0).
+    unsigned char bExcludeFromShipCount;
     // +0x5ac cleared by the ctor; the only writer is FEncounterParameters::Spawn: the
     // [EncounterParameters] nickname id of the encounter that spawned the ship. Content has
     // no reader.
@@ -210,7 +216,7 @@ struct FNpcShipEvent
     unsigned int TetherStatus;    // +0x18
     float Value;                  // +0x1c lead value (kind 2: follow distance)
     Vector Position;              // +0x20
-    // +0x2c what the timer reports: 0 clear the ship's +0x1b1, 1 lead_object_event,
+    // +0x2c what the timer reports: 0 clear the ship's bCommMuted, 1 lead_object_event,
     // 2 follow_event, 3 tether_object_event.
     int Kind;
 };

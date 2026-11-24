@@ -13,7 +13,7 @@
 #include "common_aisteer.h"   // ICRSplineSegment
 #include "common_goods.h"     // BaseWatcher
 #include "common_csys.h"      // Matrix (LookMatrixYup output, see Orient3d8 below)
-#include "common_idea.h"      // MoveIdea, FaceIdea -- real classes behind SubObjectA/B (see below)
+#include "common_idea.h"      // MoveIdea, FaceIdea -- real classes behind Move/B (see below)
 
 #include <cstddef>
 
@@ -34,48 +34,12 @@
 // class's own members: they write up to +0x46c, past FormationBehavior's 0x2b8.
 // ============================================================================
 
-// Intermediate base holding DockBehavior's own +0x04..+0x2c fields: MSVC lays out bases
-// before the derived class's members, so this block must be its own base to put the
-// RequestCB vptr at +0x2c and the sub-objects at +0x30.
-class DockBehaviorFields : public Behavior
+// Behavior (0x2c bytes) comes first, so the RequestCB vptr lands at +0x2c and the
+// sub-objects start at +0x30.
+class DockBehavior : public Behavior, public IObjAffect::RequestCB
 {
 public:
-    explicit DockBehaviorFields(int InTypeId);
-
-    int TypeId;                 // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
-    unsigned CachedHandle08;    // +0x08, the binder's ThreatSourcePtr14->get_id() (an object id)
-    int ModeSelector0xc;        // +0x0c. Written by SetModeFromFlags() (values 1/2/3).
-    int UpdateResult10;         // +0x10. Update()'s tri-state result/early-out code (1/2/3).
-    void* ThreatSourcePtr14;    // +0x14, the binder's owner. Update() calls its vtable slots
-                                 // 0x40/0x6c.
-    IObjDB* ObjectDb;
-    float DeltaTime1c;
-    // +0x20, an IBehaviorManager*: slot 4 (LAB_062c3910) calls
-    // IBehaviorManager::lock_maneuvers on it by symbol. Kept void*.
-    void* BehaviorMgrPtr20;
-    // +0x24, the binder's SystemManager (NavHelper). Update() passes it to FUN_062c2af0 and
-    // FUN_062c2d90.
-    void* NavHelperPtr24;
-    unsigned char Flags28;       // +0x28. Update() tests bit 0x1 (early-exit to state 2);
-                                  // SetModeFromFlags() tests bit 0x2.
-    unsigned char Flag29;        // +0x29. SetModeFromFlags() tests it (nonzero => mode 3).
-    unsigned char Pad2a[0x2c - 0x2a]; // +0x2a, alignment only
-};
-static_assert(offsetof(DockBehaviorFields, CachedHandle08) == 0x08, "DockBehaviorFields::CachedHandle08 offset");
-static_assert(offsetof(DockBehaviorFields, ModeSelector0xc) == 0x0c, "DockBehaviorFields::ModeSelector0xc offset");
-static_assert(offsetof(DockBehaviorFields, UpdateResult10) == 0x10, "DockBehaviorFields::UpdateResult10 offset");
-static_assert(offsetof(DockBehaviorFields, ThreatSourcePtr14) == 0x14, "DockBehaviorFields::ThreatSourcePtr14 offset");
-static_assert(offsetof(DockBehaviorFields, BehaviorMgrPtr20) == 0x20, "DockBehaviorFields::BehaviorMgrPtr20 offset");
-static_assert(offsetof(DockBehaviorFields, NavHelperPtr24) == 0x24, "DockBehaviorFields::NavHelperPtr24 offset");
-static_assert(offsetof(DockBehaviorFields, Flags28) == 0x28, "DockBehaviorFields::Flags28 offset");
-static_assert(offsetof(DockBehaviorFields, Flag29) == 0x29, "DockBehaviorFields::Flag29 offset");
-static_assert(sizeof(DockBehaviorFields) == 0x2c, "DockBehaviorFields size (own data ends right before the RequestCB secondary vtable ptr at +0x2c)");
-
-class DockBehavior : public DockBehaviorFields, public IObjAffect::RequestCB
-{
-public:
-    // Retail's ctor argument is the behavior type id (7, "Dock"); it is forwarded to DockBehaviorFields.
-    // See Behavior::GetTypeId() in common_behavior.h.
+    // Retail's ctor argument is the behavior type id (7, "Dock"), forwarded to Behavior's ctor.
     explicit DockBehavior(int InTypeId);
 
     // ------------------------------------------------------------------
@@ -109,10 +73,10 @@ public:
     ~DockBehavior() override;
 
     // Slot 5, LAB_062c35c0: mode = (Flags28 & 0x2) ? 1 : 2, 3 if Flag29; stored in
-    // ModeSelector0xc and returned (RET 4).
+    // Readiness and returned (RET 4).
     int SetModeFromFlags();
 
-    // Slot 11, LAB_062c3000: ModeState320 (+0x320, not ModeSelector0xc) is none of
+    // Slot 11, LAB_062c3000: ModeState320 (+0x320, not Readiness) is none of
     // 6/7/8/10.
     bool IsClearanceState() const;
 
@@ -126,7 +90,7 @@ public:
     int Update();
 
     // FUN_062c4900, not a vtable slot: the tail half of Update(), its only caller
-    // (.text:062c3cea, unadjusted this). Returns the tri-state left in UpdateResult10
+    // (.text:062c3cea, unadjusted this). Returns the tri-state left in UpdateResult
     // (0 = done/idle, 1 = continue, 2 = give up).
     int UpdateApproachTail();
 
@@ -166,24 +130,24 @@ public:
     bool OnResult(int Param1, int Param2, int Param3) override;
 
     // Slot 1, LAB_062c31c0. The binder FUN_062d2090 (false when P1 or P3 is null) gates the
-    // rest: resets AbortFlag398/Flag39b, SetContext on SubObjectA/B/C with
-    // (ThreatSourcePtr14, NavHelperPtr24, raw Param2), zeroes Opaque444 (+0x444..+0x44c) and
+    // rest: resets AbortFlag398/Flag39b, SetContext on Move/B/C with
+    // (OwnerContext, SysMgr, raw Param2), zeroes Opaque444 (+0x444..+0x44c) and
     // Flags28 bit 0x2, and when the "hpmount" hardpoint lookup fails rebuilds
-    // OrientMatrix3d8 from the NavHelper's own target. Returns the binder's result.
+    // OrientMatrix3d8 from the SysMgr's own target. Returns the binder's result.
     bool SetContext(void* Param1, void* Param2, void* Param3) override;
 
     // Slot 3, LAB_062c3720. Early-outs to `EnterState(0xd)` if
     // Watcher324's watched block is gone; otherwise resets several per-tick
     // fields (DockPortIndex=-1, CombatFlag344=0, BrakingDistance via FUN_062e5af0/
-    // FUN_062e5ab0*3.0, SetCruiseLock(1,3) via FUN_062d21d0), then branches on
-    // StateFlags32c's sign bit: if clear, calls ThreatSourcePtr14's vtbl+0x138
+    // FUN_062e5ab0*3.0, SetAvoidanceAllowed(1,3) via FUN_062d21d0), then branches on
+    // StateFlags32c's sign bit: if clear, calls OwnerContext's vtbl+0x138
     // "get transform" (writes Opaque388/Facing38c/an intercept-point out-param),
     // builds OrientMatrix3d8 via LookMatrixYup, and updates
-    // SubObjectA via FUN_062d4e50 with the watched block's vtbl+0x20 result;
+    // Move via FUN_062d4e50 with the watched block's vtbl+0x20 result;
     // if set and bit 0x40 set, tail-calls FUN_062c50e0.
-    // Finally checks ThreatSourcePtr14's vtbl+0xbc "is threatening" bool and a
+    // Finally checks OwnerContext's vtbl+0xbc "is threatening" bool and a
     // distance-squared-vs-DAT_063fc518 test on the watched block's position to
-    // decide `EnterState(0xd)` vs `EnterState(1)`, then FUN_062d5a80 on SubObjectA and a
+    // decide `EnterState(0xd)` vs `EnterState(1)`, then FUN_062d5a80 on Move and a
     // PI-shaped dword store to +0x46c.
     void RecomputeApproach();
 
@@ -192,12 +156,12 @@ public:
     //     else reset TerminalType/RequestedDockPortIndex/ApproachClearedFlag334 and cancel
     //     the owner's request.
     //   * Otherwise lock_maneuvers(false) and release NavPilotPtr, then by StateFlags32c's
-    //     sign bit: set -> SubObjectA.SetField44(2) (FUN_062d88b0), the AbortFlag398/Flag399
+    //     sign bit: set -> Move.SetField44(2) (FUN_062d88b0), the AbortFlag398/Flag399
     //     gated CShip::request_exit_tradelane and the Flag39a gated cancel; clear ->
     //     SetField44(2 when the owner is the player and ModeState320 == 1, else 0) and,
     //     unless Flags28 bit 0, the resets.
     //   * Shared tail LAB_062c3a9e: clear Flag39a/AbortFlag398, GotoDirective vtbl+0x10,
-    //     SubObjectB.Commit(), SubObjectA.Commit(), SetCruiseLock(1,3),
+    //     Face.Commit(), Move.Commit(), SetAvoidanceAllowed(1,3),
     //     GunGroups.SetShieldActive(1) (FUN_062e9a60), FUN_062d20f0, ModeState320 = 0.
     //     GotoWatcherPtr is not cleared here.
     void Disengage();
@@ -211,7 +175,7 @@ public:
 
     // Slot 12, LAB_062c5540. No-op without NavPilotPtr. When the squared magnitude of
     // ReferencePoint compares unordered against DAT_06399408, forwards it to NavPilotPtr's
-    // vtbl+0x30. Otherwise builds a pub::AI::DirectiveGotoOp (Field_50 from DAT_063ebdb4,
+    // vtbl+0x30. Otherwise builds a pub::AI::DirectiveGotoOp (ArrivalRange from DAT_063ebdb4,
     // arrival radii from ProxWatcher450, destination from the intercept point at +0x3cc when
     // StateFlags32c & 0xc0, else the watched object's position) and submits it via
     // NavPilotPtr vtbl+0x28.
@@ -220,9 +184,9 @@ public:
     // Slot 22, LAB_062c54b0. A notification-message handler:
     // `param->TypeCode` (+0) selects between two "is this about MY watched
     // object" identity checks against `param->Payload` (+4) -- type 4 checks
-    // a flag byte plus two vtbl+0x20 "get id" calls (ThreatSourcePtr14's and
+    // a flag byte plus two vtbl+0x20 "get id" calls (OwnerContext's and
     // Watcher324's watched-block's) against Payload+0xc/+0x10; type 3 checks
-    // NavHelper's nested +0x14fc/+0x84 sub-object's own vtbl+0x20 result
+    // SysMgr's nested +0x14fc/+0x84 sub-object's own vtbl+0x20 result
     // against Payload+8. On a match, sets Flag399=1 and calls
     // `EnterState(0xc)`. Any other TypeCode, or a non-matching identity check, is a
     // silent no-op.
@@ -236,14 +200,14 @@ public:
 private:
     // Helpers of UpdateApproachTail()/EnterState().
     bool CheckCanProceed();                                  // FUN_062c4530
-    // FUN_062c56d0: builds the final-approach spline (+0x348) and hands it to SubObjectC.
+    // FUN_062c56d0: builds the final-approach spline (+0x348) and hands it to SplineMove.
     void BuildFinalApproachSpline();
 
     // FUN_062c47f0 (thiscall). Computes this tick's linear and angular speed caps and
     // pushes them into the three Idea sub-objects; see the .cpp.
     void AdvancePreamble();
-    // Retail's inlined "refresh the NavHelper's lead point unless already recomputed this
-    // frame" (062c4a72, 062c4b0e, 062c3e97): if NavHelperPtr24+0x157a is clear, set
+    // Retail's inlined "refresh the SysMgr's lead point unless already recomputed this
+    // frame" (062c4a72, 062c4b0e, 062c3e97): if SysMgr+0x157a is clear, set
     // +0x14fc+0x7e and call slot 0x2c of +0x14fc+0x84 with (+0x14fc+0x18, +0x14fc+0xc).
     void NavHelperRefreshLeadPoint();
     // .rdata:DAT_0639f518, the double 0.6, the only multiplier EnterState()'s case 9 applies
@@ -256,11 +220,9 @@ private:
     //   FUN_062d75c0 FaceIdea::SetBasis, FUN_062d5980 MoveIdea::SetMode,
     //   .text:062a66b0 MoveIdea::SetRange3c, .text:063275f0 MoveIdea::SetAngle38,
     //   FUN_062d5a70 MoveIdea::SetField59 (+0x59; SetEnabled at 062d5a10 writes +0x58),
-    //   FUN_062d88b0 MoveIdea::SetField44 (all eleven callers pass SubObjectA).
+    //   FUN_062d88b0 MoveIdea::SetField44 (all eleven callers pass Move).
     static float QueryHandleRange(void* HandleField, int Mode);            // FUN_062c2ad0
 
-    // Raw-offset reach for Opaque430 (+0x430), whose width retail never proves.
-    void* RawAt(unsigned Offset) { return reinterpret_cast<unsigned char*>(this) + Offset; }
 
     // Disengage's three owner IObjAffect slot-0x60 sites (RequestType, &Watcher324 id, 0).
     void CancelOwnerRequest(int RequestType);
@@ -272,14 +234,14 @@ private:
 public:
     // ------------------------------------------------------------------
     // Fields, ascending offset; retail size exactly 0x470.
-    // +0x04..+0x2c is DockBehaviorFields; +0x2c is the RequestCB vptr.
+    // +0x04..+0x29 is Behavior's; +0x2c is the RequestCB vptr.
     // ------------------------------------------------------------------
 
-    MoveIdea SubObjectA;    // +0x30 (ctor FUN_062d4e60, 0x78 bytes)
-    FaceIdea SubObjectB;    // +0xa8 (ctor FUN_062d6750, 0xc0 bytes)
+    MoveIdea Move;    // +0x30 (ctor FUN_062d4e60, 0x78 bytes)
+    FaceIdea Face;    // +0xa8 (ctor FUN_062d6750, 0xc0 bytes)
     // +0x168, ends +0x2dc (ctor FUN_062d9bf0, vtable .rdata:063a0568, 0x174 bytes). Its
     // Move/Face watchers at +0x190 / +0x208 are two of the dtor's six watcher clears.
-    SplineMoveIdea SubObjectC;
+    SplineMoveIdea SplineMove;
 
     // +0x2dc (ends +0x2f4): an AfterburnerIdea by value (ctor FUN_062da500) followed by the
     // manager's Goto behavior pointer. EnterState (.text:062c3d6a) and Disengage
@@ -288,7 +250,7 @@ public:
     struct GotoDirectiveHandle
     {
         AfterburnerIdea Idea;               // +0x00 (absolute +0x2dc)
-        void* NavPilotPtr;                  // +0x14 (absolute +0x2f0), the manager's Goto behavior
+        Behavior* NavPilotPtr;              // +0x14 (absolute +0x2f0), the manager's Goto behavior
     };
     GotoDirectiveHandle GotoDirective; // +0x2dc
 
@@ -316,7 +278,7 @@ public:
     ICRSplineSegment Spline;   // +0x348, ends at +0x388.
 
     // +0x388 (4 bytes, a pointer to a polymorphic object): out-param 1 of
-    // ThreatSourcePtr14->vtbl[0x138] in RecomputeApproach (out-params +0x388 / +0x3cc /
+    // OwnerContext->vtbl[0x138] in RecomputeApproach (out-params +0x388 / +0x3cc /
     // +0x38c); UpdateApproachTail null-tests it (.text:062c4a2c) and calls its vtbl+0x20
     // (062c4c8b). Pointee class not identified.
     void* LaneNextRing;
@@ -351,7 +313,10 @@ public:
     // transform's rotation here (9-dword MOVSD at .text:062c5175-062c5184) and reads its
     // column z (+0x414/+0x420/+0x42c).
     Matrix Orient40c;
-    unsigned char Opaque430[0x43c - 0x430]; // +0x430: EnterState reads a Vector here (RawAt)
+    // +0x430: the own ship's "hpmount" hardpoint relative to its centre, in its local frame
+    // (SetContext, .text:062c31c0..); zeroed when there is no such hardpoint. EnterState hands
+    // it to MoveIdea's Offset4c.
+    Vector HpMountOffset;
     int DockPortIndex;              // +0x43c. Set by OnResult() to its own 3rd int parameter; also
                                 // reset to -1 by RecomputeApproach().
     int TerminalType;       // +0x440. Cleared by RecomputeApproach()/Disengage().
@@ -388,9 +353,9 @@ public:
     float MaxApproachSpeed46c;
 };
 
-static_assert(offsetof(DockBehavior, SubObjectA) == 0x30, "DockBehavior::SubObjectA offset");
-static_assert(offsetof(DockBehavior, SubObjectB) == 0xa8, "DockBehavior::SubObjectB offset");
-static_assert(offsetof(DockBehavior, SubObjectC) == 0x168, "DockBehavior::SubObjectC offset");
+static_assert(offsetof(DockBehavior, Move) == 0x30, "DockBehavior::Move offset");
+static_assert(offsetof(DockBehavior, Face) == 0xa8, "DockBehavior::Face offset");
+static_assert(offsetof(DockBehavior, SplineMove) == 0x168, "DockBehavior::SplineMove offset");
 static_assert(offsetof(DockBehavior, GotoDirective) == 0x2dc, "DockBehavior::GotoDirective offset");
 static_assert(sizeof(AfterburnerIdea) == 0x14, "GotoDirectiveHandle::Idea is an AfterburnerIdea (0x14 bytes, ends at NavPilotPtr)");
 static_assert(offsetof(DockBehavior::GotoDirectiveHandle, NavPilotPtr) == 0x14, "GotoDirectiveHandle::NavPilotPtr offset (absolute +0x2f0)");
@@ -402,25 +367,26 @@ static_assert(offsetof(DockBehavior, StateFlags32c) == 0x32c, "DockBehavior::Sta
 static_assert(offsetof(DockBehavior, RequestedDockPortIndex) == 0x330, "DockBehavior::RequestedDockPortIndex offset");
 static_assert(offsetof(DockBehavior, ApproachClearedFlag334) == 0x334, "DockBehavior::ApproachClearedFlag334 offset");
 static_assert(offsetof(DockBehavior, BrakingDistance) == 0x33c, "DockBehavior::BrakingDistance offset");
-static_assert(offsetof(DockBehavior, StateTimer340) == 0x340, "DockBehavior::StateTimer340 offset (Common.dll.txt 062c5019/062c501f/062c5049)");
+static_assert(offsetof(DockBehavior, StateTimer340) == 0x340, "DockBehavior::StateTimer340 offset");
 static_assert(offsetof(DockBehavior, CombatFlag344) == 0x344, "DockBehavior::CombatFlag344 offset");
 static_assert(offsetof(DockBehavior, Spline) == 0x348, "DockBehavior::Spline offset");
-static_assert(offsetof(DockBehavior, LaneNextRing) == 0x388, "DockBehavior::LaneNextRing offset (Common.dll.txt 062c4a2c/062c4c8b/062c4f2e)");
+static_assert(offsetof(DockBehavior, LaneNextRing) == 0x388, "DockBehavior::LaneNextRing offset");
 static_assert(offsetof(DockBehavior, Facing38c) == 0x38c, "DockBehavior::Facing38c offset");
 static_assert(offsetof(DockBehavior, AbortFlag398) == 0x398, "DockBehavior::AbortFlag398 offset");
 static_assert(offsetof(DockBehavior, Flag399) == 0x399, "DockBehavior::Flag399 offset");
 static_assert(offsetof(DockBehavior, Flag39a) == 0x39a, "DockBehavior::Flag39a offset");
 static_assert(offsetof(DockBehavior, Flag39b) == 0x39b, "DockBehavior::Flag39b offset");
-static_assert(offsetof(DockBehavior, InterceptPoint39c) == 0x39c, "DockBehavior::InterceptPoint39c offset (Common.dll.txt 062c4028/062c416a/062c4244)");
-static_assert(offsetof(DockBehavior, DestPoint3cc) == 0x3cc, "DockBehavior::DestPoint3cc offset (Common.dll.txt 062c4c6f-062c4c88, the 3-dword copy into SavedPosition3fc)");
+static_assert(offsetof(DockBehavior, InterceptPoint39c) == 0x39c, "DockBehavior::InterceptPoint39c offset");
+static_assert(offsetof(DockBehavior, DestPoint3cc) == 0x3cc, "DockBehavior::DestPoint3cc offset");
 static_assert(offsetof(DockBehavior, OrientMatrix3d8) == 0x3d8, "DockBehavior::OrientMatrix3d8 offset");
-static_assert(offsetof(DockBehavior, SavedPosition3fc) == 0x3fc, "DockBehavior::SavedPosition3fc offset (Common.dll.txt 062c4c77/062c4ebb)");
+static_assert(offsetof(DockBehavior, SavedPosition3fc) == 0x3fc, "DockBehavior::SavedPosition3fc offset");
 static_assert(offsetof(DockBehavior, DockPointRadius) == 0x408, "DockBehavior::DockPointRadius offset");
 static_assert(offsetof(DockBehavior, Orient3a8) == 0x3a8, "DockBehavior::Orient3a8 offset (.text:062c51d4)");
 static_assert(offsetof(DockBehavior, Orient40c) == 0x40c, "DockBehavior::Orient40c offset (.text:062c5175)");
+static_assert(offsetof(DockBehavior, HpMountOffset) == 0x430, "DockBehavior::HpMountOffset offset");
 static_assert(offsetof(DockBehavior, DockPortIndex) == 0x43c, "DockBehavior::DockPortIndex offset");
 static_assert(offsetof(DockBehavior, TerminalType) == 0x440, "DockBehavior::TerminalType offset");
 static_assert(offsetof(DockBehavior, ProxWatcher450) == 0x450, "DockBehavior::ProxWatcher450 offset");
-static_assert(sizeof(DockBehavior::DockProximityWatcher) == 0x1c, "DockProximityWatcher size (0x450..0x46c span confirmed by items 1257/1259/1272)");
-static_assert(offsetof(DockBehavior, MaxApproachSpeed46c) == 0x46c, "DockBehavior::MaxApproachSpeed46c offset (Common.dll.txt 062c3d76/062c4213/062c4270/062c47fc)");
+static_assert(sizeof(DockBehavior::DockProximityWatcher) == 0x1c, "DockProximityWatcher size (0x450..0x46c)");
+static_assert(offsetof(DockBehavior, MaxApproachSpeed46c) == 0x46c, "DockBehavior::MaxApproachSpeed46c offset");
 static_assert(sizeof(DockBehavior) == 0x470, "DockBehavior size == retail operator_new argument at .text:062d1a07");

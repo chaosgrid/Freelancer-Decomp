@@ -17,7 +17,7 @@ public:
     class CDPServer* Host;
     class CDPClientProxy* ClientProxies[128];
     int NumClients;
-    unsigned int Field_0x214;
+    unsigned int Field_0x214; // +0x214 (Client 06b73d3c): no retail code reads or writes it.
     bool bStarted;
 
     CDPClientProxy* FindProxy(unsigned int ClientId) const;
@@ -93,8 +93,8 @@ public:
     virtual void SendServerSetReputation(unsigned int ClientId, const FServerSetReputationInfo& Info) override;
     virtual void SendServerAdjustAttitude(unsigned int ClientId, const FPayloadServerAdjustAttitude& Info) override;
     virtual void SendServerSendComm(unsigned int ClientId, unsigned int SenderId, unsigned int ReceiverId,
-                                    unsigned int VoiceId, Costume CommCostume, unsigned int CommType,
-                                    const unsigned int* TextIds, int TextCount, unsigned int Mood,
+                                    unsigned int VoiceId, Costume CommCostume, unsigned int CaptionIds,
+                                    const unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
                                     float Duration, bool bReceiverIsOwnShip) override;
     virtual void SendServerSendNNMessage(unsigned int ClientId, unsigned int MessageId) override;
     virtual void SendServerSetMissionMessage(const unsigned int& ClientId, const CSetMissionMessage& Message) override;

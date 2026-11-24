@@ -60,7 +60,7 @@ unsigned int Mine::get_type_bits() const
 CMine* Mine::cmine() const
 {
     CObject* const Obj = Object;
-    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0xfu) != 0xfu)
+    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassMine) != CObject::ClassMine)
         return nullptr;
     return static_cast<CMine*>(Obj);
 }
@@ -126,7 +126,7 @@ void Mine::arm()
     // The listener is the CObjectCB sub-object (+0x70).
     PhySys::PhantomParms Parms;
     Parms.SystemId = OwnerSystem->SystemInfo->NicknameId;
-    Parms.Flag04 = 0;
+    Parms.bPhysicalUnmoveable = 0;
     Parms.Flag05 = 1;
     Parms.Name[0] = '\0';
     Parms.Position = get_position();
@@ -252,7 +252,7 @@ bool Mine::destroy(int Kind, unsigned int ObjId)
                 ExplosionDamageEvent Blast;
                 Blast.ExplodingObjId = get_id();
                 Blast.InflictorId = cmine()->OwnerId;
-                Blast.Cause = static_cast<DamageCause>(7);
+                Blast.Cause = DamageCause::Mine;
                 Blast.Position = get_position();
                 Blast.Explosion = Explosion;
                 Blast.SkipCollisionGroup = nullptr;

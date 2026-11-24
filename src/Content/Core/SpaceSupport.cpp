@@ -311,23 +311,26 @@ namespace
         Type = 2;
         GGcsHandlers.AddHandler(&Type);
 
-        SetGcsCategoryInterval(2, 12.0f);
-        SetGcsCategoryInterval(0x19, 30.0f);
+        SetGcsCategoryInterval(GCS_EVENT_DOCK_GRANTED, 12.0f);
+        SetGcsCategoryInterval(GCS_EVENT_FIDGET, 30.0f);
         SetGcsDefaultInterval(static_cast<double>(15.0f));
-        SetGcsCategoryChance(7, 0.4f);
-        SetGcsCategoryChance(6, 0.05f);
-        SetGcsCategoryInterval(6, 3.0f + 3.0f);
-        SetGcsCategoryInterval(7, 0.0f);
-        SetGcsCategoryInterval(8, 3.0f + 3.0f);
-        SetGcsCategoryInterval(9, 3.0f);
-        SetGcsCategoryInterval(0xa, 3.0f);
-        SetGcsCategoryInterval(0xb, 3.0f);
-        SetGcsCategoryInterval(0xd, 3.0f);
-        SetGcsCategoryInterval(0xe, 3.0f);
-        SetGcsCategoryInterval(0xf, 3.0f);
-        SetGcsCategoryInterval(0x10, 3.0f);
+        SetGcsCategoryChance(GCS_EVENT_KILLED, 0.4f);
+        SetGcsCategoryChance(GCS_EVENT_DAMAGED, 0.05f);
+        SetGcsCategoryInterval(GCS_EVENT_DAMAGED, 3.0f + 3.0f);
+        SetGcsCategoryInterval(GCS_EVENT_KILLED, 0.0f);
+        SetGcsCategoryInterval(GCS_EVENT_IN_SIGHTS, 3.0f + 3.0f);
+        SetGcsCategoryInterval(GCS_EVENT_ENGAGE, 3.0f);
+        SetGcsCategoryInterval(GCS_EVENT_COMBAT_OVER, 3.0f);
+        SetGcsCategoryInterval(GCS_EVENT_NO_ENGAGE, 3.0f);
+        SetGcsCategoryInterval(GCS_EVENT_DRIFT, 3.0f);
+        SetGcsCategoryInterval(GCS_EVENT_FLEE, 3.0f);
+        SetGcsCategoryInterval(GCS_EVENT_FRIENDLY_FIRE, 3.0f);
+        SetGcsCategoryInterval(GCS_EVENT_LEADER_CHANGED, 3.0f);
 
-        int const Categories[] = {6, 7, 8, 0xa, 0xb, 0xd, 0xe, 0xf, 0x10};
+        int const Categories[] = {
+            GCS_EVENT_DAMAGED, GCS_EVENT_KILLED, GCS_EVENT_IN_SIGHTS, GCS_EVENT_COMBAT_OVER,
+            GCS_EVENT_NO_ENGAGE, GCS_EVENT_DRIFT, GCS_EVENT_FLEE, GCS_EVENT_FRIENDLY_FIRE,
+            GCS_EVENT_LEADER_CHANGED};
         for (int Index = 0; Index < static_cast<int>(sizeof(Categories) / sizeof(Categories[0]));
              ++Index)
         {
@@ -408,18 +411,18 @@ namespace
                 int const Count = Item->Count;
                 int NewCount = 0;
                 // Worth below drop_properties[1] (signed) -> 0.
-                if (WorthValue >= Props->DropProperties[0])
+                if (WorthValue >= Props->MinWorth)
                 {
                     // The excess worth, per drop_properties[2], capped at the count, rounded
                     // (0.5 = DAT_06fb74e0); a divisor 0 keeps the count; no excess gives 0.
-                    int const Excess = WorthValue - Props->DropProperties[0];
+                    int const Excess = WorthValue - Props->MinWorth;
                     int Scaled = 0;
                     if (Excess > 0)
                     {
                         Scaled = Count;
-                        if (Props->DropProperties[1] != 0)
+                        if (Props->WorthPerUnit != 0)
                         {
-                            int Capped = Excess / Props->DropProperties[1];
+                            int Capped = Excess / Props->WorthPerUnit;
                             if (Capped >= Count)
                                 Capped = Count;
                             Scaled = static_cast<int>(floor(static_cast<double>(Capped) + 0.5));
@@ -427,9 +430,9 @@ namespace
                     }
 
                     // + drop_properties[3], at most drop_properties[4], then at most the count.
-                    int Bounded = Props->DropProperties[3];
-                    if (Props->DropProperties[2] + Scaled < Props->DropProperties[3])
-                        Bounded = Scaled + Props->DropProperties[2];
+                    int Bounded = Props->MaxCandidates;
+                    if (Props->BonusCount + Scaled < Props->MaxCandidates)
+                        Bounded = Scaled + Props->BonusCount;
                     if (Bounded >= Count)
                         Bounded = Count;
 
@@ -445,8 +448,8 @@ namespace
                         ++NewCount;
 
                     // At most drop_properties[5].
-                    if (NewCount >= Props->DropProperties[4])
-                        NewCount = Props->DropProperties[4];
+                    if (NewCount >= Props->MaxDrops)
+                        NewCount = Props->MaxDrops;
                 }
 
                 // Health 0.5 + rand()/32768 * 0.3 (DAT_06fbbc10 is the double of 0.3f,
@@ -671,8 +674,8 @@ namespace
             if (!pub::SinglePlayer())
                 break;
             FContentPlayerState* Player = FindContentPlayerStateByShip(&Msg[0]);
-            if (Player != nullptr && Player->ValueE4 == 10)                   // FUN_06f48c10
-                Player->SetValueE4(0);                                        // FUN_06f48c20
+            if (Player != nullptr && Player->ManeuverBehaviorId == 10)                   // FUN_06f48c10
+                Player->SetManeuverBehaviorId(0);                                        // FUN_06f48c20
             break;
         }
         case EMessage::Heartbeat:
@@ -727,7 +730,7 @@ namespace
             std::list<FDockQueueEntry>::iterator It = FindDockingShip(Msg[0]);
             if (It == GDockingShips.end())
                 break;
-            It->bField_0x10 = true;
+            It->bFinishOnClear = true;
             MarkDockTerminal(It->DockTargetId, It->DockIndex, false);
             UpdateDockQueues();
             break;
@@ -746,8 +749,8 @@ namespace
             FContentPlayerState* Player = FindContentPlayerState(Msg[0]);     // FUN_06f49b00
             if (Player == nullptr)
                 break;
-            Player->SetValueE4(Msg[2]);
-            Player->SetValueE8(Msg[1]);
+            Player->SetManeuverBehaviorId(Msg[2]);
+            Player->SetManeuverTargetId(Msg[1]);
             break;
         }
         case EMessage::FreeTerminalRequest:
@@ -780,7 +783,7 @@ namespace
             Entry.DockTargetId = Msg[2];
             Entry.DockIndex = static_cast<int>(Msg[3]);
             pub::Player::GetShip(Msg[1], Entry.ShipId);
-            Entry.bField_0x10 = true;
+            Entry.bFinishOnClear = true;
             GDockingShips.push_back(Entry);
             if ((TargetType & 0x200100) != 0)
             {
@@ -863,7 +866,7 @@ namespace
             Entry.DockTargetId = Msg[3];
             Entry.DockIndex = 0;
             pub::Player::GetShip(Msg[2], Entry.ShipId);
-            Entry.bField_0x10 = true;
+            Entry.bFinishOnClear = true;
             GDockingShips.push_back(Entry);                                   // FUN_06f690a0
             break;
         }
@@ -950,8 +953,8 @@ namespace
                  Players.begin();
              It != Players.end(); ++It)
         {
-            if (It->second->ValueE8 == ObjectId)                              // FUN_06f48c30
-                It->second->SetValueE8(0);                                    // FUN_06f48c40
+            if (It->second->ManeuverTargetId == ObjectId)                              // FUN_06f48c30
+                It->second->SetManeuverTargetId(0);                                    // FUN_06f48c40
         }
 
         FSystemInfo* System = FindSystemInfo(&Event->SystemId);
@@ -1005,13 +1008,13 @@ namespace
         if (Event->OwnerPlayer != 0 && Event->Kind == 1)
         {
             pub::Audio::Tryptich Track;
-            Track.Field0 = 0;
-            Track.Field4 = 0;
-            Track.Field8 = 0;
-            Track.FieldC = pub::GetNicknameId("music_death");
+            Track.SpaceMusic = 0;
+            Track.DangerMusic = 0;
+            Track.BattleMusic = 0;
+            Track.OverrideMusic = pub::GetNicknameId("music_death");
             Track.Field10 = 1;
             float Fade = -1.0f;
-            std::memcpy(&Track.Field14, &Fade, sizeof(Fade));
+            std::memcpy(&Track.FadeBits, &Fade, sizeof(Fade));
             pub::Audio::SetMusic(Event->OwnerPlayer, Track);
         }
 

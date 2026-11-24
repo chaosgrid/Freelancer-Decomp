@@ -183,7 +183,7 @@ public:
     // Flag bits for update(float, unsigned) below, exported as `public: static unsigned int
     // const CObject::<NAME>` in .rdata 0x0639e524..0x0639e53c (ordinals 2068, 1853, 1854, 1851,
     // 1850, 1852, 2069). UPDATE_DUMB == 0x3d is NO_DYNAMICS|NO_SCANNER|NO_BEHAVIOR|NO_ACTIONS|
-    // NO_COUNTERMEASURE_AI. TODO: bit 0x02 has no named constant in this module.
+    // NO_COUNTERMEASURE_AI. Retail exports no constant for bit 0x02.
     static unsigned int const UPDATE_DEFAULT;        // 0x0639e524 = 0x00
     static unsigned int const NO_DYNAMICS;           // 0x0639e528 = 0x01, read at 062960aa/062b0e75
     static unsigned int const NO_SCANNER;            // 0x0639e52c = 0x04, read at 0629f719
@@ -300,8 +300,7 @@ public:
     // by PhySys::BuildIVP_Sphere (.text:06289471) and ReMakePhysicalR (.text:0628a681),
     // cleared with it on teardown, and passed to PhySys::GetCurrentTime(unsigned) by
     // AnimDB::Update (.text:0627e261).
-    // TODO: PhySys::CreateParms+0x14, the source, is still named CollisionGroupId
-    // (common_physys.h), a misnomer for this id.
+    // Copied from PhySys::CreateParms::SystemId (+0x14).
     unsigned PhysicsSystemId;           // +0x50
     IVP_Real_Object* BodyPtr;           // +0x54  IVP physics body, null if not physical
     // +0x58: the object's physics part (Archetype-owned, not freed by ~CObject), or null.
@@ -332,10 +331,11 @@ public:
     // (.text:062af5c9..062af5df). FUN_0628f700 (vector::_Insert_n) appends at _Last from the
     // non-physical attachment paths.
     std::vector<FPartMapEntry> PartMap; // +0x64 .. +0x73
-    // +0x74: the physics control mode the body was built with: 0 (not physical), 1 (golem
-    // force controller) or 2 (plain IVP body), copied from PhySys::CreateParms+0x18 by
-    // FUN_06288e60 (.text:06288e99 / 06288edd). AnimDB::Update dispatches on it
-    // (.text:0627e12a): mode 1 drives GolemController, mode 2 BodyPtr (FUN_06343cc0).
+    // +0x74: retail's anim_technique, a PhySys::AnimTechnique: none, golem (driven by
+    // GolemController) or merged (the body merged into the root's core), set from
+    // PhySys::CreateParms+0x18 by FUN_06288e60 (.text:06288e99 / 06288edd). AnimDB::Update
+    // dispatches on it (.text:0627e12a): golem drives GolemController, merged BodyPtr
+    // (FUN_06343cc0).
     int PhysicsControlMode;             // +0x74
     // +0x78: std::list<void*> of the PhySys phantoms attached to this object (VC6 layout:
     // allocator byte +0x78, _Myhead +0x7c, _Mysize +0x80). The ctor builds the empty head
@@ -455,7 +455,7 @@ public:
     // Listing 0x55e00. NOT virtual in retail (?get_scanner_interference@CSimple@@QBEMXZ is Q).
     // Re-samples the current zone's interference modifier through ITS OWN vtable slot +0x60
     // (a Zone-side virtual, unrelated to CObject's own +0x60 enable_controllers slot) and
-    // scales the cached ScannerInterference value (set by update_zones), clamped to [0,1].
+    // scales the cached ZoneImmersion value (set by update_zones), clamped to [0,1].
     float get_scanner_interference() const;
     // Listing 0x1cb70 override / 0x55ea0. CObject::beam_object then a refresh of the cached
     // center-of-mass/radius (vtable+0x84 -- see cpp for the ICF identity with
@@ -479,8 +479,11 @@ public:
     // the CSimple by subtracting 0x9c (TractorArm::GetTarget/SetTarget, CEGun's lock).
     Watchable SelfWatchable;    // +0x9c
     unsigned char FlagsA0;      // +0xa0  bit0 targetable (+0xa1..+0xa3: alignment, never written)
-    Universe::IZone* ZoneAtA4;  // +0xa4  Common ZONE (vftable 063a5094), set by update_zones
-    float ScannerInterference;  // +0xa8
+    // +0xa4 / +0xa8: set by update_zones, the smallest physical zone at the object's position
+    // (Common ZONE, vftable 063a5094) and that zone's GetImmersion there.
+    Universe::IZone* CurrentZone; // +0xa4
+    float ZoneImmersion;        // +0xa8
+
     IObjDB* ObjectDb;           // +0xac
     unsigned Id;                // +0xb0
     unsigned OwnerPlayer;       // +0xb4
@@ -922,8 +925,8 @@ public:
     bool is_instant_kill();
     CmnAsteroid::CAsteroidField const* get_owner_field();
     // .text:0629d4d0 (ICF-folded with CLoot::set_contents_hit_pts): `MOV [this+0xf4],EAX`.
-    // Stores the star-system id the owning cube passes in (CollisionGroupId below).
-    void set_system(unsigned int SystemId);
+    // Stores the star-system id the owning cube passes in (SystemId below).
+    void set_system(unsigned int InSystemId);
 
     unsigned char OpaqueE4[4];      // +0xe4 unidentified; only ever bulk-copied (copy ctor)
     unsigned long AsteroidId;       // +0xe8
@@ -931,8 +934,8 @@ public:
     bool bMine;                     // +0xf0
     bool bInstantKill;              // +0xf1
     // Stored by the owning CAsteroidCube before init() (the cube's SystemId, cube+0x50), not
-    // through CreateParms. init_physics passes it as PhySys::CreateParms::CollisionGroupId.
-    unsigned CollisionGroupId;      // +0xf4
+    // through CreateParms. init_physics passes it as PhySys::CreateParms::SystemId.
+    unsigned SystemId;              // +0xf4
     CmnAsteroid::CAsteroidField const* OwnerField;  // +0xf8
 };
 
@@ -941,7 +944,7 @@ static_assert(offsetof(CAsteroid, AsteroidId) == 0xe8, "CAsteroid+0xe8 id");
 static_assert(offsetof(CAsteroid, CubeId) == 0xec, "CAsteroid+0xec cube id");
 static_assert(offsetof(CAsteroid, bMine) == 0xf0, "CAsteroid+0xf0 mine");
 static_assert(offsetof(CAsteroid, bInstantKill) == 0xf1, "CAsteroid+0xf1 instant_kill");
-static_assert(offsetof(CAsteroid, CollisionGroupId) == 0xf4, "CAsteroid+0xf4 collision group");
+static_assert(offsetof(CAsteroid, SystemId) == 0xf4, "CAsteroid+0xf4 system id");
 static_assert(offsetof(CAsteroid, OwnerField) == 0xf8, "CAsteroid+0xf8 owner field");
 
 // CDynamicAsteroid: animated/scripted asteroid-like scenery (ObjectClass 0x4001). A direct
@@ -954,8 +957,9 @@ public:
     // CDynamicAsteroid isn't a CSimple.
     struct CreateParms
     {
-        unsigned CollisionGroupId;  // +0x00
+        unsigned SystemId;          // +0x00
         Vector Velocity;            // +0x04
+
         Vector AngularVelocity;     // +0x10
     };
 
@@ -975,11 +979,11 @@ public:
     // 0x062a2a70. Non-virtual; just forwards to the virtual init_physics below.
     void init(CreateParms const& Parms);
     // 0x062a2a90. Mass 1.0, LinearDamping 1e-5, AngularDamping (0,0,0);
-    // CollisionGroupId comes from CreateParms rather than a cube (unlike CAsteroid).
+    // SystemId comes from CreateParms rather than a cube (unlike CAsteroid).
     // Retail never applies Velocity/AngularVelocity here either.
     // Retail: ?init_physics@CDynamicAsteroid@@MAEXABVVector@@0I@Z (M = protected virtual).
 protected:
-    virtual void init_physics(Vector const& Velocity, Vector const& AngularVelocity, unsigned CollisionGroupId);
+    virtual void init_physics(Vector const& Velocity, Vector const& AngularVelocity, unsigned SystemId);
 
 public:
     // Vtable slot 0639dc8c is COMDAT-folded with CAsteroid::update (a CObject::update
@@ -1229,12 +1233,20 @@ protected:
     void GetBoundingSphere(float& OutRadius, Vector& OutCenter) const;
 
 public:
+    // State values: the ctor sets 1, Kill 2, Destroy 3.
+    enum
+    {
+        STATE_ALIVE = 1,
+        STATE_KILLED = 2,
+        STATE_DESTROYED = 3,
+    };
+
     CEqObj* Owner;                              // +0x00
     Archetype::CollisionGroup const* Arch;      // +0x04
     int RootIndex;                              // +0x08 FindChild, -1
     float HitPts;                               // +0x0c
     int Field10;                                // +0x10 TODO: the ctor writes 1 (062a019d); no reader found in Common
-    int State;                                  // +0x14 1 alive / 2 killed / 3 destroyed
+    int State;                                  // +0x14 STATE_*
     int Fate;                                   // +0x18
     CObject* DestroyedObj;                      // +0x1c
     // +0x20..+0x33: bounds cache. The ctor zeroes the byte at +0x20 and the dwords at
@@ -1371,7 +1383,7 @@ public:
     struct CreateParms : CSimple::CreateParms
     {
         unsigned Pad58;           // +0x58
-        unsigned DockingCount;    // +0x5c → CShip +0x160
+        unsigned DockingBaseId;   // +0x5c → CEqObj::DockingBaseId (+0x160); a solar's "base"
         unsigned VibeId;          // +0x60 → this+0x104 (stored as int)
         Costume SpaceCostume;     // +0x64 → this+0x108 (13 dwords)
         unsigned VoiceId;         // +0x98 → this+0x13c
@@ -1408,7 +1420,7 @@ public:
         // base's +0xac list and +0x9c vector (FUN_06d0a080 is the base part alone).
     };
 
-    static_assert(offsetof(CreateParms, DockingCount) == 0x5c, "CEqObj::CreateParms+0x5c");
+    static_assert(offsetof(CreateParms, DockingBaseId) == 0x5c, "CEqObj::CreateParms+0x5c");
     static_assert(offsetof(CreateParms, VibeId) == 0x60, "CEqObj::CreateParms+0x60");
     static_assert(offsetof(CreateParms, SpaceCostume) == 0x64, "CEqObj::CreateParms+0x64 costume");
     static_assert(offsetof(CreateParms, VoiceId) == 0x98, "CEqObj::CreateParms+0x98 voice");
@@ -1829,7 +1841,7 @@ public:
     // Listing 0x524d0. Notifies ship about target change.
     void notify_set_target(CShip* TargetShip, bool bIsTarget);
     // Listing 0x52a20. Launches ship from dock/base.
-    void launch(IObjRW* DockObj, CEqObj* BaseObj, int LaunchType);
+    void launch(IObjRW* DockObj, CEqObj* BaseObj, int DockPortIndex);
     int get_status(char* p1, int p2) const;
     // Checks if this ship is player-controlled.
     bool is_player() const;
@@ -1867,7 +1879,7 @@ public:
     IObjRW* next_enemy();
     IObjRW* previous_enemy();
     IObjRW* next_target(bool bReverse);
-    bool leaving_system_update(unsigned& SystemId);
+    bool leaving_system_update(unsigned& LeavingObjId);
     Archetype::Ship const* shiparch() const;
 
     static float const JETTISON_CLEARANCE_TIME;
@@ -1952,7 +1964,7 @@ public:
     // Listing 0x52c10. Closes bay doors.
     float close_bay();
     // Listing 0x52d40. Jumps ship in from hyperspace.
-    void jump_in(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Speed);
+    void jump_in(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Duration);
 
 private:
     // Listing 0x54540. Collects force components for thrust calculation. Retail:

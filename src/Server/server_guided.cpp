@@ -84,7 +84,7 @@ unsigned int Guided::get_type_bits() const
 CGuided* Guided::cguided() const
 {
     CObject* const Obj = Object;
-    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0xa7u) != 0xa7u)
+    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassGuided) != CObject::ClassGuided)
         return nullptr;
     return static_cast<CGuided*>(Obj);
 }
@@ -103,7 +103,7 @@ bool Guided::create(Archetype::Root* Arch)
 
     // The CGuided narrowing is not null-tested before open (vt+0x4c).
     CObject* Narrowed = Object;
-    if (Narrowed == nullptr || (static_cast<unsigned>(Narrowed->ObjectClass) & 0xa7u) != 0xa7u)
+    if (Narrowed == nullptr || (static_cast<unsigned>(Narrowed->ObjectClass) & CObject::ClassGuided) != CObject::ClassGuided)
         Narrowed = nullptr;
     Narrowed->open(Arch);
 
@@ -138,7 +138,7 @@ void Guided::arm()
 
     PhySys::PhantomParms Parms;
     Parms.SystemId = 0;
-    Parms.Flag04 = 0;
+    Parms.bPhysicalUnmoveable = 0;
     Parms.Flag05 = 0;
     Parms.Name[0] = '\0';
     Parms.Position.x = 0.0f;
@@ -218,7 +218,7 @@ bool Guided::update(float Dt)
         bool bHavePos = false;
         CObject const* const TargetObj = PosTarget->cobject();                     // vt+0x150
         if (TargetObj != nullptr &&
-            (static_cast<unsigned>(TargetObj->ObjectClass) & 0x103u) == 0x103u)
+            (static_cast<unsigned>(TargetObj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
         {
             unsigned short const SubTarget = cguided()->SubTarget;
             if (SUBOBJ_ID_ROOT != SubTarget)
@@ -244,7 +244,7 @@ bool Guided::update(float Dt)
             bool bHaveVel = false;
             CObject const* const TargetObj = VelTarget->cobject();
             if (TargetObj != nullptr &&
-                (static_cast<unsigned>(TargetObj->ObjectClass) & 0x103u) == 0x103u)
+                (static_cast<unsigned>(TargetObj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             {
                 unsigned short const SubTarget = cguided()->SubTarget;
                 if (SUBOBJ_ID_ROOT != SubTarget)
@@ -457,7 +457,7 @@ bool Guided::destroy(int Kind, unsigned int ObjId)
     Blast.InflictorId = cguided()->OwnerId;
     Archetype::Munition const* const MunitionArch =
         static_cast<Archetype::Munition const*>(Object->get_archetype());
-    Blast.Cause = static_cast<DamageCause>(MunitionArch->bCruiseDisruptor ? 6 : 5);
+    Blast.Cause = MunitionArch->bCruiseDisruptor ? DamageCause::CruiseDisrupter : DamageCause::MissileTorpedo;
     Blast.Position = get_position();
     Blast.Explosion = Explosion;
     Blast.SkipCollisionGroup = nullptr;
@@ -620,7 +620,7 @@ unsigned int Bullet::get_type_bits() const
 CBeam* Bullet::cbeam() const
 {
     CObject* const Obj = Object;
-    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x67u) != 0x67u)
+    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassBeam) != CObject::ClassBeam)
         return nullptr;
     return static_cast<CBeam*>(Obj);
 }
@@ -638,7 +638,7 @@ bool Bullet::create(Archetype::Root* Arch)
 
     // The CBeam narrowing is not null-tested before open.
     CObject* Narrowed = Object;
-    if (Narrowed == nullptr || (static_cast<unsigned>(Narrowed->ObjectClass) & 0x67u) != 0x67u)
+    if (Narrowed == nullptr || (static_cast<unsigned>(Narrowed->ObjectClass) & CObject::ClassBeam) != CObject::ClassBeam)
         Narrowed = nullptr;
     Narrowed->open(Arch);
 

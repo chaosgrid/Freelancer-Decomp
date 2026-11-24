@@ -581,7 +581,7 @@ int SystemManagerGunGroupManager::UpdateMissileFireState()
                     continue;
             }
         }
-        else if (Kind == FGunGroupSlot::KindHpType10)
+        else if (Kind == FGunGroupSlot::KindTorpedo)
         {
             bWide = 1;
             if ((ShipFlags & 8) == 0)
@@ -844,7 +844,7 @@ bool SystemManagerGunGroupManager::RefreshFromPersonality()
     // gated by Sys+0x1429; see GetFormationLeader). is_player is called untested.
     if (!Sys->SelfTarget.Iface->is_player() && Sys->PersonalityData.FormationParams.bLeaderMakesMeTougher != 0)
     {
-        IObjRW* const Leader = Sys->GunConvergenceStateBytes.GetFormationLeader();
+        IObjRW* const Leader = Sys->FormationLeaders.GetFormationLeader();
         if (Leader != nullptr)
         {
             CObject const* const Obj = Leader->cobject();
@@ -856,7 +856,7 @@ bool SystemManagerGunGroupManager::RefreshFromPersonality()
                 if (Iface != nullptr)
                 {
                     Src = Iface->get_sys();
-                    Sys->Unknown14 = 1;
+                    Sys->bLeaderParamsBorrowed = 1;
                 }
             }
         }
@@ -1034,9 +1034,9 @@ bool FCmDropperWatcher::Bind(SystemManager* NewOwner)
     Count = 0;
 
     // Retail bug, reproduced: Ids holds only 8 ushorts (this block is at
-    // SystemManager+0x1344, FGunConvergenceStateBlock starts at +0x1364), yet
+    // SystemManager+0x1344, FFormationLeaderState starts at +0x1364), yet
     // find_equipment may write up to 0x40 ids. With 8 or more countermeasure droppers
-    // the ids run on into the convergence block (still inside the SystemManager).
+    // the ids run on into the formation-leader block (still inside the SystemManager).
     IObjRW* const Obj = WatchedObject(Owner->Watcher);
     int const Result = Obj->find_equipment(Ids, 0x40, EquipTypeCmDropper);
 

@@ -4,59 +4,6 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "common_physys.h"
-
-#include "common_archetype.h"
-#include "common_cobject.h"
-#include "common_cobjdb.h"
-#include "common_id.h"
-#include "common_universe.h"
-#include "common_net.h"
-#include "common_phyarch.h"
-#include "common_misc.h"
-#include "common_server.h"
-
-#include "dacom.h"
-#include "DALib.h"
-#include "x86math.h"
-#include "ivp_collision/ivp_collision.h" // IVP_Collision::get_objects
-#include "ivp_physics/ivp_core.h"
-#include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_environment.h"
-#include "ivp_physics/ivp_controller.h"
-#include "ivp_physics/ivp_material.h"
-#include "ivp_physics/ivp_listener.h"
-#include "ivp_physics/ivp_mindist_settings.h"
-#include "ivp_physics/ivp_mindist.h"
-#include "common_csys.h"
-#include "ivp_compact_builder/ivp_compact_ledge.h"
-#include "ivp_compact_builder/ivp_surface_builder_pointsoup.h"
-#include "ivp_compact_builder/ivp_surface_builder_ledge_soup.h"
-#include "ivp_physics/ivp_surman_polygon.h"
-#include "ivp_collision/ivp_ray_solver.h"
-#include "ivp_collision/ivp_sphere_query.h"
-
-#include <assert.h>
-#include <float.h>
-#include <math.h>
-#include <new>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <map>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <mmsystem.h>
-
-// Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
-#ifdef GetCurrentTime
-#undef GetCurrentTime
-#endif
-
 #include "Physics/common_physys_internal.h"
 
 using namespace CmnPhySys;
@@ -100,7 +47,7 @@ PhySys::PhyCollisionStateManager::~PhyCollisionStateManager()
     IVP_Real_Object* const Body = OwnerObject->BodyPtr;
     if (Body == nullptr)
         return;
-    IVP_Controller_Phantom* const Phantom = (IVP_Controller_Phantom*)Body->first_child;
+    IVP_Controller_Phantom* const Phantom = (IVP_Controller_Phantom*)Body->controller_phantom;
     if (Phantom == nullptr)
         return;
     Phantom->remove_listener_phantom(this);
@@ -144,7 +91,7 @@ void PhySys::PhyCollisionStateManager::enable_collisions(bool bEnable, bool bImm
     // phantom and enables detection.
     if (!bImmediate && CollisionType == 0)
     {
-        if (Body->first_child != nullptr)
+        if (Body->controller_phantom != nullptr)
         {
             Body->convert_phantom_to_object();
             IntruderCount = 0;
@@ -162,13 +109,13 @@ void PhySys::PhyCollisionStateManager::enable_collisions(bool bEnable, bool bImm
         return;
 
     // Without a phantom one is built (client_data 1) and this manager becomes its listener.
-    if (Body->first_child == nullptr)
+    if (Body->controller_phantom == nullptr)
     {
         IVP_Template_Phantom Template;
         Template.client_data = (void*)(uintptr_t)1;
         OwnerObject->BodyPtr->convert_to_phantom(&Template);
         IVP_Real_Object* const Converted = OwnerObject->BodyPtr;
-        ((IVP_Controller_Phantom*)Converted->first_child)->add_listener_phantom(this);
+        ((IVP_Controller_Phantom*)Converted->controller_phantom)->add_listener_phantom(this);
     }
 
     OwnerObject->BodyPtr->enable_collision_detection(true);
@@ -176,7 +123,7 @@ void PhySys::PhyCollisionStateManager::enable_collisions(bool bEnable, bool bImm
     // With a phantom, a non-phantom archetype, detection enabled and nobody inside, the
     // phantom is turned back into an object at once (IntruderCount is already 0).
     IVP_Real_Object* const BodyAfter = OwnerObject->BodyPtr;
-    if (BodyAfter == nullptr || BodyAfter->first_child == nullptr)
+    if (BodyAfter == nullptr || BodyAfter->controller_phantom == nullptr)
         return;
     if (CollisionType != 0)
         return;
@@ -205,7 +152,7 @@ bool PhySys::PhyCollisionStateManager::get_actual_collision_state() const
         return false;
     if ((Body->flags & 0x300u) != 0x100u)
         return false;
-    return Body->first_child == nullptr;
+    return Body->controller_phantom == nullptr;
 }
 
 void PhySys::PhyCollisionStateManager::update(float Dt)
@@ -214,7 +161,7 @@ void PhySys::PhyCollisionStateManager::update(float Dt)
     IVP_Real_Object* const Body = OwnerObject->BodyPtr;
     if (Body == nullptr)
         return;
-    if (Body->first_child == nullptr)         // no phantom controller
+    if (Body->controller_phantom == nullptr)         // no phantom controller
         return;
     if (CollisionType != 0)
         return;
@@ -320,7 +267,7 @@ int PhySys::PhyCollisionStateManager::get_intruding_cobjs(bool bRoot, CheapSet<C
     IVP_Real_Object* const Body = OwnerObject->BodyPtr;
     if (Body != nullptr)
     {
-        IVP_Controller_Phantom* const Phantom = (IVP_Controller_Phantom*)Body->first_child;
+        IVP_Controller_Phantom* const Phantom = (IVP_Controller_Phantom*)Body->controller_phantom;
         if (Phantom != nullptr)
         {
             // SizeMm + 1 slots, the bound re-read on every pass.

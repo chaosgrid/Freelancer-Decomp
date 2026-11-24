@@ -10,7 +10,7 @@
 // sprites a CliAsteroid field draws beyond its real asteroid cubes (FCliAsteroid +0x198 flag,
 // +0x19C block, see cli_asteroid.h), and the vertex-buffer batch they are drawn through.
 //
-// Call path: the per-field tick (CliAsteroidTickOne, FUN_005225d0) -> (Flag198,
+// Call path: the per-field tick (CliAsteroidTickOne, FUN_005225d0) -> (bHasBillboards,
 // ASTEROID_EXT > 1, [EFFECTS], BillboardNearCamera) -> the ambient pass -> BillboardDraw.
 //
 // The batch is one static object, DAT_006797d0 (static init LAB_0054dad0 = FUN_0054daf0(0x142),

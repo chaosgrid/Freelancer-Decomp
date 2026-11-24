@@ -51,7 +51,7 @@ static_assert(sizeof(FContentSpaceObjParams) == 0x44, "FContentSpaceObjParams si
 // on the ATTACKING player's ship, keyed by the damaged object.
 struct FSpaceObjAttacker
 {
-    unsigned int AttackerId;   // +0x00 the damaged object's id (misnamed); 0 = free slot
+    unsigned int VictimId;     // +0x00 the damaged object's id; 0 = free slot
     // +0x04: +RelativeDamage * 50 per hit, +10 when more than a second passed since
     // HostilityTime.
     float Hostility;
@@ -131,7 +131,7 @@ public:
     // FUN_06f34670 (in TU43's range).
     void DestroySpaceObj();
     // FUN_06eb7280: always returns true.
-    bool FindOrAllocAttacker(unsigned int AttackerId, FSpaceObjAttacker** Out);
+    bool FindOrAllocAttacker(unsigned int VictimId, FSpaceObjAttacker** Out);
 
     unsigned int SpaceObjId;                              // +0x04 0 from the ctor
     FContentPlayerStateBase* ReputationHandle;            // +0x08 not released by the dtor

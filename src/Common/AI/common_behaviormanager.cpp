@@ -78,7 +78,7 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
     memset(PadBd, 0, sizeof(PadBd));
     memset(OpaqueD9, 0, sizeof(OpaqueD9));
     BehaviorTimerC = 0.0f;
-    Field0xF8 = 0;
+    bScanState = 0;
     memset(OpaqueFa, 0, sizeof(OpaqueFa));
     memset(Pad131, 0, sizeof(Pad131));
     memset(Pad151, 0, sizeof(Pad151));
@@ -124,7 +124,7 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
     ObjectDb = nullptr;
     Pathfind = nullptr;
     BehaviorDirty = 0;
-    Field0xF8 = 1;
+    bScanState = 1;
     Flags1c8 = static_cast<unsigned char>(Flags1c8 | 1);
     for (int Index = 0; Index < 5; ++Index)
         DirectiveCallbacks[Index] = nullptr;
@@ -460,7 +460,7 @@ bool IBehaviorManager::set_current_directive(IDirectiveInfo const& Dir,
         if (CurrentBehaviorIndex != -1)
             BehaviorDispatchTable[CurrentBehaviorIndex]->cancel_notify();
         SetCurrentBehavior(static_cast<int>(DefaultBehaviorIndex), false, nullptr);
-        Sys->GunConvergenceStateBytes.SetFollowLeader(nullptr);
+        Sys->FormationLeaders.SetFollowLeader(nullptr);
         return true;
     }
 
@@ -928,7 +928,7 @@ void IBehaviorManager::UpdateNotificationQueue(float Dt)
             continue;
         }
 
-        // Expired: pass the raw IObjRW (Watched - 8) and Field1C as Extra with Duration 0,
+        // Expired: pass the raw IObjRW (Watched - 8) and Extra as Extra with Duration 0,
         // which in both callees is the immediate path, never another queue insert.
         if (Cur->Mode == 0)
         {
@@ -937,7 +937,7 @@ void IBehaviorManager::UpdateNotificationQueue(float Dt)
                 ? reinterpret_cast<IObjRW*>(const_cast<char*>(
                       reinterpret_cast<char const*>(WatchedA) - 8))
                 : nullptr;
-            QueueNotification(RawA, Cur->Field1C, 0.0f);
+            QueueNotification(RawA, Cur->Extra, 0.0f);
         }
         else if (Cur->Mode == 1)
         {
@@ -946,7 +946,7 @@ void IBehaviorManager::UpdateNotificationQueue(float Dt)
                 ? reinterpret_cast<IObjRW*>(const_cast<char*>(
                       reinterpret_cast<char const*>(WatchedB) - 8))
                 : nullptr;
-            InsertNotification(RawB, Cur->Field1C, 0.0f);
+            InsertNotification(RawB, Cur->Extra, 0.0f);
         }
         // Mode >= 2: the node is simply retired.
 
@@ -977,7 +977,7 @@ void IBehaviorManager::QueueNotification(IObjRW* Target, unsigned Extra, float D
             ? reinterpret_cast<Watchable const*>(reinterpret_cast<char const*>(Target) + 8)
             : nullptr);
         Node->WatcherB.set(nullptr);
-        Node->Field1C = Extra;
+        Node->Extra = Extra;
         Node->Timer = Duration;
         return;
     }
@@ -1013,7 +1013,7 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
         Node->WatcherB.set((Target != nullptr)
             ? reinterpret_cast<Watchable const*>(reinterpret_cast<char const*>(Target) + 8)
             : nullptr);
-        Node->Field1C = Extra;
+        Node->Extra = Extra;
         Node->Timer = Duration;
         return;
     }
@@ -1044,10 +1044,10 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
         [[fallthrough]];
     case 1:
         // FUN_062ecc50 on Sys+0x1364: the record's +0xc3 byte.
-        Mgr->Sys->GunConvergenceStateBytes.SetFlagC3(0);
+        Mgr->Sys->FormationLeaders.SetFlagC3(0);
         break;
     case 2:
-        Mgr->Sys->GunConvergenceStateBytes.SetFlagC3(1);
+        Mgr->Sys->FormationLeaders.SetFlagC3(1);
         break;
     case 3:
         {
@@ -1093,7 +1093,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
 
     // FUN_062e66c0, then FUN_062ec6b0 on Sys+0x1364.
     UpdateSystemManager(Sys, Dt);
-    Sys->GunConvergenceStateBytes.SyncFormationLeader();
+    Sys->FormationLeaders.SyncFormationLeader();
 
     // No null test, as in retail: UpdateSystemManager has just re-resolved the iface from the
     // live watched object.
@@ -1182,9 +1182,9 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
         int const* DirDwords = reinterpret_cast<int const*>(DirectiveStorage);
         bool NewContentFlag = (Sys->Targeting.AttackState == 2) && (CurrentBehaviorIndex == 2)
                              && (DirDwords[0] == 0 || DirDwords[1] == 1);
-        if (NewContentFlag != (Field0xF8 != 0))
+        if (NewContentFlag != (bScanState != 0))
         {
-            Field0xF8 = NewContentFlag ? 1 : 0;
+            bScanState = NewContentFlag ? 1 : 0;
             ContentCbPtr->scan_state_change(NewContentFlag);
         }
     }
@@ -1322,7 +1322,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                     // FUN_062ecaf0 on Sys+0x1364 returns the leader, already -8 adjusted.
                     bProximityGated = true;
                     IObjRW* const Partner =
-                        Sys->GunConvergenceStateBytes.GetCurrentLeader();
+                        Sys->FormationLeaders.GetCurrentLeader();
                     if (Partner != nullptr)
                     {
                         if (SinglePlayer())
@@ -1507,8 +1507,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
     {
         if (BehaviorTimerB >= 0.2f || BehaviorDirty != 0 || bReevaluate)
         {
-            // Behavior+0x1c via the accessor (see Behavior::GetTickDelta).
-            TickBehavior->SetTickDelta(BehaviorTimerB);
+            TickBehavior->DeltaTime = BehaviorTimerB;
             TickBehavior->OnUpdate();
             BehaviorTimerB = 0.0f;
             BehaviorDirty = 0;
@@ -1545,10 +1544,10 @@ void IBehaviorManager::NotifyDirectiveCallbacks()
 }
 
 // FUN_062d29a0, RET 8.
-void IBehaviorManager::SetDirectiveResult(int Word11c, int Word118)
+void IBehaviorManager::SetDirectiveResult(int CompletedBehavior, int DirectiveResult)
 {
-    PendingDirectiveResult = Word118;
-    PendingCompletedBehavior = Word11c;
+    PendingDirectiveResult = DirectiveResult;
+    PendingCompletedBehavior = CompletedBehavior;
 }
 
 // FUN_062d35c0.
@@ -1712,7 +1711,7 @@ bool IBehaviorManager::SetCurrentBehavior(int NewIndex, bool bForce, void* Direc
 
 // LAB_062d3f90 -- vftable 063a037c slot 0, the only virtual of retail IBehaviorManager.
 // thiscall, RET 4; jump table at .text:062d42f0 (8 entries). `Rec` is Sys+0x1364 and `Data`
-// is [Event+4]. The Rec helpers are FGunConvergenceStateBlock members: FUN_062ec590
+// is [Event+4]. The Rec helpers are FFormationLeaderState members: FUN_062ec590
 // SetValueB4, FUN_062ec5d0 SetDirectiveOrder, FUN_062ec650 SetValueB0, FUN_062ec6a0
 // SuppressCurrentLeader.
 void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
@@ -1723,7 +1722,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         return;
 
     unsigned char* const Data = static_cast<unsigned char*>(Event->Data);
-    FGunConvergenceStateBlock* const Rec = &Sys->GunConvergenceStateBytes;  // Sys + 0x1364
+    FFormationLeaderState* const Rec = &Sys->FormationLeaders;  // Sys + 0x1364
     switch (Event->Type)
     {
     case 0:
@@ -1775,7 +1774,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
         if (LeftId == Sys->SelfTarget.Iface->get_id())
             Rec->SetValueB0(0);
 
-        ClearGunConvergenceStateWatcherIfTarget(Sys, static_cast<int>(LeftId));
+        ClearFormationLeaderWatcherIfTarget(Sys, static_cast<int>(LeftId));
 
         // Behavior slot 21 (+0x54) with the dword [Data+8].
         for (int Index = 0; Index < 21; ++Index)
@@ -1820,7 +1819,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
     {
         // FUN_062ecaf0 returns the leader (already -8 adjusted) or 0. The behavior slot 22 call
         // is unconditional (entry not null-tested).
-        IObjRW* const Watched = Sys->GunConvergenceStateBytes.GetCurrentLeader();
+        IObjRW* const Watched = Sys->FormationLeaders.GetCurrentLeader();
         if (Watched != nullptr)
         {
             if (Watched->get_id() ==
@@ -1838,7 +1837,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
 
     case 5:
     {
-        IObjRW* const Watched = Sys->GunConvergenceStateBytes.GetCurrentLeader();
+        IObjRW* const Watched = Sys->FormationLeaders.GetCurrentLeader();
         if (Watched == nullptr)
             return;
         if (Watched->get_id() !=
@@ -1865,7 +1864,7 @@ void IBehaviorManager::OnEvent(FBehaviorManagerEvent const* Event)
             TickSuppressedFlag = 1;
             return;
         }
-        Sys->GunConvergenceStateBytes.SuppressCurrentLeader();
+        Sys->FormationLeaders.SuppressCurrentLeader();
         return;
     }
 }

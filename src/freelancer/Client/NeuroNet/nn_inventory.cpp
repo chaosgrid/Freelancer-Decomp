@@ -46,6 +46,7 @@
 #include "Interface/win3d_immediate.h"        // Win3DBegin / Win3DVertex3f / Win3DEnd / ... (OpenGL.cpp)
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "DALib.h"
 #include "render/IRenderPipeline.h"
@@ -89,7 +90,7 @@ FInventoryShipModel::FInventoryShipModel()
     , Toggle(nullptr)
     , ShipArchId(0)
     , Loadout()
-    , bFlag28(0)
+    , bDpConnect(0)
 {
     // FUN_004c6140. Retail leaves +0x10 and +0x14 unwritten; the port zeroes them with the rest.
     InfoText = nullptr;
@@ -107,7 +108,7 @@ void FInventoryShipModel::Clear()
 {
     // FUN_004c6250.
     Loadout.Items.clear();
-    bFlag28 = 0;
+    bDpConnect = 0;
     if (ShipView != nullptr)
     {
         ShipView->SelectGood(0, false);
@@ -115,7 +116,7 @@ void FInventoryShipModel::Clear()
     }
 }
 
-void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bFlag)
+void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bNewDpConnect)
 {
     // FUN_004c62b0 (RET 8).
     if (ShipView != nullptr)
@@ -129,10 +130,10 @@ void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bF
     // FUN_004c6250's body, inlined in retail.
     Clear();
 
-    bFlag28 = bFlag;
+    bDpConnect = bNewDpConnect;
     if (ShipView != nullptr)
     {
-        ShipView->LoadShip(&ShipArch->Nickname, true, bFlag != 0); // FUN_00585a90(ship+8, 1, bFlag)
+        ShipView->LoadShip(&ShipArch->Nickname, true, bNewDpConnect != 0); // FUN_00585a90
         ShipView->LoadEquipment(Source);                          // FUN_005850f0
     }
 
@@ -400,7 +401,7 @@ bool FInventoryShipModel::ShowItem(EquipDesc const* Item, bool bFlag, int Mode)
     }
 
     // Retail has two identical branches here.
-    if ((Item->is_internal() && Mode == 0) || (Item->is_internal() && Mode == 2))
+    if ((Item->is_internal() && Mode == kNnFilterWeapons) || (Item->is_internal() && Mode == kNnFilterEquipment))
     {
         Archetype::Equipment const* Weapon = nullptr;
         Archetype::Equipment const* Shield = nullptr;
@@ -460,19 +461,19 @@ void FInventoryShipModel::SortFrom(EquipDescList const* Source)
         // Usable: weapons / equipment need a free-able hardpoint, ammo a launcher in Source.
         if (Good != nullptr && ShipView != nullptr)
         {
-            if (Filter == 0 || Filter == 2)
+            if (Filter == kNnFilterWeapons || Filter == kNnFilterEquipment)
             {
                 if (ShipView->FindHardpointForGood(Good->Id, true) == nullptr) // FUN_00585f20
                     Record.bUsable = 0;
             }
-            else if (Filter == 1)
+            else if (Filter == kNnFilterAmmo)
             {
                 Record.bUsable = NnListHasLauncherFor(Source, Item.ArchId) ? 1 : 0;
             }
         }
 
         // Commodities sort by their name.
-        if (ShipView != nullptr && Filter == 4 && Record.Arch != nullptr && !Item.bMission)
+        if (ShipView != nullptr && Filter == kNnFilterCommodity && Record.Arch != nullptr && !Item.bMission)
         {
             Record.bHasName = 1;
             GetIdsStringWWithRawFallback(static_cast<unsigned>(Record.Arch->IdsName), Record.Name,
@@ -689,7 +690,7 @@ int NnLoadoutResaleValue(EquipDescList const* List, FInventoryShipModel const* O
         if (Saved != nullptr && Saved->find_equipment_item(Item.Id) == nullptr)
             bHeld = false;
 
-        if (NnItemFilterMode(Item.ArchId) != 4 && !Good->bCombinable && bHeld) // +0x70
+        if (NnItemFilterMode(Item.ArchId) != kNnFilterCommodity && !Good->bCombinable && bHeld) // +0x70
         {
             // Used goods (DAT_005d6d3c / DAT_005d1914).
             int const Unit = static_cast<int>(
@@ -752,7 +753,7 @@ int NnItemFilterMode(unsigned ArchId)
     // FUN_0047e460 (cdecl).
     Archetype::Equipment* const Arch = Archetype::GetEquipment(ArchId);
     if (Arch == nullptr || Arch->IdsName == 0)
-        return 5;
+        return kNnFilterNone;
 
     // Docked: a market price of exactly 0.0 returns 5 (an unordered compare goes on).
     unsigned const BaseId = GetClientLocationCurrentBase();
@@ -761,34 +762,36 @@ int NnItemFilterMode(unsigned ArchId)
         FClientMarket* const Market = GetClientLocationBaseMarket(BaseId);
         if (Market != nullptr &&
             static_cast<double>(ClientMarketGetPrice(Market, Arch2Good(ArchId))) == 0.0)
-            return 5;
+            return kNnFilterNone;
     }
 
     if (GoodList::find_by_id(Arch2Good(ArchId)) == nullptr)
-        return 5;
+        return kNnFilterNone;
 
     // Retail switches through the byte table 0x0047e540.
     int const HpType = static_cast<int>(Arch->get_hp_type());
-    if (HpType == 2)
-        return 3;
-    if (HpType == 3)
-        return 1;
-    if (HpType >= 5 && HpType <= 9)
-        return 2;
-    if (HpType == 0xe)
-        return 4;
-    if (HpType >= 0x25 && HpType <= 0x42)
-        return 2;
-    if (HpType == 4 || (HpType >= 0xa && HpType <= 0xd) || (HpType >= 0xf && HpType <= 0x24))
-        return 0;
-    return 4; // below 2 or above 0x42: the default case, 0x0047e516
+    if (HpType == HpTypeInternal)
+        return kNnFilterCargoBay;
+    if (HpType == HpTypeMunition)
+        return kNnFilterAmmo;
+    if (HpType >= HpTypeShieldGenerator && HpType <= HpTypeThruster)
+        return kNnFilterEquipment;
+    if (HpType == HpTypeCargoPod)
+        return kNnFilterCommodity;
+    if (HpType >= HpTypeFighterShieldSpecial1 && HpType <= HpTypeFreighterShieldSpecial10)
+        return kNnFilterEquipment;
+    if (HpType == HpTypeGun || (HpType >= HpTypeTorpedo && HpType <= HpTypeTurret) ||
+        (HpType >= HpTypeGunSpecial1 && HpType <= HpTypeTorpedoSpecial1))
+        return kNnFilterWeapons;
+    // Below HpTypeInternal or above 0x42: the default case, 0x0047e516.
+    return kNnFilterCommodity;
 }
 
 int NnInventory::GetItemFilterMode(EquipDesc const* Desc)
 {
     // FUN_0047e440 (RET 4; ECX is not read).
     if (Desc == nullptr)
-        return 5;
+        return kNnFilterNone;
     return NnItemFilterMode(Desc->ArchId); // FUN_0047e460
 }
 
@@ -873,7 +876,7 @@ void NnInventory::ResetFields()
     Field4e2 = 0;
     Field4e3 = 0;
     Field4e4 = 0;
-    Result4e5 = 0;
+    bNoTransaction = 0;
     bShowShipInfoCard = 0;
     bSelectedSellable = 0;
     bNeedBind = 0;
@@ -1011,20 +1014,12 @@ void NnInventory::Close()
     Field4e3 = 0;
     if (ResultFn != nullptr)
     {
-        ResultFn(Result4e5, ResultArg);
+        ResultFn(bNoTransaction, ResultArg);
         ResultFn = nullptr;
     }
 
     Win3DReparent(this, nullptr);
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child);
-        Child = Next;
-    }
-    Destroy();
-    delete this;
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
 }
 
 bool NnInventory::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
@@ -1107,15 +1102,15 @@ void NnInventory::UpdateFilterButtons()
 {
     // FUN_0047e590.
     if (FilterCargoBay != nullptr)
-        FilterCargoBay->SetProperty(0xc, Mode == 3 ? 1 : 0, 0);
+        FilterCargoBay->SetProperty(0xc, Mode == kNnFilterCargoBay ? 1 : 0, 0);
     if (FilterWeapons != nullptr)
-        FilterWeapons->SetProperty(0xc, Mode == 0 ? 1 : 0, 0);
+        FilterWeapons->SetProperty(0xc, Mode == kNnFilterWeapons ? 1 : 0, 0);
     if (FilterEquipment != nullptr)
-        FilterEquipment->SetProperty(0xc, Mode == 2 ? 1 : 0, 0);
+        FilterEquipment->SetProperty(0xc, Mode == kNnFilterEquipment ? 1 : 0, 0);
     if (FilterCommodity != nullptr)
-        FilterCommodity->SetProperty(0xc, Mode == 4 ? 1 : 0, 0);
+        FilterCommodity->SetProperty(0xc, Mode == kNnFilterCommodity ? 1 : 0, 0);
     if (FilterAmmo != nullptr)
-        FilterAmmo->SetProperty(0xc, Mode == 1 ? 1 : 0, 0);
+        FilterAmmo->SetProperty(0xc, Mode == kNnFilterAmmo ? 1 : 0, 0);
 }
 
 void NnInventory::SetMode(int NewMode, bool bPropagate)
@@ -1390,7 +1385,7 @@ void NnInventory::BuyFromDealer(int Count)
                 NnVoiceEnqueue(G_NnVoiceMountedId, 0); // FUN_00489e80(DAT_00671c70, 0)
                 FInventoryShipModel::PlayMountSound(Good->ArchId);
             }
-            else if (NnItemFilterMode(Good->ArchId) == 3 && Count == 1 &&
+            else if (NnItemFilterMode(Good->ArchId) == kNnFilterCargoBay && Count == 1 &&
                      Good->ArchId != G_NanobotArchId && Good->ArchId != G_ShieldBatteryArchId &&
                      !HasEquippedOfClass(Good->ArchId))
             {
@@ -1411,7 +1406,7 @@ void NnInventory::BuyFromDealer(int Count)
         }
 
         ReqPlayerSpendCashRetail(GetMarketPackagePrice(Entry->Info.GoodId) * Count);
-        Result4e5 = 0;
+        bNoTransaction = 0;
         bTradePending = 1;
 
         // A good with an ammo package (GoodInfo +0xb8 / +0xbc).
@@ -1477,7 +1472,7 @@ void NnInventory::BuyFromDealer(int Count)
     if (Dealer->TradeMode == 2)
         return;
     PendingBuyGoodId = GoodId; // +0x3bc
-    if (Mode == 0 || Mode == 2)
+    if (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment)
         bCheckHardpointAfterBuy = 1;  // +0x3b9
     else
         bCheckStockAfterBuy = 1;  // +0x3c0
@@ -1491,7 +1486,7 @@ void NnInventory::SellSelected(int Count)
     EquipDesc* const Item = GetSelectedItem(); // FUN_0047e790
     if (Item == nullptr)
         return;
-    if (Mode == 0) // +0x32c, weapons
+    if (Mode == kNnFilterWeapons) // +0x32c, weapons
         G_WeaponGroups.RemoveHardpoint(Item->Hardpoint); // FUN_004f6380
 
     // The market is not null-tested.
@@ -1509,7 +1504,7 @@ void NnInventory::SellSelected(int Count)
         // A used item (not a commodity, not combinable, in the saved loadout +0x3a8) sells at
         // the used price (DAT_005d0e2c / DAT_005d1914), all on the x87 stack.
         int Cash = 0;
-        if (NnItemFilterMode(Item->ArchId) != 4 && !arch_is_combinable(Item->ArchId) &&
+        if (NnItemFilterMode(Item->ArchId) != kNnFilterCommodity && !arch_is_combinable(Item->ArchId) &&
             SavedLoadout.find_equipment_item(Item->Id) != nullptr)
         {
             double const Unit =
@@ -1532,7 +1527,7 @@ void NnInventory::SellSelected(int Count)
         ClientMarketRequestSell(Market, GetClientLocationCurrentBase(), GoodId, Count);
         ReqRemovePlayerEquipRetail(ItemId, Count);
         Ship.LoadShip(&GetPlayerEquipDescListRetail(), 1);
-        Result4e5 = 0;
+        bNoTransaction = 0;
 
         if (Count == ItemCount && InfoCardFacts != nullptr) // +0x398
             ClearInfoCard(); // FUN_0047e9e0
@@ -1788,7 +1783,7 @@ void NnInventory::CreateControls()
                 Base[2] + 0.001f};                               // DAT_005d1494
             float const DamageHalfExtents[3] = {0.03f, 0.003f, 0.0f};
             CreateCargoBarControl(Name, "", DamagePosition, nullptr, DamageHalfExtents, 1, 0x43c,
-                                  G_NnPaletteArgb_679bac, G_NnPaletteArgb_679bac);
+                                  G_NnPaletteGreen, G_NnPaletteGreen);
         }
 
         sprintf(Name, "ItemPrice0%d", Number);
@@ -2101,7 +2096,7 @@ void NnInventory::Draw()
                 // ftol of the extended product; the port forms it in double.
                 HoveredCargoVolume = static_cast<int>(static_cast<double>(Dealer->Quantity) *
                                             static_cast<double>(Offer->Volume));
-                if (Mode == 0 || Mode == 2)
+                if (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment)
                 {
                     EquipDesc* const Item = GetSelectedItem(); // FUN_0047e790
                     if (bDealerMode != 0 || (Item != nullptr && Item->bEquipped))
@@ -2116,7 +2111,7 @@ void NnInventory::Draw()
                     OfferVolume = static_cast<int>(static_cast<double>(Dealer->Quantity) *
                                                    static_cast<double>(Offer->Volume));
                 }
-                if (Mode == 0 || Mode == 2)
+                if (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment)
                     OfferVolume = 0;
             }
         }
@@ -2334,9 +2329,9 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Ship.ShipView->CollectHpTypes(Hardpoint.Value); // FUN_00586560
             int const Filter = NnItemFilterMode(Item->ArchId);
             int Group = 0;
-            if (Filter == 0)
+            if (Filter == kNnFilterWeapons)
                 Group = 0;
-            else if (Filter == 2)
+            else if (Filter == kNnFilterEquipment)
                 Group = 1;
             else
                 break;
@@ -2358,9 +2353,9 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Ship.ShipView->CollectHpTypes(Hardpoint.Value); // FUN_00586560
         int const Filter = NnItemFilterMode(Item->ArchId);
         int Group = 0;
-        if (Filter == 0)
+        if (Filter == kNnFilterWeapons)
             Group = 0;
-        else if (Filter == 2)
+        else if (Filter == kNnFilterEquipment)
             Group = 1;
         else
             break;
@@ -2404,13 +2399,13 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Dealer->TradeMode = TradeMode;
             Dealer->ProcessMessage(0xef01, 0, 0);
         }
-        Result4e5 = 1;
+        bNoTransaction = 1;
         ResultArg = reinterpret_cast<void*>(A);
         ResultFn = reinterpret_cast<FNnInventoryResultFn>(B);
         if (TradeMode == 1)
-            SetMode(4, true);
+            SetMode(kNnFilterCommodity, true);
         else if (TradeMode == 2 || TradeMode == 3)
-            SetMode(0, true);
+            SetMode(kNnFilterWeapons, true);
 
         SavedLoadout.Items.clear();
         EquipDescList& PlayerList = GetPlayerEquipDescListRetail(); // FUN_004c4060
@@ -2491,7 +2486,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Control == TradeRouteButton)
         {
-            if (Mode == 4 && SelectedIndex != -1)
+            if (Mode == kNnFilterCommodity && SelectedIndex != -1)
             {
                 EquipDesc* const Item = GetSelectedItem();
                 if (Item != nullptr)
@@ -2555,15 +2550,15 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
 
         if (Control == FilterCargoBay)
-            SetMode(3, true);
+            SetMode(kNnFilterCargoBay, true);
         else if (Control == FilterWeapons)
-            SetMode(0, true);
+            SetMode(kNnFilterWeapons, true);
         else if (Control == FilterEquipment)
-            SetMode(2, true);
+            SetMode(kNnFilterEquipment, true);
         else if (Control == FilterCommodity)
-            SetMode(4, true);
+            SetMode(kNnFilterCommodity, true);
         else if (Control == FilterAmmo)
-            SetMode(1, true);
+            SetMode(kNnFilterAmmo, true);
         else if (Control == JettisonButton)
             JettisonSelected(); // FUN_0047e650
         else if (Control == Ship.InfoText)
@@ -2623,7 +2618,7 @@ void NnInventory::SelectRow(int Row, int Unused)
     }
 
     EquipDesc* const Item = GetSelectedItem();
-    Ship.ShowItem(Item, bFlag, Item != nullptr ? NnItemFilterMode(Item->ArchId) : 5);
+    Ship.ShowItem(Item, bFlag, Item != nullptr ? NnItemFilterMode(Item->ArchId) : kNnFilterNone);
 
     // Retail clears +0x4e8 / +0x4ec a second time after ClearSelection.
     if (Dealer != nullptr)
@@ -2658,11 +2653,11 @@ void NnInventory::SelectHardpoint(char const* Name)
     int const SavedMode = Mode;
     Ship.ShipView->CollectHpTypes(Name); // FUN_00586560
     if (Ship.ShipView->HasHpTypeGroup(0)) // FUN_00586800
-        SetMode(0, true);
+        SetMode(kNnFilterWeapons, true);
     else if (Ship.ShipView->HasHpTypeGroup(1))
-        SetMode(2, true);
+        SetMode(kNnFilterEquipment, true);
     else if (Ship.ShipView->HasHpType(1)) // FUN_00586510
-        SetMode(3, true);
+        SetMode(kNnFilterCargoBay, true);
 
     // Walk the list page by page; stop after a page whose last row is empty.
     SelectRow(-1, 1);
@@ -2733,12 +2728,12 @@ void NnInventory::JettisonSelected()
 void NnInventory::ToggleEquip(EquipDesc* Item, int State)
 {
     // FUN_0047f720 (RET 8).
-    int Filter = 0; // only read on the hardpoint path
+    int Filter = kNnFilterWeapons; // only read on the hardpoint path
     bool bHardpointItem = false;
     if (Item != nullptr)
     {
         Filter = NnItemFilterMode(Item->ArchId);
-        bHardpointItem = (Filter == 0 || Filter == 2);
+        bHardpointItem = (Filter == kNnFilterWeapons || Filter == kNnFilterEquipment);
     }
 
     if (!bHardpointItem)
@@ -2821,7 +2816,7 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         }
 
         PlayOrRewindUiSoundSlot(0x11); // FUN_005645c0
-        if (Filter == 0)
+        if (Filter == kNnFilterWeapons)
             G_WeaponGroups.RemoveHardpoint(Item->Hardpoint); // FUN_004f6380
         Item->make_internal();
         Item->set_equipped(false);
@@ -2914,14 +2909,14 @@ static char const* const G_NnGoodDealIcons[6] = {
 // every other type.
 static int NnHpTypeClassNumber(int HpType)
 {
-    unsigned const Index = static_cast<unsigned>(HpType - 0xf);
-    if (Index > 0x33)
+    unsigned const Index = static_cast<unsigned>(HpType - HpTypeGunSpecial1);
+    if (Index > 0x33) // through HpTypeFreighterShieldSpecial10
         return 0;
-    if (HpType == 0x23 || HpType == 0x24)
+    if (HpType == HpTypeTorpedoSpecial2 || HpType == HpTypeTorpedoSpecial1)
         return 0;
-    if (HpType <= 0x22)
-        return (HpType - 0xf) % 10 + 1;
-    return (HpType - 0x25) % 10 + 1;
+    if (HpType <= HpTypeTurretSpecial10)
+        return (HpType - HpTypeGunSpecial1) % 10 + 1;
+    return (HpType - HpTypeFighterShieldSpecial1) % 10 + 1;
 }
 
 bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int Count, int Price,
@@ -3005,7 +3000,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                 else
                 {
                     int ClassNumber = 0;
-                    if (Mode == 0 || Mode == 2)
+                    if (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment)
                     {
                         int HpType = static_cast<int>(Arch->get_hp_type()); // vt+0x18
                         if (Arch->get_class_type() == Archetype::AClassGun)
@@ -3080,7 +3075,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             {
                 QuantityText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(L""), 0); // DAT_005c8ce0
             }
-            if (Mode == 3)
+            if (Mode == kNnFilterCargoBay)
             {
                 unsigned char bOn = 1;
                 if (ArchId == G_NanobotArchId || ArchId == G_ShieldBatteryArchId || bDealerMode != 0)
@@ -3093,7 +3088,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                 QuantityText->SetProperty(1, 0, 0);
                 QuantityText->SetProperty(0xc, bSelected, 0);
             }
-            else if (bDealerMode == 0 && (Mode == 0 || Mode == 2))
+            else if (bDealerMode == 0 && (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment))
             {
                 QuantityText->SetProperty(1, 1, 0);
             }
@@ -3169,7 +3164,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             {
                 bToggle = 0;
             }
-            else if (bEquipped == 0 && (Mode == 0 || Mode == 2))
+            else if (bEquipped == 0 && (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment))
             {
                 if (Good == nullptr)
                     bToggle = 0;
@@ -3498,7 +3493,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
         // FUN_0057da40's result is not read.
         RenderDisplayList Text;
         {
-            StyleNode Style(0x9ca4);
+            StyleNode Style(kTextStyleBody);
             RdlAppendNode(Text, Style.Clone());
         }
         LoadIdsIntoRdl(ShownInfoIds, Text);
@@ -3559,7 +3554,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 // Panes 1..3: IdsInfo1..3 (+0xec / +0xf0 / +0xf4).
                 RenderDisplayList Facts;
                 {
-                    StyleNode Style(0x9ca4);
+                    StyleNode Style(kTextStyleBody);
                     RdlAppendNode(Facts, Style.Clone());
                 }
                 LoadIdsIntoRdl(static_cast<unsigned>(ShipArch->IdsInfo1), Facts);
@@ -3576,7 +3571,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
 
                 RenderDisplayList Stats;
                 {
-                    StyleNode Style(0x9ca4);
+                    StyleNode Style(kTextStyleBody);
                     RdlAppendNode(Stats, Style.Clone());
                 }
                 LoadIdsIntoRdl(static_cast<unsigned>(ShipArch->IdsInfo2), Stats);
@@ -3586,7 +3581,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
 
                 RenderDisplayList Values;
                 {
-                    StyleNode Style(0x9ca4);
+                    StyleNode Style(kTextStyleBody);
                     RdlAppendNode(Values, Style.Clone());
                 }
                 LoadIdsIntoRdl(static_cast<unsigned>(ShipArch->IdsInfo3), Values);
@@ -3629,7 +3624,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
 
     RenderDisplayList Card;
     {
-        StyleNode Style(0x9ca4);
+        StyleNode Style(kTextStyleBody);
         RdlAppendNode(Card, Style.Clone());
     }
     if (IdsFirst != 0)
@@ -3677,13 +3672,13 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 // Pane 2: the stat labels (L"\n" is DAT_005d0254).
                 RenderDisplayList Labels;
                 {
-                    StyleNode Style(0xf64);
+                    StyleNode Style(kTextStyleCardTitle);
                     RdlAppendNode(Labels, Style.Clone());
                 }
                 LoadIdsIntoRdl(0x6e1, Labels);
                 AppendTextMaybeXmlRdl(L"\n", static_cast<unsigned>(wcslen(L"\n")), Labels, false);
                 {
-                    StyleNode Style(0x9ca4);
+                    StyleNode Style(kTextStyleBody);
                     RdlAppendNode(Labels, Style.Clone());
                 }
                 BuildDealerEquipmentStatText(Labels, ArchId, true, false); // FUN_00484090(,,1,0)
@@ -3694,7 +3689,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
                 // Pane 3: the stat values.
                 RenderDisplayList Values;
                 {
-                    StyleNode Style(0x9ca4);
+                    StyleNode Style(kTextStyleBody);
                     RdlAppendNode(Values, Style.Clone());
                 }
                 AppendTextMaybeXmlRdl(L"\n", static_cast<unsigned>(wcslen(L"\n")), Values, false);
@@ -3766,12 +3761,12 @@ void NnInventory::UpdateRowVisibility(int Count)
             int const TradeMode = Dealer->TradeMode;
             if (TradeMode == 3)
             {
-                if (Mode != 4)
+                if (Mode != kNnFilterCommodity)
                     bNoPrice = false;
             }
             else if (TradeMode == 1)
             {
-                if (Mode == 4)
+                if (Mode == kNnFilterCommodity)
                     bNoPrice = false;
             }
             if (TradeMode == 2)
@@ -3797,7 +3792,7 @@ void NnInventory::UpdateRowVisibility(int Count)
 
         if (EquipToggle[Row] != nullptr)
         {
-            if (bHide || Mode == 4 || Mode == 1)
+            if (bHide || Mode == kNnFilterCommodity || Mode == kNnFilterAmmo)
                 EquipToggle[Row]->SetProperty(1, 1, 0);
             if (bDealerMode != 0)
             {
@@ -3835,7 +3830,7 @@ void NnInventory::UpdateRowVisibility(int Count)
         bMission = true;
 
     // IsScanner is slot 46 (true for NN_Scanner).
-    if (Mode == 4 && SelectedIndex != -1 && !bMission && !IsScanner() &&
+    if (Mode == kNnFilterCommodity && SelectedIndex != -1 && !bMission && !IsScanner() &&
         (QuantityControl[0] == nullptr || (QuantityControl[0]->Flags & 2) == 0))
     {
         TradeRouteButton->Flags = static_cast<unsigned char>(TradeRouteButton->Flags | 3);
@@ -3853,13 +3848,13 @@ static unsigned const G_NnHpClassInfoIds[10] = {
     0x38b, 0x38c, 0x394, 0x38f, 0x38d, 0x38e, 0x390, 0x391, 0x392, 0x393,
 };
 
-void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned char bArg3)
+void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned char bResync)
 {
     // FUN_0047d2f0 (RET 0xc). Arg2 is only handed on to the recursive call.
     int const DealerTradeMode = (Dealer != nullptr) ? Dealer->TradeMode : 0;
 
     // Resync with the player's loadout.
-    if (bArg3 != 0 && GetPlayerShipArchetypeIdRetail() != 0) // FUN_004c3e10
+    if (bResync != 0 && GetPlayerShipArchetypeIdRetail() != 0) // FUN_004c3e10
     {
         if (LastEquipRevision != static_cast<int>(GetPlayerEquipRevisionRetail())) // FUN_004c4f90
         {
@@ -3877,7 +3872,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             {
                 Partner->Inventory->PendingMountHardpoint.clear();
                 unsigned const GoodId = Partner->GetSelectedMarketGood(); // FUN_00483580
-                if (GoodId != 0 && (Partner->Mode == 0 || Partner->Mode == 2))
+                if (GoodId != 0 && (Partner->Mode == kNnFilterWeapons || Partner->Mode == kNnFilterEquipment))
                 {
                     char const* const Hardpoint =
                         Partner->Inventory->Ship.ShipView->FindHardpointForGood(GoodId, false); // FUN_00585f20
@@ -4037,14 +4032,16 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
 
         // Commodities are not scaled by health. The used rate applies to a non-combinable item
         // in this window's saved loadout +0x3a8 (type 0 only), or -- any type -- on a ship
-        // dealer to one in its partner's +0x3a8.
+        // dealer to one in its partner's +0x3a8. Retail: the rate (and DAT_005d1910's rounding)
+        // applies to the health-scaled price, where NnLoadoutResaleValue / SellSelected scale
+        // the used unit price by health afterwards, so list and paid prices can differ by one.
         int Price = 0;
         if (Good != nullptr && Market != nullptr)
         {
             int const Type = ClientMarketGetTransactionType(Market, Good->Id);
             if (Type == 0 || Type == 1)
             {
-                if (Filter == 4)
+                if (Filter == kNnFilterCommodity)
                     Price = static_cast<int>(ClientMarketGetPrice(Market, Good->Id));
                 else
                     Price = static_cast<int>(
@@ -4052,11 +4049,11 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                         static_cast<double>(Item->Health));
 
                 bool bUsed = false;
-                if (Type == 0 && Filter != 4 && !Good->bCombinable &&
+                if (Type == 0 && Filter != kNnFilterCommodity && !Good->bCombinable &&
                     SavedLoadout.find_equipment_item(Item->Id) != nullptr)
                     bUsed = true;
                 else if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == 2 &&
-                         Filter != 4 && !Good->bCombinable)
+                         Filter != kNnFilterCommodity && !Good->bCombinable)
                 {
                     NnInventory* const Partner = static_cast<NnDealer*>(this)->Inventory;
                     if (Partner != nullptr &&
@@ -4072,7 +4069,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         int const Health = static_cast<int>(static_cast<double>(Item->Health) * 100.0);
         unsigned char bShowToggle = 0;
         unsigned char bEquipped = 0;
-        if (Good != nullptr && Filter != 1 && Filter != 4)
+        if (Good != nullptr && Filter != kNnFilterAmmo && Filter != kNnFilterCommodity)
         {
             bEquipped = Item->bEquipped ? 1 : 0;
             bShowToggle = 1;
@@ -4083,7 +4080,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
 
         // Mounted weapons and equipment are already on the hardpoint rows.
         bool bSelected = false;
-        if (!((Filter == 0 || Filter == 2) && bEquipped != 0))
+        if (!((Filter == kNnFilterWeapons || Filter == kNnFilterEquipment) && bEquipped != 0))
         {
             if (FocusEquipId != SUBOBJ_ID_NONE && Item->Id == FocusEquipId)
                 FocusCounter = Counter;
@@ -4091,12 +4088,12 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             // Usable: a free hardpoint for an unmounted weapon / equipment of an own inventory,
             // a launcher for ammo.
             bool bUnusable = false;
-            if (bEquipped == 0 && bDealerMode == 0 && Good != nullptr && (Mode == 0 || Mode == 2))
+            if (bEquipped == 0 && bDealerMode == 0 && Good != nullptr && (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment))
             {
                 if (Ship.ShipView->FindHardpointForGood(Good->Id, true) == nullptr) // FUN_00585f20
                     bUnusable = true;
             }
-            else if (Mode == 1)
+            else if (Mode == kNnFilterAmmo)
             {
                 bUnusable = !NnListHasLauncherFor(List, Item->ArchId); // FUN_00482d80
             }
@@ -4154,7 +4151,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             continue;
 
         // The hovered row is the launcher's.
-        if ((Mode == 1 || bAllModes) && Counter == HoverIndex && Hovered == nullptr)
+        if ((Mode == kNnFilterAmmo || bAllModes) && Counter == HoverIndex && Hovered == nullptr)
             Hovered = Item;
 
         bool const bSelected = FillItemRow(&Counter, AmmoId, 1, 0, 0, 100, 0, 0, 0, 0, 0, 0, 1);
@@ -4183,7 +4180,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
     if (Hovered != nullptr)
     {
         HoveredCargoVolume = static_cast<int>(Hovered->get_cargo_space_occupied());
-        if ((Mode == 0 || Mode == 2) && (bDealerMode != 0 || Hovered->bEquipped))
+        if ((Mode == kNnFilterWeapons || Mode == kNnFilterEquipment) && (bDealerMode != 0 || Hovered->bEquipped))
             HoveredCargoVolume = 0;
     }
 
@@ -4253,7 +4250,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         }
 
         LastRowCount = Counter;
-        RefreshItemList(List, Arg2, bArg3);
+        RefreshItemList(List, Arg2, bResync);
     }
 
     // +0x4e0 (the card shows the ship) holds on an own inventory with no dealer and no
@@ -4365,11 +4362,11 @@ EquipDesc* NnInventory::GetSelectedItem()
     {
         EquipDesc* const Item = &*It;
         int const Filter = NnItemFilterMode(Item->ArchId); // FUN_0047e460
-        if (Filter == 5)
+        if (Filter == kNnFilterNone)
             continue;
         if (bAllModes == 0 && Filter != Mode)
             continue;
-        if (Item->bEquipped && (Mode == 0 || Mode == 2))
+        if (Item->bEquipped && (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment))
             continue;
         if (Counter == SelectedIndex)
         {

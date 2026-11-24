@@ -27,7 +27,7 @@ using namespace CmnIdea;
 using namespace CmnAiSteer;
 
 // ----------------------------------------------------------------------------
-// DodgeIdea -- common_buzzbehavior.h's "WatcherD". See common_idea.h for the
+// DodgeIdea -- BuzzBehavior::Dodge. See common_idea.h for the
 // identification and the two-sided size proof.
 // ----------------------------------------------------------------------------
 
@@ -304,10 +304,10 @@ int DodgeIdea::Update(float DeltaTime)
     }
 
     // caseD_4 (062d8178).
-    if (Pathfind->Field_214 == 2)
+    if (Pathfind->AvoidRecordKind == 2)
     {
         RefreshCachedIfacePosition(Sys);
-        Vector const RecomputeDir = Sub(Pathfind->Field_22C, CachedIfacePosition(Sys));
+        Vector const RecomputeDir = Sub(Pathfind->AvoidTargetPoint, CachedIfacePosition(Sys));
         BuildOrientationBasis(WorkingFrame, *IfaceOrientation(Sys), RecomputeDir, nullptr);
     }
 
@@ -321,7 +321,7 @@ int DodgeIdea::Update(float DeltaTime)
         if (Picker.Flag1c != 0)
         {
             IObjInspect const* const SelfIface = ObjInspectOf(Object);
-            float Value = Behavior_InvokeManagerSlotD8(ObjInspectOf(Target), 1.0f, ThrustEquipEngine);
+            float Value = Behavior_GetSpeed(ObjInspectOf(Target), 1.0f, ThrustEquipEngine);
 
             // Limit stays double. Too far: scale the target's speed by ChaseSpeedScale;
             // too close: use the own ship's speed; unordered leaves Value unchanged.
@@ -329,12 +329,12 @@ int DodgeIdea::Update(float DeltaTime)
             if (Limit + 5.0 < static_cast<double>(Clearance))
                 Value = static_cast<float>(static_cast<double>(Value) * ChaseSpeedScale);
             else if (Limit - 5.0 > static_cast<double>(Clearance))
-                Value = Behavior_InvokeManagerSlotD8(SelfIface, 1.0f, ThrustEquipEngine);
+                Value = Behavior_GetSpeed(SelfIface, 1.0f, ThrustEquipEngine);
 
             if (static_cast<double>(Value) < 50.0)
                 Value = 50.0f;
 
-            ThrottleCommand = Behavior_InvokeManagerSlotD4(SelfIface, Value, ThrustEquipEngine);
+            ThrottleCommand = Behavior_GetProjectedThrottle(SelfIface, Value, ThrustEquipEngine);
         }
     }
 
@@ -386,7 +386,7 @@ int DodgeIdea::Update(float DeltaTime)
 
     case 2:
     {
-        if (Pathfind->Field_214 != 0)
+        if (Pathfind->AvoidRecordKind != 0)
             return 0;
 
         // Dot summed z, y, x in double; compared against (double)0.9999f, unordered

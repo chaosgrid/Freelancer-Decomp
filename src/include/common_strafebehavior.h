@@ -47,7 +47,7 @@ public:
     // binder's result.
     bool SetContext(void* Owner, void* Manager, void* Sys) override;
 
-    // Slot 3, LAB_062ca1e0: FUN_062d20d0, SetCruiseLock(1, 3), the angular trigger range
+    // Slot 3, LAB_062ca1e0: FUN_062d20d0, SetAvoidanceAllowed(1, 3), the angular trigger range
     // (+0x2c), the ship's forward extent (+0x44), the strafe direction (-column 2), and the
     // personality's StrafeParams into +0x34/+0x58/+0x5c; +0x48 = 2.
     void OnEngage() override;
@@ -64,7 +64,7 @@ public:
     // Slot 7, LAB_062c9d20.
     int OnUpdate() override;
 
-    // Slot 10, LAB_062c96e0 (RET 4): Op non-null and FUN_062e74a0(Sys+0x34, Op+0xc) non-null
+    // Slot 10, LAB_062c96e0 (RET 4): Op non-null and FUN_062e74a0(Sys+0x34, &Op.TargetId) non-null
     // -> Flags28 |= 2, true; else Flags28 &= ~2, false.
     bool OnApplyDirective(void* DirectiveOp) override;
 
@@ -72,20 +72,6 @@ public:
     // mode 1 picks a point StrafeDistance34 off to the side; both arms hand the point to the
     // MoveIdea and FaceIdea, and every path ends with StrafeMode48 = Mode.
     void SelectStrafePoint(int Mode, IObjInspect const* Target);
-
-    // ---- Behavior's own +0x04..+0x29 block, still declared per class ----
-    int TypeId;                  // +0x04
-    unsigned CachedHandle08;     // +0x08
-    int ModeSelector0xc;         // +0x0c, OnEvaluateReadiness's result.
-    int UpdateResult10;          // +0x10, OnUpdate's result.
-    void* OwnerContext;          // +0x14, the owner IObjRW* (binder).
-    IObjDB* ObjectDb;
-    float DeltaTime;             // +0x1c
-    void* BehaviorMgrPtr;        // +0x20, the IBehaviorManager (binder).
-    SystemManager* NavHelper;    // +0x24, the SystemManager (binder).
-    unsigned char Flags28;       // +0x28
-    unsigned char Flag29;        // +0x29
-    unsigned char Pad2a[0x2c - 0x2a];
 
     // ---- StrafeBehavior's own fields ----
     float TriggerRange2c;        // +0x2c. OnEngage: angular distance * (1 + the 0.1-step
@@ -105,21 +91,11 @@ public:
     unsigned char Pad65[0x68 - 0x65];
     int Field68;                 // +0x68. SetContext: 999.
     int Field6c;                 // +0x6c. SetContext: 0.
-    MoveIdea SubObjectA;         // +0x70,  ctor FUN_062d4e60
-    FaceIdea SubObjectB;         // +0xe8,  ctor FUN_062d6750
-    AfterburnerIdea SubObjectC;  // +0x1a8, ctor FUN_062da500
+    MoveIdea Move;         // +0x70,  ctor FUN_062d4e60
+    FaceIdea Face;         // +0xe8,  ctor FUN_062d6750
+    AfterburnerIdea Afterburner;  // +0x1a8, ctor FUN_062da500
 };
 
-static_assert(offsetof(StrafeBehavior, TypeId) == 0x04, "StrafeBehavior::TypeId offset");
-static_assert(offsetof(StrafeBehavior, CachedHandle08) == 0x08, "StrafeBehavior::CachedHandle08 offset");
-static_assert(offsetof(StrafeBehavior, ModeSelector0xc) == 0x0c, "StrafeBehavior::ModeSelector0xc offset");
-static_assert(offsetof(StrafeBehavior, UpdateResult10) == 0x10, "StrafeBehavior::UpdateResult10 offset");
-static_assert(offsetof(StrafeBehavior, OwnerContext) == 0x14, "StrafeBehavior::OwnerContext offset");
-static_assert(offsetof(StrafeBehavior, DeltaTime) == 0x1c, "StrafeBehavior::DeltaTime offset");
-static_assert(offsetof(StrafeBehavior, BehaviorMgrPtr) == 0x20, "StrafeBehavior::BehaviorMgrPtr offset");
-static_assert(offsetof(StrafeBehavior, NavHelper) == 0x24, "StrafeBehavior::NavHelper offset");
-static_assert(offsetof(StrafeBehavior, Flags28) == 0x28, "StrafeBehavior::Flags28 offset");
-static_assert(offsetof(StrafeBehavior, Flag29) == 0x29, "StrafeBehavior::Flag29 offset");
 static_assert(offsetof(StrafeBehavior, TriggerRange2c) == 0x2c, "StrafeBehavior::TriggerRange2c offset");
 static_assert(offsetof(StrafeBehavior, StrafeDistance34) == 0x34, "StrafeBehavior::StrafeDistance34 offset");
 static_assert(offsetof(StrafeBehavior, StrafeDir38) == 0x38, "StrafeBehavior::StrafeDir38 offset");
@@ -132,7 +108,7 @@ static_assert(offsetof(StrafeBehavior, Field60) == 0x60, "StrafeBehavior::Field6
 static_assert(offsetof(StrafeBehavior, Field64) == 0x64, "StrafeBehavior::Field64 offset");
 static_assert(offsetof(StrafeBehavior, Field68) == 0x68, "StrafeBehavior::Field68 offset");
 static_assert(offsetof(StrafeBehavior, Field6c) == 0x6c, "StrafeBehavior::Field6c offset");
-static_assert(offsetof(StrafeBehavior, SubObjectA) == 0x70, "StrafeBehavior::SubObjectA offset");
-static_assert(offsetof(StrafeBehavior, SubObjectB) == 0xe8, "StrafeBehavior::SubObjectB offset");
-static_assert(offsetof(StrafeBehavior, SubObjectC) == 0x1a8, "StrafeBehavior::SubObjectC offset");
+static_assert(offsetof(StrafeBehavior, Move) == 0x70, "StrafeBehavior::Move offset");
+static_assert(offsetof(StrafeBehavior, Face) == 0xe8, "StrafeBehavior::Face offset");
+static_assert(offsetof(StrafeBehavior, Afterburner) == 0x1a8, "StrafeBehavior::Afterburner offset");
 static_assert(sizeof(StrafeBehavior) == 0x1bc, "StrafeBehavior size must match retail 0x1bc");

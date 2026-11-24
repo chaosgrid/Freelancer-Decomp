@@ -68,7 +68,7 @@ enum : int32_t
 
 // vtable .rdata:0639c2a0: four `RET 4` no-op slots (.text:062ed730) + deleting
 // dtor LAB_06289770; one data member at +4. IVP keeps these in
-// env->vector_listeners_c8 (FUN_0634d050 appends, FUN_0634cf60 fires slot 0).
+// env->collision_listeners (FUN_0634d050 appends, FUN_0634cf60 fires slot 0).
 class IVP_Listener_Collision
 {
 public:
@@ -122,7 +122,7 @@ struct IVP_Event_PSI
     IVP_Environment* environment; // +0x00
 };
 
-// Elements of IVP_Environment::vector_listeners_d0 (+0xd0), library name
+// Elements of IVP_Environment::psi_listeners (+0xd0), library name
 // IVP_Listener_PSI. No implementation was traced, so only the two called
 // slots are declared.
 class IVP_Listener_PSI

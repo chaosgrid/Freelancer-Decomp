@@ -375,11 +375,11 @@ static const FRichFontCombination GFontCombinations[GSubEntriesPerFont] = {
     {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1},
 };
 
-// DAT_063ed668 / DAT_063ed66c, DAT_0640a708 / DAT_0640a709.
-static float GRichTextScaleX = 1.0f;
+// DAT_063ed668 (font scale) / DAT_063ed66c (image scale), DAT_0640a708 / DAT_0640a709.
+static float GRichTextFontScale = 1.0f;
 namespace CmnText
 {
-    float GRichTextScaleY = 1.0f; // declared in common_text_internal.h (ImageNode reads it)
+    float GRichTextImageScale = 1.0f; // declared in common_text_internal.h (ImageNode reads it)
 }
 static bool GRichTextInitialised = false;
 static bool GRichTextOsAboveNt4 = false;
@@ -506,11 +506,11 @@ bool __cdecl InitializeRichText(int ScreenHeight)
 
     // 768.0f DAT_063a3db8, 600.0f DAT_063a3dbc. The exe passes its surface height
     // (DAT_00610854, at 005b1f64).
-    GRichTextScaleX = (float)((double)ScreenHeight / 768.0);
-    GRichTextScaleY = (float)((double)ScreenHeight / 600.0);
+    GRichTextFontScale = (float)((double)ScreenHeight / 768.0);
+    GRichTextImageScale = (float)((double)ScreenHeight / 600.0);
 
     // Doubled from the stored (float-rounded) scale.
-    DeviceTRC::mDropShadowX = (int)((double)GRichTextScaleX + (double)GRichTextScaleX);
+    DeviceTRC::mDropShadowX = (int)((double)GRichTextFontScale + (double)GRichTextFontScale);
     DeviceTRC::mDropShadowY = DeviceTRC::mDropShadowX;
 
     // Fonts are not created here (see ReinitializeRichTextFonts). GetVersionExA is
@@ -536,7 +536,7 @@ bool __cdecl InitializeRichText(int ScreenHeight)
 
 void __cdecl ReinitializeRichTextFonts()
 {
-    // .text:06326410. Fonts are scaled by GRichTextScaleX (DAT_063ed668).
+    // .text:06326410. Fonts are scaled by GRichTextFontScale (DAT_063ed668).
     for (int StyleIndex = 0; StyleIndex < GMaxFontIndices; ++StyleIndex)
     {
         DeviceTRC::WinFont* const StyleFonts = &DeviceTRC::mFont[StyleIndex * GSubEntriesPerFont];
@@ -553,7 +553,7 @@ void __cdecl ReinitializeRichTextFonts()
         TextRenderContext::FontDesc Base = {};
         Base.Name = Style.Name;
         Base.Size = Style.Size;
-        RebuildRichTextStyleFonts(StyleFonts, Base, GRichTextScaleX);
+        RebuildRichTextStyleFonts(StyleFonts, Base, GRichTextFontScale);
     }
 }
 
@@ -719,10 +719,10 @@ void DeviceTRC::get_text_fit(const wchar_t* Text, int MaxWidth, int& FitCount,
     SelectObject(Dc, OldFont);
 }
 
-void DeviceTRC::execute_text(const wchar_t* Text, bool bHighlight, int Len)
+void DeviceTRC::execute_text(const wchar_t* Text, bool bDraw, int Len)
 {
     // .text:06328240. No test of the DC. The text (with its 0x0A0A0A drop shadow) is drawn only
-    // when bHighlight is set; PosH advances by the measured width either way.
+    // when bDraw is set; PosH advances by the measured width either way.
     if (Text == nullptr)
     {
         return;
@@ -734,7 +734,7 @@ void DeviceTRC::execute_text(const wchar_t* Text, bool bHighlight, int Len)
     {
         Len = (int)wcslen(Text);
     }
-    if (bHighlight)
+    if (bDraw)
     {
         SetTextAlign(MHdc, 0);
         SetBkColor(MHdc, 0);
@@ -843,19 +843,20 @@ public:
 
 void DeviceTRC::execute_image(const Image* Img, bool bDraw)
 {
-    // .text:06328370. Retail scales both axes by ScaleY (DAT_063ed66c). No null checks on the
-    // image, its DC or this DC. Every image this context draws came from its own create_image.
+    // .text:06328370. Both axes are scaled by the one image scale (DAT_063ed66c). No null checks
+    // on the image, its DC or this DC. Every image this context draws came from its own
+    // create_image.
     const BMPImage* const DevImg = (const BMPImage*)Img;
     if (bDraw)
     {
         StretchBlt(MHdc, OriginH + PosH, OriginV + PosV,
-                   (int)((double)GRichTextScaleY * DevImg->Width),
-                   (int)((double)GRichTextScaleY * DevImg->Height),
+                   (int)((double)GRichTextImageScale * DevImg->Width),
+                   (int)((double)GRichTextImageScale * DevImg->Height),
                    DevImg->HdcSrc, 0, 0,
                    (int)DevImg->Width, (int)DevImg->Height, SRCCOPY);
     }
     // The sum is formed before truncation.
-    PosH = (int)((double)GRichTextScaleY * DevImg->Width + PosH);
+    PosH = (int)((double)GRichTextImageScale * DevImg->Width + PosH);
 }
 
 void DeviceTRC::set_clip_rect(const RECT& NewClip)

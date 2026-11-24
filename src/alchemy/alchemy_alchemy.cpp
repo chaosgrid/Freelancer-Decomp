@@ -109,7 +109,7 @@ namespace AlchemyImpl
                 // +0x20 GetNodeFlags: retail stores the whole node+4 dword.
                 float Dt = 0.0f;
                 std::memcpy(&Dt, &A, sizeof(float));
-                AsFxNode(Node)->Pad5(Dt);
+                AsFxNode(Node)->UpdateNode(Dt);
                 unsigned long Flag = 0;
                 AsFxNode(Node)->GetNodeFlags(&Flag);
                 if ((Flag & 1) != 0)
@@ -128,26 +128,26 @@ namespace AlchemyImpl
     } // namespace
 
     // FUN_0623f450. BeginDraw calls it (0x06201b5e) after saving its six render
-    // states and before the counter reset; EndDraw restores only those six, so
-    // nothing set here is undone.
+    // states and before the counter reset; EndDraw restores those six but not the
+    // texture-stage states set here.
     void ApplyParticleDrawRenderState()
     {
-        G_RenderPipeline->SetRenderState(D3DRS_LIGHTING, 0); // color write mask: off
-        G_RenderPipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0); // cull mode: none
-        G_RenderPipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, 1); // alpha blend: on
-        G_RenderPipeline->SetRenderState(D3DRS_CULLMODE, 1); // alpha test: on
+        G_RenderPipeline->SetRenderState(D3DRS_LIGHTING, FALSE);
+        G_RenderPipeline->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+        G_RenderPipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+        G_RenderPipeline->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 
-        G_RenderPipeline->SetTextureStageState(0, 1, 4);
-        G_RenderPipeline->SetTextureStageState(0, 2, 2);
-        G_RenderPipeline->SetTextureStageState(0, 3, 0);
-        G_RenderPipeline->SetTextureStageState(0, 4, 4);
-        G_RenderPipeline->SetTextureStageState(0, 5, 2);
-        G_RenderPipeline->SetTextureStageState(0, 6, 0);
-        G_RenderPipeline->SetTextureStageState(0, 0x0B, 0);
-        G_RenderPipeline->SetTextureStageState(0, 0x0D, 3);
-        G_RenderPipeline->SetTextureStageState(0, 0x0E, 3);
-        G_RenderPipeline->SetTextureStageState(1, 1, 1);
-        G_RenderPipeline->SetTextureStageState(1, 4, 1);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+        G_RenderPipeline->SetTextureStageState(0, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+        G_RenderPipeline->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+        G_RenderPipeline->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
 
         G_RenderPipeline->SetTextureStageTexture(1, nullptr);
     }
@@ -245,7 +245,7 @@ namespace AlchemyImpl
     {
         FAleChunk Chunk;
         Chunk.Filesys = Filesys;
-        Chunk.DeleteNode(kNodeLibName);
+        Chunk.CreateNode(kNodeLibName);
         Chunk.OpenNode(kNodeLibName);
         Chunk.OpenChunk(Filesys, kNodeLibName, 1);
         const unsigned long VersionBits = kAleVersion11Bits;
@@ -402,7 +402,7 @@ namespace AlchemyImpl
 
         float Dt = 0.0f;
         std::memcpy(&Dt, &A, sizeof(float));
-        AsFxNode(StartNode)->Pad5(Dt);
+        AsFxNode(StartNode)->UpdateNode(Dt);
         unsigned long Flag = 0;
         AsFxNode(StartNode)->GetNodeFlags(&Flag);
         if ((Flag & 1) != 0)
@@ -455,7 +455,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FAlchemy::Slot19(const char* Name, void* /*Unused*/)
+    GENRESULT DACOM_API FAlchemy::CreateNamedNode(const char* Name, void* /*Unused*/)
     {
         // FUN_06201d60: initializes a local FxNode and names it. Retail retains
         // its creation reference, ignores argument two, and publishes no output.
@@ -468,11 +468,9 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FAlchemy::AttachNode(void* ParentRaw, void* ChildRaw)
     {
         // FUN_06201e90: fails when the child already has a parent; links through
-        // FUN_06201e00 and AddRefs parent and child.
+        // FUN_06201e00 and AddRefs the child's new parent and the child.
         IDAComponent* Child = static_cast<IDAComponent*>(ChildRaw);
-        if (Child == nullptr)
-            return GR_GENERIC;
-        if (CallGetAttachParent(Child) != nullptr)
+        if (AsFxNode(Child)->GetAttachParent() != nullptr)
             return GR_GENERIC;
         IDAComponent* Parent = static_cast<IDAComponent*>(ParentRaw);
         LinkNodeTree(Parent, Child);
@@ -492,8 +490,7 @@ namespace AlchemyImpl
         }
         Attaches_[AttachCount_].Parent = Parent;
         Attaches_[AttachCount_].Child = Child;
-        if (Parent != nullptr)
-            Parent->AddRef();
+        AsFxNode(Child)->GetAttachParent()->AddRef();
         Child->AddRef();
         AttachCount_ += 1;
         return GR_OK;
@@ -501,7 +498,8 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FAlchemy::AttachNodeFiltered(void* A, void* B)
     {
-        // LAB_06201ed0: filter the parent before attaching the child.
+        // LAB_06201ed0: filter the parent before attaching the child. Retail: with no
+        // filter callback the parent is null, and LinkNodeTree dereferences it.
         unsigned long FilterResult = 0;
         if (G_FilterCallback != nullptr)
             FilterResult = G_FilterCallback(A, B);
@@ -670,9 +668,9 @@ namespace AlchemyImpl
         // 0xc) before the render-state saves. EndDraw's flush does not clear them.
         if (G_Defaults.bUseMaterialBatcher != 0)
             ClearBatchLists();
-        G_RenderPipeline->GetRenderState(D3DRS_CULLMODE, &SavedRsAlphaTest_);
-        G_RenderPipeline->GetRenderState(D3DRS_LIGHTING, &SavedRsColorWrite_);
-        G_RenderPipeline->GetRenderState(D3DRS_ZWRITEENABLE, &SavedRsCull_);
+        G_RenderPipeline->GetRenderState(D3DRS_CULLMODE, &SavedRsCullMode_);
+        G_RenderPipeline->GetRenderState(D3DRS_LIGHTING, &SavedRsLighting_);
+        G_RenderPipeline->GetRenderState(D3DRS_ZWRITEENABLE, &SavedRsZWriteEnable_);
         G_RenderPipeline->GetRenderState(D3DRS_ALPHABLENDENABLE, &SavedRsAlphaBlend_);
         G_RenderPipeline->GetRenderState(D3DRS_SRCBLEND, &SavedRsSrcBlend_);
         G_RenderPipeline->GetRenderState(D3DRS_DESTBLEND, &SavedRsDestBlend_);
@@ -694,9 +692,9 @@ namespace AlchemyImpl
         G_bInDraw = false;
         if (UseMaterialBatcher != 0)
             FlushAppearanceBatches();
-        G_RenderPipeline->SetRenderState(D3DRS_CULLMODE, SavedRsAlphaTest_);
-        G_RenderPipeline->SetRenderState(D3DRS_LIGHTING, SavedRsColorWrite_);
-        G_RenderPipeline->SetRenderState(D3DRS_ZWRITEENABLE, SavedRsCull_);
+        G_RenderPipeline->SetRenderState(D3DRS_CULLMODE, SavedRsCullMode_);
+        G_RenderPipeline->SetRenderState(D3DRS_LIGHTING, SavedRsLighting_);
+        G_RenderPipeline->SetRenderState(D3DRS_ZWRITEENABLE, SavedRsZWriteEnable_);
         G_RenderPipeline->SetRenderState(D3DRS_ALPHABLENDENABLE, SavedRsAlphaBlend_);
         G_RenderPipeline->SetRenderState(D3DRS_SRCBLEND, SavedRsSrcBlend_);
         G_RenderPipeline->SetRenderState(D3DRS_DESTBLEND, SavedRsDestBlend_);

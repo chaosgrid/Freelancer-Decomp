@@ -25,7 +25,7 @@ namespace
 
 TractorArm::TractorArm(CETractor* OwnerTractor)
     : Owner(OwnerTractor)
-    , State(MODE_0)
+    , State(MODE_OFF)
     , PullOffset{0.0f, 0.0f, 0.0f}
     , Timer(0.0f)
     , ErrorCode(TractorOk)
@@ -63,7 +63,7 @@ TractorArm::~TractorArm()
 {
     // FUN_0629dbd0. Retail unwatches here and then again in the BaseWatcher member destructor.
     TargetWatch.set(nullptr);
-    State = MODE_0;
+    State = MODE_OFF;
     PullOffset = Vector{0.0f, 0.0f, 0.0f};
     Timer = 0.0f;
     ErrorCode = TractorOk;
@@ -87,14 +87,14 @@ void TractorArm::SetTarget(CLoot* Target)
     PullOffset = Vector{0.0f, 0.0f, 0.0f};
     Timer = 0.0f;
     ErrorCode = TractorOk;
-    State = MODE_1;
+    State = MODE_REACHING;
 }
 
 void TractorArm::TurnOff()
 {
     // FUN_0629dea0
     TargetWatch.set(nullptr);
-    State = MODE_0;
+    State = MODE_OFF;
     PullOffset = Vector{0.0f, 0.0f, 0.0f};
     Timer = 0.0f;
     ErrorCode = TractorOk;
@@ -102,10 +102,11 @@ void TractorArm::TurnOff()
 
 void TractorArm::Update(float Dt)
 {
-    // FUN_0629dc40. Retail's FUN_0629de50 is CETractor::GetSourcePos here. MODE_1 extends the tip
-    // toward the target at up to ReachSpeed units/sec; when this frame's step reaches it,
-    // PullOffset snaps onto the target and MODE_2 counts ACQUIRE_DELAY down to Event_0x18.
-    if (State == MODE_0)
+    // FUN_0629dc40. Retail's FUN_0629de50 is CETractor::GetSourcePos here. MODE_REACHING
+    // extends the tip toward the target at up to ReachSpeed units/sec; when this frame's step
+    // reaches it, PullOffset snaps onto the target and MODE_HOLDING counts ACQUIRE_DELAY down to
+    // TractorArmAcquireTimeUp.
+    if (State == MODE_OFF)
         return;
 
     CLoot* Target = GetTarget();
@@ -113,12 +114,12 @@ void TractorArm::Update(float Dt)
     if (Code != TractorOk)
     {
         ErrorCode = Code;
-        Owner->Notify(INotify::Event_0x15, this);
+        Owner->Notify(INotify::TractorArmFailed, this);
         TurnOff();
         return;
     }
 
-    if (State == MODE_1)
+    if (State == MODE_REACHING)
     {
         Vector const SourcePos = Owner->GetSourcePos();
         Vector const Candidate{SourcePos.x + PullOffset.x, SourcePos.y + PullOffset.y,
@@ -148,32 +149,32 @@ void TractorArm::Update(float Dt)
         PullOffset.x = Target->WorldPosition.x - SourcePos.x;
         PullOffset.y = Target->WorldPosition.y - SourcePos.y;
         PullOffset.z = Target->WorldPosition.z - SourcePos.z;
-        Owner->Notify(INotify::Event_0x17, this);
-        State = MODE_2;
+        Owner->Notify(INotify::TractorArmReachedTarget, this);
+        State = MODE_HOLDING;
         Timer = ACQUIRE_DELAY;
         return;
     }
 
-    if (State == MODE_2)
+    if (State == MODE_HOLDING)
     {
         Timer -= Dt;
         if (Timer < 0.0f)
-            Owner->Notify(INotify::Event_0x18, this);
+            Owner->Notify(INotify::TractorArmAcquireTimeUp, this);
     }
 }
 
 Vector TractorArm::GetTipPos() const
 {
-    // FUN_0629df10. MODE_1: source + PullOffset. MODE_2: the target's position, or the source if
-    // it is gone. Otherwise the source. Retail's read of the literal 0x2c/0x30/0x34 sits behind a
-    // re-test of an already non-null pointer, so it is dead.
-    if (State == MODE_1)
+    // FUN_0629df10. MODE_REACHING: source + PullOffset. MODE_HOLDING: the target's position, or
+    // the source if it is gone. Otherwise the source. Retail's read of the literal
+    // 0x2c/0x30/0x34 sits behind a re-test of an already non-null pointer, so it is dead.
+    if (State == MODE_REACHING)
     {
         Vector const Source = Owner->GetSourcePos();
         return Vector{Source.x + PullOffset.x, Source.y + PullOffset.y, Source.z + PullOffset.z};
     }
 
-    if (State == MODE_2)
+    if (State == MODE_HOLDING)
     {
         CLoot* Target = GetTarget();
         if (Target != nullptr)
@@ -183,8 +184,8 @@ Vector TractorArm::GetTipPos() const
     return Owner->GetSourcePos();
 }
 
-// Ordinals 1174 and 1481, .rdata 0x0639d80c / 0x0639d810. ACQUIRE_DELAY is the MODE_2 countdown
-// (TractorArm+0x1c) before the towed CLoot is consumed. GRAB_TOLERANCE_SQUARED has no reader in
-// Common.dll; exported for symbol parity only.
+// Ordinals 1174 and 1481, .rdata 0x0639d80c / 0x0639d810. ACQUIRE_DELAY is the MODE_HOLDING
+// countdown (TractorArm+0x1c) before the towed CLoot is consumed. GRAB_TOLERANCE_SQUARED has no
+// reader in Common.dll; exported for symbol parity only.
 float const TractorArm::ACQUIRE_DELAY = 1.0f;
 float const TractorArm::GRAB_TOLERANCE_SQUARED = 1.0f;

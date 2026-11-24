@@ -42,11 +42,12 @@ struct FEffectBase
     };
     unsigned char Flags08;         // +0x08  bit0 live (light), bit1 deactivated
     unsigned char Pad09[3];
-    float Priority0C;              // +0x0C
+    float Priority;                // +0x0C  1.0, or the type info's priority
     FTransform LocalXform;         // +0x10 … +0x3F
     int EngineIndex;               // +0x40  = -1
     BaseWatcher Watcher;           // +0x44 … +0x4B
-    unsigned char Pad4C[0x0C];     // +0x4C … +0x57
+    unsigned char FrozenVelocity[0x0C]; // +0x4C … +0x57  three floats; the freeze stores the
+                                        //               instance's velocity
     unsigned RefCount;             // +0x58  FUN_004f7a80 / FUN_004f7a90
     unsigned EffectTypeId;         // +0x5C
     void* LinkPrev;                // +0x60

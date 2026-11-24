@@ -47,14 +47,6 @@ namespace
     // DAT_0066d4e0 -- the 0x400-byte send buffer BinaryRDLWriter fills before SubmitChat.
     char G_ChatSendBuffer[0x400];
 
-    // The clone-into-list idiom (FUN_0046c800 with a fresh clone, first clone deleted).
-    void AppendNodeClone(RenderDisplayList& List, RDLNode const& Node)
-    {
-        RDLNode* const Temp = Node.Clone();
-        RdlAppendNode(List, Temp->Clone());
-        delete Temp;
-    }
-
     // DAT_0066da84 +0x350: the group set's element count.
     bool ChatGroupIsEmpty()
     {
@@ -121,7 +113,7 @@ namespace
             Batch.Growth = 0x80;
             Batch.VertCapacity = 0;
             Batch.IndexCapacity = 0;
-            Batch.Flag28 = 0;
+            Batch.bCloseLoop = 0;
             Batch.bStripMode = 0;
             Batch.Pad2A = 0;
             Batch.Pad2B = 0;
@@ -209,7 +201,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     // triangles. UV repeats the tile over the box from (0, 0) to (Width, -Height).
     float const V1 = Height / TileHeight;
     Batch->Type = 4;
-    Batch->Flag28 = 0;
+    Batch->bCloseLoop = 0;
     Batch->bStripMode = 1;
     Batch->U = 0.0f;
     Batch->V = V1;
@@ -232,7 +224,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     int Count = Batch->VertCount;
     if (Count != 0)
     {
-        if (Batch->Flag28 != 0)
+        if (Batch->bCloseLoop != 0)
         {
             Batch->Vertices[Count] = Batch->Vertices[0];
             ++Count;
@@ -319,37 +311,37 @@ void ChatTextInputDisplay::SetTarget(CHAT_ID const& Id)
     unsigned char const* Color = nullptr;
     if (Id.Id == G_ChatIdChannel1.Id)
     {
-        Style = 0xd801;
+        Style = kTextStyleChatSystem;
         Name = &PrefixSystem;
         Color = kColorSystem;
     }
     else if (Id.Id == G_ChatIdChannel2.Id)
     {
-        Style = 0x1d9d;
+        Style = kTextStyleChatLocal;
         Name = &PrefixLocal;
         Color = kColorLocal;
     }
     else if (Id.Id == G_ChatIdChannel3.Id)
     {
-        Style = 0xba28;
+        Style = kTextStyleChatGroup;
         Name = &PrefixGroup;
         Color = kColorGroup;
     }
     else if (Id.Id == G_ChatIdChannel0.Id)
     {
-        Style = 0xd681;
+        Style = kTextStyleChatUniverse;
         Name = &PrefixUniverse;
         Color = kColorUniverse;
     }
     else if (Id.Id == G_ChatIdNone.Id)
     {
-        Style = 0x73f7;
+        Style = kTextStyleChatConsole;
         Name = &PrefixConsole;
         Color = kColorConsole;
     }
     else
     {
-        Style = 0x8283;
+        Style = kTextStyleChatPlayer;
         if (Table != nullptr)
             Name = Table->FindName(Id);
         else
@@ -365,11 +357,11 @@ void ChatTextInputDisplay::SetTarget(CHAT_ID const& Id)
     RdlClear(Prefix);
     {
         StyleNode const Node(Style);
-        AppendNodeClone(Prefix, Node);
+        ChatAppendNodeClone(Prefix, Node);
     }
     {
         TextNode const Node(Text, -1);
-        AppendNodeClone(Prefix, Node);
+        ChatAppendNodeClone(Prefix, Node);
     }
 
     if (Name != nullptr)
@@ -377,13 +369,13 @@ void ChatTextInputDisplay::SetTarget(CHAT_ID const& Id)
 
     {
         TextNode const Node(kTargetArrow, -1);
-        AppendNodeClone(Prefix, Node);
+        ChatAppendNodeClone(Prefix, Node);
     }
 
     RdlClear(FixedStyle);
     {
         StyleNode const Node(Style);
-        AppendNodeClone(FixedStyle, Node);
+        ChatAppendNodeClone(FixedStyle, Node);
     }
 }
 
@@ -445,7 +437,7 @@ void ChatTextInputDisplay::NextTarget()
 
 void ChatTextInputDisplay::PrevTarget()
 {
-    // FUN_0045e940.
+    // FUN_0045e940. Retail does not test Table for null.
     CHAT_ID const Own(GetPlayerConnectionId() & 0xffffu);
     CHAT_ID Result(0u);
 
@@ -558,7 +550,7 @@ void ChatTextInputDisplay::Draw()
 bool ChatTextInputDisplay::OnKeyDown(FHudCmdRecord const* Record)
 {
     // FUN_0045f700: key-downs of an active line only.
-    if (Record->Byte18 != 0 && (Flags & 1) != 0)
+    if (Record->bKeyDown != 0 && (Flags & 1) != 0)
     {
         switch (Record->Key)
         {

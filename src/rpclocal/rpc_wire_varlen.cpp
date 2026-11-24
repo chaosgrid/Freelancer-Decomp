@@ -298,7 +298,7 @@ unsigned int RpcEncodeServerRemoteObjectCargoUpdate(FPacketBase& Packet,
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.PutByte(Wire->Field_0x04);                                  // / 06d8f8f4
+    Stream.PutByte(Wire->Flag);                                  // / 06d8f8f4
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -332,7 +332,7 @@ unsigned int RpcDecodeServerRemoteObjectCargoUpdate(FPacketBase& Packet,
     if (!Stream.GetByte(Flag)) {                                       // 06d8f9e5 / 06d8fa02
         return Stream.GetError();
     }
-    Wire->Field_0x04 = Flag;
+    Wire->Flag = Flag;
     if (!RpcGetEquipList(Stream, Slot)) {                              // 06d8fa17 FUN_06da2480
         return Stream.GetError();
     }

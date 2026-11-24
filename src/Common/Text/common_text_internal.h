@@ -17,13 +17,13 @@ namespace CmnText
     // DAT_0640957c: global default text attributes (TextRenderAttributes::Packed layout:
     // byte0 = style index, bytes 1-3 = color), seeded by the static initializer at RVA 0xc6290.
     // TextRenderContext, both DeviceTRC ctors and TRANode (0xc7380/0xc7b40/0xc7bf0/0xc8658) copy
-    // its current value at construction.
+    // it at construction. Nothing but that initializer writes it, so it is a constant here.
     static const unsigned long GDefaultTextAttribsPacked = 0xFFFFFF00u;
 
-    // DAT_063ed66c, the rich-text scale InitializeRichText / ReinitializeRichTextFonts set.
-    // Defined in common_textrender.cpp; DeviceTRC::execute_image and ImageNode::GetVisualSize
-    // (common_rdlnodes.cpp) read it.
-    extern float GRichTextScaleY;
+    // DAT_063ed66c, the image scale (screen height / 600) InitializeRichText sets. Defined in
+    // common_textrender.cpp; DeviceTRC::execute_image and ImageNode::GetVisualSize
+    // (common_rdlnodes.cpp) scale both image axes by it.
+    extern float GRichTextImageScale;
 
     // FUN_0632c490: links a new cell before Where and stores Value->Clone() in it.
     void InsertRdlCloneBefore(RenderDisplayList& Rdl, FRdlListNode* Where, RDLNode* const& Value);

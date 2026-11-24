@@ -50,7 +50,7 @@ struct FPrefOption
     int Min;                // +0x0c
     int Max;                // +0x10
     unsigned char bSlider;  // +0x14 slider (else toggle)
-    unsigned char Byte15;   // +0x15
+    unsigned char bDisabledInGame;   // +0x15
     unsigned char bHeader;  // +0x16 caption only
     unsigned char Pad17;
 };

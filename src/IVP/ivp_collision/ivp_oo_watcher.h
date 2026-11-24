@@ -73,7 +73,7 @@ public:
 
     // Slot 3 is the base's 0628f050 (`RET 8`), not overridden.
 };
-static_assert(sizeof(IVP_Synapse_OO) == 0x10, "eh vector constructor iterator element size 0x10 (.text:06369c36)");
+static_assert(sizeof(IVP_Synapse_OO) == 0x10, "eh vector constructor iterator element size 0x10 (FUN_06369be0, 06369c36)");
 
 class IVP_OO_Watcher : public IVP_Collision, public IVP_Collision_Delegator
 {
@@ -100,4 +100,4 @@ public:
     // IVP_Collision_Delegator slot 0: LAB_06369db0 (RET 4).
     void collision_is_going_to_be_deleted_event(IVP_Collision* Collision) override;
 };
-static_assert(sizeof(IVP_OO_Watcher) == 0x40, "operator_new(0x40) at .text:06360d5a");
+static_assert(sizeof(IVP_OO_Watcher) == 0x40, "operator_new(0x40) in FUN_06360c80, 06360d5a");

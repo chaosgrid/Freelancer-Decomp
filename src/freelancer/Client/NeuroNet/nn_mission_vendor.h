@@ -127,9 +127,6 @@ public:
     unsigned char Pad459[3];
 
 private:
-    // Port-only helper for the tail every close shares (e.g. 0x0048c4a5): delete the children,
-    // Destroy, delete this.
-    void DeleteSelf();
     // FUN_0048c770 -- copy the current base's offers, rows from the top, select offer 0.
     void LoadOffers();
     // FUN_0048c8a0 -- fill the five rows from ScrollOffset.

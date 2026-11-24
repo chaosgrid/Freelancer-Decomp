@@ -8,7 +8,8 @@
 
 // Common.dll-internal helpers shared by the Archetype translation units: common_archetype.cpp
 // (where they are defined), common_archetype_ships.cpp, common_archetype_equipment.cpp,
-// common_archetype_weapons.cpp and common_archetype_misc.cpp. Retail keeps all of this in one
+// common_archetype_weapons.cpp, common_archetype_misc.cpp and common_archetypeloader.cpp
+// (ArchetypeSource only). Retail keeps all of this in one
 // TU (E:\FL\Scratch\Source\Common\Archetype.cpp); none of these helpers is exported.
 
 #include "common_archetype.h"

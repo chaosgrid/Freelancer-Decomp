@@ -72,7 +72,7 @@ struct ObstacleAvoidance
         Vector Direction;     // +0x10  candidate deflection direction (unit-ish)
     };
 
-    static_assert(sizeof(Slot) == 0x1c, "ObstacleAvoidance::Slot stride 7 floats (Common.dll.c 0x062de490)");
+    static_assert(sizeof(Slot) == 0x1c, "ObstacleAvoidance::Slot stride 7 floats");
 
     // Update reads Owner+0xf0 (IBehaviorManager::WatchablePtr) and Owner+0xc
     // (IBehaviorManager::Pathfind, the PathfindManager this object is embedded in).
@@ -844,7 +844,7 @@ Vector* TransformInversePoint(Transform const* Self, Vector* Out, Vector const* 
 
 // The SystemManager+0x1364 block's ctor / Update / SetFormationLeader / SetFollowLeader /
 // SyncFormationLeader (FUN_062ebbc0 / 062ebcb0 / 062ec870 / 062ec970 / 062ec6b0) are
-// FGunConvergenceStateBlock members (common_systemmanager.h, common_gunconvergence.cpp).
+// FFormationLeaderState members (common_systemmanager.h, common_gunconvergence.cpp).
 
 static_assert(offsetof(ICRSplineSegment, P0) == 0x00, "ICRSplineSegment+0x00 P0");
 static_assert(offsetof(ICRSplineSegment, P1) == 0x0c, "ICRSplineSegment+0x0c P1");
@@ -853,7 +853,7 @@ static_assert(offsetof(ICRSplineSegment, P3) == 0x24, "ICRSplineSegment+0x24 P3"
 static_assert(offsetof(ICRSplineSegment, ArcLength) == 0x30, "ICRSplineSegment+0x30 ArcLength");
 static_assert(offsetof(ICRSplineSegment, SampleCount) == 0x34, "ICRSplineSegment+0x34 SampleCount");
 static_assert(offsetof(ICRSplineSegment, Reserved38) == 0x38, "ICRSplineSegment+0x38 Reserved38");
-static_assert(sizeof(ICRSplineSegment) == 0x40, "ICRSplineSegment sizeof 0x40 (proven by operator= COMDAT fold with GunUseStruct)");
+static_assert(sizeof(ICRSplineSegment) == 0x40, "ICRSplineSegment sizeof 0x40");
 
 // LAB_062d68b0 and LAB_062d7950 are FaceIdea::Update and DodgeIdea::Update
 // (common_faceidea.cpp / common_dodgeidea.cpp); the steering helpers they share are in

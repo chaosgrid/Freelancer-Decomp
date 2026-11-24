@@ -25,7 +25,7 @@
 #include "NeuroNet/nn_rollover.h"           // NnRolloverShowIdsAtGlobal / NnRolloverShowHoverAtGlobal
 #include "Interface/tooltip_hover.h"         // FToolTipHoverInfo, ToolTipHoverReset (FUN_004963a0)
 #include "NeuroNet/nn_text_control.h"
-#include "NeuroNet/nn_ui_pulse.h"           // G_NnPaletteArgb_679bb0 / 679ba4 / 679b94
+#include "NeuroNet/nn_ui_pulse.h"           // G_NnPaletteCyan / 679ba4 / 679b94
 #include "Core/perf_options.h"          // SavePerfOptions (FUN_005b3ec0), FindPerfOption*, ProbeMachineGraphicsLevel
 #include "Common/Graphics/pixel_format.h"          // PixelFormatFromD3D / PixelFormatGetDesc (FUN_005b7010 / 005b7030)
 #include "Space/player_spawn.h"          // GetPlayerConnectionId (DAT_00673344)
@@ -458,9 +458,9 @@ void NnPreferences::MarkKeyMapDirtyAndReload()
 {
     // Port-only helper, inlined in retail at 0x004ac6e7 / 0x004ac801 / 0x004acc1d / 0x004ad7ac.
     bDirty = 1;
-    CancelText->TextColour = G_NnPaletteArgb_679bb0;
+    CancelText->TextColour = G_NnPaletteCyan;
     CancelButton->bUseColour = 0;
-    CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState | 4);
+    CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState | kWireButtonEnabled);
     LoadKeyList(kKeyListPath);
     FillKeyRows(static_cast<int>(KeyScroll->SetProperty(0x3b, 0, 0)));
 }
@@ -537,9 +537,9 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 TakeSnapshot();
             }
             bDirty = 0;
-            CancelText->TextColour = G_NnPaletteArgb_679b94;
+            CancelText->TextColour = G_NnPaletteGrey;
             CancelButton->bUseColour = 1;
-            CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & 0xfb);
+            CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & ~kWireButtonEnabled);
             ShowConfirmDialog(false);
             LeaveCurrentPage();
             if (bDirty == 0)
@@ -702,9 +702,9 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (LoadUserKeyMapIni(UserPath) < 1)
                 LoadUserKeyMapIni(DefaultPath);
             bDirty = 0;
-            CancelText->TextColour = G_NnPaletteArgb_679b94;
+            CancelText->TextColour = G_NnPaletteGrey;
             CancelButton->bUseColour = 1;
-            CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & 0xfb);
+            CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & ~kWireButtonEnabled);
             LoadKeyList(kKeyListPath);
             FillKeyRows(static_cast<int>(KeyScroll->SetProperty(0x3b, 0, 0)));
         }
@@ -729,9 +729,9 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         {
             Revert(true);
             bDirty = 0;
-            CancelText->TextColour = G_NnPaletteArgb_679b94;
+            CancelText->TextColour = G_NnPaletteGrey;
             CancelButton->bUseColour = 1;
-            CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & 0xfb);
+            CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & ~kWireButtonEnabled);
         }
         else if (Source == DefaultsButton)
         {
@@ -934,15 +934,15 @@ bool NnPreferences::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // FUN_004ada40
     char Text[0x100];
-    sprintf(Text, "OnButton = %d\n", Event->Field0); // 0x005d50a4
+    sprintf(Text, "OnButton = %d\n", Event->Button); // 0x005d50a4
     OutputDebugStringA(Text);
     if (bKeyCapture == 0)
         return false;
-    if (Event->Field0 == -1)
+    if (Event->Button == kWin3DMouseLeft)
         return true;
-    if (Event->Field1 != 2)
+    if (Event->Action != kWin3DMousePress)
         return true;
-    return TryBindKey(Event->Field0, 0);
+    return TryBindKey(Event->Button, 0);
 }
 
 bool NnPreferences::KeyEvent(unsigned Key, unsigned char* Modifiers)
@@ -1035,16 +1035,16 @@ void NnPreferences::SelectGroup(int Group)
         Count = static_cast<int>(GetCurGroupRows().size());
         if (Index < Count)
         {
-            KeyBtnRows[Index]->ButtonState = static_cast<unsigned char>(KeyBtnRows[Index]->ButtonState | 4);
-            KeyAltBtnRows[Index]->ButtonState = static_cast<unsigned char>(KeyAltBtnRows[Index]->ButtonState | 4);
+            KeyBtnRows[Index]->ButtonState = static_cast<unsigned char>(KeyBtnRows[Index]->ButtonState | kWireButtonEnabled);
+            KeyAltBtnRows[Index]->ButtonState = static_cast<unsigned char>(KeyAltBtnRows[Index]->ButtonState | kWireButtonEnabled);
             ShowControl(CommandRows[Index]);
             ShowControl(KeyRows[Index]);
             ShowControl(KeyAltRows[Index]);
         }
         else
         {
-            KeyBtnRows[Index]->ButtonState = static_cast<unsigned char>(KeyBtnRows[Index]->ButtonState & 0xfb);
-            KeyAltBtnRows[Index]->ButtonState = static_cast<unsigned char>(KeyAltBtnRows[Index]->ButtonState & 0xfb);
+            KeyBtnRows[Index]->ButtonState = static_cast<unsigned char>(KeyBtnRows[Index]->ButtonState & ~kWireButtonEnabled);
+            KeyAltBtnRows[Index]->ButtonState = static_cast<unsigned char>(KeyAltBtnRows[Index]->ButtonState & ~kWireButtonEnabled);
             HideControl(CommandRows[Index]);
             HideControl(KeyRows[Index]);
             HideControl(KeyAltRows[Index]);
@@ -1059,9 +1059,9 @@ void NnPreferences::SelectGroup(int Group)
     for (int Index = 0; Index < 3; ++Index)
     {
         if (Index != Group)
-            GroupTexts[Index]->TextColour = G_NnPaletteArgb_679bb0;
+            GroupTexts[Index]->TextColour = G_NnPaletteCyan;
     }
-    GroupTexts[Group]->TextColour = G_NnPaletteArgb_679ba4;
+    GroupTexts[Group]->TextColour = G_NnPaletteAmber;
 }
 
 void NnPreferences::EnterKeyMapPage()
@@ -1075,7 +1075,7 @@ void NnPreferences::EnterKeyMapPage()
         bFlipping = 1;
         wchar_t Unused[0x40];
         GetIdsStringWWithRawFallback(0x52f, Unused, 0x40);
-        PageTexts[0]->TextColour = G_NnPaletteArgb_679ba4;
+        PageTexts[0]->TextColour = G_NnPaletteAmber;
         return;
     }
     SelectGroup(0);
@@ -1111,9 +1111,9 @@ namespace
     // The "enter an option page" tail shared by FUN_004ae650 / 4ae770 / 4ae890.
     void ResetCancelGrey(NnTextControl* CancelText, WireButtonControl* CancelButton)
     {
-        CancelText->TextColour = G_NnPaletteArgb_679b94;
+        CancelText->TextColour = G_NnPaletteGrey;
         CancelButton->bUseColour = 1;
-        CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & 0xfb);
+        CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & ~kWireButtonEnabled);
     }
 }
 
@@ -1126,7 +1126,7 @@ void NnPreferences::EnterInterfacePage()
     {
         CurPage = 1;
         bFlipping = 1;
-        PageTexts[1]->TextColour = G_NnPaletteArgb_679ba4;
+        PageTexts[1]->TextColour = G_NnPaletteAmber;
         return;
     }
     RefreshRows(-1);
@@ -1152,7 +1152,7 @@ void NnPreferences::EnterVideoPage()
     {
         CurPage = 2;
         bFlipping = 1;
-        PageTexts[2]->TextColour = G_NnPaletteArgb_679ba4;
+        PageTexts[2]->TextColour = G_NnPaletteAmber;
         return;
     }
     RefreshRows(-1);
@@ -1178,7 +1178,7 @@ void NnPreferences::EnterAudioPage()
     {
         CurPage = 3;
         bFlipping = 1;
-        PageTexts[3]->TextColour = G_NnPaletteArgb_679ba4;
+        PageTexts[3]->TextColour = G_NnPaletteAmber;
         return;
     }
     RefreshRows(-1);
@@ -1203,7 +1203,7 @@ void NnPreferences::EnterCreditsPage()
     {
         CurPage = 4;
         bFlipping = 1;
-        PageTexts[4]->TextColour = G_NnPaletteArgb_679ba4;
+        PageTexts[4]->TextColour = G_NnPaletteAmber;
         return;
     }
     SetTextIds(DefaultsText, 0x765);
@@ -1247,7 +1247,7 @@ void NnPreferences::LeaveKeyMapPage()
     HideControl(DefaultsButton);
     HideControl(DefaultsText);
     HideControl(Title);
-    PageTexts[0]->TextColour = G_NnPaletteArgb_679bb0;
+    PageTexts[0]->TextColour = G_NnPaletteCyan;
 }
 
 namespace
@@ -1290,7 +1290,7 @@ void NnPreferences::LeaveInterfacePage()
     HideControl(CancelText);
     HideControl(DefaultsButton);
     HideControl(DefaultsText);
-    PageTexts[1]->TextColour = G_NnPaletteArgb_679bb0;
+    PageTexts[1]->TextColour = G_NnPaletteCyan;
 }
 
 void NnPreferences::LeaveVideoPage()
@@ -1309,7 +1309,7 @@ void NnPreferences::LeaveVideoPage()
     HideControl(DefaultsButton);
     HideControl(DefaultsText);
     HideControl(StaticBar);
-    PageTexts[2]->TextColour = G_NnPaletteArgb_679bb0;
+    PageTexts[2]->TextColour = G_NnPaletteCyan;
 }
 
 void NnPreferences::LeaveAudioPage()
@@ -1327,7 +1327,7 @@ void NnPreferences::LeaveAudioPage()
     HideControl(CancelText);
     HideControl(DefaultsButton);
     HideControl(DefaultsText);
-    PageTexts[3]->TextColour = G_NnPaletteArgb_679bb0;
+    PageTexts[3]->TextColour = G_NnPaletteCyan;
 }
 
 void NnPreferences::LeaveCreditsPage()
@@ -1335,7 +1335,7 @@ void NnPreferences::LeaveCreditsPage()
     // Port-only helper, inlined in retail at 0x004ac2f9 / 0x004ad3bf / 0x004ad4a6 / 0x004adcf1 /
     // 0x004aefb9.
     HideControl(CreditsText);
-    PageTexts[4]->TextColour = G_NnPaletteArgb_679bb0;
+    PageTexts[4]->TextColour = G_NnPaletteCyan;
     SetTextIds(DefaultsText, 0x5e4);
     HideControl(DefaultsButton);
     HideControl(DefaultsText);
@@ -1404,15 +1404,7 @@ void NnPreferences::GotoRequestedPage()
     default:
         return;
     }
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child);
-        Child = Next;
-    }
-    Destroy();
-    delete this;
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
 }
 
 namespace
@@ -1591,7 +1583,7 @@ void NnPreferences::LoadKeyList(char const* Path)
                 if (Reader.is_value("group_num"))
                     Group = Reader.get_value_int(0);
                 else if (Reader.is_value("name"))
-                    GroupNameIds[Group] = Reader.get_value_int(0);
+                    GroupNameIds[Group] = Reader.get_value_int(0); // Retail: no bound; Group -1 hits +0x828
             }
             if (Group == 1)
             {
@@ -1721,17 +1713,17 @@ void NnPreferences::FillKeyRows(int First)
         FKeyRow const& Row = Rows[First + Index];
         NnTextControl* const KeyText = KeyRows[Index];
         NnTextControl* const AltText = KeyAltRows[Index];
-        CommandRows[Index]->TextColour = G_NnPaletteArgb_679bb0;
+        CommandRows[Index]->TextColour = G_NnPaletteCyan;
         KeyBtnRows[Index]->EdgeMask = 0xa;
         if (Row.bEditable != 0)
         {
-            KeyText->TextColour = G_NnPaletteArgb_679bb0;
-            AltText->TextColour = G_NnPaletteArgb_679bb0;
+            KeyText->TextColour = G_NnPaletteCyan;
+            AltText->TextColour = G_NnPaletteCyan;
         }
         else
         {
-            KeyText->TextColour = G_NnPaletteArgb_679b94;
-            AltText->TextColour = G_NnPaletteArgb_679b94;
+            KeyText->TextColour = G_NnPaletteGrey;
+            AltText->TextColour = G_NnPaletteGrey;
         }
         FKeyBindingLookup Lookup;
         if (Row.BindingKind == 1)
@@ -1821,7 +1813,7 @@ namespace
             Option->InfoIds = Reader.get_value_int(1);
             Option->Default = Reader.get_value_int(2);
             Option->bSlider = static_cast<unsigned char>(Reader.get_value_bool(3));
-            Option->Byte15 = static_cast<unsigned char>(Reader.get_value_bool(4));
+            Option->bDisabledInGame = static_cast<unsigned char>(Reader.get_value_bool(4));
             if (Count > 5)
             {
                 Option->Min = Reader.get_value_int(5);
@@ -1849,7 +1841,7 @@ namespace
         Option.Min = -1;
         Option.Max = -1;
         Option.bSlider = 0;
-        Option.Byte15 = 0;
+        Option.bDisabledInGame = 0;
         Option.bHeader = 0;
         Option.Pad17 = 0;
         return Option;
@@ -2010,9 +2002,9 @@ void NnPreferences::CancelChanges()
         Revert(true);
     }
     bDirty = 0;
-    CancelText->TextColour = G_NnPaletteArgb_679b94;
+    CancelText->TextColour = G_NnPaletteGrey;
     CancelButton->bUseColour = 1;
-    CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & 0xfb);
+    CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & ~kWireButtonEnabled);
     ShowConfirmDialog(false);
     LeaveCurrentPage(); // table 0x004b28c8
     if (bDirty == 0)
@@ -2426,7 +2418,8 @@ void NnPreferences::UpdateDirty(int Id, float Value)
             continue;
         if (Row.Id == Id)
         {
-            // Equal marks it (0x004b204d).
+            // Retail: equal marks it, the reverse of the other toggles (0x004b204d: TEST AH,0x44;
+            // JP skips on unequal or unordered).
             if (Snapshot[Index] == Value)
                 bFound = true;
             continue;
@@ -2439,10 +2432,10 @@ void NnPreferences::UpdateDirty(int Id, float Value)
     }
 
     bDirty = static_cast<unsigned char>(bFound);
-    CancelText->TextColour = bFound ? G_NnPaletteArgb_679bb0 : G_NnPaletteArgb_679b94;
+    CancelText->TextColour = bFound ? G_NnPaletteCyan : G_NnPaletteGrey;
     CancelButton->bUseColour = static_cast<unsigned char>(!bFound);
     CancelButton->ButtonState =
-        static_cast<unsigned char>((CancelButton->ButtonState & 0xfb) | (bFound ? 4 : 0));
+        static_cast<unsigned char>((CancelButton->ButtonState & ~kWireButtonEnabled) | (bFound ? kWireButtonEnabled : 0));
 }
 
 namespace
@@ -2599,19 +2592,19 @@ namespace
     // The colour / state block RefreshRows writes per row (0x004b0bae greyed, 0x004b0c58 live).
     void SetOptionRowGreyed(NnPreferences* Self, int Index, bool bGreyed)
     {
-        unsigned long const Colour = bGreyed ? G_NnPaletteArgb_679b94 : G_NnPaletteArgb_679bb0;
+        unsigned long const Colour = bGreyed ? G_NnPaletteGrey : G_NnPaletteCyan;
         Self->OptText[Index]->TextColour = Colour;
         Self->SmallButtonText[Index]->TextColour = Colour;
         WireButtonControl* const Small = Self->SmallButton[Index];
         if (bGreyed)
         {
             Small->bUseColour = 1;
-            Small->ButtonState = static_cast<unsigned char>(Small->ButtonState & 0xfb);
+            Small->ButtonState = static_cast<unsigned char>(Small->ButtonState & ~kWireButtonEnabled);
         }
         else
         {
             Small->bUseColour = 0;
-            Small->ButtonState = static_cast<unsigned char>(Small->ButtonState | 4);
+            Small->ButtonState = static_cast<unsigned char>(Small->ButtonState | kWireButtonEnabled);
         }
         Self->OptToggleText[Index]->TextColour = Colour;
         NnButtonControl* const Toggle = Self->OptToggle[Index];
@@ -2655,7 +2648,7 @@ void NnPreferences::RefreshRows(int Id)
         // Only the id and the three bytes are reset; pages 1..3 copy the row.
         Row.Id = -1;
         Row.bSlider = 0;
-        Row.Byte15 = 0;
+        Row.bDisabledInGame = 0;
         Row.bHeader = 0;
         if (CurPage == 1 || CurPage == 2 || CurPage == 3)
         {
@@ -2714,8 +2707,8 @@ void NnPreferences::RefreshRows(int Id)
         if (bDisabled)
             continue;
 
-        // "Not in game" rows (Byte15) are greyed while the window is open in game.
-        SetOptionRowGreyed(this, Index, Row.Byte15 != 0 && bInGame != 0);
+        // "Not in game" rows (bDisabledInGame) are greyed while the window is open in game.
+        SetOptionRowGreyed(this, Index, Row.bDisabledInGame != 0 && bInGame != 0);
         ShowControl(OptText[Index]);
         GetIdsStringWWithRawFallback(static_cast<unsigned>(RowId), Text, 0x40);
         OptText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
@@ -2813,15 +2806,15 @@ void NnPreferences::RefreshRows(int Id)
             SmallButtonText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
             if (SelWidth == CurWidth && bSel32 == bCur32)
             {
-                SmallButtonText[Index]->TextColour = G_NnPaletteArgb_679b94;
+                SmallButtonText[Index]->TextColour = G_NnPaletteGrey;
                 SmallButton[Index]->bUseColour = 1;
-                SmallButton[Index]->ButtonState = static_cast<unsigned char>(SmallButton[Index]->ButtonState & 0xfb);
+                SmallButton[Index]->ButtonState = static_cast<unsigned char>(SmallButton[Index]->ButtonState & ~kWireButtonEnabled);
             }
             else
             {
-                SmallButtonText[Index]->TextColour = G_NnPaletteArgb_679bb0;
+                SmallButtonText[Index]->TextColour = G_NnPaletteCyan;
                 SmallButton[Index]->bUseColour = 0;
-                SmallButton[Index]->ButtonState = static_cast<unsigned char>(SmallButton[Index]->ButtonState | 4);
+                SmallButton[Index]->ButtonState = static_cast<unsigned char>(SmallButton[Index]->ButtonState | kWireButtonEnabled);
             }
             break;
         }
@@ -2997,7 +2990,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         CreateTextControl("Screen Title", "PageHeader", TitlePosition, nullptr,
                           NnFloatBits(0x3ef645a2), NnFloatBits(0x3d75c28f), NnFloatBits(0x3fe00000),
                           0x4f8, 1, 0, 1));
-    Title->TextColour = G_NnPaletteArgb_679bb0;
+    Title->TextColour = G_NnPaletteCyan;
 
     // The page column's origin and step.
     float ColumnX = NnFloatBits(0xbe99999a);
@@ -3109,7 +3102,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             CreateTextControl("mainMenuText", "ButtonText", Position, nullptr, TextWidth,
                               TextHeight, TextScale, MainMenuIds, 1, 0, 1));
         PageTexts[5]->SetProperty(0x24, 1, 0);
-        PageTexts[5]->TextColour = G_NnPaletteArgb_679bb0;
+        PageTexts[5]->TextColour = G_NnPaletteCyan;
     }
 
     // The option rows' origin, optlist.ini, and the scroll origin (RowY + 0.007f).
@@ -3143,7 +3136,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             CreateTextControl(Name, "SubHeader", TextRow, nullptr, NnFloatBits(0x3e5c28f6),
                               NnFloatBits(0x3cf5c28f), 1.0f, 0, 0, 0, 0));
         OptText[Index]->SetProperty(0x24, 1, 0);
-        OptText[Index]->Byte380 = 0;
+        OptText[Index]->bHoverPulse = 0;
 
         // {0.415, TY, 0}, half extents {0.015, 0.015, 0}; +0x370 = DAT_00679b94.
         sprintf(Name, "opt_toggle %d", Index);
@@ -3154,7 +3147,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             "Interface\\NeuroNet\\Inventory\\repairblackbox.3db", "ui_shipview_select", nullptr,
             TogglePosition, nullptr, ToggleExtents, 0, 0, 0, 0, 0x65f, 0x67a));
         OptToggle[Index]->SetProperty(0x35, 1, 0);
-        memcpy(OptToggle[Index]->Colour, &G_NnPaletteArgb_679b94, 4);
+        memcpy(OptToggle[Index]->Colour, &G_NnPaletteGrey, 4);
 
         // {0.28, TY - 0.003f, 0}, 0.22 x 0.03, scale 0.9.
         sprintf(Name, "opt_toggleText %d", Index);
@@ -3205,8 +3198,8 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         float const SmallButtonExtents[3] = {NnFloatBits(0x3db851ec), NnFloatBits(0x3c343958), 0.0f};
         SmallButton[Index] = static_cast<WireButtonControl*>(CreateWireButtonControl(
             Name, "ui_select_item", SmallButtonRow, SmallButtonExtents, 0, 0, 0, 0, 0));
-        memcpy(SmallButton[Index]->Colour, &G_NnPaletteArgb_679b94, 4);
-        SmallButton[Index]->WireState2 = static_cast<unsigned char>(SmallButton[Index]->WireState2 | 1);
+        memcpy(SmallButton[Index]->Colour, &G_NnPaletteGrey, 4);
+        SmallButton[Index]->WireState2 = static_cast<unsigned char>(SmallButton[Index]->WireState2 | kWire2FlushBatchers);
 
         // {0.32, TY - 0.003f, 0}, 0.18 x 0.03, scale 0.9.
         sprintf(Name, "opt_smallBtnText %d", Index);
@@ -3234,8 +3227,8 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         float const DefaultsPosition[3] = {NnFloatBits(0xbc75c28f), NnFloatBits(0xbe970a3d), 0.0f};
         DefaultsButton = static_cast<WireButtonControl*>(CreateWireButtonControl(
             "opt_set_defaults_btn", "ui_select_item", DefaultsPosition, WireExtents, 0, 0, 0, 0, 0));
-        memcpy(CancelButton->Colour, &G_NnPaletteArgb_679b94, 4);
-        memcpy(DefaultsButton->Colour, &G_NnPaletteArgb_679b94, 4);
+        memcpy(CancelButton->Colour, &G_NnPaletteGrey, 4);
+        memcpy(DefaultsButton->Colour, &G_NnPaletteGrey, 4);
 
         float const CancelTextPosition[3] = {NnFloatBits(0x3e9a1cac), NnFloatBits(0xbe981062), 0.0f};
         CancelText = static_cast<NnTextControl*>(
@@ -3274,9 +3267,9 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
     }
 
     bDirty = 0;
-    CancelText->TextColour = G_NnPaletteArgb_679b94;
+    CancelText->TextColour = G_NnPaletteGrey;
     CancelButton->bUseColour = 1;
-    CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & 0xfb);
+    CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & ~kWireButtonEnabled);
 
     LeaveAudioPage();
     LeaveVideoPage();
@@ -3301,7 +3294,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         GroupButtons[Group] = static_cast<WireButtonControl*>(CreateWireButtonControl(
             Name, "ui_select_item", TabPosition, TabExtents, 0, 0, 0, 0, 0xf));
         GroupButtons[Group]->WireState =
-            static_cast<unsigned char>(GroupButtons[Group]->WireState & 0xbf);
+            static_cast<unsigned char>(GroupButtons[Group]->WireState & ~kWirePulseWhileHovered);
     }
 
     // The tab captions, 0.125 x 0.0295, scale 0.9.
@@ -3337,7 +3330,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         float const ButtonPosition[3] = {NnFloatBits(0x3eae147b), ButtonY, -1.0f};
         KeyBtnRows[Row] = static_cast<WireButtonControl*>(CreateWireButtonControl(
             Name, "ui_select_item", ButtonPosition, RowExtents, 0, 0, 0, 0, 0xa));
-        KeyBtnRows[Row]->WireState = static_cast<unsigned char>(KeyBtnRows[Row]->WireState & 0xbf);
+        KeyBtnRows[Row]->WireState = static_cast<unsigned char>(KeyBtnRows[Row]->WireState & ~kWirePulseWhileHovered);
 
         // {0.64, BY, -1}.
         sprintf(Name, "IBtn_alt_Row%d", Row);
@@ -3359,7 +3352,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             CreateTextControl(Name, "ItemName", CommandPosition, nullptr, NnFloatBits(0x3e48b439),
                               NnFloatBits(0x3cf5c28f), NnFloatBits(0x3f8ccccd), 0, 0, 0, 0));
         CommandRows[Row]->SetProperty(0x24, 1, 0);
-        CommandRows[Row]->Byte380 = 0;
+        CommandRows[Row]->bHoverPulse = 0;
 
         // {0.17 / 0.316, float(double(0.133f) - offset), 0}, 0.145 x 0.017, scale 1.1.
         float const KeyY = static_cast<float>(static_cast<double>(NnFloatBits(0x3e083127)) -
@@ -3402,7 +3395,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             CreateWireStaticControl(Name, StaticPosition, StaticExtents, 0, 0, 0, 1));
     }
 
-    StaticRows[13]->WireState2 = static_cast<unsigned char>(StaticRows[13]->WireState2 | 1);
+    StaticRows[13]->WireState2 = static_cast<unsigned char>(StaticRows[13]->WireState2 | kWire2FlushBatchers);
     FillKeyRows(0);
     LeaveKeyMapPage();
 
@@ -3429,7 +3422,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
     if (bInGame == 0)
     {
         HideControl(CreditsText);
-        PageTexts[4]->TextColour = G_NnPaletteArgb_679bb0;
+        PageTexts[4]->TextColour = G_NnPaletteCyan;
         SetTextIds(DefaultsText, 0x5e4);
         HideControl(DefaultsButton);
         HideControl(DefaultsText);
@@ -3473,7 +3466,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         DialogCancelButton = static_cast<WireButtonControl*>(CreateWireButtonControl(
             "SetKeyCancelBtn", "ui_select_item", RightPosition, DialogExtents, 0, 0, 0, 0, 0));
         DialogCancelButton->WireState2 =
-            static_cast<unsigned char>(DialogCancelButton->WireState2 | 1);
+            static_cast<unsigned char>(DialogCancelButton->WireState2 | kWire2FlushBatchers);
         DialogButtonText[0] = static_cast<NnTextControl*>(
             CreateTextControl("keymap_keyBtnText1", "ButtonText", LeftPosition, nullptr,
                               NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),

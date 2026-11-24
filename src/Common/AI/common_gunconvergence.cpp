@@ -4,16 +4,16 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-// Common.dll -- the 0xC8-byte record at SystemManager+0x1364 (FGunConvergenceStateBlock,
+// Common.dll -- the 0xC8-byte record at SystemManager+0x1364 (FFormationLeaderState,
 // common_systemmanager.h): the owning ship's formation / follow-leader state.
 // Retail run 0x062ebbc0-0x062ecd30; every function here is reached with ECX = Sys + 0x1364.
 
 #include "common_systemmanager.h"
 #include "common_cobject.h"  // CEqObj::get_behavior_interface (SyncFormationLeader)
 #include "common_iface.h"    // IObjRW, IBehaviorManager, ObjInspectOf, ObjRwFromWatchable, ObjAffectOf
-#include "AI/common_behavior_internal.h" // CmnBehavior::FollowerExternalIfaceIsPlayer (gates A / B)
+#include "AI/common_behavior_internal.h" // CmnBehavior::OwnerIsPlayer (gates A / B)
 
-using CmnBehavior::FollowerExternalIfaceIsPlayer;
+using CmnBehavior::OwnerIsPlayer;
 
 namespace
 {
@@ -33,7 +33,7 @@ namespace
 // FUN_062ecaf0. +0xC5 is the gate byte (non-zero -> null); the follow-leader slot +0x14 wins
 // over the formation-leader slot +0x0C unless it holds one of the sentinels 0 / 8; the raw
 // Watchable value minus 8 is the IObjRW (a 0 slot stays null).
-IObjRW* FGunConvergenceStateBlock::GetCurrentLeader() const
+IObjRW* FFormationLeaderState::GetCurrentLeader() const
 {
     if (bLeaderSuppressed != 0)
         return nullptr;
@@ -44,7 +44,7 @@ IObjRW* FGunConvergenceStateBlock::GetCurrentLeader() const
 }
 
 // FUN_062ec6a0.
-void FGunConvergenceStateBlock::SuppressCurrentLeader()
+void FFormationLeaderState::SuppressCurrentLeader()
 {
     bLeaderSuppressed = 1;
 }
@@ -52,7 +52,7 @@ void FGunConvergenceStateBlock::SuppressCurrentLeader()
 // FUN_062ebbc0. The two BaseWatcher members zero +0x0C..+0x1B. Owner, FollowerScratch and
 // +0xBC are not written. Retail's two `set_pointer(nullptr)` calls here are dead for a fresh
 // construction (both watchers were just zeroed) and are not reproduced.
-FGunConvergenceStateBlock::FGunConvergenceStateBlock()
+FFormationLeaderState::FFormationLeaderState()
 {
     FormationNarrowAngle = 0.1f;   // 0x3dcccccd
     FormationWideAngle = 0.2f;     // 0x3e4ccccd
@@ -79,7 +79,7 @@ FGunConvergenceStateBlock::FGunConvergenceStateBlock()
 }
 
 // FUN_062ebcb0.
-void FGunConvergenceStateBlock::Update(float Dt)
+void FFormationLeaderState::Update(float Dt)
 {
     // [this+8] is the owning SystemManager (re-read at every use in retail; nothing here
     // writes it). Its +0x1429 / +0x1370 are this record's own bLeaderSuppressed /
@@ -121,16 +121,16 @@ void FGunConvergenceStateBlock::Update(float Dt)
         if (Sum > Limit)
             ForceAttackCycleTimer = 0.0f;
 
-        if (Sys->GunConvergenceStateBytes.bLeaderSuppressed == 0 &&
-            IsWatchingObject(Sys->GunConvergenceStateBytes.FormationLeaderWatcher))
+        if (Sys->FormationLeaders.bLeaderSuppressed == 0 &&
+            IsWatchingObject(Sys->FormationLeaders.FormationLeaderWatcher))
             bBreakingFormation = 0;
     }
 
     // Sys+0xEC: the break-formation damage trigger (timer table slot 9).
     if (Sys->Timers.Timers[9].Active != 0 && Active != 0 &&
-        Sys->GunConvergenceStateBytes.bLeaderSuppressed == 0)
+        Sys->FormationLeaders.bLeaderSuppressed == 0)
     {
-        if (IsWatchingObject(Sys->GunConvergenceStateBytes.FormationLeaderWatcher))
+        if (IsWatchingObject(Sys->FormationLeaders.FormationLeaderWatcher))
             bBreakingFormation = 1;
     }
 
@@ -139,9 +139,9 @@ void FGunConvergenceStateBlock::Update(float Dt)
     if (MissileValue > 0.0f)
     {
         float const Threshold = Sys->Timers.Owner->PersonalityData.FormationParams.BreakFormationMissileReactionTime;
-        if (MissileValue <= Threshold && Active != 0 && Sys->GunConvergenceStateBytes.bLeaderSuppressed == 0)
+        if (MissileValue <= Threshold && Active != 0 && Sys->FormationLeaders.bLeaderSuppressed == 0)
         {
-            if (IsWatchingObject(Sys->GunConvergenceStateBytes.FormationLeaderWatcher))
+            if (IsWatchingObject(Sys->FormationLeaders.FormationLeaderWatcher))
                 bBreakingFormation = 1;
         }
     }
@@ -211,7 +211,7 @@ void FGunConvergenceStateBlock::Update(float Dt)
 // ----------------------------------------------------------------------------
 
 // Nine byte stores of 0 to +0xBC..+0xC4, inlined in both callers.
-static void ClearLeaderStateBytes(FGunConvergenceStateBlock& B)
+static void ClearLeaderStateBytes(FFormationLeaderState& B)
 {
     B.Field_0xBC = 0;
     B.bOrderPending = 0;
@@ -225,7 +225,7 @@ static void ClearLeaderStateBytes(FGunConvergenceStateBlock& B)
 }
 
 // FUN_062ec870. The get_id call orders below are retail's.
-void FGunConvergenceStateBlock::SetFormationLeader(IObjRW* Target)
+void FFormationLeaderState::SetFormationLeader(IObjRW* Target)
 {
     if (Target != nullptr)
     {
@@ -265,7 +265,7 @@ void FGunConvergenceStateBlock::SetFormationLeader(IObjRW* Target)
 }
 
 // FUN_062ec970.
-void FGunConvergenceStateBlock::SetFollowLeader(IObjRW* Target)
+void FFormationLeaderState::SetFollowLeader(IObjRW* Target)
 {
     if (Target != nullptr)
     {
@@ -315,7 +315,7 @@ void FGunConvergenceStateBlock::SetFollowLeader(IObjRW* Target)
 }
 
 // FUN_062ec6b0.
-void FGunConvergenceStateBlock::SyncFormationLeader()
+void FFormationLeaderState::SyncFormationLeader()
 {
     if (Owner != nullptr && IsWatchingObject(Owner->Watcher))
     {
@@ -381,20 +381,20 @@ void FGunConvergenceStateBlock::SyncFormationLeader()
 }
 
 // ----------------------------------------------------------------------------
-// FGunConvergenceStateBlock accessors; every retail call site passes
+// FFormationLeaderState accessors; every retail call site passes
 // ECX = SystemManager + 0x1364.
 // ----------------------------------------------------------------------------
 
 // FUN_062ec590, RET 8. The flag is stored as given, not derived from the value. Sole caller:
 // IBehaviorManager::OnEvent case 5.
-void FGunConvergenceStateBlock::SetValueB4(unsigned int Value, unsigned char Flag)
+void FFormationLeaderState::SetValueB4(unsigned int Value, unsigned char Flag)
 {
     ValueB4 = Value;
     bValueB4Valid = Flag;
 }
 
 // FUN_062ec5b0. Single call site: BaseFollowerBehavior::OnUpdate (0x062cb8ec).
-unsigned char FGunConvergenceStateBlock::TryGetValueB4(unsigned int* Out) const
+unsigned char FFormationLeaderState::TryGetValueB4(unsigned int* Out) const
 {
     unsigned char const Valid = bValueB4Valid;
     if (Valid)
@@ -403,7 +403,7 @@ unsigned char FGunConvergenceStateBlock::TryGetValueB4(unsigned int* Out) const
 }
 
 // FUN_062ec5d0, RET 0x14. Sole call site: IBehaviorManager::OnEvent case 4.
-void FGunConvergenceStateBlock::SetDirectiveOrder(unsigned char P1, unsigned int P2, unsigned int P3,
+void FFormationLeaderState::SetDirectiveOrder(unsigned char P1, unsigned int P2, unsigned int P3,
                                                   unsigned char P4, unsigned int P5)
 {
     bOrderPending = P1;
@@ -415,7 +415,7 @@ void FGunConvergenceStateBlock::SetDirectiveOrder(unsigned char P1, unsigned int
 
 // FUN_062ec610: packs the order into the caller's 0x10-byte block. Sole call site:
 // BaseFollowerBehavior::OnUpdate (0x062cbac4, its FollowerDirectiveOrder block).
-void FGunConvergenceStateBlock::GetDirectiveOrder(unsigned char* Out) const
+void FFormationLeaderState::GetDirectiveOrder(unsigned char* Out) const
 {
     *(unsigned int*)(Out + 0x0) = OrderObjectId;
     *(unsigned int*)(Out + 0x4) = OrderSecondObjectId;
@@ -426,7 +426,7 @@ void FGunConvergenceStateBlock::GetDirectiveOrder(unsigned char* Out) const
 
 // FUN_062ec650, RET 4. Callers: IBehaviorManager::OnEvent case 3 and
 // BaseFollowerBehavior::OnUpdate (.text:062cbb18).
-void FGunConvergenceStateBlock::SetValueB0(unsigned int Value)
+void FFormationLeaderState::SetValueB0(unsigned int Value)
 {
     if (Value == 0)
     {
@@ -440,7 +440,7 @@ void FGunConvergenceStateBlock::SetValueB0(unsigned int Value)
 
 // FUN_062ec680, RET 4. The getter half of FUN_062ec650; BaseFollowerBehavior::OnUpdate is its
 // only caller.
-bool FGunConvergenceStateBlock::TryGetValueB0(unsigned int* Out) const
+bool FFormationLeaderState::TryGetValueB0(unsigned int* Out) const
 {
     if (bValueB0Valid != 0)
         *Out = ValueB0;
@@ -448,10 +448,10 @@ bool FGunConvergenceStateBlock::TryGetValueB0(unsigned int* Out) const
 }
 
 // FUN_062ecc00, RET 0. Gate B.
-bool FGunConvergenceStateBlock::FollowerDirectiveGateB() const
+bool FFormationLeaderState::FollowerDirectiveGateB() const
 {
     SystemManager* const Sys = Owner;
-    if (FollowerExternalIfaceIsPlayer(Sys))
+    if (OwnerIsPlayer(Sys))
         return false;
     if (bBreakingFormation == 0)
         return false;
@@ -461,11 +461,11 @@ bool FGunConvergenceStateBlock::FollowerDirectiveGateB() const
 
 // FUN_062ecb20, RET 0. Gate A. Callers: BuzzBehavior::EvaluateReadiness (.text:062c6121),
 // EvadeBehavior (062c7b36), FaceBehavior (062c8c6a), StrafeBehavior (062c9735), TrailBehavior
-// (062ca834) and BaseFollowerBehavior::OnUpdate (062cbc64), all on NavHelper+0x1364.
-bool FGunConvergenceStateBlock::FollowerDirectiveGateA() const
+// (062ca834) and BaseFollowerBehavior::OnUpdate (062cbc64), all on SysMgr+0x1364.
+bool FFormationLeaderState::FollowerDirectiveGateA() const
 {
     SystemManager* const Sys = Owner;   // [ESI+8], no null test
-    if (FollowerExternalIfaceIsPlayer(Sys))
+    if (OwnerIsPlayer(Sys))
         return false;
     // Sys+0x1958: JobParams.bForceAttackFormation.
     if (Sys->PersonalityData.JobParams.bForceAttackFormation == 0)
@@ -492,7 +492,7 @@ bool FGunConvergenceStateBlock::FollowerDirectiveGateA() const
     // Sys->Owner (the IBehaviorManager), no null test.
     if (Sys->Owner->CurrentBehaviorIndex != 0xa)
         return false;
-    if (FollowerExternalIfaceIsPlayer(Sys))
+    if (OwnerIsPlayer(Sys))
         return false;
     if (bBreakingFormation == 0)
         return false;
@@ -512,7 +512,7 @@ static IObjRW* FormationLeaderOfRecordOwner(SystemManager* Sys)
 }
 
 // FUN_062ecc60, RET 4.
-void FGunConvergenceStateBlock::NotifyFormationLeader1(float Delay)
+void FFormationLeaderState::NotifyFormationLeader1(float Delay)
 {
     IObjRW* const Leader = FormationLeaderOfRecordOwner(Owner);
     if (Leader == nullptr)
@@ -524,7 +524,7 @@ void FGunConvergenceStateBlock::NotifyFormationLeader1(float Delay)
 }
 
 // FUN_062ecce0, RET 0.
-void FGunConvergenceStateBlock::NotifyFormationLeader2()
+void FFormationLeaderState::NotifyFormationLeader2()
 {
     IObjRW* const Leader = FormationLeaderOfRecordOwner(Owner);
     if (Leader == nullptr)
@@ -533,13 +533,13 @@ void FGunConvergenceStateBlock::NotifyFormationLeader2()
 }
 
 // FUN_062ecc50, RET 4.
-void FGunConvergenceStateBlock::SetFlagC3(unsigned char Value)
+void FFormationLeaderState::SetFlagC3(unsigned char Value)
 {
     bForceAttackFormation = Value;   // +0xc3
 }
 
 // FUN_062ecad0: the follow leader as an IObjRW, or null when the +0xc5 gate byte is set.
-IObjRW* FGunConvergenceStateBlock::GetFollowLeader() const
+IObjRW* FFormationLeaderState::GetFollowLeader() const
 {
     if (bLeaderSuppressed != 0)
         return nullptr;
@@ -549,7 +549,7 @@ IObjRW* FGunConvergenceStateBlock::GetFollowLeader() const
 // FUN_062ecd30, RET 0: the record owner's ship gets IObjAffect slot 0x60 (1, &own id, -1).
 // With no watched ship retail dispatches through address 4 and faults; the port dispatches
 // through the same null-derived pointer, with no guard.
-int FGunConvergenceStateBlock::RequestRelease()
+int FFormationLeaderState::RequestRelease()
 {
     SystemManager* const Sys = Owner;
     bReleaseRequested = 1;
@@ -559,14 +559,14 @@ int FGunConvergenceStateBlock::RequestRelease()
 }
 
 // FUN_062ecab0 (3 call sites): the formation leader, or null when the +0xc5 gate byte is set.
-IObjRW* FGunConvergenceStateBlock::GetFormationLeader() const
+IObjRW* FFormationLeaderState::GetFormationLeader() const
 {
     if (bLeaderSuppressed != 0)
         return nullptr;
     return WatchedObject(FormationLeaderWatcher);
 }
 
-// FUN_062ec520, RET 4. Callers: GotoBehavior::Update and GuideBehavior::Update (NavHelper +
+// FUN_062ec520, RET 4. Callers: GotoBehavior::Update and GuideBehavior::Update (SysMgr +
 // 0x1364).
 //
 // The owning SystemManager is dereferenced with no test; only its watched object is tested.
@@ -574,7 +574,7 @@ IObjRW* FGunConvergenceStateBlock::GetFormationLeader() const
 //
 // Retail quirk: the count guard (`TEST EBX,EBX / JBE`) rejects only an exactly-zero count and
 // the loop compares unsigned, so the count is modelled as unsigned.
-bool FGunConvergenceStateBlock::IsIdAmongOwnerFormationFollowers(unsigned WantedId)
+bool FFormationLeaderState::IsIdAmongOwnerFormationFollowers(unsigned WantedId)
 {
     IObjRW* const OwnerObj = WatchedObject(Owner->Watcher);
     if (OwnerObj == nullptr)

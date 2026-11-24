@@ -63,15 +63,6 @@ struct FScreenQuadRenderStateSaver
 int ScreenQuadClip1D(float* Edge0, float* Edge1, float* Attr0, float* Attr1, float Lo, float Hi,
                      float Span);
 
-// Cached SetRenderState / SetPipelineState / SetTextureStageState — skip when unchanged.
-void ScreenQuadSetRenderState(IRenderPipeline* Pipe, int State, int Value);
-void ScreenQuadSetPipelineState(IRenderPipeline* Pipe, int Id, int Value);
-void ScreenQuadSetTextureStageState(IRenderPipeline* Pipe, int Stage, int Type, int Value);
-void ScreenQuadInvalidateStateCache();
-
-// MenuSetup2D path (different RS preset from the batcher DAT_005c7520 table).
-void ApplyScreenQuadRenderStates(IRenderPipeline* Pipe);
-
 // FUN_00402d30 — DAT_00616474 material-list key. On change only DAT_00616498 is nulled; the
 // previous key's container stays in the map with its queued nodes.
 void ScreenQuadSetMaterialKey(unsigned long Key);

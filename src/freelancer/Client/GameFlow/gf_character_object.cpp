@@ -460,7 +460,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     if (Bone != -1)
     {
         DALib::Deform->SetPosePos(Lod.Instance, const_cast<float*>(&Desc.Pos.x));
-        SetFloat1C(Desc.Pos.y);
+        SetFloorHeight(Desc.Pos.y);
         DALib::Deform->SetPoseOri(Lod.Instance, const_cast<Matrix*>(&Desc.Orient));
     }
     Hardpoints.analyze_instance(Bone);
@@ -486,8 +486,6 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
             CacheString Name;
             Name.clear();
             Name.Value = StringAlloc(It->c_str(), true);
-            CacheString Pair;
-            Pair.clear();
             Archetype::PushMaterialPathPair(&Paths, Name.Value, 0xffffffffu);
         }
 
@@ -588,11 +586,11 @@ void* FCharacterObject::GetEngineInstance()
     return reinterpret_cast<void*>(static_cast<intptr_t>(Bone));
 }
 
-void FCharacterObject::SetFloat1C(float Value)
+void FCharacterObject::SetFloorHeight(float Value)
 {
     // LAB_004449a0: IDeformable slot 24 with the value, +0x1c = value, +0x378 = 1.
     DALib::Deform->SetHeight(Lod.Instance, Value);
-    Float1C = Value;
+    FloorHeight = Value;
     bPoseDirty = 1;
 }
 
@@ -785,7 +783,7 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
     DALib::Deform->SetLod(Lod.Instance, FrameTime, LodIds);
 
     // FUN_0044b370.
-    float const Height = GetFloat1C();
+    float const Height = GetFloorHeight();
     unsigned long HeightBits = 0;
     memcpy(&HeightBits, &Height, sizeof(HeightBits));
     RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
@@ -871,7 +869,7 @@ FGfScriptSequence* FCharacterObject::CreateOwnScript(char const* ScriptName, uns
     Sequence->AddScript(ScriptName, 0, &Frame, Engine);
     Sequence->Mirror.Add(this, nullptr);
     Sequence->BindMode = 1;
-    Sequence->Field_0x05 = 1;
+    Sequence->bOwnScript = 1;
     Sequence->bLoop = 1;
     Sequence->bLetterbox = 0;
     Sequence->bApplySpatial = bSpatial;
@@ -1264,8 +1262,8 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
                             nullptr);
     }
 
-    Sequence->SetDialog(static_cast<int>(Behavior->DialogType), static_cast<int>(Behavior->OfferArg),
-                        static_cast<int>(Behavior->OfferMissionId), Behavior->NameFmtStr,
+    Sequence->SetDialog(static_cast<int>(Behavior->DialogType), static_cast<int>(Behavior->OfferId),
+                        static_cast<int>(Behavior->OfferKind), Behavior->NameFmtStr,
                         Behavior->DescFmtStr);
 
     // +0x14 set -- this character alone, bound as the mirror's first;
@@ -1339,5 +1337,5 @@ void PlacePlayerAtSetpoint(char const* SetpointName)
     void* const Instance = Player->Lod.Instance;
     DALib::Deform->SetPosePos(Instance, &Pos.x);
     DALib::Deform->SetPoseOri(Instance, &Orient);
-    Player->SetFloat1C(Pos.y);
+    Player->SetFloorHeight(Pos.y);
 }

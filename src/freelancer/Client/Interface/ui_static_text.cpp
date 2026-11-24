@@ -34,7 +34,7 @@ bool UiStaticText::Create(Win3D* NewParent, void* Payload)
     Flags = static_cast<unsigned char>(Flags & 0xfe);
     Width = 0.1f;
     Height = 0.1f;
-    FlagE1 = 0;
+    bDrawBackground = 0;
     SetText(L"StaticText");
 
     if (Payload != nullptr)
@@ -45,7 +45,7 @@ bool UiStaticText::Create(Win3D* NewParent, void* Payload)
         LocalHeight = TextPayload->Bottom;
         Height = TextPayload->Bottom;
         SetText(TextPayload->CaptionUtf16);
-        ColorD8 = 0xff000000u;
+        BackgroundColor = 0xff000000u;
     }
     return true;
 }

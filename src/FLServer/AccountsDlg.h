@@ -7,7 +7,7 @@
 // CAccountsDlg — "Manage Accounts & Characters" (dialog 0x93). Lists every account of
 // Players (account rows carry the CAccount* as item data, the character rows under them carry
 // their 1-based position below the account row) and edits / deletes accounts and characters.
-// Retail: ctor .text:00412aa0, dtor 0040d150, vtable .rdata:0041df90, message map 0041df88.
+// Retail: ctor .text:00412aa0, dtor 0040d150, vtable .rdata:0041df90, message map 0041df88 (entries 0041dec8).
 #pragma once
 
 #include "FLListBox.h"

@@ -203,8 +203,9 @@ namespace
                 break;
             InsertAt = InsertAt + 1;
         }
-        // Retail bug kept: no capacity check on the insertion path (only the append is
-        // bounded), so more than 0x400 visible layered objects overrun the stack array.
+        // Retail: no capacity check on the insertion path (only the append is bounded,
+        // FUN_0059e5c0 0059e656 `cmp edx,400h`), so more than 0x400 visible layered objects
+        // overrun the array.
         if (Size - InsertAt != 0)
             memmove(&Sorted[InsertAt + 1], &Sorted[InsertAt], (Size - InsertAt) * sizeof(Win3D*));
         Sorted[InsertAt] = Object;
@@ -348,7 +349,7 @@ Win3D::~Win3D()
 {
     // FUN_004b4fd0. Children are destroyed, not deleted.
     G_Win3DLiveCount = G_Win3DLiveCount - 1;
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Destroy();
     Win3DUnregister(this);
@@ -422,7 +423,7 @@ bool Win3D::Create(Win3D* NewParent, void* /*Data*/)
 void Win3D::Destroy()
 {
     // FUN_004b5090.
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Destroy();
     Win3DUnregister(this);
@@ -584,7 +585,8 @@ void Win3DPushCapture(Win3D* Object)
 {
     // FUN_0059d8d0. A non-zero +0x38 means the object may already be on the stack: it is moved
     // to the head. A zero +0x38 means it is the tail or absent -- either way it is pushed
-    // without a search, as retail does.
+    // without a search. Retail: pushing the tail (or the only entry) again makes the stack
+    // cyclic, and every capture walk then loops forever.
     Win3D* const OldNext = Object->CaptureNext;
     if (OldNext == nullptr)
     {
@@ -746,6 +748,7 @@ bool Win3DUnregister(Win3D* Object)
     Object->Flags = static_cast<unsigned char>(Object->Flags | kWin3DUnregistered);
     if (G_KeyFocus == Object)
         G_KeyFocus = nullptr;
+    // Retail: the whole capture stack is dropped, not just its head popped.
     if (G_CaptureHead == Object)
         G_CaptureHead = nullptr;
     if (G_Hover == Object)
@@ -801,9 +804,9 @@ bool Win3DDispatchKey(FHudCmdRecord const* Record)
     // written.
     unsigned char Modifiers =
         static_cast<unsigned char>(reinterpret_cast<uintptr_t>(Record) & 0xe0);
-    unsigned char const Byte18 = Record->Byte18;
-    Modifiers = static_cast<unsigned char>(Modifiers | ((Byte18 & 1) << 1));
-    if (Byte18 == 0)
+    unsigned char const bKeyDown = Record->bKeyDown;
+    Modifiers = static_cast<unsigned char>(Modifiers | ((bKeyDown & 1) << 1));
+    if (bKeyDown == 0)
         Modifiers = static_cast<unsigned char>(Modifiers | 0x01);
     unsigned const Shift = Record->Modifiers;
     if ((Shift & 0x03) != 0)
@@ -1529,14 +1532,14 @@ namespace
         FWin3DMouseEvent Event;
         unsigned const ButtonIndex = MsgId - 6;
         if (ButtonIndex < 8)
-            Event.Field0 = -1 - static_cast<int>(ButtonIndex);
+            Event.Button = -1 - static_cast<int>(ButtonIndex);
         else
-            Event.Field0 = 0;
-        unsigned char const Byte1A = HudCommandRecord()->Byte1A;
-        if (HudCommandRecord()->Byte18 != 0)
-            Event.Field1 = 2 + (Byte1A != 0 ? 1 : 0);
+            Event.Button = 0;
+        unsigned char const bDoubleClick = HudCommandRecord()->bDoubleClick;
+        if (HudCommandRecord()->bKeyDown != 0)
+            Event.Action = kWin3DMousePress + (bDoubleClick != 0 ? 1 : 0);
         else
-            Event.Field1 = 1;
+            Event.Action = kWin3DMouseRelease;
 
         // Walk the capture chain. For each capture object the pick inside it gets the event
         // first; the capture object itself gets it when the pick missed or

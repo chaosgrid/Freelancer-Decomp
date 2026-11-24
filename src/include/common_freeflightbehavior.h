@@ -34,7 +34,7 @@ class FreeFlightBehavior : public GotoBehavior
 {
 public:
     // Retail's ctor argument is the behavior type id (19, "FreeFlight"); it is forwarded to GotoBehavior.
-    // See Behavior::GetTypeId() in common_behavior.h.
+    // See Behavior::TypeId in common_behavior.h.
     explicit FreeFlightBehavior(int InTypeId);
     ~FreeFlightBehavior() override;
 

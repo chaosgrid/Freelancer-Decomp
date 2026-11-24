@@ -607,7 +607,7 @@ namespace AlchemyImpl
         // Mesh particles never come through here: FxMeshAppearance overrides EmitOne with
         // FUN_06224c20 (alchemy_appearances.cpp), which asks the mesh factory and fills
         // Extra2 +0x30 itself. Particle (0x74) records never come through here either:
-        // FxParticleAppearance::Pad47 (FUN_0622f6a0) allocates and fills them itself.
+        // FxParticleAppearance::SpawnParticle (FUN_0622f6a0) allocates and fills them itself.
         //
         // Perp and dust (stride 0x3C, kStrideDust == kStridePerp) keep three floats at
         // +0x30 (perp's persisted billboard axis, FUN_06233330; dust's previous
@@ -1654,16 +1654,6 @@ namespace AlchemyImpl
     static_assert(sizeof(FAlchemyVertex) == kAlchemyVertexStride,
                   "FAlchemyVertex must match FUN_06208aa0 stride 0x18");
 
-    IGenericFx* QueryGenericFx(IDAComponent* Node)
-    {
-        if (Node == nullptr)
-            return nullptr;
-        void* Out = nullptr;
-        if (Node->QueryInterface(Iids::FxNode, &Out) != GR_OK || Out == nullptr)
-            return nullptr;
-        return static_cast<IGenericFx*>(Out);
-    }
-
     // Field pointers are borrowed from the captured vector range. Alive callbacks
     // reload the slot; only an erase refreshes the loop end. Particle arguments alias
     // the stored position/velocity and age directly, including on exception paths.
@@ -1692,7 +1682,7 @@ namespace AlchemyImpl
                         AsFxNode(*Position)->ApplyFieldToVel(&Particle->PosX, &Particle->Age, 0.0f);
                     Particle = Particle->Next;
                 }
-                AsFxNode(*Position)->Pad40();
+                AsFxNode(*Position)->EndField();
                 ++Position;
             }
         } while (Position != LoopEnd);
@@ -2021,43 +2011,9 @@ namespace AlchemyImpl
         return (Node != nullptr) ? AsFxNode(Node)->GetFirstChild() : nullptr;
     }
 
-    IDAComponent* CallGetPrevSibling(void* Node)
-    {
-        return (Node != nullptr) ? AsFxNode(Node)->GetPrevSibling() : nullptr;
-    }
-
     IDAComponent* CallGetNextSibling(void* Node)
     {
         return (Node != nullptr) ? AsFxNode(Node)->GetNextSibling() : nullptr;
-    }
-
-    int CallGetSortKey(void* Node)
-    {
-        return (Node != nullptr) ? AsFxNode(Node)->GetSortKey() : 0;
-    }
-
-    void CallSetParent(IDAComponent* Node, IDAComponent* Parent)
-    {
-        if (Node != nullptr)
-            AsFxNode(Node)->SetParent(Parent);
-    }
-
-    void CallSetFirstChild(IDAComponent* Node, IDAComponent* Child)
-    {
-        if (Node != nullptr)
-            AsFxNode(Node)->SetFirstChild(Child);
-    }
-
-    void CallSetPrevSibling(IDAComponent* Node, IDAComponent* Prev)
-    {
-        if (Node != nullptr)
-            AsFxNode(Node)->SetPrevSibling(Prev);
-    }
-
-    void CallSetNextSibling(IDAComponent* Node, IDAComponent* Next)
-    {
-        if (Node != nullptr)
-            AsFxNode(Node)->SetNextSibling(Next);
     }
 
     // FUN_06201e00: node-tree link (sort-key ordered), not a particle update.
@@ -2090,32 +2046,6 @@ namespace AlchemyImpl
             AsFxNode(Cursor)->SetPrevSibling(Child);
         ChildNode->SetPrevSibling(Prev);
         ChildNode->SetNextSibling(Cursor);
-    }
-
-    // Unused port helper. Retail FUN_06201f00 is FAlchemy::DetachNode.
-    GENRESULT UnlinkNodeTree(IDAComponent* Node)
-    {
-        IDAComponent* Parent = CallGetAttachParent(Node);
-        if (Parent == nullptr)
-            return GR_GENERIC;
-        IDAComponent* Prev = CallGetPrevSibling(Node);
-        IDAComponent* Next = CallGetNextSibling(Node);
-        if (Prev != nullptr)
-            CallSetNextSibling(Prev, Next);
-        if (Next != nullptr)
-            CallSetPrevSibling(Next, Prev);
-        IDAComponent* ParentAgain = CallGetAttachParent(Node);
-        if (ParentAgain != nullptr)
-        {
-            if (CallGetFirstChild(ParentAgain) == Node)
-                CallSetFirstChild(ParentAgain, Next);
-        }
-        else
-            G_RootNode = Next;
-        CallSetParent(Node, nullptr);
-        CallSetNextSibling(Node, nullptr);
-        CallSetPrevSibling(Node, nullptr);
-        return GR_OK;
     }
 
     // LAB_06228d74: DAT_062563a8 pairs until key==0.

@@ -212,9 +212,9 @@ void __cdecl HandleDamageReputation(FSubObjDamageEvent const* InEvent)
     // A new victim restarts the slot.
     double Elapsed = Now - Slot->LastTime;
     Slot->LastTime = static_cast<float>(Now);
-    if (Slot->AttackerId != Event.ObjId)
+    if (Slot->VictimId != Event.ObjId)
     {
-        Slot->AttackerId = Event.ObjId;
+        Slot->VictimId = Event.ObjId;
         Slot->FirstTime = static_cast<float>(Now);
         Slot->HostilityTime = static_cast<float>(Now);
         Elapsed = 0.0;

@@ -62,7 +62,7 @@ namespace
 }
 
 // ----------------------------------------------------------------------------
-// BreakAwayIdea -- common_buzzbehavior.h's "WatcherE".
+// BreakAwayIdea -- BuzzBehavior::BreakAway.
 // ----------------------------------------------------------------------------
 
 // FUN_062d8970.

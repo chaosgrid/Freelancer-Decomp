@@ -865,7 +865,7 @@ void __cdecl BuildPathDirectives(FSystemInfo* System, Vector const* From, Vector
         if (Leg->Kind == 0)
         {
             TRefHandle<FObjListDirective> Directive;
-            CreateObjListDirective(0x13, &Directive.Pointer);
+            CreateObjListDirective(OBJLIST_DOCK, &Directive.Pointer);
             FObjListDock* Dock = static_cast<FObjListDock*>(Directive.Pointer);
             Dock->SetTarget(&Leg->ObjectA, &Leg->ObjectB);                 // FUN_06f276f0
             Dock->Op.Priority = 1;
@@ -875,7 +875,7 @@ void __cdecl BuildPathDirectives(FSystemInfo* System, Vector const* From, Vector
         else if (Leg->Kind == 1)
         {
             TRefHandle<FObjListDirective> Directive;
-            CreateObjListDirective(5, &Directive.Pointer);
+            CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);
             FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(Directive.Pointer);
             Goto->SetDestination(&Leg->PointB, *Range, -1.0f, 0, false, false);   // FUN_06f26460
             Goto->Op.Priority = 1;

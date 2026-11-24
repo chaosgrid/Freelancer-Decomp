@@ -88,9 +88,9 @@ WinControl::WinControl()
     HitOffset[0] = 0.0f;
     HitOffset[1] = 0.0f;
     HitOffset[2] = 0.0f;
-    Field2e0[0] = 0.0f;
-    Field2e0[1] = 0.0f;
-    Field2e0[2] = 10000.0f; // 0x461c4000
+    RequestedPosition[0] = 0.0f;
+    RequestedPosition[1] = 0.0f;
+    RequestedPosition[2] = 10000.0f; // 0x461c4000
     bAttached = 0;
     MeshPath[0] = '\0';
     HardpointName[0] = '\0';
@@ -249,7 +249,7 @@ void WinControl::Draw()
     // FUN_005a0760 (FUN_005a06a0 inlined).
     DrawStaticMesh();
     Win3DDrawChildren(this);
-    Slot39();
+    PostDraw();
 }
 
 void WinControl::DrawStaticMesh()
@@ -290,9 +290,9 @@ void WinControl::SetHiddenWithChildren(bool bHide)
 
 bool WinControl::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // FUN_005a0650: a capturing control takes every Field0 == -1 event; otherwise the event
+    // FUN_005a0650: a capturing control takes every left-button event; otherwise the event
     // is taken when the cached mouse ray hits this control.
-    if (bCaptured != 0 && Event->Field0 == -1)
+    if (bCaptured != 0 && Event->Button == kWin3DMouseLeft)
         return true;
     float Ray[3];
     return HitTest(Win3DGetMouseRay(Ray));
@@ -559,7 +559,7 @@ void WinControl::SetMesh(char const* Path, char const* MaterialPath)
     RefreshAttachment();
 }
 
-void WinControl::Slot39()
+void WinControl::PostDraw()
 {
     // FUN_00401e90.
 }
@@ -597,25 +597,25 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // FUN_005a13c0 (RET 0xc), jump table 0x005a1638 over Msg - 1.
     switch (Msg)
     {
-    case 1:
+    case kWinPropHide:
         if (A == 1)
             Flags = static_cast<unsigned char>(Flags & 0xfc);
         else
             Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         return 1;
-    case 2:
+    case kWinPropDisable:
         Flags = static_cast<unsigned char>((Flags & 0xfe) | (A == 0 ? 1 : 0));
         return 1;
-    case 3:
+    case kWinPropToolTip:
         ToolTipIds = static_cast<int>(A);
         return 1;
-    case 4:
+    case kWinPropMesh:
         SetMesh(reinterpret_cast<char const*>(A), reinterpret_cast<char const*>(B));
         return 1;
-    case 5:
+    case kWinPropPosition:
         SetPosition(reinterpret_cast<float const*>(A));
         return 1;
-    case 6:
+    case kWinPropOffset:
     {
         float const* const NewOffset = reinterpret_cast<float const*>(A);
         Offset[0] = NewOffset[0];
@@ -640,7 +640,7 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         return 0;
     }
-    case 7:
+    case kWinPropGetOffset:
     {
         float* const Out = reinterpret_cast<float*>(A);
         Out[0] = Offset[0];
@@ -648,7 +648,7 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Out[2] = Offset[2];
         return 0;
     }
-    case 8:
+    case kWinPropOrientation:
         if (HasInstance(this))
         {
             float Matrix[12];
@@ -660,12 +660,12 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
         }
         return 1;
-    case 9:
+    case kWinPropFlag2d2:
         Field2d2 = (A != 0) ? 1 : 0;
         return 1;
-    case 10:
+    case kWinPropGetInstance:
         return reinterpret_cast<intptr_t>(MeshHolder.EngineInstance);
-    case 11:
+    case kWinPropGetMeshPath:
         strncpy(reinterpret_cast<char*>(A), MeshPath, static_cast<size_t>(B));
         return 0;
     default:

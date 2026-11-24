@@ -43,7 +43,7 @@ FaceIdea::FaceIdea()
     // Retail calls FUN_062e5ba0(this->Object, 1.0f) here while Object is still
     // null, so the result is 0.0f. SetThrottleScale() stores raw/derived the other
     // way round (raw in +0x90, derived in +0x94); that asymmetry is retail's.
-    , Field90(Behavior_InvokeManagerSlotF8(ObjInspectOf(Object), 1.0f))   // FUN_062e5ba0
+    , Field90(Behavior_GetProjectedAxisThrottleXY(ObjInspectOf(Object), 1.0f))   // FUN_062e5ba0
     , TurnThrottle(1.0f)
     , AngleWeight98(BitsToFloat(0x3f1c28f6u))
     , AngleWeight9c(BitsToFloat(0x3e490fdbu))
@@ -67,13 +67,13 @@ bool FaceIdea::SetContext(void* InObject, void* InHandle, void* InContext)
 
     IObjInspect const* const Obj = ObjInspectOf(Object);
 
-    float const Rate = Behavior_InvokeManagerSlotF0(Obj, 1.0f, 0.0f);   // FUN_062e5b20
+    float const Rate = Behavior_GetAngularSpeedXY(Obj, 1.0f, 0.0f);   // FUN_062e5b20
 
     // FUN_062e5950; DAT_063a0400 == 1000.0f.
     AngleWeight98 = Behavior_GetAngularDistanceTravelled(Obj, 0.0f, 0.0f, Rate, 1000.0f);
 
     // FUN_062e5b50: a third push (0) is not read by the callee; the result is dropped.
-    (void)Behavior_InvokeManagerSlotF4(Obj, 1.0f);
+    (void)Behavior_GetAngularSpeedZ(Obj, 1.0f);
 
     AngleWeight9c = BitsToFloat(0x3e490fdbu);   // pi/16
     bUpValid = 0;
@@ -142,7 +142,7 @@ void FaceIdea::SetAxis(Vector const& Axis)
 void FaceIdea::SetThrottleScale(float Value)
 {
     Field90 = Value;
-    TurnThrottle = Behavior_InvokeManagerSlotF8(ObjInspectOf(Object), Value);   // FUN_062e5ba0
+    TurnThrottle = Behavior_GetProjectedAxisThrottleXY(ObjInspectOf(Object), Value);   // FUN_062e5ba0
 }
 
 // FUN_062d7640. Retail's three compares against DAT_06399408 (0.0f) are equality
@@ -187,16 +187,14 @@ void FaceIdea::SetScale94(float Value)
 // (SelfTarget+0xc / +0x7e).
 // ============================================================================
 
-// Raw offsets this body still reads through `B`: +0x04 Object, +0x14 Watcher,
-// +0x1c Position1c, +0x34 ZeroBlock34, +0x64 Field64 (case 1/2 gate),
-// +0x6c/+0x78/+0x84 case 2's up-hint triple (0xc apart, inside Opaque65),
-// +0x98 AngleWeight98. +0x94 (TurnThrottle) is the steering magnitude cap; +0xa8
-// (RemainingAngle) is compared against +0x8c (FacingTolerance) for the return.
+// The one raw read left (through `B`) is case 2's up-hint triple at +0x6c/+0x78/+0x84 (0xc
+// apart, inside Opaque65; no writer found). +0x94 (TurnThrottle) is the steering magnitude
+// cap; +0xa8 (RemainingAngle) is compared against +0x8c (FacingTolerance) for the return.
 //
 // Retail never reads DeltaTime here (no reroll timer on this variant).
 int FaceIdea::Update(float /*DeltaTime*/)
 {
-    unsigned char* const B = reinterpret_cast<unsigned char*>(this);
+    unsigned char const* const B = reinterpret_cast<unsigned char const*>(this);
 
     if (Object == nullptr)
         return 3;
@@ -225,7 +223,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         RefreshCachedIfacePosition(Sys);
 
         Vector TargetPos{};
-        GetIfacePositionOrZero(&TargetPos, ObjRwFromWatchable(*reinterpret_cast<void* const*>(B + 0x14)));
+        GetIfacePositionOrZero(&TargetPos, ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target())));
         Vector const RelDir = Sub(TargetPos, CachedIfacePosition(Sys));
 
         Matrix* const Reference = IfaceOrientation(Sys);
@@ -247,10 +245,10 @@ int FaceIdea::Update(float /*DeltaTime*/)
 
     case 1:
     {
-        void* const Watcher = *reinterpret_cast<void* const*>(B + 0x14);
-        if (Watcher == nullptr)
+        Watchable* const Watched = const_cast<Watchable*>(Watcher.target());
+        if (Watched == nullptr)
             return 2;
-        IObjRW* const Adjusted = ObjRwFromWatchable(Watcher);
+        IObjRW* const Adjusted = ObjRwFromWatchable(Watched);
         if (Adjusted == nullptr)
             return 2;
 
@@ -271,7 +269,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
 
         // Aim at the target with its own up axis: column 1 of the node's transform
         // (FUN_062e61f0; retail's +0x4/+0x10/+0x1c).
-        Transform const* const NodeTransform = Behavior_InvokeNodeSlotC(Adjusted);
+        Transform const* const NodeTransform = Behavior_GetTransform(Adjusted);
         Vector NodeUp;
         NodeUp.x = NodeTransform->Rotation.E[0][1];
         NodeUp.y = NodeTransform->Rotation.E[1][1];
@@ -294,7 +292,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         //   this->0x64 != 0   : BuildOrientationBasis(.., &UpHintTriple)
         //   flag 0, gate true : SteeringFrameFromRelativeDir(.., ShipUp)
         //   flag 0, gate false: BuildOrientationBasis(.., nullptr)
-        bool const UseRawUpHint = *reinterpret_cast<unsigned char const*>(B + 0x64) != 0;
+        bool const UseRawUpHint = Field64 != 0;
         bool Gate = false;
         if (!UseRawUpHint)
         {
@@ -302,7 +300,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         }
 
         RefreshCachedIfacePosition(Sys);
-        Vector const RelDir = Sub(*reinterpret_cast<Vector const*>(B + 0x1c), CachedIfacePosition(Sys));
+        Vector const RelDir = Sub(Position1c, CachedIfacePosition(Sys));
 
         Matrix* const Reference = IfaceOrientation(Sys);
         if (UseRawUpHint)
@@ -345,7 +343,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
 
     case 4:
         // Raw 9-float frame, copied verbatim (no orientation rebuild at all).
-        WorkingFrame = *reinterpret_cast<Matrix const*>(B + 0x34);
+        WorkingFrame = *reinterpret_cast<Matrix const*>(ZeroBlock34);
         break;
 
     default:
@@ -382,16 +380,16 @@ int FaceIdea::Update(float /*DeltaTime*/)
     }
 
     // ---- Shared tail for cases 0-4 and the fallback.
-    // Step 1: when Pathfind->Field_214 has bit 0x2 set (a bit test, not the `== 2`
+    // Step 1: when Pathfind->AvoidRecordKind has bit 0x2 set (a bit test, not the `== 2`
     // DodgeIdea uses at its analogous site), recompute the frame toward
-    // Pathfind->Field_22C. Retail writes the same stack frame every case filled.
+    // Pathfind->AvoidTargetPoint. Retail writes the same stack frame every case filled.
     Matrix& ThrottleFrame = WorkingFrame;
-    if ((static_cast<unsigned char>(Pathfind->Field_214) & 0x2) != 0)
+    if ((static_cast<unsigned char>(Pathfind->AvoidRecordKind) & 0x2) != 0)
     {
         bool const Gate = Sys->Thrust.CheckSteeringGate();
         RefreshCachedIfacePosition(Sys);
 
-        Vector const RecomputeDir = Sub(Pathfind->Field_22C, CachedIfacePosition(Sys));
+        Vector const RecomputeDir = Sub(Pathfind->AvoidTargetPoint, CachedIfacePosition(Sys));
 
         Matrix* const RecomputeReference = IfaceOrientation(Sys);
         if (Gate)
@@ -430,8 +428,8 @@ int FaceIdea::Update(float /*DeltaTime*/)
     // Step 3: FUN_062e2c70 (LimitAxisThrottleForTurn). With a watched target moving
     // faster than 1.0 (DAT_06399410, double), TurnAngle = lead angle and
     // ReferenceAngle = 0.35f; otherwise 0.0f and this->0x98.
-    IObjInspect const* const BoundObject = static_cast<IObjInspect const*>(*reinterpret_cast<void* const*>(B + 0x4));
-    IObjRW* const LeadNode = ObjRwFromWatchable(*reinterpret_cast<void* const*>(B + 0x14));
+    IObjInspect const* const BoundObject = static_cast<IObjInspect const*>(Object);
+    IObjRW* const LeadNode = ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target()));
 
     Vector LimitedSteer{ 0.0f, 0.0f, 0.0f };
     if (LeadNode != nullptr && GetIfaceVectorMagnitude(LeadNode) > 1.0)
@@ -464,7 +462,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
         float const LeadAngle = std::acos(ClampedDot3(DirectDir, LeadDir));
 
         // FUN_062e5ba0; retail discards the result. Issued for parity.
-        (void)Behavior_InvokeManagerSlotF8(BoundObject, LeadAngle);
+        (void)Behavior_GetProjectedAxisThrottleXY(BoundObject, LeadAngle);
 
         LimitAxisThrottleForTurn(LimitedSteer, BoundObject, SteerVector, &ThrottleFrame,
                                  LeadAngle, 0.35f, true); // 0x3eb33333 == 0.35f
@@ -472,7 +470,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
     else
     {
         LimitAxisThrottleForTurn(LimitedSteer, BoundObject, SteerVector, &ThrottleFrame,
-                                 0.0f, *reinterpret_cast<float const*>(B + 0x98), true);
+                                 0.0f, AngleWeight98, true);
     }
     SteerVector = LimitedSteer;
 

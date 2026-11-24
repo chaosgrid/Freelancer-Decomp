@@ -61,18 +61,11 @@ namespace
     // radius.
     constexpr float kFadeFactor = 0.35f;
 
-    // DAT_005dc374: LIGHTING (0x89) on, SPECULARENABLE (0x1d) off, ALPHABLENDENABLE (0x1b) off
-    // (the opaque draw state).
-    unsigned long const kRsDynOpaque[] = {0x89, 1, 0x1d, 0, 0x1b, 0, 0};
-    // DAT_005dc394: the same with ALPHABLENDENABLE on, SRCBLEND (0x13) SRCALPHA (5), DESTBLEND
-    // (0x14) INVSRCALPHA (6).
-    unsigned long const kRsDynBlend[] = {0x89, 1, 0x1d, 0, 0x1b, 1, 0x13, 5, 0x14, 6, 0};
-
-    // The render-state table loop FUN_005261b0 inlines: do-while, so the first state is applied
-    // without a zero test.
-    void ApplyRsTable(IRenderPipeline* Pipe, unsigned long const* Table)
+    // The render-state table loop FUN_005261b0 inlines over kRsAsteroidOpaque / kRsAsteroidBlend
+    // (cli_asteroid.h): do-while, so the first state is applied without a zero test.
+    void ApplyRsTable(IRenderPipeline* Pipe, unsigned const* Table)
     {
-        unsigned long State = Table[0];
+        unsigned State = Table[0];
         do
         {
             Pipe->SetRenderState((D3DRENDERSTATETYPE)State, static_cast<int>(Table[1]));
@@ -88,7 +81,6 @@ namespace
 
     void ParticleSetIntensity(FParticleEffect* Particle, float Intensity)
     {
-        typedef void(__thiscall * FSetIntensity)(FParticleEffect*, float);
         Particle->SetIntensity(Intensity);
     }
 }
@@ -534,14 +526,14 @@ FCliDynamicAsteroidGameobj* CliDynamicAsteroidSpawn(FCliDynamicAsteroid* This)
             ? static_cast<CDynamicAsteroid*>(Obj)
             : nullptr;
     CDynamicAsteroid::CreateParms Parms;
-    Parms.CollisionGroupId = 0;
+    Parms.SystemId = 0;
     Parms.Velocity.x = 0.0f;
     Parms.Velocity.y = 0.0f;
     Parms.Velocity.z = 0.0f;
     Parms.AngularVelocity.x = 0.0f;
     Parms.AngularVelocity.y = 0.0f;
     Parms.AngularVelocity.z = 0.0f;
-    Parms.CollisionGroupId = StarSysGetActiveSystemId();
+    Parms.SystemId = StarSysGetActiveSystemId();
     Dynamic->init(Parms);
     // Collisions off while it waits to be placed.
     if (Go->GetObject() != nullptr)
@@ -794,7 +786,7 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
         This->Material->Bind(nullptr);
 
     IRenderPipeline* const Pipe = DALib::Pipeline;
-    ApplyRsTable(Pipe, kRsDynOpaque);
+    ApplyRsTable(Pipe, kRsAsteroidOpaque);
     int SavedAlphaBlend = 0;
     Pipe->GetRenderState(D3DRS_ALPHAREF, &SavedAlphaBlend);
     Pipe->SetRenderState(D3DRS_ALPHAREF, 5);
@@ -862,13 +854,13 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
         MaterialBlock[3] = This->SlotPtrs[Index]->Alpha;
         if (!(MaterialBlock[3] < 1.0f))
         {
-            ApplyRsTable(Pipe, kRsDynOpaque);
+            ApplyRsTable(Pipe, kRsAsteroidOpaque);
             Pipe->SetRenderState(D3DRS_ALPHAREF, 0x7f);
             bBlending = 0;
         }
         else if (bBlending == 0)
         {
-            ApplyRsTable(Pipe, kRsDynBlend);
+            ApplyRsTable(Pipe, kRsAsteroidBlend);
             Pipe->SetRenderState(D3DRS_ALPHAREF, 5);
             bBlending = 1;
         }
@@ -890,5 +882,5 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
     }
 
     Pipe->SetRenderState(D3DRS_ALPHAREF, SavedAlphaBlend);
-    ApplyRsTable(Pipe, kRsDynOpaque);
+    ApplyRsTable(Pipe, kRsAsteroidOpaque);
 }

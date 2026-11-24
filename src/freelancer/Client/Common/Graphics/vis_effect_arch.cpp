@@ -425,9 +425,9 @@ namespace
             }
             // An unordered run_time clears the bit.
             if (Info->RunTime < 0.0f)
-                Effect->Flags50 = static_cast<unsigned char>(Effect->Flags50 | 1u);
+                Effect->Flags = static_cast<unsigned char>(Effect->Flags | kEffectArchFlagLooping);
             else
-                Effect->Flags50 = static_cast<unsigned char>(Effect->Flags50 & ~1u);
+                Effect->Flags = static_cast<unsigned char>(Effect->Flags & ~kEffectArchFlagLooping);
             return true;
         }
         // FUN_0042dd20; a hit also copies the VisEffect's nickname into +0x0c.
@@ -539,10 +539,10 @@ namespace
     // The dword +0x50..+0x53 FUN_0040e6e0 compares and copies.
     unsigned EffectArchFlagsDword(FEffectArch const* Arch)
     {
-        return static_cast<unsigned>(Arch->Flags50) |
-               (static_cast<unsigned>(Arch->Pad51[0]) << 8) |
-               (static_cast<unsigned>(Arch->Pad51[1]) << 16) |
-               (static_cast<unsigned>(Arch->Pad51[2]) << 24);
+        return static_cast<unsigned>(Arch->Flags) |
+               (static_cast<unsigned>(Arch->FlagsHigh[0]) << 8) |
+               (static_cast<unsigned>(Arch->FlagsHigh[1]) << 16) |
+               (static_cast<unsigned>(Arch->FlagsHigh[2]) << 24);
     }
 
     // FUN_0040e6e0 (thiscall on the registered arch, RET 4) -- a reload's copy of an [Effect]
@@ -629,10 +629,10 @@ namespace
         {
             FDUMP(0x100002, "%s(%d) : *** WARNING: %x: 'flags' changed to %x.", kEffectArchCpp,
                   0x9e, OldFlags, NewFlags);
-            Existing->Flags50 = Incoming->Flags50;
-            Existing->Pad51[0] = Incoming->Pad51[0];
-            Existing->Pad51[1] = Incoming->Pad51[1];
-            Existing->Pad51[2] = Incoming->Pad51[2];
+            Existing->Flags = Incoming->Flags;
+            Existing->FlagsHigh[0] = Incoming->FlagsHigh[0];
+            Existing->FlagsHigh[1] = Incoming->FlagsHigh[1];
+            Existing->FlagsHigh[2] = Incoming->FlagsHigh[2];
         }
     }
 
@@ -805,10 +805,10 @@ void EffectArchConstruct(FEffectArch* Arch)
     Arch->LgtColorG = 0xff;
     Arch->LgtColorB = 0xff;
     Arch->LgtColorA = 0xff;
-    Arch->Flags50 = 0;             // +0x50  (a dword store)
-    Arch->Pad51[0] = 0;
-    Arch->Pad51[1] = 0;
-    Arch->Pad51[2] = 0;
+    Arch->Flags = 0;               // +0x50  (a dword store)
+    Arch->FlagsHigh[0] = 0;
+    Arch->FlagsHigh[1] = 0;
+    Arch->FlagsHigh[2] = 0;
     Arch->RefCount = 0;            // +0x54
 }
 

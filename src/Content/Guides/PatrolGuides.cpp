@@ -128,10 +128,10 @@ int FPatrolRoute::Update(std::list<FObjListDirective*>* Out)
     if (State == 1)
     {
         TRefHandle<FObjListDirective> Directive;
-        CreateObjListDirective(5, &Directive.Pointer);                 // FUN_06f24870
+        CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);                 // FUN_06f24870
         FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(Directive.Pointer);
         Goto->SetDestination(&Path->Points[NextPoint], 500.0f, -1.0f, 0, false, false);
-        Goto->Op.Field_58 = 1;                                          // [dir+0x164]
+        Goto->Op.bFlyThrough = 1;                                          // [dir+0x164]
         Goto->Op.Priority = 1;
         Out->push_back(Directive.Pointer);                              // FUN_06f1e390
         Directive->AddRef();
@@ -160,10 +160,10 @@ int FPatrolRoute::Update(std::list<FObjListDirective*>* Out)
         if (State != 4)
         {
             TRefHandle<FObjListDirective> Directive;
-            CreateObjListDirective(5, &Directive.Pointer);
+            CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);
             FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(Directive.Pointer);
             Goto->SetDestination(&Path->Points[NextPoint], 500.0f, -1.0f, 0, false, false);
-            Goto->Op.Field_58 = 1;
+            Goto->Op.bFlyThrough = 1;
             Goto->Op.Priority = 1;
             Out->push_back(Directive.Pointer);
             Directive->AddRef();
@@ -223,7 +223,7 @@ bool FPatrolRoute::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
     }
 
     TRefHandle<FObjListDirective> Unused;
-    CreateObjListDirective(5, &Unused.Pointer);
+    CreateObjListDirective(OBJLIST_GOTO_VEC, &Unused.Pointer);
     static_cast<FObjListGotoVec*>(Unused.Pointer)
         ->SetDestination(&OutPosition, 500.0f, -1.0f, 0, false, false);
     return true;
@@ -432,7 +432,7 @@ void FCargoScanRoute::AddTractorBeamDirective(unsigned int InTargetId,
                                               std::list<FObjListDirective*>* List)
 {
     TRefHandle<FObjListDirective> Directive;
-    CreateObjListDirective(0x19, &Directive.Pointer);
+    CreateObjListDirective(OBJLIST_TRACTOR_BEAM, &Directive.Pointer);
     FObjListTractorBeam* Tractor = static_cast<FObjListTractorBeam*>(Directive.Pointer);
     Tractor->SetTarget(InTargetId, false);                             // FUN_06f28df0
     Tractor->Op.Priority = 0;
@@ -446,7 +446,7 @@ void FCargoScanRoute::AddGotoShipDirective(unsigned int InTargetId,
                                            std::list<FObjListDirective*>* List)
 {
     TRefHandle<FObjListDirective> Directive;
-    CreateObjListDirective(3, &Directive.Pointer);
+    CreateObjListDirective(OBJLIST_GOTO_SHIP, &Directive.Pointer);
     FObjListGotoShip* Goto = static_cast<FObjListGotoShip*>(Directive.Pointer);
     Goto->SetTarget(&InTargetId, 50.0f, -1.0f);                         // FUN_06f26150
     Goto->Op.Priority = 0;
@@ -624,7 +624,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
         }
         if (IsSameShipOrFormation(Ship, Words[1]))                      // FUN_06f68270
             break;
-        QueueScanEvent(0x18, Words[1], 0, 1);
+        QueueScanEvent(GCS_EVENT_SCAN_LOOT_TAKEN, Words[1], 0, 1);
         SetFormationAttitudes(Ship->GetSystem(), Ship->SpaceObjId, Words[1], true, true,
                               -1.0f);                                   // FUN_06f67d80
         break;
@@ -727,7 +727,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
             break;
         int const Reason = static_cast<int>(Words[4]);
         if (Reason >= 0 && Reason <= 2)
-            QueueScanEvent(0x18, Taker, 0, 1);
+            QueueScanEvent(GCS_EVENT_SCAN_LOOT_TAKEN, Taker, 0, 1);
         SetFormationAttitudes(Ship->GetSystem(), Ship->SpaceObjId, Taker, true, true, -1.0f);
         break;
     }
@@ -802,7 +802,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             State = 2;
             bStop = false;
             TRefHandle<FObjListDirective> Directive;
-            CreateObjListDirective(6, &Directive.Pointer);
+            CreateObjListDirective(OBJLIST_TRAIL, &Directive.Pointer);
             FObjListTrail* Trail = static_cast<FObjListTrail*>(Directive.Pointer);
             Trail->SetTarget(&TargetId, static_cast<float>(ScanRange));  // FUN_06f275b0
             Trail->Op.Priority = 1;
@@ -832,7 +832,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             // 06f0cef2, 06f0d4a2.
             if (bScanAnnounce)
             {
-                QueueScanEvent(0x11, 0, 0, 1);
+                QueueScanEvent(GCS_EVENT_SCAN_ANNOUNCE, 0, 0, 1);
                 State = 5;
                 return;
             }
@@ -878,7 +878,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             {
                 // 06f0d2fb.
                 if (bScanAnnounce)
-                    QueueScanEvent(0x12, 0, 0, 1);
+                    QueueScanEvent(GCS_EVENT_SCAN_NOTHING_FOUND, 0, 0, 1);
                 Reset();
                 bStop = true;
                 break;
@@ -895,7 +895,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
                 int Response = 3;
                 if (!Cargo->bMission)
                 {
-                    QueueScanEvent(0x13, 0, CargoGoodId, 1);
+                    QueueScanEvent(GCS_EVENT_SCAN_CONTRABAND, 0, CargoGoodId, 1);
                     Response = pub::AI::get_scan_response(ShipId, TargetId, CargoGoodId);
                 }
                 bStop = false;
@@ -907,7 +907,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
                 }
                 else if (Response >= 1 && Response <= 2)
                 {
-                    QueueScanEvent(0x15, 0, 0, static_cast<unsigned int>(Response));
+                    QueueScanEvent(GCS_EVENT_SCAN_RESPONSE, 0, 0, static_cast<unsigned int>(Response));
                     State = 0xd;
                 }
             }
@@ -920,7 +920,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             {
                 // 06f0d28a: a player is asked to jettison it.
                 AnswerTimer = 0.0f;
-                QueueScanEvent(0x13, 0, CargoGoodId, 1);
+                QueueScanEvent(GCS_EVENT_SCAN_CONTRABAND, 0, CargoGoodId, 1);
                 State = 7;
                 bStop = true;
             }
@@ -947,7 +947,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
                 Reset();
                 return;
             }
-            QueueScanEvent(0x14, 0, 0, 1);
+            QueueScanEvent(GCS_EVENT_SCAN_JETTISONED, 0, 0, 1);
             State = 0xb;
             return;
         }
@@ -979,7 +979,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
                 Reset();
                 return;
             }
-            QueueScanEvent(0x16, 0, 0, 1);
+            QueueScanEvent(GCS_EVENT_SCAN_HOSTILE, 0, 0, 1);
             SetFormationAttitudes(Ship->GetSystem(), Ship->SpaceObjId, TargetId, true, true,
                                   -1.0f);                               // DAT_06fb80e8
             Reset();
@@ -1142,10 +1142,10 @@ void FPatrolGuide::Reset()
 }
 
 // LAB_06f0af30.
-void FPatrolGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
+void FPatrolGuide::OnDirectivesDone(int CompletedBehavior, int DirectiveResult)
 {
-    (void)ResultWord11c;
-    (void)ResultWord118;
+    (void)CompletedBehavior;
+    (void)DirectiveResult;
     Start();
 }
 

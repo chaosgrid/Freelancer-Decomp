@@ -81,8 +81,6 @@ namespace Archetype
 
     namespace
     {
-        const char kArchetypeSource[] = "E:\\FL\\Scratch\\Source\\Common\\Archetype.cpp";
-
         struct FNamedType
         {
             char const* Name;
@@ -223,7 +221,7 @@ namespace Archetype
             {
                 if (!DamageObjUnmatched((*List)[Index]))
                     continue;
-                FDUMP(0x100002, Fmt, kArchetypeSource, Line, Group->ObjName);
+                FDUMP(0x100002, Fmt, ArchetypeSource, Line, Group->ObjName);
                 List->clear();
                 return;
             }

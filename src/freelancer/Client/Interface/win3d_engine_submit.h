@@ -22,39 +22,40 @@ extern I3DMathEngine* G_Win3DObjectMath;
 // FUN_0059da60
 FSpaceCamera* GetWin3DSceneCamera();
 
-// FUN_0059efa0 — thiscall on the holder (its instance at +0x04).
-void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor, unsigned char bFrontCull,
-                               float Scale, unsigned long Flags);
+// FUN_0059efa0 — thiscall on the holder (its instance at +0x04). bDepthTested non-zero: ZFUNC
+// LESSEQUAL with z write off; zero: ZFUNC ALWAYS with z write on (RS 0x17 / 0x0e, not restored).
+void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
+                               unsigned char bDepthTested, float Scale, unsigned long Flags);
 
 // FUN_00434310 (cdecl, 7 args) — tinted submit (RGBA bytes). MaterialSelector goes to
-// IFLAppearance::GetOverrideMaterial; bCullLightingByte picks the depth func / z-write states
-// (RS 0x17 / 0x0e, not cull / lighting despite the name). Both callers pass 1 for the selector.
+// IFLAppearance::GetOverrideMaterial; bDepthTested picks the depth func / z-write states as
+// above, restored afterwards. Both callers pass 1 for the selector.
 // Nothing unless game option 0xb is on.
 void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
                                      unsigned char MaterialSelector, unsigned long Flags,
                                      unsigned char const ColorRgba[4],
-                                     unsigned char bCullLightingByte, float Scale);
+                                     unsigned char bDepthTested, float Scale);
 
 // FUN_00434630 — wraps tinted submit: Flags |= 0x8200; if !bFrontCull Flags |= 0x2000.
 void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, void* EngineInstance,
                                             unsigned char bFrontCull,
                                             unsigned char const ColorRgba[4],
-                                            unsigned char bLightingEnable, float Scale,
+                                            unsigned char bDepthTested, float Scale,
                                             unsigned long Flags);
 
 // FUN_00433f40 (cdecl, 8 args) -- the material-parameter submit: nothing for instance -1
-// (returns 1); else the depth states from bCullLightingByte, material 0
+// (returns 1); else the depth states from bDepthTested, material 0
 // given parameter 0 = ColorRgba / 255 and parameter 0xa = bParam10, then the render with
 // Flags | 0x100 (| 0x2000 without bFrontCull, | 0x30 with a scaled identity when Scale != 1).
 // Returns the renderer's answer. Callers: SubmitWin3DOutlinedEngineInstance and 0x00548411
 // (not ported).
 int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsigned char bFrontCull,
                                       unsigned char const ColorRgba[4],
-                                      unsigned char bCullLightingByte, float Scale,
+                                      unsigned char bDepthTested, float Scale,
                                       unsigned char bParam10, unsigned long Flags);
 
 // FUN_00434670 (cdecl, 6 args) -- the outlined wire: the material submit in black with
-// lighting byte 0 and parameter 0xa off, then the tinted submit with ColorRgba and
+// bDepthTested 0 and parameter 0xa off, then the tinted submit with ColorRgba and
 // Flags | 0x8100 (| 0x2000 without bFrontCull). Caller: StaticControl::Draw.
 void SubmitWin3DOutlinedEngineInstance(void* Camera, void* EngineInstance,
                                        unsigned char bFrontCull, unsigned char const ColorRgba[4],

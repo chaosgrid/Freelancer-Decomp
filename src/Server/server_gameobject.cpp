@@ -21,7 +21,7 @@
 #include "../include/server_createinfo.h" // Server_Acquire3DMathEngine (DAT_06d8d71c)
 #include "../include/x86math.h"          // I3DMathEngine::MatrixToQuaternion
 #include "../include/common_physys.h"   // PhySys::RCBegin/RCEnd, Collision::CalcCollisionDamage
-#include "../include/common_universe.h" // Universe::IZone (CSimple::ZoneAtA4)
+#include "../include/common_universe.h" // Universe::IZone (CSimple::CurrentZone)
 #include <cmath>
 #include <windows.h>
 #include <cstdio>
@@ -56,12 +56,12 @@ GameObject::GameObject()
     : LastDamageTime(0.0)
     , bInvincible(0)
     , bInvincibleFlag(0)
-    , InvincibleTimer(1.0f)
+    , MaxHpLoss(1.0f)
     , bDestroyed(0)
     , bInDamageCallback(0)
     , OwnerSystem(nullptr)
 {
-    PendingDamage.Cause = static_cast<DamageCause>(0x18);
+    PendingDamage.Cause = DamageCause::Pending;
 }
 
 // FUN_06cee4a0, entered with ECX on the CBase sub-object at +0x0c (the scalar
@@ -150,9 +150,9 @@ unsigned char GameObject::is_invincible() const
     return bInvincible;
 }
 
-float GameObject::get_invincible_timer() const
+float GameObject::get_max_hp_loss() const
 {
-    return InvincibleTimer;
+    return MaxHpLoss;
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@ void GameObject::on_object_left_system(unsigned int ObjId)
     CObject* const Obj = Object;
     if (Obj == nullptr)
         return;
-    if ((static_cast<unsigned>(Obj->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         return;
     IBehaviorManager* const Behavior = static_cast<CEqObj*>(Obj)->get_behavior_interface();
     if (Behavior == nullptr)
@@ -537,7 +537,7 @@ void GameObject::set_invincible(FInvincibility const& Cmd)
     // The command's own values start the reduction.
     bInvincible = Cmd.bProtect;
     bInvincibleFlag = Cmd.bFromPlayers;
-    InvincibleTimer = Cmd.MaxHpLoss;
+    MaxHpLoss = Cmd.MaxHpLoss;
 
     // One pass over every node, no early exit.
     bool bNew = true;
@@ -556,9 +556,9 @@ void GameObject::set_invincible(FInvincibility const& Cmd)
         if (bInvincibleFlag == 0)
             bInvincibleFlag = It->bFromPlayers;
         // Takes the node's value on <= or unordered: the minimum.
-        float const Current = InvincibleTimer;
+        float const Current = MaxHpLoss;
         float const Node = It->MaxHpLoss;
-        InvincibleTimer = (Node > Current) ? Current : Node;
+        MaxHpLoss = (Node > Current) ? Current : Node;
     }
 
     if (bNew)
@@ -638,14 +638,14 @@ bool GameObject::damage_hull(float Amount, DamageList& Damage)
         NewHitPts = 0.0f;
     }
 
-    // Invincibility floor: the hull may not go below (1 - InvincibleTimer) of
+    // Invincibility floor: the hull may not go below (1 - MaxHpLoss) of
     // its maximum. Already below it -> unchanged; crossing it -> clamped onto it.
     if (is_damage_blocked(Damage))
     {
         // Max and Floor are stored floats; 1/Max stays on the x87 stack for both
         // products, so it is a double here.
         float const MaxHitPts = csimple()->get_max_hit_pts();
-        float const Floor = 1.0f - get_invincible_timer();
+        float const Floor = 1.0f - get_max_hp_loss();
         double const InvMax = 1.0 / static_cast<double>(MaxHitPts);
         if (Current * InvMax < Floor)
             NewHitPts = Current;
@@ -749,8 +749,8 @@ int GameObject::request_cancel(int, unsigned const*, int) { return -3; }        
 int GameObject::go_tradelane(IObjInspect const*, IObjInspect const*, bool, float) { return -3; }  // 06cef380
 int GameObject::stop_tradelane() { return -3; }                                      // 06cef390
 int GameObject::slot_6c(int, int) { return -3; }                                     // 06cef350
-int GameObject::slot_70(unsigned) { return -3; }                                     // 06cef3a0
-int GameObject::slot_74(unsigned) { return -3; }                                     // 06cef3a0
+int GameObject::launch_complete(unsigned) { return -3; }                             // 06cef3a0
+int GameObject::jump_in_complete(unsigned) { return -3; }                            // 06cef3a0
 
 // ---------------------------------------------------------------------------
 // EqObj -- .text:06ce6620
@@ -793,7 +793,7 @@ CEqObj* EqObj::ceqobj() const
     // Retail's own narrowing test on this family is the ObjectClass mask, not
     // RTTI: Ship::create checks (ObjectClass & 0x503) == 0x503, Loot::create
     // (ObjectClass & 0x803) == 0x803. Everything CEqObj-derived carries 0x103.
-    if ((static_cast<unsigned>(Obj->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         return nullptr;
     return static_cast<CEqObj*>(Obj);
 }
@@ -913,7 +913,7 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
                         // Once per DockQueue entry.
                         for (std::list<FDockRequest>::iterator It = DockQueue.begin();
                              It != DockQueue.end(); ++It)
-                            OwnerSystem->remove_from_list_d4(this);
+                            OwnerSystem->remove_docking_solar(this);
 
                         ceqobj()->disconnect(static_cast<IObjRW*>(this));
                         // Not destroyed yet: the fuse will do it.
@@ -963,7 +963,7 @@ void EqObj::destroy_notify()
 {
     // StarSystem FUN_06d0c730(this), once per DockQueue entry.
     for (std::list<FDockRequest>::iterator It = DockQueue.begin(); It != DockQueue.end(); ++It)
-        OwnerSystem->remove_from_list_d4(this);
+        OwnerSystem->remove_docking_solar(this);
 
     // Unless a player's object in single player.
     if (!(SinglePlayer() && csimple()->OwnerPlayer != 0))
@@ -1287,7 +1287,7 @@ void EqObj::apply_root_entry(DamageList const& Damage, DamageEntry const& Entry)
     Ev.InflictorId = 0;
     Ev.EquipType = 0;
     Ev.CollisionGroupType = 0;
-    Ev.Cause = static_cast<DamageCause>(0);
+    Ev.Cause = DamageCause::Unknown;
     Ev.Damage = 0.0f;
     Ev.RelativeDamage = 0.0f;
     Ev.RelativeHealth = 0.0f;
@@ -1348,7 +1348,7 @@ void EqObj::apply_equip_entry(DamageList const& Damage, DamageEntry const& Entry
     Ev.InflictorId = 0;
     Ev.EquipType = 0;
     Ev.CollisionGroupType = 0;
-    Ev.Cause = static_cast<DamageCause>(0);
+    Ev.Cause = DamageCause::Unknown;
     Ev.Damage = 0.0f;
     Ev.RelativeDamage = 0.0f;
     Ev.RelativeHealth = 0.0f;
@@ -1382,7 +1382,7 @@ void EqObj::apply_equip_entry(DamageList const& Damage, DamageEntry const& Entry
 
     // A cargo stack (type 0x10000, Count +0x28 > 1 unsigned) loses one unit
     // when its entry reaches 0, otherwise takes the hit points.
-    if (Equip->Type == 0x10000 && static_cast<CECargo*>(Equip)->Count > 1)
+    if (Equip->Type == EquipTypeCargo && static_cast<CECargo*>(Equip)->Count > 1)
     {
         if (Entry.HitPts == 0.0f)
         {
@@ -1409,7 +1409,7 @@ void EqObj::apply_power_entry(DamageList const& Damage, DamageEntry const& Entry
     Ev.InflictorId = 0;
     Ev.EquipType = 0;
     Ev.CollisionGroupType = 0;
-    Ev.Cause = static_cast<DamageCause>(0);
+    Ev.Cause = DamageCause::Unknown;
     Ev.Damage = 0.0f;
     Ev.RelativeDamage = 0.0f;
     Ev.RelativeHealth = 0.0f;
@@ -1457,7 +1457,7 @@ void EqObj::apply_group_entry(DamageList const& Damage, DamageEntry& Entry)
     Ev.InflictorId = 0;
     Ev.EquipType = 0;
     Ev.CollisionGroupType = 0;
-    Ev.Cause = static_cast<DamageCause>(0);
+    Ev.Cause = DamageCause::Unknown;
     Ev.Damage = 0.0f;
     Ev.RelativeDamage = 0.0f;
     Ev.RelativeHealth = 0.0f;
@@ -1526,7 +1526,7 @@ static CSolar* EqObj_Solar(EqObj const* Obj)
     CObject* const Raw = Obj->cobj();
     if (Raw == nullptr)
         return nullptr;
-    if ((static_cast<unsigned>(Raw->ObjectClass) & 0x303u) != 0x303u)
+    if ((static_cast<unsigned>(Raw->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
         return nullptr;
     return static_cast<CSolar*>(Raw);
 }
@@ -1658,7 +1658,7 @@ static CLoot* EqObj_LootOf(IObjRW* Obj)
     CObject const* const Raw = Obj->cobject();
     if (Raw == nullptr)
         return nullptr;
-    if ((static_cast<unsigned>(Raw->ObjectClass) & 0x803u) != 0x803u)
+    if ((static_cast<unsigned>(Raw->ObjectClass) & CObject::ClassLoot) != CObject::ClassLoot)
         return nullptr;
     return const_cast<CLoot*>(static_cast<CLoot const*>(Raw));
 }
@@ -1841,11 +1841,11 @@ int EqObj::toggle_item(unsigned short const* EquipId, bool bActivate, int Source
             // Switching an engine (type 0x20000) off is refused (-5) while the
             // ship strafes or has a thruster on; the CShip narrowing is used
             // without a null test.
-            if (!bActivate && Found->Type == 0x20000u)
+            if (!bActivate && Found->Type == EquipTypeEngine)
             {
                 CObject* const Raw = cobj();
                 CShip* Ship = nullptr;
-                if (Raw != nullptr && (static_cast<unsigned>(Raw->ObjectClass) & 0x503u) == 0x503u)
+                if (Raw != nullptr && (static_cast<unsigned>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                     Ship = static_cast<CShip*>(Raw);
                 if (Ship->get_strafe_dir() != 0 || Ship->any_thrusters_on())
                 {
@@ -2007,7 +2007,7 @@ int EqObj::use_shield_batteries(unsigned short EquipId, Archetype::ShieldBattery
 
     // Over the shields (type 0x100): the one with the lowest relative health
     // strictly below 1.0f whose max hit points are above 0.0f.
-    CEquipTraverser Walk(0x100);
+    CEquipTraverser Walk(EquipTypeShield);
     float Lowest = 1.0f;
     CEquip* Weakest = nullptr;
     for (;;)
@@ -2081,7 +2081,7 @@ void EqObj::queue_dock_request(int Port, unsigned int ShipId)
     Request.ShipId = ShipId;
     DockQueue.push_back(Request);
 
-    OwnerSystem->add_to_list_d4(this);   // FUN_06d0c6d0
+    OwnerSystem->add_docking_solar(this);   // FUN_06d0c6d0
 }
 
 // FUN_06ce78d0. Port < 0 (signed test) matches any port.
@@ -2096,7 +2096,7 @@ bool EqObj::dequeue_dock_request(int Port, unsigned int ShipId)
 
         DockQueue.erase(It);
 
-        OwnerSystem->remove_from_list_d4(this);   // FUN_06d0c730
+        OwnerSystem->remove_docking_solar(this);   // FUN_06d0c730
         return true;
     }
 
@@ -2122,7 +2122,7 @@ void EqObj::process_dock_queue(float Dt)
         {
             // The ship is gone.
             It = DockQueue.erase(It);
-            OwnerSystem->remove_from_list_d4(this);
+            OwnerSystem->remove_docking_solar(this);
             continue;
         }
 
@@ -2191,7 +2191,7 @@ void EqObj::process_dock_queue(float Dt)
         }
 
         It = DockQueue.erase(It);
-        OwnerSystem->remove_from_list_d4(this);
+        OwnerSystem->remove_docking_solar(this);
     }
 }
 
@@ -2218,12 +2218,12 @@ void EqObj::explode()
     ExplosionDamageEvent Event;
     Event.ExplodingObjId = 0;
     Event.InflictorId = 0;
-    Event.Cause = static_cast<DamageCause>(4);
+    Event.Cause = DamageCause::Explosion;
     Event.Explosion = nullptr;
     Event.SkipCollisionGroup = nullptr;
     Event.ExplodingObjId = get_id();
     Event.InflictorId = get_id();
-    Event.Cause = static_cast<DamageCause>(4);
+    Event.Cause = DamageCause::Explosion;
     Event.Position = get_position();
     Event.Explosion = Blast;
     Event.SkipCollisionGroup = PhySys::GetCollisionGroup(Object);
@@ -2245,7 +2245,7 @@ void EqObj::collect_droppable_equip(std::vector<EquipDesc>& Out)
             break;
         if (Equip->IsDestroyed())
             continue;
-        if (Equip->Type == 0x800)                                  // cargo pods stay
+        if (Equip->Type == EquipTypeCargoPod)                                  // cargo pods stay
             continue;
         if (!Equip->IsLootable())
             continue;
@@ -2430,7 +2430,7 @@ bool EqObj::inflict_equip_damage(char const* Hardpoint, float Damage, bool bCanK
 bool EqObj::dump_cargo(char const* Hardpoint, DamageList& Out)
 {
     bool bDumped = false;
-    CEquipTraverser Walk(0x10000);
+    CEquipTraverser Walk(EquipTypeCargo);
     for (;;)
     {
         // ceqobj() re-narrowed every iteration.
@@ -2483,7 +2483,7 @@ bool EqObj::dump_cargo(char const* Hardpoint, DamageList& Out)
 // +0x1d8 -- .text:06ce91e0.
 bool EqObj::drain_shields(DamageList& Out)
 {
-    CEquipTraverser Walk(0x100);
+    CEquipTraverser Walk(EquipTypeShield);
     for (;;)
     {
         CEquip* const Equip = ceqobj()->EquipManager.Traverse(Walk);   // re-narrowed each pass
@@ -2516,7 +2516,7 @@ void EqObj::damage_sub_obj(FSubObjDamage const& Hit, DamageList& Damage)
         CEquip* const Equip = ceqobj()->EquipManager.FindByID(Hit.SubObjId);
         if (Equip == nullptr)
             return;
-        if (Equip->Type == 0x100)
+        if (Equip->Type == EquipTypeShield)
             damage_shield(static_cast<CEShield*>(Equip), Hit.Damage, Damage);   // vt +0x214
         else
             damage_equip(Equip, Hit.Damage, Damage);               // vt +0x210
@@ -2558,7 +2558,7 @@ void EqObj::munition_hit(FMunitionImpact const& Hit, DamageList& Damage)
         CEquip* const Equip = Ce->EquipManager.FindByID(Hit.SubObjId);
         if (Equip == nullptr)
             return;
-        if (Equip->Type == 0x100)
+        if (Equip->Type == EquipTypeShield)
         {
             // The shield takes the whole hit; no energy pass.
             munition_hit_shield(static_cast<CEShield*>(Equip), Munition, Damage);   // vt +0x20c
@@ -2748,7 +2748,7 @@ bool EqObj::explosion_hit_shield(ExplosionDamageEvent const& Blast, DamageList& 
     float const Middle = RadiusSq * (4.0f / 9.0f);
     float const Inner = RadiusSq * (1.0f / 9.0f);
 
-    CEquipTraverser Walk(0x100);
+    CEquipTraverser Walk(EquipTypeShield);
     CEquipManager const& Equipment = Ce->EquipManager;
     for (CEquip const* Equip = Equipment.Traverse(Walk); Equip != nullptr; Equip = Equipment.Traverse(Walk))
     {
@@ -2795,7 +2795,7 @@ void EqObj::destroy_cargo(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
             if (Fate == DamageEntry::SubObjFate::Separated)
             {
                 // A separated pod drops its stack as loot (fate 4).
-                destroy_equip(Cargo, static_cast<DamageEntry::SubObjFate>(4), Out);   // vt +0x224
+                destroy_equip(Cargo, DamageEntry::SubObjFate::Loot, Out);   // vt +0x224
             }
             else
             {
@@ -2826,7 +2826,7 @@ void EqObj::destroy_cargo(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                     Event.SystemId = 0;
                     Event.InflictorId = 0;
                     Event.ObjId = 0;
-                    Event.Cause = static_cast<DamageCause>(0);
+                    Event.Cause = DamageCause::Unknown;
                     Event.SystemId = OwnerSystem->SystemInfo->NicknameId;   // FUN_06d06cd0
                     Event.InflictorId = Out.InflictorId;
                     Event.ObjId = get_id();
@@ -2893,7 +2893,7 @@ void EqObj::destroy_equip(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
         return;
 
     // A cargo pod goes through destroy_cargo.
-    if (Equip->Type == 0x800)
+    if (Equip->Type == EquipTypeCargoPod)
     {
         destroy_cargo(Equip, Fate, Out);                           // vt +0x228
         return;
@@ -2932,7 +2932,7 @@ void EqObj::destroy_equip(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                     Event.SystemId = 0;
                     Event.InflictorId = 0;
                     Event.ObjId = 0;
-                    Event.Cause = static_cast<DamageCause>(0);
+                    Event.Cause = DamageCause::Unknown;
                     Event.SystemId = OwnerSystem->SystemInfo->NicknameId;   // FUN_06d06cd0
                     Event.ObjId = get_id();
                     Event.InflictorId = Out.InflictorId;
@@ -3016,7 +3016,7 @@ bool EqObj::damage_hull(float Amount, DamageList& Damage)
             Amount = Player->difficulty_scale * Amount;
 
         // Armour (type 0x1000000) divides by its hit_pts_scale (Armor+0x70).
-        CEquip* const Armor = ceqobj()->EquipManager.FindFirst(0x1000000u);
+        CEquip* const Armor = ceqobj()->EquipManager.FindFirst(EquipTypeArmor);
         if (Armor != nullptr)
             Amount = Amount / static_cast<CEArmor*>(Armor)->ArmorArch()->HitPtsScale;
     }
@@ -3069,7 +3069,7 @@ bool EqObj::damage_equip(CEquip* Equip, float Damage, DamageList& Out)
     // the new one does not.
     if (is_damage_blocked(Out))
     {
-        float const Floor = 1.0f - get_invincible_timer();
+        float const Floor = 1.0f - get_max_hp_loss();
         float const Max = Equip->GetMaxHitPoints();
         double const RelCurrent = (Max != 0.0f) ? static_cast<double>(Current) / Max : 0.0;
         if (RelCurrent < Floor)
@@ -3130,13 +3130,13 @@ bool EqObj::damage_shield(CEShield* Shield, float Damage, DamageList& Out)
 
     // A blocked list: with no invincible timer left (<= 0 or unordered) the
     // shield keeps its current value; otherwise a new relative value below
-    // F = 1 - timer is either held at the current value (when that one is below
+    // F = 1 - MaxHpLoss is either held at the current value (when that one is below
     // F too) or raised to Max * F (GetMaxHitPoints re-read). Both ratios test
     // Max for zero here.
     if (is_damage_blocked(Out))
     {
-        float const Timer = get_invincible_timer();
-        if (!(Timer > 0.0f))
+        float const MaxLoss = get_max_hp_loss();
+        if (!(MaxLoss > 0.0f))
         {
             NewHitPts = Current;
         }
@@ -3145,7 +3145,7 @@ bool EqObj::damage_shield(CEShield* Shield, float Damage, DamageList& Out)
             float const Max = Shield->GetMaxHitPoints();
             double const RelNew = (Max != 0.0f) ? static_cast<double>(NewHitPts) / Max : 0.0;  // kept on the x87 stack
             float const RelCurrent = (Max != 0.0f) ? Current / Max : 0.0f;  // stored as float
-            float const Floor = 1.0f - Timer;
+            float const Floor = 1.0f - MaxLoss;
             if (RelNew < Floor)
             {
                 if (RelCurrent < Floor)
@@ -3197,7 +3197,7 @@ bool EqObj::damage_group(CArchGroup* Group, float Damage, DamageList& Out)
         // Armour's hit_pts_scale (Arch+0x70) divides first; the quotient stays
         // on the FPU unrounded.
         double Scaled = Damage;
-        CEquip* const Armor = ceqobj()->EquipManager.FindFirst(0x1000000u);
+        CEquip* const Armor = ceqobj()->EquipManager.FindFirst(EquipTypeArmor);
         if (Armor != nullptr)
             Scaled = (double)Damage / ((CEArmor*)Armor)->ArmorArch()->HitPtsScale;
 
@@ -3226,7 +3226,7 @@ bool EqObj::damage_group(CArchGroup* Group, float Damage, DamageList& Out)
     // in both ratios.
     if (is_damage_blocked(Out))
     {
-        float const Floor = 1.0f - get_invincible_timer();
+        float const Floor = 1.0f - get_max_hp_loss();
         // The first zero test sees the unrounded GetMaxHitPoints, the divisions
         // and the second zero test the stored float.
         double const MaxExact = Group->GetMaxHitPoints();
@@ -3308,7 +3308,7 @@ bool EqObj::damage_power(float Damage, DamageList& Out)
     if (is_damage_blocked(Out))
     {
         float const Max = Ce->MaxPower;
-        float const Floor = 1.0f - get_invincible_timer();
+        float const Floor = 1.0f - get_max_hp_loss();
         double const Inverse = 1.0 / Max;  // never stored
         if (Current * Inverse < Floor)
             NewHitPts = Current;
@@ -3392,7 +3392,7 @@ void EqObj::destroy_group_contents(CArchGroup* Group, DamageList& Out)
         long const Parent = static_cast<CExternalEquip const*>(Equip)->GetParentConnector(false);
         if (!Group->IsInstInGroup(Parent))
             continue;
-        if (Equip->Type == 1 || Equip->Type == 2)
+        if (Equip->Type == EquipTypeLight || Equip->Type == EquipTypeAttachedFX)
             continue;
         destroy_equip(const_cast<CEquip*>(Equip), DamageEntry::SubObjFate::Destroyed, Out);   // vt +0x224
     }
@@ -3453,7 +3453,7 @@ int EqObj::build_loot(EquipDesc const& Desc, std::vector<FLootRecord>& Out)
         if (Equip != nullptr)
         {
             CExternalEquip const* Mounted = nullptr;
-            if (Equip->Type == 0x10000)
+            if (Equip->Type == EquipTypeCargo)
                 Mounted = static_cast<CExternalEquip const*>(static_cast<CECargo*>(Equip)->CargoPod);
             else
                 Mounted = CExternalEquip::cast(Equip);
@@ -3538,7 +3538,7 @@ bool EqObj::build_equip_loot(CAttachedEquip const* Equip, FLootRecord& Out)
     float const HitPts = Equip->GetHitPoints();
     Out.HitPts = HitPts;
 
-    if (Equip->Type == 0x800)
+    if (Equip->Type == EquipTypeCargoPod)
     {
         // A cargo pod carries its stack.
         CECargo* const Cargo = CECargoPod::cast(Equip)->Cargo;
@@ -3620,14 +3620,14 @@ bool EqObj::build_equip_loot(CAttachedEquip const* Equip, FLootRecord& Out)
 void EqObj::decay_cargo(float Elapsed)
 {
     DamageList Decay;
-    Decay.Cause = static_cast<DamageCause>(0x14);
+    Decay.Cause = DamageCause::LootDecay;
 
     // Not a solar (0x303), and the equipment manager has decaying cargo
     // (CEquipManager+0x1c > 0, signed). The CEqObj null is dereferenced as in
     // retail.
     CEqObj* const Ce = ceqobj();
     bool bDecay = true;
-    if (Ce != nullptr && (static_cast<unsigned>(Ce->ObjectClass) & 0x303u) == 0x303u)
+    if (Ce != nullptr && (static_cast<unsigned>(Ce->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
         bDecay = false;
     if (!(Ce->EquipManager.DecayingCargoCount > 0))
         bDecay = false;
@@ -3641,7 +3641,7 @@ void EqObj::decay_cargo(float Elapsed)
         return;
 
     // Every cargo stack (non-const traversal).
-    CEquipTraverser Walk(0x10000);
+    CEquipTraverser Walk(EquipTypeCargo);
     for (CEquip* Equip = Ce->EquipManager.Traverse(Walk); Equip != nullptr; Equip = Ce->EquipManager.Traverse(Walk))
     {
         CECargo* const Cargo = static_cast<CECargo*>(Equip);
@@ -3849,7 +3849,7 @@ unsigned short SrvRepairDroid::pick_target() const
     {
         if (CAttachedEquip::cast(Item) == nullptr)
             continue;
-        if (Item->Type == 0x100)
+        if (Item->Type == EquipTypeShield)
             continue;
         // Compared unrounded; only the winner is rounded to float.
         double const Relative = Item->GetRelativeHealth();
@@ -4023,7 +4023,7 @@ SrvCounterMeasureDropper::SrvCounterMeasureDropper(CEquip* InEquip, EqObj* InOwn
 void SrvCounterMeasureDropper::notify(Event Code, void* Param)
 {
     (void)Param;
-    if (Code == Event_0x19)
+    if (Code == IncomingMissileDetected)
     {
         // An AI owner drops a countermeasure through its own IObjAffect slot
         // +0x34: count 1, no target position, client -1.
@@ -4242,8 +4242,8 @@ void SrvGun::launch_guided(Vector const& Target)
 // layout.
 Ship::Ship()
 {
-    DeathSequenceObjId = 0;
-    DeathSequenceTimer = 0.0f;
+    DockedObjId = 0;
+    DockExitTimer = 0.0f;
     bDockInUse = 0;
     PendingRequest = nullptr;
     JettisonTimer = 0.0f;
@@ -4261,8 +4261,8 @@ Ship::Ship()
 // sentinel and size -- not bDockInUse and PendingRequest).
 Ship::~Ship()
 {
-    // FUN_06d00180: drop this ship from the dying-ship list.
-    Ship_ForgetDying(this);
+    // FUN_06d00180: drop this ship from the dock-exited ship list.
+    Ship_ForgetDockExited(this);
 
     // Through the just re-stamped Ship vtable, i.e. this class's own.
     destroy_notify();
@@ -4272,25 +4272,25 @@ Ship::~Ship()
 }
 
 // ---------------------------------------------------------------------------
-// The dying-ship list (server_gameobject.h). FUN_06d00090 / FUN_06d000d0 are
+// The dock-exited ship list (server_gameobject.h). FUN_06d00090 / FUN_06d000d0 are
 // this definition's construction and atexit destruction.
 // ---------------------------------------------------------------------------
-std::list<Ship*> GDyingShips;
+std::list<Ship*> GDockExitedShips;
 
 // FUN_06d00130 (size at DAT_06d8d8e8).
-void Ship_QueueDying(Ship* DyingShip)
+void Ship_QueueDockExited(Ship* ExitedShip)
 {
-    GDyingShips.push_back(DyingShip);
+    GDockExitedShips.push_back(ExitedShip);
 }
 
 // FUN_06d00180: every matching node is removed -- the walk does not stop at
 // the first match.
-void Ship_ForgetDying(Ship* DyingShip)
+void Ship_ForgetDockExited(Ship* ExitedShip)
 {
-    std::list<Ship*>::iterator It = GDyingShips.begin();
-    while (It != GDyingShips.end()) {
-        if (*It == DyingShip)
-            It = GDyingShips.erase(It);
+    std::list<Ship*>::iterator It = GDockExitedShips.begin();
+    while (It != GDockExitedShips.end()) {
+        if (*It == ExitedShip)
+            It = GDockExitedShips.erase(It);
         else
             ++It;
     }
@@ -4335,7 +4335,7 @@ CShip* Ship::cship() const
     CObject* Obj = cobj();
     if (Obj == nullptr)
         return nullptr;
-    if ((static_cast<unsigned>(Obj->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return nullptr;
     return static_cast<CShip*>(Obj);
 }
@@ -4373,13 +4373,13 @@ void Ship::tick_zone_damage(float Dt)
 
     // The zone CSimple::update_zones cached (+0xa4); GetDamage is Common
     // .text:0633ad80, the zone's damage rate (+0x60).
-    Universe::IZone* const Zone = Simple->ZoneAtA4;
+    Universe::IZone* const Zone = Simple->CurrentZone;
     if (Zone != nullptr)
     {
         float const Rate = Zone->GetDamage();
         if (Rate > 0.0f)
         {
-            AccumulatedDamage = Rate * Simple->ScannerInterference * Dt + AccumulatedDamage;
+            AccumulatedDamage = Rate * Simple->ZoneImmersion * Dt + AccumulatedDamage;
         }
     }
 
@@ -4398,7 +4398,7 @@ void Ship::tick_zone_damage(float Dt)
     // Retail builds the list inline and stores the cause directly. Cause 8 has
     // no name in DamageCause (common_misc.h names 0..5 only).
     DamageList Damage;
-    Damage.Cause = static_cast<DamageCause>(8);
+    Damage.Cause = DamageCause::ZoneDamage;
 
     apply_damage_ratio(Ratio, Damage);             // FUN_06d012e0
     apply_damage_list(Damage);                     // vt +0x188
@@ -4613,14 +4613,14 @@ bool Ship::update(float Dt)
     if (!EqObj::update(Dt))                                     // FUN_06ce7e20
         return false;
 
-    if (DeathSequenceObjId == 0u)
+    if (DockedObjId == 0u)
     {
         // OwnerPlayer is read through the (& 3) narrowing with NO null test;
         // CObject::update itself goes through the raw Object.
         CObject* const Raw = Object;
         CSimple* Simple = nullptr;
         if (Raw != nullptr &&
-            (static_cast<unsigned>(Raw->ObjectClass) & 0x3u) == 0x3u)
+            (static_cast<unsigned>(Raw->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
             Simple = static_cast<CSimple*>(Raw);
 
         if (Simple->OwnerPlayer == 0u)
@@ -4638,30 +4638,30 @@ bool Ship::update(float Dt)
         return true;
     }
 
-    // Death-sequence arm: the raw CBase::Object, no class or null test.
-    CObject* const DeathObj = Object;
+    // Dock-exit arm: the raw CBase::Object, no class or null test.
+    CObject* const DockedObj = Object;
     if (SinglePlayer() != 0)
     {
         // CShip::bJumpedOut (+0x214).
-        if (((CShip*)DeathObj)->bJumpedOut == 0)
+        if (((CShip*)DockedObj)->bJumpedOut == 0)
             return true;
-        Ship_QueueDying(this);                                 // FUN_06d00130
-        DeathSequenceObjId = 0u;
+        Ship_QueueDockExited(this);                                 // FUN_06d00130
+        DockedObjId = 0u;
         return true;
     }
 
     // MP: bail while CShip+0x2bd (bIsPlayer) is set.
-    if (static_cast<CShip*>(DeathObj)->bIsPlayer != 0)
+    if (static_cast<CShip*>(DockedObj)->bIsPlayer != 0)
         return true;
 
     // Leave unless <= 0.
-    DeathSequenceTimer -= Dt;
-    if (DeathSequenceTimer <= 0.0f)
+    DockExitTimer -= Dt;
+    if (DockExitTimer <= 0.0f)
     {
-        DeathObj->enable_collisions_r(true);
-        Ship_QueueDying(this);
-        DeathSequenceTimer = 0.0f;
-        DeathSequenceObjId = 0u;
+        DockedObj->enable_collisions_r(true);
+        Ship_QueueDockExited(this);
+        DockExitTimer = 0.0f;
+        DockedObjId = 0u;
     }
     return true;
 }
@@ -4677,14 +4677,14 @@ bool Ship::update(float Dt)
 void Ship::enter_system(StarSystem* Sys, PhySys::CreateParms const* Parms)
 {
     GameObject::enter_system(Sys, Parms);
-    DeathSequenceObjId = 0u;
+    DockedObjId = 0u;
 }
 
 // .text:06d01a10. OwnerPlayer is read unguarded; the EqObj body (FUN_06ceb330)
 // is called directly.
 void Ship::apply_damage_list(DamageList& Damage)
 {
-    if (Damage.Cause == static_cast<DamageCause>(6) && csimple()->OwnerPlayer == 0u)
+    if (Damage.Cause == DamageCause::CruiseDisrupter && csimple()->OwnerPlayer == 0u)
         toggle_cruise(false, true, 0);
     EqObj::apply_damage_list(Damage);
 }
@@ -4721,7 +4721,7 @@ bool Ship::light_fuse(unsigned int SourceId, ID_String const& FuseId,
         CObject* const FollowerObj = const_cast<CObject*>(FollowerAgain->cobject());
         CEqObj* const FollowerEqObj =
             (FollowerObj != nullptr &&
-             (static_cast<unsigned int>(FollowerObj->ObjectClass) & 0x503u) == 0x503u)
+             (static_cast<unsigned int>(FollowerObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CEqObj*>(FollowerObj) : nullptr;
         IBehaviorManager* const Behavior = FollowerEqObj->get_behavior_interface();
         if (Behavior == nullptr)
@@ -4805,7 +4805,7 @@ int Ship::set_strafe_dir(StrafeDir Dir)
     CShip* const Raw = static_cast<CShip*>(Object);
     if (Raw->get_strafe_dir() == Dir)
         return 0;
-    CEquip* const Engine = Raw->EquipManager.FindFirst(0x20000u);
+    CEquip* const Engine = Raw->EquipManager.FindFirst(EquipTypeEngine);
     if (!Engine->IsActive())
     {
         unsigned short const EngineId = Engine->GetID();
@@ -4937,10 +4937,10 @@ int Ship::jettison_cargo(unsigned short EquipId, int Count, int SourceClient)
         // InflictorOwner read through the unguarded (& 3) narrowing.
         DamageList Damage;
         Damage.bDestroyed = false;
-        Damage.Cause = static_cast<DamageCause>(0x16);
+        Damage.Cause = DamageCause::CargoPodJettison;
         Damage.InflictorId = get_id();
         Damage.InflictorOwner = csimple()->OwnerPlayer;
-        destroy_equip(Pod, static_cast<DamageEntry::SubObjFate>(4), Damage);
+        destroy_equip(Pod, DamageEntry::SubObjFate::Loot, Damage);
         apply_damage_list(Damage);
         return 0;
     }
@@ -4991,10 +4991,10 @@ int Ship::set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient)
     return 0;
 }
 
-// .text:06d02410. The engine (CEEngine::cast of FindFirst(0x20000)) is used
+// .text:06d02410. The engine (CEEngine::cast of FindFirst(EquipTypeEngine)) is used
 // untested; engaging cruise from the server switches the thrusters off first.
 // Announced through FUN_06d0e580.
-int Ship::toggle_cruise(bool bEngage, bool bArg2, int SourceClient)
+int Ship::toggle_cruise(bool bEngage, bool bInstant, int SourceClient)
 {
     if (OwnerSystem == nullptr)
         return -5;
@@ -5007,24 +5007,24 @@ int Ship::toggle_cruise(bool bEngage, bool bArg2, int SourceClient)
     {
         bool bChanged = false;
         CEEngine* const Engine =
-            CEEngine::cast(static_cast<CEqObj*>(Object)->EquipManager.FindFirst(0x20000u));
+            CEEngine::cast(static_cast<CEqObj*>(Object)->EquipManager.FindFirst(EquipTypeEngine));
         if (Engine->bCruiseActive != static_cast<unsigned char>(bEngage))
         {
             bChanged = true;
             if (bEngage && SourceClient == 0)
                 toggle_thrusters(false, 0);
-            Engine->EngageCruise(bEngage, bArg2);
+            Engine->EngageCruise(bEngage, bInstant);
         }
         if (SourceClient == 0 && !bChanged)
             return 0;
     }
 
     unsigned int const Id = get_id();
-    OwnerSystem->notify_cruise(Id, bEngage, bArg2, SourceClient);
+    OwnerSystem->notify_cruise(Id, bEngage, bInstant, SourceClient);
     return 0;
 }
 
-// .text:06d02500. The engine (FindFirst(0x20000)) is used untested; the
+// .text:06d02500. The engine (FindFirst(EquipTypeEngine)) is used untested; the
 // server's own request to activate is refused (-5) under cruise and switches
 // an inactive engine on. Announced through FUN_06d0e600.
 int Ship::toggle_thrusters(bool bActivate, int SourceClient)
@@ -5041,7 +5041,7 @@ int Ship::toggle_thrusters(bool bActivate, int SourceClient)
     {
         bool bChanged = false;
         CEqObj* const Raw = static_cast<CEqObj*>(Object);
-        CEquip* const Engine = Raw->EquipManager.FindFirst(0x20000u);
+        CEquip* const Engine = Raw->EquipManager.FindFirst(EquipTypeEngine);
         unsigned char const bCruiseActive = static_cast<CEEngine*>(Engine)->bCruiseActive;
         bool const bEngineActive = Engine->IsActive();
         if (SourceClient == 0 && bActivate)
@@ -5055,7 +5055,7 @@ int Ship::toggle_thrusters(bool bActivate, int SourceClient)
             }
         }
 
-        CEquipTraverser Walk(0x400);
+        CEquipTraverser Walk(EquipTypeThruster);
         for (CEquip* Thruster = Raw->EquipManager.Traverse(Walk); Thruster != nullptr;
              Thruster = Raw->EquipManager.Traverse(Walk))
         {
@@ -5189,7 +5189,7 @@ int Ship::stop_tradelane()
 
 // .text:06d02000. Lifts the launch grant apply_launch_invincibility made and
 // sends controller event 0x28 (LaunchComplete).
-int Ship::slot_70(unsigned Id)
+int Ship::launch_complete(unsigned BaseObjId)
 {
     if (bLaunchInvincible != 0)
     {
@@ -5201,7 +5201,7 @@ int Ship::slot_70(unsigned Id)
         Cmd.MaxHpLoss = 1.0f;
         set_invincible(Cmd);
         unsigned int Msg[2];
-        Msg[0] = Id;
+        Msg[0] = BaseObjId;
         Msg[1] = get_id();
         Server_ControllerDispatch(0, pub::Controller::EMessage::LaunchComplete, Msg);
     }
@@ -5210,10 +5210,10 @@ int Ship::slot_70(unsigned Id)
 
 // .text:06d02070. Controller event 0x26 (JumpInComplete), then lifts the type-2
 // invincibility.
-int Ship::slot_74(unsigned Arg)
+int Ship::jump_in_complete(unsigned SystemId)
 {
     unsigned int Msg[2];
-    Msg[0] = Arg;
+    Msg[0] = SystemId;
     Msg[1] = get_id();
     Server_ControllerDispatch(0, pub::Controller::EMessage::JumpInComplete, Msg);
     FInvincibility Cmd = {};
@@ -5478,7 +5478,7 @@ CSolar* Solar::csolar() const
     CObject* Obj = cobj();
     if (Obj == nullptr)
         return nullptr;
-    if ((static_cast<unsigned>(Obj->ObjectClass) & 0x303u) != 0x303u)
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
         return nullptr;
     return static_cast<CSolar*>(Obj);
 }
@@ -5522,7 +5522,7 @@ CLoot* Loot::cloot() const
     CObject* Obj = cobj();
     if (Obj == nullptr)
         return nullptr;
-    if ((static_cast<unsigned>(Obj->ObjectClass) & 0x803u) != 0x803u)
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassLoot) != CObject::ClassLoot)
         return nullptr;
     return static_cast<CLoot*>(Obj);
 }

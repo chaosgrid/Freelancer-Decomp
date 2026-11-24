@@ -178,14 +178,14 @@ void CAttachedEquip::Disconnect()
             {
                 if (Debris->BodyPtr != nullptr)
                     PhySys::AddImpulseAtPoint(Debris, ChildPush, Point);
-                Owner->notify(INotify::Event_0x5, this);
+                Owner->notify(INotify::EquipSeparated, this);
             }
             if (Owner->BodyPtr != nullptr)
                 PhySys::AddImpulseAtPoint(Owner, ParentPush, Point);
         }
         else if (Fate != kFateStay)
         {
-            Owner->notify(INotify::Event_0x6, this);
+            Owner->notify(INotify::EquipDetachedInPlace, this);
             Attachment->Disconnect(this, false);
             if (Fate != 3 && Fate != 4)
                 FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCAttachedEquipSource, 0xd1,

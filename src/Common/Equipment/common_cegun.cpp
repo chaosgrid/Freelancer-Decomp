@@ -71,8 +71,8 @@ namespace
 
     double JointAbsDelta(CEGun::JointChannel const& Joint)
     {
-        // Inlined in Update, CanSeeTargetObject and FUN_06297560. An unlimited joint folds a
-        // delta above pi to pi - delta (not 2pi - delta).
+        // Inlined in Update, CanSeeTargetObject and FUN_06297560. Retail: an unlimited joint
+        // folds a delta above pi to pi - delta, not 2pi - delta (FSUBR pi, .text:06298611).
         double Delta = fabs((double)(Joint.Current) - Joint.Desired);
         if (Joint.bLimited == 0 && kGunPi < Delta)
             Delta = (double)(kGunPi) - Delta;
@@ -295,7 +295,7 @@ bool CEGun::Activate(bool bOn)
 bool CEGun::is_guided() const
 {
     // FUN_06296ce0; no null or class test.
-    return MunitionArch()->Seeker != 0;
+    return MunitionArch()->Seeker != Archetype::Munition::SeekerNone;
 }
 
 FireResult CEGun::Fire(Vector const& Target)
@@ -359,7 +359,7 @@ void CEGun::ComputeLaunchInfo_OneBarrel(ProjLaunchInfo& Out, int Barrel,
     // FUN_06297870. LockTarget / LockSubId keep the caller's default unless the lock block at
     // the end writes them. No null or class tests on Projectile, Owner or Arch.
     Archetype::Munition const* const Munition = (Archetype::Munition const*)(Projectile);
-    if (Munition->Seeker == 0)
+    if (Munition->Seeker == Archetype::Munition::SeekerNone)
     {
         // Unguided: muzzle velocity plus the owner's, oriented along the total.
         Vector const OwnerVel = Owner->get_velocity();
@@ -411,8 +411,8 @@ void CEGun::ComputeLaunchInfo_OneBarrel(ProjLaunchInfo& Out, int Barrel,
         Out.Orient = LookMatrix(Vel);
     }
 
-    // A lock seeker (2) that has finished locking (NaN does not) hands over its target.
-    if (Munition->Seeker == 2)
+    // A lock seeker that has finished locking (NaN does not) hands over its target.
+    if (Munition->Seeker == Archetype::Munition::SeekerLock)
     {
         double const Remaining = (double)(Munition->TimeToLock) - LockElapsed;
         if (Remaining <= 0.0)
@@ -730,7 +730,7 @@ float CEGun::GetMunitionRange() const
     if (IsDestroyed())
         return 0.0f;
     Archetype::Munition const* const Proj = (Archetype::Munition const*)(Projectile);
-    if (Proj->Seeker == 2 && Proj->SeekerRange > 0.0f && Proj->SeekerFovCos < 1.0f)
+    if (Proj->Seeker == Archetype::Munition::SeekerLock && Proj->SeekerRange > 0.0f && Proj->SeekerFovCos < 1.0f)
         return Proj->SeekerRange;
     return GunArch()->get_munition_range();
 }
@@ -739,7 +739,7 @@ float CEGun::GetSecondsTillLock() const
 {
     // FUN_06298ee0: clamped at 0 (NaN passes through). No null or class tests.
     Archetype::Munition const* const Proj = (Archetype::Munition const*)(Projectile);
-    if (Proj->Seeker != 2)
+    if (Proj->Seeker != Archetype::Munition::SeekerLock)
         return 0.0f;
     double const Remaining = (double)(Proj->TimeToLock) - LockElapsed;
     if (0.0 > Remaining)
@@ -938,7 +938,7 @@ bool CEGun::ComputeTgtLeadPosition(Vector& Out) const
 
     // A guided munition leads as if instantaneous. No class or null test.
     float Speed = GunArch()->MuzzleVelocity;
-    if (MunitionArch()->Seeker != 0)
+    if (MunitionArch()->Seeker != Archetype::Munition::SeekerNone)
         Speed = kSeekerLeadSpeed;
 
     float Time = 0.0f;

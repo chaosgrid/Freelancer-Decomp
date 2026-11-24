@@ -111,7 +111,7 @@ namespace AlchemyImpl
         // Per-node update. FUN_06240180 (node vtable slot 3): TickLifetime(Dt) through the
         // object's own vtable. FLBeamAppearance and the three emitters override it
         // (FUN_0620de30; LAB_0621b9d0 / LAB_0621d360 / LAB_0623bcf0).
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // Outer +0x18, the per-node draw. FUN_062403f0 (node vtable slot 4 default)
         // returns 0. The appearances override it with their draw.
         GENRESULT DACOM_API DrawOrEnqueue() override { return GR_OK; }
@@ -253,30 +253,29 @@ namespace AlchemyImpl
         }
         // Outer +0x8C for every node that has no sphere (FxNode FUN_06202950, cone emitter
         // LAB_0621c430, field LAB_0620ecb0): 0xfffffff9, nothing written. Every appearance
-        // except dust overrides it; dust's FUN_0620f830 computes one in retail and is not
-        // ported, so dust lands here.
+        // overrides it.
         GENRESULT DACOM_API GetBoundingSphere(float* /*OutSphere*/) override
         {
             return static_cast<GENRESULT>(0xfffffff9);
         }
         // Outer +0x90 / +0x94 / +0x98 (FxNode LAB_06202960 / 980 / 9a0): the family tag
         // bytes node+0x94 (appearance) / +0x95 (emitter) / +0x96 (field).
-        GENRESULT DACOM_API GetFlagBit4(unsigned char* Out) override
+        GENRESULT DACOM_API GetIsAppearance(unsigned char* Out) override
         {
             *Out = bIsAppearanceNode_;
             return GR_OK;
         }
-        GENRESULT DACOM_API GetFlagBit1(unsigned char* Out) override
+        GENRESULT DACOM_API GetIsEmitter(unsigned char* Out) override
         {
             *Out = bIsEmitterNode_;
             return GR_OK;
         }
-        GENRESULT DACOM_API GetFlagBit2(unsigned char* Out) override
+        GENRESULT DACOM_API GetIsField(unsigned char* Out) override
         {
             *Out = bIsFieldNode_;
             return GR_OK;
         }
-        GENRESULT DACOM_API Pad40() override { return GR_OK; }
+        GENRESULT DACOM_API EndField() override { return GR_OK; }
         GENRESULT DACOM_API FillBatchedGeometry() override { return GR_OK; }
         // Batch begin / end-and-draw (IGenericFx, retail appearance +0x9C / +0xA0). The four
         // batched appearance kinds override them. Every other appearance reaches the
@@ -289,29 +288,30 @@ namespace AlchemyImpl
             return GR_OK;
         }
         GENRESULT DACOM_API EndBatchedDraw() override { return GR_OK; }
-        GENRESULT DACOM_API Pad42() override { return GR_OK; }
+        // Appearance +0xA8: every retail body returns 0xfffffff9.
+        GENRESULT DACOM_API Pad42() override { return static_cast<GENRESULT>(0xfffffff9); }
         // FUN_06244430, inner +0x5c / appearance +0xB0 (remove a field): the unchecked
         // iterator starts at the by-value argument itself. Retail's malformed algorithm is
         // kept, not a search by field or index.
-        GENRESULT DACOM_API Pad44(IDAComponent* Value) override;
+        GENRESULT DACOM_API RemoveField(IDAComponent* Field) override;
         // Appearance +0xB4 (FUN_06244580 via a this+0xc thunk, basic LAB_062195a0): begins
         // every associated field.
-        GENRESULT DACOM_API Pad45() override;
+        GENRESULT DACOM_API BeginFields() override;
         // Appearance +0xB8 (FUN_062445c0 via a this+0xc thunk, basic LAB_062195b0): will a
         // particle spawned with (Six, Age, Duration) survive this frame's fields?
-        GENRESULT DACOM_API Pad46(const float* Six, float Age, float Duration) override;
+        GENRESULT DACOM_API TestParticleSpawn(const float* Six, float Age, float Duration) override;
         // Appearance +0xBC: the spawn. Every appearance has its own body (basic
         // FUN_06215f40, rect FUN_0623b410, perp FUN_06235db0, oriented FUN_0622bd80,
         // beam FUN_0620e430, dust FUN_06212700, particle FUN_0622f6a0, mesh
         // FUN_06224c20) and overrides it; this default spawns nothing.
-        GENRESULT DACOM_API Pad47(const float* /*Six*/, float /*Age*/,
-                                  float /*Duration*/) override
+        GENRESULT DACOM_API SpawnParticle(const float* /*Six*/, float /*Age*/,
+                                          float /*Duration*/) override
         {
             return GR_OK;
         }
         // Appearance +0xC0 (FUN_06244660 via a this+0xc thunk, basic LAB_062195d0): ends
         // every associated field (field +0xa0).
-        GENRESULT DACOM_API Pad48() override;
+        GENRESULT DACOM_API EndFields() override;
         // Appearance +0xC4 / +0xC8 (basic LAB_062195e0 / LAB_06219600): INC / DEC of
         // node+0xb0. Only appearance vtables have these slots in retail.
         GENRESULT DACOM_API AddEmitterRef() override
@@ -388,15 +388,6 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        // Retail [this+0x12C] (FLDustAppearance only; the dust leaf keeps it as
-        // LastCameraStep_).
-        float DACOM_API GetDustPrevCameraDistance() override { return DustPrevCameraDistance_; }
-        GENRESULT DACOM_API SetDustPrevCameraDistance(float Distance) override
-        {
-            DustPrevCameraDistance_ = Distance;
-            return GR_OK;
-        }
-
         // The billboard blend pair (descriptor +0x68/+0x6c) is the constant {5 SRCALPHA,
         // 2 ONE} every retail descriptor builder writes; no property overrides it.
 
@@ -412,10 +403,6 @@ namespace AlchemyImpl
         // FUN_06201cc0 walks through [outer+8]. See FBatchList (alchemy_types.h).
         IGenericFx* BatchPrev_ = nullptr;
         IGenericFx* BatchNext_ = nullptr;
-
-        // Port-only accessors for Age_/Duration_.
-        float GetLifetimeAge() const { return Age_; }
-        float GetLifetimeDuration() const { return Duration_; }
 
         // FUN_0623fc30 -- the node-base half of every class's archetype copy constructor
         // (FUN_06244120 / FUN_06244f90 / FUN_06245b30, 18 callers). Duration_ =
@@ -474,11 +461,6 @@ namespace AlchemyImpl
                                            const float& Duration);
         FPooledParticle* EraseListParticle(FAppearancePool* Pool, FPooledParticle* Particle);
         void EvictOldestListParticle(FAppearancePool* Pool);
-        // UpdateListAppearance: the per-node update, basic FUN_06216420, rect
-        // FUN_06238780, perp FUN_06233040, oriented FUN_0622c3d0, dust FUN_0620fb70.
-        // FrameRamp is the descriptor ramp the class evaluates for a flag-8 frame.
-        void UpdateListAppearance(FAlDrawContext& DrawContext, FAppearancePool* Pool, float Dt,
-                                  INestedSingleRamp* FrameRamp);
 
         void ReleaseAssociatedFields();
         void DestroyListAppearance(FAppearancePool* Pool);
@@ -526,7 +508,7 @@ namespace AlchemyImpl
         // Node-base +0x90, 1.0f from FUN_0623fb80; outer +0x84/+0x88.
         float LodInput_;
         // Node-base +0x94 / +0x95 / +0x96, zero from FUN_0623fb80; the family
-        // constructors set one of them (see IGenericFx::GetFlagBit4). The appearance
+        // constructors set one of them (see IGenericFx::GetIsAppearance). The appearance
         // and field leaves set theirs in this class's constructor from PrimaryIid_
         // (retail sets them in the shared appearance init FUN_06244360 and in each field
         // constructor), FFxEmitterBase sets +0x95.
@@ -556,10 +538,6 @@ namespace AlchemyImpl
         // zeroes it; the writer is outer +0x5C SetNodeOuterTime (cone LAB_0621c2c0),
         // which IFxEffect Slot6 (LAB_0621f820) walks over every node.
         float AppearanceOuterTime_;
-
-        // Retail FLDustAppearance-only [this+0x12C] previous-frame camera distance
-        // (FUN_0620fcb0); zero-initialised.
-        float DustPrevCameraDistance_;
 
         // Retail node+0xb4 (the beam's +0xb8): the appearance's texture state,
         // FUN_06244b20 at construction, FUN_06244b50 in every appearance destructor.

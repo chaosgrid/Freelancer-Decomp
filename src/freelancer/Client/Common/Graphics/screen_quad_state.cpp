@@ -30,21 +30,7 @@ unsigned long const G_ScreenQuadDefaultFrame[5] = {0u, 0u, 0u, 0x3f800000u, 0x3f
 
 namespace
 {
-    static const int kMaxCachedRenderStates = 64;
-    static const int kMaxCachedPipelineStates = 16;
-    static const int kMaxCachedTextureStageStates = 32;
     static const unsigned kScreenQuadFvf = 0x1c4u; // XYZRHW|DIFFUSE|SPECULAR|TEX1
-
-    struct FCachedIntPair
-    {
-        int Key;
-        int Value;
-        unsigned char bValid;
-    };
-
-    FCachedIntPair GRenderStateCache[kMaxCachedRenderStates];
-    FCachedIntPair GPipelineStateCache[kMaxCachedPipelineStates];
-    FCachedIntPair GTextureStageCache[kMaxCachedTextureStageStates];
 
     // FVF 0x1C4 vertex — FUN_004042c0 expand shape (8 dwords / 0x20).
     struct FScreenQuadGpuVert
@@ -104,45 +90,6 @@ namespace
     // DAT_00616494 — lazy 3DMathEngine (FUN_005b73e0 CreateInstance "3DMathEngine").
     I3DMathEngine* G_ScreenQuadMath = nullptr;
 
-
-    bool CacheLookupOrStore(FCachedIntPair* Table, int Capacity, int Key, int Value, bool* bChanged)
-    {
-        int FreeSlot = -1;
-        for (int Index = 0; Index < Capacity; ++Index)
-        {
-            if (Table[Index].bValid == 0)
-            {
-                if (FreeSlot < 0)
-                    FreeSlot = Index;
-                continue;
-            }
-            if (Table[Index].Key != Key)
-                continue;
-            if (Table[Index].Value == Value)
-            {
-                *bChanged = false;
-                return true;
-            }
-            Table[Index].Value = Value;
-            *bChanged = true;
-            return true;
-        }
-        if (FreeSlot < 0)
-        {
-            *bChanged = true;
-            return false;
-        }
-        Table[FreeSlot].Key = Key;
-        Table[FreeSlot].Value = Value;
-        Table[FreeSlot].bValid = 1;
-        *bChanged = true;
-        return true;
-    }
-
-    void ClearCache(FCachedIntPair* Table, int Capacity)
-    {
-        memset(Table, 0, static_cast<size_t>(Capacity) * sizeof(FCachedIntPair));
-    }
 
     I3DMathEngine* AcquireScreenQuadMath()
     {
@@ -635,71 +582,6 @@ int ScreenQuadClip1D(float* Edge0, float* Edge1, float* Attr0, float* Attr1, flo
     return -1;
 }
 
-void ScreenQuadInvalidateStateCache()
-{
-    ClearCache(GRenderStateCache, kMaxCachedRenderStates);
-    ClearCache(GPipelineStateCache, kMaxCachedPipelineStates);
-    ClearCache(GTextureStageCache, kMaxCachedTextureStageStates);
-}
-
-void ScreenQuadSetRenderState(IRenderPipeline* Pipe, int State, int Value)
-{
-    if (Pipe == nullptr)
-        return;
-    bool bChanged = true;
-    CacheLookupOrStore(GRenderStateCache, kMaxCachedRenderStates, State, Value, &bChanged);
-    if (bChanged)
-        Pipe->SetRenderState((D3DRENDERSTATETYPE)State, Value);
-}
-
-void ScreenQuadSetPipelineState(IRenderPipeline* Pipe, int Id, int Value)
-{
-    if (Pipe == nullptr)
-        return;
-    bool bChanged = true;
-    CacheLookupOrStore(GPipelineStateCache, kMaxCachedPipelineStates, Id, Value, &bChanged);
-    if (bChanged)
-        Pipe->SetPipelineState(Id, Value);
-}
-
-void ScreenQuadSetTextureStageState(IRenderPipeline* Pipe, int Stage, int Type, int Value)
-{
-    if (Pipe == nullptr)
-        return;
-    int const Key = (Stage << 16) | (Type & 0xffff);
-    bool bChanged = true;
-    CacheLookupOrStore(GTextureStageCache, kMaxCachedTextureStageStates, Key, Value, &bChanged);
-    if (bChanged)
-        Pipe->SetTextureStageState(Stage, Type, Value);
-}
-
-void ApplyScreenQuadRenderStates(IRenderPipeline* Pipe)
-{
-    if (Pipe == nullptr)
-        return;
-    ScreenQuadSetRenderState(Pipe, 7, 0);
-    ScreenQuadSetRenderState(Pipe, 14, 0);
-    ScreenQuadSetRenderState(Pipe, 0x16, 1);
-    ScreenQuadSetRenderState(Pipe, 0x1b, 1);
-    ScreenQuadSetRenderState(Pipe, 0x13, 5);
-    ScreenQuadSetRenderState(Pipe, 0x14, 6);
-    ScreenQuadSetRenderState(Pipe, 0x89, 0);
-    ScreenQuadSetRenderState(Pipe, 0x1c, 0);
-    ScreenQuadSetRenderState(Pipe, 0x8d, 1);
-    ScreenQuadSetRenderState(Pipe, 0xA8, 0xF);
-    ScreenQuadSetPipelineState(Pipe, 0, 1);
-    ScreenQuadSetTextureStageState(Pipe, 0, 1, 4);
-    ScreenQuadSetTextureStageState(Pipe, 0, 2, 2);
-    ScreenQuadSetTextureStageState(Pipe, 0, 3, 0);
-    ScreenQuadSetTextureStageState(Pipe, 0, 4, 4);
-    ScreenQuadSetTextureStageState(Pipe, 0, 5, 2);
-    ScreenQuadSetTextureStageState(Pipe, 0, 6, 0);
-    ScreenQuadSetTextureStageState(Pipe, 0, 0xD, 3);
-    ScreenQuadSetTextureStageState(Pipe, 0, 0xE, 3);
-    ScreenQuadSetTextureStageState(Pipe, 0, 0x12, 0);
-    ScreenQuadSetTextureStageState(Pipe, 1, 1, 1);
-}
-
 void ScreenQuadSetMaterialKey(unsigned long Key)
 {
     // FUN_00402d30. The previous key's container keeps its queued nodes in the map until a
@@ -1067,11 +949,6 @@ void ScreenQuadFlush(IRenderPipeline* Pipe, unsigned long Key)
         G_MaterialListKey = G_MaterialListKeyDefault;
         G_ActiveContainer = nullptr;
     }
-
-    // Port bookkeeping, not retail: every state above went to the pipeline directly, so the
-    // ScreenQuadSet* cache the menu path keeps (see the header) no longer mirrors the device.
-    // Runs before the savers' destructors, which also write directly.
-    ScreenQuadInvalidateStateCache();
 }
 
 // DAT_006101ec -- .data byte, initial 1, never written; sole reader FUN_00404720. Set: the

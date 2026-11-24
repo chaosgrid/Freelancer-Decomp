@@ -25,14 +25,14 @@ class IFont
 public:
     // +0x00 LAB_00416550 -- `LEA EAX,[ECX+0x4c]`: the id string's text (FontImp::Id, "%s,%d"
     // written by FUN_00415a80). Caller not identified.
-    virtual char const* Slot00() = 0;
+    virtual char const* GetId() = 0;
     // +0x04 LAB_00416560 -- `LEA EAX,[ECX+0x8]`: the nickname (FUN_004177b0 matches it).
     virtual char const* GetName() = 0;
     // +0x08 LAB_00416ad0 -- `FLD [ECX+0xd0]`: fixed_height.
     virtual float GetFixedHeight() = 0;
     // +0x0c LAB_00416570 -- the autoscale prelude, then the realized HFONT (+0x118). The glyph
     // atlas rasterizer selects it into its scratch DC (FUN_004127d0, 0x00412a0c).
-    virtual HFONT__* Slot03() = 0;
+    virtual HFONT__* GetHFont() = 0;
     // +0x10 LAB_00416820 -- the autoscale prelude, then &this+0xdc, the LOGFONTA the face was
     // built from (`LEA EAX,[EBP+0xdc]` at 0x00416abe). FLImeInputBox (FUN_00564280, 0x005642bc)
     // hands it to IMEInputBox's constructor.
@@ -42,11 +42,11 @@ public:
     // GetCharWidth to GetCharWidthA/W.
     virtual float GetGlyphAdvance(wchar_t Ch) = 0;
     // +0x18 LAB_00416af0 -- the autoscale prelude, then the realized TEXTMETRIC height (+0x120)
-    // or, with no HFONT (+0x118), Slot07. ListBox::Update (FUN_005a2230) divides the cursor
+    // or, with no HFONT (+0x118), GetInitLineHeight. ListBox::Update (FUN_005a2230) divides the cursor
     // offset by it to find the hovered row.
     virtual int GetLineHeight() = 0;
     // +0x1c LAB_00416ae0 -- `MOV EAX,[ECX+0xd4]`: the tmHeight FUN_00415a80 snapshots at init.
-    virtual int Slot07() = 0;
+    virtual int GetInitLineHeight() = 0;
     // +0x20 LAB_00415f60 -- measure a string: Out[0] = width, Out[1] = height.
     virtual void MeasureString(int* OutWH, wchar_t const* Text, int Len) = 0;
     // +0x24 LAB_004172b0 (RET 0xc) -- the ratio-target autoscale prelude, then the number of

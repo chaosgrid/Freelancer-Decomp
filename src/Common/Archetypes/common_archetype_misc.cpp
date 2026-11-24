@@ -157,7 +157,7 @@ namespace Archetype
         Impulse = 0.0f;
         HullDamage = 0.0f;
         EnergyDamage = 0.0f;
-        Process = 1;
+        Process = ProcessDisappear;
         Lifetime = 0.0f;
         LifetimeMax = 10000.0f;
         Effects.clear();
@@ -217,11 +217,11 @@ namespace Archetype
             // Table 063ed218 via DACOM.DLL stricmp; no match leaves the value.
             char const* Text = Reader.get_value_string();
             if (CallDacomStricmp(Text, "none") == 0)
-                Process = 2;
+                Process = ProcessNone;
             else if (CallDacomStricmp(Text, "shatter") == 0)
-                Process = 0;
+                Process = ProcessShatter;
             else if (CallDacomStricmp(Text, "disappear") == 0)
-                Process = 1;
+                Process = ProcessDisappear;
             return true;
         }
         if (Reader.is_value("debris_type"))

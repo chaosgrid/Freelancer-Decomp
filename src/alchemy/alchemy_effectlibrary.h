@@ -41,7 +41,11 @@ namespace AlchemyImpl
         GENRESULT DACOM_API FindByHash(unsigned long Hash, IFxEffectArchetype** Out) override;
         GENRESULT DACOM_API MakeUniqueName(const char* Name, const char** Out) override;
         GENRESULT DACOM_API RemapAllRec16FieldD(unsigned long OldId, unsigned long NewId) override;
-        GENRESULT DACOM_API Slot14(void* /*Unused*/) override { return ClearEffects(); }
+        GENRESULT DACOM_API Initialize(AGGDESC* /*Desc*/) override
+        {
+            ClearEffects();
+            return GR_OK;
+        }
 
     private:
         struct FAleLibEntry

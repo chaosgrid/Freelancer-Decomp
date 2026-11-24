@@ -20,53 +20,53 @@
 // direct call to that class's Init with the remaining arguments in order.
 
 WinControl* WinControl::CreateButtonControl(char const* Name, char const* MeshPath,
-                                            char const* String350, char const* SoundName,
+                                            char const* Mesh2, char const* SoundName,
                                             char const* KeyCommandName, float const* Position,
                                             char const* Hardpoint, float const* HalfExtents,
-                                            unsigned char bFlag331, unsigned char bFlag330Bit3,
-                                            unsigned char bFlag330Bit5, unsigned char bNoZEnable,
-                                            int ToolTipIds, int Dword32c, int Dword34c)
+                                            unsigned char bNoMeshRender, unsigned char bActionButton,
+                                            unsigned char bNoColorChange, unsigned char bNoZEnable,
+                                            int ToolTipIds, int ToolTip2Ids, int CommandId)
 {
     // FUN_005a0c90 (ButtonControl::Init FUN_0055ac30).
     Win3D* const Created = WinFactoryCreate(Name, "ButtonControl", this, nullptr);
     if (Created != nullptr)
     {
         NnButtonControl* const Button = static_cast<NnButtonControl*>(Created);
-        Button->Init(MeshPath, String350, SoundName, KeyCommandName, Position, Hardpoint,
-                     HalfExtents, bFlag331, bFlag330Bit3, bFlag330Bit5, bNoZEnable, ToolTipIds,
-                     Dword32c, Dword34c);
+        Button->Init(MeshPath, Mesh2, SoundName, KeyCommandName, Position, Hardpoint,
+                     HalfExtents, bNoMeshRender, bActionButton, bNoColorChange, bNoZEnable, ToolTipIds,
+                     ToolTip2Ids, CommandId);
     }
     return static_cast<WinControl*>(Created);
 }
 
 WinControl* WinControl::CreateWireButtonControl(char const* Name, char const* SoundName,
                                                 float const* Position, float const* HalfExtents,
-                                                unsigned char bFlag3, unsigned char bNoZEnable,
-                                                int ToolTipIds, int CommandId, int WireFlags)
+                                                unsigned char bAlwaysWhite, unsigned char bNoZEnable,
+                                                int ToolTipIds, int CommandId, int EdgeMask)
 {
     // FUN_005a0d00.
     Win3D* const Created = WinFactoryCreate(Name, "WireButtonControl", this, nullptr);
     if (Created != nullptr)
     {
         WireButtonControl* const Wire = static_cast<WireButtonControl*>(Created);
-        Wire->Init(SoundName, Position, HalfExtents, bFlag3, bNoZEnable, ToolTipIds, CommandId,
-                   static_cast<unsigned>(WireFlags)); // FUN_005a3ee0
+        Wire->Init(SoundName, Position, HalfExtents, bAlwaysWhite, bNoZEnable, ToolTipIds, CommandId,
+                   static_cast<unsigned>(EdgeMask)); // FUN_005a3ee0
     }
     return static_cast<WinControl*>(Created);
 }
 
 WinControl* WinControl::CreateWireStaticControl(char const* Name, float const* Position,
-                                                float const* HalfExtents, unsigned char bFlag3,
+                                                float const* HalfExtents, unsigned char bAlwaysWhite,
                                                 unsigned char bNoZEnable, int ToolTipIds,
-                                                int WireFlags)
+                                                int EdgeMask)
 {
     // FUN_005a0d60.
     Win3D* const Created = WinFactoryCreate(Name, "WireStaticControl", this, nullptr);
     if (Created != nullptr)
     {
         WireStaticControl* const Wire = static_cast<WireStaticControl*>(Created);
-        Wire->Init(Position, HalfExtents, bFlag3, bNoZEnable, ToolTipIds,
-                   static_cast<unsigned>(WireFlags)); // FUN_005a3360
+        Wire->Init(Position, HalfExtents, bAlwaysWhite, bNoZEnable, ToolTipIds,
+                   static_cast<unsigned>(EdgeMask)); // FUN_005a3360
     }
     return static_cast<WinControl*>(Created);
 }
@@ -74,35 +74,35 @@ WinControl* WinControl::CreateWireStaticControl(char const* Name, float const* P
 WinControl* WinControl::CreateStaticControl(char const* Name, char const* MeshPath,
                                             float const* Position, char const* Hardpoint,
                                             float const* HalfExtents, unsigned char bNoZEnable,
-                                            unsigned char Byte34c, unsigned char Byte344,
-                                            unsigned char Byte345, unsigned char Byte346,
-                                            unsigned char Byte34b, unsigned char Byte34a,
-                                            int Int418, int Int41c, unsigned char Byte349,
-                                            float const* Vector338)
+                                            unsigned char bZClear, unsigned char bNoMeshRender,
+                                            unsigned char bNoWireRender, unsigned char bNoColoring,
+                                            unsigned char bRenderToWindow, unsigned char bNoClearRender,
+                                            int ForceRadius, int RotationSpeed, unsigned char bEnableRotation,
+                                            float const* StartYpr)
 {
     // FUN_005a0db0 (StaticControl::Init FUN_00588540).
     Win3D* const Created = WinFactoryCreate(Name, "StaticControl", this, nullptr);
     if (Created != nullptr)
     {
         NnStaticControl* const Static = static_cast<NnStaticControl*>(Created);
-        Static->Init(MeshPath, Position, Hardpoint, HalfExtents, bNoZEnable, Byte34c, Byte344,
-                     Byte345, Byte346, Byte34b, Byte34a, Int418, Int41c, Byte349, Vector338);
+        Static->Init(MeshPath, Position, Hardpoint, HalfExtents, bNoZEnable, bZClear, bNoMeshRender,
+                     bNoWireRender, bNoColoring, bRenderToWindow, bNoClearRender, ForceRadius, RotationSpeed, bEnableRotation, StartYpr);
     }
     return static_cast<WinControl*>(Created);
 }
 
 WinControl* WinControl::CreateTextControl(char const* Name, char const* StyleName,
                                           float const* Position, char const* Hardpoint,
-                                          float Width, float Height, float Arg6, unsigned Ids,
-                                          int Dword358, int Dword344, unsigned char Byte378)
+                                          float Width, float Height, float FontScale, unsigned Ids,
+                                          int Justification, int TextToolTipIds, unsigned char bTopLeftAnchor)
 {
     // FUN_005a0e30 (TextControl::Init FUN_0058a110).
     Win3D* const Created = WinFactoryCreate(Name, "TextControl", this, nullptr);
     if (Created != nullptr)
     {
         NnTextControl* const Text = static_cast<NnTextControl*>(Created);
-        Text->Init(StyleName, Position, Hardpoint, Width, Height, Arg6, Ids, Dword358, Dword344,
-                   Byte378);
+        Text->Init(StyleName, Position, Hardpoint, Width, Height, FontScale, Ids, Justification, TextToolTipIds,
+                   bTopLeftAnchor);
     }
     return static_cast<WinControl*>(Created);
 }
@@ -185,33 +185,33 @@ RichTextEditWin* WinControl::CreateUiTextEdit(char const* Name, float const* Att
 WinControl* WinControl::CreateRichTextWireButtonControl(char const* Name, char const* SoundName,
                                                         float const* Position,
                                                         float const* HalfExtents,
-                                                        unsigned char bFlag3,
+                                                        unsigned char bAlwaysWhite,
                                                         unsigned char bNoZEnable, int ToolTipIds,
                                                         unsigned CaptionIds, int CommandId,
-                                                        int WireFlags)
+                                                        int EdgeMask)
 {
     // FUN_005a1950.
     Win3D* const Created = WinFactoryCreate(Name, "RichTextWireButtonControl", this, nullptr);
     if (Created != nullptr)
     {
         RichTextWireButtonControl* const Wire = static_cast<RichTextWireButtonControl*>(Created);
-        Wire->Init(SoundName, Position, HalfExtents, bFlag3, bNoZEnable, ToolTipIds, CaptionIds,
-                   CommandId, static_cast<unsigned>(WireFlags)); // FUN_005a4810
+        Wire->Init(SoundName, Position, HalfExtents, bAlwaysWhite, bNoZEnable, ToolTipIds, CaptionIds,
+                   CommandId, static_cast<unsigned>(EdgeMask)); // FUN_005a4810
     }
     return static_cast<WinControl*>(Created);
 }
 
 WinControl* WinControl::CreateEditControl(char const* Name, char const* StyleName,
                                           float const* Position, char const* Hardpoint,
-                                          float Width, float Height, float Arg6, unsigned Ids,
-                                          int Dword358, int Dword344)
+                                          float Width, float Height, float FontScale, unsigned Ids,
+                                          int Justification, int TextToolTipIds)
 {
     // FUN_005a0e90 (factory DAT_0067d860; TextControl::Init with a trailing 0).
     Win3D* const Created = WinFactoryCreate(Name, "EditControl", this, nullptr);
     if (Created != nullptr)
     {
         NnEditControl* const Edit = static_cast<NnEditControl*>(Created);
-        Edit->Init(StyleName, Position, Hardpoint, Width, Height, Arg6, Ids, Dword358, Dword344,
+        Edit->Init(StyleName, Position, Hardpoint, Width, Height, FontScale, Ids, Justification, TextToolTipIds,
                    0); // FUN_0058a110
     }
     return static_cast<WinControl*>(Created);
@@ -222,11 +222,11 @@ WinControl* WinControl::CreateToggleButtonControl(char const* Name, char const* 
                                                   char const* KeyCommandName,
                                                   float const* Position, char const* Hardpoint,
                                                   float const* HalfExtents,
-                                                  unsigned char bFlag331,
-                                                  unsigned char bFlag330Bit3,
-                                                  unsigned char bFlag330Bit5,
+                                                  unsigned char bNoMeshRender,
+                                                  unsigned char bActionButton,
+                                                  unsigned char bNoColorChange,
                                                   unsigned char bNoZEnable, int ToolTipIds,
-                                                  int Dword32c)
+                                                  int ToolTip2Ids)
 {
     // FUN_005a0fb0 (factory DAT_00679a80; ToggleButtonControl::Init FUN_0055c1c0).
     Win3D* const Created = WinFactoryCreate(Name, "ToggleButtonControl", this, nullptr);
@@ -234,7 +234,7 @@ WinControl* WinControl::CreateToggleButtonControl(char const* Name, char const* 
     {
         static_cast<NnToggleButtonControl*>(Created)->Init(
             MeshPath, AltMeshPath, SoundName, KeyCommandName, Position, Hardpoint, HalfExtents,
-            bFlag331, bFlag330Bit3, bFlag330Bit5, bNoZEnable, ToolTipIds, Dword32c);
+            bNoMeshRender, bActionButton, bNoColorChange, bNoZEnable, ToolTipIds, ToolTip2Ids);
     }
     return static_cast<WinControl*>(Created);
 }

@@ -46,7 +46,7 @@
 
 #pragma pack(push, 4)
 
-// Growable pointer array used by slots 4 and 5. Not IVP_U_Vector_Base: 32-bit
+// Growable pointer array used by slots 4 and 5. Not IVP_U_Vector: 32-bit
 // fields (capacity +0x00, count +0x04, elems +0x08), grown by FUN_0635d3e0 to
 // 2*old+1. The element type is caller-defined.
 struct IVP_SurfaceManager_OutList

@@ -126,7 +126,8 @@ bool IsMouseFlightHoldThresholdReached();
 // so the loader calls this.
 void ResetMouseFlightState();
 
-// FUN_004c83a0 / FUN_004c83b0 -- two raw setters for .data:00673568/0067356c. Both globals are
-// write-only across the whole PE; purpose/owner not identified.
-void SetUnknownFloat673568(float Value);
-void SetUnknownFloat67356c(float Value);
+// FUN_004c83a0 / FUN_004c83b0 -- two raw setters for .data:00673568/0067356c, fed the
+// CFGINTERFACENOTIFICATION "target_window" / "status_window" values (IClientImpl LAB_005a5f20).
+// Both globals are write-only across the whole PE.
+void SetTargetWindowNotification(float Value);
+void SetStatusWindowNotification(float Value);

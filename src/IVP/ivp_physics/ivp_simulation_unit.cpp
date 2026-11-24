@@ -573,7 +573,7 @@ void IVP_Simulation_Unit_Rebalance_And_Clear_Topology_Flag(IVP_Simulation_Unit* 
 
 // FUN_063496a0, the library's simulate_single_sim_unit_psi. x87 terms are
 // double and rounded at the float stores.
-//   - The arena busy word (vector_cores_frozen +0x10) is incremented; the
+//   - The arena busy word (sim_unit_mem +0x10) is incremented; the
 //     current time and the controller bucket count are read once up front.
 //   - Cores: retail runs n-1 .. 1 in the loop and then index 0
 //     unconditionally, so an empty unit reads elems[0], as retail does.
@@ -621,7 +621,7 @@ void IVP_Simulation_Unit_Process_One_Psi_Step(IVP_Event_Sim* EventSim, IVP_Simul
     IVP_Environment* Env = EventSim->environment;
     // The two counters live on different objects: the arena's own +0x10 busy
     // word and the environment's next_movement_check (+0x118).
-    uint16_t* BusyCounter = &Env->vector_cores_frozen->State;
+    uint16_t* BusyCounter = &Env->sim_unit_mem->State;
     int16_t* CooldownTimer = &Env->next_movement_check;
 
     ++(*BusyCounter);
@@ -717,7 +717,7 @@ void IVP_Simulation_Unit_Process_One_Psi_Step(IVP_Event_Sim* EventSim, IVP_Simul
     }
 
     --(*BusyCounter);
-    Env->vector_cores_frozen->reset_chunks(); // FUN_06344070
+    Env->sim_unit_mem->reset_chunks(); // FUN_06344070
 }
 
 // ============================================================================

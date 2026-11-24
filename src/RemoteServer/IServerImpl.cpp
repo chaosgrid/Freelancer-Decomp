@@ -64,6 +64,8 @@ FPacketSerializer::~FPacketSerializer() {
     }
 }
 
+// 06bd9cd0 (no Ghidra function; LAB_06bd98a0 tail-jumps here). Retail: a packet that fails
+// Allocate or Decode skips only its 2-byte id, and a failed Decode leaks the packet.
 void RpcDispatchMsgs(IServerImpl* Server, const unsigned char* Data, unsigned int Size) {
     const unsigned char* Cursor = Data;
     unsigned int Remaining = Size;
@@ -183,13 +185,13 @@ void IServerImpl::GoTradelane(unsigned int PlayerId, const XGoTradelane& Info) {
     }
 }
 
-void IServerImpl::StopTradelane(unsigned int SessionId, unsigned int Arg1, unsigned int Arg2, unsigned int Arg3) {
+void IServerImpl::StopTradelane(unsigned int SessionId, unsigned int ShipId, unsigned int TradelaneRing1, unsigned int TradelaneRing2) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 0x10, &Packet) == 0) {
         FRpcStopTradeLanePacket* TypedPacket = static_cast<FRpcStopTradeLanePacket*>(Packet);
-        TypedPacket->ShipId = Arg1;
-        TypedPacket->TradeLaneRing1 = Arg2;
-        TypedPacket->TradeLaneRing2 = Arg3;
+        TypedPacket->ShipId = ShipId;
+        TypedPacket->TradeLaneRing1 = TradelaneRing1;
+        TypedPacket->TradeLaneRing2 = TradelaneRing2;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -247,7 +249,7 @@ void IServerImpl::Login(const SLoginInfo& Info, unsigned int SessionId) {
     }
 }
 
-void IServerImpl::CharacterInfoReq(unsigned int SessionId, bool bFullInfo) {
+void IServerImpl::CharacterInfoReq(unsigned int SessionId, bool bSendEmpty) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQUESTCHARINFO, &Packet) == 0) {
         this->PushToServer(Packet->AsRaw());
@@ -275,17 +277,17 @@ void IServerImpl::CreateNewCharacter(const SCreateCharacterInfo& Info, unsigned 
     if (Serializer->Allocate(3, FLPACKET_CLIENT_CREATENEWCHAR, &Packet) == 0) {
         wchar_t Name[64];
         std::wcsncpy(Name, Info.Name, 64);
-        const unsigned int Field_0x80 = Info.FactionId;
-        const unsigned int Field_0x84 = Info.BaseId;
-        const unsigned int Field_0x88 = Info.PackageId;
-        const unsigned int Field_0x8c = Info.PilotId;
+        const unsigned int FactionId = Info.FactionId;
+        const unsigned int BaseId = Info.BaseId;
+        const unsigned int PackageId = Info.PackageId;
+        const unsigned int PilotId = Info.PilotId;
         Name[63] = L'\0';
         FRpcCreateNewCharacterPacket* TypedPacket = static_cast<FRpcCreateNewCharacterPacket*>(Packet);
         memcpy(TypedPacket->Name, Name, sizeof(Name));
-        TypedPacket->FactionId = Field_0x80;
-        TypedPacket->BaseId = Field_0x84;
-        TypedPacket->PackageId = Field_0x88;
-        TypedPacket->PilotId = Field_0x8c;
+        TypedPacket->FactionId = FactionId;
+        TypedPacket->BaseId = BaseId;
+        TypedPacket->PackageId = PackageId;
+        TypedPacket->PilotId = PilotId;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -576,12 +578,12 @@ void IServerImpl::GFGoodVaporized(const SGFGoodVaporizedInfo& Info, unsigned int
     }
 }
 
-void IServerImpl::MissionResponse(unsigned int Arg0, unsigned long MissionId, unsigned char bAccepted, unsigned int SessionId) {
+void IServerImpl::MissionResponse(unsigned int OfferId, unsigned long OfferKind, unsigned char bAccepted, unsigned int SessionId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_MISSIONRESPONSE, &Packet) == 0) {
         FRpcMissionResponsePacket* TypedPacket = static_cast<FRpcMissionResponsePacket*>(Packet);
-        TypedPacket->OfferId = Arg0; // TODO: first argument's game meaning.
-        TypedPacket->OfferKind = MissionId;
+        TypedPacket->OfferId = OfferId;
+        TypedPacket->OfferKind = OfferKind;
         TypedPacket->bAccepted = bAccepted;
         this->PushToServer(Packet->AsRaw());
     }
@@ -637,21 +639,21 @@ void IServerImpl::PlayerLaunch(unsigned int ShipId, unsigned int SessionId) {
     }
 }
 
-void IServerImpl::LaunchComplete(unsigned int Arg0, unsigned int ObjectId) {
+void IServerImpl::LaunchComplete(unsigned int BaseObjId, unsigned int ObjectId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_LAUNCHCOMPLETE, &Packet) == 0) {
         FRpcLaunchCompletePacket* TypedPacket = static_cast<FRpcLaunchCompletePacket*>(Packet);
-        TypedPacket->Field_0x00 = Arg0;
+        TypedPacket->Field_0x00 = BaseObjId;
         TypedPacket->Field_0x04 = ObjectId;
         this->PushToServer(Packet->AsRaw());
     }
 }
 
-void IServerImpl::JumpInComplete(unsigned int Arg0, unsigned int ObjectId) {
+void IServerImpl::JumpInComplete(unsigned int SystemId, unsigned int ObjectId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_JUMPINCOMPLETE, &Packet) == 0) {
         FRpcJumpInCompletePacket* TypedPacket = static_cast<FRpcJumpInCompletePacket*>(Packet);
-        TypedPacket->Field_0x00 = Arg0;
+        TypedPacket->Field_0x00 = SystemId;
         TypedPacket->Field_0x04 = ObjectId;
         this->PushToServer(Packet->AsRaw());
     }
@@ -771,26 +773,26 @@ void IServerImpl::MissionSaveB(unsigned int SessionId, unsigned long MissionId) 
     }
 }
 
-void IServerImpl::RequestEvent(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned int Arg3, unsigned long Arg4, unsigned int SessionId) {
+void IServerImpl::RequestEvent(int EventType, unsigned int ObjectId, unsigned int TargetId, unsigned int SecondId, unsigned long bFlag, unsigned int SessionId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQUEST_EVENT, &Packet) == 0) {
         FRpcRequestEventPacket* TypedPacket = static_cast<FRpcRequestEventPacket*>(Packet);
         TypedPacket->EventType = static_cast<unsigned char>(EventType);
-        TypedPacket->ShipId = Arg1;
-        TypedPacket->TargetId = Arg2;
-        TypedPacket->SecondId = Arg3;
-        TypedPacket->Field_0x10 = static_cast<unsigned char>(Arg4);
+        TypedPacket->ShipId = ObjectId;
+        TypedPacket->TargetId = TargetId;
+        TypedPacket->SecondId = SecondId;
+        TypedPacket->Field_0x10 = static_cast<unsigned char>(bFlag);
         this->PushToServer(Packet->AsRaw());
     }
 }
 
-void IServerImpl::RequestCancel(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned long Arg3, unsigned int SessionId) {
+void IServerImpl::RequestCancel(int EventType, unsigned int ObjectId, unsigned int TargetId, unsigned long Arg3, unsigned int SessionId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQUEST_CANCEL, &Packet) == 0) {
         FRpcRequestCancelPacket* TypedPacket = static_cast<FRpcRequestCancelPacket*>(Packet);
         TypedPacket->EventType = static_cast<unsigned char>(EventType);
-        TypedPacket->ShipId = Arg1;
-        TypedPacket->TargetId = Arg2;
+        TypedPacket->ShipId = ObjectId;
+        TypedPacket->TargetId = TargetId;
         TypedPacket->Field_0x0c = static_cast<unsigned char>(Arg3);
         this->PushToServer(Packet->AsRaw());
     }
@@ -914,11 +916,11 @@ void IServerImpl::RequestPlayerStats(unsigned int SessionId, unsigned char* Data
     }
 }
 
-void IServerImpl::PopUpDialog(unsigned int SessionId, unsigned int Arg1) {
+void IServerImpl::PopUpDialog(unsigned int SessionId, unsigned int Buttons) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 0x1b, &Packet) == 0) {
         FRpcPopUpDialogPacket* TypedPacket = static_cast<FRpcPopUpDialogPacket*>(Packet);
-        TypedPacket->Buttons = Arg1;
+        TypedPacket->Buttons = Buttons;
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -1090,6 +1092,7 @@ void IServerImpl::PushToServer(CDAPacket* Packet) {
     return;
 }
 
+// 06bd9040. Retail: SenderId is never stored, only TargetId (+0x20).
 void IServerImpl::SubmitChat(CHAT_ID SenderId, unsigned long Size, const void* MsgData, CHAT_ID TargetId, int SystemId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 0x05, &Packet) == 0) {

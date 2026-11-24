@@ -23,18 +23,18 @@
 #include <vector>
 #include <windows.h>
 
-// LayoutRichText (.text:06326600). Lays Rdl out into OutRdl as lines no wider than Param3: every
-// committed node is cloned into OutRdl behind a PositionNode that places it. Param5/Param6 are the
-// H/V origin, Param7 is single-line mode (truncate with a "." marker), Param8 receives the
-// laid-out height, Param9 allows word wrap. The result is true when anything was split, deferred
-// or dropped.
+// LayoutRichText (.text:06326600). Lays Rdl out into OutRdl as lines no wider than MaxWidth:
+// every committed node is cloned into OutRdl behind a PositionNode that places it. OriginH /
+// OriginV are the H/V origin, bSingleLine is single-line mode (truncate with a "." marker),
+// OutHeight receives the laid-out height, bWordWrap allows word wrap. The result is true when
+// anything was split, deferred or dropped.
 //
 // The "." is measured in the font of its TRANode {Attrs 0x10, mask 0xff}; in single-line mode a
-// dot narrower than Param3 reserves its width. RDLRefNode and StyleNode push a frame over their
+// dot narrower than MaxWidth reserves its width. RDLRefNode and StyleNode push a frame over their
 // list and are not laid out themselves. A node that does not fit tries, in order: a word split
-// (flag 0, only with Param9 and not Param7), a deferral to the next line (Param9 and the line not
-// empty), a hard split (flag 1); a node that cannot be split is committed whole (dropped in
-// single-line mode). Justify 1 centres, 2 right-aligns, anything else is left. Retail clones each
+// (flag 0, only with bWordWrap and not bSingleLine), a deferral to the next line (bWordWrap and
+// the line not empty), a hard split (flag 1); a node that cannot be split is committed whole
+// (dropped in single-line mode). Justify 1 centres, 2 right-aligns, anything else is left. Retail clones each
 // node into a temporary before the OutRdl insert (FUN_0632c490) and deletes it after; the port
 // keeps that.
 namespace
@@ -78,7 +78,7 @@ namespace CmnText
     }
 }
 
-bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl, int Param3, RenderDisplayList& OutRdl, int Param5, int Param6, bool Param7, int* Param8, bool Param9)
+bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl, int MaxWidth, RenderDisplayList& OutRdl, int OriginH, int OriginV, bool bSingleLine, int* OutHeight, bool bWordWrap)
 {
     bool bResult = false;
     std::list<RDLNode*> Fragments;        // split fragments, deleted at the end
@@ -86,7 +86,7 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
     TextRenderContext::State SavedState;
     Ctx.get_state(SavedState);
     Ctx.StateStack.push_front(SavedState);
-    const int FullWidth = Param3;
+    const int FullWidth = MaxWidth;
 
     // Retail builds the TRANode without a ctor call: set_attributes, +0x10 zeroed by hand.
     TextNode Ellipsis;
@@ -116,15 +116,15 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
     Ctx.set_state(Ctx.StateStack.front());
     Ctx.StateStack.pop_front();
 
-    if (Param7 && EllipsisSize.Width < Param3)
+    if (bSingleLine && EllipsisSize.Width < MaxWidth)
     {
-        Param3 -= EllipsisSize.Width;
+        MaxWidth -= EllipsisSize.Width;
     }
 
     std::list<FLayoutLineEntry> Line;
     int JustifyMode = 0;
-    int VCursor = Param6;
-    int Remaining = Param3;               // width left on the line
+    int VCursor = OriginV;
+    int Remaining = MaxWidth;               // width left on the line
     std::deque<FLayoutFrame> Frames;
     {
         FRdlListNode* const Sentinel = Rdl.NodeList;
@@ -219,9 +219,9 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
                 RDLNode* Left = nullptr;
                 RDLNode* Right = nullptr;
                 bool bDone = false;
-                if (!Param7)
+                if (!bSingleLine)
                 {
-                    if (Param9 && Node->SplitAtSize(Ctx, Remaining, 0, Left, Right))
+                    if (bWordWrap && Node->SplitAtSize(Ctx, Remaining, 0, Left, Right))
                     {
                         Fragments.push_back(Left);
                         Fragments.push_back(Right);
@@ -233,7 +233,7 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
                         bResult = true;
                         bDone = true;
                     }
-                    else if (Remaining != Param3 && Param9)
+                    else if (Remaining != MaxWidth && bWordWrap)
                     {
                         bBroken = true;   // the node waits for the next line
                         bResult = true;
@@ -251,7 +251,7 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
                         Line.push_back(Entry);
                         Node = Right;
                     }
-                    else if (Param7) // dropped
+                    else if (bSingleLine) // dropped
                     {
                         Node = nullptr;
                     }
@@ -269,7 +269,7 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
 
         // Line flush. In single-line mode the whole line is dropped when even the dot does not
         // fit.
-        if (Param7 && bBroken)
+        if (bSingleLine && bBroken)
         {
             if (EllipsisSize.Width >= FullWidth)
             {
@@ -299,14 +299,14 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
         }
         const int LineHeight = MaxBelow + MaxAscent;
 
-        int HCursor = Param5;
+        int HCursor = OriginH;
         if (JustifyMode == 1)
         {
-            HCursor = (FullWidth - LineWidth) / 2 + Param5;
+            HCursor = (FullWidth - LineWidth) / 2 + OriginH;
         }
         else if (JustifyMode == 2)
         {
-            HCursor = FullWidth - LineWidth + Param5;
+            HCursor = FullWidth - LineWidth + OriginH;
         }
 
         FRdlListNode* const OutSentinel = OutRdl.NodeList;
@@ -332,8 +332,8 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
 
         VCursor += LineHeight;
         Line.clear();
-        Remaining = Param3;
-        if (Param7)
+        Remaining = MaxWidth;
+        if (bSingleLine)
         {
             break;
         }
@@ -356,16 +356,16 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
         Ctx.StateStack.pop_front();
     }
 
-    if (Param8 != nullptr)
+    if (OutHeight != nullptr)
     {
-        *Param8 = VCursor - Param6;
+        *OutHeight = VCursor - OriginV;
     }
     return bResult;
 }
 
 // .text:0632a020. Compares the text runs (TextNode / TextPtrNode) of two display lists, raw when
-// Param3 is set, through towlower otherwise; returns the first difference (unsigned 16-bit code
-// units subtracted).
+// bCaseSensitive is set, through towlower otherwise; returns the first difference (unsigned
+// 16-bit code units subtracted).
 // Two retail quirks reproduced as they are (deterministic):
 //   * B's cursor is only advanced past nodes WITHOUT text; after a run is found it stays on that
 //     node, so every refill of B re-reads the same run. Equal names therefore compare as -1, not 0.
@@ -373,7 +373,7 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
 // RETAIL UB, not reproduced: with distinct lists the B walk never meets A's sentinel, so a B
 // with no text left runs onto its own sentinel and dereferences its uninitialised payload.
 // The port also stops at B's own sentinel (same result as reaching the end).
-int __cdecl lex_compare(RenderDisplayList const& A, RenderDisplayList const& B, bool Param3)
+int __cdecl lex_compare(RenderDisplayList const& A, RenderDisplayList const& B, bool bCaseSensitive)
 {
     FRdlListNode* const ASentinel = A.NodeList;
     FRdlListNode* const BSentinel = B.NodeList;
@@ -461,7 +461,7 @@ int __cdecl lex_compare(RenderDisplayList const& A, RenderDisplayList const& B, 
                 }
                 unsigned int CharA = 0;
                 unsigned int CharB = 0;
-                if (Param3)
+                if (bCaseSensitive)
                 {
                     CharA = (unsigned short)*AText;
                     CharB = (unsigned short)*BText;
@@ -716,13 +716,13 @@ RenderDisplayList& RenderDisplayList::operator=(const RenderDisplayList& Other)
     return *this;
 }
 
-void RenderDisplayList::execute(TextRenderContext& Ctx, bool bHighlight)
+void RenderDisplayList::execute(TextRenderContext& Ctx, bool bDraw)
 {
     // .text:06329cd0. No null tests in retail.
     FRdlListNode* const Sentinel = NodeList;
     for (FRdlListNode* Cur = Sentinel->Next; Cur != Sentinel; Cur = Cur->Next)
     {
-        Cur->Node->Execute(Ctx, bHighlight);
+        Cur->Node->Execute(Ctx, bDraw);
     }
 }
 

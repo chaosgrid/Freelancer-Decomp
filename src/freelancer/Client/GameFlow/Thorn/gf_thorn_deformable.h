@@ -57,7 +57,7 @@ struct FThornDeformable : FThornComponent
     void* GetEngineInstance() override;                                  // 17 LAB_00452200
     void SetScene(void* Scene) override;                                 // 19 LAB_00452ec0
     void SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,
-                  unsigned char bFlag14) override;                       // 20 LAB_00452ed0
+                  unsigned char bRunningLights) override;                // 20 LAB_00452ed0
 
     // FUN_00452e40 (thiscall, RET 4) -- the character instance's frame (world). Caller: the
     // spawn FUN_0044ded0.

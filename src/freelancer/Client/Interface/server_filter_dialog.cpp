@@ -15,6 +15,7 @@
 #include "Interface/tooltip_hover.h"    // FToolTipHoverInfo
 #include "Interface/win3d.h"
 #include "Interface/win_factory.h"
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_text.h"
 
@@ -152,7 +153,7 @@ void FServerFilterDialogRow::Build(WinControl* Dialog, FServerFilterRowDesc cons
         Data->SetFixedStyle(true);
         Data->SetImeEnabled(false);
         {
-            StyleNode const Style(0x9ca4);
+            StyleNode const Style(kTextStyleBody);
             AppendNodeClone(Data->FixedStyle, Style);
         }
         {
@@ -175,7 +176,9 @@ void FServerFilterDialogRow::Build(WinControl* Dialog, FServerFilterRowDesc cons
 
 void ServerFilterDialog::ReadControls()
 {
-    // FUN_00562fd0. Toggle state 0 is "on" (property 0x2f reads it; SETZ).
+    // FUN_00562fd0. Toggle state 0 is "on" (property 0x2f reads it; SETZ). Retail: the five rows
+    // write +0x04 / +0x05 / +0x06 / +0x08 / +0x09; bFilterAllowNewPlayers (+0x07) is never
+    // edited by the dialog (nor shown by WriteControls).
     if (Target == nullptr)
         return;
     int State = 0;
@@ -255,11 +258,11 @@ bool ServerFilterDialog::Create(Win3D* NewParent, void* Data)
         LoadIdsIntoRdl(0x60079, Text); // result ignored
         Title->ClearContent();
         {
-            StyleNode const Style(0x9ca4);
+            StyleNode const Style(kTextStyleBody);
             Title->AppendNode(Style);
         }
         {
-            StyleNode const Style(0x1df5);
+            StyleNode const Style(kTextStyleScreenTitle);
             Title->AppendNode(Style);
         }
         Title->AppendContent(Text);
@@ -290,7 +293,7 @@ bool ServerFilterDialog::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // FUN_005635a0. On a button-down the edit boxes are dropped one by one until the mouse is
     // over one of them or its label, which then takes the focus. Every mouse event is taken.
-    if (Event->Field1 == 2)
+    if (Event->Action == kWin3DMousePress)
     {
         bool bFocused = false;
         for (int Index = 0; Index < 5; ++Index)

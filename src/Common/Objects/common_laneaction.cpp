@@ -52,10 +52,10 @@ LaneAction::LaneAction(IObjInspect const* InEntranceRing, IObjInspect const* InE
     Opaque_F8[3] = 0;
 
     // The ring slots are left for BuildRingTransform.
-    MatrixSetIdentity(EntranceRingXform.Orient);
-    EntranceRingXform.Pos = Vector{ 0.0f, 0.0f, 0.0f };
-    MatrixSetIdentity(ExitRingXform.Orient);
-    ExitRingXform.Pos = Vector{ 0.0f, 0.0f, 0.0f };
+    MatrixSetIdentity(LegStartXform.Orient);
+    LegStartXform.Pos = Vector{ 0.0f, 0.0f, 0.0f };
+    MatrixSetIdentity(LegEndXform.Orient);
+    LegEndXform.Pos = Vector{ 0.0f, 0.0f, 0.0f };
     MatrixSetIdentity(LanePose.Rotation);
     LanePose.Translation = Vector{ 0.0f, 0.0f, 0.0f };
 
@@ -73,12 +73,12 @@ LaneAction::LaneAction(IObjInspect const* InEntranceRing, IObjInspect const* InE
     Field95 = 0;
     Opaque_F8[0] = 0;
 
-    BuildRingTransform(EntranceRing, EntranceRingXform);
-    BuildRingTransform(ExitRing, ExitRingXform);
+    BuildRingTransform(EntranceRing, LegStartXform);
+    BuildRingTransform(ExitRing, LegEndXform);
 
     bRingApproachValid = bFastExit ? 1 : 0;   // +0x97
     Speed = InSpeed;                          // +0x98
-    ExitState = 0;
+    LaneState = LANE_STOPPED;
     bExitFlag = 0;
     TransitElapsed = 0.0f;
     TransitRamp = 0.0f;
@@ -95,24 +95,24 @@ LaneAction::~LaneAction()
 
 bool LaneAction::update(float Dt)
 {
-    // FUN_062c13f0. ExitState is +0x90 (+0x80 from the IAction base).
+    // FUN_062c13f0. LaneState is +0x90 (+0x80 from the IAction base).
     (void)Dt;
-    return ExitState != 0;
+    return LaneState != LANE_STOPPED;
 }
 
 void LaneAction::request_exit()
 {
     // FUN_062c2300
     bExitFlag = 1;
-    ExitState = 4;
+    LaneState = LANE_LEAVING;
 }
 
 void LaneAction::stop(char bSkipStopTradelane)
 {
     // FUN_062c2350
-    if (ExitState != 0)
+    if (LaneState != LANE_STOPPED)
     {
-        ExitState = 0;
+        LaneState = LANE_STOPPED;
         PhySys::Controller::UnRegister(this);
 
         if (TradelaneObjWatcher.target() != nullptr)
@@ -134,7 +134,7 @@ void LaneAction::stop(char bSkipStopTradelane)
                 Rw->set_throttle(1.0f);            // IObjAffect slot 0
             }
         }
-        ExitState = 0;
+        LaneState = LANE_STOPPED;
     }
 }
 
@@ -181,13 +181,13 @@ void LaneAction::InitializeApproach()
     // FUN_062c1490
     if (bRingApproachValid != 0)
     {
-        // State 2, or 3 when the exit ring has no ring after it.
-        ExitState = 2;
+        // LANE_CRUISE, or LANE_LAST_LEG when the exit ring has no ring after it.
+        LaneState = LANE_CRUISE;
         unsigned NextRingId = 0;
-        ExitRingXform.Ring->traverse_rings(NextRingId, bHpLeftLane != 0);
+        LegEndXform.Ring->traverse_rings(NextRingId, bHpLeftLane != 0);
         if (NextRingId == 0)
         {
-            ExitState = 3;
+            LaneState = LANE_LAST_LEG;
         }
 
         // DAT_0639f410 (80.0f) / DAT_0639f3cc (2500.0f).
@@ -197,8 +197,8 @@ void LaneAction::InitializeApproach()
     }
     else
     {
-        // State 1: the traveller's speed / 2500 through the inlined 0x5f3759df fast length.
-        ExitState = 1;
+        // LANE_SPIN_UP: the traveller's speed / 2500 through the inlined 0x5f3759df fast length.
+        LaneState = LANE_SPIN_UP;
 
         Vector const Vel = TradelaneObj()->get_velocity();   // no null test
 
@@ -278,7 +278,7 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
     (void)CoreList;
 
     // FUN_062c19d0
-    if (TradelaneObjWatcher.target() == nullptr || TradelaneObj() == nullptr || ExitState == 5)
+    if (TradelaneObjWatcher.target() == nullptr || TradelaneObj() == nullptr || LaneState == LANE_DONE)
     {
         stop(0);
         return;
@@ -295,7 +295,7 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
 
     float Progress = 0.0f;
 
-    if (ExitState == 4)
+    if (LaneState == LANE_LEAVING)
     {
         // Exiting: the lane pose follows the traveller's own transform.
         LanePose = TradelaneObj()->get_transform();
@@ -337,22 +337,22 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
         if (NewRamp <= (double)TransitRampTarget)
         {
             TransitRamp = TransitRampTarget;
-            ExitState = 5;
+            LaneState = LANE_DONE;
             stop(0);
             return;
         }
     }
     else
     {
-        ProjectOntoSegment(EntranceRingXform, ExitRingXform, &Progress, &LanePose);
+        ProjectOntoSegment(LegStartXform, LegEndXform, &Progress, &LanePose);
     }
 
-    // A damaged exit ring (health != 1.0f, NaN included) forces an exit once the traveller is
+    // A damaged leg-end ring (health != 1.0f, NaN included) forces an exit once the traveller is
     // half way.
-    if (ExitRingXform.Ring != nullptr)
+    if (LegEndXform.Ring != nullptr)
     {
         float Health = 1.0f;
-        ExitRingXform.Ring->get_status(Health);
+        LegEndXform.Ring->get_status(Health);
 
         if (Health != 1.0f && (double)Progress >= 0.5)
         {
@@ -363,12 +363,12 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
             }
 
             bExitFlag = 1;
-            ExitState = 4;
+            LaneState = LANE_LEAVING;
             return;
         }
     }
 
-    if (ExitState == 1 || ExitState == 2 || ExitState == 3)
+    if (LaneState == LANE_SPIN_UP || LaneState == LANE_CRUISE || LaneState == LANE_LAST_LEG)
     {
         // Ring hop; unordered skips.
         if (Progress >= 1.0f)
@@ -383,29 +383,29 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
 
             if (ObjDb != nullptr)
             {
-                // The exit frame becomes the entrance frame whatever the answer.
+                // The end frame becomes the start frame whatever the answer.
                 unsigned NextRingId = 0;
-                ExitRingXform.Ring->traverse_rings(NextRingId, bHpLeftLane != 0);
-                EntranceRingXform = ExitRingXform;
+                LegEndXform.Ring->traverse_rings(NextRingId, bHpLeftLane != 0);
+                LegStartXform = LegEndXform;
 
                 if (NextRingId != 0)
                 {
-                    BuildRingTransform(ObjDb->FindById(&NextRingId), ExitRingXform);   // IObjDB slot 1
+                    BuildRingTransform(ObjDb->FindById(&NextRingId), LegEndXform);   // IObjDB slot 1
 
                     Progress = (float)fmod((double)Progress, 1.0);   // _CIfmod
 
-                    if (ExitState != 3)
+                    if (LaneState != LANE_LAST_LEG)
                     {
                         unsigned AfterNextId = NextRingId;
-                        ExitRingXform.Ring->traverse_rings(AfterNextId, bHpLeftLane != 0);
+                        LegEndXform.Ring->traverse_rings(AfterNextId, bHpLeftLane != 0);
                         if (AfterNextId == 0)
-                            ExitState = 3;
+                            LaneState = LANE_LAST_LEG;
                     }
                 }
                 else
                 {
-                    ExitRingXform.Ring = nullptr;
-                    ExitState = 4;
+                    LegEndXform.Ring = nullptr;
+                    LaneState = LANE_LEAVING;
                 }
             }
         }
@@ -473,7 +473,7 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
                 // DAT_0639f450; unordered does not exit.
                 if (SelfAlong + -LeaderAlong > -500.0)
                 {
-                    ExitState = 4;
+                    LaneState = LANE_LEAVING;
                     return;
                 }
             }
@@ -481,22 +481,22 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
     }
 
     // Speed schedule.
-    if (ExitState == 1)
+    if (LaneState == LANE_SPIN_UP)
     {
-        // 0.125 is DAT_0639f440; the unrounded sum is compared (unordered stays in state 1).
+        // 0.125 is DAT_0639f440; the unrounded sum is compared (unordered stays in LANE_SPIN_UP).
         double const Ramped = (double)Dt * 0.125 + TransitRamp;
         TransitRamp = (float)Ramped;
         if (Ramped >= 1.0)
         {
-            ExitState = 2;
+            LaneState = LANE_CRUISE;
             TransitRamp = 1.0f;
         }
     }
-    else if (ExitState == 2)
+    else if (LaneState == LANE_CRUISE)
     {
         TransitRamp = 1.0f;
     }
-    else if (ExitState == 3)
+    else if (LaneState == LANE_LAST_LEG)
     {
         // 400 is the double DAT_0639f448, 2500.0f DAT_0639f3cc.
         TransitRamp = (float)(1.0 - (1.0 - 400.0 / 2500.0) * Progress);
@@ -517,8 +517,8 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
     CapturedShipPos.y = Dy + CapturedShipPos.y;
     CapturedShipPos.z = (float)(Dz + CapturedShipPos.z);
 
-    // For the first 3 s (double DAT_0639f438) of state 1, blend from the captured pose.
-    if (ExitState == 1 && TransitElapsed < 3.0)
+    // For the first 3 s (double DAT_0639f438) of LANE_SPIN_UP, blend from the captured pose.
+    if (LaneState == LANE_SPIN_UP && TransitElapsed < 3.0)
     {
         I3DMathEngine* const Math = Acquire3DMathEngine();
 

@@ -26,6 +26,7 @@
 #include "Interface/win3d.h"                  // Win3DFindByName, Win3DFindByClassName, Win3DDeleteTree
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "DALib.h"
 #include "common_goods.h"           // MissionVendorProperties, MissionVendorAcceptance
@@ -70,12 +71,9 @@ namespace
         "Interface\\NeuroNet\\MissionVendor\\MV_missionretrieve.3db",
     };
 
-    // LAB_0048b280 / LAB_0048b290 / LAB_0048b2a0 -- three float statics of this translation unit
-    // (DAT_00672030 = DAT_0067202c = -0.6, DAT_00672028 = 0.6). Each has one XREF, its
-    // initializer's write; nothing reads them.
-    float G_MissionVendorStatic672030 = -0.6f;
-    float G_MissionVendorStatic67202c = -0.6f;
-    float G_MissionVendorStatic672028 = 0.6f;
+    // DAT_00672030 / DAT_0067202c / DAT_00672028 (-0.6f / -0.6f / 0.6f, static inits
+    // LAB_0048b280 / LAB_0048b290 / LAB_0048b2a0) are this TU's copies of a header float
+    // constant that nothing reads; the port has no counterpart.
 
     uintptr_t PointerArg(void const* Pointer)
     {
@@ -104,7 +102,7 @@ namespace
     {
         RenderDisplayList Text;
         {
-            StyleNode Style(0x9ca4);
+            StyleNode Style(kTextStyleBody);
             RdlAppendNode(Text, Style.Clone());
         }
         AppendTextMaybeXmlRdl(Buffer, static_cast<unsigned>(wcslen(Buffer)), Text, false);
@@ -154,19 +152,6 @@ uintptr_t NnMissionVendor::RowDword(size_t ArrayOffset, int Index) const
     unsigned char const* const Bytes = reinterpret_cast<unsigned char const*>(this);
     memcpy(&Value, Bytes + ArrayOffset + static_cast<ptrdiff_t>(Index) * 4, sizeof(Value));
     return Value;
-}
-
-void NnMissionVendor::DeleteSelf()
-{
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child); // FUN_0043d2a0
-        Child = Next;
-    }
-    Destroy();   // slot 10
-    delete this; // slot 0 with 1
 }
 
 void NnMissionVendor::ResetVideo()
@@ -223,8 +208,8 @@ bool NnMissionVendor::Create(Win3D* NewParent, void* Data)
                                   2.0f, 0x72b, 1, 0, 1);
     }
 
-    // The offers of the base of the current room (FUN_0043a460's +0x34). Note LoadOffers reads
-    // those of DAT_0066873c instead.
+    // The offers of the base of the current room (FUN_0043a460's +0x34, 0x0048b8d1). Retail:
+    // LoadOffers reads those of DAT_0066873c instead (0x0048c788).
     TMirrorPropertyBucket<MissionVendorProperties>* const Bucket = GetClientLocationBaseMissionOffers(
         GetRoomRuntimeBaseId(static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime())));
     int Count = 0;
@@ -602,7 +587,7 @@ void NnMissionVendor::Update()
     {
         bCloseRequested = 0;
         NavBarCloseService(false); // FUN_004424f0(0)
-        DeleteSelf();
+        Win3DDeleteTree(this);
     }
 }
 
@@ -614,7 +599,7 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x4e:
     {
         // Closed from outside: no callback, no NavBar. (Retail tests `this` first.)
-        DeleteSelf();
+        Win3DDeleteTree(this);
         return 0;
     }
     case 0x3e:
@@ -657,7 +642,7 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (ResultCallback != nullptr)
                 ResultCallback(ResultContext, 0);
             NavBarCloseService(false);
-            DeleteSelf();
+            Win3DDeleteTree(this);
             return 0;
         }
         if (A == PointerArg(AcceptButton))
@@ -668,7 +653,7 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (ResultCallback != nullptr)
                 ResultCallback(ResultContext, 1);
             MissionVendorProperties const& Offer = Offers[Selected];
-            G_Server->MissionResponse(Offer.TargetId, Offer.SystemId, true, GetPlayerConnectionId());
+            G_Server->MissionResponse(Offer.OfferId, Offer.OfferKind, true, GetPlayerConnectionId());
             return 0;
         }
 
@@ -704,7 +689,7 @@ bool NnMissionVendor::OnEvent(unsigned MsgId)
     if (ResultCallback != nullptr)
         ResultCallback(ResultContext, 0);
     NavBarCloseService(false);
-    DeleteSelf();
+    Win3DDeleteTree(this);
     return true;
 }
 
@@ -712,7 +697,7 @@ void NnMissionVendor::CloseWindow()
 {
     // FUN_0048c720. The NavBar goes first; retail then tests `this` (its caller already has).
     NavBarCloseService(false);
-    DeleteSelf();
+    Win3DDeleteTree(this);
 }
 
 void NnMissionVendor::OnAcceptResult(MissionVendorAcceptance const& Result)

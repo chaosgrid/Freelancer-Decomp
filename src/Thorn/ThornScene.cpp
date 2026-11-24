@@ -560,7 +560,7 @@ namespace
     // FUN_06f3b9a0: math +0x38 TransposeTransform(out, csys.orient, csys.pos).
     // Retail consumes the result without testing the GENRESULT and has no
     // manual-math fallback.
-    void Fun06f3b9a0(float* Out3, const FThornCsys* Csys)
+    void TransposeTransformCsysPos(float* Out3, const FThornCsys* Csys)
     {
         I3DMathEngine* Math = AcquireSceneCsysMathEngine();
         // Snapshot the live input only after factory acquisition, as retail does.
@@ -571,11 +571,6 @@ namespace
         std::memcpy(&Position, Csys->Pos, sizeof(Position));
         Math->TransposeTransform(Result, Orientation, Position);
         std::memcpy(Out3, &Result, sizeof(Result));
-    }
-
-    void Fun06f23090(float* Out3, const float* In3)
-    {
-        NegateVector3(Out3, In3);
     }
 
     // FUN_06f3b970: nine then three forward DWORD copies. Reading each word
@@ -603,9 +598,9 @@ namespace
     void InvertParentCsys(float* Out12, const FThornCsys* Csys)
     {
         float Tmp[3];
-        Fun06f3b9a0(Tmp, Csys);
+        TransposeTransformCsysPos(Tmp, Csys);
         float Neg[3];
-        Fun06f23090(Neg, Tmp);
+        NegateVector3(Neg, Tmp);
         float Transposed[9];
         Transpose9(Transposed, Csys->Orient);
         PackCsysWords(Out12, Transposed, Neg);
@@ -751,7 +746,7 @@ namespace
     void TransformFloorHardpoint(const FThornCsys* Parent, float* Hardpoint)
     {
         float NegativePosition[3];
-        Fun06f3b9a0(NegativePosition, Parent);
+        TransposeTransformCsysPos(NegativePosition, Parent);
         NegateInverseOrientationWords(NegativePosition);
         unsigned int Transposed[9];
         const int SourceIndices[9] = {0, 3, 6, 1, 4, 7, 2, 5, 8};
@@ -1772,46 +1767,46 @@ namespace
     // FUN_06f431d0(blob, mask): copy 15 dwords, mirror words 5/6 through the
     // optional output pointers, and push the colour to the light control on
     // mask bit 1.
-    void Fun06f431d0(FThornEntity* Entity, const void* Blob15, unsigned char Mask)
+    void ApplySceneBlob(FThornEntity* Entity, const void* Blob15, unsigned char Mask)
     {
         const unsigned char* Source = static_cast<const unsigned char*>(Blob15);
         for (int Index = 0; Index < 15; ++Index)
         {
             unsigned int Word;
             std::memcpy(&Word, Source + Index * sizeof(Word), sizeof(Word));
-            std::memcpy(&Entity->SceneFogPacked[Index], &Word, sizeof(Word));
+            std::memcpy(&Entity->LiveSceneBlob[Index], &Word, sizeof(Word));
         }
-        if (Entity->SceneFogOutputA != nullptr)
-            *Entity->SceneFogOutputA = Entity->SceneFogPacked[5];
-        if (Entity->SceneFogOutputB != nullptr)
-            *Entity->SceneFogOutputB = Entity->SceneFogPacked[6];
+        if (Entity->UpAxisSink != nullptr)
+            *Entity->UpAxisSink = Entity->LiveSceneBlob[5];
+        if (Entity->FrontAxisSink != nullptr)
+            *Entity->FrontAxisSink = Entity->LiveSceneBlob[6];
         if (Entity->LightControl != nullptr && (Mask & 1) != 0)
         {
             // +0x104 is ILightControl (from its QI); slot 3 reads RGB words 0..2.
-            Entity->LightControl->SetColor(reinterpret_cast<int*>(Entity->SceneFogPacked));
+            Entity->LightControl->SetColor(reinterpret_cast<int*>(Entity->LiveSceneBlob));
         }
     }
 
     // FUN_06f43140(mask): IFogControl from packed +0x138. Bits 1 / 0xA / 0x70 / 4.
-    void Fun06f43140(FThornEntity* Entity, unsigned char Mask)
+    void ApplySceneFog(FThornEntity* Entity, unsigned char Mask)
     {
         if (Entity->FogControl == nullptr)
             return;
-        const unsigned char* FogBytes = reinterpret_cast<const unsigned char*>(&Entity->SceneFogPacked[7]);
+        const unsigned char* FogBytes = reinterpret_cast<const unsigned char*>(&Entity->LiveSceneBlob[7]);
         if ((Mask & 1) != 0)
             Entity->FogControl->SetOn(FogBytes[0]);
         if ((Mask & 0xA) != 0)
-            Entity->FogControl->SetTableMode(FogBytes[1], Entity->SceneFogPacked[11]);
+            Entity->FogControl->SetTableMode(FogBytes[1], Entity->LiveSceneBlob[11]);
         if ((Mask & 0x70) != 0)
         {
             float RangeValues[3];
-            std::memcpy(RangeValues, &Entity->SceneFogPacked[12], sizeof(RangeValues));
+            std::memcpy(RangeValues, &Entity->LiveSceneBlob[12], sizeof(RangeValues));
             Entity->FogControl->SetRangeValue(&RangeValues[0], &RangeValues[1], &RangeValues[2]);
         }
         if ((Mask & 4) != 0)
         {
             // The packed block's int colour, not a float copy.
-            Entity->FogControl->SetColor(reinterpret_cast<const int*>(&Entity->SceneFogPacked[8]));
+            Entity->FogControl->SetColor(reinterpret_cast<const int*>(&Entity->LiveSceneBlob[8]));
         }
     }
 
@@ -1840,8 +1835,8 @@ namespace
                 Entity->LightControl->GetDirection(reinterpret_cast<float*>(Blob + 0x0C));
                 Entity->LightControl->GetRange(reinterpret_cast<float*>(Blob + 0x18));
                 Entity->LightControl->GetCutoff(reinterpret_cast<float*>(Blob + 0x1C));
-                Entity->LightControl->GetInfinite(reinterpret_cast<float*>(Blob + 0x24));
-                Entity->LightControl->GetOn(reinterpret_cast<float*>(Blob + 0x20));
+                Entity->LightControl->GetInfinite(reinterpret_cast<int*>(Blob + 0x24));
+                Entity->LightControl->GetOn(reinterpret_cast<int*>(Blob + 0x20));
                 ConvertCompactLight(Out);
             }
             std::memcpy(&Entity->LightEntityDescriptor, Out, sizeof(Entity->LightEntityDescriptor));
@@ -2249,22 +2244,6 @@ namespace
             Slot = nullptr;
         }
         IDAComponent* EngineObject = static_cast<IDAComponent*>(EngineObj);
-        const GENRESULT Hr = EngineObject->QueryInterface(Iid, reinterpret_cast<void**>(&Slot));
-        if (Hr >= 0)
-            Result = 0;
-    }
-
-    // Same as BindQi (PSYS bind, LAB_06f43730).
-    template <class TControl>
-    void BindLiveEntityControl(IDAComponent* EngineObject, const char* Iid,
-                         TControl*& Slot, int& Result)
-    {
-        if (Slot != nullptr)
-        {
-            TControl* Previous = Slot;
-            Previous->Release();
-            Slot = nullptr;
-        }
         const GENRESULT Hr = EngineObject->QueryInterface(Iid, reinterpret_cast<void**>(&Slot));
         if (Hr >= 0)
             Result = 0;
@@ -2839,14 +2818,14 @@ void ThornPublishEntityDescTail(FThornEntity* Entity)
     else if (Type == kThornEntityScene || Type == kThornEntitySubScene)
     {
         if (Type == kThornEntityScene && (Entity->Snap.Flags & 1) == 0)
-            std::memcpy(Entity->Snap.SceneBlob, Entity->SceneFogPacked, sizeof(Entity->Snap.SceneBlob));
+            std::memcpy(Entity->Snap.SceneBlob, Entity->LiveSceneBlob, sizeof(Entity->Snap.SceneBlob));
         else
         {
             std::memset(Entity->Snap.SceneBlob, 0, sizeof(Entity->Snap.SceneBlob));
             Entity->Snap.SceneBlob[5] = 6;
             Entity->Snap.SceneBlob[6] = 6;
         }
-        Fun06f431d0(Entity, Entity->Snap.SceneBlob, 0xFF);
+        ApplySceneBlob(Entity, Entity->Snap.SceneBlob, 0xFF);
     }
     else if (Type == kThornEntityMotionPath)
     {
@@ -3754,24 +3733,6 @@ void FThornEvent::ApplyCameraPropAnimDesc(const void* DescIn)
     FinalizeDesc();
 }
 
-void FThornEvent::ApplyCameraPropAnimPayload(int DescriptorType, int Mask,
-                                             const float* Target4)
-{
-    // FUN_06f46060 payload step: only an input type 5 copies the mask and
-    // four camera values.
-    Type = kThornTypeCameraPropAnim;
-    if (DescriptorType == kThornTypeCameraPropAnim && Target4 != nullptr)
-    {
-        CamMask = Mask;
-        std::memcpy(CamTarget, Target4, sizeof(CamTarget));
-    }
-    else
-    {
-        CamMask = 0;
-        std::memset(CamTarget, 0, sizeof(CamTarget));
-    }
-}
-
 void FThornEvent::ApplyStartPsysDesc(const void* DescIn)
 {
     ApplyCommonDesc(DescIn);
@@ -3799,23 +3760,6 @@ void FThornEvent::ApplyPsysPropAnimDesc(const void* DescIn)
         std::memcpy(&SparamTarget, &ZeroBits, sizeof(SparamTarget));
     }
     FinalizeDesc();
-}
-
-void FThornEvent::ApplyPsysPropAnimPayload(int DescriptorType, int Mask, float Target)
-{
-    // FUN_06f48920 payload step: type 0xe copies mask and sparam; a mismatch
-    // clears both.
-    Type = kThornTypePsysPropAnim;
-    if (DescriptorType == kThornTypePsysPropAnim)
-    {
-        PsysMask = Mask;
-        SparamTarget = Target;
-    }
-    else
-    {
-        PsysMask = 0;
-        SparamTarget = 0.0f;
-    }
 }
 
 void FThornEvent::ApplyFogPropAnimDesc(const void* DescIn)
@@ -3854,37 +3798,6 @@ void FThornEvent::ApplyReverbPropAnimDesc(const void* DescIn)
     else
         ReverbMask = 0;
     FinalizeDesc();
-}
-
-void FThornEvent::ApplyFogPropAnimPayload(int DescriptorType, int Mask,
-                                          const FThornFog8* Target)
-{
-    // Copies all eight words, flag bytes and padding included; a mismatch
-    // clears only the mask.
-    Type = kThornTypeFogPropAnim;
-    Desc.Type = kThornTypeFogPropAnim;
-    if (DescriptorType == kThornTypeFogPropAnim)
-    {
-        FogMask = Mask;
-        std::memcpy(&FogTarget, Target, sizeof(FogTarget));
-    }
-    else
-        FogMask = 0;
-}
-
-void FThornEvent::ApplyReverbPropAnimPayload(int DescriptorType, int Mask,
-                                             const FThornReverb4* Target4)
-{
-    // FUN_06f49150 payload step (after FUN_06f438c0): forces type 0x11; a
-    // matching input copies the mask and four reverb words, otherwise only
-    // the mask is cleared.
-    Type = kThornTypeReverbPropAnim;
-    Desc.Type = kThornTypeReverbPropAnim;
-    ReverbMask = 0;
-    if (DescriptorType != kThornTypeReverbPropAnim)
-        return;
-    ReverbMask = Mask;
-    std::memcpy(&ReverbTarget, Target4, sizeof(ReverbTarget));
 }
 
 void FThornEvent::ApplyAudioPropAnimDesc(const void* DescIn)
@@ -4060,7 +3973,7 @@ float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
             __asm { fstp st(0) }
             // StartPercent is read only after the callback.
             if (Period > 0)
-                return Curve->Slot12WrapEvaluate(static_cast<int>(ElapsedBits), Period) * Scale + StartPercent;
+                return Curve->WrapEvaluate(static_cast<int>(ElapsedBits), Period) * Scale + StartPercent;
             return Curve->Evaluate(Ratio) * Scale + StartPercent;
         }
         // The unbound quotient stays extended through both operations.
@@ -4343,7 +4256,7 @@ float FThornEvent::EvaluateProgress(int TimeMs) const
             const int Period = PcurvePeriod;
             if (Period > 0)
             {
-                return Curve->Slot12WrapEvaluate(static_cast<int>(ElapsedBits), Period);
+                return Curve->WrapEvaluate(static_cast<int>(ElapsedBits), Period);
             }
             else
             {
@@ -4694,9 +4607,9 @@ unsigned char FThornEvent::StartFogPropAnim(FThornScene* Scene)
         FThornEntity* Primary = *PrimaryEntry;
         IFogControl* Control = Primary->FogControl;
         if (Control != nullptr)
-            Control->GetPacked(reinterpret_cast<unsigned char*>(&Primary->SceneFogPacked[7]));
+            Control->GetPacked(reinterpret_cast<unsigned char*>(&Primary->LiveSceneBlob[7]));
         // Retail keeps the entity pointer captured before the GET.
-        std::memcpy(&FogCapturePacked, &Primary->SceneFogPacked[7], sizeof(FogCapturePacked));
+        std::memcpy(&FogCapturePacked, &Primary->LiveSceneBlob[7], sizeof(FogCapturePacked));
     }
     ApplyEndTime(this);
     return 1;
@@ -4722,7 +4635,7 @@ unsigned char FThornEvent::TickFogPropAnim(int TimeMs, FThornScene* Scene)
                 const bool bSnapDiscrete = U >= 1.0f;
                 FThornEntity* Primary = *PrimaryEntry;
                 FThornSceneFogSnapshot Out;
-                std::memcpy(&Out, Primary->SceneFogPacked, sizeof(Out));
+                std::memcpy(&Out, Primary->LiveSceneBlob, sizeof(Out));
                 FThornFog8* ResultFog = &Out.Fog;
                 const FThornFog8* Capture = &FogCapturePacked;
                 if (bSnapDiscrete)
@@ -4746,8 +4659,8 @@ unsigned char FThornEvent::TickFogPropAnim(int TimeMs, FThornScene* Scene)
                     ResultFog->Color[2] = FogLerpInteger(Capture->Color[2], Target.Color[2], &U);
                 }
                 // Mask 0; retail pushes a third argument that is unused.
-                Fun06f431d0(Primary, &Out, 0);
-                Fun06f43140(Primary, static_cast<unsigned char>(FogMask));
+                ApplySceneBlob(Primary, &Out, 0);
+                ApplySceneFog(Primary, static_cast<unsigned char>(FogMask));
             }
         }
     }
@@ -5377,8 +5290,8 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
                     Secondary->LightControl->GetDirection(Live.Direction);
                     Secondary->LightControl->GetRange(&Live.RangeTemp);
                     Secondary->LightControl->GetCutoff(&Live.CutoffTemp);
-                    Secondary->LightControl->GetInfinite(reinterpret_cast<float*>(&Live.Infinite));
-                    Secondary->LightControl->GetOn(reinterpret_cast<float*>(&Live.On));
+                    Secondary->LightControl->GetInfinite(&Live.Infinite);
+                    Secondary->LightControl->GetOn(&Live.On);
                     ConvertCompactLightRetail(reinterpret_cast<const unsigned char*>(&Live),
                                               reinterpret_cast<unsigned char*>(&Live.Type));
                 }
@@ -5388,10 +5301,10 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
             {
                 FThornEntity* Secondary = *SecondaryEntry;
                 if (Secondary->LightControl != nullptr)
-                    Secondary->LightControl->GetColor(reinterpret_cast<float*>(Secondary->SceneFogPacked));
+                    Secondary->LightControl->GetColor(reinterpret_cast<float*>(Secondary->LiveSceneBlob));
                 // Retail keeps color 2 in EBX rather than in the target copy;
                 // all three feed the colour interpolation either way.
-                std::memcpy(Target.Color, Secondary->SceneFogPacked, sizeof(Target.Color));
+                std::memcpy(Target.Color, Secondary->LiveSceneBlob, sizeof(Target.Color));
             }
         }
     }
@@ -5411,7 +5324,7 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
         {
             // Only the three colour words reach the scene sink; the rest is
             // zeroed here instead of retail's stack garbage.
-            std::memcpy(Output.Color, (*PrimaryEntry)->SceneFogPacked, sizeof(Output.Color));
+            std::memcpy(Output.Color, (*PrimaryEntry)->LiveSceneBlob, sizeof(Output.Color));
         }
         EvalLightProps(&Output, &LightCapture, &Target, &LightMask, &U);
         if ((*PrimaryEntry)->Snap.Type == kThornEntityLight)
@@ -5419,10 +5332,10 @@ unsigned char FThornEvent::TickLightPropAnim(int TimeMs, FThornScene* Scene)
         else if ((*PrimaryEntry)->Snap.Type == kThornEntityScene)
         {
             unsigned int SceneSnapshot[15];
-            std::memcpy(SceneSnapshot, (*PrimaryEntry)->SceneFogPacked, sizeof(SceneSnapshot));
+            std::memcpy(SceneSnapshot, (*PrimaryEntry)->LiveSceneBlob, sizeof(SceneSnapshot));
             std::memcpy(SceneSnapshot, Output.Color, sizeof(Output.Color));
             // Retail passes -1 for both remaining arguments; the third is unused.
-            Fun06f431d0(*PrimaryEntry, SceneSnapshot, 0xff);
+            ApplySceneBlob(*PrimaryEntry, SceneSnapshot, 0xff);
         }
     }
     return RetailStillRunningPredicate(TimeMs, EndTimeMs);
@@ -5647,7 +5560,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
 
     float PathVector[3];
     if ((Desc.Flags & kThornFlagPosition) != 0 &&
-        Secondary->MotionPath->Slot4Evaluate(Percent, PathVector) == GR_OK)
+        Secondary->MotionPath->GetPositionAt(Percent, PathVector) == GR_OK)
     {
         float PathXform[12];
         IdentityOrient(PathXform);
@@ -5670,7 +5583,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
     {
         if ((Desc.Flags & kThornFlagLookAt) != 0)
         {
-            if (Secondary->MotionPath->Slot6LookAt(Percent, PathVector) == GR_OK)
+            if (Secondary->MotionPath->GetTangentAt(Percent, PathVector) == GR_OK)
             {
                 float PathXform[12];
                 IdentityOrient(PathXform);
@@ -5691,7 +5604,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
         else
         {
             float QuaternionWords[4];
-            if (Secondary->MotionPath->Slot5Orientation(Percent, QuaternionWords) == GR_OK)
+            if (Secondary->MotionPath->GetOrientationAt(Percent, QuaternionWords) == GR_OK)
             {
                 FQuaternion Quaternion;
                 std::memcpy(&Quaternion, QuaternionWords, sizeof(Quaternion));
@@ -5908,8 +5821,8 @@ void FThornScene::BindEntitySceneAxes(FThornEntity* Entity)
     }
     // Borrows the forward frame, not the inverse cache.
     Entity->ParentCsys = &SceneForwardCsys_;
-    Entity->SceneFogOutputA = &SceneUpAxis_;
-    Entity->SceneFogOutputB = &SceneFrontAxis_;
+    Entity->UpAxisSink = &SceneUpAxis_;
+    Entity->FrontAxisSink = &SceneFrontAxis_;
 }
 
 void FThornScene::RegisterFrameEntity(FThornEntity* Entity)
@@ -6076,11 +5989,6 @@ FThornEntity::FThornEntity()
     Snap.NearPlane = 0.1f;
     Snap.FarPlane = 100000.0f;
     Snap.Aspect = 4.0f / 3.0f;
-    // FUN_06f42d70 (SCENE/SUBSCENE constructor) sets both axes to the
-    // sentinel 6; Attach (LAB_06f43230 tail) remaps a remaining 6 to the
-    // defaults (front=5, up=1). Unused for other entity types.
-    SceneUpAxis = 6;
-    SceneFrontAxis = 6;
     BoundControlType = -1;
     InitializeLightEntityPortState(this);
 }
@@ -6155,7 +6063,7 @@ FThornEntity::FThornEntity(int Type, const FThornEntitySnap* Desc, FThornScene* 
     }
     else if (Type == kThornEntityScene || Type == kThornEntitySubScene)
     {
-        Fun06f431d0(this, Snap.SceneBlob, 0xFF);
+        ApplySceneBlob(this, Snap.SceneBlob, 0xFF);
         InnerSetPos(LoadPos);
         InnerSetOrient(LoadOrient);
     }
@@ -6346,7 +6254,7 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
             std::memcpy(&Word, &SnapIn->SceneBlob[Index], sizeof(Word));
             std::memcpy(&Snap.SceneBlob[Index], &Word, sizeof(Word));
         }
-        Fun06f431d0(this, Snap.SceneBlob, 0xFF);
+        ApplySceneBlob(this, Snap.SceneBlob, 0xFF);
     }
 
     if (DescriptorOwnerType == kThornEntitySound)
@@ -6956,18 +6864,14 @@ GENRESULT FThornScene::GetEntityOrient(int Index, float* OutMat9)
 
 GENRESULT FThornScene::Attach(int Index, void* EngineObj)
 {
-    // Slot 12: lookup + entity vtable +0x20. Does not AddRef EngineObj.
-    // A null EngineObj crashes in retail's QI; callers use Detach (slot 13).
+    // Slot 12 (LAB_06f392a0): lookup + entity vtable +0x20. Does not AddRef
+    // EngineObj. Retail: no null test at any level; every type's bind QIs
+    // EngineObj first, so a null one faults. Callers use Detach (slot 13).
     FThornEntity* Entity = EntityAt(Index);
     if (Entity == nullptr)
         return GR_GENERIC;
-    if (EngineObj == nullptr && Entity->DescriptorOwnerType != kThornEntityPsys &&
-        Entity->DescriptorOwnerType != kThornEntityScene &&
-        Entity->DescriptorOwnerType != kThornEntitySubScene)
-        return GR_GENERIC;
 
     // Keyed on the constructed type, even if slot 2 changed the descriptor Type.
-    Entity->EngineObj = EngineObj;
     const int EntType = Entity->DescriptorOwnerType;
     Entity->BoundControlType = EntType;
 
@@ -7009,26 +6913,24 @@ GENRESULT FThornScene::Attach(int Index, void* EngineObj)
     }
     else if (EntType == kThornEntityScene || EntType == kThornEntitySubScene)
     {
-        IDAComponent* EngineObject = static_cast<IDAComponent*>(EngineObj);
-        BindLiveEntityControl(EngineObject, Iids::GeoTransformControl, Entity->GeoControl, Result);
-        BindLiveEntityControl(EngineObject, Iids::LightControl, Entity->LightControl, Result);
-        BindLiveEntityControl(EngineObject, Iids::UserEventControl, Entity->UserEventControl, Result);
-        BindLiveEntityControl(EngineObject, Iids::ScriptControl, Entity->ScriptControl, Result);
-        BindLiveEntityControl(EngineObject, Iids::FogControl, Entity->FogControl, Result);
-        BindLiveEntityControl(EngineObject, Iids::ReverbControl, Entity->ReverbControl, Result);
-        BindLiveEntityControl(EngineObject, Iids::SubtitleControl, Entity->SubtitleControl, Result);
-        // Sentinel 6 in the descriptor is replaced in descriptor and runtime alike.
+        // LAB_06f43230.
+        BindQi(EngineObj, Iids::GeoTransformControl, Entity->GeoControl, Result);
+        BindQi(EngineObj, Iids::LightControl, Entity->LightControl, Result);
+        BindQi(EngineObj, Iids::UserEventControl, Entity->UserEventControl, Result);
+        BindQi(EngineObj, Iids::ScriptControl, Entity->ScriptControl, Result);
+        BindQi(EngineObj, Iids::FogControl, Entity->FogControl, Result);
+        BindQi(EngineObj, Iids::ReverbControl, Entity->ReverbControl, Result);
+        BindQi(EngineObj, Iids::SubtitleControl, Entity->SubtitleControl, Result);
+        // A sentinel 6 axis (FUN_06f42d70) is replaced in descriptor and live blob alike.
         if (Entity->Snap.SceneBlob[6] == 6)
         {
             Entity->Snap.SceneBlob[6] = 5;
-            Entity->SceneFogPacked[6] = 5;
-            Entity->SceneFrontAxis = 5;
+            Entity->LiveSceneBlob[6] = 5;
         }
         if (Entity->Snap.SceneBlob[5] == 6)
         {
             Entity->Snap.SceneBlob[5] = 1;
-            Entity->SceneFogPacked[5] = 1;
-            Entity->SceneUpAxis = 1;
+            Entity->LiveSceneBlob[5] = 1;
         }
     }
     else if (EntType == kThornEntityMotionPath)
@@ -7039,10 +6941,10 @@ GENRESULT FThornScene::Attach(int Index, void* EngineObj)
     }
     else if (EntType == kThornEntityPsys)
     {
-        IDAComponent* EngineObject = static_cast<IDAComponent*>(EngineObj);
-        BindLiveEntityControl(EngineObject, Iids::GeoTransformControl, Entity->GeoControl, Result);
-        BindLiveEntityControl(EngineObject, Iids::PSysControl, Entity->PsysControl, Result);
-        BindLiveEntityControl(EngineObject, Iids::UserEventControl, Entity->UserEventControl, Result);
+        // FUN_06f43730.
+        BindQi(EngineObj, Iids::GeoTransformControl, Entity->GeoControl, Result);
+        BindQi(EngineObj, Iids::PSysControl, Entity->PsysControl, Result);
+        BindQi(EngineObj, Iids::UserEventControl, Entity->UserEventControl, Result);
     }
     else
     {
@@ -7063,7 +6965,6 @@ GENRESULT FThornScene::Detach(int Index)
     if (Entity == nullptr)
         return GR_GENERIC;
     Entity->InnerUnbindControls();
-    Entity->EngineObj = nullptr;
     Entity->bBound = 0;
     Entity->BindState = 0;
     return GR_OK;
@@ -8401,15 +8302,15 @@ namespace
             return -1;
         char Temporary[512];
         int HeaderLength = std::sprintf(Temporary,
-            ", param_curve = {CLSID = \"%s\", points = {", Curve->Slot10Clsid());
+            ", param_curve = {CLSID = \"%s\", points = {", Curve->GetClassId());
         int Result = 0;
         for (unsigned int Index = 0; Index < Count; ++Index)
         {
-            const int Id = Curve->Slot9IdByIndex(static_cast<int>(Index));
+            const int Id = Curve->GetKeyId(static_cast<int>(Index));
             if (Id == -1)
                 continue;
             float Values[4];
-            if (Curve->Slot5ReadKey(Id, &Values[0], &Values[1], &Values[2], &Values[3]) == 0)
+            if (Curve->ReadKey(Id, &Values[0], &Values[1], &Values[2], &Values[3]) == 0)
                 continue;
             char* PointOutput = Temporary + HeaderLength;
             const char* PointFormat = "{ %.6f, %.6f, %.6f, %.6f },";
@@ -8661,12 +8562,12 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             IPersistString* Persist = Entity->MotionPath.MotionPath;
             if (Persist != nullptr)
             {
-                const unsigned long Size = Persist->Slot5EstimateSize();
+                const unsigned long Size = Persist->EstimateSize();
                 if (Size != 0)
                 {
                     char* Data = new char[Size + 1u];
                     // The path object is reread after the size call and allocation.
-                    Entity->MotionPath.MotionPath->Slot4Save(Data, Size);
+                    Entity->MotionPath.MotionPath->Save(Data, Size);
                     SaveBufAppendStringValue(&Buf, ",\r\n\t\t\tpath_data = \"%s\"\r\n", Data);
                     delete[] Data;
                 }
@@ -9069,6 +8970,9 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
     return GR_OK;
 }
 
+// FUN_06f27bf0. Retail's table (DAT_06f5e1e8) in retail order: entries 6..12
+// do not follow the kThornType* numbering (6 is PathAnim, 7 SpatialPropAnim,
+// 10..12 StartMotion/StartIk/StartSubScene), so those log the wrong name.
 const char* ThornEventTypeDebugName(unsigned int Type)
 {
     static const char* const Names[] = {

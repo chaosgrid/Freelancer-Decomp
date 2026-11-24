@@ -1037,7 +1037,7 @@ int PathfindManager::ClassifyObstaclePhase()
 
             // The running sum is not rounded in between.
             SlotPtr->Timer = (float)(((double)(Margin) + SlotPtr->Timer) +
-                                                (double)(This->Field_1FC) * 0.5);
+                                                (double)(This->CoastDistanceFrom300) * 0.5);
 
             // FUN_062e1410; the nearest slot midpoint to WorkingTarget wins.
             if (PointInCapsule(ShipXform->Translation, SlotPtr->Timer, SlotPtr->Point, SlotPtr->Direction))
@@ -1386,7 +1386,7 @@ IObjInspect* FindClosestObstacleToAvoid(SystemManagerTimerTable* Self,
     // 0.5 is the double at .rdata:0639df88, so the product is evaluated in double; a NaN
     // readiness goes on.
     double const Readiness =
-        (double)(Behavior_InvokeManagerSlotD8(AiOwnerObjectOf(Sys), 1.0f,
+        (double)(Behavior_GetSpeed(AiOwnerObjectOf(Sys), 1.0f,
                                                          ThrustEquipTradelane)) * 0.5;
     if (Readiness <= 1.0) // .rdata:0639a1d0
         return nullptr;
@@ -1438,12 +1438,7 @@ IObjInspect* FindClosestObstacleToAvoid(SystemManagerTimerTable* Self,
     // FUN_062e8270 (EquipStatus's inlined ctor) only masks bitfields of an uninitialised
     // local; only bit 0x02 of Flags is read and that mask clears it, so zero-init is
     // equivalent (as in BuildAiTargetList).
-    EquipStatus Status;
-    Status.Flags = 0;
-    Status.Pad01 = 0;
-    Status.Pad02 = 0;
-    Status.Pad03 = 0;
-    Status.EquipFlags = 0;
+    EquipStatus Status = {};
 
     ScanList const* List = nullptr;
     Scanner->get_equipment_status(Status, Self->ScannerEquipId);

@@ -54,6 +54,19 @@ namespace
     char const kCommodityByBaseMesh[] = "Interface\\NeuroNet\\Inventory\\CHAR_infowindow.cmp"; // 005ce994
     char const kCommodityByBaseCloseMesh[] = "Interface\\NeuroNet\\Inventory\\x.3db";           // 005d01d0
 
+    // The column layout Create pushes as immediates: each column's x (shared by its title and
+    // its 13 line texts), the title row's y, and the texts' widths, height and font scale.
+    float const kCbbPriceX = NnFloatBits(0xbec7ae14);      // -0.39
+    float const kCbbBuySellX = NnFloatBits(0xbe8b4396);    // -0.272
+    float const kCbbBaseX = NnFloatBits(0xbdcac083);       // -0.099
+    float const kCbbSystemX = NnFloatBits(0x3e343958);     // 0.176
+    float const kCbbTitleY = NnFloatBits(0x3e428f5c);      // 0.19
+    float const kCbbPriceWidth = NnFloatBits(0x3dcccccd);  // 0.1 (the buy / sell column too)
+    float const kCbbBaseWidth = NnFloatBits(0x3e851eb8);   // 0.26
+    float const kCbbSystemWidth = NnFloatBits(0x3e4ccccd); // 0.2
+    float const kCbbTextHeight = NnFloatBits(0x3cf5c28f);  // 0.03
+    float const kCbbFontScale = NnFloatBits(0x3ff33333);   // 1.9
+
     // FUN_0046fc90 -- true when the window may not stay open: docked with a base-service window
     // or a moving NavBar, in space without a player ship, a "NeuroNetMissionMessage",
     // "NN_Trade" or "NN_Scanner" window, an NN_MainButton panel, a NeuroNet screen, a held
@@ -398,31 +411,31 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
 
     // The four column titles; SetProperty is called without a null test.
     {
-        float const Position[3] = {NnFloatBits(0xbec7ae14), NnFloatBits(0x3e428f5c), 0.0f};
+        float const Position[3] = {kCbbPriceX, kCbbTitleY, 0.0f};
         PriceTitle = CreateTextControl("CommodityByBasePriceTitle", "SubHeader", Position, nullptr,
-                                       NnFloatBits(0x3dcccccd), NnFloatBits(0x3cf5c28f),
-                                       NnFloatBits(0x3ff33333), 0x3d6, 0, 0, 1);
+                                       kCbbPriceWidth, kCbbTextHeight,
+                                       kCbbFontScale, 0x3d6, 0, 0, 1);
         PriceTitle->SetProperty(0x24, 1, 0);
     }
     {
-        float const Position[3] = {NnFloatBits(0xbdcac083), NnFloatBits(0x3e428f5c), 0.0f};
+        float const Position[3] = {kCbbBaseX, kCbbTitleY, 0.0f};
         BaseTitle = CreateTextControl("CommodityByBaseBaseTitle", "SubHeader", Position, nullptr,
-                                      NnFloatBits(0x3e851eb8), NnFloatBits(0x3cf5c28f),
-                                      NnFloatBits(0x3ff33333), 0x3cc, 0, 0, 1);
+                                      kCbbBaseWidth, kCbbTextHeight,
+                                      kCbbFontScale, 0x3cc, 0, 0, 1);
         BaseTitle->SetProperty(0x24, 1, 0);
     }
     {
-        float const Position[3] = {NnFloatBits(0x3e343958), NnFloatBits(0x3e428f5c), 0.0f};
+        float const Position[3] = {kCbbSystemX, kCbbTitleY, 0.0f};
         SystemTitle = CreateTextControl("CommodityByBaseSystemTitle", "SubHeader", Position,
-                                        nullptr, NnFloatBits(0x3e4ccccd), NnFloatBits(0x3cf5c28f),
-                                        NnFloatBits(0x3ff33333), 0x3cd, 0, 0, 1);
+                                        nullptr, kCbbSystemWidth, kCbbTextHeight,
+                                        kCbbFontScale, 0x3cd, 0, 0, 1);
         SystemTitle->SetProperty(0x24, 1, 0);
     }
     {
-        float const Position[3] = {NnFloatBits(0xbe8b4396), NnFloatBits(0x3e428f5c), 0.0f};
+        float const Position[3] = {kCbbBuySellX, kCbbTitleY, 0.0f};
         BuySellTitle = CreateTextControl("CommodityByBaseBuySellTitle", "SubHeader", Position,
-                                         nullptr, NnFloatBits(0x3dcccccd), NnFloatBits(0x3cf5c28f),
-                                         NnFloatBits(0x3ff33333), 0x3d8, 0, 0, 1);
+                                         nullptr, kCbbPriceWidth, kCbbTextHeight,
+                                         kCbbFontScale, 0x3d8, 0, 0, 1);
         BuySellTitle->SetProperty(0x24, 1, 0);
     }
 
@@ -439,31 +452,31 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
         FCommodityByBaseRowControls& Controls = Rows[Line];
 
         sprintf(Name, "CommodityByBasePrice%d", Line);
-        float const PricePosition[3] = {NnFloatBits(0xbec7ae14), Y, 0.0f};
+        float const PricePosition[3] = {kCbbPriceX, Y, 0.0f};
         Controls.Price = CreateTextControl(Name, "ItemName", PricePosition, nullptr,
-                                           NnFloatBits(0x3dcccccd), NnFloatBits(0x3cf5c28f),
-                                           NnFloatBits(0x3ff33333), 0, 0, 0, 1);
+                                           kCbbPriceWidth, kCbbTextHeight,
+                                           kCbbFontScale, 0, 0, 0, 1);
         Controls.Price->SetProperty(0x24, 1, 0);
 
         sprintf(Name, "CommodityByBuySellPrice%d", Line);
-        float const BuySellPosition[3] = {NnFloatBits(0xbe8b4396), Y, 0.0f};
+        float const BuySellPosition[3] = {kCbbBuySellX, Y, 0.0f};
         Controls.BuySell = CreateTextControl(Name, "ItemName", BuySellPosition, nullptr,
-                                             NnFloatBits(0x3dcccccd), NnFloatBits(0x3cf5c28f),
-                                             NnFloatBits(0x3ff33333), 0, 0, 0, 1);
+                                             kCbbPriceWidth, kCbbTextHeight,
+                                             kCbbFontScale, 0, 0, 0, 1);
         Controls.BuySell->SetProperty(0x24, 1, 0);
 
         sprintf(Name, "CommodityByBaseBase%d", Line);
-        float const BasePosition[3] = {NnFloatBits(0xbdcac083), Y, 0.0f};
+        float const BasePosition[3] = {kCbbBaseX, Y, 0.0f};
         Controls.Base = CreateTextControl(Name, "ItemName", BasePosition, nullptr,
-                                          NnFloatBits(0x3e851eb8), NnFloatBits(0x3cf5c28f),
-                                          NnFloatBits(0x3ff33333), 0, 0, 0, 1);
+                                          kCbbBaseWidth, kCbbTextHeight,
+                                          kCbbFontScale, 0, 0, 0, 1);
         Controls.Base->SetProperty(0x24, 1, 0);
 
         sprintf(Name, "CommodityByBaseSystem%d", Line);
-        float const SystemPosition[3] = {NnFloatBits(0x3e343958), Y, 0.0f};
+        float const SystemPosition[3] = {kCbbSystemX, Y, 0.0f};
         Controls.System = CreateTextControl(Name, "ItemName", SystemPosition, nullptr,
-                                            NnFloatBits(0x3e4ccccd), NnFloatBits(0x3cf5c28f),
-                                            NnFloatBits(0x3ff33333), 0, 0, 0, 1);
+                                            kCbbSystemWidth, kCbbTextHeight,
+                                            kCbbFontScale, 0, 0, 0, 1);
         Controls.System->SetProperty(0x24, 1, 0);
     }
 
@@ -653,10 +666,10 @@ void NnCommodityByBase::Update()
         WinControl* const Title = Titles[Column];
         if (Title == nullptr || (Title->Flags & kWin3DVisible) == 0)
             continue;
-        unsigned long Color = G_NnPaletteArgb_679bb0;
+        unsigned long Color = G_NnPaletteCyan;
         if (SortColumn == Column)
         {
-            Color = G_NnPaletteArgb_679ba4;
+            Color = G_NnPaletteAmber;
         }
         else if (Title->HitTest(Ray))
         {
@@ -674,7 +687,7 @@ void NnCommodityByBase::Update()
         FCommodityByBaseRowControls const& Controls = Rows[Line];
         if (Controls.Base == nullptr || (Controls.Base->Flags & kWin3DVisible) == 0)
             continue;
-        unsigned long Color = G_NnPaletteArgb_679bb0;
+        unsigned long Color = G_NnPaletteCyan;
         if (Controls.Base->HitTest(Ray) || Controls.BuySell->HitTest(Ray) ||
             Controls.Price->HitTest(Ray) || Controls.System->HitTest(Ray))
         {

@@ -491,16 +491,17 @@ void FmtStr::append(Val* Node)
 void FmtStr::append_fmt_str(const FmtStr& Other)
 {
     // FUN_0630dc50: tag 0x21, a nested subtree, with its own counter at +0x13
-    // (ValueIndex[KindUnused13], despite the name). A failed malloc does nothing; a null
-    // subtree (VC6 new) still appends the node with a null payload.
+    // (ValueIndex[KindFmtStr]). A failed malloc does nothing; a null subtree (VC6 new) still
+    // appends the node with a null payload.
+
     Val* const Node = (Val*)malloc(sizeof(Val));
     if (Node == nullptr)
         return;
     FmtStr* const Sub = new (std::nothrow) FmtStr();
     if (Sub != nullptr)
         *Sub = Other;
-    Node->Flags = ValueIndex[KindUnused13];
-    ++ValueIndex[KindUnused13];
+    Node->Flags = ValueIndex[KindFmtStr];
+    ++ValueIndex[KindFmtStr];
     Node->Subtree = Sub;
     Node->Next = nullptr;
     Node->TypeTag = 0x21;

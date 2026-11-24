@@ -787,7 +787,7 @@ bool FBarOffer::Accept(FContentPlayerState* State, FBarCharacter* Character)
                                       &Character->Nickname, false, 0);     // FUN_06f488b0
             FMissionOfferAcceptMsg Msg;
             Msg.OfferId = Controller;
-            Msg.Kind = 0;
+            Msg.Kind = pub::Controller::MissionOfferController;
             Msg.bAccepted = true;
             Msg.PlayerId = State->PlayerId;
             pub::Controller::_SendMessage(Controller, pub::Controller::EMessage::MissionResponse, &Msg);
@@ -1022,8 +1022,8 @@ int FContentBase::CreateBarScene(FCharacterEncounter const* Script, unsigned int
     // Only the offer text pointer is tested.
     Behavior.DialogType = Script->FindActionText(3) != nullptr ? 3 : 5;
     Behavior.Filter = PlayerId;
-    Behavior.OfferArg = ControllerId;
-    Behavior.OfferMissionId = 0;
+    Behavior.OfferId = ControllerId;
+    Behavior.OfferKind = pub::Controller::MissionOfferController;
 
     FBaseRoomState* RoomState =
         &RoomStates.insert(std::pair<unsigned int const, FBaseRoomState>(Script->LocationId,

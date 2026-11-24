@@ -360,6 +360,7 @@ struct SystemPlayerNode {
     SystemPlayerNode* Prev;           // +0x04
     Observer View;                    // +0x08
 };
+static_assert(offsetof(SystemPlayerNode, View.PlayerId) == 0x40, "SystemPlayerNode+0x40 player id");
 
 // FUN_06cf7140 (.text:06cf7140, `RET 0x4`) -- start tracking an object for this
 // player. Allocates the 0x2F8-byte record, constructs its
@@ -547,8 +548,8 @@ void SystemPlayerView_CreateSolarForPlayer(Observer* View, CSolarCreateInfo* Inf
 // "the receiver is this view's own ship". Only caller StarSystem::send_comm.
 void SystemPlayerView_SendComm(Observer* View, unsigned int SenderId,
                                unsigned int ReceiverId, unsigned int VoiceId,
-                               Costume const& Cost, unsigned int CommType,
-                               unsigned int* TextIds, int TextCount, unsigned int Mood,
+                               Costume const& Cost, unsigned int CaptionIds,
+                               unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
                                float Duration);
 void SystemPlayerView_CreateCounterForPlayer(Observer* View, void* Payload, GameObject* Obj);
 void SystemPlayerView_CreateMineForPlayer(Observer* View, void* Payload, GameObject* Obj);
@@ -714,12 +715,11 @@ public:
     // It is the dock queue -- SystemDockNode / FSystemDockEntry above.
     // queue_dock (FUN_06d0d370) is its only producer, the landing block of the
     // system update (FUN_06d0be50, .text:06d0c1ae .. .text:06d0c3f3) its only
-    // consumer, and erase_docks (FUN_06d0f410) empties it. The "ObjectList" field names
-    // below are misnomers for it.
-    unsigned char ObjectListAlloc;     // +0x14
+    // consumer, and erase_docks (FUN_06d0f410) empties it.
+    unsigned char DockQueueAlloc;      // +0x14
     unsigned char Pad2[3];
-    void* ObjectListHead;              // +0x18  _Head
-    unsigned int ObjectListSize;       // +0x1C  _Size
+    void* DockQueueHead;               // +0x18  _Head
+    unsigned int DockQueueSize;        // +0x1C  _Size
 
     // +0x20: the system's spatial partition. load() stores
     // COMMON.DLL::NewSpatial("BSP") here (.text:06d0705c .. 06d07067) and bulk-
@@ -747,15 +747,22 @@ public:
     ObjectList Ships;                  // +0x34  mask 0x7f0000 (IClient CREATESHIP in add_player)
     ObjectList Loot;                   // +0x48  mask 0x10000000 (Loot::get_type_bits, CREATELOOT)
     ObjectList Solars;                 // +0x5C  mask 0xfdff (CREATESOLAR; the BSP is built from it)
-    ObjectList List70;                 // +0x70  mask 0x1000000 (.text:06cf3d70 get_type_bits)
+    ObjectList GuidedMunitions;        // +0x70  mask 0x1000000 (Guided::get_type_bits, .text:06cf3d70;
+                                       //        create_guided)
     ObjectList Beams;                  // +0x84  mask 0x2000000; the MP step calls CBeam::move on
                                        //        every object in it (.text:06d0c45f)
-    ObjectList List98;                 // +0x98  mask 0x4000000 (.text:06cf3400 get_type_bits)
-    ObjectList ListAC;                 // +0xAC  mask 0x8000000 (.text:06ce61f0 get_type_bits)
-    ObjectList ListC0;                 // +0xC0  masks 0x20000000 / 0x60000000; torn down next to
-                                       //        the asteroid fields in unload (FUN_06d075f0)
-    ObjectList ListD4;                 // +0xD4  in no GetNext mask; every object in it is fed to
-                                       //        the per-step +0x16c pass (.text:06d0bfe4)
+    ObjectList Mines;                  // +0x98  mask 0x4000000 (Mine::get_type_bits, .text:06cf3400;
+                                       //        create_mine)
+    ObjectList CounterMeasures;        // +0xAC  mask 0x8000000 (CounterMeasure::get_type_bits,
+                                       //        .text:06ce61f0; create_counter_measure)
+    ObjectList MedAsteroids;           // +0xC0  masks 0x20000000 / 0x60000000: the SrvAsteroid
+                                       //        MedAsteroid / MedMine objects (create_med_asteroid,
+                                       //        create_med_mine); torn down next to the asteroid
+                                       //        fields in unload (FUN_06d075f0)
+    ObjectList DockingSolars;          // +0xD4  in no GetNext mask: solars with live EqObj dock-
+                                       //        queue entries (add_docking_solar per entry,
+                                       //        remove_docking_solar per entry); every object in it
+                                       //        is fed to the per-step +0x16c pass (.text:06d0bfe4)
     ObjectList Deferred;               // +0xE8  objects whose update() answered false; the step
                                        //        deletes them (.text:06d0c152 .. 06d0c1ac)
 
@@ -1175,7 +1182,7 @@ public:
     // 06d09d4e):
     //   operator new(0x68 / 0x88) + the class constructor (a null allocation
     //   leaves the object pointer 0 and carries on);
-    //   push the object onto the +0xc0 block (ListC0): a pooled node from
+    //   push the object onto the +0xc0 block (MedAsteroids): a pooled node from
     //   FreeList (+0xd0) when bUseHeap (+0xcc) is set and the pool is not
     //   empty, else operator new(0xc); Next = 0, Prev = Tail, Data = object;
     //   linked after Tail, or made Head when there is no Tail; Tail = node --
@@ -1297,8 +1304,8 @@ public:
     // bBroadcast and a 10000-unit radius. Only caller pub::SpaceObj::SendComm
     // (.text:06cf9367).
     void send_comm(unsigned int SenderId, unsigned int ReceiverId, unsigned int VoiceId,
-                   Costume const& Cost, unsigned int CommType, unsigned int* TextIds,
-                   int TextCount, unsigned int Mood, float Duration, bool bBroadcast);
+                   Costume const& Cost, unsigned int CaptionIds, unsigned int* TextIds,
+                   int TextCount, unsigned int PermutationIds, float Duration, bool bBroadcast);
 
     // broadcast_fuse -- FUN_06d0e750 (.text:06d0e750, RET 4). IClient +0x15c
     // (BURNFUSE) to every player of this system who can see Info.ObjectId
@@ -1334,7 +1341,7 @@ public:
     // (.text:06ce7b4a / 06ce7b5b) and pub::SpaceObj::InstantDock
     // (.text:06cfa986), each pushing (Dock, ShipObj) so ShipObj is the first
     // argument. ShipObj must be a Ship: the body writes its +0x90 / +0x94.
-    //   .text:06d0c978 .. 06d0c985  ShipObj +0x90 (DeathSequenceObjId) != 0 ->
+    //   .text:06d0c978 .. 06d0c985  ShipObj +0x90 (DockedObjId) != 0 ->
     //                               return (already on its way out)
     //   .text:06d0c993 .. 06d0ca43  every unowned ship in the ship block with a
     //                               behavior interface gets a type-3 behavior
@@ -1420,9 +1427,9 @@ public:
     //   .text:06d0cf03 .. 06d0cf37  Dock's object under (& 0x103), null tests on
     //                               Dock and on the object
     //   .text:06d0cf37 .. 06d0cf55  ShipObj's object under (& 0x503), not tested
-    //   .text:06d0cf55 .. 06d0cf5e  CShip::launch(ShipObj, the CEqObj, LaunchType)
+    //   .text:06d0cf55 .. 06d0cf5e  CShip::launch(ShipObj, the CEqObj, DockPortIndex)
     //   .text:06d0cf64 .. 06d0cf66  Ship::apply_launch_invincibility (FUN_06d01110)
-    void launch(GameObject* ShipObj, GameObject* Dock, int LaunchType);
+    void launch(GameObject* ShipObj, GameObject* Dock, int DockPortIndex);
     // FUN_06d0df40 (RET 0x14) -- controller event 0x16, CShip::use_tradelane(true),
     // the unowned ships' behaviors, IClient +0x18 (XGoTradelane).
     // IServerImpl::GoTradelane and Ship go_tradelane.
@@ -1433,17 +1440,17 @@ public:
     // Ship stop_tradelane.
     void notify_stop_tradelane(unsigned int ShipId, unsigned int EntranceId, unsigned int ExitId);
 
-    // remove_from_list_d4 -- FUN_06d0c730 (.text:06d0c730, RET 4). Unlinks the
-    // first node of ListD4 (+0xD4) whose object is Obj (MetaList::remove,
+    // remove_docking_solar -- FUN_06d0c730 (.text:06d0c730, RET 4). Unlinks the
+    // first node of DockingSolars (+0xD4) whose object is Obj (MetaList::remove,
     // inlined). Caller: EqObj::destroy_notify, once per DockQueue entry.
-    void remove_from_list_d4(GameObject* Obj);
+    void remove_docking_solar(GameObject* Obj);
 
-    // add_to_list_d4 -- FUN_06d0c6d0 (.text:06d0c6d0, RET 4; the name is the
-    // port's). Appends Obj to ListD4 (+0xD4, MetaList append inlined via
+    // add_docking_solar -- FUN_06d0c6d0 (.text:06d0c6d0, RET 4; the name is the
+    // port's). Appends Obj to DockingSolars (+0xD4, MetaList append inlined via
     // FUN_06d11850) when its get_type_bits() (vt +0x154) has any bit of 0xfdff;
     // otherwise nothing. Caller: the EqObj dock-queue insert (.text:06ce78c4),
     // once the queue entry is linked.
-    void add_to_list_d4(GameObject* Obj);
+    void add_docking_solar(GameObject* Obj);
 
     // ------------------------------------------------------------------
     // remove_solar -- retail FUN_06d08940 (.text:06d08940, thiscall, RET 4; the
@@ -1606,7 +1613,7 @@ void StarSystem_SendGroupChange(StarSystem& System, unsigned int ObjId);
 // Obj's own CSimple::OwnerPlayer. Only caller: IServerImpl::AcceptTrade
 // (.text:06cf1eed / .text:06cf1ef9), once per trading ship.
 void StarSystem_SendRemoteCargoUpdate(StarSystem& System, GameObject* Obj);
-static_assert(offsetof(StarSystem, ObjectListHead) == 0x18, "StarSystem+0x18 dock queue head");
+static_assert(offsetof(StarSystem, DockQueueHead) == 0x18, "StarSystem+0x18 dock queue head");
 static_assert(offsetof(StarSystem, Spatial) == 0x20, "StarSystem+0x20 spatial partition");
 static_assert(offsetof(StarSystem, VectorBegin) == 0x28, "StarSystem+0x28 vector _First");
 static_assert(offsetof(StarSystem, Ships) == 0x34, "StarSystem+0x34 first ObjectList");

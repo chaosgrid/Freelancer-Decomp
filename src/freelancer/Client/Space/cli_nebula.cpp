@@ -104,12 +104,10 @@ namespace
 
     // Nebula +0x38: std::map<unsigned (CreateID of the mesh name), zone_shell*>. Retail's VC6
     // map (FUN_004e7f60 ctor, lower_bound FUN_0052c7a0 / FUN_0041bd10, insert FUN_004b68b0,
-    // erase FUN_00509d60); the port keeps a real std::map in the same bytes.
-    typedef std::map<unsigned, FNebulaZoneShell*> FNebulaZoneShellMap;
-    static_assert(sizeof(FNebulaZoneShellMap) < 0x14,
-                  "std::map must fit in the retail tree's 0x14 bytes");
-
-    FNebulaZoneShellMap& NebulaZoneShells(FNebulaEffect* Nebula)
+    // erase FUN_00509d60); the port keeps a real std::map in the same bytes (FNebulaZoneShellMap,
+    // cli_nebula.h).
+    FNebulaZoneShellMap& NebulaZoneShells
+(FNebulaEffect* Nebula)
     {
         return Nebula->ZoneShells;
     }
@@ -215,9 +213,8 @@ namespace
     // Called from NebulaUpdate. No test of `this` or of the position pointer.
     void NebulaAmbientTick(FNebulaEffect* Nebula, float const* CamPos3)
     {
-        unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
         // The light at +0x270 is the one pointer retail tests.
-        FGameLight* const GLight = *reinterpret_cast<FGameLight**>(B + 0x270);
+        FGameLight* const GLight = Nebula->DynamicLight;
         if (GLight == nullptr)
             return;
 #ifdef FREELANCER_RP9
@@ -229,17 +226,17 @@ namespace
 #endif
         FEngineLight* const Light = (FEngineLight*)GLight;
         // Return when the period is <= 0; a NaN period goes on.
-        float const Period = *reinterpret_cast<float*>(B + 0x278);
+        float const Period = Nebula->DynLightningDuration;
         if (Period <= 0.0f)
             return;
 
         EngineLightSetPosition(Light, CamPos3);
 
         // The sum is stored as float but the unrounded value is compared below.
-        float const Dt = *reinterpret_cast<float*>(B + 0x1c);
-        float const AccPrev = *reinterpret_cast<float*>(B + 0x27c);
+        float const Dt = Nebula->FrameDelta;
+        float const AccPrev = Nebula->DynLightningTimer;
         double const Acc = static_cast<double>(Dt) + AccPrev;
-        *reinterpret_cast<float*>(B + 0x27c) = static_cast<float>(Acc);
+        Nebula->DynLightningTimer = static_cast<float>(Acc);
 
         // An old value not above 0 returns unless the new sum is above 0.
         if (!(AccPrev > 0.0f))
@@ -251,9 +248,9 @@ namespace
         else if (Acc > Period)
         {
             int const RArm = rand();
-            *reinterpret_cast<float*>(B + 0x27c) = static_cast<float>(
+            Nebula->DynLightningTimer = static_cast<float>(
                 (static_cast<double>(RArm) * 3.0517578125e-05f * static_cast<double>(0.7f) - 1.5) *
-                *reinterpret_cast<float*>(B + 0x274));
+                Nebula->DynLightningGap);
 
             double const First = static_cast<double>(rand()) * 3.0517578125e-05f;
             double const Second = static_cast<double>(rand()) * 3.0517578125e-05f;
@@ -275,9 +272,9 @@ namespace
             return;
         }
 
-        float Intensity = *reinterpret_cast<float*>(B + 0x28c);
-        if (B[0x26c] != 0)
-            Intensity = Intensity + *reinterpret_cast<float*>(B + 0x290);
+        float Intensity = Nebula->DynAmbientIntensity;
+        if (Nebula->bBackLightningFlash != 0)
+            Intensity = Intensity + Nebula->DynIntensityIncrease;
 
         // Flick stays unrounded (x87).
         float const U0 = static_cast<float>(static_cast<double>(rand()) * 3.0517578125e-05f);
@@ -285,9 +282,9 @@ namespace
         double const Flick =
             static_cast<double>(RFlick) * U0 * Intensity * 3.0517578125e-05f;
         // Red and green are stored as float, blue stays on the FPU.
-        float Cr = static_cast<float>(Flick * *reinterpret_cast<float*>(B + 0x280));
-        float Cg = static_cast<float>(Flick * *reinterpret_cast<float*>(B + 0x284));
-        double Cb = Flick * *reinterpret_cast<float*>(B + 0x288);
+        float Cr = static_cast<float>(Flick * Nebula->DynLightningColor[0]);
+        float Cg = static_cast<float>(Flick * Nebula->DynLightningColor[1]);
+        double Cb = Flick * Nebula->DynLightningColor[2];
         // Keep only a value below 1.0; anything else (>=, NaN) becomes 1.0.
         if (!(Cr < 1.0f))
             Cr = 1.0f;
@@ -321,18 +318,17 @@ namespace
     // left there until the [Clouds] parse.
     void LocalNebulaCloudsConstruct(FNebulaClouds* Clouds)
     {
-        unsigned char* const R = Clouds->Raw;
-        *reinterpret_cast<float*>(R + 0x8) = 1.0f;
-        *reinterpret_cast<float*>(R + 0xac) = 1.0f;
-        *reinterpret_cast<int*>(R + 0xf4) = 0;
-        *reinterpret_cast<int*>(R + 0xf8) = 0;
-        *reinterpret_cast<int*>(R + 0xfc) = 0;
-        *reinterpret_cast<int*>(R + 0x0) = 0;
-        *reinterpret_cast<int*>(R + 0x4) = 0;
-        *reinterpret_cast<int*>(R + 0xc) = 0;
-        *reinterpret_cast<int*>(R + 0xc4) = 0;
-        R[0xec] = 0;
-        *reinterpret_cast<int*>(R + 0x128) = 0;
+        Clouds->DetailCountScale = 1.0f;
+        Clouds->DetailRadiusScale = 1.0f;
+        Clouds->Centre[0] = 0.0f;
+        Clouds->Centre[1] = 0.0f;
+        Clouds->Centre[2] = 0.0f;
+        Clouds->PuffTable = nullptr;
+        Clouds->PuffCountIni = 0;
+        Clouds->PuffCount = 0;
+        Clouds->Owner = nullptr;
+        Clouds->bLoaded = 0;
+        Clouds->DisableBatcher = 0;
     }
 
     // The detail pair both FUN_00552530 and FUN_005524a0 compute, on the FPU: a = 1.0f - d;
@@ -341,10 +337,9 @@ namespace
     void CloudsDetailFactors(FNebulaClouds* Clouds, float Detail)
     {
         double const A = 1.0f - static_cast<double>(Detail);
-        *reinterpret_cast<float*>(Clouds->Raw + 0x8) = static_cast<float>(0.5f * A + Detail);
+        Clouds->DetailCountScale = static_cast<float>(0.5f * A + Detail);
         double const Ease = 1.0f - A * A;
-        *reinterpret_cast<float*>(Clouds->Raw + 0xac) =
-            static_cast<float>((1.0f - Ease) * 0.707f + Ease);
+        Clouds->DetailRadiusScale = static_cast<float>((1.0f - Ease) * 0.707f + Ease);
     }
 
     // FUN_00552530. No test of `this`.
@@ -358,40 +353,38 @@ namespace
     // +0xec are left alone.
     void LocalNebulaCloudsFreePuffTable(FNebulaClouds* Clouds)
     {
-        unsigned char* const R = Clouds->Raw;
-        for (int I = 0; I < *reinterpret_cast<int*>(R + 0xc); ++I)
+        for (int I = 0; I < Clouds->PuffCount; ++I)
         {
-            void** const Table = *reinterpret_cast<void***>(R);
-            if (Table[I] != nullptr)
-                operator delete(Table[I]);
-            (*reinterpret_cast<void***>(R))[I] = nullptr;
+            if (Clouds->PuffTable[I] != nullptr)
+                operator delete(Clouds->PuffTable[I]);
+            Clouds->PuffTable[I] = nullptr;
         }
-        operator delete(*reinterpret_cast<void**>(R));
-        *reinterpret_cast<void**>(R) = nullptr;
+        operator delete(Clouds->PuffTable);
+        Clouds->PuffTable = nullptr;
     }
 
     // FUN_005501e0
     void LocalNebulaCloudsReleaseBits(FNebulaClouds* Clouds)
     {
-        if (Clouds->Raw[0xec] == 0)
+        if (Clouds->bLoaded == 0)
             return;
         LocalNebulaCloudsFreePuffTable(Clouds);
-        *reinterpret_cast<int*>(Clouds->Raw + 4) = 0;
-        Clouds->Raw[0xec] = 0;
+        Clouds->PuffCountIni = 0;
+        Clouds->bLoaded = 0;
     }
 
     // FUN_00550040 (thiscall on the puff).
-    void LocalNebulaCloudsFillPuff(unsigned char* Puff, Vector const& Sample, float Scale,
+    void LocalNebulaCloudsFillPuff(FNebulaCloudPuff* Puff, Vector const& Sample, float Scale,
                                    Vector const& MinCorner, Vector const& MaxCorner,
                                    float const* Weights, int WeightCount)
     {
-        *reinterpret_cast<float*>(Puff + 0x0) = Sample.x;
-        *reinterpret_cast<float*>(Puff + 0x4) = Sample.y;
-        *reinterpret_cast<float*>(Puff + 0x8) = Sample.z;
+        Puff->Position[0] = Sample.x;
+        Puff->Position[1] = Sample.y;
+        Puff->Position[2] = Sample.z;
 
         // Constants: double 0x005e0bd8, double(0.8f) 0x005e0bd0.
         int const RSize = rand();
-        *reinterpret_cast<float*>(Puff + 0x18) = static_cast<float>(
+        Puff->Size = static_cast<float>(
             (static_cast<double>(RSize) * kCloudsRandScale * 0.40000003576278687 +
              0.800000011920929) *
             Scale);
@@ -404,12 +397,12 @@ namespace
         double const T = static_cast<double>(RTint) * kCloudsRandScale;
         float const Py = static_cast<float>(Dy * T);
         float const Pz = static_cast<float>(Dz * T);
-        *reinterpret_cast<float*>(Puff + 0xc) = static_cast<float>(Dx * T + MinCorner.x);
-        *reinterpret_cast<float*>(Puff + 0x10) = Py + MinCorner.y;
-        *reinterpret_cast<float*>(Puff + 0x14) = Pz + MinCorner.z;
+        Puff->Color[0] = static_cast<float>(Dx * T + MinCorner.x);
+        Puff->Color[1] = Py + MinCorner.y;
+        Puff->Color[2] = Pz + MinCorner.z;
 
         int const RIndex = rand();
-        *reinterpret_cast<int*>(Puff + 0x1c) = (RIndex * WeightCount) / 32768;
+        Puff->ShapeIndex = (RIndex * WeightCount) / 32768;
 
         // The weights accumulate on the FPU; the first running sum strictly above the pick
         // replaces +0x1c.
@@ -421,73 +414,72 @@ namespace
             Running += Weights[I];
             if (Pick < Running)
             {
-                *reinterpret_cast<int*>(Puff + 0x1c) = I;
+                Puff->ShapeIndex = I;
                 break;
             }
         }
 
-        *reinterpret_cast<int*>(Puff + 0x54) = 0;
-        *reinterpret_cast<float*>(Puff + 0x38) = -1.0f;
+        Puff->ViewDepth = 0.0f;
+        Puff->LightningTimer = -1.0f;
     }
 
     // FUN_00550b60: rebuild the puff table while +0xec is set.
     void LocalNebulaCloudsRebuildBits(FNebulaClouds* Clouds)
     {
-        unsigned char* const R = Clouds->Raw;
-        if (R[0xec] == 0)
+        if (Clouds->bLoaded == 0)
             return;
 
         // The table is the one pointer tested here.
-        if (*reinterpret_cast<void**>(R) != nullptr)
+        if (Clouds->PuffTable != nullptr)
             LocalNebulaCloudsFreePuffTable(Clouds);
 
         // The new table is not tested for null.
         int const Count = static_cast<int>(
-            static_cast<double>(*reinterpret_cast<int*>(R + 4)) * *reinterpret_cast<float*>(R + 8) +
+            static_cast<double>(Clouds->PuffCountIni) * Clouds->DetailCountScale +
             0.5f);
-        *reinterpret_cast<int*>(R + 0xc) = Count;
-        void** const Table =
-            static_cast<void**>(operator new(static_cast<unsigned>(Count) << 2));
-        *reinterpret_cast<void***>(R) = Table;
+        Clouds->PuffCount = Count;
+        FNebulaCloudPuff** const Table =
+            static_cast<FNebulaCloudPuff**>(operator new(static_cast<unsigned>(Count) << 2));
+        Clouds->PuffTable = Table;
 
-        for (int I = 0; I < *reinterpret_cast<int*>(R + 0xc); ++I)
+        for (int I = 0; I < Clouds->PuffCount; ++I)
         {
-            unsigned char* Puff = static_cast<unsigned char*>(operator new(0x58));
+            FNebulaCloudPuff* Puff = static_cast<FNebulaCloudPuff*>(operator new(sizeof(FNebulaCloudPuff)));
             if (Puff != nullptr)
             {
-                Puff[0x50] = 0;
-                Puff[0x51] = 0;
+                Puff->bActive = 0;
+                Puff->bHidden = 0;
             }
             Table[I] = Puff;
 
             // Box +0x78 / +0x84, weights +0x48, count +0x68.
-            Vector const Sample = random_inside_sphere(*reinterpret_cast<float*>(R + 0x100));
-            float const Scale = *reinterpret_cast<float*>(R + 0xa8) * *reinterpret_cast<float*>(R + 0xac);
-            LocalNebulaCloudsFillPuff(Puff, Sample, Scale, *reinterpret_cast<Vector*>(R + 0x78),
-                                      *reinterpret_cast<Vector*>(R + 0x84),
-                                      reinterpret_cast<float*>(R + 0x48),
-                                      *reinterpret_cast<int*>(R + 0x68));
+            Vector const Sample = random_inside_sphere(Clouds->CloudRadius);
+            float const Scale = Clouds->PuffRadius * Clouds->DetailRadiusScale;
+            LocalNebulaCloudsFillPuff(Puff, Sample, Scale,
+                                      *reinterpret_cast<Vector*>(Clouds->PuffColorA),
+                                      *reinterpret_cast<Vector*>(Clouds->PuffColorB),
+                                      Clouds->PuffWeights, Clouds->PuffShapeCount);
 
-            Vector const Drift = random_inside_sphere(*reinterpret_cast<float*>(R + 0xb0));
-            *reinterpret_cast<float*>(Puff + 0x44) = Drift.x;
-            *reinterpret_cast<float*>(Puff + 0x48) = Drift.y;
-            *reinterpret_cast<float*>(Puff + 0x4c) = Drift.z;
+            Vector const Drift = random_inside_sphere(Clouds->PuffDrift);
+            Puff->Velocity[0] = Drift.x;
+            Puff->Velocity[1] = Drift.y;
+            Puff->Velocity[2] = Drift.z;
 
-            // A drift period <= 0 or unordered gives timer -1.0f. Constants 0x005e0df8 /
+            // A lightning duration <= 0 or unordered gives timer -1.0f. Constants 0x005e0df8 /
             // 0x005db0b8.
-            if (!(*reinterpret_cast<float*>(R + 0xa0) > 0.0f))
+            if (!(Clouds->LightningDuration > 0.0f))
             {
-                *reinterpret_cast<float*>(Puff + 0x38) = -1.0f;
+                Puff->LightningTimer = -1.0f;
             }
             else
             {
                 int const RPhase = rand();
-                *reinterpret_cast<float*>(Puff + 0x38) = static_cast<float>(
+                Puff->LightningTimer = static_cast<float>(
                     (-0.800000011920929 -
                      static_cast<double>(RPhase) * kCloudsRandScale * 0.699999988079071) *
-                    *reinterpret_cast<float*>(R + 0x9c));
+                    Clouds->LightningGap);
             }
-            Puff[0x50] = 1;
+            Puff->bActive = 1;
         }
     }
 
@@ -522,40 +514,38 @@ namespace
 
     // FUN_00550d40. Callers: the nebula update (visibility = nebula +0x294, manager = nebula
     // +0x34) and the TexturePanels update (visibility = panels +0x70, manager = null).
-    // Puff (0x58): +0x00 position, +0x20 drift anchor, +0x2c drift direction, +0x38 drift
-    // timer, +0x3c/+0x40 drift randoms, +0x44 velocity, +0x50 bActive, +0x51 bHidden,
-    // +0x54 sort key.
+    // Each puff drifts by its velocity; its lightning timer runs while lightning_duration is
+    // positive (FNebulaCloudPuff).
     void LocalNebulaCloudsUpdate(FNebulaClouds* Clouds, void* Camera, float Dt, float Visibility,
                                  Exclusion::NebulaExclusionZoneMgr* ExclusionMgr)
     {
-        unsigned char* const C = Clouds->Raw;
-        if (C[0xec] == 0)
+        if (Clouds->bLoaded == 0)
             return;
 
-        int const PuffCount = *reinterpret_cast<int*>(C + 0xc);
+        int const PuffCount = Clouds->PuffCount;
         int Budget = static_cast<int>(static_cast<double>(Visibility) /
-                                      static_cast<double>(*reinterpret_cast<float*>(C + 0x108)) *
+                                      static_cast<double>(Clouds->BudgetVisibility) *
                                       static_cast<double>(PuffCount));
-        *reinterpret_cast<int*>(C + 0x10) = Budget;
+        Clouds->PuffBudget = Budget;
         if (Budget < 0)
-            *reinterpret_cast<int*>(C + 0x10) = 0;
+            Clouds->PuffBudget = 0;
         else if (Budget > PuffCount)
-            *reinterpret_cast<int*>(C + 0x10) = PuffCount;
+            Clouds->PuffBudget = PuffCount;
 
         // Fade: an ordered visibility <= 0 gives 0.0; everything else below the full value
         // (including unordered) divides.
-        float const FullVisibility = *reinterpret_cast<float*>(C + 0x104);
+        float const FullVisibility = Clouds->FullVisibility;
         if (Visibility > FullVisibility)
-            *reinterpret_cast<float*>(C + 0xe0) = 1.0f;
+            Clouds->Fade = 1.0f;
         else if (Visibility <= 0.0f)
-            *reinterpret_cast<float*>(C + 0xe0) = 0.0f;
+            Clouds->Fade = 0.0f;
         else
-            *reinterpret_cast<float*>(C + 0xe0) = Visibility / FullVisibility;
+            Clouds->Fade = Visibility / FullVisibility;
 
         ICamera* const Cam = static_cast<ICamera*>(Camera);
-        float const Radius = *reinterpret_cast<float*>(C + 0x100);
-        float const Ahead = *reinterpret_cast<float*>(C + 0xbc) + Radius;
-        *reinterpret_cast<float*>(C + 0xb8) = Ahead;
+        float const Radius = Clouds->CloudRadius;
+        float const Ahead = Clouds->NearFadeReach + Radius;
+        Clouds->CentreAhead = Ahead;
         float CullDistSq = static_cast<float>(static_cast<double>(Radius) * Radius *
                                               static_cast<double>(kCloudsCullSlack));
         FVector AheadLocal;
@@ -567,59 +557,56 @@ namespace
         FTransform const* const CamXf = reinterpret_cast<FTransform const*>(Cam->GetOrientation());
         FVector Centre;
         AcquireCloudsMath()->TransformXform(Centre, *CamXf, AheadLocal);
-        *reinterpret_cast<float*>(C + 0xf4) = Centre.X;
-        *reinterpret_cast<float*>(C + 0xf8) = Centre.Y;
-        *reinterpret_cast<float*>(C + 0xfc) = Centre.Z;
+        Clouds->Centre[0] = Centre.X;
+        Clouds->Centre[1] = Centre.Y;
+        Clouds->Centre[2] = Centre.Z;
 
-        unsigned char** const Table = *reinterpret_cast<unsigned char***>(C);
+        FNebulaCloudPuff** const Table = Clouds->PuffTable;
 
         // Pass 1: cull.
         int Active = 0;
-        for (int I = 0; I < *reinterpret_cast<int*>(C + 0xc); ++I)
+        for (int I = 0; I < Clouds->PuffCount; ++I)
         {
-            unsigned char* const Puff = Table[I];
+            FNebulaCloudPuff* const Puff = Table[I];
             // An ordered fade <= 0 deactivates every puff.
-            if (*reinterpret_cast<float*>(C + 0xe0) <= 0.0f)
+            if (Clouds->Fade <= 0.0f)
             {
-                Puff[0x50] = 0;
-                Puff[0x51] = 1;
+                Puff->bActive = 0;
+                Puff->bHidden = 1;
             }
-            if (Puff[0x50] == 0)
+            if (Puff->bActive == 0)
                 continue;
             // <= and unordered distances stay active.
-            double const Dx = static_cast<double>(*reinterpret_cast<float*>(C + 0xf4)) -
-                              *reinterpret_cast<float*>(Puff + 0x0);
-            double const Dy = static_cast<double>(*reinterpret_cast<float*>(C + 0xf8)) -
-                              *reinterpret_cast<float*>(Puff + 0x4);
-            double const Dz = static_cast<double>(*reinterpret_cast<float*>(C + 0xfc)) -
-                              *reinterpret_cast<float*>(Puff + 0x8);
+            double const Dx = static_cast<double>(Clouds->Centre[0]) - Puff->Position[0];
+            double const Dy = static_cast<double>(Clouds->Centre[1]) - Puff->Position[1];
+            double const Dz = static_cast<double>(Clouds->Centre[2]) - Puff->Position[2];
             double const DistSq = Dz * Dz + Dy * Dy + Dx * Dx;
             if (DistSq > CullDistSq)
             {
-                Puff[0x50] = 0;
-                Puff[0x51] = 1;
+                Puff->bActive = 0;
+                Puff->bHidden = 1;
             }
             else
                 ++Active;
         }
 
-        // The drift pass lowers this to the nearest anchor distance; nothing reads the result.
-        float NearestDistSq = static_cast<float>(
-            static_cast<double>(*reinterpret_cast<float*>(C + 0xc8)) *
-            *reinterpret_cast<float*>(C + 0xc8));
+        // The second pass lowers this to the nearest lightning anchor distance; nothing reads
+        // the result.
+        float NearestDistSq = static_cast<float>(static_cast<double>(Clouds->LLightRange) *
+                                                 Clouds->LLightRange);
 
         // Bubble sort by +0x54 until a pass makes no swap; unordered pairs never swap.
         for (;;)
         {
-            if (*reinterpret_cast<int*>(C + 0xc) <= 1)
+            if (Clouds->PuffCount <= 1)
                 break;
             int Swaps = 0;
-            for (int J = 1; J < *reinterpret_cast<int*>(C + 0xc); ++J)
+            for (int J = 1; J < Clouds->PuffCount; ++J)
             {
-                unsigned char* const Left = Table[J - 1];
-                unsigned char* const Right = Table[J];
-                float const L = *reinterpret_cast<float*>(Left + 0x54);
-                float const R = *reinterpret_cast<float*>(Right + 0x54);
+                FNebulaCloudPuff* const Left = Table[J - 1];
+                FNebulaCloudPuff* const Right = Table[J];
+                float const L = Left->ViewDepth;
+                float const R = Right->ViewDepth;
                 bool const bSwap = G_CloudsSortDescending != 0 ? (L < R) : (L > R);
                 if (bSwap)
                 {
@@ -632,42 +619,40 @@ namespace
                 break;
         }
 
-        // Pass 2: respawn, drift, move.
-        for (int I = 0; I < *reinterpret_cast<int*>(C + 0xc); ++I)
+        // Pass 2: respawn, lightning, move.
+        for (int I = 0; I < Clouds->PuffCount; ++I)
         {
             // An inactive puff respawns while fewer than the budget are active.
-            if (Table[I][0x50] == 0 && Active < *reinterpret_cast<int*>(C + 0x10))
+            if (Table[I]->bActive == 0 && Active < Clouds->PuffBudget)
             {
                 // On the sphere of radius R around the centre.
-                float const SpawnRadius = *reinterpret_cast<float*>(C + 0x100);
+                float const SpawnRadius = Clouds->CloudRadius;
                 Vector const OnSphere = random_on_unit_sphere();
                 float const Sz = static_cast<float>(static_cast<double>(SpawnRadius) * OnSphere.z);
-                float* const Pos = reinterpret_cast<float*>(Table[I]);
+                float* const Pos = Table[I]->Position;
                 Pos[0] = static_cast<float>(static_cast<double>(SpawnRadius) * OnSphere.x +
-                                            *reinterpret_cast<float*>(C + 0xf4));
+                                            Clouds->Centre[0]);
                 Pos[1] = static_cast<float>(static_cast<double>(SpawnRadius) * OnSphere.y +
-                                            *reinterpret_cast<float*>(C + 0xf8));
-                Pos[2] = static_cast<float>(static_cast<double>(Sz) +
-                                            *reinterpret_cast<float*>(C + 0xfc));
+                                            Clouds->Centre[1]);
+                Pos[2] = static_cast<float>(static_cast<double>(Sz) + Clouds->Centre[2]);
 
-                Vector const Vel = random_inside_sphere(*reinterpret_cast<float*>(C + 0xb0));
-                *reinterpret_cast<float*>(Table[I] + 0x44) = Vel.x;
-                *reinterpret_cast<float*>(Table[I] + 0x48) = Vel.y;
-                *reinterpret_cast<float*>(Table[I] + 0x4c) = Vel.z;
+                Vector const Vel = random_inside_sphere(Clouds->PuffDrift);
+                Table[I]->Velocity[0] = Vel.x;
+                Table[I]->Velocity[1] = Vel.y;
+                Table[I]->Velocity[2] = Vel.z;
 
                 // Visibility not below +0x10c accepts outright; otherwise the owner zone
                 // (+0xc4, null rejects) must report a density above 0 at the new position.
                 bool bAccept = true;
-                if (!(Visibility >= *reinterpret_cast<float*>(C + 0x10c)))
+                if (!(Visibility >= Clouds->AcceptVisibility))
                 {
-                    Universe::IZoneImmersion const* const Owner = *(Universe::IZoneImmersion const**)(C + 0xc4);
+                    Universe::IZoneImmersion const* const Owner = Clouds->Owner;
                     if (Owner == nullptr)
                         bAccept = false;
                     else
                     {
-                        using FDensity = float(__thiscall*)(void*, float const*);
                         float const Density =
-                            (float)Owner->GetImmersion(*(Vector const*)Pos);
+                            static_cast<float>(Owner->GetImmersion(*reinterpret_cast<Vector const*>(Pos)));
                         if (!(static_cast<double>(Density) > 0.0))
                             bAccept = false;
                     }
@@ -677,28 +662,28 @@ namespace
                 {
                     // Inside an exclusion zone deeper than 0.9 it stays hidden.
                     ++Active;
-                    Table[I][0x50] = 1;
-                    Table[I][0x51] = 0;
+                    Table[I]->bActive = 1;
+                    Table[I]->bHidden = 0;
                     if (ExclusionMgr != nullptr)
                     {
                         Exclusion::NebulaExclusionZone* HitZone;
                         float Depth = -1.0f;
                         if (ExclusionMgr->is_in_exclusion_zone(
-                                *reinterpret_cast<Vector const*>(Table[I]), &HitZone, &Depth,
+                                *reinterpret_cast<Vector const*>(Table[I]->Position), &HitZone, &Depth,
                                 true) &&
                             Depth > kCloudsExclusionDepth)
-                            Table[I][0x51] = 1;
+                            Table[I]->bHidden = 1;
                     }
                 }
             }
 
-            // Only active, visible puffs drift and move.
-            unsigned char* const Puff = Table[I];
-            if (Puff[0x50] == 0 || Puff[0x51] != 0)
+            // Only active, visible puffs flash and move.
+            FNebulaCloudPuff* const Puff = Table[I];
+            if (Puff->bActive == 0 || Puff->bHidden != 0)
                 continue;
 
-            float* const Timer = reinterpret_cast<float*>(Puff + 0x38);
-            float const Period = *reinterpret_cast<float*>(C + 0xa0);
+            float* const Timer = &Puff->LightningTimer;
+            float const Period = Clouds->LightningDuration;
             if (Period > 0.0f)
             {
                 // The branch is taken on the OLD timer value; < 0 and unordered go to the
@@ -707,13 +692,13 @@ namespace
                 *Timer = static_cast<float>(static_cast<double>(Dt) + OldTimer);
                 if (OldTimer >= 0.0f)
                 {
-                    // Drift anchor +0x20.
-                    if (*reinterpret_cast<float*>(C + 0xc8) > 0.0f)
+                    // Lightning anchor +0x20.
+                    if (Clouds->LLightRange > 0.0f)
                     {
                         float const* const CamPos = Cam->GetPosition();
-                        double const Ax = static_cast<double>(*reinterpret_cast<float*>(Puff + 0x20)) - CamPos[0];
-                        double const Ay = static_cast<double>(*reinterpret_cast<float*>(Puff + 0x24)) - CamPos[1];
-                        double const Az = static_cast<double>(*reinterpret_cast<float*>(Puff + 0x28)) - CamPos[2];
+                        double const Ax = static_cast<double>(Puff->LightningAnchor[0]) - CamPos[0];
+                        double const Ay = static_cast<double>(Puff->LightningAnchor[1]) - CamPos[1];
+                        double const Az = static_cast<double>(Puff->LightningAnchor[2]) - CamPos[2];
                         double const AnchorDistSq = Az * Az + Ay * Ay + Ax * Ax;
                         if (AnchorDistSq < NearestDistSq)
                             NearestDistSq = static_cast<float>(AnchorDistSq);
@@ -725,21 +710,21 @@ namespace
                         *Timer = static_cast<float>(
                             (kCloudsDriftBase -
                              static_cast<double>(R) * kCloudsRandScale * kCloudsDriftSpan) *
-                            *reinterpret_cast<float*>(C + 0x9c));
+                            Clouds->LightningGap);
                     }
                 }
                 else if (*Timer >= 0.0f)
                 {
-                    // The timer just crossed zero: anchor = position; the drift direction is a
-                    // random in-plane direction of LookMatrix(anchor - camera), length 5.0.
-                    *reinterpret_cast<float*>(Puff + 0x20) = *reinterpret_cast<float*>(Puff + 0x0);
-                    *reinterpret_cast<float*>(Puff + 0x24) = *reinterpret_cast<float*>(Puff + 0x4);
-                    *reinterpret_cast<float*>(Puff + 0x28) = *reinterpret_cast<float*>(Puff + 0x8);
+                    // The timer just crossed zero: anchor = position; the lightning direction is
+                    // a random in-plane direction of LookMatrix(anchor - camera), length 5.0.
+                    Puff->LightningAnchor[0] = Puff->Position[0];
+                    Puff->LightningAnchor[1] = Puff->Position[1];
+                    Puff->LightningAnchor[2] = Puff->Position[2];
                     float const* const CamPos = Cam->GetPosition();
                     Vector ToAnchor;
-                    ToAnchor.x = *reinterpret_cast<float*>(Puff + 0x20) - CamPos[0];
-                    ToAnchor.y = *reinterpret_cast<float*>(Puff + 0x24) - CamPos[1];
-                    ToAnchor.z = *reinterpret_cast<float*>(Puff + 0x28) - CamPos[2];
+                    ToAnchor.x = Puff->LightningAnchor[0] - CamPos[0];
+                    ToAnchor.y = Puff->LightningAnchor[1] - CamPos[1];
+                    ToAnchor.z = Puff->LightningAnchor[2] - CamPos[2];
                     Matrix const Look = LookMatrix(ToAnchor);
 
                     int const RAngle = rand();
@@ -751,7 +736,7 @@ namespace
                     FVector Dir;
                     AcquireCloudsMath()->TransformMatrix(
                         Dir, *reinterpret_cast<FMatrix const*>(&Look), InPlane);
-                    float* const DriftDir = reinterpret_cast<float*>(Puff + 0x2c);
+                    float* const DriftDir = Puff->LightningDir;
                     DriftDir[0] = Dir.X;
                     DriftDir[1] = Dir.Y;
                     DriftDir[2] = Dir.Z;
@@ -764,7 +749,7 @@ namespace
                     DriftDir[2] = static_cast<float>(Scale * DriftDir[2]);
 
                     int const RPhase = rand();
-                    *reinterpret_cast<float*>(Puff + 0x40) =
+                    Puff->LightningPhase =
                         static_cast<float>(static_cast<double>(RPhase) * kCloudsRandScale);
                 }
 
@@ -774,73 +759,69 @@ namespace
                     int const RA = rand();
                     float const A = static_cast<float>(static_cast<double>(RA) * kCloudsRandScale);
                     int const RB = rand();
-                    *reinterpret_cast<float*>(Puff + 0x3c) = static_cast<float>(
+                    Puff->LightningFlash = static_cast<float>(
                         static_cast<double>(RB) * A * kCloudsRandScale);
                 }
             }
 
-            float* const Pos = reinterpret_cast<float*>(Puff);
-            float const StepZ = static_cast<float>(
-                static_cast<double>(Dt) * *reinterpret_cast<float*>(Puff + 0x4c));
-            Pos[0] = static_cast<float>(
-                static_cast<double>(Dt) * *reinterpret_cast<float*>(Puff + 0x44) + Pos[0]);
-            Pos[1] = static_cast<float>(
-                static_cast<double>(Dt) * *reinterpret_cast<float*>(Puff + 0x48) + Pos[1]);
+            float* const Pos = Puff->Position;
+            float const StepZ = static_cast<float>(static_cast<double>(Dt) * Puff->Velocity[2]);
+            Pos[0] = static_cast<float>(static_cast<double>(Dt) * Puff->Velocity[0] + Pos[0]);
+            Pos[1] = static_cast<float>(static_cast<double>(Dt) * Puff->Velocity[1] + Pos[1]);
             Pos[2] = static_cast<float>(static_cast<double>(StepZ) + Pos[2]);
         }
 
-        *reinterpret_cast<int*>(C + 0x14) = Active;
+        Clouds->ActiveCount = Active;
     }
 
     // FUN_005513b0 (arg the nebula's exclusion manager): re-seed every puff of the table
     // around the clouds centre (+0xf4..+0xfc). No test of `this`, the table or a puff.
     void LocalNebulaCloudsRegenExcluded(FNebulaClouds* Clouds, void* ExclusionCtx)
     {
-        unsigned char* const R = Clouds->Raw;
         Exclusion::NebulaExclusionZoneMgr* const ExclMgr =
             static_cast<Exclusion::NebulaExclusionZoneMgr*>(ExclusionCtx);
-        for (int I = 0; I < *reinterpret_cast<int*>(R + 0xc); ++I)
+        for (int I = 0; I < Clouds->PuffCount; ++I)
         {
-            unsigned char* const Puff = static_cast<unsigned char*>((*reinterpret_cast<void***>(R))[I]);
+            FNebulaCloudPuff* const Puff = Clouds->PuffTable[I];
             // Past the budget (+0x10) -> hidden.
-            if (I >= *reinterpret_cast<int*>(R + 0x10))
+            if (I >= Clouds->PuffBudget)
             {
-                Puff[0x50] = 0;
-                Puff[0x51] = 1;
+                Puff->bActive = 0;
+                Puff->bHidden = 1;
                 continue;
             }
 
-            Vector const Sample = random_inside_sphere(*reinterpret_cast<float*>(R + 0x100));
-            *reinterpret_cast<float*>(Puff + 0x0) = *reinterpret_cast<float*>(R + 0xf4) + Sample.x;
-            *reinterpret_cast<float*>(Puff + 0x4) = *reinterpret_cast<float*>(R + 0xf8) + Sample.y;
-            *reinterpret_cast<float*>(Puff + 0x8) = *reinterpret_cast<float*>(R + 0xfc) + Sample.z;
-            Vector const Drift = random_inside_sphere(*reinterpret_cast<float*>(R + 0xb0));
-            *reinterpret_cast<float*>(Puff + 0x44) = Drift.x;
-            *reinterpret_cast<float*>(Puff + 0x48) = Drift.y;
-            *reinterpret_cast<float*>(Puff + 0x4c) = Drift.z;
+            Vector const Sample = random_inside_sphere(Clouds->CloudRadius);
+            Puff->Position[0] = Clouds->Centre[0] + Sample.x;
+            Puff->Position[1] = Clouds->Centre[1] + Sample.y;
+            Puff->Position[2] = Clouds->Centre[2] + Sample.z;
+            Vector const Drift = random_inside_sphere(Clouds->PuffDrift);
+            Puff->Velocity[0] = Drift.x;
+            Puff->Velocity[1] = Drift.y;
+            Puff->Velocity[2] = Drift.z;
 
             // A null zone (+0xc4) counts as outside; only an immersion strictly above 0 is in.
-            Universe::IZone const* const Zone = *reinterpret_cast<Universe::IZone**>(R + 0xc4);
+            Universe::IZoneImmersion const* const Zone = Clouds->Owner;
             if (Zone == nullptr ||
-                !(Zone->GetImmersion(*reinterpret_cast<Vector const*>(Puff)) > 0.0))
+                !(Zone->GetImmersion(*reinterpret_cast<Vector const*>(Puff->Position)) > 0.0))
             {
-                Puff[0x50] = 0;
-                Puff[0x51] = 1;
+                Puff->bActive = 0;
+                Puff->bHidden = 1;
                 continue;
             }
 
             // An exclusion hit deeper than 0.9f (0x005e0e00) hides it again.
-            Puff[0x50] = 1;
-            Puff[0x51] = 0;
+            Puff->bActive = 1;
+            Puff->bHidden = 0;
             if (ExclMgr != nullptr)
             {
                 Exclusion::NebulaExclusionZone* HitZone = nullptr;
                 float HitDist = -1.0f;
-                if (ExclMgr->is_in_exclusion_zone(*reinterpret_cast<Vector*>(Puff), &HitZone,
+                if (ExclMgr->is_in_exclusion_zone(*reinterpret_cast<Vector*>(Puff->Position), &HitZone,
                                                   &HitDist, true) &&
                     HitDist > 0.9f)
                 {
-                    Puff[0x51] = 1;
+                    Puff->bHidden = 1;
                 }
             }
         }
@@ -858,27 +839,25 @@ namespace
     // TexturePanels +0x04). No test of `this`.
     void LocalNebulaCloudsParseIni(FNebulaClouds* Clouds, INI_Reader& Reader, FShapeDB* Shapes)
     {
-        unsigned char* const R = Clouds->Raw;
-
-        if (R[0xec] != 0)
+        if (Clouds->bLoaded != 0)
         {
             LocalNebulaCloudsFreePuffTable(Clouds);
-            *reinterpret_cast<int*>(R + 4) = 0;
-            R[0xec] = 0;
+            Clouds->PuffCountIni = 0;
+            Clouds->bLoaded = 0;
         }
 
         // Defaults; +0x11c, +0x128, +0x90..+0x98 and +0x18..+0x44 are left as they are.
-        *reinterpret_cast<int*>(R + 0x114) = 0;
-        *reinterpret_cast<int*>(R + 0x110) = 0;
-        *reinterpret_cast<int*>(R + 0x124) = 0;
-        *reinterpret_cast<int*>(R + 0x120) = 0;
-        *reinterpret_cast<int*>(R + 0x118) = 0;
-        *reinterpret_cast<int*>(R + 0x74) = 0;
-        *reinterpret_cast<float*>(R + 0x6c) = 1.0f;
-        *reinterpret_cast<float*>(R + 0x70) = 1.0f;
+        Clouds->ZWriteClouds = 0;
+        Clouds->NoCloudBlend = 0;
+        Clouds->DisableLightningFlash = 0;
+        Clouds->DisableLightningBolts = 0;
+        Clouds->DisableClouds = 0;
+        Clouds->Up[2] = 0.0f;
+        Clouds->Up[0] = 1.0f;
+        Clouds->Up[1] = 1.0f;
         {
             // Normalised on the FPU, no zero test.
-            float* const N = reinterpret_cast<float*>(R + 0x6c);
+            float* const N = Clouds->Up;
             double const Inv = 1.0f / sqrt((static_cast<double>(N[0]) * N[0] +
                                             static_cast<double>(N[1]) * N[1]) +
                                            static_cast<double>(N[2]) * N[2]);
@@ -886,23 +865,23 @@ namespace
             N[1] = static_cast<float>(Inv * N[1]);
             N[2] = static_cast<float>(Inv * N[2]);
         }
-        *reinterpret_cast<float*>(R + 0xa4) = 1.0f;
-        *reinterpret_cast<float*>(R + 0xdc) = 1.0f;
-        *reinterpret_cast<float*>(R + 0xa8) = 50.0f;
-        *reinterpret_cast<float*>(R + 0xb4) = 0.75f;
-        *reinterpret_cast<int*>(R + 0xa0) = 0;
-        *reinterpret_cast<int*>(R + 0xb0) = 0;
-        *reinterpret_cast<float*>(R + 0xc0) = 1500.0f;
-        *reinterpret_cast<int*>(R + 0xc8) = 0;
-        *reinterpret_cast<int*>(R + 0x68) = 0;
+        Clouds->LightningSize = 1.0f;
+        Clouds->LightningIntensity = 1.0f;
+        Clouds->PuffRadius = 50.0f;
+        Clouds->PuffMaxAlpha = 0.75f;
+        Clouds->LightningDuration = 0.0f;
+        Clouds->PuffDrift = 0.0f;
+        Clouds->MaxDistance = 1500.0f;
+        Clouds->LLightRange = 0.0f;
+        Clouds->PuffShapeCount = 0;
         for (int I = 0; I < 8; ++I)
-            reinterpret_cast<float*>(R + 0x48)[I] = 1.0f;
-        *reinterpret_cast<float*>(R + 0xe4) = 50.0f;
-        *reinterpret_cast<float*>(R + 0xe8) = 100.0f;
-        *reinterpret_cast<float*>(R + 0x104) = BitsToFloat(0x3dcccccd);
-        *reinterpret_cast<float*>(R + 0x108) = BitsToFloat(0x3e99999a);
-        *reinterpret_cast<float*>(R + 0x10c) = BitsToFloat(0x3e99999a);
-        *reinterpret_cast<int*>(R + 0xf0) = 0;
+            Clouds->PuffWeights[I] = 1.0f;
+        Clouds->NearFadeStart = 50.0f;
+        Clouds->NearFadeEnd = 100.0f;
+        Clouds->FullVisibility = BitsToFloat(0x3dcccccd);
+        Clouds->BudgetVisibility = BitsToFloat(0x3e99999a);
+        Clouds->AcceptVisibility = BitsToFloat(0x3e99999a);
+        Clouds->Unknown_0xf0 = 0;
 
         // How many puff_colora / puff_colorb keys were taken (at most two).
         int ColorCount = 0;
@@ -910,11 +889,11 @@ namespace
         {
             if (Reader.is_value("puff_count"))
             {
-                *reinterpret_cast<int*>(R + 4) = static_cast<int>(Reader.get_value_float(0));
+                Clouds->PuffCountIni = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("puff_radius"))
             {
-                *reinterpret_cast<float*>(R + 0xa8) = Reader.get_value_float(0);
+                Clouds->PuffRadius = Reader.get_value_float(0);
             }
             else if (Reader.is_value("puff_colora") || Reader.is_value("puff_colorb"))
             {
@@ -925,13 +904,13 @@ namespace
                 {
                     float Color[3];
                     ReadColor255(Reader, Color);
-                    float* const Dest = reinterpret_cast<float*>(R + 0x78 + ColorCount * 0xc);
+                    float* const Dest = ColorCount == 0 ? Clouds->PuffColorA : Clouds->PuffColorB;
                     Dest[0] = Color[0];
                     Dest[1] = Color[1];
                     Dest[2] = Color[2];
                     if (ColorCount == 0)
                     {
-                        float* const Second = reinterpret_cast<float*>(R + 0x84);
+                        float* const Second = Clouds->PuffColorB;
                         Second[0] = Dest[0];
                         Second[1] = Dest[1];
                         Second[2] = Dest[2];
@@ -943,7 +922,7 @@ namespace
             {
                 // At most eight (+0x68). A miss is the ShapeDB warning and then this file's own
                 // error; the null shape is stored anyway.
-                if (*reinterpret_cast<int*>(R + 0x68) < 8)
+                if (Clouds->PuffShapeCount < 8)
                 {
                     char const* const Name = Reader.get_value_string();
                     FTexShape* const Shape = Shapes->Find(Name);
@@ -956,15 +935,14 @@ namespace
                               "E:\\FL\\Scratch\\Source\\Client\\Space\\SpaceTerrainRenderComp.cpp",
                               0x523, Reader.get_value_string(), File);
                     }
-                    reinterpret_cast<FTexShape**>(R + 0x28)[*reinterpret_cast<int*>(R + 0x68)] =
-                        Shape;
-                    ++*reinterpret_cast<int*>(R + 0x68);
+                    Clouds->PuffShapes[Clouds->PuffShapeCount] = Shape;
+                    ++Clouds->PuffShapeCount;
                 }
             }
             else if (Reader.is_value("puff_weights"))
             {
-                for (int I = 0; I < *reinterpret_cast<int*>(R + 0x68); ++I)
-                    reinterpret_cast<float*>(R + 0x48)[I] = Reader.get_value_float(I);
+                for (int I = 0; I < Clouds->PuffShapeCount; ++I)
+                    Clouds->PuffWeights[I] = Reader.get_value_float(I);
             }
             else if (Reader.is_value("puff_opacity"))
             {
@@ -972,11 +950,11 @@ namespace
             }
             else if (Reader.is_value("puff_max_alpha"))
             {
-                *reinterpret_cast<float*>(R + 0xb4) = Reader.get_value_float(0);
+                Clouds->PuffMaxAlpha = Reader.get_value_float(0);
             }
             else if (Reader.is_value("puff_drift"))
             {
-                *reinterpret_cast<float*>(R + 0xb0) = Reader.get_value_float(0);
+                Clouds->PuffDrift = Reader.get_value_float(0);
             }
             else if (Reader.is_value("lightning_shape"))
             {
@@ -995,123 +973,121 @@ namespace
                         memcpy(Buf, Src, Len);
                         Buf[Len] = '\0';
                     }
-                    reinterpret_cast<FTexShape**>(R + 0x18)[I] = Shapes->Find(Buf);
+                    Clouds->LightningShapes[I] = Shapes->Find(Buf);
                 }
             }
             else if (Reader.is_value("lightning_color"))
             {
-                ReadColor255(Reader, reinterpret_cast<float*>(R + 0x90));
+                ReadColor255(Reader, Clouds->LightningColor);
             }
             else if (Reader.is_value("lightning_gap"))
             {
-                *reinterpret_cast<float*>(R + 0x9c) = Reader.get_value_float(0);
+                Clouds->LightningGap = Reader.get_value_float(0);
             }
             else if (Reader.is_value("lightning_duration"))
             {
-                *reinterpret_cast<float*>(R + 0xa0) = Reader.get_value_float(0);
+                Clouds->LightningDuration = Reader.get_value_float(0);
             }
             else if (Reader.is_value("lightning_size"))
             {
-                *reinterpret_cast<float*>(R + 0xa4) = Reader.get_value_float(0);
+                Clouds->LightningSize = Reader.get_value_float(0);
             }
             else if (Reader.is_value("llight_range"))
             {
-                *reinterpret_cast<float*>(R + 0xc8) = Reader.get_value_float(0);
+                Clouds->LLightRange = Reader.get_value_float(0);
             }
             else if (Reader.is_value("llight_color"))
             {
-                ReadColor255(Reader, reinterpret_cast<float*>(R + 0xcc));
+                ReadColor255(Reader, Clouds->LLightColor);
             }
             else if (Reader.is_value("lightning_intensity"))
             {
-                *reinterpret_cast<float*>(R + 0xdc) = Reader.get_value_float(0);
+                Clouds->LightningIntensity = Reader.get_value_float(0);
             }
             else if (Reader.is_value("max_distance"))
             {
-                *reinterpret_cast<float*>(R + 0xc0) = Reader.get_value_float(0);
+                Clouds->MaxDistance = Reader.get_value_float(0);
             }
             else if (Reader.is_value("near_fade_distance"))
             {
                 // A second value strictly below the first warns and swaps the two.
-                *reinterpret_cast<float*>(R + 0xe4) = Reader.get_value_float(0);
-                *reinterpret_cast<float*>(R + 0xe8) = Reader.get_value_float(1);
-                if (*reinterpret_cast<float*>(R + 0xe8) < *reinterpret_cast<float*>(R + 0xe4))
+                Clouds->NearFadeStart = Reader.get_value_float(0);
+                Clouds->NearFadeEnd = Reader.get_value_float(1);
+                if (Clouds->NearFadeEnd < Clouds->NearFadeStart)
                 {
                     FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
                           "E:\\FL\\Scratch\\Source\\Client\\Space\\SpaceTerrainRenderComp.cpp",
                           0x555, "near_fade_distances are flipped");
-                    float const Far = *reinterpret_cast<float*>(R + 0xe8);
-                    *reinterpret_cast<float*>(R + 0xe8) = *reinterpret_cast<float*>(R + 0xe4);
-                    *reinterpret_cast<float*>(R + 0xe4) = Far;
+                    float const Far = Clouds->NearFadeEnd;
+                    Clouds->NearFadeEnd = Clouds->NearFadeStart;
+                    Clouds->NearFadeStart = Far;
                 }
             }
             else if (Reader.is_value("no_cloud_blend"))
             {
-                *reinterpret_cast<int*>(R + 0x110) = static_cast<int>(Reader.get_value_float(0));
+                Clouds->NoCloudBlend = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("zwrite_clouds"))
             {
-                *reinterpret_cast<int*>(R + 0x114) = static_cast<int>(Reader.get_value_float(0));
+                Clouds->ZWriteClouds = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("disable_clouds"))
             {
-                *reinterpret_cast<int*>(R + 0x118) = static_cast<int>(Reader.get_value_float(0));
+                Clouds->DisableClouds = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("disable_wisps"))
             {
-                *reinterpret_cast<int*>(R + 0x11c) = static_cast<int>(Reader.get_value_float(0));
+                Clouds->DisableWisps = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("disable_lightning_flash"))
             {
-                *reinterpret_cast<int*>(R + 0x124) = static_cast<int>(Reader.get_value_float(0));
+                Clouds->DisableLightningFlash = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("disable_lightning_bolts"))
             {
-                *reinterpret_cast<int*>(R + 0x120) = static_cast<int>(Reader.get_value_float(0));
+                Clouds->DisableLightningBolts = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("disable_batcher"))
             {
-                *reinterpret_cast<int*>(R + 0x128) = static_cast<int>(Reader.get_value_float(0));
+                Clouds->DisableBatcher = static_cast<int>(Reader.get_value_float(0));
             }
         }
 
         // Weights normalised; the sum stays on the FPU, no zero test.
-        R[0xec] = 1;
+        Clouds->bLoaded = 1;
         {
-            float* const Weights = reinterpret_cast<float*>(R + 0x48);
-            int const WeightCount = *reinterpret_cast<int*>(R + 0x68);
+            float* const Weights = Clouds->PuffWeights;
+            int const WeightCount = Clouds->PuffShapeCount;
             double Sum = 0.0f;
             for (int I = 0; I < WeightCount; ++I)
                 Sum += Weights[I];
             if (WeightCount > 0)
             {
                 double const InvSum = 1.0f / Sum;
-                for (int I = 0; I < *reinterpret_cast<int*>(R + 0x68); ++I)
+                for (int I = 0; I < Clouds->PuffShapeCount; ++I)
                     Weights[I] = static_cast<float>(InvSum * Weights[I]);
             }
         }
 
-        *reinterpret_cast<int*>(R + 0xc) = *reinterpret_cast<int*>(R + 4);
-        *reinterpret_cast<int*>(R + 0x10) = *reinterpret_cast<int*>(R + 4);
-        *reinterpret_cast<float*>(R + 0x100) = static_cast<float>(
-            static_cast<double>(*reinterpret_cast<float*>(R + 0xc0)) * 0.5f +
-            *reinterpret_cast<float*>(R + 0xa8));
+        Clouds->PuffCount = Clouds->PuffCountIni;
+        Clouds->PuffBudget = Clouds->PuffCountIni;
+        Clouds->CloudRadius =
+            static_cast<float>(static_cast<double>(Clouds->MaxDistance) * 0.5f + Clouds->PuffRadius);
         LocalNebulaCloudsRebuildBits(Clouds);
 
         // +0xbc, the near-fade reach; only a +0xe4 strictly above 0 computes it.
-        float const NearFade = *reinterpret_cast<float*>(R + 0xe4);
+        float const NearFade = Clouds->NearFadeStart;
         if (!(NearFade > 0.0f))
         {
-            *reinterpret_cast<int*>(R + 0xbc) = 0;
+            Clouds->NearFadeReach = 0.0f;
             return;
         }
         // Tangent constant: double 0x005e0be0. A is rounded to float, BReach stays on the FPU.
         double const Tan = tan(0.6108652551968893);
-        double const Reach = *reinterpret_cast<float*>(R + 0x100);
+        double const Reach = Clouds->CloudRadius;
         float const A = static_cast<float>(Reach * 0.8f / Tan - NearFade);
         double const BReach =
-            (Tan * NearFade + static_cast<double>(*reinterpret_cast<float*>(R + 0xa8)) * 1.2f) *
-            1.25f;
+            (Tan * NearFade + static_cast<double>(Clouds->PuffRadius) * 1.2f) * 1.25f;
         double X;
         if (BReach > Reach)
             X = A;
@@ -1121,9 +1097,9 @@ namespace
             X = A;
         // Only an ordered "less" becomes 0.
         double const Result = (X + NearFade) - Reach;
-        *reinterpret_cast<float*>(R + 0xbc) = static_cast<float>(Result);
+        Clouds->NearFadeReach = static_cast<float>(Result);
         if (Result < 0.0)
-            *reinterpret_cast<int*>(R + 0xbc) = 0;
+            Clouds->NearFadeReach = 0.0f;
     }
 
     // FUN_00504e60's clouds-list insert (node FUN_0042a7e0, value FUN_005999b0): push_back
@@ -1144,52 +1120,51 @@ namespace
     // FUN_00504e60's [Exterior] section.
     void ParseExteriorSection(FNebulaEffect* Nebula, INI_Reader& Reader)
     {
-        unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
         while (Reader.read_value())
         {
             if (Reader.is_value("bit_radius"))
             {
-                *reinterpret_cast<float*>(B + 0xa4) = Reader.get_value_float(0);
+                Nebula->BitRadius = Reader.get_value_float(0);
             }
             else if (Reader.is_value("color"))
             {
-                ReadColor255(Reader, reinterpret_cast<float*>(B + 0xa8));
+                ReadColor255(Reader, Nebula->ExteriorColor);
             }
             else if (Reader.is_value("shape"))
             {
                 // At most eight shapes (+0x60[+0xa0]); a miss warns and stores null, the count
                 // goes up either way.
-                if (*reinterpret_cast<int*>(B + 0xa0) < 8)
+                if (Nebula->ExteriorShapeCount < 8)
                 {
                     char const* const Name = Reader.get_value_string();
                     FTexShape* const Shape = NebulaShapes(Nebula)->Find(Name);
-                    reinterpret_cast<FTexShape**>(B + 0x60)[*reinterpret_cast<int*>(B + 0xa0)] =
+                    Nebula->ExteriorShapes[Nebula->ExteriorShapeCount] =
                         Shape;
-                    ++*reinterpret_cast<int*>(B + 0xa0);
+                    ++Nebula->ExteriorShapeCount;
                 }
             }
             else if (Reader.is_value("shape_weights"))
             {
                 // One weight per shape read so far.
-                for (int I = 0; I < *reinterpret_cast<int*>(B + 0xa0); ++I)
-                    reinterpret_cast<float*>(B + 0x80)[I] = Reader.get_value_float(I);
+                for (int I = 0; I < Nebula->ExteriorShapeCount; ++I)
+                    Nebula->ExteriorShapeWeights[I] = Reader.get_value_float(I);
             }
             else if (Reader.is_value("fill_shape"))
             {
                 char const* const Name = Reader.get_value_string();
-                *reinterpret_cast<FTexShape**>(B + 0x5c) = NebulaShapes(Nebula)->Find(Name);
+                Nebula->FillShape = NebulaShapes(Nebula)->Find(Name);
             }
             else if (Reader.is_value("plane_slices"))
             {
-                *reinterpret_cast<int*>(B + 0xbc) = static_cast<int>(Reader.get_value_float(0));
+                Nebula->PlaneSlices = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("min_bits"))
             {
-                *reinterpret_cast<int*>(B + 0xc0) = static_cast<int>(Reader.get_value_float(0));
+                Nebula->MinBits = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("max_bits"))
             {
-                *reinterpret_cast<int*>(B + 0xc4) = static_cast<int>(Reader.get_value_float(0));
+                Nebula->MaxBits = static_cast<int>(Reader.get_value_float(0));
             }
             else if (Reader.is_value("bit_radius_random_variation"))
             {
@@ -1200,23 +1175,23 @@ namespace
                     V = 0.9999f;
                 if (static_cast<double>(V) < 0.0)
                     V = 0.0f;
-                *reinterpret_cast<float*>(B + 0xc8) = 1.0f - V;
-                *reinterpret_cast<float*>(B + 0xcc) = V + 1.0f;
+                Nebula->BitRadiusMin = 1.0f - V;
+                Nebula->BitRadiusMax = V + 1.0f;
             }
             else if (Reader.is_value("equator_bias"))
             {
-                *reinterpret_cast<float*>(B + 0xd0) =
+                Nebula->EquatorBias =
                     static_cast<float>(1.0 - static_cast<double>(Reader.get_value_float(0)));
             }
             else if (Reader.is_value("move_bit_percent"))
             {
-                *reinterpret_cast<float*>(B + 0xd4) = Reader.get_value_float(0);
+                Nebula->MoveBitPercent = Reader.get_value_float(0);
             }
             else if (Reader.is_value("opacity"))
             {
                 float const V = Reader.get_value_float(0);
-                *reinterpret_cast<float*>(B + 0xb4) = V;
-                *reinterpret_cast<float*>(B + 0xb8) = V;
+                Nebula->Opacity = V;
+                Nebula->BitAlpha = V;
             }
         }
     }
@@ -1224,7 +1199,6 @@ namespace
     // FUN_00504e60's [Fog] section.
     void ParseFogSection(FNebulaEffect* Nebula, INI_Reader& Reader)
     {
-        unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
         while (Reader.read_value())
         {
             if (Reader.is_value("distance"))
@@ -1238,7 +1212,7 @@ namespace
             else if (Reader.is_value("color"))
             {
                 // Only a value below 1.0 is kept; anything else (>=, NaN) becomes 1.0f.
-                float* const Color = reinterpret_cast<float*>(B + 0x2a0);
+                float* const Color = Nebula->FogColor;
                 ReadColor255(Reader, Color);
                 for (int I = 0; I < 3; ++I)
                     Color[I] = (Color[I] < 1.0f) ? Color[I] : 1.0f;
@@ -1249,26 +1223,25 @@ namespace
     // FUN_00504e60's [BackgroundLightning] section.
     void ParseBackgroundLightningSection(FNebulaEffect* Nebula, INI_Reader& Reader)
     {
-        unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
         while (Reader.read_value())
         {
             if (Reader.is_value("gap"))
             {
                 float const Gap = Reader.get_value_float(0);
-                *reinterpret_cast<float*>(B + 0x250) = Gap;
-                *reinterpret_cast<float*>(B + 0x258) = -Gap;
+                Nebula->BackLightningGap = Gap;
+                Nebula->BackLightningTimer = -Gap;
             }
             else if (Reader.is_value("duration"))
             {
-                *reinterpret_cast<float*>(B + 0x254) = Reader.get_value_float(0);
+                Nebula->BackLightningDuration = Reader.get_value_float(0);
             }
             else if (Reader.is_value("color"))
             {
-                ReadColor255(Reader, reinterpret_cast<float*>(B + 0x25c));
+                ReadColor255(Reader, Nebula->BackLightningColor);
             }
             else if (Reader.is_value("intensity"))
             {
-                *reinterpret_cast<float*>(B + 0x268) = Reader.get_value_float(0);
+                Nebula->BackLightningIntensity = Reader.get_value_float(0);
             }
         }
     }
@@ -1276,42 +1249,40 @@ namespace
     // FUN_00504e60's [DynamicLightning] section.
     void ParseDynamicLightningSection(FNebulaEffect* Nebula, INI_Reader& Reader)
     {
-        unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
         while (Reader.read_value())
         {
             if (Reader.is_value("gap"))
-                *reinterpret_cast<float*>(B + 0x274) = Reader.get_value_float(0);
+                Nebula->DynLightningGap = Reader.get_value_float(0);
             else if (Reader.is_value("duration"))
-                *reinterpret_cast<float*>(B + 0x278) = Reader.get_value_float(0);
+                Nebula->DynLightningDuration = Reader.get_value_float(0);
             else if (Reader.is_value("color"))
-                ReadColor255(Reader, reinterpret_cast<float*>(B + 0x280));
+                ReadColor255(Reader, Nebula->DynLightningColor);
             else if (Reader.is_value("ambient_intensity"))
-                *reinterpret_cast<float*>(B + 0x28c) = Reader.get_value_float(0);
+                Nebula->DynAmbientIntensity = Reader.get_value_float(0);
             else if (Reader.is_value("intensity_increase"))
-                *reinterpret_cast<float*>(B + 0x290) = Reader.get_value_float(0);
+                Nebula->DynIntensityIncrease = Reader.get_value_float(0);
         }
     }
 
     // FUN_00504e60's [NebulaLight] section.
     void ParseNebulaLightSection(FNebulaEffect* Nebula, INI_Reader& Reader)
     {
-        unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
         while (Reader.read_value())
         {
             if (Reader.is_value("ambient"))
             {
-                B[0x2cc] = 1;
-                B[0x2cd] = static_cast<unsigned char>(static_cast<int>(Reader.get_value_float(0)));
-                B[0x2ce] = static_cast<unsigned char>(static_cast<int>(Reader.get_value_float(1)));
-                B[0x2cf] = static_cast<unsigned char>(static_cast<int>(Reader.get_value_float(2)));
+                Nebula->bHasAmbient = 1;
+                Nebula->Ambient[0] = static_cast<unsigned char>(static_cast<int>(Reader.get_value_float(0)));
+                Nebula->Ambient[1] = static_cast<unsigned char>(static_cast<int>(Reader.get_value_float(1)));
+                Nebula->Ambient[2] = static_cast<unsigned char>(static_cast<int>(Reader.get_value_float(2)));
             }
             else if (Reader.is_value("sun_burnthrough_intensity"))
             {
-                *reinterpret_cast<float*>(B + 0x2c4) = Reader.get_value_float(0);
+                Nebula->SunBurnthroughIntensity = Reader.get_value_float(0);
             }
             else if (Reader.is_value("sun_burnthrough_scaler"))
             {
-                *reinterpret_cast<float*>(B + 0x2c8) = Reader.get_value_float(0);
+                Nebula->SunBurnthroughScaler = Reader.get_value_float(0);
             }
         }
     }
@@ -1435,58 +1406,55 @@ namespace
     }
 
     // FUN_00552570 — [Lightning] INI into the member at Nebula+0x100; no test of `this`.
-    void LightningLoadIni(float* Lightning, INI_Reader& Reader)
+    void LightningLoadIni(FNebulaLightning* Lightning, INI_Reader& Reader)
     {
-        unsigned char* const Flag = reinterpret_cast<unsigned char*>(Lightning) + 0x14c;
-        if (*Flag != 0)
-            *Flag = 0;
-        Lightning[0x52] = 0.0f;
+        if (Lightning->bActive != 0)
+            Lightning->bActive = 0;
+        Lightning->Zone = nullptr;
         while (Reader.read_value())
         {
             if (Reader.is_value("gap"))
-                Lightning[10] = Reader.get_value_float(0);
+                Lightning->Gap = Reader.get_value_float(0);
             else if (Reader.is_value("color"))
             {
-                Lightning[7] = Reader.get_value_float(0) * (1.0f / 255.0f);
-                Lightning[8] = Reader.get_value_float(1) * (1.0f / 255.0f);
-                Lightning[9] = Reader.get_value_float(2) * (1.0f / 255.0f);
+                Lightning->Color[0] = Reader.get_value_float(0) * (1.0f / 255.0f);
+                Lightning->Color[1] = Reader.get_value_float(1) * (1.0f / 255.0f);
+                Lightning->Color[2] = Reader.get_value_float(2) * (1.0f / 255.0f);
             }
             else if (Reader.is_value("size"))
-                Lightning[11] = Reader.get_value_float(0);
+                Lightning->Size = Reader.get_value_float(0);
             else if (Reader.is_value("duration"))
-                Lightning[12] = Reader.get_value_float(0);
+                Lightning->Duration = Reader.get_value_float(0);
         }
-        Lightning[6] = 0.0f;
-        Lightning[14] = 0.0f;
-        Lightning[15] = 0.0f;
-        Lightning[16] = 0.0f;
-        Lightning[17] = 0.0f;
+        Lightning->Unknown_0x18 = 0.0f;
+        Lightning->Texture = nullptr;
+        Lightning->Unknown_0x3c[0] = 0.0f;
+        Lightning->Unknown_0x3c[1] = 0.0f;
+        Lightning->Unknown_0x3c[2] = 0.0f;
         // The first flash is a negative countdown (DAT_005e0df8 = double(-0.8f),
         // DAT_005db0b8 = double(0.7f)). This is the only write of +0x00 in Freelancer.exe, so
         // the draw's "+0x00 >= 0" test keeps a lightning with a positive gap dark for good.
         int const R = rand();
-        *Flag = 1;
-        Lightning[0] = static_cast<float>(
+        Lightning->bActive = 1;
+        Lightning->Timer = static_cast<float>(
             (static_cast<double>(-0.8f) -
              static_cast<double>(R) * 3.0517578125e-05f * static_cast<double>(0.7f)) *
-            Lightning[10]);
+            Lightning->Gap);
     }
 
     // FUN_005526d0 — clear the lightning's active flag (+0x14c).
-    void LightningDisable(float* Lightning)
+    void LightningDisable(FNebulaLightning* Lightning)
     {
-        unsigned char* const Flag = reinterpret_cast<unsigned char*>(Lightning) + 0x14c;
-        if (*Flag != 0)
-            *Flag = 0;
+        if (Lightning->bActive != 0)
+            Lightning->bActive = 0;
     }
 
-    // FUN_005526f0 (stdcall) — one lightning bolt segment as a camera-facing quad.
-    // Seg layout (0x1c): float3 A, float3 B, float* UVs (+8/+c/+10/+14). The inlined vector
-    // helpers (FUN_00423b60, FUN_00423b30, FUN_00411d60) each store float.
-    void LightningDrawSegment(float* Seg, float const* Eye)
+    // FUN_005526f0 (stdcall) — one lightning bolt segment as a camera-facing quad. The
+    // inlined vector helpers (FUN_00423b60, FUN_00423b30, FUN_00411d60) each store float.
+    void LightningDrawSegment(FNebulaLightningSegment const* Seg, float const* Eye)
     {
-        float const* const A = Seg;
-        float const* const B = Seg + 3;
+        float const* const A = Seg->A;
+        float const* const B = Seg->B;
 
         float EyeMinusA[3];
         EyeMinusA[0] = Eye[0] - A[0];
@@ -1544,7 +1512,7 @@ namespace
         Cross[2] *= K;
 
         // The UV block (+0x18) is read without a null test.
-        float const* const UvBase = *reinterpret_cast<float* const*>(Seg + 6);
+        float const* const UvBase = Seg->Uvs;
 
         Win3DTexCoord2f(UvBase[2], UvBase[3]); // +8, +0xc
         Win3DVertex3f(Mid[0] + Edge[0], Mid[1] + Edge[1], Mid[2] + Edge[2]);
@@ -1557,13 +1525,11 @@ namespace
     }
 
     // FUN_005529b0 — the lightning flash draw.
-    void LightningDraw(float* Lightning, void* Camera)
+    void LightningDraw(FNebulaLightning* Lightning, void* Camera)
     {
         // Nothing unless active (+0x14c) and the countdown +0x00 is not below zero (only an
         // ordered "less" returns).
-        unsigned char const Flag =
-            *reinterpret_cast<unsigned char*>(reinterpret_cast<unsigned char*>(Lightning) + 0x14c);
-        if (Flag == 0 || Lightning[0] < 0.0f)
+        if (Lightning->bActive == 0 || Lightning->Timer < 0.0f)
             return;
 
         Win3DDisable(kWin3DCullFace);
@@ -1574,32 +1540,28 @@ namespace
         // The red product stays on the FPU between the two multiplies; green and blue are
         // rounded to float after the first.
         double const Jitter = static_cast<double>(rand()) * 3.0517578125e-05f;
-        float const Intensity = Lightning[5];
+        float const Intensity = Lightning->Intensity;
         float const Red =
-            static_cast<float>(static_cast<double>(Lightning[7]) * Jitter * Intensity);
+            static_cast<float>(static_cast<double>(Lightning->Color[0]) * Jitter * Intensity);
         float const Green = static_cast<float>(
-            static_cast<double>(static_cast<float>(Lightning[8] * Jitter)) * Intensity);
+            static_cast<double>(static_cast<float>(Lightning->Color[1] * Jitter)) * Intensity);
         float const Blue = static_cast<float>(
-            static_cast<double>(static_cast<float>(Lightning[9] * Jitter)) * Intensity);
+            static_cast<double>(static_cast<float>(Lightning->Color[2] * Jitter)) * Intensity);
 
         ICamera* const Cam = static_cast<ICamera*>(Camera);
         Win3DApplyCamera(Cam);
 
-        FTextureRef const* const TexRef = *reinterpret_cast<FTextureRef* const*>(Lightning + 14);
-        Win3DBindTexture(TexShapeGetGpuHandle(TexRef, 0));
+        Win3DBindTexture(TexShapeGetGpuHandle(Lightning->Texture, 0));
 
         Win3DColor3f(Red, Green, Blue);
         Win3DBegin(kWin3DQuads);
 
-        // Eight 0x1c-byte segments from +0x48, each drawn while its counter (+0x128 + 4*i) is
-        // below 3; the eye is re-read per segment.
-        int* const Counters = reinterpret_cast<int*>(Lightning + 0x4a);
-        float* Seg = Lightning + 0x12;
+        // Each of the eight segments draws while its age is below 3; the eye is re-read per
+        // segment.
         for (int I = 0; I < 8; ++I)
         {
-            if (Counters[I] < 3)
-                LightningDrawSegment(Seg, Cam->GetPosition());
-            Seg += 7;
+            if (Lightning->SegmentAge[I] < 3)
+                LightningDrawSegment(&Lightning->Segments[I], Cam->GetPosition());
         }
 
         Win3DEnd();
@@ -1661,11 +1623,10 @@ void NebulaCloudsParseIni(FNebulaClouds* Clouds, INI_Reader& Reader, FShapeDB* S
 void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
 {
     FNebulaEffect* const This = this;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
 
     if (This->FlagLoaded != 0)
         This->Shutdown();
-    B[0x4c] = 1;
+    This->bReachPending = 1;
 
     // A missing zone is an FDUMP error and nothing else -- the zone's GetShape is called
     // regardless.
@@ -1676,19 +1637,19 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
               "E:\\FL\\Scratch\\Source\\Client\\Space\\Nebula.cpp", 0x1ee, ZoneName);
     (void)This->Zone->GetShape();
 
-    *reinterpret_cast<float*>(B + 0xb8) = 0.75f;
-    *reinterpret_cast<float*>(B + 0xb4) = 0.75f;
-    *reinterpret_cast<int*>(B + 0xa0) = 0;
+    This->BitAlpha = 0.75f;
+    This->Opacity = 0.75f;
+    This->ExteriorShapeCount = 0;
     for (int I = 0; I < 8; ++I)
-        reinterpret_cast<float*>(B + 0x80)[I] = 1.0f;
+        This->ExteriorShapeWeights[I] = 1.0f;
     This->FogDistance = 10000.0f;
-    *reinterpret_cast<int*>(B + 0x29c) = 0;
-    *reinterpret_cast<int*>(B + 0x24) = 0;
-    *reinterpret_cast<int*>(B + 0x28) = 0;
-    B[0x2c] = 0;
-    *reinterpret_cast<int*>(B + 0x30) = 0;
-    *reinterpret_cast<float*>(B + 0x258) = -1.0f;
-    *reinterpret_cast<int*>(B + 0xbc) = 1;
+    This->FogNear = 0.0f;
+    This->ActiveExclusionZone = nullptr;
+    This->ExclusionImmersion = 0.0f;
+    This->bHasExclusionShell = 0;
+    This->ActiveExclusionShell = nullptr;
+    This->BackLightningTimer = -1.0f;
+    This->PlaneSlices = 1;
 
     INI_Reader Reader;
     char FullPath[MAX_PATH];
@@ -1720,7 +1681,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
                 }
                 LocalNebulaCloudsSetDetail(Clouds, G_NebulaDetail);
                 LocalNebulaCloudsParseIni(Clouds, Reader, NebulaShapes(This));
-                *reinterpret_cast<Universe::IZone**>(Clouds->Raw + 0xc4) = This->Zone;
+                Clouds->Owner = This->Zone;
                 CloudsListPush(This, Clouds);
             }
             else if (Reader.is_header("ObjectFog"))
@@ -1743,8 +1704,8 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
             }
             else if (Reader.is_header("Lightning"))
             {
-                LightningLoadIni(reinterpret_cast<float*>(B + 0x100), Reader);
-                *reinterpret_cast<Universe::IZone**>(B + 0x248) = This->Zone;
+                LightningLoadIni(&This->Lightning, Reader);
+                This->Lightning.Zone = This->Zone;
             }
             else if (Reader.is_header("BackgroundLightning"))
             {
@@ -1769,11 +1730,10 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
 
     // Ambient GameLight.
     {
-        unsigned char* const LB = reinterpret_cast<unsigned char*>(This);
         // Only a strictly positive period builds the light. There is no else: +0x270 keeps
         // whatever it held (null from the ctor, or the pointer the last Shutdown released --
         // retail never clears it there).
-        float const Period = *reinterpret_cast<float*>(LB + 0x278);
+        float const Period = This->DynLightningDuration;
         if (Period > 0.0f)
         {
             // FUN_00537a90(0x12c); the result is used with no null test.
@@ -1781,7 +1741,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
             FGameLight* Light = nullptr;
             if (Mem != nullptr)
                 Light = GameLightConstruct(static_cast<FGameLight*>(Mem));
-            *reinterpret_cast<FGameLight**>(LB + 0x270) = Light;
+            This->DynamicLight = Light;
             // Type 3 = directional.
             EngineLightSetType((FEngineLight*)Light, 3, false);
             float Zero[3] = {0.0f, 0.0f, 0.0f};
@@ -1798,7 +1758,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
                 FDUMP(0x100002,
                       "%s(%d) : *** WARNING: Could not create nebula light of range %d",
                       "E:\\FL\\Scratch\\Source\\Client\\Space\\Nebula.cpp", 0x32a, 500000.0);
-                *reinterpret_cast<FGameLight**>(LB + 0x270) = nullptr;
+                This->DynamicLight = nullptr;
             }
             else if ((Light->Flags & 0x08) != 0)
             {
@@ -1817,20 +1777,19 @@ void FNebulaEffect::DrawFogOverlay(void* Camera)
     FNebulaEffect* const This = this;
     if (This->FlagLoaded == 0)
         return;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
     ICamera* const Cam = static_cast<ICamera*>(Camera);
 
     // Both are called and their results dropped.
     (void)This->Zone->GetPos();
     (void)Cam->GetOrientation();
 
-    float const* const FadePtr = reinterpret_cast<float*>(B + 0x294);
+    float const* const FadePtr = &This->InsideFade;
     bool bDrawOverlay = true;
     // Only an ordered "less" clears +0x2b8.
     if (*FadePtr < 1.0f)
-        B[0x2b8] = 0;
+        This->bFullOverlayDrawn = 0;
     // Otherwise a set +0x2b8 goes straight to the lightning.
-    if (!(*FadePtr < 1.0f) && B[0x2b8] != 0)
+    if (!(*FadePtr < 1.0f) && This->bFullOverlayDrawn != 0)
         bDrawOverlay = false;
     // <= 0 or unordered skips to the lightning.
     else if (!(*FadePtr > 0.0f))
@@ -1839,7 +1798,7 @@ void FNebulaEffect::DrawFogOverlay(void* Camera)
     if (bDrawOverlay)
     {
         if (*FadePtr >= 1.0f)
-            B[0x2b8] = 1;
+            This->bFullOverlayDrawn = 1;
     }
 
 #ifdef FREELANCER_RP9
@@ -1862,7 +1821,7 @@ void FNebulaEffect::DrawFogOverlay(void* Camera)
         Win3DDisable(kWin3DCullFace);
         Win3DSetBlendFunc(5, 6);
         Win3DBegin(kWin3DQuads);
-        float const* Rgb = reinterpret_cast<float*>(B + 0x2a0);
+        float const* Rgb = This->FogColor;
         Win3DColor4f(Rgb[0], Rgb[1], Rgb[2], Alpha);
         // The viewport rect is used with no null test.
         int const* const Vp = Cam->GetViewport();
@@ -1881,7 +1840,7 @@ void FNebulaEffect::DrawFogOverlay(void* Camera)
 
     // +0x294 is re-read; only a value strictly above 0 draws the lightning.
     if (*FadePtr > 0.0f)
-        LightningDraw(reinterpret_cast<float*>(B + 0x100), Camera);
+        LightningDraw(&This->Lightning, Camera);
 }
 
 // LAB_00508cf0 — fog shell (fill sheets) under the MaterialBatcher / depth gate. No test of
@@ -1891,9 +1850,8 @@ void FNebulaEffect::DrawFogShell(void* Camera)
     FNebulaEffect* const This = this;
     if (This->FlagLoaded == 0)
         return;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
     // Only an ordered "less" goes on.
-    float const Fade = *reinterpret_cast<float*>(B + 0x294);
+    float const Fade = This->InsideFade;
     if (!(Fade < 1.0f))
         return;
 
@@ -1916,7 +1874,7 @@ void FNebulaEffect::DrawFogShell(void* Camera)
     // takes without a fill shape; the states around it stay as retail.
     if (!NebulaVolume::ReplacesFillSheets(This))
 #endif
-        NebulaUpdateBoltCamera(This, Xform[9], Xform[10], Xform[11]);
+        NebulaDrawFillSheets(This, Xform[9], Xform[10], Xform[11]);
 
     SetMaterialBatchBinOrder(1u, 1);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 1);
@@ -1924,23 +1882,22 @@ void FNebulaEffect::DrawFogShell(void* Camera)
     Win3DEnable(kWin3DDepthTest);
 }
 
-// FUN_00508e00 — fog render states + NebulaDrawBolts under the MaterialBatcher / depth gate.
+// FUN_00508e00 — fog render states + NebulaDrawExteriorBits under the MaterialBatcher / depth gate.
 // No null tests on This, the Pipeline or the MaterialBatcher, and no guard on a zero +0x298
 // (retail divides straight through).
-void FNebulaEffect::DrawBoltsPass(void* Camera)
+void FNebulaEffect::DrawExteriorBitsPass(void* Camera)
 {
     FNebulaEffect* const This = this;
     if (This->FlagLoaded == 0)
         return;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
-    float const FarZ = *reinterpret_cast<float*>(B + 0x2ac);
-    float const Near = *reinterpret_cast<float*>(B + 0x29c);
-    float const FogDist = *reinterpret_cast<float*>(B + 0x298);
+    float const FarZ = This->FogStart;
+    float const Near = This->FogNear;
+    float const FogDist = This->FogDistance;
     double T = (static_cast<double>(FarZ) - Near) * 20.0 / FogDist;
     if (T < 0.0)
         T = 0.0;
     float const FogEnd = static_cast<float>((T + 1.0) * FogDist + FarZ);
-    FogApplyColorAndRange(reinterpret_cast<float*>(B + 0x2a0), FarZ, FogEnd);
+    FogApplyColorAndRange(This->FogColor, FarZ, FogEnd);
 
     SetMaterialBatchBinOrder(1u, -1);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 0);
@@ -1955,7 +1912,7 @@ void FNebulaEffect::DrawBoltsPass(void* Camera)
     // takes with the zone out of view; the states around it stay as retail.
     if (!NebulaVolume::ReplacesExteriorBits(This))
 #endif
-        NebulaDrawBolts(This, Camera);
+        NebulaDrawExteriorBits(This, Camera);
 
     SetMaterialBatchBinOrder(1u, 1);
     DALib::Pipeline->SetRenderState(D3DRS_LIGHTING, 1);
@@ -1971,8 +1928,7 @@ void FNebulaEffect::DrawExclusionShell(void* Camera)
     FNebulaEffect* const This = this;
     if (This->FlagLoaded == 0)
         return;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
-    if (B[0x2c] == 0)
+    if (This->bHasExclusionShell == 0)
         return;
 
     // Depth test and culling are left alone.
@@ -1986,20 +1942,19 @@ void FNebulaEffect::DrawExclusionShell(void* Camera)
     Win3DDisable(kWin3DFog);
 
     // Kept on the FPU.
-    double Alpha = (static_cast<double>(*reinterpret_cast<float*>(B + 0x28)) - 0.2f) * 1.25f;
+    double Alpha = (static_cast<double>(This->ExclusionImmersion) - 0.2f) * 1.25f;
     if (Alpha < 0.0)
         Alpha = 0.0f;
     else if (Alpha > 1.0)
         Alpha = 1.0f;
 
-    FNebulaZoneShell* const Shell = *reinterpret_cast<FNebulaZoneShell**>(B + 0x30);
+    FNebulaZoneShell* const Shell = This->ActiveExclusionShell;
     Shell->UserData[0] = Shell->Tint[0];
     Shell->UserData[1] = Shell->Tint[1];
     Shell->UserData[2] = Shell->Tint[2];
     Shell->UserData[4] = static_cast<float>(Alpha * Shell->MaxAlpha);
 
-    Exclusion::NebulaExclusionZone* const Excl =
-        *reinterpret_cast<Exclusion::NebulaExclusionZone**>(B + 0x24);
+    Exclusion::NebulaExclusionZone* const Excl = This->ActiveExclusionZone;
     Universe::IZone const& Zone = *Excl->ZonePtr;
     float const Scale = static_cast<float>(
         static_cast<double>(Zone.GetRadius()) * Shell->ShellScalar * 0.001f);
@@ -2079,22 +2034,19 @@ float FNebulaEffect::ZoneExteriorFactor(float const* CamPos3)
 
 // LAB_00504bf0 / LAB_00504c00 / LAB_00509470 / LAB_00509660 / LAB_00509670: plain float
 // getters, no test of `this`.
-float FNebulaEffect::GetFloat294()
+float FNebulaEffect::GetInsideFade()
 {
-    FNebulaEffect* const This = this;
-    return *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x294);
+    return InsideFade;
 }
 
-float FNebulaEffect::GetFloat2C4()
+float FNebulaEffect::GetSunBurnthroughIntensity()
 {
-    FNebulaEffect* const This = this;
-    return *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x2c4);
+    return SunBurnthroughIntensity;
 }
 
-float FNebulaEffect::GetFloat2C8()
+float FNebulaEffect::GetSunBurnthroughScaler()
 {
-    FNebulaEffect* const This = this;
-    return *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x2c8);
+    return SunBurnthroughScaler;
 }
 
 // LAB_00509480 — copy the fog RGB (+0x2a0); no tests. Returns Out, which the space scene's
@@ -2102,7 +2054,7 @@ float FNebulaEffect::GetFloat2C8()
 float* FNebulaEffect::CopyFogRgb(float* OutRgb3)
 {
     FNebulaEffect* const This = this;
-    float const* Src = reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x2a0);
+    float const* Src = This->FogColor;
     OutRgb3[0] = Src[0];
     OutRgb3[1] = Src[1];
     OutRgb3[2] = Src[2];
@@ -2114,12 +2066,11 @@ float* FNebulaEffect::CopyFogRgb(float* OutRgb3)
 float* FNebulaEffect::FillFogRgb(float* OutRgb3)
 {
     FNebulaEffect* const This = this;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
     // Copy when the period is <= 0; a NaN period goes on.
-    float const Period = *reinterpret_cast<float*>(B + 0x254);
+    float const Period = This->BackLightningDuration;
     if (Period <= 0.0f)
     {
-        float const* Src = reinterpret_cast<float*>(B + 0x2a0);
+        float const* Src = This->FogColor;
         OutRgb3[0] = Src[0];
         OutRgb3[1] = Src[1];
         OutRgb3[2] = Src[2];
@@ -2127,32 +2078,32 @@ float* FNebulaEffect::FillFogRgb(float* OutRgb3)
     }
 
     // The sum is stored as float; the unrounded value is compared below.
-    float const AccPrev = *reinterpret_cast<float*>(B + 0x258);
-    B[0x26c] = 0;
-    float const Dt = *reinterpret_cast<float*>(B + 0x1c);
+    float const AccPrev = This->BackLightningTimer;
+    This->bBackLightningFlash = 0;
+    float const Dt = This->FrameDelta;
     double const Acc = static_cast<double>(Dt) + AccPrev;
-    *reinterpret_cast<float*>(B + 0x258) = static_cast<float>(Acc);
+    This->BackLightningTimer = static_cast<float>(Acc);
 
     if (AccPrev > 0.0f)
     {
         // A sum strictly above the period re-arms the countdown.
-        B[0x26c] = 1;
+        This->bBackLightningFlash = 1;
         if (Acc > Period)
         {
             int const R = rand();
-            *reinterpret_cast<float*>(B + 0x258) = static_cast<float>(
+            This->BackLightningTimer = static_cast<float>(
                 (static_cast<double>(R) * 3.0517578125e-05f * static_cast<double>(0.7f) - 1.5) *
-                *reinterpret_cast<float*>(B + 0x250));
+                This->BackLightningGap);
         }
     }
     else if (Acc > 0.0)
     {
-        B[0x26c] = 1;
+        This->bBackLightningFlash = 1;
     }
 
-    if (B[0x26c] == 0)
+    if (This->bBackLightningFlash == 0)
     {
-        float const* Src = reinterpret_cast<float*>(B + 0x2a0);
+        float const* Src = This->FogColor;
         OutRgb3[0] = Src[0];
         OutRgb3[1] = Src[1];
         OutRgb3[2] = Src[2];
@@ -2162,17 +2113,16 @@ float* FNebulaEffect::FillFogRgb(float* OutRgb3)
     // Scale stays on the FPU.
     float const U0 = static_cast<float>(static_cast<double>(rand()) * 3.0517578125e-05f);
     int const Rand2 = rand();
-    double const Scale = static_cast<double>(Rand2) * *reinterpret_cast<float*>(B + 0x268) * U0 *
+    double const Scale = static_cast<double>(Rand2) * This->BackLightningIntensity * U0 *
                          3.0517578125e-05f;
     // The green and blue products are stored as float before the base is added; the red
     // product stays on the FPU. (Retail compares green's unrounded sum below, which clamps
     // to the same value.)
-    float const GreenProduct = static_cast<float>(Scale * *reinterpret_cast<float*>(B + 0x260));
-    float const BlueProduct = static_cast<float>(Scale * *reinterpret_cast<float*>(B + 0x264));
-    float R = static_cast<float>(Scale * *reinterpret_cast<float*>(B + 0x25c) +
-                                 *reinterpret_cast<float*>(B + 0x2a0));
-    float G = GreenProduct + *reinterpret_cast<float*>(B + 0x2a4);
-    float Bv = BlueProduct + *reinterpret_cast<float*>(B + 0x2a8);
+    float const GreenProduct = static_cast<float>(Scale * This->BackLightningColor[1]);
+    float const BlueProduct = static_cast<float>(Scale * This->BackLightningColor[2]);
+    float R = static_cast<float>(Scale * This->BackLightningColor[0] + This->FogColor[0]);
+    float G = GreenProduct + This->FogColor[1];
+    float Bv = BlueProduct + This->FogColor[2];
     // Keep only a value below 1.0; anything else (>=, NaN) becomes 1.0f.
     if (!(R < 1.0f))
         R = 1.0f;
@@ -2186,20 +2136,17 @@ float* FNebulaEffect::FillFogRgb(float* OutRgb3)
     return OutRgb3;
 }
 
-float FNebulaEffect::GetFloat2AC()
+float FNebulaEffect::GetFogStart()
 {
-    FNebulaEffect* const This = this;
-    return *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x2ac);
+    return FogStart;
 }
 
 // FUN_00509680 — fog factor; +0x24 is the active NebulaExclusionZone*.
 float FNebulaEffect::FogFactor(float const* CamPos3)
 {
     FNebulaEffect* const This = this;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
-    float const FarZ = *reinterpret_cast<float*>(B + 0x2b0);
-    Exclusion::NebulaExclusionZone* const Excl =
-        *reinterpret_cast<Exclusion::NebulaExclusionZone**>(B + 0x24);
+    float const FarZ = This->FogEnd;
+    Exclusion::NebulaExclusionZone* const Excl = This->ActiveExclusionZone;
     if (Excl != nullptr)
     {
         // Blended between FarZ and FogNear + FogDistance by the immersion.
@@ -2218,10 +2165,9 @@ float FNebulaEffect::FogFactor(float const* CamPos3)
     return static_cast<float>(FarZ / F);
 }
 
-float FNebulaEffect::GetFloat2B0()
+float FNebulaEffect::GetFogEnd()
 {
-    FNebulaEffect* const This = this;
-    return *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x2b0);
+    return FogEnd;
 }
 
 // LAB_00509710. The one stack argument is never read; the draw pass pushes DAT_006164d4
@@ -2230,21 +2176,16 @@ float FNebulaEffect::FogFarClamp(float Unused)
 {
     FNebulaEffect* const This = this;
     (void)Unused;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
     // 500.0f is .rdata 0x005d9668. The compare below uses the unrounded sum.
-    typedef float(__thiscall* FGetFloatFn)(FNebulaEffect* Self);
-    const double Sum =
-        static_cast<double>(This->GetFloat2B0()) +
-        500.0f;
+    const double Sum = static_cast<double>(This->GetFogEnd()) + 500.0f;
     float V = static_cast<float>(Sum);
     // An unordered sum is kept.
-    const float Floor = *reinterpret_cast<float*>(B + 0x2bc);
+    const float Floor = This->FogFarMin;
     if (Sum < Floor)
         V = Floor;
     // Only the exclusion pointer is tested; 500.0 is double .rdata 0x005db0c0. V <= R or
     // unordered returns R.
-    Exclusion::NebulaExclusionZone* const Excl =
-        *reinterpret_cast<Exclusion::NebulaExclusionZone**>(B + 0x24);
+    Exclusion::NebulaExclusionZone* const Excl = This->ActiveExclusionZone;
     if (Excl != nullptr)
     {
         const double Radius = static_cast<double>(Excl->ZonePtr->GetRadius());
@@ -2260,10 +2201,9 @@ float FNebulaEffect::FogFarClamp(float Unused)
 unsigned char const* FNebulaEffect::GetAmbientBytes()
 {
     FNebulaEffect* const This = this;
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
-    if (B[0x2cc] == 0)
+    if (This->bHasAmbient == 0)
         return nullptr;
-    return B + 0x2cd;
+    return This->Ambient;
 }
 
 // FUN_00504880, shared with the JumpShipEffect colour getter (JumpShipEffectColor,
@@ -2322,83 +2262,62 @@ FNebulaCloudsListStorage::~FNebulaCloudsListStorage()
 }
 
 FNebulaEffect::FNebulaEffect()
-    : ActiveExclusionZone(0), ExclusionImmersion(0), Flag2C(0), ActiveExclusionShell(0)
+    : ActiveExclusionZone(nullptr), ExclusionImmersion(0), bHasExclusionShell(0),
+      ActiveExclusionShell(nullptr)
 {
-    FNebulaEffect* const This = this;
     // FUN_00504970. Bytes not stored below are deliberately left untouched.
-    unsigned char* const B = reinterpret_cast<unsigned char*>(This);
+    Lightning.bActive = 0;
 
-    B[0x24c] = 0;
-
-    *reinterpret_cast<unsigned*>(B + 0xa0) = 0;
-    *reinterpret_cast<unsigned*>(B + 0xdc) = 0;
-    *reinterpret_cast<unsigned*>(B + 0xe0) = 0;
-    This->Zone = nullptr;
-    This->FlagLoaded = 0;
-    B[0x2cc] = 0;
-    *reinterpret_cast<unsigned*>(B + 0xd0) = 0;
-    *reinterpret_cast<unsigned*>(B + 0x294) = 0;
-    *reinterpret_cast<unsigned*>(B + 0x2b4) = 0;
-    *reinterpret_cast<unsigned*>(B + 0x5c) = 0;
-    This->ExclusionMgr = nullptr;
+    ExteriorShapeCount = 0;
+    ExteriorBitCount = 0;
+    ExteriorBits = nullptr;
+    Zone = nullptr;
+    FlagLoaded = 0;
+    bHasAmbient = 0;
+    EquatorBias = 0.0f;
+    InsideFade = 0.0f;
+    MaxCloudsReach = 0.0f;
+    FillShape = nullptr;
+    ExclusionMgr = nullptr;
 
     // Retail erases the (empty) zone_shell map here (FUN_00509d60).
-    NebulaZoneShells(This).clear();
+    NebulaZoneShells(this).clear();
 
-    B[0x26c] = 0;
-    *reinterpret_cast<unsigned*>(B + 0x270) = 0;
-    *reinterpret_cast<unsigned*>(B + 0x1c) = 0;
+    bBackLightningFlash = 0;
+    DynamicLight = nullptr;
+    FrameDelta = 0.0f;
 
-    *reinterpret_cast<unsigned*>(reinterpret_cast<unsigned char*>(This) + 0xc0) = 4;
-    *reinterpret_cast<unsigned*>(reinterpret_cast<unsigned char*>(This) + 0xc4) = 8;
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0xc8) = 1.0f;
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0xcc) = 1.0f;
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0xd4) =
-        BitsToFloat(0x3f400000);
-    *reinterpret_cast<unsigned*>(reinterpret_cast<unsigned char*>(This) + 0xd8) = 1;
+    MinBits = 4;
+    MaxBits = 8;
+    BitRadiusMin = 1.0f;
+    BitRadiusMax = 1.0f;
+    MoveBitPercent = 0.75f; // 0x3f400000
+    bCullBackBits = 1;
 
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x50) =
-        BitsToFloat(0x3dcccccd);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x54) =
-        BitsToFloat(0x41200000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x58) =
-        BitsToFloat(0x3e4ccccd);
+    ExclusionSortTimer = 0.1f;   // 0x3dcccccd
+    ExteriorSortTimer = 10.0f;   // 0x41200000
+    ExteriorOrientTimer = 0.2f;  // 0x3e4ccccd
 
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x250) =
-        BitsToFloat(0x41200000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x254) =
-        BitsToFloat(0x3f000000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x258) =
-        BitsToFloat(0xbf800000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x25c) =
-        BitsToFloat(0x3e800000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x260) =
-        BitsToFloat(0x3e800000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x264) =
-        BitsToFloat(0x3e800000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x268) = 1.0f;
+    BackLightningGap = 10.0f;      // 0x41200000
+    BackLightningDuration = 0.5f;  // 0x3f000000
+    BackLightningTimer = -1.0f;    // 0xbf800000
+    BackLightningColor[0] = 0.25f; // 0x3e800000
+    BackLightningColor[1] = 0.25f;
+    BackLightningColor[2] = 0.25f;
+    BackLightningIntensity = 1.0f;
 
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x274) =
-        BitsToFloat(0x40400000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x278) =
-        BitsToFloat(0x3f000000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x27c) =
-        BitsToFloat(0xbf800000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x280) = 1.0f;
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x284) = 1.0f;
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x288) = 1.0f;
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x28c) =
-        BitsToFloat(0x3e800000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x290) =
-        BitsToFloat(0x3f400000);
+    DynLightningGap = 3.0f;       // 0x40400000
+    DynLightningDuration = 0.5f;  // 0x3f000000
+    DynLightningTimer = -1.0f;    // 0xbf800000
+    DynLightningColor[0] = 1.0f;
+    DynLightningColor[1] = 1.0f;
+    DynLightningColor[2] = 1.0f;
+    DynAmbientIntensity = 0.25f;  // 0x3e800000
+    DynIntensityIncrease = 0.75f; // 0x3f400000
 
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x2c4) =
-        BitsToFloat(0x3f000000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x2c8) =
-        BitsToFloat(0x3fe00000);
-    *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(This) + 0x2bc) =
-        BitsToFloat(0x459c4000);
-
+    SunBurnthroughIntensity = 0.5f; // 0x3f000000
+    SunBurnthroughScaler = 1.75f;   // 0x3fe00000
+    FogFarMin = 5000.0f;            // 0x459c4000
 }
 
 FNebulaEffect* NebulaConstruct(FNebulaEffect* This)
@@ -2422,7 +2341,6 @@ void NebulaDestroy(FNebulaEffect* Nebula)
 #ifdef FREELANCER_RP9
     NebulaVolume::UnregisterNebula(Nebula); // port-only bookkeeping (nebula_volume.cpp)
 #endif
-    using FDel = void*(__thiscall*)(FNebulaEffect*, unsigned char);
     delete Nebula;
 }
 
@@ -2451,33 +2369,30 @@ void NebulaApplyGlobalDetail(float Detail)
     for (std::list<FNebulaEffect*>::iterator It = Nebulae.begin(); It != Nebulae.end(); ++It)
     {
         FNebulaEffect* const Nebula = *It;
-        using FDetail = void(__thiscall*)(FNebulaEffect*, float);
         Nebula->Detail(Detail);
+
     }
     TexturePanelsApplyDetailAll(Detail); // FUN_00509f60
 }
 
-void NebulaOrientBolts(FNebulaEffect* Nebula, float Tx, float Ty, float Tz)
+void NebulaOrientExteriorBits(FNebulaEffect* Nebula, float Tx, float Ty, float Tz)
 {
-    // FUN_00507340: re-aim each bolt anchor's axis (+0x14..+0x1c) square to the direction from
-    // the anchor to the target. No test of `this`, the zone or the buffer; no zero-length test.
-    unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
-
+    // FUN_00507340: re-aim each exterior bit's axis (+0x14..+0x1c) square to the direction from
+    // the bit to the target. No test of `this`, the zone or the buffer; no zero-length test.
     Vector const ZonePos = Nebula->Zone->GetPos();
     float const RelX = Tx - ZonePos.x;
     float const RelY = Ty - ZonePos.y;
     float const RelZ = Tz - ZonePos.z;
 
-    float* const Segs = *reinterpret_cast<float**>(B + 0xe0);
-    for (int I = 0; I < *reinterpret_cast<int*>(B + 0xdc); ++I)
+    for (int I = 0; I < Nebula->ExteriorBitCount; ++I)
     {
-        float* const Seg = Segs + I * 8;
+        FNebulaExteriorBit* const Bit = &Nebula->ExteriorBits[I];
         // D = normalize(Rel - anchor). The z difference is squared as unrounded * float. Dx and
         // Dz are stored as floats, Dy stays on the FPU; the dot below uses the unrounded Dz, the
         // cross the stored one.
-        double const A = static_cast<double>(RelX) - Seg[0];
-        double const Bv = static_cast<double>(RelY) - Seg[1];
-        double const C = static_cast<double>(RelZ) - Seg[2];
+        double const A = static_cast<double>(RelX) - Bit->Offset[0];
+        double const Bv = static_cast<double>(RelY) - Bit->Offset[1];
+        double const C = static_cast<double>(RelZ) - Bit->Offset[2];
         float const CF = static_cast<float>(C);
         float const Inv = static_cast<float>(1.0f / sqrt((C * CF + Bv * Bv) + A * A));
         float const Dx = static_cast<float>(A * Inv);
@@ -2487,22 +2402,22 @@ void NebulaOrientBolts(FNebulaEffect* Nebula, float Tx, float Ty, float Tz)
 
         // Only strictly above 0.25 re-aims.
         double const Dot =
-            fabs((DzExt * Seg[7] + Dy * Seg[6]) + static_cast<double>(Dx) * Seg[5]);
+            fabs((DzExt * Bit->Axis[2] + Dy * Bit->Axis[1]) + static_cast<double>(Dx) * Bit->Axis[0]);
         if (Dot > 0.25)
         {
             // N = D x O, on the FPU.
-            double const Cx = Dy * Seg[7] - static_cast<double>(DzF) * Seg[6];
-            double const Cy = static_cast<double>(DzF) * Seg[5] - static_cast<double>(Dx) * Seg[7];
-            double const Cz = static_cast<double>(Dx) * Seg[6] - Dy * Seg[5];
+            double const Cx = Dy * Bit->Axis[2] - static_cast<double>(DzF) * Bit->Axis[1];
+            double const Cy = static_cast<double>(DzF) * Bit->Axis[0] - static_cast<double>(Dx) * Bit->Axis[2];
+            double const Cz = static_cast<double>(Dx) * Bit->Axis[1] - Dy * Bit->Axis[0];
             float const CzF = static_cast<float>(Cz);
             float const CInv = static_cast<float>(1.0f / sqrt((Cz * CzF + Cy * Cy) + Cx * Cx));
             float const Ncx = static_cast<float>(Cx * CInv);
             double const Ncy = Cy * CInv;
             double const Ncz = static_cast<double>(CzF) * CInv;
             // O = N x D.
-            Seg[5] = static_cast<float>(Ncy * DzF - Ncz * Dy);
-            Seg[6] = static_cast<float>(Ncz * Dx - static_cast<double>(DzF) * Ncx);
-            Seg[7] = static_cast<float>(Dy * Ncx - Ncy * Dx);
+            Bit->Axis[0] = static_cast<float>(Ncy * DzF - Ncz * Dy);
+            Bit->Axis[1] = static_cast<float>(Ncz * Dx - static_cast<double>(DzF) * Ncx);
+            Bit->Axis[2] = static_cast<float>(Dy * Ncx - Ncy * Dx);
         }
     }
 }
@@ -2510,38 +2425,34 @@ void NebulaOrientBolts(FNebulaEffect* Nebula, float Tx, float Ty, float Tz)
 namespace
 {
     // FUN_00506600's projection step (rings and the two caps).
-    void NebulaBoltProject(Universe::IZone* Zone, Vector const& Point, Vector const& ZonePos,
-                           float* Seg)
+    void NebulaBitProject(Universe::IZone* Zone, Vector const& Point, Vector const& ZonePos,
+                          FNebulaExteriorBit* Bit)
     {
         Vector const Surface = Zone->GetSurfacePoint(Point);
-        Seg[0] = Surface.x - ZonePos.x;
-        Seg[1] = Surface.y - ZonePos.y;
-        Seg[2] = Surface.z - ZonePos.z;
+        Bit->Offset[0] = Surface.x - ZonePos.x;
+        Bit->Offset[1] = Surface.y - ZonePos.y;
+        Bit->Offset[2] = Surface.z - ZonePos.z;
     }
 
     // FUN_00506600's pull-in step: the factor on the FPU, no zero test. Len is the caller's
     // sqrt; the sites differ in their summation order.
-    void NebulaBoltShrink(FNebulaEffect* Nebula, float* Seg, double Len)
+    void NebulaBitShrink(FNebulaEffect* Nebula, FNebulaExteriorBit* Bit, double Len)
     {
-        unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
-        double const Margin = static_cast<double>(*reinterpret_cast<float*>(B + 0xd4)) *
-                              *reinterpret_cast<float*>(B + 0xa4);
+        double const Margin = static_cast<double>(Nebula->MoveBitPercent) * Nebula->BitRadius;
         double const Shrink = (Len - Margin) / Len;
-        Seg[0] = static_cast<float>(Shrink * Seg[0]);
-        Seg[1] = static_cast<float>(Shrink * Seg[1]);
-        Seg[2] = static_cast<float>(Shrink * Seg[2]);
+        Bit->Offset[0] = static_cast<float>(Shrink * Bit->Offset[0]);
+        Bit->Offset[1] = static_cast<float>(Shrink * Bit->Offset[1]);
+        Bit->Offset[2] = static_cast<float>(Shrink * Bit->Offset[2]);
     }
 }
 
 void NebulaRebuild(FNebulaEffect* Nebula)
 {
-    // FUN_00506600: the bolt-anchor buffer (+0xe0, count +0xdc, 0x20 bytes each) rebuilt on the
-    // zone's surface. No test of `this`.
-    unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
-
-    operator delete(*reinterpret_cast<void**>(B + 0xe0));
-    *reinterpret_cast<void**>(B + 0xe0) = nullptr;
-    *reinterpret_cast<int*>(B + 0xdc) = 0;
+    // FUN_00506600: the exterior bits (+0xe0, count +0xdc) rebuilt on the zone's surface. No
+    // test of `this`.
+    operator delete(Nebula->ExteriorBits);
+    Nebula->ExteriorBits = nullptr;
+    Nebula->ExteriorBitCount = 0;
 
     // double 0.05 (0x005d5b58); only an ordered "less" returns. The zone is the one pointer
     // tested.
@@ -2555,33 +2466,31 @@ void NebulaRebuild(FNebulaEffect* Nebula)
     double const Ease = 1.0f - OneMinusDetail * OneMinusDetail;
     double const OneMinusEase = 1.0f - Ease;
     float const Scale = static_cast<float>((G_NebulaDetailEase * OneMinusEase + Ease) *
-                                           *reinterpret_cast<float*>(B + 0xa4));
+                                           Nebula->BitRadius);
     float const Density = static_cast<float>(
         (1.0 - static_cast<double>(G_NebulaDetail)) * G_NebulaDetailMix + G_NebulaDetail);
-    *reinterpret_cast<float*>(B + 0xb8) = static_cast<float>(
-        (OneMinusEase * G_NebulaDetailFog + Ease) * *reinterpret_cast<float*>(B + 0xb4));
+    Nebula->BitAlpha =
+        static_cast<float>((OneMinusEase * G_NebulaDetailFog + Ease) * Nebula->Opacity);
 
-    // Per-slice bit counts: +0xc4 at the middle slice, +0xc0 at the ends.
-    int const MidCount = static_cast<int>(
-        static_cast<double>(*reinterpret_cast<int*>(B + 0xc4)) * Density + 0.5f);
-    int const EndCount = static_cast<int>(
-        static_cast<double>(*reinterpret_cast<int*>(B + 0xc0)) * Density + 0.5f);
+    // Per-slice bit counts: max_bits at the middle slice, min_bits at the ends.
+    int const MidCount = static_cast<int>(static_cast<double>(Nebula->MaxBits) * Density + 0.5f);
+    int const EndCount = static_cast<int>(static_cast<double>(Nebula->MinBits) * Density + 0.5f);
 
-    int const PlaneSlices = *reinterpret_cast<int*>(B + 0xbc);
+    int const PlaneSlices = Nebula->PlaneSlices;
     if (PlaneSlices <= 0)
         return;
 
     // Shape weights normalised; the sum on the FPU, no zero test.
     {
-        float* const Weights = reinterpret_cast<float*>(B + 0x80);
-        int const WeightCount = *reinterpret_cast<int*>(B + 0xa0);
+        float* const Weights = Nebula->ExteriorShapeWeights;
+        int const WeightCount = Nebula->ExteriorShapeCount;
         double Sum = 0.0f;
         for (int I = 0; I < WeightCount; ++I)
             Sum += Weights[I];
         if (WeightCount > 0)
         {
             double const InvSum = 1.0f / Sum;
-            for (int I = 0; I < *reinterpret_cast<int*>(B + 0xa0); ++I)
+            for (int I = 0; I < Nebula->ExteriorShapeCount; ++I)
                 Weights[I] = static_cast<float>(InvSum * Weights[I]);
         }
     }
@@ -2589,10 +2498,10 @@ void NebulaRebuild(FNebulaEffect* Nebula)
     // Total bit count: W rises to the middle slice and falls after it. This pass multiplies by
     // a float 1.0f / Mid; the ring pass below divides by Mid.
     float const Mid = static_cast<float>(static_cast<double>(PlaneSlices - 1) * 0.5);
-    int SegTotal = 0;
+    int BitTotal = 0;
     if (PlaneSlices == 1)
     {
-        SegTotal = MidCount;
+        BitTotal = MidCount;
     }
     else
     {
@@ -2607,26 +2516,27 @@ void NebulaRebuild(FNebulaEffect* Nebula)
                 W = 1.0f - (T - Mid) * InvMid;
             else
                 W = T * InvMid;
-            SegTotal += static_cast<int>(floor((1.0 - W) * EndCountD + MidCountF * W + 0.5));
+            BitTotal += static_cast<int>(floor((1.0 - W) * EndCountD + MidCountF * W + 0.5));
         }
     }
 
     // + 2 for the two polar caps; the buffer is neither tested nor cleared.
-    int const SegCount = SegTotal + 2;
-    *reinterpret_cast<int*>(B + 0xdc) = SegCount;
-    float* const Segs =
-        static_cast<float*>(operator new(static_cast<unsigned>(SegCount) << 5));
-    *reinterpret_cast<float**>(B + 0xe0) = Segs;
+    int const BitCount = BitTotal + 2;
+    Nebula->ExteriorBitCount = BitCount;
+    FNebulaExteriorBit* const Bits =
+        static_cast<FNebulaExteriorBit*>(operator new(static_cast<unsigned>(BitCount) << 5));
+    Nebula->ExteriorBits = Bits;
 
-    // Per segment: +0xc radius, +0x14/+0x18 sin/cos of a random angle, +0x1c = 0, +0x10 a
-    // weighted random shape.
-    for (int I = 0; I < *reinterpret_cast<int*>(B + 0xdc); ++I)
+    // Per bit: a random radius, the axis sin/cos of a random angle and 0, a weighted random
+    // shape.
+
+    for (int I = 0; I < Nebula->ExteriorBitCount; ++I)
     {
-        float* const S = Segs + I * 8;
-        float const RadiusLo = *reinterpret_cast<float*>(B + 0xc8);
-        float const RadiusHi = *reinterpret_cast<float*>(B + 0xcc);
+        FNebulaExteriorBit* const Bit = &Bits[I];
+        float const RadiusLo = Nebula->BitRadiusMin;
+        float const RadiusHi = Nebula->BitRadiusMax;
         int const RRadius = rand();
-        S[3] = static_cast<float>(
+        Bit->Radius = static_cast<float>(
             (static_cast<double>(RRadius) * 3.0517578125e-05f *
                  (static_cast<double>(RadiusHi) - RadiusLo) +
              RadiusLo) *
@@ -2635,84 +2545,84 @@ void NebulaRebuild(FNebulaEffect* Nebula)
         int const RAngle = rand();
         double const Angle =
             static_cast<double>(RAngle) * 3.0517578125e-05f * 6.2831854820251465;
-        S[5] = static_cast<float>(sin(Angle));
-        S[6] = static_cast<float>(cos(Angle));
-        S[7] = 0.0f;
+        Bit->Axis[0] = static_cast<float>(sin(Angle));
+        Bit->Axis[1] = static_cast<float>(cos(Angle));
+        Bit->Axis[2] = 0.0f;
         // The weights accumulate on the FPU. No match leaves +0x10 as it was.
         int const RPick = rand();
         float const Pick = static_cast<float>(static_cast<double>(RPick) * 3.0517578125e-05f);
-        int const WeightCount = *reinterpret_cast<int*>(B + 0xa0);
+        int const WeightCount = Nebula->ExteriorShapeCount;
         double Running = 0.0f;
         for (int J = 0; J < WeightCount; ++J)
         {
-            Running += reinterpret_cast<float*>(B + 0x80)[J];
+            Running += Nebula->ExteriorShapeWeights[J];
             if (Pick < Running)
             {
-                memcpy(&S[4], B + 0x60 + J * 4, sizeof(float));
+                Bit->Shape = Nebula->ExteriorShapes[J];
                 break;
             }
         }
     }
 
     // The latitude rings. The phase carries over between slices.
-    float* Seg = Segs;
+    FNebulaExteriorBit* Bit = Bits;
     float Phase = 0.0f;
-    for (int Slice = 0; Slice < *reinterpret_cast<int*>(B + 0xbc); ++Slice)
+    for (int Slice = 0; Slice < Nebula->PlaneSlices; ++Slice)
     {
-        int const Slices = *reinterpret_cast<int*>(B + 0xbc);
-        int Bits;
+        int const Slices = Nebula->PlaneSlices;
+        int SliceBits;
         if (Slices == 1)
         {
-            Bits = MidCount;
+            SliceBits = MidCount;
         }
         else
         {
-            // Past the middle the phase becomes pi (0x005c8a5c) / Bits, no zero test.
+            // Past the middle the phase becomes pi (0x005c8a5c) / SliceBits, no zero test.
             float const T = static_cast<float>(Slice);
             double W;
             if (T > Mid)
                 W = 1.0f - (static_cast<double>(T) - Mid) / Mid;
             else
                 W = static_cast<double>(T) / Mid;
-            Bits = static_cast<int>(
+            SliceBits = static_cast<int>(
                 floor((1.0 - W) * EndCount + static_cast<double>(MidCount) * W + 0.5));
             if (T > Mid)
-                Phase = static_cast<float>(3.1415927f / static_cast<double>(Bits));
+                Phase = static_cast<float>(3.1415927f / static_cast<double>(SliceBits));
         }
 
         double const Lat =
             acos((((static_cast<double>(Slice) + 1.0f) / (static_cast<double>(Slices) + 1.0f)) *
                       2.0 -
                   1.0f) *
-                 *reinterpret_cast<float*>(B + 0xd0));
+                 Nebula->EquatorBias);
 
-        if (Bits > 0)
+        if (SliceBits > 0)
         {
             // cos(Lat) is stored as float, sin(Lat) stays double.
-            double const BitsD = Bits;
+            double const BitsD = SliceBits;
             float const CosLat = static_cast<float>(cos(Lat));
             double const SinLat = sin(Lat);
             float const PointY = ZonePos.y + CosLat;
-            for (int Bit = 0; Bit < Bits; ++Bit)
+            for (int BitIndex = 0; BitIndex < SliceBits; ++BitIndex)
             {
-                // x is kept unrounded for the point; Seg[] is overwritten by the projection.
-                Seg[1] = CosLat;
+                // x is kept unrounded for the point; the offset is overwritten by the projection.
+                Bit->Offset[1] = CosLat;
                 double const Angle =
-                    static_cast<double>(Bit) * 6.2831854820251465 / BitsD + Phase;
+                    static_cast<double>(BitIndex) * 6.2831854820251465 / BitsD + Phase;
                 double const DirX = cos(Angle) * SinLat;
-                Seg[0] = static_cast<float>(DirX);
+                Bit->Offset[0] = static_cast<float>(DirX);
                 float const DirZ = static_cast<float>(sin(Angle) * SinLat);
-                Seg[2] = DirZ;
+                Bit->Offset[2] = DirZ;
                 Vector Point;
                 Point.x = static_cast<float>(ZonePos.x + DirX);
                 Point.y = PointY;
                 Point.z = ZonePos.z + DirZ;
-                NebulaBoltProject(Nebula->Zone, Point, ZonePos, Seg);
-                double const Len = sqrt((static_cast<double>(Seg[2]) * Seg[2] +
-                                         static_cast<double>(Seg[1]) * Seg[1]) +
-                                        static_cast<double>(Seg[0]) * Seg[0]);
-                NebulaBoltShrink(Nebula, Seg, Len);
-                Seg += 8;
+                NebulaBitProject(Nebula->Zone, Point, ZonePos, Bit);
+                double const Len = sqrt((static_cast<double>(Bit->Offset[2]) * Bit->Offset[2] +
+                                         static_cast<double>(Bit->Offset[1]) * Bit->Offset[1]) +
+                                        static_cast<double>(Bit->Offset[0]) * Bit->Offset[0]);
+                NebulaBitShrink(Nebula, Bit, Len);
+                ++Bit;
             }
         }
     }
@@ -2722,47 +2632,45 @@ void NebulaRebuild(FNebulaEffect* Nebula)
     Point.x = ZonePos.x;
     Point.y = ZonePos.y + 1.0f;
     Point.z = ZonePos.z;
-    NebulaBoltProject(Nebula->Zone, Point, ZonePos, Seg);
-    double const TopLen = sqrt((static_cast<double>(Seg[2]) * Seg[2] +
-                                static_cast<double>(Seg[1]) * Seg[1]) +
-                               static_cast<double>(Seg[0]) * Seg[0]);
-    NebulaBoltShrink(Nebula, Seg, TopLen);
-    Seg += 8;
+    NebulaBitProject(Nebula->Zone, Point, ZonePos, Bit);
+    double const TopLen = sqrt((static_cast<double>(Bit->Offset[2]) * Bit->Offset[2] +
+                                static_cast<double>(Bit->Offset[1]) * Bit->Offset[1]) +
+                               static_cast<double>(Bit->Offset[0]) * Bit->Offset[0]);
+    NebulaBitShrink(Nebula, Bit, TopLen);
+    ++Bit;
 
     // The -Y cap; this length sums (x^2 + y^2) + z^2.
     Point.y = ZonePos.y - 1.0f;
-    NebulaBoltProject(Nebula->Zone, Point, ZonePos, Seg);
-    double const BottomLen = sqrt((static_cast<double>(Seg[0]) * Seg[0] +
-                                   static_cast<double>(Seg[1]) * Seg[1]) +
-                                  static_cast<double>(Seg[2]) * Seg[2]);
-    NebulaBoltShrink(Nebula, Seg, BottomLen);
+    NebulaBitProject(Nebula->Zone, Point, ZonePos, Bit);
+    double const BottomLen = sqrt((static_cast<double>(Bit->Offset[0]) * Bit->Offset[0] +
+                                   static_cast<double>(Bit->Offset[1]) * Bit->Offset[1]) +
+                                  static_cast<double>(Bit->Offset[2]) * Bit->Offset[2]);
+    NebulaBitShrink(Nebula, Bit, BottomLen);
 }
 
 void FNebulaEffect::Update(void* Camera, float Dt)
 {
     FNebulaEffect* const Nebula = this;
     // LAB_00506f20 — vtable +0x08.
-    unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
-    *reinterpret_cast<float*>(B + 0x1c) = Dt;
+    Nebula->FrameDelta = Dt;
 
     // After a (re)load (+0x4c), +0x2b4 = the largest clouds reach. Retail inlines
     // NebulaExclusionZoneMgr::set_max_distance (Common .text:06242b70).
-    if (B[0x4c] != 0)
+    if (Nebula->bReachPending != 0)
     {
-        *reinterpret_cast<float*>(B + 0x2b4) = 0.0f;
+        Nebula->MaxCloudsReach = 0.0f;
         FNebulaCloudsListNode* const Sentinel = Nebula->Clouds.Sentinel;
         for (FNebulaCloudsListNode* N = Sentinel->Next; N != Sentinel; N = N->Next)
         {
-            unsigned char const* const C = N->Clouds->Raw;
+            FNebulaClouds const* const Clouds = N->Clouds;
             double const Reach =
-                static_cast<double>(*reinterpret_cast<float const*>(C + 0xc0)) * 0.5f +
-                *reinterpret_cast<float const*>(C + 0xa8);
-            if (Reach > *reinterpret_cast<float*>(B + 0x2b4))
-                *reinterpret_cast<float*>(B + 0x2b4) = static_cast<float>(Reach);
+                static_cast<double>(Clouds->MaxDistance) * 0.5f + Clouds->PuffRadius;
+            if (Reach > Nebula->MaxCloudsReach)
+                Nebula->MaxCloudsReach = static_cast<float>(Reach);
         }
         if (Nebula->ExclusionMgr != nullptr)
-            Nebula->ExclusionMgr->set_max_distance(*reinterpret_cast<float*>(B + 0x2b4));
-        B[0x4c] = 0;
+            Nebula->ExclusionMgr->set_max_distance(Nebula->MaxCloudsReach);
+        Nebula->bReachPending = 0;
     }
 
     ICamera* const Cam = static_cast<ICamera*>(Camera);
@@ -2775,26 +2683,25 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     // FUN_0054bd50 when the view jumps); retail reads it raw.
     unsigned char const CameraCut = static_cast<unsigned char const*>(Camera)[0xbc];
 
-    // Not yet fully inside (>= and unordered skip): re-orient the bolts when the +0x58 timer
-    // is above 1.0 or the camera cut, then restart that timer.
-    if (*reinterpret_cast<float*>(B + 0x294) < 1.0)
+    // Not yet fully inside (>= and unordered skip): re-orient the exterior bits when the +0x58
+    // timer is above 1.0 or the camera cut, then restart that timer.
+    if (Nebula->InsideFade < 1.0)
     {
-        if (*reinterpret_cast<float*>(B + 0x58) > 1.0f || CameraCut != 0)
+        if (Nebula->ExteriorOrientTimer > 1.0f || CameraCut != 0)
         {
-            NebulaOrientBolts(Nebula, CamPos.x, CamPos.y, CamPos.z);
-            *reinterpret_cast<float*>(B + 0x58) = 0.0f;
+            NebulaOrientExteriorBits(Nebula, CamPos.x, CamPos.y, CamPos.z);
+            Nebula->ExteriorOrientTimer = 0.0f;
         }
     }
 
     // Partly inside: the exclusion manager is sorted around the camera on a camera cut, or
     // when +0x50 is above 0.25 and +0x58 is not zero (only an ordered equal skips).
-    if (*reinterpret_cast<float*>(B + 0x294) > 0.0)
+    if (Nebula->InsideFade > 0.0)
     {
         bool bSort = CameraCut != 0;
         if (!bSort)
-            bSort = *reinterpret_cast<float*>(B + 0x294) > 0.0 &&
-                    *reinterpret_cast<float*>(B + 0x50) > 0.25f &&
-                    !(*reinterpret_cast<float*>(B + 0x58) == 0.0f);
+            bSort = Nebula->InsideFade > 0.0 && Nebula->ExclusionSortTimer > 0.25f &&
+                    !(Nebula->ExteriorOrientTimer == 0.0f);
         if (bSort && Nebula->ExclusionMgr != nullptr)
             Nebula->ExclusionMgr->sort(&CamPos);
     }
@@ -2819,35 +2726,34 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     Dir.z = static_cast<float>(Dir.z * InvLen);
     float const Depth = static_cast<float>(static_cast<double>(Len) - Zone->GetRadiusAlong(Dir));
     if (Depth > 0.0f)
-        *reinterpret_cast<float*>(B + 0x294) = 0.0f;
+        Nebula->InsideFade = 0.0f;
     else
     {
         double const Inside = -static_cast<double>(Depth);
         if (Inside > FogSpan)
-            *reinterpret_cast<float*>(B + 0x294) = 1.0f;
+            Nebula->InsideFade = 1.0f;
         else
-            *reinterpret_cast<float*>(B + 0x294) = static_cast<float>(Inside / FogSpan);
+            Nebula->InsideFade = static_cast<float>(Inside / FogSpan);
     }
 
-    if (*reinterpret_cast<float*>(B + 0x294) > 0.0)
+    if (Nebula->InsideFade > 0.0)
     {
-        *reinterpret_cast<float*>(B + 0x2b0) = Nebula->FogDistance + Nebula->FogNear;
-        *reinterpret_cast<float*>(B + 0x2ac) = Nebula->FogNear;
+        Nebula->FogEnd = Nebula->FogDistance + Nebula->FogNear;
+        Nebula->FogStart = Nebula->FogNear;
 
         // The current exclusion zone (+0x24) is dropped when the camera's immersion falls below
         // 1e-4 (>= and unordered keep it); +0x28 keeps that immersion.
-        Exclusion::NebulaExclusionZone** const ExclSlot =
-            reinterpret_cast<Exclusion::NebulaExclusionZone**>(B + 0x24);
+        Exclusion::NebulaExclusionZone** const ExclSlot = &Nebula->ActiveExclusionZone;
         if (*ExclSlot != nullptr)
         {
             float const Immersion = (*ExclSlot)->ZonePtr->GetImmersion(CamPos);
-            *reinterpret_cast<float*>(B + 0x28) = Immersion;
+            Nebula->ExclusionImmersion = Immersion;
             if (Immersion < 9.999999747378752e-05f) // DAT_005db098
             {
                 *ExclSlot = nullptr;
-                *reinterpret_cast<unsigned*>(B + 0x28) = 0;
-                B[0x2c] = 0;
-                *reinterpret_cast<void**>(B + 0x30) = nullptr;
+                Nebula->ExclusionImmersion = 0.0f;
+                Nebula->bHasExclusionShell = 0;
+                Nebula->ActiveExclusionShell = nullptr;
             }
         }
 
@@ -2856,7 +2762,7 @@ void FNebulaEffect::Update(void* Camera, float Dt)
         if (*ExclSlot == nullptr && Nebula->ExclusionMgr != nullptr)
         {
             Nebula->ExclusionMgr->is_in_exclusion_zone(
-                CamPos, ExclSlot, reinterpret_cast<float*>(B + 0x28), true);
+                CamPos, ExclSlot, &Nebula->ExclusionImmersion, true);
             if (*ExclSlot != nullptr)
             {
                 unsigned const Key = (*ExclSlot)->ZoneShellName.Id;
@@ -2864,8 +2770,8 @@ void FNebulaEffect::Update(void* Camera, float Dt)
                 FNebulaZoneShellMap::iterator const Found = NebulaFindZoneShell(Shells, Key);
                 if (Found != Shells.end())
                 {
-                    B[0x2c] = 1;
-                    *reinterpret_cast<FNebulaZoneShell**>(B + 0x30) = Found->second;
+                    Nebula->bHasExclusionShell = 1;
+                    Nebula->ActiveExclusionShell = Found->second;
                 }
             }
         }
@@ -2873,14 +2779,14 @@ void FNebulaEffect::Update(void* Camera, float Dt)
         // Inside a zone whose fog_far is beyond the near value, the far distance blends toward
         // it by the immersion.
         Exclusion::NebulaExclusionZone* const Excl = *ExclSlot;
-        if (Excl != nullptr && *reinterpret_cast<float*>(B + 0x28) > 0.0f)
+        if (Excl != nullptr && Nebula->ExclusionImmersion > 0.0f)
         {
             float const FogFar = Excl->FogFar;
-            if (FogFar > *reinterpret_cast<float*>(B + 0x2ac))
+            if (FogFar > Nebula->FogStart)
             {
-                float const F = *reinterpret_cast<float*>(B + 0x28);
-                *reinterpret_cast<float*>(B + 0x2b0) = static_cast<float>(
-                    (1.0f - static_cast<double>(F)) * *reinterpret_cast<float*>(B + 0x2b0) +
+                float const F = Nebula->ExclusionImmersion;
+                Nebula->FogEnd = static_cast<float>(
+                    (1.0f - static_cast<double>(F)) * Nebula->FogEnd +
                     static_cast<double>(FogFar) * F);
             }
         }
@@ -2890,9 +2796,9 @@ void FNebulaEffect::Update(void* Camera, float Dt)
         // Outside, the fog range follows the depth; an enabled ambient light is switched off
         // (GameLight vt+0x08, FUN_005376f0).
         double const Near = static_cast<double>(Depth) + Nebula->FogNear;
-        *reinterpret_cast<float*>(B + 0x2ac) = static_cast<float>(Near);
-        *reinterpret_cast<float*>(B + 0x2b0) = static_cast<float>(Near + Nebula->FogDistance);
-        FGameLight* const Light = *reinterpret_cast<FGameLight**>(B + 0x270);
+        Nebula->FogStart = static_cast<float>(Near);
+        Nebula->FogEnd = static_cast<float>(Near + Nebula->FogDistance);
+        FGameLight* const Light = Nebula->DynamicLight;
         if (Light != nullptr && (Light->Flags & 0x08) != 0)
             GameLightVirtualDisable(Light);
     }
@@ -2902,20 +2808,20 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     {
         FNebulaCloudsListNode* const CloudSent = Nebula->Clouds.Sentinel;
         for (FNebulaCloudsListNode* N = CloudSent->Next; N != CloudSent; N = N->Next)
-            NebulaCloudsUpdate(N->Clouds, Camera, Dt, *reinterpret_cast<float*>(B + 0x294),
-                               Nebula->ExclusionMgr);
+            NebulaCloudsUpdate(N->Clouds, Camera, Dt, Nebula->InsideFade, Nebula->ExclusionMgr);
+
     }
 
     // Fully inside (< and unordered skip).
-    if (*reinterpret_cast<float*>(B + 0x294) >= 1.0f)
+    if (Nebula->InsideFade >= 1.0f)
     {
         float const CamCopy[3] = {CamPos.x, CamPos.y, CamPos.z};
         NebulaAmbientTick(Nebula, CamCopy);
     }
 
-    *reinterpret_cast<float*>(B + 0x58) = Dt + *reinterpret_cast<float*>(B + 0x58);
-    *reinterpret_cast<float*>(B + 0x50) = Dt + *reinterpret_cast<float*>(B + 0x50);
-    *reinterpret_cast<float*>(B + 0x54) = Dt + *reinterpret_cast<float*>(B + 0x54);
+    Nebula->ExteriorOrientTimer = Dt + Nebula->ExteriorOrientTimer;
+    Nebula->ExclusionSortTimer = Dt + Nebula->ExclusionSortTimer;
+    Nebula->ExteriorSortTimer = Dt + Nebula->ExteriorSortTimer;
 }
 
 void NebulaUpdate(FNebulaEffect* Nebula, void* Camera, float Dt)
@@ -2968,12 +2874,12 @@ namespace
     }
 }
 
-void NebulaUpdateBoltCamera(FNebulaEffect* Nebula, float CamX, float CamY, float CamZ)
+void NebulaDrawFillSheets(FNebulaEffect* Nebula, float CamX, float CamY, float CamZ)
 {
     // FUN_005074e0: two crossing fog sheets through the zone, textured with the fill shape
     // (+0x5c). Only +0x5c is tested; the arguments are the camera position.
-    unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
-    FTexShape* const Shape = *reinterpret_cast<FTexShape**>(B + 0x5c);
+
+    FTexShape* const Shape = Nebula->FillShape;
     if (Shape == nullptr)
         return;
 
@@ -3089,7 +2995,7 @@ void NebulaUpdateBoltCamera(FNebulaEffect* Nebula, float CamX, float CamY, float
     Win3DSetBlendFunc(5, 6);
     Win3DBegin(kWin3DQuads);
 
-    float const* const Fog = reinterpret_cast<float*>(B + 0x2a0);
+    float const* const Fog = Nebula->FogColor;
     float V[3];
     float T[3];
 
@@ -3150,15 +3056,13 @@ void NebulaUpdateBoltCamera(FNebulaEffect* Nebula, float CamX, float CamY, float
     Win3DEnable(kWin3DCullFace);
 }
 
-void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
+void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
 {
-    // FUN_00507ed0 — the exterior bit billboards.
-    unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
-
-    // Nothing once +0x294 is not below 1.0 (unordered also exits).
-    if (*reinterpret_cast<int*>(B + 0xdc) <= 0)
+    // FUN_00507ed0 — the exterior bit billboards. Nothing once +0x294 is not below 1.0
+    // (unordered also exits).
+    if (Nebula->ExteriorBitCount <= 0)
         return;
-    if (!(*reinterpret_cast<float*>(B + 0x294) < 1.0))
+    if (!(Nebula->InsideFade < 1.0))
         return;
 
     ICamera* const Cam = static_cast<ICamera*>(Camera);
@@ -3185,33 +3089,32 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
     // A pair swaps only when the later one is farther by more than 10. The previous distance
     // is cached only right after a swap -- the swapped-down record keeps its value; a pair left
     // alone inside the 10 band keeps the flag as it was (retail quirk, kept). +0x54 is zeroed
-    // after the sort, including when there is only one segment.
-    if (*reinterpret_cast<float*>(B + 0x54) > 1.15f)
+    // after the sort, including when there is only one bit.
+    if (Nebula->ExteriorSortTimer > 1.15f)
     {
         int Swapped = 0;
         do
         {
             Swapped = 0;
-            if (*reinterpret_cast<int*>(B + 0xdc) <= 1)
+            if (Nebula->ExteriorBitCount <= 1)
                 break;
             bool bPrevCached = false;
             double PrevDistSq = 0.0;
-            for (int I = 1; I < *reinterpret_cast<int*>(B + 0xdc); ++I)
+            for (int I = 1; I < Nebula->ExteriorBitCount; ++I)
             {
-                float* const Segs = *reinterpret_cast<float**>(B + 0xe0);
-                float* const Prev = Segs + (I - 1) * 8;
-                float* const Cur = Segs + I * 8;
+                FNebulaExteriorBit* const Prev = &Nebula->ExteriorBits[I - 1];
+                FNebulaExteriorBit* const Cur = &Nebula->ExteriorBits[I];
                 if (!bPrevCached)
                 {
-                    float const Dx = (ZonePos.x + Prev[0]) - CamPos.x;
-                    float const Dy = (ZonePos.y + Prev[1]) - CamPos.y;
-                    float const Dz = (ZonePos.z + Prev[2]) - CamPos.z;
+                    float const Dx = (ZonePos.x + Prev->Offset[0]) - CamPos.x;
+                    float const Dy = (ZonePos.y + Prev->Offset[1]) - CamPos.y;
+                    float const Dz = (ZonePos.z + Prev->Offset[2]) - CamPos.z;
                     PrevDistSq = static_cast<double>(Dx) * Dx + static_cast<double>(Dy) * Dy +
                                  static_cast<double>(Dz) * Dz;
                 }
-                float const Cx = (ZonePos.x + Cur[0]) - CamPos.x;
-                float const Cy = (ZonePos.y + Cur[1]) - CamPos.y;
-                float const Cz = (ZonePos.z + Cur[2]) - CamPos.z;
+                float const Cx = (ZonePos.x + Cur->Offset[0]) - CamPos.x;
+                float const Cy = (ZonePos.y + Cur->Offset[1]) - CamPos.y;
+                float const Cz = (ZonePos.z + Cur->Offset[2]) - CamPos.z;
                 double const CurDistSq = static_cast<double>(Cx) * Cx +
                                          static_cast<double>(Cy) * Cy +
                                          static_cast<double>(Cz) * Cz;
@@ -3223,14 +3126,14 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
                 if (!(fabs(PrevDistSq - CurDistSq) > 10.0))
                     continue;
                 ++Swapped;
-                float Tmp[8];
-                memcpy(Tmp, Prev, sizeof(Tmp));
-                memcpy(Prev, Cur, sizeof(Tmp));
-                memcpy(Cur, Tmp, sizeof(Tmp));
+                FNebulaExteriorBit const Tmp = *Prev;
+                *Prev = *Cur;
+                *Cur = Tmp;
+
                 bPrevCached = true;
             }
         } while (Swapped > 0);
-        *reinterpret_cast<float*>(B + 0x54) = 0.0f;
+        Nebula->ExteriorSortTimer = 0.0f;
     }
 
     Win3DDisable(kWin3DLightingCap);
@@ -3240,7 +3143,7 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
     Win3DEnable(kWin3DBlend);
     Win3DApplyCamera(Cam);
     // The first shape (+0x60) is bound for every bit.
-    FTexShape* const BoundShape = *reinterpret_cast<FTexShape**>(B + 0x60);
+    FTexShape* const BoundShape = Nebula->ExteriorShapes[0];
     Win3DBindTexture(TexShapeGetGpuHandle(BoundShape, 0));
     // The shape's alpha cache (+0x04) is probed while negative (FUN_00552420 inline): format
     // ids 10..14 have alpha, any other id takes its descriptor's +0x48 byte.
@@ -3253,7 +3156,7 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
             bHasAlpha = static_cast<unsigned char>(PixelFormatGetDesc(Format)->HasAlpha & 0xffu);
         BoundShape->AlphaCache = bHasAlpha;
     }
-    // Also picks the colour call per bolt below.
+    // Also picks the colour call per bit below.
     bool const bHasAlpha = BoundShape->AlphaCache != 0;
     if (bHasAlpha)
         Win3DSetBlendFunc(kWin3DBlendSrcAlpha, kWin3DBlendInvSrcAlpha);
@@ -3266,8 +3169,8 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
     DALib::Pipeline->SetRenderState(D3DRS_ALPHAREF, 4);
 
     // Base alpha +0xb8, faded out over the second half of +0x294.
-    float const Fade = *reinterpret_cast<float*>(B + 0x294);
-    float BaseAlpha = *reinterpret_cast<float*>(B + 0xb8);
+    float const Fade = Nebula->InsideFade;
+    float BaseAlpha = Nebula->BitAlpha;
     if (Fade > 0.5f)
         BaseAlpha = static_cast<float>((1.0 - ((static_cast<double>(Fade) - 0.5) +
                                                (static_cast<double>(Fade) - 0.5))) * BaseAlpha);
@@ -3279,7 +3182,7 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
         EdgeFade = 0.0f;
     else
     {
-        float const Span = *reinterpret_cast<float*>(B + 0x2ac) - Nebula->FogNear;
+        float const Span = Nebula->FogStart - Nebula->FogNear;
         if (Span < 7000.0f)
             EdgeFade = 0.0f;
         else if (Span < 10000.0f)
@@ -3297,14 +3200,14 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
         ToCam[2] *= InvLen;
     }
 
-    // Segment record (0x20): +0x00 position relative to the zone, +0x0c radius, +0x10
-    // FTexShape*, +0x14 bolt axis. The count is re-read per iteration.
-    float* Seg = *reinterpret_cast<float**>(B + 0xe0);
-    for (int I = 0; I < *reinterpret_cast<int*>(B + 0xdc); ++I, Seg += 8)
+    // The count is re-read per iteration.
+    FNebulaExteriorBit* Bit = Nebula->ExteriorBits;
+    for (int I = 0; I < Nebula->ExteriorBitCount; ++I, ++Bit)
     {
         float A = BaseAlpha;
 
-        float const P[3] = { ZonePos.x + Seg[0], ZonePos.y + Seg[1], ZonePos.z + Seg[2] };
+        float const P[3] = {ZonePos.x + Bit->Offset[0], ZonePos.y + Bit->Offset[1],
+                            ZonePos.z + Bit->Offset[2]};
         float const V[3] = { P[0] - CamPos.x, P[1] - CamPos.y, P[2] - CamPos.z };
 
         // A point on or behind the eye plane is skipped.
@@ -3318,13 +3221,14 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
         if (Depth <= 0.0f)
             continue;
 
-        // Facing fade. Dot uses the segment's offset from the zone centre, not its axis.
-        int const Mode = *reinterpret_cast<int*>(B + 0xd8);
+        // Facing fade. Dot uses the bit's offset from the zone centre, not its axis.
+
+        int const Mode = Nebula->bCullBackBits;
         if (Mode != 0 || EdgeFade < 1.0f)
         {
-            float const Sx = Seg[0];
-            float const Sy = Seg[1];
-            float const Sz = Seg[2];
+            float const Sx = Bit->Offset[0];
+            float const Sy = Bit->Offset[1];
+            float const Sz = Bit->Offset[2];
             float const Inv = 1.0f / sqrtf(Sx * Sx + Sz * Sz + Sy * Sy);
             float const Dot = ToCam[0] * (Sx * Inv) + ToCam[2] * (Sz * Inv) + ToCam[1] * (Sy * Inv);
             if (Mode == 0)
@@ -3342,8 +3246,8 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
         }
 
         // Q = V x axis and H = Q x V, each scaled to the radius.
-        float const R = Seg[3];
-        float const* const Axis = Seg + 5;
+        float const R = Bit->Radius;
+        float const* const Axis = Bit->Axis;
         float Qx = V[1] * Axis[2] - V[2] * Axis[1];
         float Qy = V[2] * Axis[0] - V[0] * Axis[2];
         float Qz = V[0] * Axis[1] - V[1] * Axis[0];
@@ -3365,15 +3269,16 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
             continue;
 
         // The additive path premultiplies the colour.
-        float const Cr = *reinterpret_cast<float*>(B + 0xa8);
-        float const Cg = *reinterpret_cast<float*>(B + 0xac);
-        float const Cb = *reinterpret_cast<float*>(B + 0xb0);
+        float const Cr = Nebula->ExteriorColor[0];
+        float const Cg = Nebula->ExteriorColor[1];
+        float const Cb = Nebula->ExteriorColor[2];
         if (bHasAlpha)
             Win3DColor4f(Cr, Cg, Cb, A);
         else
             Win3DColor3f(Cr * A, Cg * A, Cb * A);
 
-        FTexShape const* const Shape = *reinterpret_cast<FTexShape* const*>(Seg + 4);
+        FTexShape const* const Shape = Bit->Shape;
+
         Win3DTexCoord2f(Shape->U0, Shape->V0);
         Win3DVertex3f((P[0] + Qx) + Hx, (P[1] + Qy) + Hy, (P[2] + Qz) + Hz);
         Win3DTexCoord2f(Shape->U1, Shape->V0);
@@ -3392,11 +3297,10 @@ void NebulaDrawBolts(FNebulaEffect* Nebula, void* Camera)
     Win3DEnable(kWin3DCullFace);
 
     // The effect at +0xec (the companion's, released by Shutdown).
-    FEffectBase* const Effect = *reinterpret_cast<FEffectBase**>(B + 0xec);
+    FEffectBase* const Effect = static_cast<FEffectBase*>(Nebula->Companion.Values[2]);
     if (Effect != nullptr)
     {
-        using FEffectSlot0C = void(__thiscall*)(FEffectBase*, float);
-        Effect->SetIntensity(static_cast<float>(1.0 - *reinterpret_cast<float*>(B + 0x294)));
+        Effect->SetIntensity(static_cast<float>(1.0 - Nebula->InsideFade));
     }
 }
 
@@ -3408,14 +3312,13 @@ void FNebulaEffect::Shutdown()
     if (Nebula->FlagLoaded == 0)
         return;
 
-    unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
-    *reinterpret_cast<unsigned*>(B + 0xa0) = 0;
+    Nebula->ExteriorShapeCount = 0;
 
-    void* Bolt = *reinterpret_cast<void**>(B + 0xe0);
-    if (Bolt != nullptr)
-        operator delete(Bolt);
-    *reinterpret_cast<void**>(B + 0xe0) = nullptr;
-    *reinterpret_cast<unsigned*>(B + 0xdc) = 0;
+    if (Nebula->ExteriorBits != nullptr)
+        operator delete(Nebula->ExteriorBits);
+
+    Nebula->ExteriorBits = nullptr;
+    Nebula->ExteriorBitCount = 0;
 
     // Every Clouds is destroyed, then the list is cleared (FUN_00535980).
     FNebulaCloudsListNode* const Sentinel = Nebula->Clouds.Sentinel;
@@ -3457,20 +3360,20 @@ void FNebulaEffect::Shutdown()
         Shells.clear();
     }
 
-    LightningDisable(reinterpret_cast<float*>(B + 0x100));
+    LightningDisable(&Nebula->Lightning);
 
     // The effect / sound / light companion at +0xe4 is stopped (FUN_004fcef0 prelude inlined)
     // and released (FUN_00502d90 inlined). Nothing in Nebula.cpp ever fills it.
-    CliEffectCompanionArmStop(B + 0xe4);
-    CliEffectCompanionClear(B + 0xe4);
+    CliEffectCompanionArmStop(&Nebula->Companion);
+    CliEffectCompanionClear(&Nebula->Companion);
 
     // +0x270 is NOT cleared -- only a later Load with a positive period rewrites it.
-    FGameLight* const Ambient = *reinterpret_cast<FGameLight**>(B + 0x270);
+    FGameLight* const Ambient = Nebula->DynamicLight;
     if (Ambient != nullptr)
     {
         if ((Ambient->Flags & 0x08) != 0)
             GameLightVirtualDisable(Ambient);
-        GameLightRelease(*reinterpret_cast<FGameLight**>(B + 0x270));
+        GameLightRelease(Nebula->DynamicLight);
     }
 
     NebulaShapes(Nebula)->Clear();
@@ -3489,10 +3392,10 @@ FNebulaEffect::~FNebulaEffect()
     // FUN_00504cf0
     NebulaShutdown(Nebula);
 
-    unsigned char* const B = reinterpret_cast<unsigned char*>(Nebula);
 
     // ~lightning (+0x100) is FUN_005526d0.
-    LightningDisable(reinterpret_cast<float*>(B + 0x100));
+    LightningDisable(&Nebula->Lightning);
+
 
     // Clouds, companion, zone-shell map and ShapeDB unwind in reverse member order.
 }

@@ -1357,8 +1357,8 @@ FSoundManager::FSoundManager()
       FreeHw3dBuffers(0), SampleRate(0x5622), Channels(2), BitsPerSample(0x10), CoordScale(1),
       DistanceFactor(1.0f), DopplerFactor(1.0f), RolloffFactor(1.0f), Max3dPan(10000.0f),
       Window(nullptr), ArchEntries(nullptr), ArchCount(0), ArchCap(0), bArchEmpty(1), Pad108(0),
-      AttachedUnused(nullptr), AttachedSentinel(nullptr), AttachedCount(0),
-      InstanceUnused(nullptr), InstanceSentinel(nullptr), InstanceEmbeddedCount(0), NextArchId(1),
+      AttachedListAllocator(nullptr), AttachedSentinel(nullptr), AttachedCount(0),
+      InstanceListAllocator(nullptr), InstanceSentinel(nullptr), InstanceEmbeddedCount(0), NextArchId(1),
       Listener(nullptr), DirectSound(nullptr), Primary(nullptr), Parser(nullptr),
       bCoInitialized(0), Controlling(nullptr)
 {

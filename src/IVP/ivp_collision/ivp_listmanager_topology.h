@@ -14,7 +14,7 @@
 //     of IVP_Simulation_Unit_Find_Disconnected_Core / Split_Off_Core_Group
 //     (ivp_simulation_unit.cpp).
 //   * FUN_06355c80..FUN_063561c0: per-core-pair energy budget and the
-//     restitution/impulse-split math on a raw 0x6c-byte scratch.
+//     restitution/impulse-split math on a 0x6c-byte stack scratch.
 // FUN_06355bb0 (reset_time) and FUN_06356510/560/5c0 live in
 // ivp_friction_solver.cpp; FUN_06355c10 / FUN_063562d0 in
 // ivp_mindist_limiter.cpp.
@@ -62,10 +62,10 @@ int IVP_ListManager_RefreshAttachedCtxAndCountLive(IVP_ListManager_CorePairEntry
 // FUN_06355c80. IVP_ListManager_TickCorePairBudget on every entry.
 void IVP_ListManager_TickAllCorePairBudgets(IVP_ListManager* Manager);
 
-// FUN_06355ca0. Clears CorePairEntry+0x24 (_field24, the budget) on every entry.
+// FUN_06355ca0. Clears CorePairEntry+0x24 (IntegratedAntiEnergy, the budget) on every entry.
 void IVP_ListManager_ClearAllCorePairBudgets(IVP_ListManager* Manager);
 
-// FUN_06355cc0. Scales Entry->_field24 by Environment->field_120; while the
+// FUN_06355cc0. Scales Entry->IntegratedAntiEnergy by Environment->integrated_energy_damp; while the
 // result is non-negative and neither core has an AxisLock (+0x10), spends
 // some through IVP_ComputeAndApplyContactAxisImpulse, adds the amount spent
 // to the float at IVP_Environment+0x68 and subtracts it from the budget.
@@ -75,19 +75,38 @@ void IVP_ListManager_TickCorePairBudget(IVP_ListManager_CorePairEntry* Entry);
 // Scalar restitution / impulse-axis math.
 // ---------------------------------------------------------------------------
 // The 0x6c-byte scratch FUN_063561c0 builds on its stack (`SUB ESP,0x6c`)
-// and passes as `this` to FUN_06355db0 / FUN_06356000 / FUN_06356050.
-// Slots 0x18/0x19 (+0x60/+0x64) are IVP_Core*; the rest is a per-pair axis
-// scratch with no named retail class, kept as a raw float array indexed as
-// Ghidra does.
+// and passes as `this` to FUN_06355db0 / FUN_06356000 / FUN_06356050: the
+// pair's relative linear and spin motion, each with the two sides' masses /
+// axis inertias, and the energy in each. Side A is CoreA (+0x60), the
+// unmoveable side when there is one. No retail class name is known.
 struct IVP_PairContactAxisSetup
 {
-    float Field[0x1B]; // indices 0x00-0x1A, matching Ghidra's param_1_00[N] indexing
-
-    // Field[0x18]/[0x19] are IVP_Core*.
-    IVP_Core*& CoreA() { return *reinterpret_cast<IVP_Core**>(&Field[0x18]); }
-    IVP_Core*& CoreB() { return *reinterpret_cast<IVP_Core**>(&Field[0x19]); }
+    float LinearAxis[3];     // +0x00: normalised CoreB.Speed - CoreA.Speed
+    float Pad03;             // +0x0c: not written
+    float SpinAxisA[3];      // +0x10: normalised world spin delta, in A's frame
+    float Pad07;             // +0x1c
+    float SpinAxisB[3];      // +0x20: the negated delta, in B's frame
+    float Pad0b;             // +0x2c
+    float LinearSpeed;       // +0x30: |CoreB.Speed - CoreA.Speed|
+    float MassA;             // +0x34
+    float MassB;             // +0x38
+    float InvMassA;          // +0x3c
+    float InvMassB;          // +0x40
+    float SpinSpeed;         // +0x44: |world spin delta|
+    float AxisInertiaA;      // +0x48: |RotInertia * SpinAxisA| (1.0f when below 1e-10f)
+    float AxisInertiaB;      // +0x4c
+    float InvAxisInertiaA;   // +0x50
+    float InvAxisInertiaB;   // +0x54
+    float SpinEnergy;        // +0x58
+    float LinearEnergy;      // +0x5c
+    IVP_Core* CoreA;         // +0x60
+    IVP_Core* CoreB;         // +0x64
+    float EnergySum;         // +0x68: SpinEnergy + LinearEnergy
 };
 static_assert(sizeof(IVP_PairContactAxisSetup) == 0x6C, "IVP_PairContactAxisSetup must match retail's 0x6C-byte scratch extent (FUN_063561c0's own SUB ESP,0x6c)");
+static_assert(offsetof(IVP_PairContactAxisSetup, LinearSpeed) == 0x30, "IVP_PairContactAxisSetup+0x30");
+static_assert(offsetof(IVP_PairContactAxisSetup, CoreA) == 0x60, "IVP_PairContactAxisSetup+0x60");
+static_assert(offsetof(IVP_PairContactAxisSetup, EnergySum) == 0x68, "IVP_PairContactAxisSetup+0x68");
 
 // FUN_06355d20. (A - sqrt(|A*A - (D+D)*(B+C)|)) * (1/(B+C)), left on the x87
 // stack (double here); both callers spill it as float.
@@ -98,18 +117,18 @@ double IVP_SolveContactAxisRoot(float A, float B, float C, float D);
 double IVP_SolveContactAxisEnergySplit(float A, float B, float C, float D, float E);
 
 // FUN_06355db0, thiscall on the scratch. Orders the two cores (a kinematic
-// CoreB is swapped into slot 0x18), then stores the normalised relative
+// CoreB is swapped into CoreA), then stores the normalised relative
 // linear speed, the normalised relative world spin taken back into each
 // core's frame, the inertia-weighted lengths with their inverses, and the
 // masses / inverse masses.
 void IVP_PopulateContactAxisSetup(IVP_PairContactAxisSetup* Setup, IVP_Core* CoreA, IVP_Core* CoreB);
 
-// FUN_06356000. Two IVP_SolveContactAxisEnergySplit calls (Field[0x11..0x15]
-// and Field[0x0c..0x10]) into Field[0x16] / [0x17], their sum into [0x1a].
+// FUN_06356000. Two IVP_SolveContactAxisEnergySplit calls (spin, then linear)
+// into SpinEnergy / LinearEnergy, their sum into EnergySum.
 void IVP_ComputeContactAxisEnergies(IVP_PairContactAxisSetup* Setup);
 
 // FUN_06356050. Adds the two roots' impulses onto both cores' SpeedChange
-// (+0x84) / RotSpeedChange (+0x74); only side 0x18 is gated on kinematic flags.
+// (+0x84) / RotSpeedChange (+0x74); only CoreA is gated on kinematic flags.
 void IVP_ApplyContactAxisImpulses(IVP_PairContactAxisSetup* Setup, float Scale);
 
 // FUN_063561c0, thiscall on Entry (reads Entry->CoreA/CoreB, +0x28/+0x2c).

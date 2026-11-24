@@ -8,6 +8,7 @@
 // view's jump links. See nn_navmap.h. Retail Client\Interface\NeuroNet\NavMap.cpp.
 
 #include "NeuroNet/NavMap/nn_navmap.h"
+#include "NeuroNet/Chat/chat_init.h"                 // kTextStyleBody
 #include "NeuroNet/Economy/best_path.h"               // BestPathGetWaypointCount / BestPathGetWaypoint / First
 #include "Interface/Pages/character_select_equip.h"  // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
 #include "Space/HUD/hud_target.h"              // NavMapSectorName (FUN_0048dc10)
@@ -15,7 +16,7 @@
 #include "Common/Fonts/ids_strings.h"             // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "Common/misc_util.h"               // FmtStrSprintf (FUN_0041c970)
 #include "NeuroNet/nn_text_scratch.h"         // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
-#include "NeuroNet/nn_ui_pulse.h"             // G_NnPaletteArgb_679bb0
+#include "NeuroNet/nn_ui_pulse.h"             // G_NnPaletteCyan
 #include "Space/player_spawn.h"            // GetPlayerWaypointCountRetail / GetPlayerWaypointRetail
 #include "Interface/rich_text_win.h"
 #include "Interface/ui_scroll.h"
@@ -243,7 +244,7 @@ void NeuroNetNavMap::RefreshMissionInfo()
 
         RenderDisplayList Text;
         {
-            StyleNode Style(0x9ca4);
+            StyleNode Style(kTextStyleBody);
             RdlAppendNode(Text, Style.Clone());
         }
         AppendTextMaybeXmlRdl(G_NnTextScratchB,
@@ -263,7 +264,7 @@ void NeuroNetNavMap::RefreshMissionInfo()
     {
         RenderDisplayList Text;
         {
-            StyleNode Style(0x9ca4);
+            StyleNode Style(kTextStyleBody);
             RdlAppendNode(Text, Style.Clone());
         }
         AppendTextMaybeXmlRdl(G_NnTextScratchB,
@@ -353,7 +354,7 @@ void NeuroNetNavMap::RefreshObjectives()
             ObjectiveText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB),
                                             0);
             ObjectiveText[Row]->SetProperty(0x33,
-                                            reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679bb0),
+                                            reinterpret_cast<uintptr_t>(&G_NnPaletteCyan),
                                             1);
             ObjectiveText[Row]->SetProperty(1, 0, 0);
             MissionObjective[Row]->SetProperty(1, 0, 0);

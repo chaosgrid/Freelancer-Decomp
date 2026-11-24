@@ -333,9 +333,9 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
         Parms.AngularDamping[0] = 0.0f;
         Parms.AngularDamping[1] = 0.0f;
         Parms.AngularDamping[2] = 0.0f;
-        Parms.CollisionGroupId = ParentObj->PhysicsSystemId;
+        Parms.SystemId = ParentObj->PhysicsSystemId;
         Parms.Type = 2;
-        Parms.bFlag1c = 0;
+        Parms.bPhysicalUnmoveable = 0;
         Parms.bEnableCollisions = 1;
         Parms.Name[0] = '\0';
         _itoa((int)Equip->Owner->Id, Parms.Name, 0x18);
@@ -467,9 +467,9 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
     Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
     Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
     Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-    Parms.CollisionGroupId = ParentObj->PhysicsSystemId;
+    Parms.SystemId = ParentObj->PhysicsSystemId;
     Parms.Type = 2;
-    Parms.bFlag1c = 0;
+    Parms.bPhysicalUnmoveable = 0;
     Parms.bEnableCollisions = 0;
     Parms.Name[0] = '\0';
     _itoa((int)ParentObj->Id, Parms.Name, 0x18);

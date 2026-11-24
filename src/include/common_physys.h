@@ -132,6 +132,17 @@ namespace PhySys
     typedef IVP_BOOL(__cdecl* FCollisionFilter)(IVP_Real_Object* A, IVP_Real_Object* B);
     COMMON_API extern FCollisionFilter m_pCollisionFilter;
 
+    // CObject+0x74 and CreateParms+0x18 values; retail calls the field "anim_technique"
+    // ("PhySys::GetRadiusR(): Unknown anim_technique!", "Unknown anim_technique in
+    // PhySys::_BeamR_Children()"). Golem: the part is driven by an FLControllerGolem; merged:
+    // the part's body is merged into its root's core (FUN_06343700).
+    enum AnimTechnique
+    {
+        ANIM_TECHNIQUE_NONE = 0,
+        ANIM_TECHNIQUE_GOLEM = 1,
+        ANIM_TECHNIQUE_MERGED = 2,
+    };
+
     // ---- CreateParms ----
     // CShip::init_physics stack -> BuildIVP_Real. 13 dwords (copy loop at 0x06288970).
     struct CreateParms
@@ -139,19 +150,17 @@ namespace PhySys
         float Mass;                  // +0x00  arch Root+0x20
         float LinearDamping;         // +0x04  DEFAULT_LINEAR_DAMPING
         float AngularDamping[3];     // +0x08
-        // +0x14. MISNOMER, kept only because renaming it sweeps src/Common/common_casteroid.*
-        // and CAsteroid+0xf4 (which carries the same value under the same wrong name). This is
-        // the STAR-SYSTEM id, not a collision group: BuildIVP_Sphere and ReMakePhysicalR copy
-        // it straight onto CObject+0x50 (.text:06289471 / 0628a681, `MOV EDX,[EBP+0x14]` then
-        // `MOV [EDI+0x50],EDX` right after the BodyPtr store at +0x54), and CObject+0x50 is
-        // then handed to PhySys::GetCurrentTime(unsigned) at .text:0627e261 as the key into
-        // the systems map DAT_063fc098 -- the same unsigned key PhySys::Startup(unsigned) and
-        // Update(unsigned,float) take, compared unsigned at .text:06289a8e (`CMP EDX,[EAX+0xc]`
-        // + JC). common_cobject.cpp already fills it from IObjDB's get-system accessor.
-        // OPEN TODO: rename to SystemId across CreateParms, CAsteroid+0xf4 and CAsteroidCube.
-        unsigned CollisionGroupId;   // +0x14
-        int Type;                    // +0x18  CShip writes 2
-        unsigned char bFlag1c;       // +0x1c
+        // +0x14: the star-system id. BuildIVP_Sphere and ReMakePhysicalR copy it straight onto
+        // CObject+0x50 (.text:06289471 / 0628a681, `MOV EDX,[EBP+0x14]` then `MOV [EDI+0x50],EDX`
+        // right after the BodyPtr store at +0x54), and CObject+0x50 is then handed to
+        // PhySys::GetCurrentTime(unsigned) at .text:0627e261 as the key into the systems map
+        // DAT_063fc098 -- the same unsigned key PhySys::Startup(unsigned) and
+        // Update(unsigned,float) take.
+        unsigned SystemId;           // +0x14
+
+        int Type;                    // +0x18  AnimTechnique for the child parts (CShip: merged)
+
+        unsigned char bPhysicalUnmoveable;       // +0x1c
         unsigned char bEnableCollisions; // +0x1d  BuildIVP_Real reads this
         char Name[8];                // +0x1e  itoa(object id)
         unsigned char bHasInertia;   // +0x26  Root+0x38
@@ -235,7 +244,8 @@ namespace PhySys
     struct PhantomParms
     {
         unsigned SystemId;          // +0x00
-        unsigned char Flag04;       // +0x04
+        unsigned char bPhysicalUnmoveable; // +0x04  -> the body template's FlagsHi, as CreateParms+0x1c
+
         unsigned char Flag05;       // +0x05
         char Name[10];              // +0x06 .. +0x0f  collision-group name
         Vector Position;            // +0x10
@@ -595,8 +605,8 @@ namespace Collision
     COMMON_API bool __cdecl Load(class INI_Reader& Reader);
     COMMON_API void __cdecl Free();
     COMMON_API float __cdecl GetImpactDamageFromType(unsigned TypeId);
-    COMMON_API float __cdecl CalcCollisionDamage(unsigned TypeId, Vector const& RelVel, Vector const& Normal);
-    COMMON_API float __cdecl CalcCollisionDamage(float DamageFactor, float MaxSpeed, float ActualSpeed);
+    COMMON_API float __cdecl CalcCollisionDamage(unsigned TypeId, Vector const& Normal, Vector const& RelVel);
+    COMMON_API float __cdecl CalcCollisionDamage(float Speed, float Mass, float OtherMass);
 }
 
 // ---- SphereIntruderChecker ----

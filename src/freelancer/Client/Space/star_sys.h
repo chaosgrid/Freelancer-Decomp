@@ -38,6 +38,8 @@
 struct FNebulaEffect;
 class Vector;
 struct IObjRW;
+struct DamageList;
+
 
 namespace Universe
 {
@@ -128,7 +130,7 @@ void StarSysClearMusicOverride();
 
 // FUN_00553250 -- a hit between A and the object the damage record names; flags battle music
 // (DAT_00679968) when one side is the player and the other is hostile to it.
-void StarSysNoteDamage(IObjRW* Victim, void const* DamageRecord);
+void StarSysNoteDamage(IObjRW* Victim, DamageList const* Damage);
 // FUN_005532d0 -- flags battle music when the player's target (ship id) is hostile.
 void StarSysNoteTargetChange(unsigned ShipId);
 

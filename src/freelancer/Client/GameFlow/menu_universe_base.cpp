@@ -10,7 +10,7 @@
 #include "GameFlow/mirror_property_bucket.h" // FLocationBaseRuntime::MissionOffers (+0x00)
 #include "Common/Audio/menu_sound_arch.h"
 #include "Common/Audio/sound_config.h"
-#include "Interface/Pages/character_select_equip.h" // SetPlayerBaseIdRetail / SetPlayerFactionScratchRetail
+#include "Interface/Pages/character_select_equip.h" // SetPlayerBaseIdRetail / SetPlayerLocationIdRetail
 #include "GameFlow/gameflow.h"               // SetGameflowLocationBase (FUN_0043d590)
 #include "Network/login_mgr.h"              // WaitForServerResponse (FUN_005a89b0), G_bServerDisconnected
 #include "Core/main_command_handler.h"   // SetClientQuitRequested (FUN_005b2c50)
@@ -22,7 +22,6 @@
 #include "Space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
 #include "GameFlow/room_control.h"
 #include "Network/server_connect.h"         // GetLocalServerInterface (DAT_0067ecd0)
-#include "Common/Graphics/scene_render_registry.h"
 #include "Interface/win3d_renderables.h"
 
 #include "common_misc.h"
@@ -1022,7 +1021,7 @@ void ChangeClientLocation(unsigned Location)
             LoadLocationBase(NewEntry, NewBase);
         NewEntry->RefCount += 1;
         SetPlayerBaseIdRetail(NewBase);
-        SetPlayerFactionScratchRetail(Location);
+        SetPlayerLocationIdRetail(Location);
         SetGameflowLocationBase(NewBase);
     }
     else if ((G_LocationCurrentRoom & 0x3fffffffu) != 0)

@@ -1415,8 +1415,11 @@ namespace
         // Slot 4. The orientation variant's FUN_06f350d0 frees the four core blocks
         // (+0x48/+0x38/+0x28/+0x18), then builds a fresh 0x60-byte core from (Pts, Count)
         // with FUN_06f22d30 and FUN_06f22ca0 -- this method's sequence for nonempty input.
-        // Empty / one-point producer paths still differ from retail (FUN_06f22ec0 /
-        // FUN_06f233b0).
+        // Deviation: with Count 0 retail's FUN_06f21ca0 leaves the vectors empty and
+        // +0x54/+0x58 unwritten, and FUN_06f22630 then stores through the null Times vector
+        // (+0x38) and faults; the port leaves an empty core. With Count 1 retail grows the
+        // point vector with an uninitialised stack fill that the start ghost reads as P2; the
+        // port's storage is zeroed.
         GENRESULT LoadPointsInternal(const float* Pts, int Count)
         {
             FreePath();
@@ -1700,13 +1703,13 @@ namespace
         // QueryInterface / AddRef / Release are the forwarding overrides above. No facet slot
         // tests its `this`; the inner-core tests live in the helpers they call.
         // Slot 3, LAB_06f34180 (position) / LAB_06f354a0 (orientation).
-        GENRESULT DACOM_API Slot3Transform(float T, float* OutXform) override
+        GENRESULT DACOM_API GetTransformAt(float T, float* OutXform) override
         {
             return EvaluateTransform(&T, OutXform);
         }
 
         // Slot 4, LAB_06f343f0: checks the inner core, not the public facade.
-        GENRESULT DACOM_API Slot4Evaluate(float T, float* OutVec3) override
+        GENRESULT DACOM_API GetPositionAt(float T, float* OutVec3) override
         {
             if (!HasInnerSpline())
                 return static_cast<GENRESULT>(-1);
@@ -1716,19 +1719,19 @@ namespace
 
         // Slot 5: LAB_06f34420 (position) / LAB_06f35530 (orientation, which forces success
         // once its inner exists). EvaluateOrientation keeps both contracts.
-        GENRESULT DACOM_API Slot5Orientation(float T, float* Out) override
+        GENRESULT DACOM_API GetOrientationAt(float T, float* Out) override
         {
             return EvaluateOrientation(&T, Out);
         }
 
         // Slot 6, LAB_06f34640.
-        GENRESULT DACOM_API Slot6LookAt(float T, float* OutVec3) override
+        GENRESULT DACOM_API GetTangentAt(float T, float* OutVec3) override
         {
             return EvaluateLookAt(&T, OutVec3);
         }
 
         // Slot 7, LAB_06f34670: the inner core at object+0xc, null -> -1; see PathLength.
-        GENRESULT DACOM_API Slot7Length(float* OutLength) override
+        GENRESULT DACOM_API GetPathLength(float* OutLength) override
         {
             return PathLength(OutLength);
         }
@@ -1736,14 +1739,14 @@ namespace
         // IPersistString facet (+8; tables .rdata:06f5ab50 position / 06f5ac50 orientation).
         // QI / AddRef / Release thunk to the object's own slots (LAB_06f37ac0..06f37ae0).
         // Slot 3, FUN_06f34cc0 (position).
-        GENRESULT DACOM_API Slot3Load(const char* Text) override { return LoadPersist(Text); }
+        GENRESULT DACOM_API Load(const char* Text) override { return LoadPersist(Text); }
         // Slot 4, FUN_06f34bc0 (position) / FUN_06f35580 (orientation).
-        GENRESULT DACOM_API Slot4Save(char* Buffer, unsigned long Size) override
+        GENRESULT DACOM_API Save(char* Buffer, unsigned long Size) override
         {
             return SavePersist(Buffer, Size);
         }
         // Slot 5, LAB_06f34ca0 (position, no test) / LAB_06f356c0 (orientation).
-        unsigned long DACOM_API Slot5EstimateSize() override { return PersistEstimateSize(); }
+        unsigned long DACOM_API EstimateSize() override { return PersistEstimateSize(); }
 
     private:
         // The real core owns Points, Quats, Times and individual sample rows.
@@ -1911,18 +1914,6 @@ namespace
                 fstp Z
                 mov eax, Z
                 mov dword ptr [edx + 8], eax
-            }
-        }
-
-        void ApplyLoadedQuats(const FQuat* Quats, int Count)
-        {
-            if (!bOrientation_ || Quats_ == nullptr || Quats == nullptr)
-                return;
-            for (int Index = 0; Index < Count; ++Index)
-            {
-                const float Values[4] = {Quats[Index].W, Quats[Index].X, Quats[Index].Y,
-                                         Quats[Index].Z};
-                SetOrientationInternal(static_cast<unsigned int>(Index), Values);
             }
         }
 

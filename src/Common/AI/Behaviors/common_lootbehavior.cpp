@@ -12,7 +12,7 @@
 #include "common_cobject.h"        // CObject, CShip, CLoot, CEqObj::get_behavior_interface
 #include "common_iface.h"          // IObjInspect, IObjAffect, IObjRW, IBehaviorManager, EquipmentVal
 #include "common_misc.h"           // SUBOBJ_ID_NONE
-#include "common_systemmanager.h"  // SystemManager -- what NavHelper points at
+#include "common_systemmanager.h"  // SystemManager -- what SysMgr points at
 
 #include <cstring>
 
@@ -68,35 +68,35 @@ namespace
         return ((1.5f - ((static_cast<double>(Seed) * Seed) * DistSq) * 0.5f) * Seed) * DistSq;
     }
 
-    // FUN_062ecd90: `this` is the SystemManager+0x1498 tractor record {Owner1498, Watcher149C,
-    // Unknown14A4 = tractor equipment id}. Points the tractor at Target through the owner
+    // FUN_062ecd90: `this` is the SystemManager+0x1498 tractor record {TractorOwner, TractorTargetWatcher,
+    // TractorEquipId = tractor equipment id}. Points the tractor at Target through the owner
     // ship's IObjAffect::tractor_single (slot 0x40).
     bool TractorActivate(SystemManager* Sys, IObjRW* Target)
     {
         if (Target == nullptr)
             return false;
-        unsigned short const* const Id = reinterpret_cast<unsigned short const*>(&Sys->Unknown14A4);
+        unsigned short const* const Id = reinterpret_cast<unsigned short const*>(&Sys->TractorEquipId);
         if (*Id == SUBOBJ_ID_NONE)
             return false;
-        IObjRW* const Current = WatchedObject(Sys->Watcher149C);
+        IObjRW* const Current = WatchedObject(Sys->TractorTargetWatcher);
         if (Current != nullptr && Current->get_id() == Target->get_id())
             return false;
-        Sys->Watcher149C.set(reinterpret_cast<Watchable const*>(reinterpret_cast<char*>(Target) + 8));
-        IObjRW* const Owner = WatchedObject(Sys->Owner1498->Watcher);
-        int const Result = static_cast<IObjAffect*>(Owner)->tractor_single(Id, WatchedObject(Sys->Watcher149C), -1);
+        Sys->TractorTargetWatcher.set(reinterpret_cast<Watchable const*>(reinterpret_cast<char*>(Target) + 8));
+        IObjRW* const Owner = WatchedObject(Sys->TractorOwner->Watcher);
+        int const Result = static_cast<IObjAffect*>(Owner)->tractor_single(Id, WatchedObject(Sys->TractorTargetWatcher), -1);
         return Result == 0;
     }
 
     // FUN_062ece40: releases the tractor through IObjAffect::toggle_item (slot 0x4c).
     bool TractorRelease(SystemManager* Sys)
     {
-        if (WatchedObject(Sys->Watcher149C) == nullptr)
+        if (WatchedObject(Sys->TractorTargetWatcher) == nullptr)
             return false;
-        unsigned short const* const Id = reinterpret_cast<unsigned short const*>(&Sys->Unknown14A4);
+        unsigned short const* const Id = reinterpret_cast<unsigned short const*>(&Sys->TractorEquipId);
         if (*Id == SUBOBJ_ID_NONE)
             return false;
-        Sys->Watcher149C.set(nullptr);
-        IObjRW* const Owner = WatchedObject(Sys->Owner1498->Watcher);
+        Sys->TractorTargetWatcher.set(nullptr);
+        IObjRW* const Owner = WatchedObject(Sys->TractorOwner->Watcher);
         return static_cast<IObjAffect*>(Owner)->toggle_item(Id, false, -1) == 0;
     }
 }
@@ -105,19 +105,7 @@ namespace
 // FUN_062ce400.
 // ----------------------------------------------------------------------------
 LootBehavior::LootBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , OwnerContext(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime(0.0f)
-    , BehaviorMgrPtr(nullptr)
-    , NavHelper(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
+    : Behavior(InTypeId)
     , Move()                        // FUN_062d4e60
     , Face()                        // FUN_062d6750
     , bHasTractor164(0)             // not written by retail's ctor; SetContext writes it
@@ -128,7 +116,6 @@ LootBehavior::LootBehavior(int InTypeId)
     , Field170(13.0f)
     , Target{}
 {
-    ConstructBase(InTypeId);        // FUN_062d2020
 }
 
 // FUN_062ce4c0 (scalar deleting FUN_062ce4a0).
@@ -144,8 +131,8 @@ bool LootBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     bool const bOk = BindContext(Owner, Manager, Sys);              // FUN_062d2090
     if (bOk)
     {
-        Move.SetContext(OwnerContext, NavHelper, Manager);
-        Face.SetContext(OwnerContext, NavHelper, Manager);
+        Move.SetContext(OwnerContext, SysMgr, Manager);
+        Face.SetContext(OwnerContext, SysMgr, Manager);
     }
 
     // The rest runs whether or not the binder accepted the context.
@@ -160,11 +147,11 @@ bool LootBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     Tractor.Value = 0.0f;
     Tractor.EquipId = SUBOBJ_ID_NONE;
     Tractor.Pad = 0;
-    IObjRW* const Ship = OwnShip(NavHelper);
+    IObjRW* const Ship = OwnShip(SysMgr);
     if (Ship->find_equipment(&Tractor.EquipId, 1, 0x100000) == 0)  // tractor class
     {
         bHasTractor164 = 1;
-        if (OwnShip(NavHelper)->get_equipment_val(Tractor, Tractor.EquipId,
+        if (OwnShip(SysMgr)->get_equipment_val(Tractor, Tractor.EquipId,
                                                   static_cast<EquipmentValType>(5), 0.0f) == 0)
         {
             // Double 0.75 (.rdata:0639fe28), rounded once.
@@ -191,7 +178,7 @@ void LootBehavior::OnDisengage()
     Target.bDirected = 0;
     Move.Commit();
     Face.Commit();
-    (void)TractorRelease(NavHelper);
+    (void)TractorRelease(SysMgr);
     Behavior::OnDisengage();
 }
 
@@ -202,18 +189,18 @@ int LootBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
     // Only with a tractor and the TargetManager in attack state 2.
-    if (bHasTractor164 != 0 && NavHelper->Targeting.AttackState == 2)
+    if (bHasTractor164 != 0 && SysMgr->Targeting.AttackState == 2)
     {
         if (WatchedObject(Target.Watcher) == nullptr)
             (void)AcquireLootTarget(&Target);
         if (WatchedObject(Target.Watcher) != nullptr)
         {
-            ModeSelector0xc = Flag29 ? 3 : 0;
-            return ModeSelector0xc;
+            Readiness = Flag29 ? 3 : 0;
+            return Readiness;
         }
     }
-    ModeSelector0xc = Flag29 ? 3 : 2;
-    return ModeSelector0xc;
+    Readiness = Flag29 ? 3 : 2;
+    return Readiness;
 }
 
 // ----------------------------------------------------------------------------
@@ -229,14 +216,14 @@ bool LootBehavior::IsLootUnclaimed(IObjRW* Loot)
 
     // Every ship-class object in the owner's scan list (FUN_062e74e0).
     ScanList const* List = nullptr;
-    (void)NavHelper->Timers.GetOwnScanList(List, 0x7f0000);
+    (void)SysMgr->Timers.GetOwnScanList(List, 0x7f0000);
     if (List == nullptr)
         return false;
 
     for (int Index = 0; static_cast<unsigned>(Index) < static_cast<unsigned>(List->Count); ++Index)   // unsigned compare
     {
         IObjRW* const Other = WatchedObject(List->Entries[Index]);
-        if (Other == OwnShip(NavHelper))
+        if (Other == OwnShip(SysMgr))
             continue;
         unsigned OtherType = 0;                                     // not pre-set in retail
         Other->get_type(OtherType);                                 // result unread
@@ -264,7 +251,7 @@ bool LootBehavior::IsLootUnclaimed(IObjRW* Loot)
 // ----------------------------------------------------------------------------
 bool LootBehavior::AcquireLootTarget(FLootTarget* Slot)
 {
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     pub::AI::Personality::JobStruct const& Job = Sys->PersonalityData.JobParams;
     if (Job.LootPreference == 0)                                    // Sys+0x18fc
         return false;
@@ -288,6 +275,8 @@ bool LootBehavior::AcquireLootTarget(FLootTarget* Slot)
         if ((CandidateType & 0x10000000u) == 0)
             continue;
 
+        // Retail: each failed test below ends the whole scan (`JE 062ceb0f`, past the loop),
+        // not just this candidate.
         CLoot const* const Loot = static_cast<CLoot const*>(CObjectOfClass(Candidate, CObject::ClassLoot));
         if (Loot->bCanAiTractor == 0)                               // +0xfc
             break;
@@ -351,22 +340,22 @@ int LootBehavior::OnUpdate()
 {
     if (OwnerContext == nullptr)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
     IObjRW* const Loot = WatchedObject(Target.Watcher);
     if (Loot == nullptr)
     {
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     if (!OwnHoldHasRoom(Sys))
     {
         Target.Watcher.set(nullptr);
         Target.bDirected = 0;
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
@@ -389,13 +378,13 @@ int LootBehavior::OnUpdate()
             Move.Commit();
             if (!TractorActivate(Sys, Loot))
             {
-                UpdateResult10 = 1;
+                UpdateResult = 1;
                 return 1;
             }
         }
         Target.Watcher.set(nullptr);
         Target.bDirected = 0;
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
@@ -408,14 +397,14 @@ int LootBehavior::OnUpdate()
         Move.Commit();
         Face.SetWatchObject(Loot);                                  // FUN_062d7510
         if (Face.Update(DeltaTime) == 1 && TractorActivate(Sys, Loot))
-            return 2;                                               // UpdateResult10 not written
+            return 2;                                               // UpdateResult not written
     }
     else
     {
         Face.SetWatchObject(Loot);
         Face.Update(DeltaTime);
     }
-    UpdateResult10 = 1;
+    UpdateResult = 1;
     return 1;
 }
 
@@ -424,8 +413,8 @@ int LootBehavior::OnUpdate()
 // ----------------------------------------------------------------------------
 bool LootBehavior::OnApplyDirective(void* DirectiveOp)
 {
-    unsigned char* const Op = static_cast<unsigned char*>(DirectiveOp);
-    void* const Found = NavHelper->Timers.FindVerifiedObject((unsigned const*)(Op + 0xc));   // FUN_062e74a0
+    pub::AI::DirectiveTractorBeamOp const* const Op = static_cast<pub::AI::DirectiveTractorBeamOp const*>(DirectiveOp);
+    void* const Found = SysMgr->Timers.FindVerifiedObject(&Op->TargetId);   // FUN_062e74a0
     Target.Watcher.set(Found != nullptr ? reinterpret_cast<Watchable const*>(static_cast<char*>(Found) + 8)
                                         : nullptr);
     if (WatchedObject(Target.Watcher) != nullptr)
@@ -435,6 +424,6 @@ bool LootBehavior::OnApplyDirective(void* DirectiveOp)
         return true;
     }
     Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-    Flag16c = Op[0x10];
+    Flag16c = Op->Field_10;
     return false;
 }

@@ -400,7 +400,7 @@ void CargoBarControl::Draw()
         Win3DEnd();
     }
 
-    Slot39();
+    PostDraw();
 }
 
 void CargoBarControl::SetPosition(float const* NewPosition)
@@ -524,9 +524,9 @@ intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
     case 1:
         if (A != 0)
-            Flags = static_cast<unsigned char>(Flags & 0xfc);
+            Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         else
-            Flags = static_cast<unsigned char>(Flags | 3);
+            Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         break;
     case 2:
         bShow = (A == 0) ? 1 : 0;

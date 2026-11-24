@@ -10,6 +10,7 @@
 #include "common_id.h"
 #include "common_ini.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
+#include "Core/msvcrt_atof.h"
 #include "dacom.h"
 
 #include <map>
@@ -145,7 +146,7 @@ bool __cdecl Loadout::ReadCargoLine(INI_Reader& Reader, EquipDesc& Desc)
     }
     else
     {
-        if (atof(Reader.get_value_string(2)) != 0.0)
+        if (MsvcrtAtof(Reader.get_value_string(2)) != 0.0)
             return true;
         CacheString Hp;
         Hp.Value = StringAlloc(Reader.get_value_string(2), false);

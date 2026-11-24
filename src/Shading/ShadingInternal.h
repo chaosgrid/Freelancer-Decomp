@@ -27,17 +27,13 @@ static const void* kRegisterPriority = (const void*)0x80000000;
 // D3D8 numbers (enum names are d3d8.h matches, not DLL strings).
 static const D3DRENDERSTATETYPE kRsLighting = D3DRS_LIGHTING;
 static const D3DRENDERSTATETYPE kRsColorVertex = D3DRS_COLORVERTEX;
-static const D3DRENDERSTATETYPE kRsSpecularEnable = D3DRS_SPECULARENABLE;
 static const D3DRENDERSTATETYPE kRsAlphaBlendEnable = D3DRS_ALPHABLENDENABLE;
 static const D3DRENDERSTATETYPE kRsSrcBlend = D3DRS_SRCBLEND;
 static const D3DRENDERSTATETYPE kRsDestBlend = D3DRS_DESTBLEND;
 static const D3DRENDERSTATETYPE kRsZWriteEnable = D3DRS_ZWRITEENABLE;
 static const D3DRENDERSTATETYPE kRsZFunc = D3DRS_ZFUNC;
 static const D3DRENDERSTATETYPE kRsCullMode = D3DRS_CULLMODE;
-static const D3DRENDERSTATETYPE kRsAlphaRef = D3DRS_ALPHAREF;
-static const D3DRENDERSTATETYPE kRsAlphaFunc = D3DRS_ALPHAFUNC;
 static const D3DRENDERSTATETYPE kRsAlphaTestEnable = D3DRS_ALPHATESTENABLE;
-static const unsigned long kZFuncLessEqual = 4;
 
 static const unsigned long kTssColorOp = 1;
 static const unsigned long kTssColorArg1 = 2;
@@ -48,60 +44,9 @@ static const unsigned long kTssAlphaArg2 = 6;
 static const unsigned long kTssTexCoordIndex = 0xB;
 static const unsigned long kTssAddressU = 0xD;
 static const unsigned long kTssAddressV = 0xE;
-static const unsigned long kTssTextureTransformFlags = 0x18;
-
-static const unsigned long kTopDisable = 1;
-static const unsigned long kTopSelectArg1 = 2;
-static const unsigned long kTopModulate = 4;
-static const unsigned long kTopModulate2X = 5;
-static const unsigned long kTopAdd = 7;
-static const unsigned long kTaDiffuse = 0;
-static const unsigned long kTaCurrent = 1;
-static const unsigned long kTaTexture = 2;
-static const unsigned long kBlendZero = 1;
-static const unsigned long kBlendSrcAlpha = 5;
-static const unsigned long kBlendInvSrcAlpha = 6;
-static const unsigned long kBlendDestColor = 9;
-static const unsigned long kBlendOne = 2;
-
-static const unsigned long kSubmitFlagIrDraw = 0x100;
-static const unsigned long kSubmitFlagSkipAlphaTest = 0x400;
 
 // DAT_06ed4848 dword[4]: NONE stays, CW↔CCW. Indexed by D3DRS_CULLMODE (0x16).
 static const unsigned long kCullFlip[4] = {0, 1, 3, 2};
-
-// D3D8 D3DPRIMITIVETYPE. SphereMesh slot-10 arg2 is immediate 4 (TRIANGLELIST).
-static const unsigned long kD3dPrimTriangleList = 4;
-static const unsigned long kD3dPrimMax = 6;
-
-enum EMaterialBind
-{
-    BindDcDt = 0,
-    BindLightMap,
-    BindNebula,
-    BindAtmosphere,
-    BindDcDtEt,
-    BindEcEt,
-    BindDetailMap,
-    BindBtDetail,
-    BindNull,
-    BindStub
-};
-
-enum EMaterialSubmit
-{
-    SubmitDcDt = 0,
-    SubmitDcDtTwo,
-    SubmitKernel,
-    SubmitLightMap,
-    SubmitDetail2Pass,
-    SubmitIllumDetail2Pass,
-    SubmitMaskedDetail2Pass,
-    SubmitAtmosphere,
-    SubmitNull,
-    SubmitStub,
-    SubmitBtDetailTwo
-};
 
 // FShadingPropertyValue / FShadingPropertyRecord (FUN_06eb28f0, stride 0x4C) live in
 // render/shading.h because freelancer.exe's SwappedMaterial reads them.
@@ -113,42 +58,10 @@ inline bool IidEqual(const char* Left, const char* Right)
     return std::strcmp(Left, Right) == 0;
 }
 
-inline GENRESULT QiFrom(void* Object, const char* Iid, void** Out)
-{
-    if (Out != nullptr)
-        *Out = nullptr;
-    if (Object == nullptr || Iid == nullptr || Out == nullptr)
-        return GR_GENERIC;
-    IDAComponent* Component = (IDAComponent*)Object;
-    return Component->QueryInterface(Iid, Out);
-}
-
-inline void* VtableSlot(void* Object, unsigned long ByteOffset)
-{
-    if (Object == nullptr)
-        return nullptr;
-    void** Table = *(void***)Object;
-    return Table[ByteOffset / 4];
-}
-
-inline void PipeSetMaterial(IRenderPipeline* Pipeline, const float* MaterialBlock)
-{
-    if (Pipeline != nullptr)
-        SetMaterialBlock(Pipeline, MaterialBlock);
-}
-
 inline void PipeSetRs(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State, unsigned long Value)
 {
     if (Pipeline != nullptr)
         Pipeline->SetRenderState(State, (int)Value);
-}
-
-inline unsigned long PipeGetRs(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State)
-{
-    int Value = 0;
-    if (Pipeline != nullptr)
-        Pipeline->GetRenderState(State, &Value);
-    return (unsigned long)Value;
 }
 
 // IRenderPipeline +0xC8 slot 50 — get_texture_format (FUN_06d0e3d9).
@@ -160,11 +73,6 @@ inline GENRESULT PipeGetTextureFormat(IRenderPipeline* Pipeline, unsigned long H
     return Pipeline->GetTextureFormat((void*)Handle, OutFormat);
 }
 
-static const unsigned long kPixelFormatField04[15] = {
-    0, 8, 0x18, 0x10, 0x10, 0x10, 0x10, 0x20, 0x20, 0, 0, 0, 0, 0, 0};
-static const unsigned long kPixelFormatField08[15] = {0, 0, 8, 5, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
-static const unsigned long kPixelFormatField18[15] = {0, 0, 8, 6, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
-static const unsigned long kPixelFormatField28[15] = {0, 0, 8, 5, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
 static const unsigned long kPixelFormatAlphaBits[15] = {
     0, 0, 0, 0, 0, 4, 1, 8, 0, 0, 1, 0, 0, 0, 0};
 static const unsigned char kPixelFormatHasAlpha[15] = {0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1};
@@ -206,34 +114,6 @@ inline void PipeSetTexture(IRenderPipeline* Pipeline, unsigned long Stage, unsig
                                          (void*)Handle);
 }
 
-// IRenderPipeline +0x100 slot 64 — set_texture_stage_transform (FUN_06d0fdd2).
-inline void PipeSetTextureTransform(IRenderPipeline* Pipeline, unsigned long Stage,
-                                    const float* Matrix)
-{
-    if (Pipeline == nullptr || Matrix == nullptr)
-        return;
-    Pipeline->SetTextureStageTransform((int)Stage, Matrix);
-}
-
-inline GENRESULT PipeVerify(IRenderPipeline* Pipeline)
-{
-    if (Pipeline != nullptr)
-        return Pipeline->VerifyState();
-    return GR_OK;
-}
-
-// Draw a borrowed vertex buffer with its base vertex and index span.
-inline GENRESULT PipeDrawIndexedVb(IRenderPipeline* Pipeline, unsigned long Prim, void* Vb,
-                                   unsigned long StartIndex, unsigned long NumVerts, void* Indices,
-                                   unsigned long Count)
-{
-    if (Pipeline == nullptr)
-        return GR_GENERIC;
-    return Pipeline->DrawIndexedPrimitiveVb(Prim, Vb, (unsigned int)StartIndex,
-                                            (unsigned int)NumVerts, Indices,
-                                            (unsigned int)Count, 0);
-}
-
 // Convert the published opaque file-system argument at the local boundary.
 inline IFileSystem* AsFileSystem(void* FileSystem)
 {
@@ -248,11 +128,6 @@ inline IVertexBufferManager* AsVbMgr(void* VbMgr)
 inline IRPDraw* AsRpDraw(void* Draw)
 {
     return (IRPDraw*)Draw;
-}
-
-inline ITextureLibrary2* AsTexLib(void* TexLib)
-{
-    return (ITextureLibrary2*)TexLib;
 }
 
 inline GENRESULT RpDrawIndexed(void* Draw, unsigned long Prim, unsigned long MinIndex,
@@ -348,37 +223,6 @@ inline void VbMgrUnlock(void* VbMgr, FVertexMemoryLock* Out)
     AsVbMgr(VbMgr)->UnlockVertexMemory(Out);
 }
 
-// IVertexBufferManager+0x20 FUN_06d114c5 → FUN_06d1f040.
-inline void VbMgrCopy(IVertexBufferManager* VbMgr, void* Dest, unsigned long Fvf, const FRpVertexSrcDesc* Mesh,
-                      unsigned long Start, unsigned long Count)
-{
-    if (VbMgr == nullptr || Dest == nullptr || Mesh == nullptr)
-        return;
-    VbMgr->CopyVertexData(Dest, Fvf, Mesh, Start, Count);
-}
-
-inline unsigned long PipeGetState(IRenderPipeline* Pipeline, unsigned long Id)
-{
-    int Value = 0;
-    if (Pipeline != nullptr)
-        Pipeline->GetPipelineState((int)Id, &Value);
-    return (unsigned long)Value;
-}
-
-inline void PipeSetWorld12(IRenderPipeline* Pipeline, const float* M12)
-{
-    if (Pipeline == nullptr || M12 == nullptr)
-        return;
-    Pipeline->SetWorld(M12);
-}
-
-inline void PipeSetModelview12(IRenderPipeline* Pipeline, const float* M12)
-{
-    if (Pipeline == nullptr || M12 == nullptr)
-        return;
-    Pipeline->SetModelview(M12);
-}
-
 inline int FileSystemOpenNode(void* FileSystem, const char* Name)
 {
     return AsFileSystem(FileSystem)->OpenNode(Name);
@@ -456,12 +300,6 @@ inline void ApplyStateTable(IRenderPipeline* Pipeline, const unsigned long* Tabl
     }
 }
 
-inline bool MatchSimplePattern(const char* Pattern, const char* Text)
-{
-    const std::unique_ptr<FMaterialRegex> Expression = FMaterialRegex::Compile(Pattern);
-    return FMaterialRegex::Search(Expression.get(), Text);
-}
-
 struct FSystemAggDesc
 {
     unsigned long Size;
@@ -532,27 +370,6 @@ inline bool WriteNamedBytes(void* FileSystem, const char* Name, const void* Buff
     return WriteOk != 0 && BytesWritten == Size;
 }
 
-// UTF +0x7C OpenByDesc is the retail no-IDataBuffer stub. Named leaves: OpenNode + Read(0) + "..".
-inline unsigned long ReadUtfNamedLeaf(void* FileSystem, const char* Name, void* Buffer,
-                                      unsigned long MaxBytes)
-{
-    if (FileSystem == nullptr || Name == nullptr || Buffer == nullptr || MaxBytes == 0)
-        return 0;
-    if (FileSystemOpenNode(FileSystem, Name) == 0)
-        return 0;
-    unsigned long Size = FileSystemGetSize(FileSystem, 0);
-    if (Size > MaxBytes)
-        Size = MaxBytes;
-    unsigned long BytesRead = 0;
-    int ReadOk = 0;
-    if (Size != 0)
-        ReadOk = FileSystemRead(FileSystem, 0, Buffer, Size, &BytesRead);
-    FileSystemOpenNode(FileSystem, "..");
-    if (ReadOk == 0)
-        return 0;
-    return BytesRead;
-}
-
 struct FTexBlock
 {
     const char* Name;           // +0
@@ -567,6 +384,13 @@ struct FTexBlock
     unsigned long AddressV;     // +24
     unsigned char bSkipResolve; // +28
     unsigned char Pad29[3];
+
+    // Run for every element by the vector delete of a material's block array.
+    ~FTexBlock()
+    {
+        delete[] Name;
+        Name = nullptr;
+    }
 };
 
 static_assert(sizeof(FTexBlock) == 0x2C, "FTexBlock stride 0x2C");
@@ -705,6 +529,4 @@ class FMaterialBatcher;
 class FTextureLibrary;
 class FMaterialAnimation;
 
-FMaterial* CreateMaterialInstance(const char* FactoryName);
-FMaterial* AsShadingFMaterial(IMaterial* Material);
 void RegisterShadingComponents();

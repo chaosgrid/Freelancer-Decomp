@@ -34,7 +34,7 @@ void CAccountsDlg::DoDataExchange(CDataExchange* DX)
 	DDX_Control(DX, 1040, AccountList);
 }
 
-// Message map .rdata:0041dec8.
+// Message-map entries .rdata:0041dec8 (the AFX_MSGMAP at 0041df88 points here).
 BEGIN_MESSAGE_MAP(CAccountsDlg, CDialog)
 	ON_WM_MEASUREITEM()                             // 00412c50
 	ON_LBN_SELCHANGE(1040, &CAccountsDlg::OnSelChangeList) // 00412f00

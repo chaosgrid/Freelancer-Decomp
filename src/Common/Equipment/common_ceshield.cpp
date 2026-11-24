@@ -425,7 +425,7 @@ void CEShieldIntruderChecker::Attach(CEShield* Shield)
 
     PhySys::PhantomParms Parms;
     Parms.SystemId = 0;
-    Parms.Flag04 = 0;
+    Parms.bPhysicalUnmoveable = 0;
     Parms.Flag05 = 0;
     Parms.Position.x = 0.0f;
     Parms.Position.y = 0.0f;

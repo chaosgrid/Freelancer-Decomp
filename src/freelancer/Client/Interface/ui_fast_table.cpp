@@ -87,7 +87,7 @@ namespace
         }
         Self->MaxLines = Other->MaxLines;
         // +0x0c is the child vector's allocator byte; +0x0d..+0x0f are not written by retail.
-        Self->Field0C = Other->Field0C;
+        Self->ChildAlloc = Other->ChildAlloc;
         Self->Pad0D[0] = 0;
         Self->Pad0D[1] = 0;
         Self->Pad0D[2] = 0;
@@ -498,8 +498,9 @@ namespace
 {
     // One half of FUN_0058c470 ("Columns", then "Rows"): size query, _alloca((size + 3) & ~3),
     // the read, and -- only when both queries agree -- the vector emptied, resized to size / 4
-    // (unsigned) and filled. A failed query or a type other than REG_BINARY counts as size -1 on
-    // both reads, so a missing value compares equal and resizes to 0x3fffffff, as in retail.
+    // (unsigned) and filled. Retail: a failed query or a type other than REG_BINARY counts as
+    // size -1 on both reads, so a missing value compares equal and resizes to 0x3fffffff floats
+    // (0058c514 `cmp eax,esi; jnz`, no other test); that allocation fails.
     void LoadEdgeVector(FRegKeyStack* Stack, char const* Name, std::vector<float>& Edges)
     {
         DWORD Type = 0;
@@ -1002,7 +1003,8 @@ void UiFastTable::Update()
             else
                 Info = nullptr;
         }
-        // Read through the record without a null test, as retail.
+        // Retail: no null test -- an out-of-range index reads address 4 (0058e8fc
+        // `cmp [ecx+4],ebx` with ecx = 0).
         if (Info->IdsAlt != 0)
             NnToolTipFeedHover(Info);
     }
@@ -1193,7 +1195,7 @@ void UiFastTable::Draw()
             ++Last;
     }
     unsigned long Color = 0;
-    NnUiPulseBlendFromArgb(&Color, G_NnPaletteArgb_679ba4);
+    NnUiPulseBlendFromArgb(&Color, G_NnPaletteAmber);
     Win3DColor4ubv(reinterpret_cast<unsigned char const*>(&Color));
     Win3DBegin(kWin3DLineLoop);
     Win3DVertex3f(ColEdges[0], RowEdges[First], 0.0f);
@@ -1220,10 +1222,10 @@ void UiFastTable::MouseLeave(float const* /*Ray*/)
 bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // LAB_0058f230
-    if (Event->Field0 != -1)
+    if (Event->Button != kWin3DMouseLeft)
         return WinControl::MouseEvent(Event);
 
-    if (Event->Field1 == 3)
+    if (Event->Action == kWin3DMouseDoubleClick)
     {
         // Double click on a selectable, hoverable hovered row: select it (0x300d to the parent
         // on a change) and always send 0xf002. Consumed either way.
@@ -1245,7 +1247,7 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
     }
 
-    if (Event->Field1 == 2)
+    if (Event->Action == kWin3DMousePress)
     {
         unsigned const Self = static_cast<unsigned>(reinterpret_cast<uintptr_t>(this));
         if (bHovered != 0)
@@ -1337,11 +1339,12 @@ void UiScrollTable::SetItemCount(unsigned NewItemCount, unsigned NewFixedRows)
     {
         // Everything fits: value 0 and the bar hidden.
         ScrollBar->SetValue(0.0f);
-        ScrollBar->Flags = static_cast<unsigned char>(ScrollBar->Flags & 0xfc);
+        ScrollBar->Flags =
+            static_cast<unsigned char>(ScrollBar->Flags & ~(kWin3DActive | kWin3DVisible));
         MarkDirty(true, true);
         return;
     }
-    ScrollBar->Flags = static_cast<unsigned char>(ScrollBar->Flags | 3);
+    ScrollBar->Flags = static_cast<unsigned char>(ScrollBar->Flags | kWin3DActive | kWin3DVisible);
     // The range converts as signed, the page as unsigned.
     ScrollBar->SetRange(0.0f, static_cast<float>(static_cast<int>(NewItemCount)));
     ScrollBar->SetPage(static_cast<float>(

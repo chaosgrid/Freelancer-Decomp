@@ -20,7 +20,7 @@
 #include "common_newchar.h"
 #include "common_pub.h"
 #include "common_pathfind.h"
-#include "common_universe.h" // Universe::IZone (CSimple::ZoneAtA4, get_zone_props)
+#include "common_universe.h" // Universe::IZone (CSimple::CurrentZone, get_zone_props)
 #include "dacom.h"
 
 #include <cmath>
@@ -29,8 +29,6 @@
 #include <cstring>
 #include <cstdlib>
 #include <new>
-
-static const char* kIfaceSource = "common_iface.cpp";
 
 // ObjectClass bitmask checks from retail code:
 //   & 3 == 3         → CSimple-derived (CSimple, CEqObj, CShip, etc.)
@@ -513,10 +511,10 @@ int IObjInspectImpl::is_cruise_active(bool& OutActive) const
     return -3;
 }
 
-int IObjInspectImpl::is_cruise_active(bool& OutCruise, bool& OutTradLane) const
+int IObjInspectImpl::is_cruise_active(bool& OutCruise, bool& OutCharging) const
 {
-    // FUN_062bf9e0 (from the listing). Despite the SDK name, OutTradLane is "cruise still
-    // charging": CruiseChargeTime > elapsed on the first engine. Retail reads the charge time
+    // FUN_062bf9e0 (from the listing). OutCharging (the SDK calls it a tradelane flag): cruise
+    // still charging, CruiseChargeTime > elapsed on the first engine. Retail reads the charge time
     // through CEArmor::ArmorArch on the CEEngine (same Arch field, Archetype::Engine+0x80); the
     // port calls CEEngine::GetCruiseChargeTime.
     CShip* Sh = InspectShip(Object);
@@ -530,10 +528,10 @@ int IObjInspectImpl::is_cruise_active(bool& OutCruise, bool& OutTradLane) const
     }
     OutCruise = Engine->IsCruiseEngaged();
     if (!OutCruise) {
-        OutTradLane = false;
+        OutCharging = false;
         return 0;
     }
-    OutTradLane = (Engine->GetCruiseChargeTime() > Engine->GetCruiseChargeTimeElapsed());
+    OutCharging = (Engine->GetCruiseChargeTime() > Engine->GetCruiseChargeTimeElapsed());
     return 0;
 }
 
@@ -624,10 +622,10 @@ int IObjInspectImpl::get_zone_props(unsigned long& OutProps) const
     CSimple* S = InspectSimple(Object);
     if (S != nullptr)
     {
-        if (S->ZoneAtA4 != nullptr)
+        if (S->CurrentZone != nullptr)
         {
             // Zone slot +0x1c (062a6690).
-            OutProps = S->ZoneAtA4->GetProperties();
+            OutProps = S->CurrentZone->GetProperties();
             return 0;
         }
         OutProps = 0;
@@ -1498,7 +1496,6 @@ template class COMMON_API std::vector<IObjInspect*>;
 // ---------------------------------------------------------------------------
 void InitEquipStatusBits(EquipStatus* Status)
 {
-    unsigned char* const param_1 = (unsigned char*)Status;
-    param_1[0] = param_1[0] & 0xf8;
-    *reinterpret_cast<unsigned*>(param_1 + 4) &= 0xe0000000u;
+    Status->Flags = Status->Flags & 0xf8;
+    Status->EquipFlags &= 0xe0000000u;
 }

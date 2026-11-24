@@ -63,6 +63,20 @@ struct FEncounterShip
     FEncounterShip();
 };
 
+// FEncounterFormation::Arrival indices, named after the "arrival" keys of ParseArrival.
+// Index 2 has no key of its own ("all" sets it; PlaceAtDock reads only 3..6).
+enum EArrivalMethod
+{
+    ARRIVAL_TRADELANE = 1,             // "tradelane"
+    ARRIVAL_UNNAMED_2 = 2,
+    ARRIVAL_OBJECT_DOCKING_RING = 3,   // "object_docking_ring" (and "object_all")
+    ARRIVAL_OBJECT_JUMP_GATE = 4,      // "object_jump_gate" (and "object_all")
+    ARRIVAL_OBJECT_STATION = 5,        // "object_station" (and "object_all")
+    ARRIVAL_OBJECT_CAPITAL = 6,        // "object_capital" (and "object_all")
+    ARRIVAL_CRUISE = 7,                // "cruise"
+    ARRIVAL_BUZZ = 8,                  // "buzz"
+};
+
 // EncounterParameters +0x2c element: one [EncounterFormation] section, retail 0x80 bytes.
 // Ctor FUN_06ef5b50 (defaults + ParseSection), dtor FUN_06ef3e30, copy FUN_06efa7c0 (all
 // member-wise).
@@ -83,9 +97,8 @@ struct FEncounterFormation
     ID_String Formation;                // +0x38 "formation" (set only while both are empty)
     ID_String FormationByClass;         // +0x3c "formation_by_class" (same rule)
     int Behavior;                       // +0x40 "behavior" -> ParseGuideBehavior (0)
-    // +0x44: arrival flags, always 9 bytes (1 by default; "arrival" clears them first):
-    // [1] tradelane, [2] (all only), [3] object_docking_ring, [4] object_jump_gate,
-    // [5] object_station, [6] object_capital, [7] cruise, [8] buzz; [0] is never written.
+    // +0x44: arrival flags indexed by EArrivalMethod, always 9 bytes (1 by default; "arrival"
+    // clears them first); [0] is never written.
     std::vector<unsigned char> Arrival;
     double ZoneCreationDistance;        // +0x58 (double) value 0 (1500.0)
     // +0x60: the space object ids created for this formation; FUN_06ef52d0 drops the ones

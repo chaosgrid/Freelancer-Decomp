@@ -484,7 +484,7 @@ unsigned int RpcEncodeClientRequestEvent(FPacketBase& Packet, unsigned char** Bu
     Stream.PutDword(Wire->ShipId);
     Stream.PutDword(Wire->TargetId);
     Stream.PutDword(Wire->SecondId);
-    Stream.PutByte(Wire->Field_0x10);
+    Stream.PutByte(Wire->bFlag);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -506,7 +506,7 @@ unsigned int RpcDecodeClientRequestEvent(FPacketBase& Packet, const unsigned cha
     Stream.GetDword(Wire->ShipId);
     Stream.GetDword(Wire->TargetId);
     Stream.GetDword(Wire->SecondId);
-    Stream.GetByte(Wire->Field_0x10);
+    Stream.GetByte(Wire->bFlag);
     if (Stream.Failed()) {
         return Stream.GetError();
     }

@@ -617,9 +617,10 @@ namespace Archetype
         // at +4, Count at +8; ctor in FUN_062f2180), filled by EqObj::read's "fuse" case with
         // FGroupFuse elements. The port keeps a heap std::vector<FGroupFuse>* in the first 4
         // bytes, like ShieldLinks, so bNomad/bDockingCamera stay at +0x80/+0x81.
-        // Consumer: freelancer.exe FUN_00533e10 (EquippedObjScanFuseIgnitions,
+        // Consumers: freelancer.exe FUN_00533e10 (EquippedObjScanFuseIgnitions,
         // client_equip_fx.cpp) compares HitPts against these thresholds and ignites the named
-        // fuse. Server.dll's own fuse database (FUN_06cfd4b0) is not ported.
+        // fuse; Server.dll's EqObj sweep (server_gameobject.cpp) does the same against
+        // ServerFuseDB (FUN_06cfd4b0, server_fuse.cpp).
         std::vector<FGroupFuse>* Fuses;           // +0x74 heap (retail VC6 list dummy slot)
         unsigned char Pad78[8];                   // +0x78 unused (retail Head/Count remainder)
         bool bNomad;                              // +0x80
@@ -1398,7 +1399,15 @@ namespace Archetype
         static void LoadBeamArchIdx();
         static void FreeBeamArchIdx();
 
-        bool is_guided() const { return Seeker != 0; }
+        // Seeker values, from the "seeker" key's tokens (Munition::read).
+        enum : unsigned
+        {
+            SeekerNone = 0,
+            SeekerDumb = 1,
+            SeekerLock = 2,
+        };
+
+        bool is_guided() const { return Seeker != SeekerNone; }
 
         // Retail Archetype::Munition::operator=, part of the "inherit=" shape-copy family;
         // see Equipment::InheritFrom.
@@ -1408,7 +1417,7 @@ namespace Archetype
         float EnergyDamage;               // +0x84
         ID_String WeaponType;             // +0x88
         ID_String Motor;                  // +0x8c
-        unsigned Seeker;                  // +0x90  0 none, 1 dumb, 2 lock
+        unsigned Seeker;                  // +0x90  SeekerNone / SeekerDumb / SeekerLock
         float TimeToLock;                 // +0x94
         float SeekerRange;                // +0x98
         float SeekerFovCos;               // +0x9c  cos(deg * 0.01745329), default 1
@@ -1568,6 +1577,14 @@ namespace Archetype
         // none, and retail exports exactly the memberwise copy ctor, dtor and this.
         Explosion& operator=(Explosion const&) = default;
         void reset();
+
+        // Process values, from the "process" key's tokens (Explosion::read).
+        enum : unsigned
+        {
+            ProcessShatter = 0,
+            ProcessDisappear = 1,
+            ProcessNone = 2,
+        };
         bool read(INI_Reader& Reader);
 
         ID_String Nickname;                          // +0x00
@@ -1575,7 +1592,7 @@ namespace Archetype
         float Impulse;                               // +0x08
         float HullDamage;                            // +0x0C
         float EnergyDamage;                          // +0x10
-        unsigned Process;                            // +0x14 default 1 = disappear
+        unsigned Process;                            // +0x14 default ProcessDisappear
         float Lifetime;                              // +0x18
         float LifetimeMax;                           // +0x1C default 10000
         std::vector<FExplosionEffect> Effects;       // retail list +0x20

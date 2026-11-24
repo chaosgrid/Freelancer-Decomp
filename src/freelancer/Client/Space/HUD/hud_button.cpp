@@ -334,9 +334,9 @@ void HUD_Button::Draw()
 bool HUD_Button::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // LAB_004c9430: a click (-1, 2) posts the command record through FUN_0054bcb0.
-    if (Event->Field0 != -1)
+    if (Event->Button != kWin3DMouseLeft)
         return false;
-    if (Event->Field1 != 2)
+    if (Event->Action != kWin3DMousePress)
         return false;
     FSpaceCommand Command;
     memset(&Command, 0, sizeof(Command));

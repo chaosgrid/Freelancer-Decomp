@@ -95,7 +95,7 @@ void EffectBaseConstruct(FEffectBase* This, unsigned TypeId)
     if (This == nullptr)
         return;
     std::memset((unsigned char*)This + sizeof(void*), 0, sizeof(FEffectBase) - sizeof(void*));
-    This->Priority0C = 1.0f;
+    This->Priority = 1.0f;
     // Identity rotation.
     This->LocalXform.Rotation.D[0][0] = 1.0f;
     This->LocalXform.Rotation.D[1][1] = 1.0f;
@@ -151,7 +151,7 @@ unsigned char FEffectBase::Start(FEffectArch* Arch)
         FEffectTypeInfo const* const Info =
             EffectTypeInfoByIndex(static_cast<int>(This->EffectTypeId));
         if (Info != nullptr)
-            This->Priority0C = Info->Priority;
+            This->Priority = Info->Priority;
     }
     return 1;
 }
@@ -191,7 +191,7 @@ void FEffectBase::Attach(void* WatchableOwner, int EngineIndex, FTransform const
     This->EngineIndex = EngineIndex;
     This->LocalXform = *LocalXform;
     // The frozen velocity +0x4c..+0x54.
-    std::memset(This->Pad4C, 0, sizeof(This->Pad4C));
+    std::memset(This->FrozenVelocity, 0, sizeof(This->FrozenVelocity));
 }
 
 void EffectAttach(FEffectBase* This, void* WatchableOwner, int EngineIndex,
@@ -227,7 +227,7 @@ namespace
         void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex));
 
         // The instance's CObject velocity into +0x4c.
-        float* const Velocity = reinterpret_cast<float*>(This->Pad4C);
+        float* const Velocity = reinterpret_cast<float*>(This->FrozenVelocity);
         CObject* const Object = static_cast<CObject*>(DALib::Engine->GetInstanceUserData(Instance));
         if (Object != nullptr)
         {

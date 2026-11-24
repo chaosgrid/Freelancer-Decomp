@@ -10,17 +10,17 @@
 unsigned char G_HudChromeColorRgba[4] = {0x87u, 0xC3u, 0xE0u, 0xC0u};
 
 // LAB_00561c00 .. LAB_00561d80 (bytes R,G,B,A in memory = little-endian 0xAABBGGRR).
-unsigned long G_NnPaletteArgb_679bb0 = 0xFFE0C387u; // LAB_00561c00
-unsigned long G_NnPaletteArgb_679bac = 0xFF1DBF3Bu; // LAB_00561c20
-unsigned long G_NnPaletteArgb_679ba8 = 0xFF1D1DBFu; // LAB_00561c40
-unsigned long G_NnPaletteArgb_679ba4 = 0xFF52EAF5u; // LAB_00561c60
-unsigned long G_NnPaletteArgb_679b9c = 0xFFC20088u; // LAB_00561ca0
-unsigned long G_NnPaletteArgb_679b98 = 0xFFE04848u; // LAB_00561cc0
-unsigned long G_NnPaletteArgb_679b94 = 0xFF808080u; // LAB_00561ce0
-unsigned long G_NnPaletteArgb_679b90 = 0xFFC5FBA8u; // LAB_00561d00
-unsigned long G_NnPaletteArgb_679b88 = 0xFFFD7EFFu; // LAB_00561d40
-unsigned long G_NnPaletteArgb_679b84 = 0xFFFFFFFFu; // LAB_00561d60
-unsigned long G_NnPaletteArgb_679b80 = 0xFFFF5ACEu; // LAB_00561d80
+unsigned long G_NnPaletteCyan = 0xFFE0C387u;      // DAT_00679bb0, LAB_00561c00
+unsigned long G_NnPaletteGreen = 0xFF1DBF3Bu;     // DAT_00679bac, LAB_00561c20
+unsigned long G_NnPaletteRed = 0xFF1D1DBFu;       // DAT_00679ba8, LAB_00561c40
+unsigned long G_NnPaletteAmber = 0xFF52EAF5u;     // DAT_00679ba4, LAB_00561c60
+unsigned long G_NnPalettePurple = 0xFFC20088u;    // DAT_00679b9c, LAB_00561ca0
+unsigned long G_NnPaletteBlue = 0xFFE04848u;      // DAT_00679b98, LAB_00561cc0
+unsigned long G_NnPaletteGrey = 0xFF808080u;      // DAT_00679b94, LAB_00561ce0
+unsigned long G_NnPalettePaleGreen = 0xFFC5FBA8u; // DAT_00679b90, LAB_00561d00
+unsigned long G_NnPalettePink = 0xFFFD7EFFu;      // DAT_00679b88, LAB_00561d40
+unsigned long G_NnPaletteWhite = 0xFFFFFFFFu;     // DAT_00679b84, LAB_00561d60
+unsigned long G_NnPaletteViolet = 0xFFFF5ACEu;    // DAT_00679b80, LAB_00561d80
 
 namespace
 {
@@ -86,7 +86,7 @@ void NnUiPulseAdvance(double DeltaSeconds)
 
 unsigned long NnUiPulseIdleArgb()
 {
-    return G_NnPaletteArgb_679bb0;
+    return G_NnPaletteCyan;
 }
 
 float NnUiPulsePhaseNorm()
@@ -122,12 +122,12 @@ void NnUiPulseBlendArgb(unsigned long* OutArgb)
         if (Norm < 0.5f)
         {
             From = GPulseMidArgb;
-            To = G_NnPaletteArgb_679bb0;
+            To = G_NnPaletteCyan;
             T = Norm + Norm;
         }
         else
         {
-            From = G_NnPaletteArgb_679ba4;
+            From = G_NnPaletteAmber;
             To = GPulseMidArgb;
             T = (Norm - 0.5f) + (Norm - 0.5f);
         }
@@ -137,12 +137,12 @@ void NnUiPulseBlendArgb(unsigned long* OutArgb)
         if (Norm < 0.5f)
         {
             From = GPulseMidArgb;
-            To = G_NnPaletteArgb_679ba4;
+            To = G_NnPaletteAmber;
             T = Norm + Norm;
         }
         else
         {
-            From = G_NnPaletteArgb_679bb0;
+            From = G_NnPaletteCyan;
             To = GPulseMidArgb;
             T = (Norm - 0.5f) + (Norm - 0.5f);
         }
@@ -164,7 +164,7 @@ void NnUiPulseBlendFromArgb(unsigned long* OutArgb, unsigned long BaseArgb)
     {
         int const Shift = Channel * 8;
         int const BaseByte = static_cast<int>((BaseArgb >> Shift) & 0xffu);
-        int const HotByte = static_cast<int>((G_NnPaletteArgb_679ba4 >> Shift) & 0xffu);
+        int const HotByte = static_cast<int>((G_NnPaletteAmber >> Shift) & 0xffu);
         int const Half = static_cast<int>(static_cast<double>(HotByte - BaseByte) * -0.5);
         MidSum += static_cast<unsigned char>(BaseByte - Half);
     }
@@ -185,7 +185,7 @@ void NnUiPulseBlendFromArgb(unsigned long* OutArgb, unsigned long BaseArgb)
         }
         else
         {
-            From = G_NnPaletteArgb_679ba4;
+            From = G_NnPaletteAmber;
             To = DimArgb;
             T = (Norm - 0.5f) + (Norm - 0.5f);
         }
@@ -195,7 +195,7 @@ void NnUiPulseBlendFromArgb(unsigned long* OutArgb, unsigned long BaseArgb)
         if (Norm < 0.5f)
         {
             From = DimArgb;
-            To = G_NnPaletteArgb_679ba4;
+            To = G_NnPaletteAmber;
             T = Norm + Norm;
         }
         else
@@ -215,24 +215,24 @@ void NnReputationColorArgb(unsigned long* OutArgb, float Attitude)
     // DAT_005ce7f4; an unordered attitude ends up white.
     if (Attitude <= -0.6f)
     {
-        *OutArgb = G_NnPaletteArgb_679ba8;
+        *OutArgb = G_NnPaletteRed;
         return;
     }
     if (Attitude <= -0.2f)
     {
-        *OutArgb = G_NnPaletteArgb_679b84;
+        *OutArgb = G_NnPaletteWhite;
         return;
     }
     if (Attitude >= 0.6f)
     {
-        *OutArgb = G_NnPaletteArgb_679bac;
+        *OutArgb = G_NnPaletteGreen;
         return;
     }
     // Both ways white, as in retail.
     if (Attitude >= 0.2f)
     {
-        *OutArgb = G_NnPaletteArgb_679b84;
+        *OutArgb = G_NnPaletteWhite;
         return;
     }
-    *OutArgb = G_NnPaletteArgb_679b84;
+    *OutArgb = G_NnPaletteWhite;
 }

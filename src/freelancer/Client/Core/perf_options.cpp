@@ -139,15 +139,13 @@ namespace
         G_SunEffectQuality = static_cast<float>(Q);
 
         // Every star of the list DAT_00675180 (StarSphereList): its sun body (+0x14) gets
-        // +0x2b8 = ftol(int +0x2b4 * (1.0f - Q) + 0.5f). No null tests.
+        // LodReduction (+0x2b8) = ftol(MaxLod (+0x2b4) * (1.0f - Q) + 0.5f). No null tests.
         double const Keep = 1.0 - Q;
         FStarSphereListNode* const Sentinel = StarSphereList()->Sentinel;
         for (FStarSphereListNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
         {
-            unsigned char* const Body = Node->Sphere->SunBody->Raw;
-            int const Full = *reinterpret_cast<int const*>(Body + 0x2b4);
-            *reinterpret_cast<int*>(Body + 0x2b8) =
-                static_cast<int>(static_cast<double>(Full) * Keep + 0.5);
+            FSunEffectBody* const Body = Node->Sphere->SunBody;
+            Body->LodReduction = static_cast<int>(static_cast<double>(Body->MaxLod) * Keep + 0.5);
         }
     }
 

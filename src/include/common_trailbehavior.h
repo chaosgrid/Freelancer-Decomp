@@ -77,20 +77,6 @@ public:
     // Slot 14, LAB_062cb2a0: `ADD ECX,0x2c; JMP FUN_062d6700` -- MatchThrottle2Idea::SetFlag38.
     void set_cruise(bool bOn) override;
 
-    // ---- Behavior's own +0x04..+0x2b block, still declared per class ----
-    int TypeId;                     // +0x04
-    unsigned CachedHandle08;        // +0x08
-    int ModeSelector0xc;            // +0x0c, OnEvaluateReadiness's result.
-    int UpdateResult10;             // +0x10, OnUpdate's result.
-    void* OwnerContext;             // +0x14, the owner IObjRW* (binder).
-    IObjDB* ObjectDb;
-    float DeltaTime;                // +0x1c
-    IBehaviorManager* BehaviorMgrPtr; // +0x20 (binder)
-    SystemManager* NavHelper;       // +0x24 (binder)
-    unsigned char Flags28;          // +0x28
-    unsigned char Flag29;           // +0x29
-    unsigned char Pad2a[0x2c - 0x2a];
-
     // ---- TrailBehavior's own fields ----
     MatchThrottle2Idea MatchThrottle; // +0x2c
     FaceIdea Face;                  // +0x88
@@ -132,15 +118,6 @@ public:
     float CatchUpRange244;          // +0x244, ctor 1500.0f; handed to MatchThrottle2Idea
 };
 
-static_assert(offsetof(TrailBehavior, TypeId) == 0x04, "TrailBehavior::TypeId offset");
-static_assert(offsetof(TrailBehavior, ModeSelector0xc) == 0x0c, "TrailBehavior::ModeSelector0xc offset");
-static_assert(offsetof(TrailBehavior, UpdateResult10) == 0x10, "TrailBehavior::UpdateResult10 offset");
-static_assert(offsetof(TrailBehavior, OwnerContext) == 0x14, "TrailBehavior::OwnerContext offset");
-static_assert(offsetof(TrailBehavior, DeltaTime) == 0x1c, "TrailBehavior::DeltaTime offset");
-static_assert(offsetof(TrailBehavior, BehaviorMgrPtr) == 0x20, "TrailBehavior::BehaviorMgrPtr offset");
-static_assert(offsetof(TrailBehavior, NavHelper) == 0x24, "TrailBehavior::NavHelper offset");
-static_assert(offsetof(TrailBehavior, Flags28) == 0x28, "TrailBehavior::Flags28 offset");
-static_assert(offsetof(TrailBehavior, Flag29) == 0x29, "TrailBehavior::Flag29 offset");
 static_assert(offsetof(TrailBehavior, MatchThrottle) == 0x2c, "TrailBehavior::MatchThrottle offset");
 static_assert(offsetof(TrailBehavior, Face) == 0x88, "TrailBehavior::Face offset");
 static_assert(offsetof(TrailBehavior, Move) == 0x148, "TrailBehavior::Move offset");

@@ -20,7 +20,7 @@
 //   +0x330 state bits (ctor: & 0x80): 0 hovered (MouseEnter / MouseLeave), 1 focused (0x2c /
 //          0x2d), 2 lit while pressed (MouseEvent / Update), 3 "action_button", 4 captured
 //          (the press this button holds), 5 "no_color_change" (draw white), 6 selected (0xc),
-//          7 the press was the right button
+//          7 the press was a double click
 //   +0x331 state bits (ctor: (old & 0xee) | 0xe): 0 "no_mesh_render" (0x32), 1 enabled,
 //          2 light while pressed, 3 pulse while hovered, 4 draw while inactive (0x34)
 //   +0x332 spin (0x36), +0x333 blink (0x51), +0x334 blink phase, +0x335 montage mode
@@ -94,11 +94,11 @@ public:
 
     // Retail +0x330 / +0x331 / +0x337, for owners that write a button's state directly rather
     // than through SetProperty (CTradeEquipListLine, NN_Trade).
-    unsigned char GetFlags330() const { return ButtonBits; }
-    void SetFlags330(unsigned char Value) { ButtonBits = Value; }
-    unsigned char GetFlags331() const { return ButtonBits2; }
-    void SetFlags331(unsigned char Value) { ButtonBits2 = Value; }
-    void SetByte337(unsigned char Value) { bGlow = Value; }
+    unsigned char GetButtonBits() const { return ButtonBits; }
+    void SetButtonBits(unsigned char Value) { ButtonBits = Value; }
+    unsigned char GetButtonBits2() const { return ButtonBits2; }
+    void SetButtonBits2(unsigned char Value) { ButtonBits2 = Value; }
+    void SetGlow(unsigned char Value) { bGlow = Value; }
 
     int ToolTip2Ids;               // +0x32c
     unsigned char ButtonBits;      // +0x330

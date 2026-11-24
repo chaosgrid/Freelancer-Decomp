@@ -51,8 +51,8 @@ MissionVendorProperties::MissionVendorProperties()
 MissionVendorProperties::MissionVendorProperties(MissionVendorProperties const& Other)
     : Key(Other.Key)
     , BaseId(Other.BaseId)
-    , TargetId(Other.TargetId)
-    , SystemId(Other.SystemId)
+    , OfferId(Other.OfferId)
+    , OfferKind(Other.OfferKind)
     , MissionClass(Other.MissionClass)
     , Title(Other.Title)
     , Description(Other.Description)
@@ -73,8 +73,8 @@ MissionVendorProperties& MissionVendorProperties::operator=(MissionVendorPropert
     destroy();
     Key = Other.Key;
     BaseId = Other.BaseId;
-    TargetId = Other.TargetId;
-    SystemId = Other.SystemId;
+    OfferId = Other.OfferId;
+    OfferKind = Other.OfferKind;
     MissionClass = Other.MissionClass;
     Title = Other.Title;
     Description = Other.Description;
@@ -88,8 +88,8 @@ void MissionVendorProperties::clear()
 {
     Key = -1;
     BaseId = 0;
-    TargetId = 0;
-    SystemId = 0;
+    OfferId = 0;
+    OfferKind = 0;
     MissionClass = 0;
     DestroyAndZero(Title);
     DestroyAndZero(Description);
@@ -132,8 +132,8 @@ void MissionVendorProperties::init(MissionVendorOfferDescription const& Desc)
     destroy();
     Key = -1;
     BaseId = Desc.BaseId;
-    TargetId = Desc.TargetId;
-    SystemId = Desc.SystemId;
+    OfferId = Desc.OfferId;
+    OfferKind = Desc.OfferKind;
     MissionClass = Desc.MissionClass;
     Title = Desc.Title;
     Description = Desc.Description;
@@ -146,8 +146,8 @@ void MissionVendorProperties::marshal(MarshalBuffer* Buf) const
 {
     Buf->put_void(&Key, 4);
     Buf->put_void(&BaseId, 4);
-    Buf->put_void(&TargetId, 4);
-    Buf->put_void(&SystemId, 4);
+    Buf->put_void(&OfferId, 4);
+    Buf->put_void(&OfferKind, 4);
     Buf->put_void(&MissionClass, 4);
     Buf->put_FmtStr(Title);
     Buf->put_FmtStr(Description);
@@ -167,9 +167,9 @@ void MissionVendorProperties::unmarshal(MarshalBuffer* Buf)
     Buf->get_void(&Scratch, 4);
     BaseId = Scratch;
     Buf->get_void(&Scratch, 4);
-    TargetId = Scratch;
+    OfferId = Scratch;
     Buf->get_void(&Scratch, 4);
-    SystemId = Scratch;
+    OfferKind = Scratch;
     Buf->get_void(&Scratch, 4);
     MissionClass = Scratch;
     Title = Buf->get_FmtStr();
@@ -275,14 +275,14 @@ NewsBroadcastProperties::NewsBroadcastProperties()
 NewsBroadcastProperties::NewsBroadcastProperties(NewsBroadcastProperties const& Other)
     : Key(Other.Key)
     , BaseId(Other.BaseId)
-    , bFlag1(Other.bFlag1)
-    , bFlag2(Other.bFlag2)
-    , Category(Other.Category)
+    , bBreaking(Other.bBreaking)
+    , bAutoselect(Other.bAutoselect)
+    , Icon(Other.Icon)
+    , CategoryName(Other.CategoryName)
     , Headline(Other.Headline)
-    , Body(Other.Body)
-    , Logo(Other.Logo)
+    , Text(Other.Text)
     , LogoTexture(Other.LogoTexture)
-    , LogoTextureId(Other.LogoTextureId)
+    , AudioId(Other.AudioId)
 {
 }
 
@@ -298,14 +298,14 @@ NewsBroadcastProperties& NewsBroadcastProperties::operator=(NewsBroadcastPropert
     destroy();
     Key = Other.Key;
     BaseId = Other.BaseId;
-    bFlag1 = Other.bFlag1;
-    bFlag2 = Other.bFlag2;
-    Category = Other.Category;
+    bBreaking = Other.bBreaking;
+    bAutoselect = Other.bAutoselect;
+    Icon = Other.Icon;
+    CategoryName = Other.CategoryName;
     Headline = Other.Headline;
-    Body = Other.Body;
-    Logo = Other.Logo;
+    Text = Other.Text;
     malloc_strcpy(&LogoTexture, Other.LogoTexture);
-    LogoTextureId = Other.LogoTextureId;
+    AudioId = Other.AudioId;
     return *this;
 }
 
@@ -315,22 +315,22 @@ void NewsBroadcastProperties::clear()
 {
     Key = -1;
     BaseId = 0;
-    bFlag1 = false;
-    bFlag2 = false;
-    Category = 0;
+    bBreaking = false;
+    bAutoselect = false;
+    Icon = 0;
+    DestroyAndZero(CategoryName);
     DestroyAndZero(Headline);
-    DestroyAndZero(Body);
-    DestroyAndZero(Logo);
+    DestroyAndZero(Text);
     LogoTexture = nullptr;
-    LogoTextureId = 0;
+    AudioId = 0;
 }
 
 // .text:0631b360
 void NewsBroadcastProperties::destroy()
 {
+    CategoryName.destroy();
     Headline.destroy();
-    Body.destroy();
-    Logo.destroy();
+    Text.destroy();
     malloc_strfree(&LogoTexture);
     clear();
 }
@@ -352,14 +352,14 @@ void NewsBroadcastProperties::init(NewsBroadcastDescription const& Desc)
     destroy();
     Key = -1;
     BaseId = Desc.BaseId;
-    bFlag1 = Desc.bFlag1;
-    bFlag2 = Desc.bFlag2;
-    Category = Desc.Category;
+    bBreaking = Desc.bBreaking;
+    bAutoselect = Desc.bAutoselect;
+    Icon = Desc.Icon;
+    CategoryName = Desc.CategoryName;
     Headline = Desc.Headline;
-    Body = Desc.Text;
-    Logo = Desc.Audio;
+    Text = Desc.Text;
     malloc_strcpy(&LogoTexture, Desc.LogoTexture);
-    LogoTextureId = CreateID(Desc.AudioName);
+    AudioId = CreateID(Desc.AudioName);
 }
 
 // .text:0631b3f0
@@ -367,14 +367,14 @@ void NewsBroadcastProperties::marshal(MarshalBuffer* Buf) const
 {
     Buf->put_void(&Key, 4);
     Buf->put_void(&BaseId, 4);
-    Buf->put_bool(bFlag1);
-    Buf->put_bool(bFlag2);
-    Buf->put_void(&Category, 4);
+    Buf->put_bool(bBreaking);
+    Buf->put_bool(bAutoselect);
+    Buf->put_void(&Icon, 4);
+    Buf->put_FmtStr(CategoryName);
     Buf->put_FmtStr(Headline);
-    Buf->put_FmtStr(Body);
-    Buf->put_FmtStr(Logo);
+    Buf->put_FmtStr(Text);
     Buf->put_string(LogoTexture);
-    Buf->put_FL_ID(LogoTextureId);
+    Buf->put_FL_ID(AudioId);
 }
 
 // .text:0631b490. The same stack-cell quirk as MissionVendorProperties::unmarshal. LogoTexture
@@ -386,15 +386,15 @@ void NewsBroadcastProperties::unmarshal(MarshalBuffer* Buf)
     Key = (int)Scratch;
     Buf->get_void(&Scratch, 4);
     BaseId = Scratch;
-    bFlag1 = Buf->get_bool();
-    bFlag2 = Buf->get_bool();
+    bBreaking = Buf->get_bool();
+    bAutoselect = Buf->get_bool();
     Buf->get_void(&Scratch, 4);
-    Category = Scratch;
+    Icon = Scratch;
+    CategoryName = Buf->get_FmtStr();
     Headline = Buf->get_FmtStr();
-    Body = Buf->get_FmtStr();
-    Logo = Buf->get_FmtStr();
+    Text = Buf->get_FmtStr();
     LogoTexture = Buf->get_string();
-    LogoTextureId = Buf->get_FL_ID();
+    AudioId = Buf->get_FL_ID();
 }
 
 // ---------------------------------------------------------------------------

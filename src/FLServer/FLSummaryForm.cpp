@@ -152,17 +152,18 @@ void CFLSummaryForm::Refresh()
 	{
 		::SendMessageA(LoadBar.m_hWnd, PBM_SETPOS, Load, 0);
 		COLORREF Color;
-		if ((unsigned int)Load <= 0x21)
+		// Unsigned compares: a negative load takes the red arm.
+		if ((unsigned int)Load <= 33)
 		{
-			Color = 0x1dbf3b;
+			Color = RGB(0x3b, 0xbf, 0x1d); // green, 0x1dbf3b
 		}
-		else if ((unsigned int)Load <= 0x31)
+		else if ((unsigned int)Load <= 49)
 		{
-			Color = 0x52eaf5;
+			Color = RGB(0xf5, 0xea, 0x52); // yellow, 0x52eaf5
 		}
 		else
 		{
-			Color = 0x1d1dbf;
+			Color = RGB(0xbf, 0x1d, 0x1d); // red, 0x1d1dbf
 		}
 		::SendMessageA(LoadBar.m_hWnd, PBM_SETBARCOLOR, 0, Color);
 		CString Format;

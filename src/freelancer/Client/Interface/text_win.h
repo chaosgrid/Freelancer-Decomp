@@ -58,18 +58,20 @@ public:
     float Bounds[4];                // +0x0bc -- {0, 0, width, -height}, rebuilt by Draw
     unsigned long ColorIdle;        // +0x0cc -- DAT_00679bb0
     unsigned long ColorPulse;       // +0x0d0 -- pulse base, DAT_00679ba4
-    unsigned long ColorD4;          // +0x0d4 -- zeroed, used by subclasses
-    unsigned long ColorD8;          // +0x0d8 -- zeroed, used by subclasses
+    unsigned long ColorD4;          // +0x0d4 -- zeroed; only ToolTip ApplyHover writes it, no reader
+    unsigned long BackgroundColor;  // +0x0d8 -- the box Rollover / ToolTip Draw fill
     unsigned long ColorInactive;    // +0x0dc -- DAT_00679b94
+    // +0xe0 / +0xe2 / +0xe3 / +0xe4 / +0xe5: written (InitTextDefaults, Rollover, ToolTip,
+    // TextMsgButton::SetFlagsE4E5), never read in the exe.
     unsigned char FlagE0;           // +0x0e0
-    unsigned char FlagE1;           // +0x0e1
+    unsigned char bDrawBackground;  // +0x0e1 -- Rollover / ToolTip Draw: the filled, outlined box
     unsigned char FlagE2;           // +0x0e2
     unsigned char FlagE3;           // +0x0e3
     unsigned char FieldE4;          // +0x0e4 -- not written by TextWin
     unsigned char FieldE5;          // +0x0e5 -- not written by TextWin
-    unsigned char bUsePalette;      // +0x0e6
+    unsigned char bEnabled;         // +0x0e6 -- Draw: idle / pulse colour, else ColorInactive
     unsigned char PadE7;            // +0x0e7
-    unsigned FieldE8;               // +0x0e8 -- Font::String draw-origin +0x10
+    unsigned HAlign;                // +0x0e8 -- Font::String draw-origin HAlign (1 centre, 2 right)
 
 private:
     TextWin(TextWin const&) = delete;
@@ -84,8 +86,8 @@ static_assert(offsetof(TextWin, Bounds) == 0xbc, "TextWin +0xbc bounds");
 static_assert(offsetof(TextWin, ColorIdle) == 0xcc, "TextWin +0xcc idle colour");
 static_assert(offsetof(TextWin, ColorInactive) == 0xdc, "TextWin +0xdc inactive colour");
 static_assert(offsetof(TextWin, FlagE0) == 0xe0, "TextWin +0xe0 flags");
-static_assert(offsetof(TextWin, bUsePalette) == 0xe6, "TextWin +0xe6");
-static_assert(offsetof(TextWin, FieldE8) == 0xe8, "TextWin +0xe8");
+static_assert(offsetof(TextWin, bEnabled) == 0xe6, "TextWin +0xe6");
+static_assert(offsetof(TextWin, HAlign) == 0xe8, "TextWin +0xe8");
 
 // FUN_004176c0 (cdecl, 8-byte return in EAX:EDX) -- a width/height at depth Z in world units
 // to screen units through the Win3D camera.

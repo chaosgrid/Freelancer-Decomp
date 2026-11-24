@@ -8,17 +8,17 @@
 
 #include "dacom.h"
 
-// 8-slot IMotionPath. Slot 4 = per-frame position LAB_06f343f0 (stdcall RET 0xC).
+// 8-slot IMotionPath (SplinePath.cpp FSplinePath). T is the path parameter.
 struct IMotionPath : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3Transform(float T, float* OutXform) = 0;     // 3  RET 0xC
-    virtual GENRESULT DACOM_API Slot4Evaluate(float T, float* OutVec3) = 0;       // 4  RET 0xC
-    virtual GENRESULT DACOM_API Slot5Orientation(float T, float* Out) = 0;                    // 5  +0x14 quat
-    virtual GENRESULT DACOM_API Slot6LookAt(float T, float* OutVec3) = 0;        // 6  +0x18 LOOK_AT
+    virtual GENRESULT DACOM_API GetTransformAt(float T, float* OutXform) = 0;      // 3  RET 0xC, 3x3 + pos
+    virtual GENRESULT DACOM_API GetPositionAt(float T, float* OutVec3) = 0;        // 4  RET 0xC, LAB_06f343f0
+    virtual GENRESULT DACOM_API GetOrientationAt(float T, float* OutQuat) = 0;     // 5  RET 0xC, quaternion
+    virtual GENRESULT DACOM_API GetTangentAt(float T, float* OutVec3) = 0;         // 6  RET 0xC, LOOK_AT direction
     // 7  RET 0x8 LAB_06f34670: *OutLength = inner+0x4 (FUN_06f224e0), the
     // un-normalised total arc length accumulated by FUN_06f22630; -1 when the
     // inner spline core has not been created yet.
-    virtual GENRESULT DACOM_API Slot7Length(float* OutLength) = 0;
+    virtual GENRESULT DACOM_API GetPathLength(float* OutLength) = 0;
 };
 
 
@@ -105,9 +105,9 @@ static_assert(sizeof(FThornLightProps) == 0x90, "FUN_06f27fe0 lightprops is 0x24
 // IPersistString facet retained by MOTION_PATH descriptors. RET includes the interface receiver.
 struct IPersistString : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3Load(const char* Text) = 0;                  // +0x0c RET 8
-    virtual GENRESULT DACOM_API Slot4Save(char* Buffer, unsigned long Size) = 0;   // +0x10 RET 12
-    virtual unsigned long DACOM_API Slot5EstimateSize() = 0;                    // +0x14 RET 4
+    virtual GENRESULT DACOM_API Load(const char* Text) = 0;                      // +0x0c RET 8
+    virtual GENRESULT DACOM_API Save(char* Buffer, unsigned long Size) = 0;      // +0x10 RET 12
+    virtual unsigned long DACOM_API EstimateSize() = 0;                          // +0x14 RET 4
 };
 
 // The MOTION_PATH entity's descriptor tail (+0x44). Retail stores a VC6 string plus a
@@ -178,18 +178,19 @@ static_assert(sizeof(FThornExtendedProgress) == 10, "x87 extended value storage"
 struct IParamCurve : IDAComponent
 {
     virtual float DACOM_API Evaluate(float T) = 0;                               // 3  RET 4, ST(0)
-    virtual unsigned char DACOM_API Slot4Replace(int Id, float F0, float F1, float F2,
-                                                  float F3) = 0;                 // 4  RET 0x14
-    virtual unsigned char DACOM_API Slot5ReadKey(int Id, float* Out0, float* Out1, float* Out2,
-                                                  float* Out3) = 0;              // 5  RET 0x14
+    virtual unsigned char DACOM_API ReplaceKey(int Id, float F0, float F1, float F2,
+                                               float F3) = 0;                    // 4  RET 0x14
+    virtual unsigned char DACOM_API ReadKey(int Id, float* Out0, float* Out1, float* Out2,
+                                            float* Out3) = 0;                    // 5  RET 0x14
     virtual int DACOM_API AddKey(float F0, float F1, float F2, float F3) = 0;     // 6  RET 0x10
-    virtual unsigned char DACOM_API Slot7DeleteKey(int Id) = 0;                 // 7  RET 4
-    virtual unsigned int DACOM_API GetKeyCount() = 0;                          // 8 RET 0, LAB_06f2f7b0
-    virtual int DACOM_API Slot9IdByIndex(int Index) = 0;                         // 9  RET 4
-    virtual const char* DACOM_API Slot10Clsid() = 0;                             // 10 RET 0
-    virtual const char* DACOM_API Slot11Display() = 0;                           // 11 RET 0
-    virtual float DACOM_API Slot12WrapEvaluate(int A, int B) = 0;                // 12 RET 8
-    virtual void DACOM_API Slot13Rebuild() = 0;                                  // 13 RET 0
+    virtual unsigned char DACOM_API DeleteKey(int Id) = 0;                       // 7  RET 4
+    virtual unsigned int DACOM_API GetKeyCount() = 0;                            // 8 RET 0, LAB_06f2f7b0
+    virtual int DACOM_API GetKeyId(int Index) = 0;                               // 9  RET 4
+    virtual const char* DACOM_API GetClassId() = 0;                              // 10 RET 0
+    virtual const char* DACOM_API GetDisplayName() = 0;                          // 11 RET 0
+    // 12: Evaluate((Elapsed % Period) / Period), signed IDIV (2f810).
+    virtual float DACOM_API WrapEvaluate(int Elapsed, int Period) = 0;          // 12 RET 8
+    virtual void DACOM_API Rebuild() = 0;                                        // 13 RET 0
     virtual void* DACOM_API Slot14Dtor(unsigned char DeleteFlag) = 0;            // 14
     virtual int DACOM_API Slot15PersistStub(void* Unused) = 0;                   // 15 RET 4 → 0
     virtual int DACOM_API Slot16PersistStub(void* Unused) = 0;                   // 16 RET 4 → 0
@@ -518,7 +519,7 @@ struct IThornLoadParser
     virtual unsigned int DACOM_API GetEntityCount() = 0;     // 1, retail 06f2d4d0
     virtual unsigned int DACOM_API GetEventCount() = 0;      // 2, retail 06f2d4e0
     virtual unsigned int DACOM_API GetDuration() = 0;        // 3, retail 06f2d4f0
-    virtual GENRESULT DACOM_API Load(IFileSystem* FileSystem) = 0; // 4, 06f250e0
+    virtual GENRESULT DACOM_API Load(IFileSystem* FileSystem) = 0;               // 4, 06f250e0
     virtual GENRESULT DACOM_API Build(IFileSystem* FileSystem, IScriptEngine* Engine,
                                       IThornComContext* ComContext) = 0; // 5, 06f2a910
 };
@@ -536,53 +537,54 @@ struct IThornSaveParser
                                      IThornComContext* ComContext) = 0; // 3, retail 06f2aa10
 };
 
-// 45-slot IScriptEngine (PTR_LAB_06f5af50). Names only where ABI callers exist.
-// Slot = offset/4. RET evidence is in decomp-tracker. Do not invent DA method names.
+// 45-slot IScriptEngine (PTR_LAB_06f5af50), implemented by thorn's FScriptEngine (Thorn.cpp).
+// Slot = offset/4. Names come from what the retail bodies do; slots 3, 25 and 27..30 are
+// stubs or an alias with no recovered purpose and keep placeholders.
 struct IScriptEngine : IDAComponent
 {
-    virtual GENRESULT DACOM_API Slot3(void* A, void* B) = 0;                      // 3  RET 0xC unused
-    virtual GENRESULT DACOM_API Slot4Load(void* FileSystem) = 0;                   // 4  RET 0x8
-    virtual GENRESULT DACOM_API Slot5Save(void* FileSystem) = 0;                   // 5  RET 0x8 save FUN_06f2aa10
-    virtual unsigned long DACOM_API Slot6EntityCount() = 0;                       // 6  RET 0x4
-    virtual void* DACOM_API Slot7EntityHandle(int Index) = 0;                     // 7  RET 0x8
-    virtual void* DACOM_API Slot8EntitySnapInorder(int Index) = 0;                                 // 8  RET 0x8 inorder snapshot
-    virtual void* DACOM_API Slot9Entity(int Index) = 0;                           // 9  RET 0x8
-    virtual GENRESULT DACOM_API Slot10GetPos(int Index, float* OutVec3) = 0;      // 10 RET 0xC
-    virtual GENRESULT DACOM_API Slot11GetOrient(int Index, float* OutMat9) = 0;   // 11 RET 0xC
-    virtual GENRESULT DACOM_API Slot12Attach(int Index, void* EngineObj) = 0;     // 12 RET 0xC
-    virtual GENRESULT DACOM_API Slot13Detach(int Index) = 0;                      // 13 RET 0x8
-    virtual unsigned long DACOM_API Slot14EventCount() = 0;                       // 14 RET 0x4
-    virtual void* DACOM_API Slot15EventByIndex(int Index) = 0;                    // 15 RET 0x8
-    virtual void* DACOM_API Slot16EventById(int Id) = 0;                          // 16 RET 0x8
-    virtual int DACOM_API Slot17GetDuration() = 0;                                // 17 RET 0x4
-    virtual GENRESULT DACOM_API Slot18SetDuration(int Ms) = 0;                    // 18 RET 0x8 this+0x20
-    virtual int DACOM_API Slot19GetClock() = 0;                                   // 19 RET 0x4
-    // LAB_06f39430: this in ECX, byte on stack → this+0x30, XOR EAX,EAX, RET 4.
-    virtual GENRESULT __thiscall Slot20SetLoop(unsigned char Value) = 0;          // 20 thiscall
-    virtual GENRESULT DACOM_API Slot21GetState() = 0;                             // 21 RET 0x4 get this+0x2c
-    virtual GENRESULT DACOM_API Slot22Start(int Arg) = 0;                         // 22 RET 0x8
-    virtual GENRESULT DACOM_API Slot23Stop() = 0;                                 // 23 RET 0x4
-    virtual GENRESULT DACOM_API Slot24Pause() = 0;                                // 24 RET 0x4 LAB_06f397f0 6|7→5
-    virtual GENRESULT DACOM_API Slot25Start(int Arg) = 0;                         // 25 JMP vtbl+0x58 = 22
-    virtual GENRESULT DACOM_API Slot26Tick(int DtMs) = 0;                         // 26 RET 0x8
-    virtual GENRESULT DACOM_API Slot27(void* A) = 0;                              // 27 RET 0x8 stub 0
-    virtual GENRESULT DACOM_API Slot28(void* A, void* B) = 0;                     // 28 RET 0xC stub 0
-    virtual GENRESULT DACOM_API Slot29(void* A, void* B, void* C) = 0;            // 29 RET 0x10 stub −1
-    virtual GENRESULT DACOM_API Slot30(void* A, void* B, void* C) = 0;            // 30 RET 0x10 stub −1
-    virtual unsigned long DACOM_API Slot31UserPropCount(int Index) = 0;                        // 31 RET 0x8 userprop count
-    virtual const char* DACOM_API Slot32UserPropKey(int Index, int N) = 0;                   // 32 RET 0xC N-th userprop key
-    virtual GENRESULT DACOM_API Slot33UserProp(void* Handle, const char* Key,
-                                               char** Out) = 0;                  // 33 RET 0x10
-    virtual GENRESULT DACOM_API Slot34SetUserProp(int Index, const char* Key,
-                                                  const char* Value) = 0;        // 34 RET 0x10
-    virtual GENRESULT DACOM_API Slot35AddEntity(void* Desc, int* OutIndex) = 0;  // 35 RET 0xC
-    virtual GENRESULT DACOM_API Slot36RemoveEntity(int Index) = 0;                // 36 RET 0x8
-    virtual GENRESULT DACOM_API Slot37UpdateEntity(int Index, void* Desc) = 0;    // 37 RET 0xC
-    virtual GENRESULT DACOM_API Slot38AddEvent(const void* Desc, int* OutId) = 0;  // 38 RET 0xC
-    virtual GENRESULT DACOM_API Slot39RemoveEvent(int Id) = 0;                    // 39 RET 0x8
-    virtual GENRESULT DACOM_API Slot40SetCom(IThornComContext* Com) = 0;              // 40 RET 0x8 this+0x1c
-    virtual GENRESULT DACOM_API Slot41SetLoadParser(IThornLoadParser* Parser) = 0;            // 41 RET 0x8 this+0x100
-    virtual GENRESULT DACOM_API Slot42SetSaveParser(IThornSaveParser* Parser) = 0;            // 42 RET 0x8 this+0x104
-    virtual GENRESULT DACOM_API Slot43LoadPath(const char* Path) = 0;             // 43 RET 0x8
-    virtual GENRESULT DACOM_API Slot44SavePath(const char* Path) = 0;             // 44 RET 0x8 → slot 5
+    virtual GENRESULT DACOM_API Slot3(void* A, void* B) = 0;                          // 3  RET 0xC, returns 0
+    virtual GENRESULT DACOM_API Load(void* FileSystem) = 0;                      // 4  RET 0x8
+    virtual GENRESULT DACOM_API Save(void* FileSystem) = 0;                      // 5  RET 0x8, FUN_06f2aa10
+    virtual unsigned long DACOM_API GetEntityCount() = 0;                             // 6  RET 0x4
+    virtual void* DACOM_API GetEntityHandle(int Order) = 0;                           // 7  RET 0x8, in-order walk
+    virtual void* DACOM_API GetEntityDescInOrder(int Order) = 0;                      // 8  RET 0x8, same walk
+    virtual void* DACOM_API GetEntityDesc(int Index) = 0;                             // 9  RET 0x8
+    virtual GENRESULT DACOM_API GetEntityPosition(int Index, float* OutVec3) = 0;     // 10 RET 0xC
+    virtual GENRESULT DACOM_API GetEntityOrientation(int Index, float* OutMat9) = 0;  // 11 RET 0xC
+    virtual GENRESULT DACOM_API AttachEntity(int Index, void* EngineObj) = 0;         // 12 RET 0xC
+    virtual GENRESULT DACOM_API DetachEntity(int Index) = 0;                          // 13 RET 0x8
+    virtual unsigned long DACOM_API GetEventCount() = 0;                              // 14 RET 0x4
+    virtual void* DACOM_API GetEventByIndex(int Index) = 0;                           // 15 RET 0x8
+    virtual void* DACOM_API GetEventById(int Id) = 0;                                 // 16 RET 0x8
+    virtual int DACOM_API GetScriptDuration() = 0;                                    // 17 RET 0x4
+    virtual GENRESULT DACOM_API SetScriptDuration(int Ms) = 0;                        // 18 RET 0x8, this+0x20
+    virtual int DACOM_API GetClockMs() = 0;                                           // 19 RET 0x4
+    // LAB_06f39430: this in ECX, byte on stack -> this+0x30, XOR EAX,EAX, RET 4.
+    virtual GENRESULT __thiscall SetLooping(unsigned char Value) = 0;                 // 20 thiscall
+    virtual GENRESULT DACOM_API GetPlayState() = 0;                                   // 21 RET 0x4, this+0x2c
+    virtual GENRESULT DACOM_API StartPlayback(int Arg) = 0;                           // 22 RET 0x8
+    virtual GENRESULT DACOM_API StopPlayback() = 0;                                   // 23 RET 0x4
+    virtual GENRESULT DACOM_API PausePlayback() = 0;                                  // 24 RET 0x4, LAB_06f397f0 6|7 -> 5
+    virtual GENRESULT DACOM_API Slot25Start(int Arg) = 0;                             // 25 JMP vtbl+0x58 = 22
+    virtual GENRESULT DACOM_API TickPlayback(int DtMs) = 0;                           // 26 RET 0x8
+    virtual GENRESULT DACOM_API Slot27(void* A) = 0;                                  // 27 RET 0x8, returns 0
+    virtual GENRESULT DACOM_API Slot28(void* A, void* B) = 0;                         // 28 RET 0xC, returns 0
+    virtual GENRESULT DACOM_API Slot29(void* A, void* B, void* C) = 0;                // 29 RET 0x10, returns -1
+    virtual GENRESULT DACOM_API Slot30(void* A, void* B, void* C) = 0;                // 30 RET 0x10, returns -1
+    virtual unsigned long DACOM_API GetUserPropCount(int Index) = 0;                  // 31 RET 0x8
+    virtual const char* DACOM_API GetUserPropKey(int Index, int N) = 0;               // 32 RET 0xC, N-th key
+    virtual GENRESULT DACOM_API GetUserProp(void* Handle, const char* Key,
+                                            char** Out) = 0;                          // 33 RET 0x10
+    virtual GENRESULT DACOM_API SetUserProp(int Index, const char* Key,
+                                            const char* Value) = 0;                   // 34 RET 0x10
+    virtual GENRESULT DACOM_API AddEntity(void* Desc, int* OutIndex) = 0;             // 35 RET 0xC
+    virtual GENRESULT DACOM_API RemoveEntity(int Index) = 0;                          // 36 RET 0x8
+    virtual GENRESULT DACOM_API UpdateEntity(int Index, void* Desc) = 0;              // 37 RET 0xC
+    virtual GENRESULT DACOM_API AddEvent(const void* Desc, int* OutId) = 0;           // 38 RET 0xC
+    virtual GENRESULT DACOM_API RemoveEvent(int Id) = 0;                              // 39 RET 0x8
+    virtual GENRESULT DACOM_API SetComContext(IThornComContext* Com) = 0;             // 40 RET 0x8, this+0x1c
+    virtual GENRESULT DACOM_API SetLoadParser(IThornLoadParser* Parser) = 0;          // 41 RET 0x8, this+0x100
+    virtual GENRESULT DACOM_API SetSaveParser(IThornSaveParser* Parser) = 0;          // 42 RET 0x8, this+0x104
+    virtual GENRESULT DACOM_API LoadFromPath(const char* Path) = 0;                   // 43 RET 0x8 -> slot 4
+    virtual GENRESULT DACOM_API SaveToPath(const char* Path) = 0;                     // 44 RET 0x8 -> slot 5
 };

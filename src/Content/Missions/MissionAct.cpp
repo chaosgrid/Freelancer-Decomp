@@ -1094,13 +1094,13 @@ ActPlayMusic::ActPlayMusic(FMissionScript* InMission)
     : Act(InMission)
     , bCancel(0)
 {
-    Music.Field0 = 0;
-    Music.Field4 = 0;
-    Music.Field8 = 0;
-    Music.FieldC = 0;
+    Music.SpaceMusic = 0;
+    Music.DangerMusic = 0;
+    Music.BattleMusic = 0;
+    Music.OverrideMusic = 0;
     Music.Field10 = 0;
     float const NoFade = -1.0f;
-    memcpy(&Music.Field14, &NoFade, sizeof(NoFade));
+    memcpy(&Music.FadeBits, &NoFade, sizeof(NoFade));
 }
 
 // LAB_06ecd160: slots 0..3 are the track ids, 4 the fade, 5 the bool at +0x1c.
@@ -1111,7 +1111,7 @@ void ActPlayMusic::Parse(INI_Reader& Reader)
         bCancel = 1;
         return;
     }
-    unsigned int* const Ids[4] = {&Music.Field0, &Music.Field4, &Music.Field8, &Music.FieldC};
+    unsigned int* const Ids[4] = {&Music.SpaceMusic, &Music.DangerMusic, &Music.BattleMusic, &Music.OverrideMusic};
     for (unsigned int Slot = 0; Slot < 4; ++Slot)
     {
         if (!Reader.is_value_empty(Slot) && _stricmp(Reader.get_value_string(Slot), "none") != 0)
@@ -1120,7 +1120,7 @@ void ActPlayMusic::Parse(INI_Reader& Reader)
     if (!Reader.is_value_empty(4) && _stricmp(Reader.get_value_string(4), "none") != 0)
     {
         float const Fade = Reader.get_value_float(4);
-        memcpy(&Music.Field14, &Fade, sizeof(Fade));
+        memcpy(&Music.FadeBits, &Fade, sizeof(Fade));
     }
     if (!Reader.is_value_empty(5) && _stricmp(Reader.get_value_string(5), "none") != 0)
         Music.Field10 = Reader.get_value_bool(5) ? 1 : 0;
@@ -1179,8 +1179,8 @@ void ActPlayerCanTradelane::Parse(INI_Reader& Reader)
     for (unsigned int Slot = 1; !Reader.is_value_empty(Slot); Slot += 2)
     {
         FTlrException Pair;
-        Pair.Values[0] = pub::GetNicknameId(Reader.get_value_string(Slot));
-        Pair.Values[1] = pub::GetNicknameId(Reader.get_value_string(Slot + 1));
+        Pair.FirstRingId = pub::GetNicknameId(Reader.get_value_string(Slot));
+        Pair.SecondRingId = pub::GetNicknameId(Reader.get_value_string(Slot + 1));
         Exceptions.push_back(Pair);
     }
 }
@@ -2036,8 +2036,8 @@ bool ActAdjHealth::Execute()
 {
     std::map<unsigned int, float> Healths;
     std::multimap<unsigned int, unsigned int>::iterator Member =
-        Mission->FormationMembers.lower_bound(FormationId);
-    while (Member != Mission->FormationMembers.upper_bound(FormationId))
+        Mission->LabelObjects.lower_bound(FormationId);
+    while (Member != Mission->LabelObjects.upper_bound(FormationId))
     {
         float Health = 0.0f;
         pub::SpaceObj::GetRelativeHealth(Member->second, Health);
@@ -2106,7 +2106,7 @@ bool ActCallThorn::Execute()
                                       Script.Data);
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
         return true;
-    Mission->Field_0x2c8 = 1;
+    Mission->bCutsceneActive = 1;
     unsigned int const ShipId = Mission->PlayerState->GetShipId();
     if ((ShipId & GNagIdMask) != 0)
         pub::SpaceObj::SetInvincible(ShipId, true, false, 0.0f);
@@ -2143,8 +2143,8 @@ bool ActCloak::Execute()
 {
     unsigned int const Key = CreateID(Formation.Data);
     std::multimap<unsigned int, unsigned int>::iterator Member =
-        Mission->FormationMembers.lower_bound(Key);
-    while (Member != Mission->FormationMembers.upper_bound(Key))
+        Mission->LabelObjects.lower_bound(Key);
+    while (Member != Mission->LabelObjects.upper_bound(Key))
     {
         TString<0x30> const Name = Mission->GetMissionObjectName(&Member->second);
         std::list<TString<0x30>>::iterator Listed = Mission->DecloakedNames.begin();
@@ -2412,12 +2412,12 @@ void ActAddRtc::Parse(INI_Reader& Reader)
 // LAB_06ec7de0: FUN_06eb8a20 starts the record, which is then appended to mission +0x2f0.
 bool ActAddRtc::Execute()
 {
-    FStoryMissionListNode_0x2f4 Record;
+    FMissionRtc Record;
     Record.PathLength = Path.Length;
     memcpy(Record.Path, Path.Data, Path.Length + 1);
     Record.bRepeatable = bRepeatable;
     Mission->StartRtcScript(&Record);
-    Mission->List_0x2f4.push_back(Record);
+    Mission->RtcScripts.push_back(Record);
     return true;
 }
 
@@ -2553,8 +2553,8 @@ void ActSetPriority::Parse(INI_Reader& Reader)
 bool ActSetPriority::Execute()
 {
     std::multimap<unsigned int, unsigned int>::iterator Member =
-        Mission->FormationMembers.lower_bound(FormationId);
-    while (Member != Mission->FormationMembers.upper_bound(FormationId))
+        Mission->LabelObjects.lower_bound(FormationId);
+    while (Member != Mission->LabelObjects.upper_bound(FormationId))
     {
         FContentNpcShip* const Npc = Mission->FindNpcById(&Member->second);
         if (Npc != nullptr)
@@ -2815,8 +2815,8 @@ bool ActInvulnerable::Execute()
     }
 
     std::multimap<unsigned int, unsigned int>::iterator Member =
-        Mission->FormationMembers.lower_bound(Key);
-    if (Member == Mission->FormationMembers.upper_bound(Key))
+        Mission->LabelObjects.lower_bound(Key);
+    if (Member == Mission->LabelObjects.upper_bound(Key))
     {
         if (FindContentPlayerState(Mission->PlayerId) == nullptr)
             return true;
@@ -2863,7 +2863,7 @@ bool ActInvulnerable::Execute()
         if (Result != 0)
             (void)Mission->FindNpcById(&Member->second);
         ++Member;
-    } while (Member != Mission->FormationMembers.upper_bound(Key));
+    } while (Member != Mission->LabelObjects.upper_bound(Key));
     return true;
 }
 
@@ -2899,14 +2899,14 @@ bool ActMarkObj::Execute()
     bool bResult = true;
     unsigned int const Key = CreateID(Label.Data);
     std::multimap<unsigned int, unsigned int>::iterator Member =
-        Mission->FormationMembers.lower_bound(Key);
-    if (Member == Mission->FormationMembers.end())
+        Mission->LabelObjects.lower_bound(Key);
+    if (Member == Mission->LabelObjects.end())
     {
         unsigned int const ObjectId = Mission->GetLabelObjectId(&Label);
         Mission->MarkMissionObject(ObjectId, Mode, Label);
         return true;
     }
-    if (Member == Mission->FormationMembers.upper_bound(Key))
+    if (Member == Mission->LabelObjects.upper_bound(Key))
         return true;
 
     do
@@ -2937,7 +2937,7 @@ bool ActMarkObj::Execute()
         else
             bResult = false;
         ++Member;
-    } while (Member != Mission->FormationMembers.upper_bound(Key));
+    } while (Member != Mission->LabelObjects.upper_bound(Key));
     return bResult;
 }
 
@@ -3008,7 +3008,7 @@ ActSendComm::ActSendComm(FMissionScript* InMission)
     : Act(InMission)
     , TextId(0)
     , VoiceId(0)
-    , CommType(0)
+    , CaptionIds(0)
     , Duration(-1)
 {
     ClearTString(Sender);
@@ -3037,7 +3037,7 @@ void ActSendComm::Parse(INI_Reader& Reader)
         (void)Reader.is_value_empty(7);
         pub::GetVoiceID(VoiceId, Reader.get_value_string(4));
         if (!Reader.is_value_empty(5))
-            CommType = static_cast<unsigned int>(Reader.get_value_int(5));
+            CaptionIds = static_cast<unsigned int>(Reader.get_value_int(5));
         if (!Reader.is_value_empty(6))
         {
             if (_stricmp(Reader.get_value_string(6), "NO_HEAD") != 0)
@@ -3100,7 +3100,7 @@ bool ActSendComm::Execute()
         CommDuration = 1.0f;
 
     if (SpeakerCostume.PartIds[0] != 0)
-        System->SendComm(SenderId, ReceiverId, TextId, VoiceId, CommType, &SpeakerCostume,
+        System->SendComm(SenderId, ReceiverId, TextId, VoiceId, CaptionIds, &SpeakerCostume,
                          CommDuration);
     else
         System->SendComm(SenderId, ReceiverId, TextId, 0, 0, nullptr, CommDuration);
@@ -3115,7 +3115,7 @@ bool ActSendComm::Execute()
 ActEtherComm::ActEtherComm(FMissionScript* InMission)
     : Act(InMission)
     , VoiceId(0)
-    , CommType(0)
+    , CaptionIds(0)
     , TextId(0)
     , Duration(-1)
 {
@@ -3129,7 +3129,7 @@ ActEtherComm::ActEtherComm(FMissionScript* InMission)
 void ActEtherComm::Parse(INI_Reader& Reader)
 {
     pub::GetVoiceID(VoiceId, Reader.get_value_string(0));
-    CommType = static_cast<unsigned int>(Reader.get_value_int(1));
+    CaptionIds = static_cast<unsigned int>(Reader.get_value_int(1));
     Receiver = Reader.get_value_string(2);
     TextId = pub::GetNicknameId(Reader.get_value_string(3));
     int const Value = Reader.get_value_int(4);
@@ -3168,7 +3168,7 @@ bool ActEtherComm::Execute()
     {
         CommDuration = 1.0f;
     }
-    pub::SpaceObj::SendComm(0, ReceiverId, VoiceId, &SpeakerCostume, CommType, &TextId, 1, 0,
+    pub::SpaceObj::SendComm(0, ReceiverId, VoiceId, &SpeakerCostume, CaptionIds, &TextId, 1, 0,
                             CommDuration, true);
     return true;
 }
@@ -3525,7 +3525,7 @@ bool ActStaticCam::Execute()
         return true;
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
         return true;
-    Mission->Field_0x2c8 = 1;
+    Mission->bCutsceneActive = 1;
     unsigned int const ShipId = Mission->PlayerState->GetShipId();
     if ((ShipId & GNagIdMask) != 0)
         pub::SpaceObj::SetInvincible(ShipId, true, false, 0.0f);
@@ -3962,8 +3962,8 @@ bool ActSetVibeLblToShip::Execute()
 {
     unsigned int const ShipId = Mission->GetLabelObjectId(&Ship);
     std::multimap<unsigned int, unsigned int>::iterator Member =
-        Mission->FormationMembers.lower_bound(FormationId);
-    while (Member != Mission->FormationMembers.upper_bound(FormationId))
+        Mission->LabelObjects.lower_bound(FormationId);
+    while (Member != Mission->LabelObjects.upper_bound(FormationId))
     {
         if ((Member->second & GNagIdMask) != 0 && (ShipId & GNagIdMask) != 0)
             Mission->SetObjectVibe(Member->second, ShipId, Lo, Hi);
@@ -3997,8 +3997,8 @@ bool ActSetVibeShipToLbl::Execute()
 {
     unsigned int const ShipId = Mission->GetLabelObjectId(&Ship);
     std::multimap<unsigned int, unsigned int>::iterator Member =
-        Mission->FormationMembers.lower_bound(FormationId);
-    while (Member != Mission->FormationMembers.upper_bound(FormationId))
+        Mission->LabelObjects.lower_bound(FormationId);
+    while (Member != Mission->LabelObjects.upper_bound(FormationId))
     {
         if ((ShipId & GNagIdMask) != 0 && (Member->second & GNagIdMask) != 0)
             Mission->SetObjectVibe(ShipId, Member->second, Lo, Hi);

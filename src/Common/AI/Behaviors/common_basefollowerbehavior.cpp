@@ -11,8 +11,9 @@
 #include "common_behavior.h"
 #include "AI/common_behavior_internal.h" // CmnBehavior:: follower helpers (common_behavior.cpp)
 #include "common_aisteer.h" // GetIfacePositionOrZero, IsWithinInterceptRangeOfIface
-#include "common_systemmanager.h" // SystemManager -- BaseFollowerBehavior::NavHelper's real type
+#include "common_systemmanager.h" // SystemManager -- BaseFollowerBehavior::SysMgr's real type
 #include "common_misc.h" // SinglePlayer() -- OnUpdate's multiplayer group test
+#include "common_cobject.h" // CShip::bIsPlayer / GroupId
 #include "common_csys.h"  // Matrix, Transform
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
 #include "x86math.h"      // FVector, FMatrix
@@ -23,29 +24,18 @@
 #include <cstdint>
 #include <cstring>
 
-using CmnBehavior::FollowerExternalIfaceIsPlayer;
-using CmnBehavior::FollowerPlayerShipOrNull;
+using CmnBehavior::OwnerIsPlayer;
+using CmnBehavior::ShipOrNull;
 
 // ============================================================================
 // BaseFollowerBehavior
 // ============================================================================
 
-// FUN_062cb2b0. FUN_062d2020(TypeId) is ConstructBase; the five Ideas are constructed in
+// FUN_062cb2b0. FUN_062d2020(TypeId) is Behavior's ctor; the five Ideas are constructed in
 // declaration order. Retail leaves +0x288, +0x290..+0x29b and +0x29c unwritten; the port
 // zeroes them.
 BaseFollowerBehavior::BaseFollowerBehavior(int InTypeId)
-    : TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(2)
-    , UpdateResult(1)
-    , OwnerContext(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime(0.0f)
-    , BehaviorMgrPtr(nullptr)
-    , NavHelper(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
+    : Behavior(InTypeId)
     , LeadWatcher()
     , MatchThrottle()
     , Face()
@@ -54,11 +44,11 @@ BaseFollowerBehavior::BaseFollowerBehavior(int InTypeId)
     , Afterburner()
     , DockDelegate(nullptr)
     , GotoDelegate(nullptr)
-    , Flag280(0)
-    , Flag281(0)
-    , Flag282(0)
-    , Flag283(0)
-    , Flag284(0)
+    , bLeftTradeLane(0)
+    , bInTradeLane(0)
+    , bDockDelegateActive(0)
+    , bPlayerCatchUp(0)
+    , bGotoDelegateActive(0)
     , Flag285(0)
     , Pad286{}
     , Field288(0)
@@ -67,7 +57,6 @@ BaseFollowerBehavior::BaseFollowerBehavior(int InTypeId)
     , Offset290{ 0.0f, 0.0f, 0.0f }
     , Field29c(0)
 {
-    ConstructBase(InTypeId);   // 062cb2d3 FUN_062d2020
 }
 
 // FUN_062cb3b0: only the members' own BaseWatcher destructors (BreakAway +0x1f0, Move +0x164,
@@ -112,7 +101,7 @@ BaseFollowerBehavior::~BaseFollowerBehavior()
 //   * GetRotatedOffset() (+0x70): hidden return buffer handed to FUN_062c50c0 -> Vector().
 // ============================================================================
 
-// FGunConvergenceStateBlock members used here (common_gunconvergence.cpp): FUN_062ecaf0
+// FFormationLeaderState members used here (common_gunconvergence.cpp): FUN_062ecaf0
 // GetCurrentLeader, 062ec5b0 TryGetValueB4, 062ec610 GetDirectiveOrder, 062ec650 SetValueB0,
 // 062ec680 TryGetValueB0, 062ecb20/062ecc00 FollowerDirectiveGateA/B. FUN_062e74a0 is
 // SystemManagerTimerTable::FindVerifiedObject; FUN_062c50c0 is DockBehavior::SetDestPointOffset.
@@ -123,7 +112,7 @@ BaseFollowerBehavior::~BaseFollowerBehavior()
 struct FollowerDirectiveOrder
 {
     unsigned int DockObjectId;      // record +0xa8; dock candidate id, -> DirectiveDockOp::DockObjectId
-    unsigned int SecondaryObjectId;      // record +0xac; second object id, -> DirectiveDockOp::Field_10
+    unsigned int SecondaryObjectId;      // record +0xac; second object id, -> DirectiveDockOp::NextRingId
     unsigned char bOrderPending;     // record +0xbd
     unsigned char bMidLane;     // record +0xc2; 1 = commit without the range test; go_tradelane's bool
     unsigned char Pad0A[2];
@@ -134,7 +123,7 @@ static_assert(sizeof(FollowerDirectiveOrder) == 0x10, "FollowerDirectiveOrder mu
 
 int BaseFollowerBehavior::OnUpdate()
 {
-    IObjRW* const Owner = static_cast<IObjRW*>(OwnerContext);
+    IObjRW* const Owner = OwnerContext;
     if (Owner == nullptr)
     {
         UpdateResult = 3;
@@ -147,17 +136,17 @@ int BaseFollowerBehavior::OnUpdate()
         return 0;
     }
 
-    SystemManager* const Sys = NavHelper;   // not null-tested from here on (as retail)
-    FGunConvergenceStateBlock* const Rec = &Sys->GunConvergenceStateBytes;   // Sys + 0x1364
+    SystemManager* const Sys = SysMgr;   // not null-tested from here on (as retail)
+    FFormationLeaderState* const Rec = &Sys->FormationLeaders;   // Sys + 0x1364
 
     // FUN_062ecaf0 returns an IObjRW* (or 0); retail adds 8 back to get the Watchable
     // sub-object and re-points only on change, which is BaseWatcher::set()'s own guard.
     {
-        IObjRW* const Override = Sys->GunConvergenceStateBytes.GetCurrentLeader();   // FUN_062ecaf0(Rec)
+        IObjRW* const Override = Sys->FormationLeaders.GetCurrentLeader();   // FUN_062ecaf0(Rec)
         LeadWatcher.set(static_cast<Watchable const*>(Override));   // null stays null
     }
 
-    if (FollowerExternalIfaceIsPlayer(Sys))
+    if (OwnerIsPlayer(Sys))
     {
         IObjRW* Node = ObjRwFromWatchable(
             const_cast<Watchable*>(LeadWatcher.target()));
@@ -168,20 +157,16 @@ int BaseFollowerBehavior::OnUpdate()
         }
 
         // Multiplayer only: when both ends are player ships, their group ids must both be
-        // non-zero and equal. +0x2bd is CShip::bIsPlayer and +0x1b4 CShip::GroupId, read by
-        // offset because FollowerPlayerShipOrNull returns a CObject.
+        // non-zero and equal.
         if (!SinglePlayer())
         {
-            CObject const* const OwnerShip = FollowerPlayerShipOrNull(Owner->cobject());
-            CObject const* const LeaderShip = FollowerPlayerShipOrNull(Node->cobject());
+            CShip const* const OwnerShip = ShipOrNull(Owner->cobject());
+            CShip const* const LeaderShip = ShipOrNull(Node->cobject());
             if (OwnerShip != nullptr && LeaderShip != nullptr &&
-                *(reinterpret_cast<unsigned char const*>(OwnerShip) + 0x2bd) != 0 &&
-                *(reinterpret_cast<unsigned char const*>(LeaderShip) + 0x2bd) != 0)
+                OwnerShip->bIsPlayer != 0 && LeaderShip->bIsPlayer != 0)
             {
-                unsigned int const OwnerGroup =
-                    *reinterpret_cast<unsigned int const*>(reinterpret_cast<char const*>(OwnerShip) + 0x1b4);
-                unsigned int const LeaderGroup =
-                    *reinterpret_cast<unsigned int const*>(reinterpret_cast<char const*>(LeaderShip) + 0x1b4);
+                unsigned int const OwnerGroup = OwnerShip->GroupId;
+                unsigned int const LeaderGroup = LeaderShip->GroupId;
                 if (OwnerGroup == 0 || LeaderGroup == 0 || OwnerGroup != LeaderGroup)
                 {
                     UpdateResult = 3;
@@ -257,7 +242,7 @@ int BaseFollowerBehavior::OnUpdate()
         return 2;
     }
 
-    if (Flag283 != 0)
+    if (bPlayerCatchUp != 0)
     {
         // Every non-returning path ends at LAB_062cba4a, which clears the latch.
         if (!IsWithinInterceptRangeOfIface(&Sys->SelfTarget, Watched, 200.0f))
@@ -271,20 +256,20 @@ int BaseFollowerBehavior::OnUpdate()
                                    + static_cast<double>(Vel.z) * Vel.z;
             if (SpeedSq < 100.0)
             {
-                if (Flag284 == 0)
+                if (bGotoDelegateActive == 0)
                 {
                     pub::AI::DirectiveGotoOp Op;
-                    Op.Field_0C = 0;
-                    Op.Field_1C = static_cast<int32_t>(Watched->get_id());
-                    Op.Field_50 = 100.0f;   // 0x42c80000
+                    Op.GotoKind = 0;
+                    Op.TargetId = static_cast<int32_t>(Watched->get_id());
+                    Op.ArrivalRange = 100.0f;   // 0x42c80000
                     GotoDelegate->OnApplyDirective(&Op);
                     GotoDelegate->OnEngage();
                     // Retail then tests the literal 1 it just stored; that branch is dead.
-                    Flag284 = 1;
+                    bGotoDelegateActive = 1;
                 }
                 // Same hand-down as IBehaviorManager: child +0x1c, then slot 7.
                 // +0x27c is not null-tested.
-                GotoDelegate->SetTickDelta(DeltaTime);
+                GotoDelegate->DeltaTime = DeltaTime;
                 int const ChildResult = GotoDelegate->OnUpdate();
                 if (ChildResult == 1 || ChildResult == 0)
                 {
@@ -293,24 +278,24 @@ int BaseFollowerBehavior::OnUpdate()
                 }
             }
         }
-        Flag283 = 0;
+        bPlayerCatchUp = 0;
     }
-    else if (Flag284 != 0)
+    else if (bGotoDelegateActive != 0)
     {
-        Flag284 = 0;
+        bGotoDelegateActive = 0;
         GotoDelegate->OnDisengage();
     }
 
-    if (Flag282 != 0 && DockDelegate != nullptr)
+    if (bDockDelegateActive != 0 && DockDelegate != nullptr)
     {
-        DockDelegate->SetTickDelta(DeltaTime);
+        DockDelegate->DeltaTime = DeltaTime;
         int const ChildResult = DockDelegate->OnUpdate();
         if (ChildResult == 1 || ChildResult == 0)
         {
             UpdateResult = ChildResult;
             return ChildResult;
         }
-        Flag282 = 0;
+        bDockDelegateActive = 0;
         DockDelegate->OnDisengage();
     }
 
@@ -319,15 +304,15 @@ int BaseFollowerBehavior::OnUpdate()
     Rec->GetDirectiveOrder((unsigned char*)&Order);
 
     bool RunPendingLookup = false;
-    if (Flag281 != 0)
+    if (bInTradeLane != 0)
     {
-        if (Order.bOrderPending != 0 || Flag280 == 0)
+        if (Order.bOrderPending != 0 || bLeftTradeLane == 0)
         {
             UpdateResult = 0;
             return 0;
         }
-        Flag280 = 0;
-        Flag281 = 0;
+        bLeftTradeLane = 0;
+        bInTradeLane = 0;
         RunPendingLookup = true;
     }
     else if (Order.bOrderPending == 0)
@@ -380,7 +365,7 @@ int BaseFollowerBehavior::OnUpdate()
                 UpdateResult = 1;
                 return 1;
             }
-            Flag281 = 1;
+            bInTradeLane = 1;
             UpdateResult = 0;
             return 0;
         }
@@ -389,14 +374,14 @@ int BaseFollowerBehavior::OnUpdate()
         {
             pub::AI::DirectiveDockOp Op;
             Op.DockObjectId = Order.DockObjectId;
-            Op.Field_10 = static_cast<int32_t>(Order.SecondaryObjectId);
+            Op.NextRingId = static_cast<int32_t>(Order.SecondaryObjectId);
             DockDelegate->OnApplyDirective(&Op);
             // FUN_062c50c0 copies the offset into the delegate's +0x444.
             Vector const Offset = GetRotatedOffset();
             static_cast<DockBehavior*>(DockDelegate)->SetDestPointOffset(Offset);   // FUN_062c50c0
             DockDelegate->OnEngage();
         }
-        Flag282 = 1;
+        bDockDelegateActive = 1;
         UpdateResult = 1;
         return 1;
     }
@@ -418,7 +403,7 @@ int BaseFollowerBehavior::OnUpdate()
     if (!Rec->FollowerDirectiveGateA() || Rec->FollowerDirectiveGateB())
     {
         if (Rec->FollowerDirectiveGateB() &&
-            *(reinterpret_cast<unsigned char*>(Sys) + 0x1958) != 0)
+            Sys->PersonalityData.JobParams.bForceAttackFormation != 0)   // Sys+0x1958
         {
             ReachedPayload = true;
         }
@@ -439,7 +424,7 @@ int BaseFollowerBehavior::OnUpdate()
 // FUN_062cbcf0. Switches on FormationParams.FormationExitMode (SystemManager+0x1810), unsigned.
 void BaseFollowerBehavior::UpdateTickPayload(float Delta)
 {
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     pub::AI::Personality::FormationUseStruct const& Params = Sys->PersonalityData.FormationParams;
     switch ((unsigned int)Params.FormationExitMode)
     {
@@ -496,13 +481,13 @@ bool BaseFollowerBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     {
         LeadWatcher.set(nullptr);
         // Each Idea gets (this->Owner, this->Sys, Manager); the results are discarded.
-        (void)Face.SetContext(OwnerContext, NavHelper, Manager);
-        (void)MatchThrottle.SetContext(OwnerContext, NavHelper, Manager);
+        (void)Face.SetContext(OwnerContext, SysMgr, Manager);
+        (void)MatchThrottle.SetContext(OwnerContext, SysMgr, Manager);
         MatchThrottle.SetFlag3a(true);                              // FUN_062d6720
         MatchThrottle.SetFlag3b(true);                              // FUN_062d6730
-        (void)Move.SetContext(OwnerContext, NavHelper, Manager);
-        (void)BreakAway.SetContext(OwnerContext, NavHelper, Manager);
-        (void)Afterburner.SetContext(OwnerContext, NavHelper, Manager);
+        (void)Move.SetContext(OwnerContext, SysMgr, Manager);
+        (void)BreakAway.SetContext(OwnerContext, SysMgr, Manager);
+        (void)Afterburner.SetContext(OwnerContext, SysMgr, Manager);
     }
     return bBound;
 }
@@ -513,46 +498,46 @@ void BaseFollowerBehavior::OnEngage()
     Behavior::OnEngage();                                              // FUN_062d20d0
     Flag285 = 0;
     Field288 = 0;
-    Flag281 = 0;
-    Flag280 = 0;
-    NavHelper->Thrust.SetStrafeDir(StrafeNone);                     // FUN_062e9030
-    NavHelper->Thrust.SetThrustersActive(false);                    // FUN_062e9120
-    SetCruiseLock(1, 3);                                            // FUN_062d21d0
-    Flag282 = 0;
-    DockDelegate = BehaviorMgrPtr->BehaviorDispatchTable[7];        // Manager+0x190
-    Flag284 = 0;
-    if (NavHelper->SelfTarget.Iface->is_player())
-        Flag283 = 1;
-    GotoDelegate = BehaviorMgrPtr->BehaviorDispatchTable[2];        // Manager+0x17c
+    bInTradeLane = 0;
+    bLeftTradeLane = 0;
+    SysMgr->Thrust.SetStrafeDir(StrafeNone);                     // FUN_062e9030
+    SysMgr->Thrust.SetThrustersActive(false);                    // FUN_062e9120
+    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
+    bDockDelegateActive = 0;
+    DockDelegate = BehaviorMgr->BehaviorDispatchTable[7];        // Manager+0x190
+    bGotoDelegateActive = 0;
+    if (SysMgr->SelfTarget.Iface->is_player())
+        bPlayerCatchUp = 1;
+    GotoDelegate = BehaviorMgr->BehaviorDispatchTable[2];        // Manager+0x17c
 }
 
 // Slot 4, FUN_062cb5e0.
 void BaseFollowerBehavior::OnDisengage()
 {
     Field29c = 0;
-    if (Flag281 != 0)
+    if (bInTradeLane != 0)
     {
         IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
         if (Owner->is_player())
         {
             CObject const* const Object = Owner->cobject();
             if (Object != nullptr &&
-                (static_cast<unsigned int>(Object->ObjectClass) & 0x503u) == 0x503u)
+                (Object->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
                 static_cast<CShip*>(const_cast<CObject*>(Object))->request_exit_tradelane();
         }
     }
-    Flag281 = 0;
+    bInTradeLane = 0;
     Face.Commit();
     MatchThrottle.Commit();
     Move.Commit();
     BreakAway.Commit();
     Afterburner.Commit();
-    if (Flag282 != 0 && DockDelegate != nullptr)
+    if (bDockDelegateActive != 0 && DockDelegate != nullptr)
         DockDelegate->OnDisengage();
-    if (Flag284 != 0 && GotoDelegate != nullptr)
+    if (bGotoDelegateActive != 0 && GotoDelegate != nullptr)
         GotoDelegate->OnDisengage();
-    Flag282 = 0;
-    Flag284 = 0;
+    bDockDelegateActive = 0;
+    bGotoDelegateActive = 0;
     GotoDelegate = nullptr;
     DockDelegate = nullptr;
     Behavior::OnDisengage();                                              // FUN_062d20f0
@@ -561,7 +546,7 @@ void BaseFollowerBehavior::OnDisengage()
 // Slot 8, LAB_062cb6d0: unless the dock delegate runs or a lane order is out.
 void BaseFollowerBehavior::PostUpdate()
 {
-    if (Flag282 != 0 || Flag281 != 0)
+    if (bDockDelegateActive != 0 || bInTradeLane != 0)
         return;
     MatchThrottle.SyncCruise(DeltaTime);
 }
@@ -570,7 +555,7 @@ void BaseFollowerBehavior::PostUpdate()
 void BaseFollowerBehavior::slide_strafe_burst(StrafeDir Dir)
 {
     (void)Dir;
-    NavHelper->Thrust.SetStrafeDir(StrafeNone);
+    SysMgr->Thrust.SetStrafeDir(StrafeNone);
 }
 
 // Slot 21, LAB_062cf300.
@@ -588,13 +573,13 @@ void BaseFollowerBehavior::OnObjectLeftSystem(void* Arg)
 void BaseFollowerBehavior::OnEvent(void* Arg)
 {
     FBehaviorManagerEvent const* const Event = static_cast<FBehaviorManagerEvent const*>(Arg);
-    if (Flag282 != 0 && DockDelegate != nullptr)
+    if (bDockDelegateActive != 0 && DockDelegate != nullptr)
         DockDelegate->OnEvent(Arg);
     if (Event->Type != 4)
         return;
     FBehaviorTradelaneEvent const* const Lane =
         static_cast<FBehaviorTradelaneEvent const*>(Event->Data);
-    IObjRW* const Watched = NavHelper->GunConvergenceStateBytes.GetCurrentLeader();
+    IObjRW* const Watched = SysMgr->FormationLeaders.GetCurrentLeader();
     unsigned int WatchedId = 0;
     if (Watched != nullptr)
         WatchedId = Watched->get_id();
@@ -612,20 +597,20 @@ void BaseFollowerBehavior::OnEvent(void* Arg)
                 Ship = (CShip*)Object;
             Ship->request_exit_tradelane();
         }
-        else if (Flag282 != 0 && DockDelegate != nullptr)
+        else if (bDockDelegateActive != 0 && DockDelegate != nullptr)
         {
-            Flag282 = 0;
+            bDockDelegateActive = 0;
             DockDelegate->OnDisengage();
         }
     }
 
     // The own ship (ExternalIface) left a lane.
-    if (NavHelper->SelfTarget.Iface->get_id() != Lane->ShipId)
+    if (SysMgr->SelfTarget.Iface->get_id() != Lane->ShipId)
         return;
     if (Lane->bEnteringLane != 0)
         return;
-    Flag280 = 1;
-    if (Flag282 != 0)
+    bLeftTradeLane = 1;
+    if (bDockDelegateActive != 0)
         return;
     unsigned int Zero = 0;                                          // retail reuses the argument slot
     (void)ObjAffectOf(OwnerContext)->request_cancel(2, &Zero, 0);          // IObjAffect +0x60

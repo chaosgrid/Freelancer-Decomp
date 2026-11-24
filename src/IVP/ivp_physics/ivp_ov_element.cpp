@@ -16,6 +16,7 @@
 #include "../ivp_compact_builder/ivp_compact_ledge.h"
 #include "../ivp_collision/ivp_oo_watcher.h" // IVP_OO_Watcher (delegate_collisions_for_object)
 #include "../ivp_utility/ivp_core_trap.h" // IVP_CoreTrap (LAB_0634dc00)
+#include "../ivp_utility/ivp_crc32.h" // g_Crc32Table_063edcdc (IVP_OV_HashNodeKey)
 
 #include <cassert>
 #include <cmath>
@@ -78,30 +79,6 @@ namespace
     {
         return (int)((param_1 >> 0x17) & 0xff) - 0x7f;
     }
-
-    // ------------------------------------------------------------------------
-    // FUN_06369200's lookup table (retail DAT_063edcdc, the reflected CRC-32
-    // table, polynomial 0xEDB88320). ivp_vhash.cpp defines the same retail
-    // global as g_Crc32Table_063edcdc (ivp_utility/ivp_crc32.h); this TU
-    // builds its own copy.
-    // ------------------------------------------------------------------------
-    struct OvCrc32Table
-    {
-        uint32_t Entry[256];
-
-        OvCrc32Table()
-        {
-            for (uint32_t I = 0; I < 256; ++I)
-            {
-                uint32_t C = I;
-                for (int32_t K = 0; K < 8; ++K)
-                    C = ((C & 1u) != 0) ? (0xEDB88320u ^ (C >> 1)) : (C >> 1);
-                Entry[I] = C;
-            }
-        }
-    };
-
-    const OvCrc32Table g_OvCrc32Table;
 
     // ------------------------------------------------------------------------
     // Retail indexes IVP_OV_Tree_Manager's power-of-two table off the manager
@@ -212,7 +189,7 @@ IVP_OV_Element::~IVP_OV_Element()
     IVP_Environment* Env = real_object->environment;
 
     // FUN_0634caf0: every delegator's object_is_removed_from_collision_detection.
-    IVP_Environment_Notify_Vector12c_Slot4(Env, real_object);
+    IVP_Environment_Notify_Object_Removed_From_Collision_Detection(Env, real_object);
 
     IVP_OV_Tree_Manager* Tree = Env->ov_tree_manager;
     Tree->remove_ov_element(this);
@@ -974,7 +951,7 @@ uint32_t IVP_OV_HashNodeKey(const IVP_OV_Node* Node)
 
     uint32_t Crc = 0xffffffffu;
     for (int32_t I = 0; I < 0x14; ++I) // the five key dwords
-        Crc = (Crc >> 8) ^ g_OvCrc32Table.Entry[(Bytes[I] ^ Crc) & 0xff];
+        Crc = (Crc >> 8) ^ g_Crc32Table_063edcdc[(Bytes[I] ^ Crc) & 0xff]; // DAT_063edcdc
 
     // The top bit keeps a live tag from matching the hash's "slot empty" zero.
     return Crc | 0x80000000u;
@@ -1027,7 +1004,7 @@ IVP_Mindist_Manager::~IVP_Mindist_Manager()
 // partner is offered to the environment's collision delegators.
 //
 // The element itself comes back from collect_touching (it trivially touches
-// itself); the original_core equality gate below drops it, as in retail.
+// itself); the friction_core equality gate below drops it, as in retail.
 // ----------------------------------------------------------------------------
 void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
 {
@@ -1043,7 +1020,7 @@ void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
 
     Tree->remove_ov_element(Element);
 
-    ++environment->counter_7c;
+    ++environment->ov_element_recheck_count;
 
     // The element's centre from the core's world translation (core+0x124).
     Element->CenterX = Core->MWorldFCore.vv.x;
@@ -1163,7 +1140,7 @@ void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
             continue;
 
         // Objects sharing an original core never collide.
-        if (Object->original_core == OtherObj->original_core)
+        if (Object->friction_core == OtherObj->friction_core)
             continue;
 
         // Two asymmetric core-flag gates: a 0x300 object refuses 0x300 and 0xc
@@ -1237,15 +1214,15 @@ void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
             delete Coll;                                            // slot 4, deleting dtor
     }
 
-    // Offer every new partner to the collision delegators (vector_12c) until
+    // Offer every new partner to the collision delegators (collision_delegator_roots) until
     // one claims the pair.
     for (int32_t B = static_cast<int32_t>(NewPartners.n_elems) - 1; B >= 0; --B)
     {
         IVP_Real_Object* NewObj = NewPartners.elems[B];
-        for (int32_t D = static_cast<int32_t>(environment->vector_12c.n_elems) - 1; D >= 0; --D)
+        for (int32_t D = static_cast<int32_t>(environment->collision_delegator_roots.n_elems) - 1; D >= 0; --D)
         {
             IVP_Collision_Delegator_Root* Delegator =
-                static_cast<IVP_Collision_Delegator_Root*>(environment->vector_12c.elems[D]);
+                static_cast<IVP_Collision_Delegator_Root*>(environment->collision_delegator_roots.elems[D]);
             IVP_Collision* Claimed =
                 Delegator->delegate_collisions_for_object(Object, NewObj); // slot 5
             if (Claimed != nullptr)

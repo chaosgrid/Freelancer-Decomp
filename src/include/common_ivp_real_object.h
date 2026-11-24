@@ -8,7 +8,7 @@
 
 // Common.dll's IVP object hierarchy (IVP_Object .. IVP_Real_Object, IVP_Polygon, IVP_Ball).
 // Public header (src/IVP/ivp_physics/ivp_real_object.h only includes it): Server.dll reads IVP_Real_Object
-// fields directly (StarSystem_MpCollisionFilter 06d06c30: client_data +0xa4, first_child
+// fields directly (StarSystem_MpCollisionFilter 06d06c30: client_data +0xa4, controller_phantom
 // +0x1c; the mine push 06cf3c03: core +0x98), and the client's collision filter LAB_005544e0
 // reads client_data, so the layout is a cross-DLL contract.
 
@@ -91,7 +91,7 @@ public:
     uint16_t PoolCapacity = 0;      // +0x00: 06362ef7.
     uint16_t PoolFreeHead = 0xffff; // +0x02: 0xffff == free list empty; 06362eff (ctor) / 06362fa2 (Insert check).
     Entry* PoolEntries = nullptr;   // +0x04: 06362f0f (ctor alloc).
-    float PoolKeyThreshold = 0.0f;  // +0x08: init'd from the bit pattern 0x501502f9 (06362f59).
+    float PoolMinKey = 0.0f;        // +0x08: the smallest key; 1e10f (0x501502f9, 06362f59) when empty. Insert takes Key <= it as the new minimum (0636309e).
     uint16_t PoolSortedHead = 0xffff; // +0x0c: 0xffff == empty; 06362f4d.
     uint16_t PoolLiveIndex = 0xffff;  // +0x0e: 0xffff == empty; 06362f53.
     uint16_t PoolCount = 0;           // +0x10: incremented by Insert (06362f98).
@@ -112,11 +112,11 @@ public:
     uint16_t Insert(void* Payload, float Key);
     void Remove(uint16_t Slot);
 };
-static_assert(sizeof(IVP_Priority_Pool) == 0x14, "IVP_Priority_Pool size must be 0x14 -- retail's own `PUSH 0x14; CALL operator_new` at Common.dll.txt:063608e2");
+static_assert(sizeof(IVP_Priority_Pool) == 0x14, "IVP_Priority_Pool size must be 0x14 (operator new(0x14), FUN_063608a0)");
 static_assert(offsetof(IVP_Priority_Pool, PoolCapacity) == 0x00, "IVP_Priority_Pool+0x00");
 static_assert(offsetof(IVP_Priority_Pool, PoolFreeHead) == 0x02, "IVP_Priority_Pool+0x02");
 static_assert(offsetof(IVP_Priority_Pool, PoolEntries) == 0x04, "IVP_Priority_Pool+0x04");
-static_assert(offsetof(IVP_Priority_Pool, PoolKeyThreshold) == 0x08, "IVP_Priority_Pool+0x08");
+static_assert(offsetof(IVP_Priority_Pool, PoolMinKey) == 0x08, "IVP_Priority_Pool+0x08");
 static_assert(offsetof(IVP_Priority_Pool, PoolSortedHead) == 0x0c, "IVP_Priority_Pool+0x0c");
 static_assert(offsetof(IVP_Priority_Pool, PoolLiveIndex) == 0x0e, "IVP_Priority_Pool+0x0e");
 static_assert(offsetof(IVP_Priority_Pool, PoolCount) == 0x10, "IVP_Priority_Pool+0x10");
@@ -175,7 +175,7 @@ public:
     //      by motion). With both gradients zeroed the extrapolation degenerates
     //      to exactly these two values, which is what (1) then reads back.
     //   3. DrainAndShift below (FUN_06352220) negates both, folds -Outer into
-    //      every live entry's Key and into PoolKeyThreshold/AccumulatedDeltaA
+    //      every live entry's Key and into PoolMinKey/AccumulatedDeltaA
     //      (.text:06352263-06352292), hands both negated values to each
     //      entry's vtable-slot-3 callback (06352265/06352274, push order
     //      EBX=-Outer then EBP=-Inner) and then zeroes both: a rebase of the
@@ -196,7 +196,7 @@ public:
     uint16_t PoolCapacity = 0;         // +0x20: 06362ef7.
     uint16_t PoolFreeHead = 0xffff;     // +0x22: 0xffff == free list empty; 06362eff (ctor) / 06362fa2 (Insert check).
     Entry* PoolEntries = nullptr;        // +0x24: 06362f0f (ctor alloc); read as `this+0x24` by WalkActiveEntries / DrainAndShift.
-    float PoolKeyThreshold = 0.0f;        // +0x28: init'd from the bit pattern 0x501502f9 (06362f59); compared against each inserted Key (FCOMP, 0636309e) and shifted by DrainAndShift (06352279-06352288). TODO: exact meaning (a running priority bound?).
+    float PoolMinKey = 0.0f;        // +0x28: the smallest key; 1e10f (0x501502f9, 06362f59) when empty. Insert takes Key <= it as the new minimum (0636309e); DrainAndShift shifts it (06352279-06352288).
     uint16_t PoolSortedHead = 0xffff;      // +0x2c: 0xffff == empty; 06362f4d (ctor).
     uint16_t PoolLiveIndex = 0xffff;        // +0x2e: 0xffff == empty; 06362f53 (ctor); the iteration cursor of WalkActiveEntries / DrainAndShift.
     uint16_t PoolCount = 0;                  // +0x30: incremented by Insert (06362f98); the loop guard of WalkActiveEntries / DrainAndShift.
@@ -204,7 +204,7 @@ public:
 
     // The seven fields above are an IVP_Priority_Pool (retail calls the pool functions on
     // `this+0x20`, .text:0635217e ctor, 063521d8 dtor). They stay spelled out because
-    // common_physys.cpp reads Hull.PoolEntries / PoolLiveIndex / PoolKeyThreshold by name;
+    // common_physys.cpp reads Hull.PoolEntries / PoolLiveIndex / PoolMinKey by name;
     // Pool() is the bridge and the static_asserts below pin the aliasing.
     // TODO: replace them with an `IVP_Priority_Pool Pool;` member.
     IVP_Priority_Pool& Pool() { return *reinterpret_cast<IVP_Priority_Pool*>(&PoolCapacity); }
@@ -241,7 +241,7 @@ static_assert(sizeof(IVP_Hull_Manager) == 0x34, "IVP_Hull_Manager size must be 0
 static_assert(offsetof(IVP_Hull_Manager, PoolCapacity)     == 0x20 + offsetof(IVP_Priority_Pool, PoolCapacity),     "hull/pool alias: PoolCapacity");
 static_assert(offsetof(IVP_Hull_Manager, PoolFreeHead)     == 0x20 + offsetof(IVP_Priority_Pool, PoolFreeHead),     "hull/pool alias: PoolFreeHead");
 static_assert(offsetof(IVP_Hull_Manager, PoolEntries)      == 0x20 + offsetof(IVP_Priority_Pool, PoolEntries),      "hull/pool alias: PoolEntries");
-static_assert(offsetof(IVP_Hull_Manager, PoolKeyThreshold) == 0x20 + offsetof(IVP_Priority_Pool, PoolKeyThreshold), "hull/pool alias: PoolKeyThreshold");
+static_assert(offsetof(IVP_Hull_Manager, PoolMinKey) == 0x20 + offsetof(IVP_Priority_Pool, PoolMinKey), "hull/pool alias: PoolMinKey");
 static_assert(offsetof(IVP_Hull_Manager, PoolSortedHead)   == 0x20 + offsetof(IVP_Priority_Pool, PoolSortedHead),   "hull/pool alias: PoolSortedHead");
 static_assert(offsetof(IVP_Hull_Manager, PoolLiveIndex)    == 0x20 + offsetof(IVP_Priority_Pool, PoolLiveIndex),    "hull/pool alias: PoolLiveIndex");
 static_assert(offsetof(IVP_Hull_Manager, PoolCount)        == 0x20 + offsetof(IVP_Priority_Pool, PoolCount),        "hull/pool alias: PoolCount");
@@ -254,7 +254,7 @@ static_assert(offsetof(IVP_Hull_Manager, InnerValueAtLastEdit) == 0x14, "IVP_Hul
 static_assert(offsetof(IVP_Hull_Manager, AccumulatedDeltaA) == 0x18, "IVP_Hull_Manager+0x18");
 static_assert(offsetof(IVP_Hull_Manager, PoolCapacity) == 0x20, "IVP_Hull_Manager+0x20");
 static_assert(offsetof(IVP_Hull_Manager, PoolEntries) == 0x24, "IVP_Hull_Manager+0x24");
-static_assert(offsetof(IVP_Hull_Manager, PoolKeyThreshold) == 0x28, "IVP_Hull_Manager+0x28");
+static_assert(offsetof(IVP_Hull_Manager, PoolMinKey) == 0x28, "IVP_Hull_Manager+0x28");
 static_assert(offsetof(IVP_Hull_Manager, PoolLiveIndex) == 0x2e, "IVP_Hull_Manager+0x2e");
 static_assert(offsetof(IVP_Hull_Manager, PoolCount) == 0x30, "IVP_Hull_Manager+0x30");
 
@@ -359,10 +359,9 @@ struct IVP_RealObjectConstructionTemplate
 
     uint8_t _unknown_0x48[0x4c - 0x48];
 
-    // +0x4c: a float FUN_06362570 (IVP_Ball::IVP_Ball) adds to its param_2 (1.0f at the one
-    // call site) to produce Self->field_94 (`FLD [EDI+0x4c]`, .text:063625bf). Meaning
-    // unknown.
-    float Field_0x4c; // +0x4c
+    // +0x4c: the library's extra_radius, copied to IVP_Real_Object::extra_radius (an IVP_Ball
+    // adds its radius, FUN_06362570 `FLD [EDI+0x4c]` at 063625bf).
+    float ExtraRadius; // +0x4c
 
     // +0x50: an optional center-of-mass override. FUN_06345b20 tests it
     // (.text:06345b46-06345b72) while building the LocalCsys for Self->vtable[2]
@@ -399,7 +398,7 @@ static_assert(offsetof(IVP_RealObjectConstructionTemplate, AutoCheckRotInertia) 
 static_assert(offsetof(IVP_RealObjectConstructionTemplate, InertiaBoxVector) == 0x24, "IVP_RealObjectConstructionTemplate+0x24");
 static_assert(offsetof(IVP_RealObjectConstructionTemplate, RotInertiaClampFactor) == 0x34, "IVP_RealObjectConstructionTemplate+0x34");
 static_assert(offsetof(IVP_RealObjectConstructionTemplate, SpeedDampInput) == 0x38, "IVP_RealObjectConstructionTemplate+0x38");
-static_assert(offsetof(IVP_RealObjectConstructionTemplate, Field_0x4c) == 0x4c, "IVP_RealObjectConstructionTemplate+0x4c");
+static_assert(offsetof(IVP_RealObjectConstructionTemplate, ExtraRadius) == 0x4c, "IVP_RealObjectConstructionTemplate+0x4c");
 static_assert(offsetof(IVP_RealObjectConstructionTemplate, OptionalComOverride) == 0x50, "IVP_RealObjectConstructionTemplate+0x50");
 static_assert(offsetof(IVP_RealObjectConstructionTemplate, ClientData) == 0x54, "IVP_RealObjectConstructionTemplate+0x54");
 
@@ -477,7 +476,7 @@ public:
 
     IVP_Object* first_object; // +0x1c
 };
-static_assert(sizeof(IVP_Cluster) == 0x20, "IVP_Cluster is 0x20 bytes (operator new(0x20) at .text:0634ad98)");
+static_assert(sizeof(IVP_Cluster) == 0x20, "IVP_Cluster is 0x20 bytes (operator new(0x20), FUN_0634ad70)");
 
 // The intermediate layer (vtbl 063a544c). Its ctor is inlined into 06345100
 // (.text:06345131-06345140): IVP_Object(Father, Template), vptr, then the hull
@@ -491,10 +490,10 @@ class IVP_Real_Object_Fast_Static : public IVP_Object
 public:
     IVP_Real_Object_Fast_Static(IVP_Cluster* Father, const IVP_RealObjectConstructionTemplate* Template);
 
-    // +0x1c: the object's IVP_Controller_Phantom (convert_to_phantom
-    // 06345f10, deleted by ~IVP_Real_Object at .text:06345326-06345345).
-    // Name kept from the port's earlier flattened layout (many users).
-    void* first_child; // +0x1C
+    // +0x1c: the object's IVP_Controller_Phantom, or null (convert_to_phantom
+    // 06345f10, deleted by ~IVP_Real_Object at 06345326-06345345). Every reader
+    // casts it to IVP_Controller_Phantom*.
+    void* controller_phantom; // +0x1C
 
     // +0x20: head of this object's intrusive list of attached synapses, threaded
     // through the synapse (an IVP_Ledge_Mindist's +0x18 or +0x34 slot), so the stored
@@ -594,15 +593,21 @@ public:
     //     (:0635c0e8, FUN_0635d2e0 on Environment->+0x14).
     // See src/IVP/ivp_physics/ivp_ov_element.h for the full class.
     IVP_OV_Element*     ov_element;       // +0x90
-    // +0x94: a float. FUN_06362570 writes `Template->Field_0x4c + *param_2`
-    // (`FLD [EDI+0x4c]; FADD [param2]; FSTP [this+0x94]`); FUN_06345b20 reads it once
-    // (`FLD [EBX+0x94]`, EBX = this) as an input to IVP_Core::UpperLimitRadius. (The
-    // +0x94.. zero-fill later in FUN_06345b20 is on the core, ESI = this->core.) A
-    // per-object bias of the core's angular-speed limit; name not assigned.
-    float               field_94;         // +0x94
+    // +0x94: the library's extra_radius: a shell added around the surface.
+    // Template->ExtraRadius, plus the radius for an IVP_Ball (FUN_06362570
+    // `FLD [EDI+0x4c]; FADD [param2]; FSTP [this+0x94]`). FUN_06345b20 adds it to
+    // the surface radius for IVP_Core::UpperLimitRadius; the mindist sums both
+    // objects' values (CombinedRadius) and the contact frame pushes the point
+    // out by it; the ray solver reads it as a ball's radius.
+    float               extra_radius;     // +0x94
     IVP_Core*           core;             // +0x98 (Physical core)
-    IVP_Core*           original_core;    // +0x9C
-    IVP_Core*           field_a0;         // +0xA0
+    // +0x9C / +0xA0: the library's friction_core and original_core. All three
+    // cores are set to the same core by the ctor and the split / merge paths;
+    // the contact, friction and wake code reads +0x9C, and ~IVP_Real_Object
+    // unlinks +0x98, then +0xA0 unless equal, then +0x9C unless equal to either
+    // (Ipion's physical / original / friction order).
+    IVP_Core*           friction_core;    // +0x9C
+    IVP_Core*           original_core;    // +0xA0
     void*               client_data;      // +0xA4 (CObject* back-pointer in Freelancer)
 
     void get_m_world_f_object_at_transform(IVP_Time Time, IVP_U_Matrix* OutMatrix);
@@ -638,7 +643,7 @@ public:
     void enable_collision_detection(bool bEnable);
 
     // FUN_06345f10 (.text:06345f10-06345f86, RET 4), the SDK's
-    // convert_to_phantom: replaces any phantom in first_child (+0x1c) by a
+    // convert_to_phantom: replaces any phantom in controller_phantom (+0x1c) by a
     // new IVP_Controller_Phantom(this, Template) and returns it.
     IVP_Controller_Phantom* convert_to_phantom(const IVP_Template_Phantom* Template);
 
@@ -661,7 +666,7 @@ public:
     void recalc_invalid_mindists();
 
     // FUN_06344dc0 (.text:06344dc0-06344dd1): if the core's movement byte
-    // (+0x60) is exactly 8, tail-jump to ReviveOriginalCoreIfSleeping (063450e0).
+    // (+0x60) is exactly 8, tail-jump to ReviveFrictionCoreIfSleeping (063450e0).
     void ensure_in_simulation();
 
     // FUN_06344fb0 (.text:06344fb0-063450cb, plain RET): put the object's core
@@ -684,7 +689,7 @@ public:
     void beam_object_to_new_position(const IVP_U_Quat* RotationWs, const IVP_U_Point* PositionWs, int32_t bOptimizeForRepeatedCalls);
 
     // FUN_06346170 (.text:06346170-06346190): movement byte (+0x78) == 8 ->
-    // environment->add_revive_core(original_core) (0634bb90), else
+    // environment->add_revive_core(friction_core) (0634bb90), else
     // core->update_time_of_last_motion() (063470e0).
     void EnsureInSimulation();
 
@@ -727,9 +732,9 @@ public:
     void async_push_object_ws(const IVP_U_Point* PositionWs, const IVP_U_Point* ImpulseWs);
 
     // FUN_063450e0 (8 instructions; `this` is an IVP_Real_Object: flags +0x78,
-    // original_core +0x9C): if (flags & 0xFF) == 8, forward into original_core's sim-unit
+    // friction_core +0x9C): if (flags & 0xFF) == 8, forward into friction_core's sim-unit
     // wake pass.
-    void ReviveOriginalCoreIfSleeping();
+    void ReviveFrictionCoreIfSleeping();
 
     // FUN_06353510: lazily resolves this object's narrow-phase cache slot (cache_object),
     // bumps its refcount and conditionally refreshes it.
@@ -816,7 +821,7 @@ class IVP_Ball : public IVP_Real_Object
 public:
     // The second argument differs from IVP_Polygon's: retail passes 0 as the base ctor's
     // SurfaceManager (`PUSH 0x0`, .text:063625a0) and reads this parameter as a float,
-    // field_94 = Parms->Field_0x4c + *Radius (.text:063625ae-063625d1). The surface manager
+    // extra_radius = Parms->ExtraRadius + *Radius (.text:063625ae-063625d1). The surface manager
     // is then set to the module's default instance (.text:063625c4).
     IVP_Ball(IVP_Cluster* Father, const float* Radius,
              const IVP_RealObjectConstructionTemplate* Parms,

@@ -46,7 +46,7 @@ class EvadeBehavior : public Behavior
 {
 public:
     // FUN_062c7790 (.text:062c7790-062c786d): FUN_062d2020(TypeId), the five ideas, the
-    // +0x2a0 watcher zeroed, vptr, +0x2b4/+0x2b5/+0x2b6/+0x2b7 = 0, Mode2c = 0, +0x2b8 = 0,
+    // +0x2a0 watcher zeroed, vptr, +0x2b4/+0x2b5/+0x2b6/+0x2b7 = 0, EvadeMode = 0, +0x2b8 = 0,
     // +0x2ac = 3.0f, +0x2bc = 0x3f34fdf4 (0.707f).
     explicit EvadeBehavior(int InTypeId);
     // FUN_062c7900: set_pointer(0) on +0x2a0, +0x1e0 (FaceIdea's watcher), +0x1c0
@@ -94,22 +94,8 @@ public:
     // 0..3 over the personality's EvadeDodge Field_04..Field_10.
     int PickDodgeStyle();
 
-    // ---- Behavior's own +0x04..+0x29 block, still declared per class ----
-    int TypeId;                  // +0x04
-    unsigned CachedHandle08;     // +0x08
-    int ModeSelector0xc;         // +0x0c, OnEvaluateReadiness's result.
-    int UpdateResult10;          // +0x10, OnUpdate's result.
-    void* OwnerContext;          // +0x14, the owner IObjRW* (binder).
-    IObjDB* ObjectDb;
-    float DeltaTime;             // +0x1c
-    void* BehaviorMgrPtr;        // +0x20, the IBehaviorManager (binder).
-    SystemManager* NavHelper;    // +0x24, the SystemManager (binder).
-    unsigned char Flags28;       // +0x28
-    unsigned char Flag29;        // +0x29
-    unsigned char Pad2a[0x2c - 0x2a];
-
     // ---- EvadeBehavior's own fields ----
-    int Mode2c;                  // +0x2c. OnUpdate's mode 1..4; ctor and OnEngage zero it.
+    int EvadeMode;                  // +0x2c. OnUpdate's mode 1..4; ctor and OnEngage zero it.
     DodgeIdea Dodge;             // +0x30
     BreakAwayIdea BreakAway;     // +0x110
     DodgeMissileIdea DodgeMissile; // +0x1ac
@@ -128,16 +114,7 @@ public:
     float ConeCos2bc;            // +0x2bc. Ctor 0x3f34fdf4.
 };
 
-static_assert(offsetof(EvadeBehavior, TypeId) == 0x04, "EvadeBehavior::TypeId offset");
-static_assert(offsetof(EvadeBehavior, ModeSelector0xc) == 0x0c, "EvadeBehavior::ModeSelector0xc offset");
-static_assert(offsetof(EvadeBehavior, UpdateResult10) == 0x10, "EvadeBehavior::UpdateResult10 offset");
-static_assert(offsetof(EvadeBehavior, OwnerContext) == 0x14, "EvadeBehavior::OwnerContext offset");
-static_assert(offsetof(EvadeBehavior, DeltaTime) == 0x1c, "EvadeBehavior::DeltaTime offset");
-static_assert(offsetof(EvadeBehavior, BehaviorMgrPtr) == 0x20, "EvadeBehavior::BehaviorMgrPtr offset");
-static_assert(offsetof(EvadeBehavior, NavHelper) == 0x24, "EvadeBehavior::NavHelper offset");
-static_assert(offsetof(EvadeBehavior, Flags28) == 0x28, "EvadeBehavior::Flags28 offset");
-static_assert(offsetof(EvadeBehavior, Flag29) == 0x29, "EvadeBehavior::Flag29 offset");
-static_assert(offsetof(EvadeBehavior, Mode2c) == 0x2c, "EvadeBehavior::Mode2c offset");
+static_assert(offsetof(EvadeBehavior, EvadeMode) == 0x2c, "EvadeBehavior::EvadeMode offset");
 static_assert(offsetof(EvadeBehavior, Dodge) == 0x30, "EvadeBehavior::Dodge offset");
 static_assert(offsetof(EvadeBehavior, BreakAway) == 0x110, "EvadeBehavior::BreakAway offset");
 static_assert(offsetof(EvadeBehavior, DodgeMissile) == 0x1ac, "EvadeBehavior::DodgeMissile offset");

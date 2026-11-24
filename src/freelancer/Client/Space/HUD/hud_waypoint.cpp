@@ -91,7 +91,7 @@ namespace
     void SendTargetCommand(unsigned ObjectId)
     {
         FSpaceCommand Command = {};
-        Command.Id = 0x1c;
+        Command.Id = USER_SET_TARGET;
         Command.ObjectId = ObjectId;
         Command.SubObjectId = SUBOBJ_ID_NONE;
         Command.Byte26 = 1;
@@ -433,7 +433,7 @@ void HUD_Waypoint::SetWaypoint(Vector const* Pos, bool bNewUser, int NewIndex, i
     Solar->create(Arch);
     CObject* const SolarObject = static_cast<CBase*>(Solar)->Object;
     CSolar* SolarCObject = nullptr;
-    if (SolarObject != nullptr && (static_cast<unsigned>(SolarObject->ObjectClass) & 0x303u) == 0x303u)
+    if (SolarObject != nullptr && (static_cast<unsigned>(SolarObject->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
         SolarCObject = static_cast<CSolar*>(SolarObject);
     SolarCObject->init(Parms);
     Solar->PostCreateInit();
@@ -553,7 +553,7 @@ void EqObjCreateParmsDefaults(CEqObj::CreateParms& Parms)
     Parms.AngularVelocity.z = 0.0f;
     Parms.Pad58 = 0;                                                // +0x58
     Win3DIdentityRotation3x3(reinterpret_cast<float*>(&Parms.Orient)); // FUN_004215b0 on +0x1c
-    Parms.DockingCount = 0;                                         // +0x5c
+    Parms.DockingBaseId = 0;                                        // +0x5c
     Parms.VibeId = 0xffffffffu;                                     // +0x60
     Parms.SpaceCostume.PartIds[0] = 0;                              // +0x64..+0x70
     Parms.SpaceCostume.PartIds[1] = 0;

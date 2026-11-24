@@ -154,11 +154,11 @@ void FGfScript::Init()
     bPlayerActor = 0;
     PlayerCharacter = nullptr;
     SetIdentityCsys(PlayerCsys);
-    PlayerField94 = 0.0f;
+    PlayerFloorHeight = 0.0f;
     PlayerDeformInstance = nullptr;
     BindMode = 0;
     bLoop = 0;
-    Field_0x55 = 0;
+    bOwnScript = 0;
     bApplySpatial = 1;
     Priority = 0;
     bFade = 0;
@@ -189,7 +189,7 @@ void FGfScript::Teardown()
             continue;
         Object->SetScene(nullptr);
         Spawned[Index]->Stop();
-        Engine->Slot13Detach(Index);
+        Engine->DetachEntity(Index);
     }
     Engine = nullptr;
     Sequence->ClearProps();
@@ -206,7 +206,7 @@ bool FGfScript::CollectSoundEvent(int EventId, FGfScriptSoundEvent* Out)
     if (Engine == nullptr)
         return false;
     FThornEventDesc const* const Event =
-        static_cast<FThornEventDesc const*>(Engine->Slot16EventById(EventId));
+        static_cast<FThornEventDesc const*>(Engine->GetEventById(EventId));
     if (Event->Type != kThornTypeStartSound)
         return false;
     Out->StartMs = Event->StartMs;
@@ -214,7 +214,7 @@ bool FGfScript::CollectSoundEvent(int EventId, FGfScriptSoundEvent* Out)
     Out->bLoop = static_cast<unsigned char>((static_cast<unsigned>(Event->Flags) >> 3) & 1);
     int const EntityIndex = Event->PrimaryIndex;
     FThornEntitySnap const* const Snap =
-        static_cast<FThornEntitySnap const*>(Engine->Slot9Entity(EntityIndex));
+        static_cast<FThornEntitySnap const*>(Engine->GetEntityDesc(EntityIndex));
     if (Snap->Type != kThornEntitySound)
         return false;
     if ((Snap->Flags & 1) != 0)
@@ -236,12 +236,12 @@ void FGfScript::CollectSoundEvents()
 {
     if (Engine == nullptr)
         return;
-    int const Count = static_cast<int>(Engine->Slot14EventCount());
+    int const Count = static_cast<int>(Engine->GetEventCount());
     int Index = 0;
     for (Index = 0; Index < Count; ++Index)
     {
         FThornEventDesc const* const Event =
-            static_cast<FThornEventDesc const*>(Engine->Slot15EventByIndex(Index));
+            static_cast<FThornEventDesc const*>(Engine->GetEventByIndex(Index));
         FGfScriptSoundEvent Local;
         memset(&Local, 0, sizeof(Local));
         if (!CollectSoundEvent(Event->UniqueId, &Local))
@@ -287,7 +287,7 @@ void FGfScript::StartScriptSounds()
 int FGfScript::GetSoundTailMs()
 {
     int Tail = 0;
-    int const Clock = Engine->Slot19GetClock();
+    int const Clock = Engine->GetClockMs();
     std::list<FGfScriptSoundEvent>::iterator It = SoundEvents.begin();
     for (; It != SoundEvents.end(); ++It)
     {
@@ -383,14 +383,14 @@ void* FGfScript::PlayStreamedSoundEvent(int EventId, int Offset)
 // FUN_0044f720. The name is copied into +0xa0 without freeing the old one (retail); the file
 // is freed first.
 void FGfScript::Start(IScriptEngine* InEngine, char const* InScriptFile, int InBindMode,
-                      unsigned char bInLoop, unsigned char bInField55,
+                      unsigned char bInLoop, unsigned char bInOwnScript,
                       unsigned char bInApplySpatial, int InPriority, unsigned char bInFade,
                       char const* InName, unsigned char bInPropsToRoom,
                       unsigned char bInSoundsUseFade)
 {
     Engine = InEngine;
     BindMode = InBindMode;
-    Field_0x55 = bInField55;
+    bOwnScript = bInOwnScript;
     bApplySpatial = bInApplySpatial;
     bLoop = bInLoop;
     bPropsToRoom = bInPropsToRoom;
@@ -403,13 +403,13 @@ void FGfScript::Start(IScriptEngine* InEngine, char const* InScriptFile, int InB
     malloc_strcpy(&ScriptFile, InScriptFile);
     if (Engine == nullptr)
         return;
-    Duration = Engine->Slot17GetDuration();
+    Duration = Engine->GetScriptDuration();
     Spawn();
     CollectSoundEvents();
     StartScriptSounds();
-    Engine->Slot20SetLoop(bLoop);
-    Engine->Slot22Start(0);
-    Engine->Slot26Tick(0);
+    Engine->SetLooping(bLoop);
+    Engine->StartPlayback(0);
+    Engine->TickPlayback(0);
 }
 
 // FUN_0044f7f0. The clock compare is unsigned; the remaining time is loaded as an unsigned
@@ -426,8 +426,8 @@ bool FGfScript::Update(int Ms)
     {
         if (bPaused == 0)
         {
-            Engine->Slot26Tick(GetSoundTailMs() + Ms);
-            int const Clock = Engine->Slot19GetClock();
+            Engine->TickPlayback(GetSoundTailMs() + Ms);
+            int const Clock = Engine->GetClockMs();
             if (bLoop == 0 && static_cast<unsigned>(Clock) >= static_cast<unsigned>(Duration))
                 bFinished = 1;
             if (bFade != 0 && bFadeStarted == 0)
@@ -450,7 +450,7 @@ bool FGfScript::Update(int Ms)
         }
         else
         {
-            Engine->Slot26Tick(Duration - Engine->Slot19GetClock());
+            Engine->TickPlayback(Duration - Engine->GetClockMs());
             if (bFade != 0)
             {
                 SetFadeImmediate(1.0f);
@@ -462,7 +462,7 @@ bool FGfScript::Update(int Ms)
     }
     if (bFinished != 0)
     {
-        Engine->Slot26Tick(100);
+        Engine->TickPlayback(100);
         if (bFade != 0)
         {
             SetFadeImmediate(1.0f);
@@ -477,8 +477,8 @@ void FGfScript::Restart()
 {
     if (Engine == nullptr)
         return;
-    Engine->Slot23Stop();
-    Engine->Slot22Start(0);
+    Engine->StopPlayback();
+    Engine->StartPlayback(0);
 }
 
 // FUN_0044f970.
@@ -510,7 +510,7 @@ void FGfScript::Pause()
 void FGfScript::Advance(float Scale)
 {
     unsigned const RemainingMs =
-        static_cast<unsigned>(Duration) - static_cast<unsigned>(Engine->Slot19GetClock());
+        static_cast<unsigned>(Duration) - static_cast<unsigned>(Engine->GetClockMs());
     if (RemainingMs == 0)
         return;
     double const Scaled =
@@ -621,7 +621,7 @@ FGfScript* FGfScriptEntry::Create(FRoomRuntime* InRoom, FGfScriptSequence* InSeq
 FGfScriptSequence::FGfScriptSequence()
     : BindMode(0),
       bLoop(0),
-      Field_0x05(0),
+      bOwnScript(0),
       bLetterbox(1),
       bFade(0),
       bApplySpatial(1),
@@ -646,7 +646,7 @@ FGfScriptSequence::FGfScriptSequence()
       bSkip(0),
       bFindable(0),
       bPlayerSaved(0),
-      PlayerField64(0.0f),
+      PlayerFloorHeight(0.0f),
       PlayerDeformInstance(nullptr),
       PlayerCharacter(nullptr),
       CameraHalfFovX(0.0f),
@@ -661,8 +661,8 @@ FGfScriptSequence::FGfScriptSequence()
       Current(-1),
       bActive(0),
       OfferType(0),
-      OfferArg(0),
-      OfferMissionId(0),
+      OfferId(0),
+      OfferKind(0),
       bOfferShown(0),
       bOfferAnswered(0),
       bOfferAccepted(0),
@@ -732,16 +732,17 @@ void FGfScriptSequence::AddScript(char const* File, int InKind, Csys const* InFr
     if (Engine == nullptr)
         Engine = ThornScriptLoad(Entry.ScriptFile);
     Entry.Engine = Engine;
-    SetGameflowArrivalDelayMs(static_cast<unsigned>(Engine->Slot17GetDuration()));
+    SetGameflowArrivalDelayMs(static_cast<unsigned>(Engine->GetScriptDuration()));
     ++Count;
 }
 
 // FUN_00454f30.
-void FGfScriptSequence::SetDialog(int A, int B, int C, FmtStr const& TextA, FmtStr const& TextB)
+void FGfScriptSequence::SetDialog(int InOfferType, int InOfferId, int InOfferKind, FmtStr const& TextA,
+                                  FmtStr const& TextB)
 {
-    OfferType = A;
-    OfferArg = B;
-    OfferMissionId = C;
+    OfferType = InOfferType;
+    OfferId = InOfferId;
+    OfferKind = InOfferKind;
     DialogTextA = TextA;
     DialogTextB = TextB;
 }
@@ -771,7 +772,7 @@ void FGfScriptSequence::StartEntry(int Index)
         bScriptFade = 1;
 
     FGfScriptEntry& Started = Entries[Current];
-    Started.Script->Start(Started.Engine, Started.ScriptFile, BindMode, bLoop, Field_0x05,
+    Started.Script->Start(Started.Engine, Started.ScriptFile, BindMode, bLoop, bOwnScript,
                           bApplySpatial, Priority, bScriptFade, Name, bPropsToRoom,
                           bSoundsUseFade);
 
@@ -785,7 +786,7 @@ void FGfScriptSequence::StartEntry(int Index)
     {
         bPlayerSaved = 1;
         PlayerCsys = Script->PlayerCsys;
-        PlayerField64 = Script->PlayerField94;
+        PlayerFloorHeight = Script->PlayerFloorHeight;
         PlayerDeformInstance = Script->PlayerDeformInstance;
         PlayerCharacter = Script->PlayerCharacter;
     }
@@ -960,7 +961,7 @@ void FGfScriptSequence::StopPlayback(unsigned char bArg)
         // Results unused; the character is not null-tested.
         DALib::Deform->SetPosePos(PlayerDeformInstance, &PlayerCsys.Pos.x);
         DALib::Deform->SetPoseOri(PlayerDeformInstance, &PlayerCsys.Orient);
-        PlayerCharacter->SetFloat1C(PlayerField64);
+        PlayerCharacter->SetFloorHeight(PlayerFloorHeight);
     }
 
     if (bLetterbox != 0 && !bMoved)
@@ -1105,8 +1106,8 @@ void __cdecl FGfScriptSequence::OnOfferAnswer(void* Context, int Answer)
             {
                 if (!SinglePlayer() && Seq->OfferType == 3)
                     SetMissionOfferSequenceRetail(Seq);
-                G_Server->MissionResponse(static_cast<unsigned>(Seq->OfferArg),
-                                          static_cast<unsigned long>(Seq->OfferMissionId),
+                G_Server->MissionResponse(static_cast<unsigned>(Seq->OfferId),
+                                          static_cast<unsigned long>(Seq->OfferKind),
                                           Seq->bOfferAccepted != 0, GetPlayerConnectionId());
             }
         }
@@ -1122,8 +1123,8 @@ void __cdecl FGfScriptSequence::OnOfferAnswer(void* Context, int Answer)
         {
             Seq->bOfferAnswered = 1;
             Seq->bOfferAccepted = 0;
-            G_Server->MissionResponse(static_cast<unsigned>(Seq->OfferArg),
-                                      static_cast<unsigned long>(Seq->OfferMissionId), false,
+            G_Server->MissionResponse(static_cast<unsigned>(Seq->OfferId),
+                                      static_cast<unsigned long>(Seq->OfferKind), false,
                                       GetPlayerConnectionId());
         }
     }
@@ -1350,9 +1351,6 @@ bool FGfScriptSequence::Update(int Ms)
                     bSkip = 0;
                 StartEntry(Current);
             }
-        }
-        if (!bDone)
-        {
         }
     }
 

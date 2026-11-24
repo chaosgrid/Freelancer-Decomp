@@ -6,7 +6,7 @@
 
 #pragma once
 
-// Retail ToolTip (RTTI .?AUToolTip@@ : TextWin, vftable 0x005d5f7c, 29 slots, size 0x16c),
+// Retail ToolTip (RTTI .?AUToolTip@@ : TextWin, vftable 0x005d5f7c, 29 slots, size 0x170),
 // built by WINFACTORY<ToolTip>::Create FUN_004be420 (the inlined TextWin part, the +0xf4 text
 // entry, then FUN_004bd770) and kept in the singleton DAT_0067244c. Overrides against TextWin:
 // 0 FUN_004bd670 (dtor FUN_004bd690), 4 FUN_0053f330 (never hit), 9 FUN_004bd830 Create,

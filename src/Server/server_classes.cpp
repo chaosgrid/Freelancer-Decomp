@@ -837,8 +837,9 @@ bool __cdecl PlayerData_CheckForCheats(PlayerData& Slot) {
     PlayerData_ReportCheat(Slot, Reason);
     Slot.bCheatReported = 1;
 
-    // TODO(port): not ported -- retail then sends IClient slot 9, PushToClient(client_id,
-    // NULL), outside single player (as PlayerData_SendClientNullPacket in IServerImpl.cpp).
+    // IClient slot 9, PushToClient(client_id, NULL), with no null test on the interface.
+    if (!SinglePlayer())
+        ::g_pClientInterface->PushToClient(Slot.client_id, nullptr);
     return true;
 }
 
@@ -863,14 +864,14 @@ static unsigned short PlayerData_NextEquipId(PlayerSlot& Slot) {
 unsigned short __cdecl PlayerData_AddEquipment(PlayerSlot& Slot, unsigned int ArchId,
                                                CacheString const& Hardpoint, int Count,
                                                float Health, unsigned char bEquipped,
-                                               bool bNoCombine, bool bNotify) {
+                                               bool bMission, bool bNotify) {
     if (!PlayerData_EquipGateOpen(Slot))
         return SUBOBJ_ID_NONE;
 
     unsigned short EquipId = 0;
     bool bCombine = false;
 
-    if (arch_is_combinable(ArchId) && !bNoCombine) {
+    if (arch_is_combinable(ArchId) && !bMission) {
         // Retail sets the combinable flag BEFORE it knows whether a stack was found, so a
         // miss still adds combinable; it just gets a fresh id.
         bCombine = true;
@@ -884,8 +885,7 @@ unsigned short __cdecl PlayerData_AddEquipment(PlayerSlot& Slot, unsigned int Ar
         EquipId = PlayerData_NextEquipId(Slot);
     }
 
-    // The six setters, in retail's order. Server.dll imports no EquipDesc "set_mission",
-    // so EquipDesc::bMission is never written on this path.
+    // The six setters, in retail's order; bMission is a plain byte store (06d4f0aa).
     EquipDesc Desc;
     Desc.set_arch_id(ArchId);
     Desc.set_id(EquipId);
@@ -893,6 +893,7 @@ unsigned short __cdecl PlayerData_AddEquipment(PlayerSlot& Slot, unsigned int Ar
     Desc.set_count(Count);
     Desc.set_status(Health);
     Desc.set_equipped(bEquipped);
+    Desc.bMission = bMission;
 
     int const Combined = Slot.equipment.add_equipment_item(Desc, bCombine);
 
@@ -942,9 +943,11 @@ void __cdecl PlayerData_ModifyEquipment(PlayerSlot& Slot, unsigned short Id,
 
     EquipDesc* Item = Slot.equipment.find_equipment_item(Id);
     if (Item == nullptr) {
-        // Not ported: retail FDUMPs here (0x100001, "*** ERROR: PlayerData::m...",
-        // PlayerDB.cpp line 0xdd7, with the id and the client id; the full format is not
-        // recorded).
+        FDUMP(0x100001,
+              "%s(%d) : *** ERROR: PlayerData::modify_item(): CLI(%d) ID(0x%X) NEW_STATUS(%f). "
+              "Couldn't find item, expect strange inventory behavior",
+              "E:\\FL\\Scratch\\Source\\Server\\PlayerDB.cpp", 0xdd7, Slot.client_id,
+              (unsigned int)Id, (double)Health);
         return;
     }
 
@@ -1469,8 +1472,7 @@ bool PlayerDB::is_valid(const unsigned int& Id) {
 }
 
 // PlayerDB::is_valid_ship_owner -- retail RVA 0x1A40, ordinal 496: the FIRST argument is
-// the player id, the SECOND the ship flid. The declaration in common_server.h names the
-// parameters the other way round (cosmetic: both are `const unsigned int&`).
+// the player id, the SECOND the ship flid.
 bool PlayerDB::is_valid_ship_owner(const unsigned int& PlayerId, const unsigned int& ShipFlid) {
     if (!is_valid(PlayerId)) return false;
     return m_PlayerArray[PlayerId - 1].ship_object_id == ShipFlid;
@@ -1655,7 +1657,7 @@ void PlayerDB::logout(unsigned int SessionId) {
     // (8) Every OTHER occupied session drops this player from its player list
     //     (FLPACKET_SERVER_PLAYERLIST), when this session actually picked a character.
     if ((!IsMPServer() || Slot.selected_character.is_valid())
-        && m_MaxPlayers != 0 && g_pClientInterface) {
+        && m_MaxPlayers != 0) {
         for (unsigned int Other = 1; Other <= m_MaxPlayers; ++Other) {
             if (Other == SessionId) continue;
             if (m_PlayerArray[Other - 1].client_id == 0) continue;
@@ -2048,7 +2050,6 @@ unsigned int PlayerDB::GetGroupID(unsigned int PlayerId) {
 void PlayerDB::SendGroupID(unsigned int PlayerId, unsigned int GroupId) {
     // Retail RVA 0x74890: IClient slot 118 to every valid player.
     extern IClient* g_pClientInterface;
-    if (!g_pClientInterface) return;
 
     unsigned int max_players = PlayerDB_GetMaxPlayers();
     if (max_players == 0) return;
@@ -2062,7 +2063,6 @@ void PlayerDB::SendGroupID(unsigned int PlayerId, unsigned int GroupId) {
 void PlayerDB::SendSystemID(unsigned int PlayerId, unsigned int SystemId) {
     // Retail RVA 0x74900: IClient slot 119 to every valid player.
     extern IClient* g_pClientInterface;
-    if (!g_pClientInterface) return;
 
     unsigned int max_players = PlayerDB_GetMaxPlayers();
     if (max_players == 0) return;
@@ -2390,7 +2390,6 @@ void PlayerDB::SetMOTD(std::wstring& Message) {
     m_MOTD = Message;
 
     extern IClient* g_pClientInterface;
-    if (!g_pClientInterface || !m_PlayerArray) return;
 
     for (unsigned int Index = 1; Index <= m_MaxPlayers; ++Index) {
         if (m_PlayerArray[Index - 1].client_id != 0) {
@@ -2868,9 +2867,7 @@ void PlayerDB::DeleteAccount(CiWString& AccountName) {
     // Retail drops the account's live client (IClient slot 17) before touching the disk.
     if (Account != nullptr && Account->m_ClientID != 0) {
         extern IClient* g_pClientInterface;
-        if (g_pClientInterface) {
-            g_pClientInterface->DisconnectClient(Account->m_ClientID);
-        }
+        g_pClientInterface->DisconnectClient(Account->m_ClientID);
     }
 
     char AccountDir[260];
@@ -3089,7 +3086,7 @@ bool CPlayerGroup::AddMember(unsigned int PlayerId) {
     CObject const* const Cobj = ShipObj->cobject();
     if (Cobj == nullptr)
         return true;
-    if ((static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return true;
     const_cast<CShip*>(static_cast<CShip const*>(Cobj))->GroupId = m_GroupID;
     SysDB::SysMapType::iterator System = SysDB::SysMap.find(Joiner.system_id);
@@ -3150,7 +3147,7 @@ bool CPlayerGroup::DelMember(unsigned int PlayerId) {
     CObject const* const Cobj = ShipObj->cobject();
     if (Cobj == nullptr)
         return true;
-    if ((static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return true;
     const_cast<CShip*>(static_cast<CShip const*>(Cobj))->GroupId = 0;
     SysDB::SysMapType::iterator System = SysDB::SysMap.find(Leaver.system_id);
@@ -3662,7 +3659,7 @@ void MedMine::arm(float DetectRadius, unsigned int SystemId)
     IntruderCount = 0;
 
     PhySys::PhantomParms Parms;
-    Parms.Flag04 = 0;
+    Parms.bPhysicalUnmoveable = 0;
     Parms.Flag05 = 0;
     Parms.Name[0] = '\0';
     Parms.Orientation = Matrix(1.0f, 0.0f, 0.0f,
@@ -3726,7 +3723,7 @@ void MedMine::added(CObject* Obj)
     CObject* const Root = GetRoot(Obj);
     if (Root == nullptr)
         return;
-    if ((static_cast<unsigned int>(Root->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned int>(Root->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
 
     Vector const& MinePos = get_position();
@@ -3750,7 +3747,7 @@ void MedMine::deleted(CObject* Obj)
     CObject* const Root = GetRoot(Obj);
     if (Root == nullptr)
         return;
-    if ((static_cast<unsigned int>(Root->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned int>(Root->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
     --IntruderCount;
 }
@@ -4162,17 +4159,11 @@ SERVER_API ChatHookFn g_pSystemChatHook = nullptr;    // RVA 0xAF60C
 unsigned int StarSystem::count_players(unsigned int ExcludeId) const
 {
     unsigned int Count = 0;
-    // PlayerListHead at this+0x0C.
-    unsigned int const* Sentinel = reinterpret_cast<unsigned int const*>(
-        *reinterpret_cast<void* const*>(
-            reinterpret_cast<unsigned char const*>(this) + 0x0C));
-
-    unsigned int const* Node = reinterpret_cast<unsigned int const*>(*Sentinel);
-    while (Node != Sentinel) {
-        if (Node[0x10] != ExcludeId) {
+    SystemPlayerNode const* const Sentinel = static_cast<SystemPlayerNode const*>(PlayerListHead);
+    for (SystemPlayerNode const* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
+        if (Node->View.PlayerId != ExcludeId) {
             Count++;
         }
-        Node = reinterpret_cast<unsigned int const*>(*Node);
     }
     return Count;
 }
@@ -4267,7 +4258,7 @@ bool StarSystem::activate_object(GameObject* Obj, bool bOn, unsigned int Index)
     // A solar is announced to every player, anything else only where seen.
     CObject const* Solar = Obj->cobject();
     if (Solar != nullptr &&
-        (static_cast<unsigned int>(Solar->ObjectClass) & 0x303u) != 0x303u)
+        (static_cast<unsigned int>(Solar->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
         Solar = nullptr;
 
     // The pad bytes are never written.
@@ -4456,7 +4447,7 @@ void StarSystem::tractor_loot(::Loot* LootObj, EqObj* Ship, unsigned int Space, 
         // The CShip narrowing is not null-tested before its EquipManager is used.
         CObject* const Raw = Ship->Object;
         CShip* const ShipCobj =
-            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CShip*>(Raw) : nullptr;
         CETractor* const Tractor = CETractor::cast(ShipCobj->EquipManager.FindByID(TractorId));
         if (Tractor != nullptr)
@@ -4473,7 +4464,7 @@ void StarSystem::tractor_loot(::Loot* LootObj, EqObj* Ship, unsigned int Space, 
 void SrvTractor::notify(Event Code, void* Param)
 {
     // Event 0x18: TractorArm::Update's consume timer ran out; Param is the TractorArm.
-    if (Code == Event_0x18)
+    if (Code == TractorArmAcquireTimeUp)
     {
         CLoot* const Target = static_cast<TractorArm*>(Param)->GetTarget();
         if (Target != nullptr)
@@ -4481,7 +4472,7 @@ void SrvTractor::notify(Event Code, void* Param)
             // The owner's CShip, not null-tested before the call.
             CObject* const Raw = (Owner != nullptr) ? Owner->Object : nullptr;
             CShip* const ShipCobj =
-                (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+                (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                     ? static_cast<CShip*>(Raw) : nullptr;
 
             int const Space = ShipCobj->get_space_for_cargo_type(Target->ContentsArch);
@@ -4665,7 +4656,7 @@ unsigned int ObjectList::collect_in_sphere(unsigned int* OutIds, unsigned int Ma
         if (Wrapper == nullptr)
             continue;
         CObject* const Raw = Wrapper->Object;
-        if (Raw == nullptr || (static_cast<unsigned int>(Raw->ObjectClass) & 3u) != 3u)
+        if (Raw == nullptr || (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
             continue;
         CSimple* const Simple = static_cast<CSimple*>(Raw);
         if ((Simple->TypeBits & TypeMask) == 0u)
@@ -4788,7 +4779,7 @@ void StarSystem::load_solars()
             ::Solar* const Wrapper = new ::Solar();                 // FUN_06d02b70
 
             CObject* const Attached =
-                ((static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u) ? Obj : nullptr;
+                ((static_cast<unsigned int>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar) ? Obj : nullptr;
             Wrapper->attach_existing(Attached);                     // FUN_06d02c20
 
             Wrapper->enter_system(this, nullptr);
@@ -4819,7 +4810,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
 {
     CSolar::CreateParms Parms;
     Parms.Pad58 = 0;
-    Parms.DockingCount = 0;
+    Parms.DockingBaseId = 0;
     Parms.VibeId = 0;
     Parms.SpaceCostume.PartIds[0] = 0;                             // FUN_06d0a060
     Parms.SpaceCostume.PartIds[1] = 0;
@@ -4880,13 +4871,13 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
 
     CObject* const Raw = Wrapper->Object;
     CSolar* const Cs =
-        (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x303u) == 0x303u)
+        (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             ? static_cast<CSolar*>(Raw) : nullptr;
 
     // FUN_06d0a770's values: VibeId -1, the accessory ids (+0x74..+0x93) not written.
     CSolar::CreateParms Parms;
     Parms.Pad58 = 0u;
-    Parms.DockingCount = 0u;
+    Parms.DockingBaseId = 0u;
     Parms.VibeId = 0xffffffffu;
     Parms.SpaceCostume.PartIds[0] = 0u;
     Parms.SpaceCostume.PartIds[1] = 0u;
@@ -4915,9 +4906,9 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
     Parms.OwnerPlayer = 0u;
     Server_QuatToMatrix(Parms.Orient, Req.Orientation);            // DAT_06d8da08 vt +0x54
 
-    // DockingBaseId feeds both DockingCount and DockWithBaseId.
+    // Req.DockingBaseId feeds both DockingBaseId and DockWithBaseId.
     Parms.VisitValue = Req.VisitValue;
-    Parms.DockingCount = Req.DockingBaseId;
+    Parms.DockingBaseId = Req.DockingBaseId;
     Parms.DockWithBaseId = Req.DockingBaseId;
     Parms.VibeId = static_cast<unsigned int>(Req.VibeGroupId);
     Parms.SpaceCostume.PartIds[0] = Req.CostumeHead;
@@ -4974,7 +4965,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
     {
         CObject* const BucketRaw = Wrapper->Object;
         CSolar* const BucketSolar =
-            (BucketRaw != nullptr && (static_cast<unsigned int>(BucketRaw->ObjectClass) & 0x303u) == 0x303u)
+            (BucketRaw != nullptr && (static_cast<unsigned int>(BucketRaw->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                 ? static_cast<CSolar*>(BucketRaw) : nullptr;
         float const Radius = BucketSolar->Radius;
         Vector const& Position = Wrapper->get_position();
@@ -5013,7 +5004,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         // (not the copy's).
         Wrapper->find(Req.ObjId);
         CObject* const Raw = Wrapper->Object;
-        Cs = (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+        Cs = (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                  ? static_cast<CShip*>(Raw) : nullptr;
     }
     else
@@ -5025,14 +5016,14 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         Arch->Release();
 
         CObject* const Raw = Wrapper->Object;
-        Cs = (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+        Cs = (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                  ? static_cast<CShip*>(Raw) : nullptr;
 
         // FUN_06d0a770's values (see create_solar), then the CShip tail. The CEqObj tail
         // +0xb8 .. +0xe4 is stack garbage in retail; CShip::init does not read it.
         CShip::CreateParms Parms;
         Parms.Pad58 = 0u;
-        Parms.DockingCount = 0u;
+        Parms.DockingBaseId = 0u;
         Parms.VibeId = 0xffffffffu;
         Parms.SpaceCostume.PartIds[0] = 0u;
         Parms.SpaceCostume.PartIds[1] = 0u;
@@ -5091,7 +5082,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         Parms.ArchGroupDescs = Copy.CollisionGroups;
 
         Parms.GroupNameId = Copy.GroupNameId;
-        Parms.DockingCount = Copy.DockingBaseId;
+        Parms.DockingBaseId = Copy.DockingBaseId;
         Cs->init(Parms);
 
         // The owner's player group id into CShip::GroupId.
@@ -5177,10 +5168,9 @@ void StarSystem::add_player(unsigned int SessionId)
     bool const bSingle = SinglePlayer();
 
     if (!bSingle) {
-        // Retail pushes id-then-session, so the session is the FIRST parameter. The null
-        // test on SystemInfo is the port's; retail calls through it.
-        Players.SendSystemID(SessionId,
-                             (SystemInfo != nullptr) ? SystemInfo->NicknameId : 0u);
+        // Retail pushes id-then-session, so the session is the FIRST parameter. SystemInfo
+        // is read unguarded.
+        Players.SendSystemID(SessionId, SystemInfo->NicknameId);
 
         // Unchecked raw slot; read back only by the AttitudeTowards call below.
         int const PlayerRep = Players[SessionId].rep_vibe;
@@ -5196,7 +5186,7 @@ void StarSystem::add_player(unsigned int SessionId)
                 CObject* Raw = const_cast<CObject*>(Obj->cobject());
                 CSolar* Solar = nullptr;
                 if (Raw != nullptr &&
-                    (static_cast<unsigned int>(Raw->ObjectClass) & 0x303u) == 0x303u)
+                    (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                     Solar = static_cast<CSolar*>(Raw);
 
                 if (Solar != nullptr && Solar->bDynamic) {
@@ -5293,7 +5283,7 @@ void StarSystem::add_player(unsigned int SessionId)
                 CObject* const Raw = Obj->cobj();
                 CShip* const Ship =
                     (Raw != nullptr &&
-                     (static_cast<unsigned>(Raw->ObjectClass) & 0x503u) == 0x503u)
+                     (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                         ? static_cast<CShip*>(Raw)
                         : nullptr;
                 if (Ship != nullptr) {
@@ -5335,7 +5325,7 @@ void StarSystem::add_player(unsigned int SessionId)
                 CObject* const Raw = Obj->cobj();
                 CLoot* const Loot =
                     (Raw != nullptr &&
-                     (static_cast<unsigned>(Raw->ObjectClass) & 0x803u) == 0x803u)
+                     (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassLoot) == CObject::ClassLoot)
                         ? static_cast<CLoot*>(Raw)
                         : nullptr;
                 FServerLootDesc* const Desc = &Descs[Filled];
@@ -5677,7 +5667,7 @@ void SystemPlayerView_SendGroupChange(Observer* View, unsigned int ObjId)
     CObject const* const Cobj = Obj->cobject();
     if (Cobj == nullptr)
         return;
-    if ((static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
     unsigned int const GroupId = static_cast<CShip const*>(Cobj)->GroupId;
     g_pClientInterface->SendServerMiscObjUpdateObjectGroup(View->PlayerId, ObjId, GroupId);
@@ -5711,7 +5701,7 @@ void SystemPlayerView_SendRemoteCargoUpdate(Observer* View, GameObject* Obj)
     EquipDescVector Items;
     CObject const* const Cobj = Obj->cobject();
     CShip const* Ship = nullptr;
-    if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) == 0x503u)
+    if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
         Ship = static_cast<CShip const*>(Cobj);
     Ship->get_equip_desc_list(Items);
     g_pClientInterface->SendServerRemoteObjectCargoUpdate(View->PlayerId, Ship->Id, Items, 1u);
@@ -5944,8 +5934,8 @@ void SystemPlayerView_CreateSolarForPlayer(Observer* View, CSolarCreateInfo* Inf
 // port passes 0/1.
 void SystemPlayerView_SendComm(Observer* View, unsigned int SenderId,
                                unsigned int ReceiverId, unsigned int VoiceId,
-                               Costume const& Cost, unsigned int CommType,
-                               unsigned int* TextIds, int TextCount, unsigned int Mood,
+                               Costume const& Cost, unsigned int CaptionIds,
+                               unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
                                float Duration)
 {
     if (!SinglePlayer()) {
@@ -5969,7 +5959,7 @@ void SystemPlayerView_SendComm(Observer* View, unsigned int SenderId,
         ReceiverId == Players[View->PlayerId].ship_object_id;
     static_assert(sizeof(Costume) == 13 * sizeof(unsigned int), "Costume is 13 dwords");
     g_pClientInterface->SendServerSendComm(View->PlayerId, SenderId, ReceiverId, VoiceId,
-                                           Cost, CommType, TextIds, TextCount, Mood, Duration,
+                                           Cost, CaptionIds, TextIds, TextCount, PermutationIds, Duration,
                                            bReceiverIsOwnShip);
 }
 
@@ -6055,7 +6045,7 @@ void SystemPlayerView_DamageObject(Observer* View, unsigned int ObjId,
     CObject* const Raw = Obj->cobj();
     CSimple* Solar = nullptr;
     if (Raw != nullptr &&
-        (static_cast<unsigned>(Raw->ObjectClass) & 0x303u) == 0x303u) {
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar) {
         Solar = Obj->csimple();
     }
 
@@ -6173,7 +6163,7 @@ void SystemPlayerView_OnObjectLanded(Observer* View,
 SrvAsteroid::MedAsteroid* StarSystem::create_med_asteroid(unsigned int const& ObjId)
 {
     SrvAsteroid::MedAsteroid* const Obj = new SrvAsteroid::MedAsteroid();
-    ListC0.append(Obj);
+    MedAsteroids.append(Obj);
     Obj->find(ObjId);
     Obj->enter_system(this, nullptr);
     return Obj;
@@ -6182,7 +6172,7 @@ SrvAsteroid::MedAsteroid* StarSystem::create_med_asteroid(unsigned int const& Ob
 SrvAsteroid::MedMine* StarSystem::create_med_mine(unsigned int const& ObjId)
 {
     SrvAsteroid::MedMine* const Obj = new SrvAsteroid::MedMine();
-    ListC0.append(Obj);
+    MedAsteroids.append(Obj);
     Obj->find(ObjId);
     Obj->enter_system(this, nullptr);
     return Obj;
@@ -6232,7 +6222,7 @@ void StarSystem::explode(ExplosionDamageEvent const& Blast)
 
         for (std::vector<CObject*>::iterator It = Roots.begin(); It != Roots.end(); ++It) {
             CObject* const Root = *It;
-            if (Root == nullptr || (static_cast<unsigned int>(Root->ObjectClass) & 3u) != 3u)
+            if (Root == nullptr || (static_cast<unsigned int>(Root->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
                 continue;
             unsigned int const Id = static_cast<CSimple*>(Root)->Id;
             // Not the exploding object itself.
@@ -6271,7 +6261,7 @@ void StarSystem::explode(ExplosionDamageEvent const& Blast)
 
         for (std::vector<CObject*>::iterator It = Roots.begin(); It != Roots.end(); ++It) {
             CObject* const Root = *It;
-            if (Root == nullptr || (static_cast<unsigned int>(Root->ObjectClass) & 3u) != 3u)
+            if (Root == nullptr || (static_cast<unsigned int>(Root->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
                 continue;
             CSimple* const Simple = static_cast<CSimple*>(Root);
             // Players' objects are not pushed.
@@ -6528,7 +6518,7 @@ void StarSystem::create_mine(FServerLaunchRecord const& Rec)
     Obj->enter_system(this, nullptr);
     Obj->arm();                                                     // FUN_06cf3560
 
-    List98.append(Obj);
+    Mines.append(Obj);
 
     // The CREATEMINE record; every default of retail's inlined ctor but +0x44 is
     // overwritten.
@@ -6552,7 +6542,7 @@ void StarSystem::create_mine(FServerLaunchRecord const& Rec)
 // StarSystem::create_counter_measure -- retail FUN_06d092c0, from
 // SrvCounterMeasureDropper::launch. create_mine's body with different FDUMP lines (the id
 // text still says "new mine", retail's string), the (& 0x17) narrowing, divert_missiles
-// after enter_system, ListAC, and the countermeasure notifier.
+// after enter_system, CounterMeasures, and the countermeasure notifier.
 void StarSystem::create_counter_measure(FServerLaunchRecord const& Rec)
 {
     CFLIDMaker* const Maker = CFLIDMaker::GetInstance();
@@ -6603,7 +6593,7 @@ void StarSystem::create_counter_measure(FServerLaunchRecord const& Rec)
     Obj->enter_system(this, nullptr);
     Obj->divert_missiles();                                         // FUN_06ce6300
 
-    ListAC.append(Obj);
+    CounterMeasures.append(Obj);
 
     FServerCreateProjectileInfo Info;
     Info.ObjId = Parms.Id;
@@ -6669,7 +6659,7 @@ void StarSystem::create_guided(FServerLaunchRecord const& Rec)
 
     GuidedObject->init(Parms);
 
-    List70.append(Obj);
+    GuidedMunitions.append(Obj);
 
     Obj->enter_system(this, nullptr);
     Obj->arm();
@@ -6702,7 +6692,7 @@ void StarSystem::create_guided(FServerLaunchRecord const& Rec)
     if (Target != nullptr && !Target->is_destroyed())
     {
         CObject* const Raw = Target->Object;
-        if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x103u) == 0x103u)
+        if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
         {
             IBehaviorManager* const Behavior = static_cast<CEqObj*>(Raw)->get_behavior_interface();
             if (Behavior != nullptr)
@@ -6827,7 +6817,7 @@ void StarSystem::collect_dockable_solars(std::list<GameObject*>& Out, unsigned i
         GameObject* const Obj = Node->Data;
         CObject* const Cobj = Obj->cobj();
         CEqObj* Eq = nullptr;
-        if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & 0x303u) == 0x303u)
+        if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             Eq = static_cast<CEqObj*>(Cobj);
         // Retail reads +0x164 through the narrowed pointer without testing it.
         unsigned int const Base = Eq->DockingPointBaseId;
@@ -6853,8 +6843,8 @@ void StarSystem::collect_dockable_solars(std::list<GameObject*>& Out, unsigned i
 // player within 10000 of the sender (an unordered compare sends). x87: the squared
 // distance (dz^2 + dx^2) + dy^2 is taken in double, as at MSVC's default precision.
 void StarSystem::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsigned int VoiceId,
-                           Costume const& Cost, unsigned int CommType, unsigned int* TextIds,
-                           int TextCount, unsigned int Mood, float Duration, bool bBroadcast)
+                           Costume const& Cost, unsigned int CaptionIds, unsigned int* TextIds,
+                           int TextCount, unsigned int PermutationIds, float Duration, bool bBroadcast)
 {
     bool bNoSender = false;
     Vector SenderPos = {};
@@ -6878,13 +6868,13 @@ void StarSystem::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsig
         if (bNoSender) {
             if (SinglePlayer() || ReceiverId == ShipId || bBroadcast)
                 SystemPlayerView_SendComm(&Node->View, SenderId, ReceiverId, VoiceId, Cost,
-                                          CommType, TextIds, TextCount, Mood, Duration);
+                                          CaptionIds, TextIds, TextCount, PermutationIds, Duration);
             continue;
         }
 
         if (ReceiverId == ShipId) {
             SystemPlayerView_SendComm(&Node->View, SenderId, ReceiverId, VoiceId, Cost,
-                                      CommType, TextIds, TextCount, Mood, Duration);
+                                      CaptionIds, TextIds, TextCount, PermutationIds, Duration);
             if (!bBroadcast)
                 return;
             continue;
@@ -6903,7 +6893,7 @@ void StarSystem::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsig
         if (DistSq > static_cast<double>(1.0e8f))
             continue;
         SystemPlayerView_SendComm(&Node->View, SenderId, ReceiverId, VoiceId, Cost,
-                                  CommType, TextIds, TextCount, Mood, Duration);
+                                  CaptionIds, TextIds, TextCount, PermutationIds, Duration);
     }
 }
 
@@ -7059,7 +7049,7 @@ void StarSystem::notify_fire_weapon(unsigned int const& ObjId, std::vector<unsig
 void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
 {
     ::Ship* const DockingShip = static_cast< ::Ship*>(ShipObj);
-    if (DockingShip->DeathSequenceObjId != 0)
+    if (DockingShip->DockedObjId != 0)
         return;
 
     // Every unowned ship's behavior manager hears of the dock (OwnerPlayer read unguarded,
@@ -7075,7 +7065,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
             continue;
         CObject* const Raw = (Obj != nullptr) ? Obj->Object : nullptr;
         CEqObj* const Other =
-            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CEqObj*>(Raw) : nullptr;
         IBehaviorManager* const Behavior = Other->get_behavior_interface();
         if (Behavior == nullptr)
@@ -7108,7 +7098,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
         SystemPlayerView_OnObjectLeftSystem(&Player->View, &ShipId, &DockId);
     }
 
-    DockingShip->DeathSequenceObjId = Dock->get_id();
+    DockingShip->DockedObjId = Dock->get_id();
 
     if (ShipObj->csimple()->OwnerPlayer != 0u)
     {
@@ -7130,7 +7120,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
     // An AI ship's CShip (not null-tested after the narrowing).
     CObject* const Raw = ShipObj->Object;
     CShip* const Cs =
-        (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+        (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             ? static_cast<CShip*>(Raw) : nullptr;
 
     if (SinglePlayer())
@@ -7142,9 +7132,9 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
     // A gate or hole gives the ship 12 seconds to go through.
     Cs->enable_collisions_r(false);
     if ((Dock->get_type_bits() & 0x40u) != 0u || (Dock->get_type_bits() & 0x800u) != 0u)
-        DockingShip->DeathSequenceTimer = 12.0f;                // .rdata:06d67cc0
+        DockingShip->DockExitTimer = 12.0f;                // .rdata:06d67cc0
     else
-        DockingShip->DeathSequenceTimer = 0.0f;
+        DockingShip->DockExitTimer = 0.0f;
 }
 
 // FUN_06d0cc00. See server_sysdb.h.
@@ -7160,7 +7150,7 @@ void StarSystem::arrive_ship(GameObject* Obj, GameObject* JumpObj, Vector const&
         // Handed on without a null test.
         CObject* const Raw = (Obj != nullptr) ? Obj->Object : nullptr;
         CShip* const Cs =
-            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CShip*>(Raw) : nullptr;
 
         if ((Bits & 0x40u) != 0u || (Bits & 0x800u) != 0u)
@@ -7227,12 +7217,12 @@ void StarSystem::remove_ship(GameObject* Obj, PhySys::CreateParms* OutParms)
 // FUN_06d0d100. See server_sysdb.h.
 void StarSystem::add_ship(GameObject* Obj, PhySys::CreateParms* Parms, Vector const& Pos, Matrix const& Orient)
 {
-    Parms->CollisionGroupId = SystemInfo->NicknameId;
+    Parms->SystemId = SystemInfo->NicknameId;
 
     // The (& 1) narrowing; the writes below do not test the result.
     CObject* const Raw =
         (Obj != nullptr && Obj->Object != nullptr &&
-         (static_cast<unsigned int>(Obj->Object->ObjectClass) & 0x1u) == 0x1u)
+         (static_cast<unsigned int>(Obj->Object->ObjectClass) & CObject::ClassObject) == CObject::ClassObject)
             ? Obj->Object : nullptr;
     Raw->WorldPosition = Pos;
     Raw->Orientation = Orient;
@@ -7245,7 +7235,7 @@ void StarSystem::add_ship(GameObject* Obj, PhySys::CreateParms* Parms, Vector co
 
     CObject* const ShipRaw = (Obj != nullptr) ? Obj->Object : nullptr;
     CShip* const Cs =
-        (ShipRaw != nullptr && (static_cast<unsigned int>(ShipRaw->ObjectClass) & 0x503u) == 0x503u)
+        (ShipRaw != nullptr && (static_cast<unsigned int>(ShipRaw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             ? static_cast<CShip*>(ShipRaw) : nullptr;
 
     // Filled only when the object is a CShip.
@@ -7262,7 +7252,7 @@ void StarSystem::add_ship(GameObject* Obj, PhySys::CreateParms* Parms, Vector co
 }
 
 // FUN_06d0cee0. See server_sysdb.h.
-void StarSystem::launch(GameObject* ShipObj, GameObject* Dock, int LaunchType)
+void StarSystem::launch(GameObject* ShipObj, GameObject* Dock, int DockPortIndex)
 {
     if (ShipObj->csimple()->OwnerPlayer != 0u)
     {
@@ -7274,16 +7264,16 @@ void StarSystem::launch(GameObject* ShipObj, GameObject* Dock, int LaunchType)
 
     CObject* const DockRaw = (Dock != nullptr) ? Dock->Object : nullptr;
     CEqObj* const DockEq =
-        (DockRaw != nullptr && (static_cast<unsigned int>(DockRaw->ObjectClass) & 0x103u) == 0x103u)
+        (DockRaw != nullptr && (static_cast<unsigned int>(DockRaw->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             ? static_cast<CEqObj*>(DockRaw) : nullptr;
 
     // Not tested afterwards.
     CObject* const ShipRaw = (ShipObj != nullptr) ? ShipObj->Object : nullptr;
     CShip* const Cs =
-        (ShipRaw != nullptr && (static_cast<unsigned int>(ShipRaw->ObjectClass) & 0x503u) == 0x503u)
+        (ShipRaw != nullptr && (static_cast<unsigned int>(ShipRaw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             ? static_cast<CShip*>(ShipRaw) : nullptr;
 
-    Cs->launch(static_cast<IObjRW*>(ShipObj), DockEq, LaunchType);
+    Cs->launch(static_cast<IObjRW*>(ShipObj), DockEq, DockPortIndex);
     static_cast< ::Ship*>(ShipObj)->apply_launch_invincibility();  // FUN_06d01110
 }
 
@@ -7313,7 +7303,7 @@ void StarSystem::notify_go_tradelane(unsigned int ShipId, unsigned int EntranceI
             Msg[3] = SystemInfo->NicknameId;
             Server_ControllerDispatch(0, pub::Controller::EMessage::TradelaneEnter, Msg);
             CObject* const Raw = Obj->Object;
-            if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+            if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 static_cast<CShip*>(Raw)->use_tradelane(true);
             continue;
         }
@@ -7322,7 +7312,7 @@ void StarSystem::notify_go_tradelane(unsigned int ShipId, unsigned int EntranceI
             continue;
         CObject* const Raw = Obj->Object;
         CEqObj* const Ship =
-            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CEqObj*>(Raw) : nullptr;
         IBehaviorManager* const Behavior = Ship->get_behavior_interface();
         if (Behavior == nullptr)
@@ -7384,7 +7374,7 @@ void StarSystem::notify_stop_tradelane(unsigned int ShipId, unsigned int Entranc
             Msg[3] = SystemInfo->NicknameId;
             Server_ControllerDispatch(0, pub::Controller::EMessage::TradelaneExit, Msg);
             CObject* const Raw = Obj->Object;
-            if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+            if (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 static_cast<CShip*>(Raw)->use_tradelane(false);
         }
 
@@ -7394,7 +7384,7 @@ void StarSystem::notify_stop_tradelane(unsigned int ShipId, unsigned int Entranc
             continue;
         CObject* const Raw = Obj->Object;
         CEqObj* const Ship =
-            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & 0x503u) == 0x503u)
+            (Raw != nullptr && (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CEqObj*>(Raw) : nullptr;
         IBehaviorManager* const Behavior = Ship->get_behavior_interface();
         if (Behavior == nullptr)
@@ -7427,22 +7417,22 @@ void StarSystem::notify_stop_tradelane(unsigned int ShipId, unsigned int Entranc
 }
 
 // FUN_06d0c6d0: solars only.
-void StarSystem::add_to_list_d4(GameObject* Obj)
+void StarSystem::add_docking_solar(GameObject* Obj)
 {
     if ((Obj->get_type_bits() & 0xfdffu) == 0u)
         return;
-    ListD4.append(Obj);
+    DockingSolars.append(Obj);
 }
 
 // FUN_06d0c730: the first match only.
-void StarSystem::remove_from_list_d4(GameObject* Obj)
+void StarSystem::remove_docking_solar(GameObject* Obj)
 {
     MetaNode<GameObject>* Node = nullptr;
-    while (ListD4.traverse(Node, true))
+    while (DockingSolars.traverse(Node, true))
     {
         if (Node->Data == Obj)
         {
-            ListD4.remove(Node);
+            DockingSolars.remove(Node);
             return;
         }
     }
@@ -7461,7 +7451,7 @@ GameObject* StarSystem::find_solar(unsigned int const* NicknameId) const
         CObject* const Raw = const_cast<CObject*>(Obj->cobject());
         CSolar* Solar = nullptr;
         if (Raw != nullptr &&
-            (static_cast<unsigned int>(Raw->ObjectClass) & 0x303u) == 0x303u)
+            (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             Solar = static_cast<CSolar*>(Raw);
         // Retail reads the nickname even off the zeroed pointer; the solar list never
         // holds anything else.
@@ -7520,7 +7510,7 @@ static CEqObj* GameObject_ceqobj(GameObject* Obj)
     CObject* const Raw = (Obj != nullptr) ? Obj->cobj() : nullptr;
     if (Raw == nullptr)
         return nullptr;
-    if ((static_cast<unsigned>(Raw->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         return nullptr;
     return static_cast<CEqObj*>(Raw);
 }
@@ -7578,24 +7568,24 @@ unsigned short StarSystem::add_cargo(GameObject* Obj, unsigned int ArchId,
     if (bCombined)
     {
         // FUN_06d4f230: add_equipment with the cargo-bay hardpoint baked in. The combine
-        // path forces bNoCombine and bNotify both to zero.
+        // path forces bMission and bNotify both to zero.
         if (Slot != nullptr)
         {
             PlayerData_AddEquipment(*Slot, ArchId, EquipDesc::CARGO_BAY_HP_NAME,
                                     (int)Count, Health, /*bEquipped*/false,
-                                    /*bNoCombine*/false, /*bNotify*/false);
+                                    /*bMission*/false, /*bNotify*/false);
         }
     }
     else
     {
-        // Here the mission flag DOES travel on as bNoCombine.
+        // Here the mission flag DOES travel on.
         unsigned short EquipId = SUBOBJ_ID_NONE;
         if (Slot != nullptr)
         {
             EquipId = PlayerData_AddEquipment(*Slot, ArchId,
                                               EquipDesc::CARGO_BAY_HP_NAME,
                                               (int)Count, Health, /*bEquipped*/false,
-                                              /*bNoCombine*/bMission, /*bNotify*/false);
+                                              bMission, /*bNotify*/false);
         }
         else
         {
@@ -7746,12 +7736,12 @@ void StarSystem::unload()
     }
 
     // Six lists in retail's order.
-    StarSystem_DeleteBlock(Ships);     // +0x34
-    StarSystem_DeleteBlock(Loot);      // +0x48
-    StarSystem_DeleteBlock(List70);    // +0x70
-    StarSystem_DeleteBlock(Beams);     // +0x84
-    StarSystem_DeleteBlock(List98);    // +0x98
-    StarSystem_DeleteBlock(ListAC);    // +0xac
+    StarSystem_DeleteBlock(Ships);           // +0x34
+    StarSystem_DeleteBlock(Loot);            // +0x48
+    StarSystem_DeleteBlock(GuidedMunitions); // +0x70
+    StarSystem_DeleteBlock(Beams);           // +0x84
+    StarSystem_DeleteBlock(Mines);           // +0x98
+    StarSystem_DeleteBlock(CounterMeasures); // +0xac
 
     // +0xe8: a forward traverse deleting every non-null Data, then MetaList::free.
     {
@@ -7775,7 +7765,7 @@ void StarSystem::unload()
     unsigned int const SystemId = SystemInfo->NicknameId;
     SrvAsteroid::SrvAsteroid_UnloadSystem(SystemId);
     CmnAsteroid::Unload(SystemId);
-    StarSystem_DeleteBlock(ListC0);
+    StarSystem_DeleteBlock(MedAsteroids);
 
     // FUN_06d0f2f0: clear the 0xC-byte POD vector.
     VectorEnd = VectorBegin;
@@ -7817,9 +7807,9 @@ StarSystem::StarSystem()
       ListAlloc(0),
       PlayerListHead(StarSystem_NewPlayerSentinel()),
       PlayerListSize(0),
-      ObjectListAlloc(0),
-      ObjectListHead(StarSystem_NewDockSentinel()),
-      ObjectListSize(0),
+      DockQueueAlloc(0),
+      DockQueueHead(StarSystem_NewDockSentinel()),
+      DockQueueSize(0),
       Spatial(nullptr),
       VectorAlloc(0),
       VectorBegin(nullptr),
@@ -7843,9 +7833,9 @@ StarSystem::StarSystem(StarSystem const& Other)
       ListAlloc(Other.ListAlloc),
       PlayerListHead(StarSystem_NewPlayerSentinel()),
       PlayerListSize(0),
-      ObjectListAlloc(Other.ObjectListAlloc),
-      ObjectListHead(StarSystem_NewDockSentinel()),
-      ObjectListSize(0),
+      DockQueueAlloc(Other.DockQueueAlloc),
+      DockQueueHead(StarSystem_NewDockSentinel()),
+      DockQueueSize(0),
       Spatial(Other.Spatial),
       VectorAlloc(Other.VectorAlloc),
       VectorBegin(nullptr),
@@ -7854,12 +7844,12 @@ StarSystem::StarSystem(StarSystem const& Other)
       Ships(Other.Ships),
       Loot(Other.Loot),
       Solars(Other.Solars),
-      List70(Other.List70),
+      GuidedMunitions(Other.GuidedMunitions),
       Beams(Other.Beams),
-      List98(Other.List98),
-      ListAC(Other.ListAC),
-      ListC0(Other.ListC0),
-      ListD4(Other.ListD4),
+      Mines(Other.Mines),
+      CounterMeasures(Other.CounterMeasures),
+      MedAsteroids(Other.MedAsteroids),
+      DockingSolars(Other.DockingSolars),
       Deferred(Other.Deferred),
       bLoaded(Other.bLoaded)
 {
@@ -7886,8 +7876,8 @@ StarSystem::StarSystem(StarSystem const& Other)
 
     // FUN_06d10a30: the same for the dock queue (FUN_06d0f830 copies each entry).
     {
-        SystemDockNode* const End = static_cast<SystemDockNode*>(ObjectListHead);
-        SystemDockNode* const SrcEnd = static_cast<SystemDockNode*>(Other.ObjectListHead);
+        SystemDockNode* const End = static_cast<SystemDockNode*>(DockQueueHead);
+        SystemDockNode* const SrcEnd = static_cast<SystemDockNode*>(Other.DockQueueHead);
         for (SystemDockNode* Src = SrcEnd->Next; Src != SrcEnd; Src = Src->Next) {
             SystemDockNode* const Node =
                 static_cast<SystemDockNode*>(::operator new(sizeof(SystemDockNode)));
@@ -7896,7 +7886,7 @@ StarSystem::StarSystem(StarSystem const& Other)
             End->Prev = Node;
             Node->Prev->Next = Node;
             ::new (static_cast<void*>(&Node->Entry)) FSystemDockEntry(Src->Entry);
-            ++ObjectListSize;
+            ++DockQueueSize;
         }
     }
 
@@ -7928,11 +7918,11 @@ StarSystem::~StarSystem()
     VectorEnd = nullptr;
     VectorCapacity = nullptr;
 
-    SystemDockNode* const DockHead = static_cast<SystemDockNode*>(ObjectListHead);
+    SystemDockNode* const DockHead = static_cast<SystemDockNode*>(DockQueueHead);
     erase_docks(DockHead->Next, DockHead);
-    ::operator delete(ObjectListHead);
-    ObjectListHead = nullptr;
-    ObjectListSize = 0;
+    ::operator delete(DockQueueHead);
+    DockQueueHead = nullptr;
+    DockQueueSize = 0;
 
     // FUN_06d0f230.
     SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
@@ -7967,9 +7957,9 @@ static IVP_BOOL __cdecl StarSystem_MpCollisionFilter(IVP_Real_Object* A, IVP_Rea
         return IVP_TRUE;
 
     CObject* ClientA = static_cast<CObject*>(A->client_data);
-    if (ClientA == nullptr && A->first_child != nullptr)
+    if (ClientA == nullptr && A->controller_phantom != nullptr)
         return IVP_TRUE;
-    if (B->client_data == nullptr && B->first_child != nullptr)
+    if (B->client_data == nullptr && B->controller_phantom != nullptr)
         return IVP_TRUE;
 
     if (ClientA != nullptr)
@@ -8078,7 +8068,7 @@ IObjRW* __thiscall StarSystem::GetNext(void* IterState)
     }
     Mask = Cursor->Mask;
     if ((Mask & 0x1000000u) != 0) {
-        Found = StarSystem_ObjDbStep(Mask, &List70, &Cursor->Node, &Cursor->List, false);
+        Found = StarSystem_ObjDbStep(Mask, &GuidedMunitions, &Cursor->Node, &Cursor->List, false);
         if (Found != nullptr)
             return Found;
     }
@@ -8090,19 +8080,19 @@ IObjRW* __thiscall StarSystem::GetNext(void* IterState)
     }
     Mask = Cursor->Mask;
     if ((Mask & 0x4000000u) != 0) {
-        Found = StarSystem_ObjDbStep(Mask, &List98, &Cursor->Node, &Cursor->List, false);
+        Found = StarSystem_ObjDbStep(Mask, &Mines, &Cursor->Node, &Cursor->List, false);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
     if ((Mask & 0x8000000u) != 0) {
-        Found = StarSystem_ObjDbStep(Mask, &ListAC, &Cursor->Node, &Cursor->List, false);
+        Found = StarSystem_ObjDbStep(Mask, &CounterMeasures, &Cursor->Node, &Cursor->List, false);
         if (Found != nullptr)
             return Found;
     }
     Mask = Cursor->Mask;
     if ((Mask & 0x20000000u) != 0)
-        Found = StarSystem_ObjDbStep(Mask, &ListC0, &Cursor->Node, &Cursor->List, false);
+        Found = StarSystem_ObjDbStep(Mask, &MedAsteroids, &Cursor->Node, &Cursor->List, false);
     return Found;
 }
 
@@ -8134,13 +8124,13 @@ GameObject* StarSystem::find_object(unsigned int Id)
     if (Node == nullptr)
         Node = Loot.find_by_id(Id);
     if (Node == nullptr)
-        Node = List70.find_by_id(Id);
+        Node = GuidedMunitions.find_by_id(Id);
     if (Node == nullptr)
-        Node = List98.find_by_id(Id);
+        Node = Mines.find_by_id(Id);
     if (Node == nullptr)
-        Node = ListAC.find_by_id(Id);
+        Node = CounterMeasures.find_by_id(Id);
     if (Node == nullptr)
-        Node = ListC0.find_by_id(Id);
+        Node = MedAsteroids.find_by_id(Id);
     if (Node == nullptr)
         Node = Solars.find_by_id(Id);
     return (Node != nullptr) ? Node->Data : nullptr;
@@ -8163,13 +8153,13 @@ GameObject* StarSystem::find_object(unsigned int Id, unsigned int TypeMask)
     else if ((TypeMask & 0xfdffu) != 0)
         List = &Solars;
     else if ((TypeMask & 0x4000000u) != 0)
-        List = &List98;
+        List = &Mines;
     else if ((TypeMask & 0x1000000u) != 0)
-        List = &List70;
+        List = &GuidedMunitions;
     else if ((TypeMask & 0x8000000u) != 0)
-        List = &ListAC;
+        List = &CounterMeasures;
     else if ((TypeMask & 0x60000000u) != 0)
-        List = &ListC0;
+        List = &MedAsteroids;
     else
         return nullptr;
 
@@ -8204,7 +8194,7 @@ void StarSystem::queue_dock(GameObject* Object, GameObject* Target,
     Element.bLand = *bLand;
 
     // A push_back, with MSVC6 _Buynode's null-Prev fallback.
-    SystemDockNode* const Sentinel = static_cast<SystemDockNode*>(ObjectListHead);
+    SystemDockNode* const Sentinel = static_cast<SystemDockNode*>(DockQueueHead);
     SystemDockNode* const Node =
         static_cast<SystemDockNode*>(::operator new(sizeof(SystemDockNode)));
     Node->Next = Sentinel;
@@ -8214,7 +8204,7 @@ void StarSystem::queue_dock(GameObject* Object, GameObject* Target,
 
     new (&Node->Entry) FSystemDockEntry(Element);                   // FUN_06d0f830
 
-    ++ObjectListSize;
+    ++DockQueueSize;
 }
 
 // FUN_06d0f410. See server_sysdb.h.
@@ -8227,7 +8217,7 @@ SystemDockNode* StarSystem::erase_docks(SystemDockNode* First, SystemDockNode* L
         Node->Next->Prev = Node->Prev;
         Node->Entry.~FSystemDockEntry();             // FUN_06d0d4a0
         ::operator delete(Node);
-        --ObjectListSize;
+        --DockQueueSize;
     }
     return First;
 }
@@ -8472,7 +8462,7 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
             GameObject* const Base = System->find_object(Players[PlayerId].exited_base_id);
             CObject* const BaseRaw = (Base != nullptr) ? Base->Object : nullptr;
             CSimple* const BaseSimple =
-                (BaseRaw != nullptr && (static_cast<unsigned int>(BaseRaw->ObjectClass) & 3u) == 3u)
+                (BaseRaw != nullptr && (static_cast<unsigned int>(BaseRaw->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
                     ? static_cast<CSimple*>(BaseRaw) : nullptr;
             Vector const& BasePos = BaseSimple->WorldPosition;
 
@@ -8535,7 +8525,7 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
 
             CObject* const RingRaw = Ring->Object;
             CEqObj* const RingEq =
-                (RingRaw != nullptr && (static_cast<unsigned int>(RingRaw->ObjectClass) & 0x103u) == 0x103u)
+                (RingRaw != nullptr && (static_cast<unsigned int>(RingRaw->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
                     ? static_cast<CEqObj*>(RingRaw) : nullptr;
             Matrix LaunchOrient;
             RingEq->launch_pos(*OutPos, LaunchOrient, *OutKind);
@@ -8560,7 +8550,7 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
         GameObject* const Found = System->find_solar(&Players[PlayerId].starting_ring);
         CObject* const FoundRaw = (Found != nullptr) ? Found->Object : nullptr;
         CSolar* const Solar =
-            (FoundRaw != nullptr && (static_cast<unsigned int>(FoundRaw->ObjectClass) & 0x303u) == 0x303u)
+            (FoundRaw != nullptr && (static_cast<unsigned int>(FoundRaw->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                 ? static_cast<CSolar*>(FoundRaw) : nullptr;
         *OutObjId = Solar->Id;
         int const Kind = static_cast<int>(

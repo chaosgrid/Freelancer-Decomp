@@ -29,7 +29,7 @@
 // pass `*(IBehaviorManager+0x08) + 0x142C`. Its +4 is the SystemManager, whose +4 is the owning
 // IBehaviorManager (two hops reach IBehaviorManager::get_current_directive and ContentCbPtr at
 // +0x110). There is no separate "IUStateGraph" class: every field this cluster touches is a
-// SystemManager field (+0x34 AI target list, +0x1364 GunConvergenceStateBytes, +0x14FC the
+// SystemManager field (+0x34 AI target list, +0x1364 FormationLeaders, +0x14FC the
 // owner's FAiTarget, +0x1580 ExternalIface, +0x1584 PersonalityData).
 
 // FUN_062ee240 (fastcall). Severity vector -> the first tier of .rdata DAT_063a0818
@@ -611,6 +611,8 @@ FAiTarget* TargetManager::SelectAttackCandidate(
                 }
                 else
                 {
+                    // Retail: i is not stepped back, so the candidate shifted into slot i is
+                    // skipped.
                     std::memmove(&candidatesOut[i], &candidatesOut[i + 1],
                                  (size_t)(matchCount - (i + 1)) * sizeof(FAiTarget*));
                     --matchCount;
@@ -704,14 +706,14 @@ void TargetManager::UpdateAttackTargetOverride()
 
     // --- (a) leader override ---
     // FUN_062ecaf0 on the Sys+0x1364 block.
-    IObjRW* const overrideTarget = Sys->GunConvergenceStateBytes.GetCurrentLeader();
+    IObjRW* const overrideTarget = Sys->FormationLeaders.GetCurrentLeader();
 
     bool skipDirectiveGate = false; // retail's LAB_062ed83d falls into LAB_062ed896 directly
     // Retail's `local_f4`, read again deep in the arbitration tail, so hoisted here.
     IObjRW* directiveProbeTarget = nullptr;
     if (overrideTarget != nullptr && overrideTarget != owner0)
     {
-        unsigned char const committedFlag = Sys->GunConvergenceStateBytes.bLeaderIdleFormation;
+        unsigned char const committedFlag = Sys->FormationLeaders.bLeaderIdleFormation;
         if (committedFlag != 1)
         {
             // LAB_062ed83d: with JobParams.bWaitForLeaderTarget set and a leader without a
@@ -766,8 +768,8 @@ void TargetManager::UpdateAttackTargetOverride()
         double const dist = CmnAiSteer::InlineFastLength(
             ((double)dx * dx + (double)dz * dz) + (double)dy * dy);
 
-        // JobParams.Field_0C (Sys+0x1830); below or unordered skips.
-        if (dist >= (double)Job.Field_0C)
+        // JobParams.CombatDriftDistance (Sys+0x1830); below or unordered skips.
+        if (dist >= (double)Job.CombatDriftDistance)
         {
             pub::AI::ContentCallback* const Listener = behaviorMgr->ContentCbPtr;
             if (Listener != nullptr)

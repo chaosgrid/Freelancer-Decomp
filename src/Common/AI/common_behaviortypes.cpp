@@ -196,10 +196,10 @@ char const* __cdecl BehaviorTypes::get_behavior_name(int Id)
     return Desc->get_name();                                   // JMP [vt+0x08]
 }
 
-Behavior* __cdecl CREATE_BEHAVIOR(int param_1)
+Behavior* __cdecl CREATE_BEHAVIOR(int TypeId)
 {
     // .text:062d1630.
-    BehaviorTypeDesc* Desc = GBehaviorRegistry[param_1];
+    BehaviorTypeDesc* Desc = GBehaviorRegistry[TypeId];
     if (Desc == nullptr)
         return nullptr;
     return Desc->create_behavior();

@@ -11,8 +11,18 @@
 #include "GameFlow/room_control.h"
 #include "x86math.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
+
+// The motion arrays sit back to back as in retail: the index -1 accesses of StartMotion /
+// StopMotion land on the neighbouring member, as retail's do.
+static_assert(offsetof(FThornCompound, Object) == 0x6c, "Thorn_Compound +0x6c");
+static_assert(offsetof(FThornCompound, Local) == 0xb0, "Thorn_Compound +0xb0");
+static_assert(offsetof(FThornCompound, Playback) == 0xe0, "Thorn_Compound +0xe0");
+static_assert(offsetof(FThornCompound, EventId) == 0x120, "Thorn_Compound +0x120");
+static_assert(offsetof(FThornCompound, bPlaying) == 0x160, "Thorn_Compound +0x160");
+static_assert(offsetof(FThornCompound, Hardpoints) == 0x170, "Thorn_Compound +0x170");
 
 namespace
 {
@@ -31,11 +41,6 @@ namespace
         if (G_ThornCompoundMath == nullptr)
             G_ThornCompoundMath = Acquire3DMathEngine();
         return G_ThornCompoundMath;
-    }
-
-    void* InstancePointer(long Instance)
-    {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
     }
 
     FVector const& AsMathVector(Vector const& Value)
@@ -145,9 +150,10 @@ FThornCompound::~FThornCompound()
 
 // FUN_004513b0. Always 0.
 //
-// RETAIL DEFECT KEPT: with all sixteen slots busy the slot index stays -1 and the three stores
-// go to [-1] -- in retail's layout EventId[-1] is Playback[15] (+0x11c), bPlaying[-1] the top
-// byte of EventId[15] (+0x15f), Playback[-1] Local.Orient's last element (+0xdc).
+// Retail: with all sixteen slots busy the slot index stays -1 and the three stores go to [-1]:
+// EventId[-1] is Playback[15] (+0x11c), bPlaying[-1] the top byte of EventId[15] (+0x15f),
+// Playback[-1] Local.Orient's last element (+0xdc). The asserts at the top keep the port's
+// layout identical, so the same members are hit.
 GENRESULT DACOM_API FThornCompound::StartMotion(void* DescArg)
 {
     FThornMotionEventDesc const* Desc = static_cast<FThornMotionEventDesc const*>(DescArg);
@@ -180,8 +186,9 @@ GENRESULT DACOM_API FThornCompound::StartMotion(void* DescArg)
     return GR_OK;
 }
 
-// FUN_00451450. With no matching slot the index stays -1 and retail tests bPlaying[-1], the top
-// byte of EventId[15]. Always 0.
+// FUN_00451450. Retail: with no matching slot the index stays -1 and bPlaying[-1], the top byte
+// of EventId[15], is tested; when it is set, Playback[-1] (+0xdc) is stopped and the three [-1]
+// stores follow. Always 0.
 GENRESULT DACOM_API FThornCompound::StopMotion(void* DescArg)
 {
     FThornMotionEventDesc const* Desc = static_cast<FThornMotionEventDesc const*>(DescArg);
@@ -393,7 +400,7 @@ void FThornCompound::Stop()
         Object->LightGroup = 3;
         Object->Layer = 0;
         Object->RenderMode = 0;
-        Object->Flag14 = 0;
+        Object->bRunningLights = 0;
     }
 }
 
@@ -412,14 +419,14 @@ void FThornCompound::SetScene(void* Scene)
 
 // LAB_00451ef0 -- only with a room object.
 void FThornCompound::SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,
-                              unsigned char bFlag14)
+                              unsigned char bRunningLights)
 {
     if (Object == nullptr)
         return;
     Object->bVisible = bVisible;
     Object->bLit = bLit;
     Object->bFog = bFog;
-    Object->Flag14 = bFlag14;
+    Object->bRunningLights = bRunningLights;
 }
 
 // FUN_00451330.

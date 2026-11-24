@@ -207,13 +207,18 @@ struct IAnimation2 : IDAComponent
     // each archetype arrives AddRef'd (engbase FUN_06614d40). -2 for a miss, else 0.
     virtual GENRESULT DACOM_API FindScriptName(void* Callback, void* Script,
                                               const char* Name, void* Context) = 0;    // 8
-    // Root precedes Name; extra arguments remain heterogeneous DWORD carriers.
+    // Root precedes Name. Sink (an IChannelSink*) and SinkContext go to every bound channel; a
+    // track bound to the root itself (an event channel) needs a sink.
     virtual unsigned long DACOM_API PlayScript(void* Script, void* Root, const char* Name,
-                                               void* ArgD, void* ArgE) = 0;            // 9
+                                               void* Sink, void* SinkContext) = 0;     // 9
     virtual GENRESULT DACOM_API DestroyScript(void* PlaybackId) = 0;                     // 10
+    // Speed is |Speed|, negated when Flags bit 0 (reverse) is set. The last four are play
+    // header [3]..[6] as raw dwords: blend duration, scale and translation scale (floats) and
+    // the type-6 transform block.
     virtual unsigned long DACOM_API EvalPlayback(unsigned long PlaybackId, unsigned long Flags,
-                                                 float Time, float Scale, void* A, void* B,
-                                                 void* C, void* D) = 0;                  // 11
+                                                 float Time, float Speed, void* BlendDuration,
+                                                 void* Scale, void* TranslationScale,
+                                                 void* Transform) = 0;                   // 11
     virtual unsigned long DACOM_API EvalStored(unsigned long PlaybackId) = 0;             // 12
     virtual unsigned long DACOM_API ApplyChannels(unsigned long PlaybackId) = 0;          // 13
     virtual unsigned long DACOM_API StopPlayback(unsigned long PlaybackId) = 0;           // 14
@@ -306,10 +311,13 @@ struct IChannel : IDAComponent
 // IRootData — 4 slots. Facet at Animation+0xC.
 struct IRootData : IDAComponent
 {
-    // Extra play-header arguments remain opaque; Arg8 is a float payload.
-    virtual unsigned char DACOM_API Eval(unsigned long PlaybackId, void* TouchArg,
-                                         unsigned long Flags, float Time, float Scale,
-                                         void* Arg6, void* Arg7, float Arg8) = 0; // 3
+    // As IAnimation2::EvalPlayback without a transform block; then the first channel of type 2
+    // or 6 is touched (type 6 writes its sampled local position to OutSampledPos) and the
+    // playback stops. Nonzero when such a channel exists.
+    virtual unsigned char DACOM_API Eval(unsigned long PlaybackId, void* OutSampledPos,
+                                         unsigned long Flags, float Time, float Speed,
+                                         void* BlendDuration, void* Scale,
+                                         float TranslationScale) = 0; // 3
 };
 
 // Hardpoint lookup key: name and its CRC.

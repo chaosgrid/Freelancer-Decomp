@@ -13,6 +13,7 @@
 #include "Interface/ui_page.h"
 #include "Interface/ui_page_desc.h"
 #include "Interface/win_factory.h"
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "DALib.h"
 #include "common_csys.h"
@@ -107,7 +108,7 @@ void UiTextMsgButton::ApplyCaptionLayout()
     RDLRefNode CaptionRef(CaptionBodyList);
     AppendNode(CaptionRef);
 
-    StyleNode Style(0x828b);
+    StyleNode Style(kTextStyleButton);
     AppendNode(Style);
 
     TRANode Tra(CaptionAttrs, 0xffffff00u, 0u);
@@ -148,7 +149,8 @@ bool UiTextMsgButton::Create(Win3D* NewParent, void* Data)
 
     SetAlignMode(2);
 
-    // Retail reads the payload here on both paths, even when it was null above.
+    // Retail: the payload is read here on both paths, even when it was null above (0059a098
+    // `mov eax,[edi+14h]` after the 0059a08f null jump).
     char const* const StyleName = Payload->StyleName;
     if (StyleName != nullptr && strcmp(StyleName, "<none>") != 0)
     {
@@ -170,7 +172,7 @@ void UiTextMsgButton::Draw()
     // rebuilds the content.
     bool const bHovered = Win3DGetHover() == this;
     unsigned long PulseArgb = 0;
-    NnUiPulseBlendFromArgb(&PulseArgb, G_NnPaletteArgb_679ba4);
+    NnUiPulseBlendFromArgb(&PulseArgb, G_NnPaletteAmber);
     unsigned char* const Attrs = reinterpret_cast<unsigned char*>(&CaptionAttrs.Packed);
 
     bool bRelayout = false;
@@ -218,11 +220,11 @@ void UiTextMsgButton::MouseEnter(float const* /*Ray*/)
 
 bool UiTextMsgButton::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // LAB_0059a3d0 (RET 4): Field1 == 2 of button -1 on an interactive button tells the parent
-    // and is consumed.
-    if (Event->Field1 != 2)
+    // LAB_0059a3d0 (RET 4): a single left press on an interactive button tells the parent and
+    // is consumed.
+    if (Event->Action != kWin3DMousePress)
         return false;
-    if (Event->Field0 != -1)
+    if (Event->Button != kWin3DMouseLeft)
         return false;
     if (bInteractive == 0)
         return false;

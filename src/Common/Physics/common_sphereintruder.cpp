@@ -4,59 +4,6 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "common_physys.h"
-
-#include "common_archetype.h"
-#include "common_cobject.h"
-#include "common_cobjdb.h"
-#include "common_id.h"
-#include "common_universe.h"
-#include "common_net.h"
-#include "common_phyarch.h"
-#include "common_misc.h"
-#include "common_server.h"
-
-#include "dacom.h"
-#include "DALib.h"
-#include "x86math.h"
-#include "ivp_collision/ivp_collision.h"
-#include "ivp_physics/ivp_core.h"
-#include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_environment.h"
-#include "ivp_physics/ivp_controller.h"
-#include "ivp_physics/ivp_material.h"
-#include "ivp_physics/ivp_listener.h"
-#include "ivp_physics/ivp_mindist_settings.h"
-#include "ivp_physics/ivp_mindist.h"
-#include "common_csys.h"
-#include "ivp_compact_builder/ivp_compact_ledge.h"
-#include "ivp_compact_builder/ivp_surface_builder_pointsoup.h"
-#include "ivp_compact_builder/ivp_surface_builder_ledge_soup.h"
-#include "ivp_physics/ivp_surman_polygon.h"
-#include "ivp_collision/ivp_ray_solver.h"
-#include "ivp_collision/ivp_sphere_query.h"
-
-#include <assert.h>
-#include <float.h>
-#include <math.h>
-#include <new>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <map>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <mmsystem.h>
-
-// Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
-#ifdef GetCurrentTime
-#undef GetCurrentTime
-#endif
-
 #include "Physics/common_physys_internal.h"
 
 using namespace CmnPhySys;
@@ -113,7 +60,7 @@ void SphereIntruderChecker::check_sphere(unsigned SystemId, Vector const& Center
     PhySys::PhantomParms Parms;
     memset(&Parms, 0, sizeof(Parms));  // +0x07..+0x0f are uninitialised in retail; never read
     Parms.SystemId = SystemId;
-    Parms.Flag04 = 0;
+    Parms.bPhysicalUnmoveable = 0;
     Parms.Flag05 = 0;
     Parms.Name[0] = '\0';
     Parms.Position = Center;

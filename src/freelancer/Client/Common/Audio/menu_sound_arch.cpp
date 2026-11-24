@@ -84,7 +84,7 @@ namespace
         unsigned Flags;
         unsigned Lod[2];
         FClientSoundArch* Linked;
-        unsigned short Pad28;
+        unsigned short UnlinkedUseCount; // +0x28 uses counted while the lod link resolves to NONE
         unsigned short UseCount;
         unsigned RefCount;
         char Nickname[64];
@@ -171,7 +171,7 @@ namespace
 
         void __thiscall Pause() override;
         void __thiscall Resume() override;
-        unsigned long __thiscall IsPaused() override { return Field08 != 0 ? 1u : 0u; }
+        unsigned long __thiscall IsPaused() override { return PauseTick != 0 ? 1u : 0u; }
         unsigned char __thiscall IsFinished() override;
         unsigned long __thiscall GetDurationMs() override;
         void __thiscall ComputeMixerScore(const float* Listener) override;
@@ -203,7 +203,7 @@ namespace
         }
 
         int Type;                     // +0x04  category (0 sfx, 1 interface, 2/5 voice, 3 music, 4 ambient)
-        int Field08;                  // +0x08  the pause tick (slot 26 stores, slot 27 clears)
+        int PauseTick;                // +0x08  0 = running; slot 26 stores the tick, slot 27 clears
         unsigned char Flags;          // +0x0C  1 loop, 2 cockpit, 4 SoundManager-played, 8 started, 0x10 tick latched
         unsigned char Pad0D[3];
         float Pitch;                  // +0x10
@@ -458,7 +458,7 @@ namespace
             return static_cast<short>(Arch->UseCount);
         if (Arch->Linked != nullptr)
             return ArchSlot5UseCount(Arch->Linked);
-        return static_cast<short>(Arch->Pad28);
+        return static_cast<short>(Arch->UnlinkedUseCount);
     }
 
     int DACOM_API ArchSlot6Attenuation(void* This)
@@ -533,7 +533,7 @@ namespace
     // FUN_0042b030's field defaults.
     FClientSoundArch::FClientSoundArch()
         : NicknameId(0), File(nullptr), SmArchId(-1), RangeMin(kDefaultRangeMin),
-          RangeMax(kDefaultRangeMax), Flags(kDefaultFlags), Linked(nullptr), Pad28(0),
+          RangeMax(kDefaultRangeMax), Flags(kDefaultFlags), Linked(nullptr), UnlinkedUseCount(0),
           UseCount(0), RefCount(1)
     {
         Lod[0] = 0;
@@ -1042,7 +1042,7 @@ namespace
     {
         if (DALib::Sound == nullptr)
             return;
-        Field08 = static_cast<int>(DALib::Sound->GetTickCountSlot());
+        PauseTick = static_cast<int>(DALib::Sound->GetTickCountSlot());
         DALib::Sound->StopInstanceBuffer(this);
     }
 
@@ -1054,10 +1054,10 @@ namespace
         {
             unsigned const Now = DALib::Sound->GetTickCountSlot();
             StartTick = static_cast<int>(static_cast<unsigned>(StartTick) +
-                Now - static_cast<unsigned>(Field08));
+                Now - static_cast<unsigned>(PauseTick));
         }
         DALib::Sound->PlayInstanceBuffer(this);
-        Field08 = 0;
+        PauseTick = 0;
     }
 
     // FUN_004290a0 -- slot 41 of Sound::Source: the destructor body (FUN_00429140's, inlined:
@@ -1168,10 +1168,6 @@ namespace
             ArchResolveLod(Arch, G_SoundLod);
         return Arch->Linked;
     }
-
-    // ISoundManager slot 36 (+0x90, AttachPlayKey) takes the key and an index: FUN_06ee32e0 is
-    // RET 0xC, and retail pushes DAT_00673344 (GetPlayerConnectionId) as the index. Unused here.
-    unsigned long G_SoundAttachIndex = 0;
 
     // The power-ratio fade step shared by the ducking fade of FUN_00428040 and the streamed fade
     // of LAB_0042a6b0, the same arithmetic as FUN_00427940 (ClientSoundFadeDb): both ends to
@@ -1784,7 +1780,7 @@ namespace
     // FUN_00429040 (thiscall, RET 4) -- the base Sound::Source constructor: the flag byte's top
     // three bits kept, +0x28 = DAT_00667c58 (FLT_MAX), then DAT_00667cbc counts it.
     FSoundSource::FSoundSource(unsigned char bBit2, unsigned char OldFlags)
-        : Type(0), Field08(0),
+        : Type(0), PauseTick(0),
           Flags(static_cast<unsigned char>((OldFlags & 0xe0u) | ((bBit2 & 1u) << 2))),
           Pitch(0.f), StartTick(0), Arch(nullptr), AttenuationDb(0.f), Pan(0.f), RefCount(1),
           MixerScale(kMixerNoScore), ListNode(nullptr)
@@ -1937,7 +1933,7 @@ namespace
             return;
         if (!IsStreamHandle(StreamHandle))
             return;
-        Field08 = 1;
+        PauseTick = 1;
         DALib::Streamer->StopStream(StreamHandle);
     }
 
@@ -1951,7 +1947,7 @@ namespace
         if (!IsStreamHandle(StreamHandle))
             return;
         DALib::Streamer->StartStream(StreamHandle);
-        Field08 = 0;
+        PauseTick = 0;
     }
 
     // FUN_0042a350 -- slot 29; falls through to the base FUN_00429840.
@@ -2080,7 +2076,7 @@ namespace
         if (Arch->Linked != nullptr)
             return ArchAcquire(Arch->Linked);
         // Lod resolved to NONE: the uses are counted in the +0x28 word.
-        ++Arch->Pad28;
+        ++Arch->UnlinkedUseCount;
         return 1;
     }
 
@@ -2103,9 +2099,9 @@ namespace
         }
         if (Arch->Linked != nullptr)
             return ArchReleaseWav(Arch->Linked);
-        if (Arch->Pad28 != 0)
-            --Arch->Pad28;
-        return static_cast<short>(Arch->Pad28);
+        if (Arch->UnlinkedUseCount != 0)
+            --Arch->UnlinkedUseCount;
+        return static_cast<short>(Arch->UnlinkedUseCount);
     }
 
     // The field copy both arms of FUN_0042bc70 share: +0x04 .. +0x14 as dwords, the +0x18 flag word bit-field by
@@ -2130,7 +2126,7 @@ namespace
         This->Lod[0] = Src->Lod[0];
         This->Lod[1] = Src->Lod[1];
         This->Linked = Src->Linked;
-        This->Pad28 = Src->Pad28;
+        This->UnlinkedUseCount = Src->UnlinkedUseCount;
         This->UseCount = Src->UseCount;
         memcpy(This->Nickname, Src->Nickname, sizeof(This->Nickname));
     }
@@ -2259,7 +2255,7 @@ namespace
                 Arch->Flags = (Arch->Flags & 0xff2fffffu) | 0x200000u;
             else
                 FDUMP(0x100002, "%s(%d) : *** WARNING: unknown 'persistent' value %s.\n",
-                      "E:\\FL\\Scratch\\Source\\Client\\cmn\\SoundArch.cpp", 0x2fd, Value);
+                      kSoundArchCpp, 0x2fd, Value);
             return true;
         }
         if (Reader.is_value("type"))
@@ -2269,7 +2265,7 @@ namespace
             if (!ParseSoundType(Arch, Value))
             {
                 FDUMP(0x100002, "%s(%d) : *** WARNING: unknown 'type' value %s.\n",
-                      "E:\\FL\\Scratch\\Source\\Client\\cmn\\SoundArch.cpp", 0x30a, Value);
+                      kSoundArchCpp, 0x30a, Value);
             }
             return true;
         }
@@ -2310,7 +2306,7 @@ namespace
         else
         {
             FDUMP(0x100002, "%s(%d) : *** WARNING: unknown [Sound] parameter %s.\n",
-                  "E:\\FL\\Scratch\\Source\\Client\\cmn\\SoundArch.cpp", 0x329,
+                  kSoundArchCpp, 0x329,
                   Reader.get_name_ptr());
             Reader.log_link("");
             return false;
@@ -3332,7 +3328,7 @@ int CreateSoundArchWav(Archetype::ISound* Arch, void* ParentFs)
     {
         // Falls through to the "failed to create" dump below too.
         FDUMP(0x100002, "%s(%d) : *** WARNING: Sound filename \"%s\" not found.\n",
-              "E:\\FL\\Scratch\\Source\\Client\\cmn\\SoundArch.cpp", 0x227, RelPath);
+              kSoundArchCpp, 0x227, RelPath);
     }
     else
     {
@@ -3354,7 +3350,7 @@ int CreateSoundArchWav(Archetype::ISound* Arch, void* ParentFs)
     {
         FDUMP(0x100002,
               "%s(%d) : *** WARNING: Failed to create archetype for sound filename \"%s\"\n",
-              "E:\\FL\\Scratch\\Source\\Client\\cmn\\SoundArch.cpp", 0x22b, RelPath);
+              kSoundArchCpp, 0x22b, RelPath);
     }
 
     ReleaseComponent(ChildFs);

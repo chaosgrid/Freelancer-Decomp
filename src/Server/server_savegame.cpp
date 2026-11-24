@@ -13,10 +13,9 @@
 // map at PlayerData+0x50 (PlayerData::FSavedCharacter), keyed by file name, and
 // CharacterSelect copies that record onto the slot later.
 //
-// Still open: FUN_06d4a5d0's MP-only front section (.text:06d4a652 .. .text:06d4aa85:
-// events 0x3a / 8 / 7, the CHARACTER_ID compare, the IClient +0x1bc/+0x1c0 and
-// reputation broadcast loops) is only approximated by IServerImpl::CharacterSelect; its
-// tail is PlayerData_LoadSelectedCharacter below.
+// FUN_06d4a5d0's head and MP-only front (.text:06d4a652 .. .text:06d4aa85) are
+// PlayerData_SelectCharacter (server_classes.cpp); its tail is
+// PlayerData_LoadSelectedCharacter below.
 
 #include "../include/common_pub.h"
 #include "../include/common_server.h"          // Players (PlayerDB::operator[])

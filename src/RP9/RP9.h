@@ -70,7 +70,7 @@ struct FRp9AggDesc
 // The 10-dword mode descriptor callers pass to select_mode / create_buffers (external shape).
 struct FRp9Mode
 {
-    int Field00;
+    int ModeIndex; // +0x00 an adapter mode index; < 0 lets select_mode pick one
     int Field04;
     int Width;
     int Height;
@@ -148,7 +148,7 @@ struct FRp9Vb
     unsigned long Locked;
     FRp9Vb* Next;
     FRp9Vb* Prev;
-    unsigned long Field1C;
+    unsigned long LockStartVertex; // +0x1C the last lock's start, in vertices
     IDirect3DVertexBuffer9* Gpu;
 };
 
@@ -675,7 +675,7 @@ public:
     unsigned long AdapterIndex_;
     unsigned long DeviceType_;
     char MgsdbPath_[0x80];
-    unsigned long Field230_;
+    unsigned long DisplayPfIndex_; // +0x230 display pfenum, the adapter format of format checks
     unsigned long BbPfIndex_;
     // {mode index, ?, width, height, colour bits, z bits, stencil bits, interval, buffer count,
     // byte flags (+0x24 swap-is-flip-or-copy, +0x25 fullscreen)}.

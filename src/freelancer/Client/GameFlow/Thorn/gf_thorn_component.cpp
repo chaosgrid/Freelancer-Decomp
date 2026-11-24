@@ -40,11 +40,6 @@ namespace
     {
         return static_cast<long>(reinterpret_cast<intptr_t>(Instance));
     }
-
-    void* InstancePointer(long Instance)
-    {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
-    }
 }
 
 // FUN_0044fbe0. Name is not cleared first: malloc_strcpy overwrites it.

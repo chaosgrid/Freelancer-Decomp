@@ -10,8 +10,9 @@
 #include "common_behavior.h"
 #include "AI/common_behavior_internal.h" // CmnBehavior:: follower helpers (common_behavior.cpp)
 #include "common_aisteer.h"
-#include "common_systemmanager.h" // SystemManager -- NavHelper's real type
+#include "common_systemmanager.h" // SystemManager -- SysMgr's real type
 #include "common_misc.h" // SinglePlayer() -- evaluate()'s multiplayer group test
+#include "common_cobject.h" // CShip::bIsPlayer / GroupId
 #include "common_csys.h"  // Matrix, Transform, MatrixSetIdentity, Acquire3DMathEngine (UpdateFollowerSteering/GetRotatedOffset)
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
 #include "x86math.h"      // I3DMathEngine::TransformMatrix (+0x2c), FVector, FMatrix
@@ -21,7 +22,7 @@
 #include <cstdint>
 #include <cstring>
 
-using CmnBehavior::FollowerPlayerShipOrNull;
+using CmnBehavior::ShipOrNull;
 
 // FUN_062cbfe0. FaceAxis2ac is not written by retail; the port zeroes it.
 FormationBehavior::FormationBehavior(int InTypeId)
@@ -32,21 +33,8 @@ FormationBehavior::FormationBehavior(int InTypeId)
     , Pad2a9{}
     , FaceAxis2ac{ 0.0f, 0.0f, 0.0f }
 {
-    Flag280 = 0;                           // again, after the base ctor FUN_062cb2b0
-    Flag281 = 0;
-}
-
-// FUN_062c47a0 (cdecl dot product) and FUN_062c4780 (thiscall |ECX|^2; Ghidra decompiles it
-// as an empty body). Both leave the result unrounded in ST0: VecDot3 sums (z + y) + x,
-// VecMagSq3 sums (x + y) + z.
-static double VecDot3(Vector const& A, Vector const& B)
-{
-    return ((double)A.z * B.z + (double)A.y * B.y) + (double)A.x * B.x;
-}
-
-static double VecMagSq3(Vector const& V)
-{
-    return ((double)V.x * V.x + (double)V.y * V.y) + (double)V.z * V.z;
+    bLeftTradeLane = 0;                           // again, after the base ctor FUN_062cb2b0
+    bInTradeLane = 0;
 }
 
 // Slot 3, FUN_062cc3b0.
@@ -54,7 +42,7 @@ void FormationBehavior::OnEngage()
 {
     BaseFollowerBehavior::OnEngage();
     (void)ObjInspectOf(OwnerContext)->get_formation_offset(Offset290);
-    if (NavHelper->SelfTarget.Iface->is_player())
+    if (SysMgr->SelfTarget.Iface->is_player())
     {
         Flag28c = 1;
         MatchThrottle.SetFlag39(true);
@@ -67,9 +55,9 @@ void FormationBehavior::OnEngage()
 void FormationBehavior::OnDisengage()
 {
     BaseFollowerBehavior::OnDisengage();
-    if (!NavHelper->SelfTarget.Iface->is_player())
+    if (!SysMgr->SelfTarget.Iface->is_player())
         return;
-    (void)NavHelper->GunConvergenceStateBytes.RequestRelease();     // FUN_062ecd30
+    (void)SysMgr->FormationLeaders.RequestRelease();     // FUN_062ecd30
     unsigned int const Id = ObjInspectOf(OwnerContext)->get_id();
     (void)ObjAffectOf(OwnerContext)->request_cancel(1, &Id, -1);
 }
@@ -79,7 +67,7 @@ int FormationBehavior::OnEvaluateReadiness(float Value)
 {
     (void)Value;
     int Result = (Flag285 != 0) ? 1 : 2;
-    FGunConvergenceStateBlock* const Rec = &NavHelper->GunConvergenceStateBytes;   // +0x1364
+    FFormationLeaderState* const Rec = &SysMgr->FormationLeaders;   // +0x1364
     if (Rec->GetFollowLeader() != nullptr)
     {
         LeadWatcher.set(nullptr);
@@ -93,8 +81,8 @@ int FormationBehavior::OnEvaluateReadiness(float Value)
     }
     if (ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target())) != nullptr)
         Result = 1;
-    ModeSelector0xc = (Flag29 != 0) ? 3 : Result;
-    return ModeSelector0xc;
+    Readiness = (Flag29 != 0) ? 3 : Result;
+    return Readiness;
 }
 
 // Slot 6, LAB_062cc0d0 (argument unread).
@@ -105,13 +93,9 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
     IObjRW* Target = nullptr;
     (void)Owner->get_target(Target);
 
-    // The owner's ship and its group id (+0x1b4), or (0, 0).
-    CObject const* OwnShip = Owner->cobject();
-    unsigned int OwnGroup = 0;
-    if (OwnShip != nullptr && (static_cast<unsigned int>(OwnShip->ObjectClass) & 0x503u) == 0x503u)
-        OwnGroup = *reinterpret_cast<unsigned int const*>(reinterpret_cast<char const*>(OwnShip) + 0x1b4);
-    else
-        OwnShip = nullptr;
+    // The owner's ship and its group id, or (0, 0).
+    CShip const* const OwnShip = ShipOrNull(Owner->cobject());
+    unsigned int const OwnGroup = (OwnShip != nullptr) ? OwnShip->GroupId : 0;
 
     if (Target == nullptr)
         return EvalSkip;
@@ -120,17 +104,15 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
     if (bInLane)
         return EvalSkip;
 
-    // Multiplayer, both player ships (+0x2bd set): their group ids must match.
+    // Multiplayer, both player ships: their group ids must match.
     if (!SinglePlayer())
     {
-        CObject const* const A = FollowerPlayerShipOrNull(Owner->cobject());
-        CObject const* const B = FollowerPlayerShipOrNull(ObjInspectOf(Target)->cobject());
-        if (A != nullptr && B != nullptr &&
-            *(reinterpret_cast<unsigned char const*>(A) + 0x2bd) != 0 &&
-            *(reinterpret_cast<unsigned char const*>(B) + 0x2bd) != 0)
+        CShip const* const A = ShipOrNull(Owner->cobject());
+        CShip const* const B = ShipOrNull(ObjInspectOf(Target)->cobject());
+        if (A != nullptr && B != nullptr && A->bIsPlayer != 0 && B->bIsPlayer != 0)
         {
-            unsigned int const GroupA = *reinterpret_cast<unsigned int const*>(reinterpret_cast<char const*>(A) + 0x1b4);
-            unsigned int const GroupB = *reinterpret_cast<unsigned int const*>(reinterpret_cast<char const*>(B) + 0x1b4);
+            unsigned int const GroupA = A->GroupId;
+            unsigned int const GroupB = B->GroupId;
             if (GroupA == 0 || GroupB == 0 || GroupA != GroupB)
                 return EvalSkip;
         }
@@ -173,18 +155,17 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
         return EvalSkip;
 
     // Against the owner's ship captured at the top.
-    CObject const* const TargetShip = FollowerPlayerShipOrNull(ObjInspectOf(Target)->cobject());
-    if (OwnShip != nullptr && TargetShip != nullptr &&
-        *(reinterpret_cast<unsigned char const*>(TargetShip) + 0x2bd) != 0)
+    CShip const* const TargetShip = ShipOrNull(ObjInspectOf(Target)->cobject());
+    if (OwnShip != nullptr && TargetShip != nullptr && TargetShip->bIsPlayer != 0)
     {
         if (OwnGroup == 0)
             return EvalSkip;
-        if (*reinterpret_cast<unsigned int const*>(reinterpret_cast<char const*>(TargetShip) + 0x1b4) != OwnGroup)
+        if (TargetShip->GroupId != OwnGroup)
             return EvalSkip;
     }
 
     // Own cached centre (latch +0x157a, set before the call).
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     if (Sys->SelfTarget.bPosValid == 0)
     {
         Sys->SelfTarget.bPosValid = 1;
@@ -234,7 +215,7 @@ void FormationBehavior::set_direction(Vector const& Dir)
     FaceAxis2ac.y = -Dir.x;
     // DAT_0639c430 = 0.0 (double). The reciprocal stays on the x87 stack; each product is
     // rounded once.
-    double const Factor = BehaviorMgrPtr->get_turn_sensitivity_factor();
+    double const Factor = BehaviorMgr->get_turn_sensitivity_factor();
     if (Factor > 0.0)
     {
         double const Inverse = 1.0 / Factor;
@@ -247,7 +228,7 @@ void FormationBehavior::set_direction(Vector const& Dir)
     FaceAxis2ac.z = -Dir.z;
 }
 
-// The NavHelper cached-physical-bounds latch (+0x157a), inlined twice in
+// The SysMgr cached-physical-bounds latch (+0x157a), inlined twice in
 // UpdateFollowerSteering (062cc6b6, 062cc748). The latch is set before get_physical_radius
 // runs; no null tests.
 static void NavRefreshPhysicalBounds(SystemManager* Nav)
@@ -263,9 +244,9 @@ static void NavRefreshPhysicalBounds(SystemManager* Nav)
 void FormationBehavior::UpdateFollowerSteering()
 {
     // Re-point LeadWatcher at the directive record's formation leader. FollowBehavior's
-    // slot 27 has no such step. NavHelper is dereferenced with no null test.
+    // slot 27 has no such step. SysMgr is dereferenced with no null test.
     {
-        IObjRW* const Directed = NavHelper->GunConvergenceStateBytes.GetFormationLeader(); // FUN_062ecab0
+        IObjRW* const Directed = SysMgr->FormationLeaders.GetFormationLeader(); // FUN_062ecab0
         LeadWatcher.set(Directed != nullptr
             ? reinterpret_cast<Watchable const*>(reinterpret_cast<unsigned char*>(Directed) + 8)
             : nullptr);
@@ -277,7 +258,7 @@ void FormationBehavior::UpdateFollowerSteering()
         return;
 
     // Only the 3x3 rotation of the leader's transform is kept.
-    Matrix const LeaderBasis = Behavior_InvokeNodeSlotC(Leader)->Rotation;
+    Matrix const LeaderBasis = Behavior_GetTransform(Leader)->Rotation;
 
     Vector LeaderPos;
     GetIfacePositionOrZero(&LeaderPos, Leader);
@@ -326,28 +307,28 @@ void FormationBehavior::UpdateFollowerSteering()
     // unordered skip the clearance.
     double Clearance = 0.0f;
     {
-        Matrix const& OwnBasis = NavHelper->SelfTarget.Iface->get_transform().Rotation;
+        Matrix const& OwnBasis = SysMgr->SelfTarget.Iface->get_transform().Rotation;
         Vector const OwnBackward{ -OwnBasis.E[0][2], -OwnBasis.E[1][2], -OwnBasis.E[2][2] };
         double const Facing = static_cast<double>(OwnBackward.z) * LeaderBackward.z
                             + static_cast<double>(OwnBackward.y) * LeaderBackward.y
                             + static_cast<double>(OwnBackward.x) * LeaderBackward.x;
         if (Facing > 0.0)
         {
-            NavRefreshPhysicalBounds(NavHelper);
+            NavRefreshPhysicalBounds(SysMgr);
 
             // Retail computes these and never reads them again (get_transform is still called).
-            Vector const FromCentre{ SlotPoint.x - NavHelper->SelfTarget.CachedPos.x,
-                                     SlotPoint.y - NavHelper->SelfTarget.CachedPos.y,
-                                     SlotPoint.z - NavHelper->SelfTarget.CachedPos.z };
-            Matrix const& OwnBasis2 = NavHelper->SelfTarget.Iface->get_transform().Rotation;
+            Vector const FromCentre{ SlotPoint.x - SysMgr->SelfTarget.CachedPos.x,
+                                     SlotPoint.y - SysMgr->SelfTarget.CachedPos.y,
+                                     SlotPoint.z - SysMgr->SelfTarget.CachedPos.z };
+            Matrix const& OwnBasis2 = SysMgr->SelfTarget.Iface->get_transform().Rotation;
             Vector const OwnBackward2{ -OwnBasis2.E[0][2], -OwnBasis2.E[1][2], -OwnBasis2.E[2][2] };
             (void)FromCentre;
             (void)OwnBackward2;
 
-            NavRefreshPhysicalBounds(NavHelper);
+            NavRefreshPhysicalBounds(SysMgr);
 
             // Radius + Standoff stays unrounded; kept when >= 0 or unordered.
-            double const Reach = static_cast<double>(NavHelper->SelfTarget.CachedRadius) + Standoff;
+            double const Reach = static_cast<double>(SysMgr->SelfTarget.CachedRadius) + Standoff;
             if (!(Reach < 0.0))
                 Clearance = Reach;
         }
@@ -367,12 +348,12 @@ void FormationBehavior::UpdateFollowerSteering()
     Face.SetPosition(TargetPoint);
 
     // FUN_062e8840 (the byte at Timers+0x78).
-    if (NavHelper->Timers.IsTimer5Active())
+    if (SysMgr->Timers.IsTimer5Active())
         Face.SetUpVector(Vector{ 0.0f, 0.0f, 1.0f });
 
     if (bDirectionSet2a8 != 0)
     {
-        Matrix const& OwnBasis = NavHelper->SelfTarget.Iface->get_transform().Rotation; // no null test
+        Matrix const& OwnBasis = SysMgr->SelfTarget.Iface->get_transform().Rotation; // no null test
         Face.SetAxis(FaceAxis2ac);
         Move.SetDirection(Vector{ -OwnBasis.E[0][2],
                                   -OwnBasis.E[1][2],
@@ -399,7 +380,7 @@ Vector FormationBehavior::GetRotatedOffset()
         const_cast<void*>(static_cast<void const*>(LeadWatcher.target())));
 
     // The 3x3 rotation only.
-    Matrix const LeaderBasis = Behavior_InvokeNodeSlotC(Leader)->Rotation;
+    Matrix const LeaderBasis = Behavior_GetTransform(Leader)->Rotation;
 
     Vector Out;
     Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(Out),

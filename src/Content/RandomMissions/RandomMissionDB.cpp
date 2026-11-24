@@ -984,12 +984,12 @@ namespace
     pub::Audio::Tryptich RmMissionMusic(char const* Nickname)
     {
         pub::Audio::Tryptich Music;
-        Music.Field0 = 0;
-        Music.Field4 = 0;
-        Music.Field8 = 0;
-        Music.FieldC = pub::GetNicknameId(Nickname);
+        Music.SpaceMusic = 0;
+        Music.DangerMusic = 0;
+        Music.BattleMusic = 0;
+        Music.OverrideMusic = pub::GetNicknameId(Nickname);
         Music.Field10 = 1;
-        std::memcpy(&Music.Field14, &GRmMusicFade, sizeof(float));
+        std::memcpy(&Music.FadeBits, &GRmMusicFade, sizeof(float));
         return Music;
     }
 }
@@ -1197,7 +1197,7 @@ void FRandomMissionObject::FailMission(int Reason)
     EndMission();
     FContentPlayerState* Owner = FindContentPlayerState(PlayerId);
     if (Owner != nullptr && Owner->GetLiveMission() == ControllerId)
-        Owner->EndLiveMission(ControllerId, 3, true);
+        Owner->EndLiveMission(ControllerId, VNPC_MISSION_FAILED, true);
 }
 
 // FUN_06f4c830. Retail erases the map's find result without an end test (FUN_06f20e00); the
@@ -1223,13 +1223,13 @@ void FRandomMissionObject::RemoveMissionPlayer(unsigned int InPlayerId, int Reas
     if (Reason == 1)
     {
         State->CountRandomMissionAborted(MissionType);
-        State->EndLiveMission(ControllerId, 4, false);
+        State->EndLiveMission(ControllerId, VNPC_MISSION_ABORTED, false);
         return;
     }
     if (Reason == 0xe)
         return;
     State->CountRandomMissionFailed(MissionType);
-    State->EndLiveMission(ControllerId, 3, false);
+    State->EndLiveMission(ControllerId, VNPC_MISSION_FAILED, false);
 }
 
 // FUN_06f4b6e0.
@@ -1436,7 +1436,7 @@ void FRandomMissionObject::UpdatePlayerSystemFlags(unsigned int InPlayerId, unsi
     if (SystemId == Data->DestSys)
     {
         if (State->ShipObject != nullptr)
-            State->SetFlags(State->GetFlags() | 0xc);
+            State->SetFlags(State->GetFlags() | PLAYER_FLAG_MISSION_AREA | PLAYER_FLAG_MISSION_DEST_SYSTEM);
         return;
     }
     unsigned int OfferSystem = SystemId;
@@ -1444,11 +1444,12 @@ void FRandomMissionObject::UpdatePlayerSystemFlags(unsigned int InPlayerId, unsi
     if (SystemId == OfferSystem)
     {
         if (State->ShipObject != nullptr)
-            State->SetFlags(State->GetFlags() | 4);
+            State->SetFlags(State->GetFlags() | PLAYER_FLAG_MISSION_AREA);
         return;
     }
     if (State->ShipObject != nullptr)
-        State->SetFlags(State->GetFlags() & 0xfffffff3u);
+        State->SetFlags(State->GetFlags() &
+                        ~(PLAYER_FLAG_MISSION_AREA | PLAYER_FLAG_MISSION_DEST_SYSTEM));
 }
 
 // FUN_06f4bd30. No null test on the player state (FUN_06f49b00); JoinMission is FUN_06f48ba0.
@@ -1569,7 +1570,8 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
             {
                 ElapsedTime = -1.0f;
                 for (int Index = 0; Index < static_cast<int>(PlayerStates.size()); ++Index)
-                    PlayerStates[Index]->SetFlags(PlayerStates[Index]->GetFlags() & 0xfffffffbu);
+                    PlayerStates[Index]->SetFlags(PlayerStates[Index]->GetFlags() &
+                                                 ~PLAYER_FLAG_MISSION_AREA);
             }
         }
         FMissionObject::HandleMissionMessage(static_cast<EMessage>(Message->ControllerId),
@@ -1705,11 +1707,11 @@ void FRandEncParams::Spawn(bool bForced)
     // The list, then the directive holder; the holder is released first at the end.
     FMissionDirectiveList LeaderDirectives;
     TRefHandle<FObjListDirective> Leader;
-    CreateObjListDirective(3, &Leader.Pointer);
+    CreateObjListDirective(OBJLIST_GOTO_SHIP, &Leader.Pointer);
     FObjListGotoShip* const Goto = static_cast<FObjListGotoShip*>(Leader.Pointer);
     Goto->SetTarget(&GotoTargetId, 200.0f, -1.0f);
-    Goto->Op.Field_5A = 0;
-    Goto->Op.Field_58 = 1;
+    Goto->Op.bGotoCruise = 0;
+    Goto->Op.bFlyThrough = 1;
     LeaderDirectives.Items.push_back(Leader.Pointer);
     Leader->AddRef();
 

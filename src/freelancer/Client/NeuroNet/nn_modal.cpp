@@ -29,7 +29,7 @@
 #include "NeuroNet/nn_story_star.h" // G_MissionObjectiveWindow (DAT_00672400), StoryStarReset
 #include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_text_scratch.h" // G_NnTextScratchA/B, G_NnTextScratchCapacity
-#include "NeuroNet/nn_ui_pulse.h"   // G_NnPaletteArgb_679b90 (DAT_00679b90)
+#include "NeuroNet/nn_ui_pulse.h"   // G_NnPalettePaleGreen (DAT_00679b90)
 #include "Space/player_behavior.h" // OnMouseFlightRawMessage (FUN_004c80f0)
 #include "GameFlow/room_control.h"  // FRoomRuntime, GetRoomRuntimeRoomId (runtime +0x38)
 #include "Space/space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
@@ -112,7 +112,7 @@ bool NnArrivalText::Create(Win3D* NewParent, void* Data)
         NnFloatBits(0x3d75c28f), NnFloatBits(0x3fb33333), 0, 0, 0, 1));
 
     // The colour override; no null test on the control.
-    Caption->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679b90), 1);
+    Caption->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPalettePaleGreen), 1);
     Caption->Flags = static_cast<unsigned char>(Caption->Flags & 0xfc);
 
     SetOffset(0.0f, 0.0f, -1.0f);
@@ -127,15 +127,7 @@ bool NnArrivalText::Create(Win3D* NewParent, void* Data)
 
 void NnArrivalText::DestroySelf()
 {
-    Win3D* Child = GetChildHead();
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->GetNextSibling();
-        Win3DDeleteTree(Child);
-        Child = Next;
-    }
-    Destroy();
-    delete this;
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
 }
 
 void NnArrivalText::Update()

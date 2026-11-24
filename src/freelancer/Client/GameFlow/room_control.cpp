@@ -151,6 +151,21 @@ static_assert(sizeof(FRoomShipPadTable) == 0x18, "FRoomShipPadTable sizeof 0x18"
 #endif
 static_assert(sizeof(FRoomShipPad) == 0x10, "FRoomShipPad sizeof 0x10");
 
+// FRoomRuntime::SceneFlags (+0x514 .. +0x517).
+enum ERoomSceneFlag
+{
+    // +0x514: the room characters' start script was looked for (FUN_0044aca0, LAB_0044ab70);
+    // it is not looked for again.
+    kRoomStartScriptChecked = 0,
+    // +0x515: FUN_0044a540 started a landing, goods-cart or character start-script sequence;
+    // the start script then waits for the request below.
+    kRoomEntryScriptStarted = 1,
+    // +0x516: the start script requested (FUN_0044ad70, from the sequence stop FUN_004554c0).
+    kRoomStartScriptRequested = 2,
+    // +0x517: a room character's start script ran (read by FUN_005588a0).
+    kRoomStartScriptRan = 3,
+};
+
 // Retail FUN_00449260 object (RoomControl). The RoomObject base (+0x00..+0x2f) is
 // FRoomObject; RoomControl registers itself with a null owner (FUN_005593d0(0)), so no room's
 // draw ever visits it. The Event::Handler face follows at +0x30: vftable 0x005cbe98 over the
@@ -190,9 +205,9 @@ struct FRoomRuntime : public FRoomObject, public EventHandler
     unsigned char Pad4FD[3];            // +0x4FD .. +0x4FF
     FRoomCamera* Camera;                // +0x500 FUN_00556be0
     std::vector<FRoomCharPlacement> Placements; // +0x504 FUN_0059ec40 (0x10) → +0x514
-    // +0x514 scene scripts started (FUN_0044aca0), +0x515 a start script runs, +0x516 the
-    // character start script requested again (FUN_0044ad70), +0x517 a character script ran.
-    unsigned char Flags514[4];          // +0x514 .. +0x517
+    // +0x514 .. +0x517, indexed by ERoomSceneFlag. Kept as one array: a new character with all
+    // 0x40 slots full lands here (RoomControlUpdateCharacter).
+    unsigned char SceneFlags[4];        // +0x514
     FCharacterObject* Characters[0x40];    // +0x518 the room's characters (FUN_00449e60)
     // +0x618: the room's props -- FUN_0044a030 appends one Gf::ObjectProp per enabled
     // RoomData+0x158 record, FUN_0044a380 appends one more, FUN_0044a2f0 finds one by name.
@@ -256,7 +271,7 @@ static_assert(offsetof(FRoomObject, AmbientSource) == 0x0C, "RoomObject +0x0c");
 static_assert(offsetof(FRoomObject, bVisible) == 0x10, "RoomObject +0x10");
 static_assert(offsetof(FRoomObject, Layer) == 0x16, "RoomObject layer +0x16");
 static_assert(offsetof(FRoomObject, RenderMode) == 0x18, "RoomObject +0x18");
-static_assert(offsetof(FRoomObject, Float1C) == 0x1C, "RoomObject +0x1c");
+static_assert(offsetof(FRoomObject, FloorHeight) == 0x1C, "RoomObject +0x1c");
 static_assert(offsetof(FRoomObject, MaterialEntries) == 0x20, "RoomObject vector +0x20");
 
 // The offsets below are retail's. They hold when std::vector is 0x10 bytes (the iterator-debug
@@ -279,6 +294,7 @@ static_assert(offsetof(FRoomRuntime, SingleLightIndex) == 0x4F8, "FRoomRuntime +
 static_assert(offsetof(FRoomRuntime, bSingleLight) == 0x4FC, "FRoomRuntime +0x4FC");
 static_assert(offsetof(FRoomRuntime, Camera) == 0x500, "FRoomRuntime Camera +0x500");
 static_assert(offsetof(FRoomRuntime, Placements) == 0x504, "FRoomRuntime +0x504");
+static_assert(offsetof(FRoomRuntime, SceneFlags) == 0x514, "FRoomRuntime +0x514");
 static_assert(offsetof(FRoomRuntime, Characters) == 0x518, "FRoomRuntime +0x518");
 static_assert(offsetof(FRoomRuntime, Props) == 0x618, "FRoomRuntime +0x618");
 static_assert(offsetof(FRoomRuntime, PropCount) == 0x818, "FRoomRuntime +0x818");
@@ -320,11 +336,11 @@ FRoomObject::FRoomObject(FRoomRuntime* InOwner)
       bLit(1),
       bFog(1),
       bEnvMap(0),
-      Flag14(0),
+      bRunningLights(0),
       LightGroup(0),
       Layer(0),
       RenderMode(0),
-      Float1C(0.0f),
+      FloorHeight(0.0f),
       MaterialEntries()
 {
     // FUN_005593d0 (the vector's allocator byte at +0x20 takes the argument's low byte, which
@@ -363,16 +379,16 @@ bool FRoomObject::IsVisible()
     return bVisible != 0;
 }
 
-void FRoomObject::SetFloat1C(float Value)
+void FRoomObject::SetFloorHeight(float Value)
 {
     // LAB_00443850.
-    Float1C = Value;
+    FloorHeight = Value;
 }
 
-float FRoomObject::GetFloat1C()
+float FRoomObject::GetFloorHeight()
 {
     // LAB_00443860.
-    return Float1C;
+    return FloorHeight;
 }
 
 void* FRoomObject::GetEngineInstance()
@@ -589,10 +605,10 @@ FRoomRuntime::FRoomRuntime()
     SingleLightIndex = 0;
     bSingleLight = 0;
     Camera = nullptr;
-    Flags514[0] = 0;
-    Flags514[1] = 0;
-    Flags514[2] = 0;
-    Flags514[3] = 0;
+    SceneFlags[kRoomStartScriptChecked] = 0;
+    SceneFlags[kRoomEntryScriptStarted] = 0;
+    SceneFlags[kRoomStartScriptRequested] = 0;
+    SceneFlags[kRoomStartScriptRan] = 0;
     for (Index = 0; Index < 0x40; ++Index)
         Characters[Index] = nullptr;
     PropCount = 0;
@@ -724,7 +740,7 @@ static void RoomControlLoadProps(FRoomRuntime* Runtime)
         Prop->LightGroup = Record->LightGroup;
         Prop->Layer = Record->Layer;
         Prop->RenderMode = static_cast<int>(Record->RenderType);
-        Prop->Flag14 = Record->bRunningLights ? 1 : 0;
+        Prop->bRunningLights = Record->bRunningLights ? 1 : 0;
         if (Record->bRoomMain)
         {
             Runtime->MainInstance = Prop->GetEngineInstance();
@@ -765,20 +781,20 @@ RoomData* GetRoomRuntimeRoomData(FRoomRuntime* Runtime)
     return Runtime->Room;
 }
 
-unsigned char RoomControlGetField1338(FRoomRuntime* Runtime)
+unsigned char RoomControlIsCameraMoving(FRoomRuntime* Runtime)
 {
     // FUN_0044c4a0.
     return Runtime->bCameraMoving;
 }
 
-void RoomControlClearField1338(FRoomRuntime* Runtime)
+void RoomControlClearCameraMoving(FRoomRuntime* Runtime)
 {
     // FUN_0044c490. G_bNnKeepPanelOpen is DAT_0066d359.
     Runtime->bCameraMoving = 0;
     G_bNnKeepPanelOpen = 0;
 }
 
-void RoomControlSetField1340(FRoomRuntime* Runtime, unsigned char Value)
+void RoomControlSetCameraMoveSkippable(FRoomRuntime* Runtime, unsigned char Value)
 {
     // Inlined in the NavBar.
     Runtime->bCameraMoveSkippable = Value;
@@ -1131,17 +1147,17 @@ bool RoomControlTrackScriptCamera(FRoomRuntime* Runtime, int Arg0,
     return RoomControlTrackCamera(Runtime, Name, Done, A, B);
 }
 
-unsigned char RoomControlGetField517(FRoomRuntime* Runtime)
+unsigned char RoomControlStartScriptRan(FRoomRuntime* Runtime)
 {
     // Read inline by FUN_005588a0.
-    return Runtime->Flags514[3];
+    return Runtime->SceneFlags[kRoomStartScriptRan];
 }
 
 void RoomControlRequestCharacterScripts(FRoomRuntime* Runtime)
 {
     // FUN_0044ad70. Read by the room update LAB_0044ab70, which then runs the room characters'
     // start script once.
-    Runtime->Flags514[2] = 1;
+    Runtime->SceneFlags[kRoomStartScriptRequested] = 1;
 }
 
 unsigned GetRoomRuntimeRoomId(FRoomRuntime* Runtime)
@@ -1253,9 +1269,9 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
         return;
     }
 
-    // The first empty slot takes a new character (FUN_00435960). RETAIL DEFECT KEPT: with all
-    // 0x40 slots taken retail stores through slot -1, which is the +0x514 flag dword just in
-    // front of the array; the port writes the same bytes there explicitly.
+    // The first empty slot takes a new character (FUN_00435960). Retail: with all 0x40 slots
+    // taken it stores through slot -1 (`mov [ebp+esi*4+518h],eax`, esi = -1), the four
+    // SceneFlags bytes just in front of the array; the port writes the same bytes explicitly.
     int Free = -1;
     for (Slot = 0; Slot < 0x40; ++Slot)
     {
@@ -1268,7 +1284,7 @@ void RoomControlUpdateCharacter(FRoomRuntime* Runtime, CharacterProperties const
     FCharacterObject* const Character = CreatePlacedCharacter(Runtime->Placements, Props, Runtime);
     if (Free == -1)
     {
-        memcpy(Runtime->Flags514, &Character, sizeof(Runtime->Flags514));
+        memcpy(Runtime->SceneFlags, &Character, sizeof(Runtime->SceneFlags));
         return;
     }
     Runtime->Characters[Free] = Character;
@@ -1381,7 +1397,7 @@ static void RoomControlRunStartScript(FRoomRuntime* Runtime, int CharacterKey, i
                                  static_cast<unsigned>(BehaviorKey), nullptr, nullptr);
     static_cast<IServer*>(GetLocalServerInterface())
         ->GFObjSelect(static_cast<unsigned>(CharacterKey), GetPlayerConnectionId());
-    Runtime->Flags514[3] = 1;
+    Runtime->SceneFlags[kRoomStartScriptRan] = 1;
 }
 
 // FUN_0044a540 -- start the room's scene scripts: the RoomData "scene =" records and the room
@@ -1478,7 +1494,7 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
     }
 
     if (Runtime->ShipPads.PlayLanding()) // FUN_00448a20
-        Runtime->Flags514[1] = 1;
+        Runtime->SceneFlags[kRoomEntryScriptStarted] = 1;
 
     if (GfObjectShip() != nullptr && Room->GoodscartScript != nullptr &&
         RtcSlider::is_enabled(static_cast<unsigned long>(Room->GoodscartPriorityId)))
@@ -1495,7 +1511,7 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
         Sequence->Priority = 0;
         Sequence->Field_0x16 = 1;
         Sequence->Play();
-        Runtime->Flags514[1] = 1;
+        Runtime->SceneFlags[kRoomEntryScriptStarted] = 1;
     }
 
     // +0x515 is set after each character, even when no sequence could be made.
@@ -1532,7 +1548,7 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
             Sequence->Field_0x16 = 1;
             Sequence->Play();
         }
-        Runtime->Flags514[1] = 1;
+        Runtime->SceneFlags[kRoomEntryScriptStarted] = 1;
     }
 
     RoomControlSetLandingPending(0);
@@ -1542,15 +1558,15 @@ void RoomControlPlayScenes(FRoomRuntime* Runtime)
 {
     // FUN_0044aca0.
     RoomControlStartScenes(Runtime);
-    if (Runtime->Flags514[1] != 0)
+    if (Runtime->SceneFlags[kRoomEntryScriptStarted] != 0)
         return;
-    if (Runtime->Flags514[0] != 0)
+    if (Runtime->SceneFlags[kRoomStartScriptChecked] != 0)
         return;
     int CharacterKey = 0;
     int BehaviorKey = -1;
     if (RoomControlFindStartScript(Runtime, &CharacterKey, &BehaviorKey))
         RoomControlRunStartScript(Runtime, CharacterKey, BehaviorKey);
-    Runtime->Flags514[0] = 1;
+    Runtime->SceneFlags[kRoomStartScriptChecked] = 1;
 }
 
 // FUN_0044d200 -- the count is re-read each pass and the entries are not null-tested.
@@ -1570,17 +1586,17 @@ void FRoomRuntime::Update(double DeltaSeconds)
     RoomControlUpdateCameraMove(this, Delta);
 
     // A restarted character start script (+0x516, FUN_0044ad70).
-    if (Flags514[2] != 0)
+    if (SceneFlags[kRoomStartScriptRequested] != 0)
     {
-        if (Flags514[0] == 0)
+        if (SceneFlags[kRoomStartScriptChecked] == 0)
         {
             int CharacterKey = 0;
             int BehaviorKey = -1;
             if (RoomControlFindStartScript(this, &CharacterKey, &BehaviorKey))
                 RoomControlRunStartScript(this, CharacterKey, BehaviorKey);
-            Flags514[0] = 1;
+            SceneFlags[kRoomStartScriptChecked] = 1;
         }
-        Flags514[2] = 0;
+        SceneFlags[kRoomStartScriptRequested] = 0;
     }
 
     // FUN_00557860 on each light; the count is re-read every iteration.
@@ -1633,7 +1649,7 @@ void FRoomShipPad::CreatePlayerShip()
     Desc.Pos = Place->Frame.Pos;
     Desc.Orient = Place->Frame.Orient;
     Desc.bShadow = 1;
-    Desc.Float1C = Place->Frame.Pos.y; // +0x3c, the pad's y
+    Desc.FloorHeight = Place->Frame.Pos.y; // +0x3c, the pad's y
     malloc_strcpy(&Desc.LaunchScript, Place->LaunchingScript);
     Desc.Ship = Archetype::GetShip(GetPlayerShipArchetypeIdRetail()); // FUN_004c3e10
     Desc.Equipment = &GetPlayerEquipDescListRetail();                  // FUN_004c4060
@@ -1898,12 +1914,12 @@ static void RoomControlLoadFlashlights(FRoomRuntime* Runtime)
 
         // Period = (Count - 1) * gap (+0x10) + endpause (+0x18), rounded to float.
         float const Period = static_cast<float>(
-            static_cast<double>(Count - 1) * static_cast<double>(Set->Param4) +
-            static_cast<double>(Set->Param6));
+            static_cast<double>(Count - 1) * static_cast<double>(Set->Gap) +
+            static_cast<double>(Set->EndPause));
         // DAT_005c8ba8 (0.0); a NaN period keeps Step 0.
         float Step = 0.0f;
         if (Period > 0.0)
-            Step = static_cast<float>(static_cast<double>(Set->Param4) /
+            Step = static_cast<float>(static_cast<double>(Set->Gap) /
                                       static_cast<double>(Period));
 
         Vector const Black = {0.0f, 0.0f, 0.0f};
@@ -1914,10 +1930,10 @@ static void RoomControlLoadFlashlights(FRoomRuntime* Runtime)
             // operator new(0x7c), FUN_00557630; DAT_005cbf58 is the 0.25.
             float const Phase =
                 static_cast<float>(-(static_cast<double>(LightIndex) * static_cast<double>(Step)));
-            float const BulbSize = static_cast<float>(static_cast<double>(Set->Param3) * 0.25);
-            FFlashLight* Light = new FFlashLight(reinterpret_cast<Vector const*>(&Set->Param0),
-                                                 &Black, Period, Phase, Set->Param5, BulbSize,
-                                                 Set->Param3);
+            float const BulbSize = static_cast<float>(static_cast<double>(Set->Scale) * 0.25);
+            FFlashLight* Light = new FFlashLight(reinterpret_cast<Vector const*>(&Set->ColorR),
+                                                 &Black, Period, Phase, Set->Blink, BulbSize,
+                                                 Set->Scale);
             // FUN_00557810 on the set's resolved frame (+0xe2c + LightIndex * 0x30).
             Runtime->Flashlights[Runtime->FlashlightCount] = Light;
             Runtime->Flashlights[Runtime->FlashlightCount]->SetFrame(Set->FinalFrames[LightIndex]);
@@ -2130,9 +2146,9 @@ namespace
             // LAB_00451370.
         }
 
-        void DACOM_API BeginRecord(void* /*Material*/, void* FieldA, void* FieldB) override;
+        void DACOM_API BeginRecord(void* /*Material*/, void* Object, void* Room) override;
 
-        void DACOM_API EndRecord(void* /*Material*/, void* /*FieldA*/, void* /*FieldB*/) override
+        void DACOM_API EndRecord(void* /*Material*/, void* /*Object*/, void* /*Room*/) override
         {
             // LAB_0041a630.
         }
@@ -2224,13 +2240,13 @@ namespace
         EngineLightClearRegisteredList();
     }
 
-    void DACOM_API FRoomBatcherSink::BeginRecord(void* /*Material*/, void* FieldA, void* FieldB)
+    void DACOM_API FRoomBatcherSink::BeginRecord(void* /*Material*/, void* Object, void* Room)
     {
-        // LAB_0041a640. FieldA is the tagged object, FieldB its room.
+        // LAB_0041a640. The record's two tags: the object and its room.
         DALib::Pipeline->SetRenderState(D3DRS_FOGENABLE, 0);
-        if (FieldA != nullptr)
-            ApplyObjectLighting(static_cast<FRoomRuntime*>(FieldB),
-                                static_cast<FRoomObject*>(FieldA));
+        if (Object != nullptr)
+            ApplyObjectLighting(static_cast<FRoomRuntime*>(Room),
+                                static_cast<FRoomObject*>(Object));
     }
 
     // FUN_00558000 is DrawFlashlightFlares (flash_light.cpp).

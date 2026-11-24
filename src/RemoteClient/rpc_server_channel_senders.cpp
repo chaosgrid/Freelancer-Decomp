@@ -17,6 +17,8 @@
 #include <cstdint>
 #include <cstring>
 #include <cwchar>
+#include <list>
+#include <new>
 
 void CClientImpl::SendServerLoginResponse(unsigned int ClientId, const unsigned char& Status) {
     FPacketBase* Packet = nullptr;
@@ -463,10 +465,6 @@ void CClientImpl::SendServerCreateShip(unsigned int ClientId, const CShipCreateI
 // ===== end SERVER 0x01..0x1f =====
 
 // ===== SERVER 0x20..0x3f =====
-#include "server_createinfo.h" // FServerCreateProjectileInfo / FServerCreateGuidedInfo (0x2d, 0x37)
-#include <cwchar> // wcslen (0x29)
-#include <list>
-#include <new>
 // Same sender shape as above (serializer at this+0x08). Where retail dereferences the first
 // argument (the client id passed BY REFERENCE) the body says so.
 
@@ -958,9 +956,6 @@ void CClientImpl::SendServerRemoteObjectCargoUpdate(const unsigned int& ClientId
 
 // ===== SERVER 0x40..0x5b =====
 // Same sender shape. BY REF: the client id is taken by reference; by value otherwise.
-#include "common_goods.h"
-#include "common_text.h"
-#include <new>
 
 // RC 06b33e70, 0x49 SETHULLSTATUS, by value; the float moves through x87 into +0x20.
 void CClientImpl::SendServerSetHullStatus(unsigned int ClientId, float HullStatus) {
@@ -1275,14 +1270,14 @@ void CClientImpl::SendServerSetCollisionGroups(unsigned int ClientId, const std:
 // count (stored to +0x5c first and re-read each pass, signed), unbounded. Past the local lies
 // retail's own frame -- the return address, then the 23 argument dwords -- so Frame reproduces
 // that memory for counts up to 33: i = 8 rewrites the count with itself, i = 9 writes the
-// return-address slot into +0x60 (overwritten by CommType, so 0 here), i = 10 puts ClientId into
+// return-address slot into +0x60 (overwritten by CaptionIds, so 0 here), i = 10 puts ClientId into
 // +0x64, which is then handed to operator delete, as retail does. Counts above 33 read past
 // Frame as retail reads past its caller's arguments (undefined; writes past the 0x78-byte packet
 // already start at i = 15 in both). TextIds: new(TextCount * 4) with no null test, signed
 // bound; Duration through x87.
 void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderId, unsigned int ReceiverId,
-                                     unsigned int VoiceId, Costume CommCostume, unsigned int CommType,
-                                     const unsigned int* TextIds, int TextCount, unsigned int Mood,
+                                     unsigned int VoiceId, Costume CommCostume, unsigned int CaptionIds,
+                                     const unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
                                      float Duration, bool bReceiverIsOwnShip) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x4f, &Packet) == 0) {
@@ -1304,10 +1299,10 @@ void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
         Frame[16] = ReceiverId;
         Frame[17] = VoiceId;
         std::memcpy(&Frame[18], &CommCostume, sizeof(Costume));
-        Frame[31] = CommType;
+        Frame[31] = CaptionIds;
         Frame[32] = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(TextIds));
         Frame[33] = static_cast<unsigned int>(TextCount);
-        Frame[34] = Mood;
+        Frame[34] = PermutationIds;
         std::memcpy(&Frame[35], &Duration, sizeof(float));
         Frame[36] = static_cast<unsigned int>(bReceiverIsOwnShip);
         Typed->Body.PartIds[0] = CommCostume.PartIds[0];
@@ -1319,7 +1314,7 @@ void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
         for (int Index = 0; Index < static_cast<int>(Typed->Body.AccessoryCount); ++Index) {
             Ids[Index] = Frame[4 + Index];
         }
-        Typed->CommType = CommType;
+        Typed->CaptionIds = CaptionIds;
         if (Typed->TextIds != nullptr) ::operator delete(Typed->TextIds);
         Typed->TextIds = static_cast<unsigned int*>(
             ::operator new(static_cast<unsigned int>(TextCount) * 4u, std::nothrow));
@@ -1327,7 +1322,7 @@ void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
         for (int Index = 0; Index < TextCount; ++Index) {
             Typed->TextIds[Index] = TextIds[Index];
         }
-        Typed->Mood = Mood;
+        Typed->PermutationIds = PermutationIds;
         RpcServerX87CopyFloat(&Typed->Duration, &Duration);
         Typed->bReceiverIsOwnShip = static_cast<unsigned char>(bReceiverIsOwnShip);
         PushToClient(ClientId, Packet->AsRaw());
@@ -1340,8 +1335,8 @@ void CClientImpl::SendServerMiscObjUpdateObjectGroup(unsigned int ClientId, unsi
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
-        Typed->SetField0x28(ObjectId);
-        Typed->SetField0x34(GroupId);
+        Typed->SetObjectId(ObjectId);
+        Typed->SetGroupId(GroupId);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1350,7 +1345,7 @@ void CClientImpl::SendServerMiscObjUpdateObjectGroup(unsigned int ClientId, unsi
 void CClientImpl::SendServerMiscObjUpdateMission(unsigned int ClientId, unsigned int MissionId, unsigned int MissionSetBy) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
-        static_cast<FRpcServerMiscObjUpdatePacket*>(Packet)->SetFields0x38(MissionId, MissionSetBy);
+        static_cast<FRpcServerMiscObjUpdatePacket*>(Packet)->SetMission(MissionId, MissionSetBy);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1370,8 +1365,8 @@ void CClientImpl::SendServerMiscObjUpdateAffiliation(unsigned int ClientId, unsi
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
-        Typed->SetField0x28(ObjectId);
-        Typed->SetField0x54(Affiliation);
+        Typed->SetObjectId(ObjectId);
+        Typed->SetAffiliation(Affiliation);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1381,8 +1376,8 @@ void CClientImpl::SendServerMiscObjUpdateRank(unsigned int ClientId, unsigned in
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
-        Typed->SetField0x24(PlayerId);
-        Typed->SetField0x2c(static_cast<unsigned short>(Rank));
+        Typed->SetPlayerId(PlayerId);
+        Typed->SetRank(static_cast<unsigned short>(Rank));
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1392,8 +1387,8 @@ void CClientImpl::SendServerMiscObjUpdatePlayerGroup(unsigned int ClientId, unsi
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
-        Typed->SetField0x24(PlayerId);
-        Typed->SetField0x34(GroupId);
+        Typed->SetPlayerId(PlayerId);
+        Typed->SetGroupId(GroupId);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }
@@ -1403,8 +1398,8 @@ void CClientImpl::SendServerMiscObjUpdateSystem(unsigned int ClientId, unsigned 
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x54, &Packet) == 0) {
         FRpcServerMiscObjUpdatePacket* Typed = static_cast<FRpcServerMiscObjUpdatePacket*>(Packet);
-        Typed->SetField0x24(PlayerId);
-        Typed->SetField0x30(SystemId);
+        Typed->SetPlayerId(PlayerId);
+        Typed->SetSystemId(SystemId);
         PushToClient(ClientId, Packet->AsRaw());
     }
 }

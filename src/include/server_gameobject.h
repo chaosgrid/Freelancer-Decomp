@@ -396,7 +396,7 @@ public:
     // Retail slot +0x19c -- `MOV AL,[ECX+0x38]; RET` at .text:06ce61b0.
     virtual unsigned char is_invincible() const;
     // Retail slot +0x1a0 -- `FLD [ECX+0x3c]; RET` at .text:06ce61c0.
-    virtual float get_invincible_timer() const;
+    virtual float get_max_hp_loss() const;
 
     // +0x1a4 -- .text:06cee9f0 (RET 4). Object-vs-object collision: relative
     // speed -> Collision::CalcCollisionDamage, handed to the system
@@ -476,11 +476,10 @@ public:
     // set_invincible (+0x194) recomputes: "any command blocks non-player damage",
     // "any command blocks player damage", and the minimum over the commands of
     // the fraction of max hit points the object may still LOSE (the floor is
-    // 1 - that fraction, see damage_hull). The historical name InvincibleTimer
-    // is kept because other lanes' code spells it; it is NOT a timer.
+    // 1 - that fraction, see damage_hull).
     unsigned char bInvincible;      // retail +0x38, ctor zeroes it
     unsigned char bInvincibleFlag;  // retail +0x39, ctor zeroes it
-    float InvincibleTimer;          // retail +0x3c, ctor stores 1.0f -- max hp-loss fraction
+    float MaxHpLoss;                // retail +0x3c, ctor stores 1.0f -- max hp-loss fraction
 
     // retail +0x40. Written only by destroy_notify() (.text:06cee673) and read
     // only by is_destroyed() (.text:06cee6d0); a one-way latch.
@@ -532,7 +531,7 @@ public:
                 int SourceClient) override;
     int set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient) override;
     int toggle_item(unsigned short const* EquipId, bool bActivate, int SourceClient) override;
-    int toggle_cruise(bool bEngage, bool bArg2, int SourceClient) override;
+    int toggle_cruise(bool bEngage, bool bInstant, int SourceClient) override;
     int toggle_thrusters(bool bActivate, int SourceClient) override;
     int use_item(unsigned short EquipId, unsigned Count, int SourceClient) override;
     int request_event(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
@@ -542,8 +541,8 @@ public:
                      bool bFastExit, float Speed) override;
     int stop_tradelane() override;
     int slot_6c(int ArgA, int ArgB) override;
-    int slot_70(unsigned Id) override;
-    int slot_74(unsigned Arg) override;
+    int launch_complete(unsigned BaseObjId) override;
+    int jump_in_complete(unsigned SystemId) override;
 
 protected:
     // Ship::create's body (.text:06d01040). Retail has no such shared function;
@@ -766,12 +765,12 @@ public:
     ObjActivateResult activate(bool bOn, unsigned int DockIndex);
     // FUN_06ce7880 (.text:06ce7880, RET 8, non-virtual). Appends {Port, ShipId}
     // to DockQueue and registers this object with its system
-    // (StarSystem::add_to_list_d4, .text:06ce78c4). Sole caller
+    // (StarSystem::add_docking_solar, .text:06ce78c4). Sole caller
     // pub::SpaceObj::Dock (.text:06cfa891).
     void queue_dock_request(int Port, unsigned int ShipId);
     // FUN_06ce78d0 (.text:06ce78d0, RET 8, non-virtual). Erases the first
     // DockQueue node carrying ShipId whose port matches (any port when Port < 0),
-    // then StarSystem::remove_from_list_d4 (.text:06ce7923); false when no node
+    // then StarSystem::remove_docking_solar (.text:06ce7923); false when no node
     // matched. Sole caller pub::SpaceObj::Dock (.text:06cfa8a4).
     bool dequeue_dock_request(int Port, unsigned int ShipId);
 
@@ -997,7 +996,7 @@ public:
 
     // -- GameObject / EqObj slots Ship overrides (vtable .rdata:06d6711c) ----
     // +0x170 .text:06d01a60 (RET 8): GameObject::enter_system (FUN_06cee6e0,
-    // called directly), then DeathSequenceObjId = 0.
+    // called directly), then DockedObjId = 0.
     void enter_system(StarSystem* Sys, PhySys::CreateParms const* Parms) override;
     // +0x188 .text:06d01a10 (RET 4): a cause-6 list on a ship nobody owns
     // first drops out of cruise (IObjAffect slot_50(false, true, 0)), then
@@ -1031,7 +1030,7 @@ public:
     int remove_follow_follower(IObjRW* Follower) override;                       // 12 .text:06d02ad0
     int jettison_cargo(unsigned short EquipId, int Count, int SourceClient) override;   // 14 .text:06d020d0
     int set_target(IObjRW* Target, unsigned short SubTarget, int SourceClient) override; // 18 .text:06d02340
-    int toggle_cruise(bool bEngage, bool bArg2, int SourceClient) override;            // 20 .text:06d02410
+    int toggle_cruise(bool bEngage, bool bInstant, int SourceClient) override;            // 20 .text:06d02410
     int toggle_thrusters(bool bActivate, int SourceClient) override;                      // 21 .text:06d02500
     int request_event(int RequestType, unsigned const* TargetId, unsigned const* SecondId,
                 int bFlag, RequestCB* Callback) override;                        // 23 .text:06d02670
@@ -1039,8 +1038,8 @@ public:
     int go_tradelane(IObjInspect const* EntranceRing, IObjInspect const* ExitRing,
                      bool bFastExit, float Speed) override;                      // 25 .text:06d028c0
     int stop_tradelane() override;                                               // 26 .text:06d02880
-    int slot_70(unsigned Id) override;                                          // 28 .text:06d02000
-    int slot_74(unsigned Arg) override;                                          // 29 .text:06d02070
+    int launch_complete(unsigned BaseObjId) override;                            // 28 .text:06d02000
+    int jump_in_complete(unsigned SystemId) override;                            // 29 .text:06d02070
 
     // Retail FUN_06d01e80 (.text:06d01e80, RET 0xc) -- the answer to the
     // request slot_5c raised. Callers: pub::SpaceObj's three response exports
@@ -1128,16 +1127,16 @@ public:
     //    CObject::update (.text:06d014b1, with CObject::NO_SCANNER for an
     //    unowned ship and CObject::UPDATE_DUMB for a player's outside single
     //    player), then the jettison tick and the damage tick. When +0x90 is
-    //    non-zero the ship is running its DEATH SEQUENCE instead:
+    //    non-zero the ship is leaving through the object it docked with instead:
     //      .text:06d014cb  single player: wait for CShip+0x214, then
     //                      .text:06d014e3 FUN_06d00130 and +0x90 = 0
     //      .text:06d014fc  multiplayer: bail while CShip+0x2bd is set,
     //      .text:06d01506  FLD [ESI+0x94] / FSUB dt / FST [ESI+0x94], and when
     //                      the result is <= 0.0 re-enable collisions
     //                      (.text:06d01525), FUN_06d00130, +0x94 = 0, +0x90 = 0.
-    //  * the system-level destroy handler at .text:06d0cad1 is what ARMS it:
+    //  * StarSystem::complete_dock at .text:06d0cad1 is what ARMS it:
     //    `MOV [EBP+0x90],EAX` right after `CALL [EDX+0x20]`, i.e. the id of the
-    //    object whose destruction started the sequence, and then
+    //    dock object (station, jump gate, jump hole) the ship docked with, and then
     //    .text:06d0cb81 / .text:06d0cb95 store the delay --
     //    .rdata:06d67cc4 == 0.0f normally, .rdata:06d67cc0 == 0x41400000 ==
     //    12.0f when get_type_bits() has bit 0x40 or bit 0x800 set.
@@ -1167,8 +1166,8 @@ public:
     // byte-compatible with retail's, so the members below reproduce the ORDER
     // and the types, not the absolute addresses. Names for what retail leaves
     // anonymous are the port's own, as bShipGone is in server_sysdb.h.
-    unsigned int DeathSequenceObjId;      // +0x90  an object id; 0 == the live path
-    float DeathSequenceTimer;             // +0x94  seconds; armed to 12.0f or 0.0f
+    unsigned int DockedObjId;             // +0x90  the dock object's id; 0 == the live path
+    float DockExitTimer;                  // +0x94  seconds; armed to 12.0f or 0.0f
     // +0x98 -- bDockInUse / bWaitingForDock. FUN_06d01e80 sets it to
     // `(RequestType == 0 && Response == 3)` = `(EventRequestType::StationJumpDock &&
     // DOCK_HOST_RESPONSE::DockInUse)` (.text:06d01f0a..06d01f1b), and .text:06cfa731
@@ -1508,7 +1507,7 @@ public:
 // ".?AVMedMine@SrvAsteroid@@" (.data:06d88ac8). Created only by the StarSystem
 // factories FUN_06d09bb0 / FUN_06d09c80 on behalf of
 // SrvAsteroid::FSrvAsteroidCube::apply_marker (.text:06d04ab0) and kept in the
-// system's +0xc0 block (StarSystem::ListC0). Bodies in server_classes.cpp.
+// system's +0xc0 block (StarSystem::MedAsteroids). Bodies in server_classes.cpp.
 //
 // Their vtables were dumped slot by slot against GameObject's (.rdata:06d657ec
 // main, .rdata:06d6576c IObjAffect, .rdata:06d65764 CBase). Everything not
@@ -1608,26 +1607,26 @@ public:
 } // namespace SrvAsteroid
 
 // ---------------------------------------------------------------------------
-// The dying-ship list -- retail's file-static std::list<Ship*> in ship.cpp:
+// The dock-exited ship list -- retail's file-static std::list<Ship*> in ship.cpp:
 // allocator byte .data:DAT_06d8d8e0, _Head .data:DAT_06d8d8e4, _Size
 // .data:DAT_06d8d8e8, 0x0C-byte nodes {Next, Prev, Ship*}.
 //   FUN_06d00090  CRT static initialiser: sentinel = operator new(0xc),
 //                 self-linked, size 0, atexit(FUN_06d000d0)
 //   FUN_06d000d0  atexit teardown: free every node, then the sentinel; zero
 //                 head and size
-//   FUN_06d00130  push_back(Ship*) -- Ship::update's death-sequence arm
+//   FUN_06d00130  push_back(Ship*) -- Ship::update's dock-exit arm
 //                 (.text:06d014e3 / .text:06d0152c)
 //   FUN_06d00180  remove(Ship*) -- every matching node; Ship::~Ship
 //                 (.text:06d00fae)
 // Drained by Server_PhysicsUpdate (FUN_06d001d0, .text:06d001e7 .. 06d0026b):
-// controller event 0x25 {ship id, DeathSequenceObjId, system id} per ship,
+// controller event 0x25 {ship id, DockedObjId, system id} per ship,
 // then the list is emptied.
 // A global std::list IS that initialiser/teardown pair: the compiler emits the
 // same construct-then-atexit(destroy) sequence for it.
 // ---------------------------------------------------------------------------
-extern std::list<Ship*> GDyingShips;
-void Ship_QueueDying(Ship* DyingShip);      // FUN_06d00130
-void Ship_ForgetDying(Ship* DyingShip);     // FUN_06d00180
+extern std::list<Ship*> GDockExitedShips;
+void Ship_QueueDockExited(Ship* ExitedShip);      // FUN_06d00130
+void Ship_ForgetDockExited(Ship* ExitedShip);     // FUN_06d00180
 
 // ---------------------------------------------------------------------------
 // Objects between star systems. Retail keeps them in a global std::list at
@@ -1682,9 +1681,7 @@ bool Server_FindLiveObject(unsigned int Id, GameObject*& OutObj, StarSystem*& Ou
 
 // Server_FindObject for the callers that only keep the object: retail passes a
 // dummy for OutSys at those sites. A false return always leaves OutObj null,
-// so the object pointer carries the whole answer. Server_LookupObject
-// (server_cobject.h) is the same with the result flattened to void*. Defined in
-// src/Server/server_pub.cpp.
+// so the object pointer carries the whole answer. Defined in src/Server/server_pub.cpp.
 GameObject* Server_LookupGameObject(unsigned int ObjId);
 
 // Retail FUN_06d00670 (.text:06d00670), __cdecl(unsigned int Flid): the lookup

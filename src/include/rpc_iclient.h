@@ -392,12 +392,12 @@ virtual void SendServerSetReputation(unsigned int ClientId, const FServerSetRepu
     // 06d89007..06d89014; Server.dll REP MOVSDs it onto the stack at 06cf6b97); TextIds is an
     // array of TextCount dwords (06d8907e..06d890b2, count compared signed); Duration goes
     // through FLD/FSTP (06d890d4); the last argument is stored as a byte (06d890db) and
-    // rpclocal's receiver always passes a literal 0 for it (06d83083). The scalar names follow
-    // pub::SpaceObj::SendComm (server side); freelancer.exe's ClientSendComm calls CommType
-    // "CaptionIds" and Mood "PermutationIds" -- TODO(name).
+    // rpclocal's receiver always passes a literal 0 for it (06d83083). CaptionIds is the caption's
+    // name line (the client's comm Appearance), PermutationIds the IDS of the text-order string
+    // ("0, 1, 2", resources.dll 19001..19011).
     virtual void SendServerSendComm(unsigned int ClientId, unsigned int SenderId, unsigned int ReceiverId,
-                                    unsigned int VoiceId, Costume CommCostume, unsigned int CommType,
-                                    const unsigned int* TextIds, int TextCount, unsigned int Mood,
+                                    unsigned int VoiceId, Costume CommCostume, unsigned int CaptionIds,
+                                    const unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
                                     float Duration, bool bReceiverIsOwnShip) = 0;
     // +0x114  0x06d89100  ch2 op 0x56  FLPACKET_SERVER_SENDNNMESSAGE (size 0x24)
 virtual void SendServerSendNNMessage(unsigned int ClientId, unsigned int MessageId) = 0;

@@ -16,6 +16,7 @@
 #include "Interface/rich_text_win.h"
 #include "Interface/win3d.h"
 #include "Interface/win_factory.h"
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_text.h"     // FmtStr, RenderDisplayList, StyleNode
 
@@ -192,7 +193,7 @@ void NnOfferDialog::Open(int Type, FmtStr const* Text, bool bInSingleButton,
     FmtStrSprintf(Text, G_NnTextScratchB, G_NnTextScratchCapacity);
     RenderDisplayList Body;
     {
-        StyleNode const Style(0x9ca4);
+        StyleNode const Style(kTextStyleBody);
         RDLNode* const Temp = Style.Clone();
         RdlAppendNode(Body, Temp->Clone());
         delete Temp;

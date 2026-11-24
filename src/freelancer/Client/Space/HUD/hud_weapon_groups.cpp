@@ -7,6 +7,7 @@
 #include "Space/HUD/hud_weapon_groups.h"
 
 #include "Space/HUD/hud_command_dispatch.h" // FSpaceCommand, SpaceSendCommand (FUN_0054bcb0)
+#include "Space/HUD/hud_element_list.h"     // USER_ACTIVATE_ITEM
 #include "Network/login_mgr.h"            // G_Server (DAT_0067ecd0)
 #include "Space/player_spawn.h"         // GetPlayerConnectionId (DAT_00673344)
 
@@ -29,7 +30,7 @@ namespace
         FSpaceCommand Command;
         memset(&Command, 0, sizeof(Command));
         Command.Byte26 = 1;
-        Command.Id = 0x19;
+        Command.Id = USER_ACTIVATE_ITEM;
         Command.ObjectId = EquipId;
         Command.SubObjectId = 2;
         SpaceSendCommand(&Command);
@@ -132,7 +133,7 @@ void FWeaponGroups::StoreActive(int Id)
     // The watched CEqObj's launchers (mask 0xe0); the hardpoint is read before IsActive; an
     // active one's name is appended.
     CObject* const Object = GetShipObject();
-    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x103u) == 0x103u)
+    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
     {
         CEqObj* const EqObj = static_cast<CEqObj*>(Object);
         CEquipTraverser Walk(EquipTypeMineDropper | EquipTypeCmDropper | EquipTypeGun);
@@ -167,7 +168,7 @@ int FWeaponGroups::GetGroupEquipIds(int Id, unsigned short* OutIds, int MaxIds)
 
     int Found = 0;
     CObject* const Object = GetShipObject();
-    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         return Found;
     }
@@ -203,7 +204,7 @@ void FWeaponGroups::Activate(int Id)
     // FUN_004f5920.
     int const Index = FindGroupIndex(Id);
     CObject* const Object = GetShipObject();
-    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         return;
     }
@@ -253,7 +254,7 @@ void FWeaponGroups::Activate(int Id)
             CShip* ShipObject = nullptr;
             CObject* const Watched = GetShipObject();
             if (Watched != nullptr &&
-                (static_cast<unsigned>(Watched->ObjectClass) & 0x503u) == 0x503u)
+                (static_cast<unsigned>(Watched->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
                 ShipObject = static_cast<CShip*>(Watched);
             }

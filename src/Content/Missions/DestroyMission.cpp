@@ -641,8 +641,8 @@ bool FRandomMissionLoader::Load(INI_Reader* Reader, FRandomMissionData** OutMiss
 }
 
 // FUN_06ef0be0. The title uses the LOADER's mission's system (retail reads [this + 8], not the
-// argument). +0x58 (IconTextureId) carries the reward and +0x5c (Filter) the player; TargetId
-// and SystemId are not written.
+// argument). +0x58 (IconTextureId) carries the reward and +0x5c (Filter) the player; OfferId
+// and OfferKind are not written.
 void FRandomMissionLoader::GetOfferDescription(FRandomMissionData const* InMission,
                                                MissionVendorOfferDescription* OutDescription)
 {

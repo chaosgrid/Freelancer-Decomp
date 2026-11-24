@@ -91,14 +91,14 @@ public:
 
     // FUN_062d4e50, thiscall, RET 4: `MOV EAX,[ECX+0xc];
     // MOV ECX,[EAX+0xc]; MOV [ECX+0x64],arg` -- Context is the IBehaviorManager, its +0x0C
-    // the PathfindManager, whose Field_064 receives the id. No null tests. Called on the
+    // the PathfindManager, whose AvoidExcludeId receives the id. No null tests. Called on the
     // MoveIdea members of DockBehavior (.text:062c3822/062c3834), BuzzBehavior
     // (FUN_062c6170) and StrafeBehavior (FUN_062ca310). Retail name unknown.
     void PublishTargetId(unsigned int Id);
 
     void* Object;              // +0x04. SetContext()'s 1st arg (ctor-zeroed).
     SystemManager* Handle;      // +0x08. SetContext()'s 2nd arg (ctor-zeroed): the owner's
-                                // SystemManager, the behaviors' +0x24 NavHelper.
+                                // SystemManager, the behaviors' +0x24 SysMgr.
     void* Context;                // +0x0c. SetContext()'s 3rd arg. Retail's ctors leave it
                                    // uninitialized; the port zeroes it.
     unsigned char Attached;         // +0x10. Ctor-zeroed; SetContext() sets 1
@@ -371,7 +371,7 @@ static_assert(offsetof(MoveIdea, bKillEngineOffBearing) == 0x59, "MoveIdea::bKil
 static_assert(offsetof(MoveIdea, MaxSpeed5c) == 0x5c, "MoveIdea::MaxSpeed5c offset");
 static_assert(offsetof(MoveIdea, MaxAngularSpeedXY60) == 0x60, "MoveIdea::MaxAngularSpeedXY60 offset");
 static_assert(offsetof(MoveIdea, EmbeddedStop) == 0x64, "MoveIdea::EmbeddedStop offset");
-static_assert(sizeof(MoveIdea) == 0x78, "MoveIdea size (matches every sibling header's confirmed SubObjectA size)");
+static_assert(sizeof(MoveIdea) == 0x78, "MoveIdea size 0x78");
 
 // ============================================================================
 // MatchThrottle2Idea : public BaseIdea -- RTTI COL 063a9a48 at [vtable-4] of
@@ -637,7 +637,7 @@ static_assert(offsetof(FaceIdea, RemainingAngle) == 0xa8, "FaceIdea::RemainingAn
 static_assert(offsetof(FaceIdea, bUpValid) == 0xad, "FaceIdea::bUpValid offset");
 static_assert(offsetof(FaceIdea, UpB0) == 0xb0, "FaceIdea::UpB0 offset");
 static_assert(offsetof(FaceIdea, ThresholdBc) == 0xbc, "FaceIdea::ThresholdBc offset");
-static_assert(sizeof(FaceIdea) == 0xc0, "FaceIdea size (matches every sibling header's confirmed SubObjectB size)");
+static_assert(sizeof(FaceIdea) == 0xc0, "FaceIdea size 0xc0");
 
 // ============================================================================
 // SplineMoveIdea : public BaseIdea -- Common.dll RTTI name
@@ -710,7 +710,7 @@ public:
     void SetStopStyle(int Value);
 
     // FUN_062da380, RET 4. Callers .text:062fe73a (GotoBehavior+0x164), 062c5a62.
-    // FUN_062e5ab0 is Behavior_QueryFixedFalloffEffect (DAT_0639e6c8 = 0.001f).
+    // FUN_062e5ab0 is Behavior_GetCoastDistance (DAT_0639e6c8 = 0.001f).
     //
     // Retail's body, in this class's own field names (its `[ESI+0x50]` is
     // 0x14+0x3c == Move.ArrivalRange, its `[ESI+0x58]` is 0x14+0x44 ==
@@ -719,9 +719,9 @@ public:
     //   Spline                     = NewSpline;             // 062da39b
     //   Move.StopStyle             = 2;                     // 062da3a1
     //   Move.bKillEngineOffBearing = 0;                     // 062da3a8
-    //   MaxSpeed15c  = Behavior_InvokeManagerSlotD8(Object, 1.0f, 1);  // 062da3ac
-    //   LookaheadScale = Behavior_QueryFixedFalloffEffect(Object, MaxSpeed15c);
-    //   SpeedNorm    = Spline->get_spline_length();         // 062da3d8
+    //   MaxSpeed15c  = Behavior_GetSpeed(Object, 1.0f, 1);  // 062da3ac
+    //   CoastDistance = Behavior_GetCoastDistance(Object, MaxSpeed15c);
+    //   SplineLength    = Spline->get_spline_length();         // 062da3d8
     // The middle pair is a genuine chain: retail FSTs the first result to a stack
     // slot at 062da3b1, reloads it as a raw dword at 062da3b5 and pushes THAT as
     // the second call's argument, so the two are not independent queries.
@@ -740,19 +740,11 @@ public:
     float MaxSpeed15c;               // +0x15c. Not ctor-initialized. SetSpline():
                                       // get_speed(1.0f, Engine) (.text:062da3b9),
                                       // as MoveIdea::MaxSpeed5c.
-    float LookaheadScale;           // +0x160. NOT ctor-initialized. Filled by
-                                     // SetSpline() from
-                                     // Behavior_QueryFixedFalloffEffect(Object,
-                                     // MaxSpeed15c), i.e. get_distance_travelled --
-                                     // a coast distance, not a scale. Name kept
-                                     // (eleven external users) despite the
-                                     // mismatch; TODO: rename with its users.
-    float SpeedNorm;                 // +0x164. NOT ctor-initialized. Filled by
-                                      // SetSpline() from
-                                      // ICRSplineSegment::get_spline_length(), i.e.
-                                      // it is the spline's arc length. Name kept
-                                      // (nine external users); TODO: rename to
-                                      // SplineLength with its users.
+    float CoastDistance;            // +0x160. NOT ctor-initialized. SetSpline():
+                                     // Behavior_GetCoastDistance(Object, MaxSpeed15c),
+                                     // the distance coasted from full speed.
+    float SplineLength;              // +0x164. NOT ctor-initialized. SetSpline():
+                                      // ICRSplineSegment::get_spline_length().
     float StepNumerator;              // +0x168. Ctor default 10.0f.
     float ExtrapolateBase;             // +0x16c. Ctor default 50.0f.
     float PersistedT;                   // +0x170. NOT ctor-initialized;
@@ -765,8 +757,8 @@ static_assert(offsetof(SplineMoveIdea, WideMode) == 0x150, "SplineMoveIdea::Wide
 static_assert(offsetof(SplineMoveIdea, BankBlendCap) == 0x154, "SplineMoveIdea::BankBlendCap offset");
 static_assert(offsetof(SplineMoveIdea, StopStyle) == 0x158, "SplineMoveIdea::StopStyle offset");
 static_assert(offsetof(SplineMoveIdea, MaxSpeed15c) == 0x15c, "SplineMoveIdea::MaxSpeed15c offset");
-static_assert(offsetof(SplineMoveIdea, LookaheadScale) == 0x160, "SplineMoveIdea::LookaheadScale offset");
-static_assert(offsetof(SplineMoveIdea, SpeedNorm) == 0x164, "SplineMoveIdea::SpeedNorm offset");
+static_assert(offsetof(SplineMoveIdea, CoastDistance) == 0x160, "SplineMoveIdea::CoastDistance offset");
+static_assert(offsetof(SplineMoveIdea, SplineLength) == 0x164, "SplineMoveIdea::SplineLength offset");
 static_assert(offsetof(SplineMoveIdea, StepNumerator) == 0x168, "SplineMoveIdea::StepNumerator offset");
 static_assert(offsetof(SplineMoveIdea, ExtrapolateBase) == 0x16c, "SplineMoveIdea::ExtrapolateBase offset");
 static_assert(offsetof(SplineMoveIdea, PersistedT) == 0x170, "SplineMoveIdea::PersistedT offset");
@@ -839,7 +831,7 @@ static_assert(sizeof(FDirectionPicker) == 0x20, "FDirectionPicker size (both der
 // DodgeIdea : public BaseIdea (+ DirectionPicker at +0x14) -- Common.dll RTTI
 // name ".?AVDodgeIdea@@". Ctor FUN_062d77d0 (vptr 063a04c8 at .text:062d7819).
 // ============================================================================
-// BuzzBehavior embeds one at +0x178 (its WatcherD). Size 0xe0: BuzzBehavior's ctor
+// BuzzBehavior embeds one at +0x178 (its Dodge). Size 0xe0: BuzzBehavior's ctor
 // builds the next member (BreakAwayIdea) at +0x258, and this ctor's highest write
 // is +0xdc (.text:062d78f5).
 //
@@ -973,7 +965,7 @@ static_assert(sizeof(DodgeIdea) == 0xe0, "DodgeIdea size (BuzzBehavior's 0x178..
 // BreakAwayIdea : public BaseIdea (+ DirectionPicker at +0x14) -- Common.dll
 // RTTI name ".?AVBreakAwayIdea@@". Ctor FUN_062d8970 (vptr 063a04f8 at .text:062d89b6).
 // ============================================================================
-// BuzzBehavior embeds one at +0x258 (its WatcherE). Size 0x9c: BuzzBehavior's next
+// BuzzBehavior embeds one at +0x258 (its BreakAway). Size 0x9c: BuzzBehavior's next
 // member is at +0x2f4, and this ctor's highest write is +0x98 (.text:062d89e0).
 //
 // Vtable .rdata:063a04f8:

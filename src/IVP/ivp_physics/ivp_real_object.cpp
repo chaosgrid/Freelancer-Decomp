@@ -8,7 +8,7 @@
 #include "ivp_core.h"
 #include "ivp_environment.h"
 #include "ivp_mindist.h" // IVP_Synapse_Real / IVP_Ledge_Mindist (synapse list teardown)
-#include "ivp_phantom.h" // IVP_Controller_Phantom (first_child)
+#include "ivp_phantom.h" // IVP_Controller_Phantom (controller_phantom)
 #include "ivp_ov_element.h" // IVP_Mindist_Manager / IVP_OV_Element (enable_collision_detection)
 #include "ivp_calc_next_psi_solver.h" // set_transformation / calc_next_PSI_matrix
 #include "ivp_simulation_unit.h"      // disable_simulation
@@ -68,7 +68,7 @@ void IVP_Priority_Pool::Init(uint16_t InitialCapacity)
     for (uint32_t I = 0; I < PoolCapacity; ++I)
         PoolEntries[I].Next = static_cast<uint16_t>(I + 1);
     PoolEntries[PoolCapacity - 1].Next = 0xffff;
-    PoolKeyThreshold = BitsToFloat(0x501502f9); // the +1e10f "empty" sentinel
+    PoolMinKey = BitsToFloat(0x501502f9); // the +1e10f "empty" sentinel
     PoolLiveIndex = 0xffff;
     PoolSortedHead = 0xffff;
 }
@@ -128,7 +128,7 @@ void IVP_Hull_Manager::DrainAndShift()
         Index = NextIndex;
     }
 
-    PoolKeyThreshold += NegDeltaA;
+    PoolMinKey += NegDeltaA;
     OuterValueAtLastEdit = 0.0f;
     InnerValueAtLastEdit = 0.0f;
     AccumulatedDeltaA += NegDeltaA;
@@ -138,7 +138,7 @@ void IVP_Hull_Manager::DrainAndShift()
 // FUN_06362f90. Every live entry sits on one ascending-by-Key doubly linked
 // list (Next/Prev, head PoolLiveIndex, so the minimum is O(1)); some entries
 // are also promoted onto an "express" list (ExpressNext/ExpressPrev, head
-// PoolSortedHead) that the insert walk uses as a skip list. PoolKeyThreshold
+// PoolSortedHead) that the insert walk uses as a skip list. PoolMinKey
 // caches the head's key.
 // ----------------------------------------------------------------------------
 uint16_t IVP_Priority_Pool::Insert(void* Payload, float Key)
@@ -191,9 +191,9 @@ uint16_t IVP_Priority_Pool::Insert(void* Payload, float Key)
     NewEntry->ExpressNext = 0xfffe;
 
     // Key <= threshold (or NaN) makes the entry the new head.
-    if (!(Key > PoolKeyThreshold))
+    if (!(Key > PoolMinKey))
     {
-        PoolKeyThreshold = Key;
+        PoolMinKey = Key;
         NewEntry->Next = PoolLiveIndex;
         if (PoolLiveIndex != 0xffff)
             PoolEntries[PoolLiveIndex].Prev = static_cast<uint16_t>(NewIndex);
@@ -318,12 +318,12 @@ void IVP_Priority_Pool::Remove(uint16_t Slot)
         if (NextIndex != 0xffff)
         {
             PoolEntries[NextIndex].Prev = 0xffff;
-            PoolKeyThreshold = PoolEntries[NextIndex].Key;
+            PoolMinKey = PoolEntries[NextIndex].Key;
         }
         else
         {
             // Empty pool: back to the ctor's +1e10f sentinel.
-            PoolKeyThreshold = BitsToFloat(0x501502f9);
+            PoolMinKey = BitsToFloat(0x501502f9);
         }
     }
 
@@ -499,15 +499,15 @@ IVP_Real_Object::IVP_Real_Object(IVP_Cluster* Father, IVP_SurfaceManager* Surfac
     shift_core_f_object.y = 0.0f;        // +0x34
     shift_core_f_object.z = 0.0f;        // +0x38
     cache_object = nullptr;              // +0x40
-    first_child = nullptr;               // +0x1c
+    controller_phantom = nullptr;               // +0x1c
 
     std::strncpy(name, Parms->ShortNameTag, sizeof(name));
 
     // operator new(0x1bc) + 06347660; the result goes to +0x98, +0x9c, +0xa0.
     IVP_Core* const NewCore = new IVP_Core(this, Orientation, InitialPosition, Parms->FlagsHi, Parms->FlagsLo);
     core = NewCore;          // +0x98
-    original_core = NewCore; // +0x9c
-    field_a0 = NewCore;      // +0xa0
+    friction_core = NewCore; // +0x9c
+    original_core = NewCore; // +0xa0
 
     // Applied to whatever +0x78 holds after the core ctor.
     if (Parms->FlagsHi != 0)
@@ -737,12 +737,12 @@ void IVP_Real_Object::unlink_contact_points(bool bSilently)
         IVP_Contact_Point* const Record =
             reinterpret_cast<IVP_Contact_Point*>(Node + *reinterpret_cast<int16_t*>(Node + 0xc));
         IVP_ListManager* const FrictionSystem = Record->ListManagerOwner; // +0x70
-        IVP_Core* const Core2 = Record->Object2->original_core;
+        IVP_Core* const Core2 = Record->Object2->friction_core;
 
         // Not silent: wake both cores, Object1's first (FUN_06347d80).
         if (!bSilently)
         {
-            Record->Object1->original_core->wake_or_ensure_simulation();
+            Record->Object1->friction_core->wake_or_ensure_simulation();
             Core2->wake_or_ensure_simulation();
         }
 
@@ -785,14 +785,14 @@ void IVP_Real_Object::enable_collision_detection(bool bEnable)
     unlink_contact_points(true);
 }
 
-// FUN_06345f10. The old phantom goes first and first_child is nulled before
+// FUN_06345f10. The old phantom goes first and controller_phantom is nulled before
 // operator new(0x44); a failed allocation stores null.
 IVP_Controller_Phantom* IVP_Real_Object::convert_to_phantom(const IVP_Template_Phantom* Template)
 {
-    delete static_cast<IVP_Controller_Phantom*>(first_child);
-    first_child = nullptr;
+    delete static_cast<IVP_Controller_Phantom*>(controller_phantom);
+    controller_phantom = nullptr;
     IVP_Controller_Phantom* const Phantom = new IVP_Controller_Phantom(this, Template);
-    first_child = Phantom;
+    controller_phantom = Phantom;
     return Phantom;
 }
 
@@ -804,8 +804,8 @@ int32_t IVP_Real_Object::convert_phantom_to_object()
 
     enable_collision_detection(false);
 
-    delete static_cast<IVP_Controller_Phantom*>(first_child);
-    first_child = nullptr;
+    delete static_cast<IVP_Controller_Phantom*>(controller_phantom);
+    controller_phantom = nullptr;
 
     if (static_cast<uint8_t>(flags) == 0x9)
     {
@@ -902,12 +902,12 @@ void IVP_Real_Object::TeardownMindistListenersAndCandidates()
 IVP_Real_Object::~IVP_Real_Object()
 {
     // The phantom (+0x1c): 063442c0 + operator delete.
-    IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(first_child);
+    IVP_Controller_Phantom* const Phantom = static_cast<IVP_Controller_Phantom*>(controller_phantom);
     if (Phantom != nullptr)
     {
         delete Phantom;
     }
-    first_child = nullptr;
+    controller_phantom = nullptr;
 
     hull_manager.WalkActiveEntries(); // 063521f0
 
@@ -918,7 +918,7 @@ IVP_Real_Object::~IVP_Real_Object()
         IVP_Environment_Object_Notify_Event Event;
         Event.Env = environment;
         Event.Object = this;
-        IVP_Environment_Notify_Object_Listeners_Slot0(environment, &Event);
+        IVP_Environment_Fire_Event_Object_Deleted(environment, &Event);
     }
 
     if ((flags & 0x2000u) != 0)
@@ -942,16 +942,16 @@ IVP_Real_Object::~IVP_Real_Object()
         IVP_Real_Object_Free_Cache_Object(this); // 0634d510
     }
 
-    // 06346f20 on core, then on field_a0 unless it is core, then on
-    // original_core unless it is either. No null tests.
+    // 06346f20 on core, then on original_core unless it is core, then on
+    // friction_core unless it is either. No null tests.
     IVP_Core_Remove_Object(core, this);
-    if (field_a0 != core)
-    {
-        IVP_Core_Remove_Object(field_a0, this);
-    }
-    if (original_core != field_a0 && original_core != core)
+    if (original_core != core)
     {
         IVP_Core_Remove_Object(original_core, this);
+    }
+    if (friction_core != original_core && friction_core != core)
+    {
+        IVP_Core_Remove_Object(friction_core, this);
     }
 
     ::operator delete(q_core_f_object); // 06391d5a
@@ -1091,7 +1091,7 @@ void IVP_Real_Object::calc_at_time_AT(IVP_U_Quat* OutQuat, IVP_U_Point* OutPosit
 
 // ============================================================================
 // FUN_06346170: IVP_Real_Object::EnsureInSimulation. Movement byte 8 enqueues
-// original_core (FUN_0634bb90); anything else updates core's time of last
+// friction_core (FUN_0634bb90); anything else updates core's time of last
 // motion (FUN_063470e0). No pointer is tested. Callers: 06346080 / 063460c0 /
 // 06346100 below, PhySys 06285627, 06347dc3.
 // ============================================================================
@@ -1099,7 +1099,7 @@ void IVP_Real_Object::EnsureInSimulation()
 {
     if (static_cast<uint8_t>(flags) == 8)
     {
-        IVP_Environment_Enqueue_Core(environment, original_core);
+        IVP_Environment_Enqueue_Core(environment, friction_core);
         return;
     }
     core->update_time_of_last_motion();
@@ -1190,15 +1190,15 @@ void IVP_Real_Object::async_push_object_ws(const IVP_U_Point* PositionWs, const 
                                  reinterpret_cast<const Vector*>(ImpulseWs));
 }
 
-// FUN_063450e0: `this` is an IVP_Real_Object (flags +0x78, original_core
-// +0x9c). Movement byte 8 calls FUN_06349490 on original_core's sim unit with
+// FUN_063450e0: `this` is an IVP_Real_Object (flags +0x78, friction_core
+// +0x9c). Movement byte 8 calls FUN_06349490 on friction_core's sim unit with
 // its environment, which IVP_Core::revive_sleeping_core models. Callers:
 // FUN_06344dc0 (ensure_in_simulation), 0634380f.
-void IVP_Real_Object::ReviveOriginalCoreIfSleeping()
+void IVP_Real_Object::ReviveFrictionCoreIfSleeping()
 {
     if ((flags & 0xFF) == 8)
     {
-        original_core->revive_sleeping_core();
+        friction_core->revive_sleeping_core();
     }
 }
 
@@ -1413,7 +1413,7 @@ IVP_SurfaceManager* IVP_GetDefaultSurfaceManager()
 // ============================================================================
 // The two IVP_Real_Object leaves, IVP_Polygon (object_type 2) and IVP_Ball
 // (object_type 3); see ivp_real_object.h. Both constructors: base ctor
-// FUN_06345100, vptr, object_type, field_94, then FUN_06345b20
+// FUN_06345100, vptr, object_type, extra_radius, then FUN_06345b20
 // (IVP_InitCoreRestStateAndDamping) with (Father->environment, Parms), then
 // FUN_0634cea0 (object listeners slot 1) with a stack {Core->Environment,
 // this} -- the record FUN_0634b480 also builds
@@ -1430,14 +1430,14 @@ IVP_Polygon::IVP_Polygon(IVP_Cluster* Father, IVP_SurfaceManager* SurfaceManager
     object_type = 2;
 
     // A plain dword copy (IVP_Ball adds its radius).
-    field_94 = Parms->Field_0x4c;
+    extra_radius = Parms->ExtraRadius;
 
     IVP_InitCoreRestStateAndDamping(this, Father->environment, Parms);
 
     IVP_Environment_Object_Notify_Event Event;
     Event.Env = core->Environment;
     Event.Object = this;
-    IVP_Environment_Notify_Object_Listeners_Slot1(core->Environment, &Event);
+    IVP_Environment_Fire_Event_Object_Created(core->Environment, &Event);
 }
 
 // FUN_06362570. vptr 063a585c.
@@ -1455,14 +1455,14 @@ IVP_Ball::IVP_Ball(IVP_Cluster* Father, const float* Radius,
     surface_manager = &g_IVP_DefaultSurfaceManager_0658afe0; // +0x80
 
     // A real float addition (IVP_Polygon copies).
-    field_94 = Parms->Field_0x4c + *Radius;
+    extra_radius = Parms->ExtraRadius + *Radius;
 
     IVP_InitCoreRestStateAndDamping(this, Father->environment, Parms);
 
     IVP_Environment_Object_Notify_Event Event;
     Event.Env = core->Environment;
     Event.Object = this;
-    IVP_Environment_Notify_Object_Listeners_Slot1(core->Environment, &Event);
+    IVP_Environment_Fire_Event_Object_Created(core->Environment, &Event);
 }
 
 // ============================================================================
@@ -1472,7 +1472,7 @@ IVP_Ball::IVP_Ball(IVP_Cluster* Father, const float* Radius,
 // and the construction template.
 //
 // object_type (2 or 3, anything else traps) selects:
-//   * UpperLimitRadius / SpeedLimit addends: 0 / 0 for a ball; for a polygon,
+//   * UpperLimitRadius / MaxSurfaceDeviation addends: 0 / 0 for a ball; for a polygon,
 //     surface_manager slot 2 with &LocalCsys.vv as the centre (so LocalCsys
 //     must be built first, as in retail).
 //   * the scaled rotation inertia: a polygon's surface_manager slot 3, or a
@@ -1510,9 +1510,9 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
 
     IVP_Core* const Core = Self->core; // loaded after the call
 
-    // UpperLimitRadius / SpeedLimit addends (FUN_06346870).
-    float MaxAngularSpeedAddend = 0.0f;
-    float SpeedLimitValue = 0.0f;
+    // UpperLimitRadius / MaxSurfaceDeviation addends (FUN_06346870).
+    float SurfaceRadius = 0.0f;
+    float MaxSurfaceDeviationValue = 0.0f;
     if (ObjectType == 3)
     {
         // Both 0.0f.
@@ -1523,7 +1523,7 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
         // D + Inner.radius to the first output and D + kind * radius *
         // DAT_063a54b4 to the second. No null test on surface_manager.
         Self->surface_manager->get_radius_and_radius_dev_to_given_center(
-            const_cast<IVP_U_Point*>(&LocalCsys.vv), &MaxAngularSpeedAddend, &SpeedLimitValue);
+            const_cast<IVP_U_Point*>(&LocalCsys.vv), &SurfaceRadius, &MaxSurfaceDeviationValue);
     }
     else
     {
@@ -1532,8 +1532,8 @@ void IVP_InitCoreRestStateAndDamping(IVP_Real_Object* Self, IVP_Environment* Env
 
     // The sum is rounded into the addend's own stack slot and reused below as
     // the sphere radius.
-    const float Radius = Self->field_94 + MaxAngularSpeedAddend;
-    Core->SetSpeedLimits(Radius, SpeedLimitValue); // FUN_06346870
+    const float Radius = Self->extra_radius + SurfaceRadius;
+    Core->SetRadius(Radius, MaxSurfaceDeviationValue); // FUN_06346870
 
     // ---- mass and rotation inertia ----
     {
@@ -1694,8 +1694,7 @@ void IVP_RealObjectConstructionTemplate::set_short_name(const char* Name)
     }
     if (std::strlen(Name) > 8)
     {
-        volatile int32_t* Trap = nullptr;
-        *Trap = 0;
+        IVP_CoreTrap();
     }
     std::strncpy(ShortNameTag, Name, 8);
 }
@@ -1725,7 +1724,7 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
 void IVP_Real_Object::ensure_in_simulation()
 {
     if (static_cast<uint8_t>(core->MovementState & 0xffu) == 8)
-        ReviveOriginalCoreIfSleeping();
+        ReviveFrictionCoreIfSleeping();
 }
 
 // FUN_06344fb0. A fixed core returns at once; a queued core is dequeued
@@ -1770,7 +1769,7 @@ void IVP_Real_Object::recheck_mindists_of_other_cores()
     {
         IVP_Ledge_Mindist* const Mindist = Synapse->get_mindist();
         IVP_Synapse_Real* const Next = Synapse->next;
-        if (Mindist->synapse[0].l_obj->core->Unconfirmed_0x1B8 != Mindist->synapse[1].l_obj->core->Unconfirmed_0x1B8)
+        if (Mindist->synapse[0].l_obj->core->MindistEventStamp != Mindist->synapse[1].l_obj->core->MindistEventStamp)
         {
             Mindist->DispatchNarrowPhaseSolve(); // FUN_06352cf0
             if ((Mindist->StateFlags & 0xc000u) == 0)
@@ -1816,7 +1815,7 @@ void IVP_Real_Object::beam_object_to_new_position(const IVP_U_Quat* RotationWs, 
 // positions extrapolated to the host environment's time (FUN_0628be60, dt
 // rounded to float), Distance = float(sqrt((dz*dz + dy*dy) + dx*dx)). When
 // exactly one object is asleep it is revived. The object's pose comes from its
-// cache slot. The host core's UpperLimitRadius and SpeedLimit grow to
+// cache slot. The host core's UpperLimitRadius and MaxSurfaceDeviation grow to
 // Distance + the old core's value when strictly greater. Then the object moves
 // to the host core, takes the host's movement byte, and is beamed to its pose
 // (PhySys::BeamBodyToWorldPose, 06343cc0).
@@ -1847,9 +1846,9 @@ void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, 
     const bool bHostSimulated = static_cast<int8_t>(Host->flags & 0xffu) < 8;
     const bool bObjectSimulated = static_cast<int8_t>(Object->flags & 0xffu) < 8;
     if (bHostSimulated && !bObjectSimulated)
-        Object->ReviveOriginalCoreIfSleeping();
+        Object->ReviveFrictionCoreIfSleeping();
     else if (!bHostSimulated && bObjectSimulated)
-        Host->ReviveOriginalCoreIfSleeping();
+        Host->ReviveFrictionCoreIfSleeping();
 
     IVP_Core* const OldCore = Object->core;
     const IVP_NarrowPhaseCacheSlot* const Slot = Object->get_cache_object_no_lock();
@@ -1863,15 +1862,15 @@ void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, 
     const double Radius = (double)(Distance) + OldCore->UpperLimitRadius;
     if (Radius > NewCore->UpperLimitRadius)
         NewCore->UpperLimitRadius = (float)(Radius);
-    const double Limit = (double)(Distance) + OldCore->SpeedLimit;
-    if (Limit > NewCore->SpeedLimit)
-        NewCore->SpeedLimit = (float)(Limit);
+    const double Limit = (double)(Distance) + OldCore->MaxSurfaceDeviation;
+    if (Limit > NewCore->MaxSurfaceDeviation)
+        NewCore->MaxSurfaceDeviation = (float)(Limit);
 
     Object->unlink_contact_points(true);
     IVP_Core_Remove_Object(OldCore, Object);
     Object->core = NewCore;
+    Object->friction_core = NewCore;
     Object->original_core = NewCore;
-    Object->field_a0 = NewCore;
     IVP_Core_Add_Object(NewCore, Object);
 
     Object->flags = (Object->flags & ~0xffu) | (Host->flags & 0xffu);
@@ -1924,13 +1923,13 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
     Object->flags = (Object->flags & 0xffffff08u) | 8u;
     IVP_Core* NewCore = new IVP_Core(Object, &Quat, &Position, 0, Template->FlagsLo);
     Object->core = NewCore;
+    Object->friction_core = NewCore;
     Object->original_core = NewCore;
-    Object->field_a0 = NewCore;
     if (Template->Material != nullptr)
         Object->material = Template->Material;
     if (Template->ClientData != nullptr)
         Object->client_data = Template->ClientData;
-    Object->field_94 = Template->Field_0x4c;
+    Object->extra_radius = Template->ExtraRadius;
     IVP_InitCoreRestStateAndDamping(Object, Env, Template); // 06345b20(Env, Template)
 
     // Retail quirk kept: OldCore is null here when the old core held only this
@@ -1981,7 +1980,7 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
 
         IVP_Calc_Next_PSI_Solver Solver(NewCore);
         Solver.calc_next_PSI_matrix(&EventSim, &ActiveHullManagers);
-        NewCore->FastSimUnitData = nullptr;
+        NewCore->OldSyncInfo = nullptr;
         IVP_Calc_Next_PSI_Solver::commit_all_hull_managers(Env, &ActiveHullManagers);
         Object->recalc_exact_mindists();
         Object->recheck_mindists_of_other_cores();

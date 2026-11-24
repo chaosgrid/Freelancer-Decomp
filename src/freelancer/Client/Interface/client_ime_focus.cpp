@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "Interface/client_ime_focus.h"
+#include "Interface/fl_ime_input_box.h"
 
 #include "Common/Fonts/font_atlas.h"
 #include "Common/Fonts/font_imp.h"
@@ -138,11 +139,10 @@ ClientIMEFocus::~ClientIMEFocus()
 
 void ClientIMEFocus::DrawRect(int X1, int Y1, int X2, int Y2, DWORD Color)
 {
-    // LAB_00563e70 (RET 0x14; `this` is not read). +0x9c of the focused box is FLImeInputBox's
-    // FontString; the x extents move left by its text width.
+    // LAB_00563e70 (RET 0x14; `this` is not read). The focused box is an FLImeInputBox; the x
+    // extents move left by the width of its composition string (+0x9c).
     IMEInputBox* Box = GetFocus();
-    FontStringChild* SizeProbe =
-        *reinterpret_cast<FontStringChild**>(reinterpret_cast<char*>(Box) + 0x9c);
+    FontStringChild* SizeProbe = static_cast<FLImeInputBox*>(Box)->CompositionString;
     int SizeWH[2];
     SizeProbe->GetSize(SizeWH);
     int const Left = X1 - SizeWH[0];
@@ -200,20 +200,18 @@ void ClientIMEFocus::DrawTextW(const wchar_t* Text, unsigned Color, void* Layout
     if (Count > 1u)
     {
         unsigned char* const Base = static_cast<unsigned char*>(Layout);
-        unsigned char* Esi = Base + 0x32;
-        for (unsigned Edi = 1u; Edi < Count; ++Edi)
+        for (unsigned Index = 1u; Index < Count; ++Index)
         {
-            // The entry's AARRGGBB dword at +0x10.
-            Win3DColor3ub(Esi[0], Esi[-1], Esi[-2]);
+            unsigned char* const Entry = Base + (Index << 5);
+            // The entry's AARRGGBB dword at +0x10: R (+0x12), G (+0x11), B (+0x10).
+            Win3DColor3ub(Entry[0x12], Entry[0x11], Entry[0x10]);
 
-            float* const Cur = reinterpret_cast<float*>(Esi - 0x12);
+            float* const Cur = reinterpret_cast<float*>(Entry);
             Win3DVertex3f(Cur[0], Cur[1], 0.0f);
 
-            unsigned NextIdx = (Edi == Count - 1u) ? 1u : (Edi + 1u);
+            unsigned NextIdx = (Index == Count - 1u) ? 1u : (Index + 1u);
             float* const Next = reinterpret_cast<float*>(Base + (NextIdx << 5));
             Win3DVertex3f(Next[0], Next[1], 0.0f);
-
-            Esi += 0x20;
         }
     }
 

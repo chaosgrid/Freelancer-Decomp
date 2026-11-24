@@ -52,13 +52,14 @@ namespace
         Out.z = A.z + B.z;
         return Out;
     }
+}
 
-    Vector GetShipPosition(FContentNpcShip* Ship)
-    {
-        Vector Position;
-        Ship->GetPosition(&Position);                                   // FUN_06eb70f0
-        return Position;
-    }
+// The ship's position (FUN_06eb70f0), as the guide bodies fetch it.
+Vector GetShipPosition(FContentNpcShip* Ship)
+{
+    Vector Position;
+    Ship->GetPosition(&Position);                                       // FUN_06eb70f0
+    return Position;
 }
 
 // FUN_06f0de80.
@@ -88,20 +89,20 @@ void IssueOnlyDirective(FContentNpcShip* Ship, FObjListDirective* Directive)
 int __cdecl ParseGuideBehavior(char const* Name)
 {
     if (strcmp(Name, "trade") == 0)
-        return 2;
+        return GUIDE_TYPE_TRADE;
     if (strcmp(Name, "patrol_path") == 0)
-        return 3;
+        return GUIDE_TYPE_PATROL_PATH;
     if (strcmp(Name, "nothing") == 0)
-        return 1;
+        return GUIDE_TYPE_NOTHING;
     if (strcmp(Name, "wander") == 0)
-        return 4;
+        return GUIDE_TYPE_WANDER;
     if (strcmp(Name, "goto_guide") == 0)
-        return 5;
+        return GUIDE_TYPE_GOTO;
     if (strcmp(Name, "dock_guide") == 0)
-        return 6;
+        return GUIDE_TYPE_DOCK;
     if (strcmp(Name, "patrol_guide") == 0)
-        return 7;
-    return Name[0] != '\0' ? 1 : 0;
+        return GUIDE_TYPE_PATROL_GUIDE;
+    return Name[0] != '\0' ? GUIDE_TYPE_NOTHING : GUIDE_TYPE_NONE;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -113,7 +114,7 @@ int __cdecl ParseGuideBehavior(char const* Name)
 // +0x13c = 0, TargetName empty, +0x174 = 0, +0x175 = 0, +0x176 = 1, vtable 06fb82d8. The
 // positions +0x124 / +0x130 are not written.
 FMbGotoGuide::FMbGotoGuide()
-    : FMetaBehavior(5, nullptr)
+    : FMetaBehavior(GUIDE_TYPE_GOTO, nullptr)
 {
     TargetName.Length = 0;
     TargetName.Data[0] = '\0';
@@ -186,12 +187,12 @@ void __cdecl LoadMetaBehavior(INI_Reader* Reader, std::list<FMetaBehavior*>* Lis
         if (_stricmp(Reader->get_name_ptr(), "MB_GOTOGUIDE") == 0)
         {
             Created = new FMbGotoGuide();
-            Type = 5;
+            Type = GUIDE_TYPE_GOTO;
         }
         else if (_stricmp(Reader->get_name_ptr(), "MB_DOCKGUIDE") == 0)
         {
             Created = new FMbDockGuide();
-            Type = 6;
+            Type = GUIDE_TYPE_DOCK;
         }
         else
         {
@@ -224,22 +225,22 @@ bool __cdecl CreateGuide(FGuideDescBase* Desc, FContentGuide** InOutGuide)
     FContentGuide* Guide = nullptr;
     switch (Desc->Type)
     {
-    case 1:
+    case GUIDE_TYPE_NOTHING:
         Guide = new FNothingGuide(static_cast<FGuideDesc const*>(Desc));
         break;
-    case 2:
+    case GUIDE_TYPE_TRADE:
         Guide = new FTradeGuide(static_cast<FGuideDesc const*>(Desc));
         break;
-    case 3:
+    case GUIDE_TYPE_PATROL_PATH:
         Guide = new FPatrolGuide(static_cast<FGuideDesc const*>(Desc));
         break;
-    case 4:
+    case GUIDE_TYPE_WANDER:
         Guide = new FWanderGuide(static_cast<FGuideDesc const*>(Desc));
         break;
-    case 5:
+    case GUIDE_TYPE_GOTO:
         Guide = new FGotoGuide(static_cast<FMbGotoGuide const*>(Desc));
         break;
-    case 6:
+    case GUIDE_TYPE_DOCK:
         Guide = new FDockGuide(static_cast<FMbDockGuide const*>(Desc));
         break;
     default:
@@ -308,7 +309,7 @@ void FTargetGuide::SwapTargets()
 void FTargetGuide::IssueDelayDirective()
 {
     TRefHandle<FObjListDirective> Directive;
-    CreateObjListDirective(1, &Directive.Pointer);                      // FUN_06f24870
+    CreateObjListDirective(OBJLIST_DELAY, &Directive.Pointer);                      // FUN_06f24870
     int const Seconds = (std::rand() * 11) / 32768 + 20;
     FObjListDelay* Delay = static_cast<FObjListDelay*>(Directive.Pointer);
     Delay->SetDelay(static_cast<float>(static_cast<long long>(Seconds)));
@@ -320,7 +321,7 @@ void FTargetGuide::IssueDelayDirective()
 void FTargetGuide::IssueLaunchDirective()
 {
     TRefHandle<FObjListDirective> Directive;
-    CreateObjListDirective(0x15, &Directive.Pointer);
+    CreateObjListDirective(OBJLIST_LAUNCH, &Directive.Pointer);
     static_cast<FObjListLaunch*>(Directive.Pointer)->Op.Priority = 1;
     IssueOnlyDirective(Ship, Directive);
 }
@@ -329,7 +330,7 @@ void FTargetGuide::IssueLaunchDirective()
 void FTargetGuide::IssueDockDirective()
 {
     TRefHandle<FObjListDirective> Directive;
-    CreateObjListDirective(0x13, &Directive.Pointer);
+    CreateObjListDirective(OBJLIST_DOCK, &Directive.Pointer);
     unsigned int const Zero = 0;                                        // DAT_06fb80e4
     FObjListDock* Dock = static_cast<FObjListDock*>(Directive.Pointer);
     Dock->SetTarget(&TargetId2, &Zero);                                 // FUN_06f276f0
@@ -447,10 +448,10 @@ void FNothingGuide::Start()
 }
 
 // LAB_06f0af30.
-void FNothingGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
+void FNothingGuide::OnDirectivesDone(int CompletedBehavior, int DirectiveResult)
 {
-    (void)ResultWord11c;
-    (void)ResultWord118;
+    (void)CompletedBehavior;
+    (void)DirectiveResult;
     Start();
 }
 
@@ -564,7 +565,7 @@ bool FTradeRoute::AddFormationWaitDirective(std::list<FObjListDirective*>* Out)
         if (!(*It)->IsInTradeLane())                                      // FUN_06f57710
             continue;
         TRefHandle<FObjListDirective> Directive;
-        CreateObjListDirective(1, &Directive.Pointer);
+        CreateObjListDirective(OBJLIST_DELAY, &Directive.Pointer);
         FObjListDelay* Delay = static_cast<FObjListDelay*>(Directive.Pointer);
         Delay->SetDelay(1.0f);
         Delay->Op.Priority = 1;
@@ -676,10 +677,10 @@ void FTradeGuide::Reset()
 }
 
 // LAB_06f0af30.
-void FTradeGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
+void FTradeGuide::OnDirectivesDone(int CompletedBehavior, int DirectiveResult)
 {
-    (void)ResultWord11c;
-    (void)ResultWord118;
+    (void)CompletedBehavior;
+    (void)DirectiveResult;
     Start();
 }
 
@@ -727,7 +728,9 @@ void FTradeGuide::SwapTargets()
 // free first leg: dock type 2 at TargetId2. A lane first leg: within 10000 (DAT_06fd0648,
 // not greater, so NaN counts as within) of its first ring -> type 2 at that ring; else type 3
 // towards it: the unit direction times 10000 (x / y rounded to float after the
-// normalisation, z kept on the x87 stack), OutFloat 500.
+// normalisation, z kept on the x87 stack), OutFloat 500. Retail: the ship position is not
+// added (06f075dc-06f0761a store the scaled direction), so FleeBehavior's point goto heads
+// 10000 from the system origin; the patrol route's flee adds it.
 bool FTradeGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinationType& OutType,
                                          Vector& OutPosition, unsigned int& OutParam,
                                          float& OutFloat)
@@ -815,10 +818,10 @@ void FWanderGuide::Reset()
 }
 
 // LAB_06f0af30.
-void FWanderGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
+void FWanderGuide::OnDirectivesDone(int CompletedBehavior, int DirectiveResult)
 {
-    (void)ResultWord11c;
-    (void)ResultWord118;
+    (void)CompletedBehavior;
+    (void)DirectiveResult;
     Start();
 }
 
@@ -858,13 +861,13 @@ void FWanderGuide::Start()
         Away.z = static_cast<float>(static_cast<double>(Away.z) * 200.0);
 
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(5, &New.Pointer);
+        CreateObjListDirective(OBJLIST_GOTO_VEC, &New.Pointer);
         Vector const Destination = Add(ShipPosition, Away);             // FUN_06f0bb80
         FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(New.Pointer);
         Goto->SetDestination(&Destination, 100.0f, -1.0f, 0, false, false);   // FUN_06f26460
-        Goto->Op.Field_5A = 0;
-        Goto->Op.Field_5B = 1;
-        Goto->Op.Field_58 = 1;
+        Goto->Op.bGotoCruise = 0;
+        Goto->Op.bGotoNoCruise = 1;
+        Goto->Op.bFlyThrough = 1;
         Goto->Op.Priority = 1;
         AssignDirective(&Directive.Pointer, New);
         IssueOnlyDirective(Ship, Directive);
@@ -916,12 +919,12 @@ void FWanderGuide::Start()
     if (bFound)
     {
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(5, &New.Pointer);
+        CreateObjListDirective(OBJLIST_GOTO_VEC, &New.Pointer);
         FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(New.Pointer);
         Goto->SetDestination(&Destination, 500.0f, -1.0f, 0, false, false);
-        Goto->Op.Field_5A = 0;
-        Goto->Op.Field_5B = 1;
-        Goto->Op.Field_58 = 1;
+        Goto->Op.bGotoCruise = 0;
+        Goto->Op.bGotoNoCruise = 1;
+        Goto->Op.bFlyThrough = 1;
         Goto->Op.Priority = 1;
         AssignDirective(&Directive.Pointer, New);
         if (MinRange < 1500.0f)
@@ -933,7 +936,7 @@ void FWanderGuide::Start()
     else if (MinRange > 100.0f)
     {
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(1, &New.Pointer);
+        CreateObjListDirective(OBJLIST_DELAY, &New.Pointer);
         FObjListDelay* Delay = static_cast<FObjListDelay*>(New.Pointer);
         Delay->SetDelay(0.5f);
         Delay->Op.Priority = 1;
@@ -976,12 +979,12 @@ void FWanderGuide::Start()
             }
 
             TRefHandle<FObjListDirective> New;
-            CreateObjListDirective(5, &New.Pointer);
+            CreateObjListDirective(OBJLIST_GOTO_VEC, &New.Pointer);
             FObjListGotoVec* Goto = static_cast<FObjListGotoVec*>(New.Pointer);
             Goto->SetDestination(&Target, 250.0f, -1.0f, 0, false, false);
-            Goto->Op.Field_5A = 0;
-            Goto->Op.Field_5B = 1;
-            Goto->Op.Field_58 = 1;
+            Goto->Op.bGotoCruise = 0;
+            Goto->Op.bGotoNoCruise = 1;
+            Goto->Op.bFlyThrough = 1;
             Goto->Op.Priority = 1;
             AssignDirective(&Directive.Pointer, New);
         }

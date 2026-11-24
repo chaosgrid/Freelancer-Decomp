@@ -40,8 +40,8 @@ namespace
     // Default and Current (FUN_0042d030 / FUN_0042d090).
     void ReleasePropertyRecord(FShadingPropertyRecord& Record)
     {
-        Record.Saved.ReleaseOwnedPayload();
-        Record.Default.ReleaseOwnedPayload();
+        Record.Maximum.ReleaseOwnedPayload();
+        Record.Minimum.ReleaseOwnedPayload();
         Record.Current.ReleaseOwnedPayload();
     }
 

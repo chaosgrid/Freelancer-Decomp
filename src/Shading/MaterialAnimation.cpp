@@ -319,10 +319,10 @@ unsigned char DACOM_API FImaInstance::FillUvMatrix(float* Out)
     }
     const FMaDelta& Delta = Block->Deltas[Frame];
     // Retail rounds B and D to float before use; C and the A product stay double.
-    const float ValueB = (float)((double)Delta.Field8 * Time + KeyB);
-    const double ValueC = (double)Delta.FieldC * Time + KeyC;
-    const float ValueD = (float)((double)Delta.Field10 * Time + KeyD);
-    const double ValueAProduct = (double)Delta.Field4 * Time;
+    const float ValueB = (float)((double)Delta.RateB * Time + KeyB);
+    const double ValueC = (double)Delta.RateC * Time + KeyC;
+    const float ValueD = (float)((double)Delta.RateD * Time + KeyD);
+    const double ValueAProduct = (double)Delta.RateA * Time;
     Out[6] = ValueB;
     Out[2] = (float)(ValueAProduct + KeyA);
     Out[0] = (float)(ValueC + 1.0); // DAT_06ed2bd8 = double 1

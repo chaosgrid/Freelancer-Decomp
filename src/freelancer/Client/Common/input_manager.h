@@ -43,8 +43,8 @@
 // exactly what FUN_00577680 copies into the key-map record DAT_0067c278.
 struct FMouseEvent
 {
-    FHudCmdRecord Record;       // +0x00  Key +0x04 (-1 - button, -9 wheel), Byte18 down,
-                                //        Byte19 repeat (always 0), Byte1A double click
+    FHudCmdRecord Record;       // +0x00  Key +0x04 (-1 - button, -9 wheel), bKeyDown down,
+                                //        bRepeat repeat (always 0), bDoubleClick double click
     unsigned char bMove;        // +0x1c  a cursor-move event (FUN_0041f850)
     unsigned char Pad1d[3];
     unsigned ButtonIndex;       // +0x20  0..7 buttons, 8 wheel

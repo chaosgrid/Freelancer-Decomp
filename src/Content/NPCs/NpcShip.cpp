@@ -117,7 +117,7 @@ FContentNpcShipParams::FContentNpcShipParams()
 // Inlined in TU58 FUN_06f732e0; members copied in declaration order.
 FContentNpcShipParams::FContentNpcShipParams(FContentNpcShipParams const& Other)
     : FContentShipParams(Other)
-    , Field_0x78(Other.Field_0x78)
+    , bExcludeFromShipCount(Other.bExcludeFromShipCount)
     , Loadout(Other.Loadout)
     , Cargo(Other.Cargo)
     , Orientation(Other.Orientation)
@@ -223,7 +223,7 @@ FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
     , Field_0x1c0(Params->Field_0x10c)
     , Loadout(Params->Loadout)
     , LifeTime(Params->InitialLifeTime)
-    , Field_0x5a8(Params->Field_0x78)
+    , bExcludeFromShipCount(Params->bExcludeFromShipCount)
 {
     PilotId.clear();
     EncounterParamsId.clear();
@@ -426,11 +426,11 @@ int FContentNpcShip::GetScanForCargo(unsigned int* Out, int MaxCount)
 }
 
 // FUN_06f33f90; the base handling is FUN_06f57820.
-void FContentNpcShip::OnDirectiveComplete(int ResultWord11c, int ResultWord118)
+void FContentNpcShip::OnDirectiveComplete(int CompletedBehavior, int DirectiveResult)
 {
-    FContentShipBase::OnDirectiveComplete(ResultWord11c, ResultWord118);
+    FContentShipBase::OnDirectiveComplete(CompletedBehavior, DirectiveResult);
     if (HasNoDirectives() && Guide != nullptr)
-        Guide->OnDirectivesDone(ResultWord11c, ResultWord118);
+        Guide->OnDirectivesDone(CompletedBehavior, DirectiveResult);
 }
 
 // LAB_06f34250. Unlike lead_object_event, the early returns skip the controller message too.
@@ -615,7 +615,7 @@ bool FContentNpcShip::request_flee_destination(uint ObjectId, FleeReason Reason,
                 // Ref-holding local (EH state 0 of FuncInfo LAB_06faebf8); FUN_06f24870(5)
                 // makes a GotoVec, set with FUN_06f26460 (no null check; -1.0f DAT_06fb9570).
                 TRefHandle<FObjListDirective> Directive;
-                CreateObjListDirective(5, &Directive.Pointer);
+                CreateObjListDirective(OBJLIST_GOTO_VEC, &Directive.Pointer);
                 static_cast<FObjListGotoVec*>(Directive.Pointer)
                     ->SetDestination(&Destination, OutFloat, -1.0f, 0, false, false);
                 if (ActiveDirective != Directive.Pointer)
@@ -759,7 +759,7 @@ bool FContentNpcShip::IsCommMuted() const
 
 // FUN_06f34100. Retail reads the first directive's dword at a raw offset chosen by type
 // code, with no cast: GetType 5 is reported by GotoVec and also by the Guide / GuideShip
-// directives (shared vtable entry 06ee99a0), whose +0x17c is GotoParams.Field_64 (float
+// directives (shared vtable entry 06ee99a0), whose +0x17c is GotoParams.TetherFarRange (float
 // bits); no directive reports 8 or 9. The offsets are pinned in MissionObjList.h.
 void FContentNpcShip::OnCommLineDone()
 {

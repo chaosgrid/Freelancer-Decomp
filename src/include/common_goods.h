@@ -425,8 +425,11 @@ struct MissionVendorOfferDescription
     // +0x00. init() copies it to MissionVendorProperties+0x04, which Server.dll's BaseDB::create_mission_vendor
     // (FUN_06d14dc0, .text:06d14dcb `MOV EAX,[EDI+0x4]`) looks up in the BASE map.
     unsigned BaseId;
-    unsigned TargetId;
-    unsigned SystemId;
+    // +0x04 / +0x08: the offer id and kind (2 = vendor offer) the client sends back in
+    // IServer::MissionResponse (nn_mission_vendor) and Content reads as
+    // FMissionOfferAcceptMsg {OfferId, Kind} (BaseSupport msg 0x2c).
+    unsigned OfferId;
+    unsigned OfferKind;
     unsigned MissionClass;
     FmtStr Title;
     FmtStr Description;
@@ -443,14 +446,15 @@ struct NewsBroadcastDescription
     // +0x00. init() copies it to NewsBroadcastProperties+0x04, the key BaseDB::create_news_broadcast
     // (FUN_06d15140, .text:06d1514b) looks up in the BASE map.
     unsigned BaseId;
-    bool bFlag1;
-    bool bFlag2;
-    unsigned Category;
-    FmtStr Headline;
-    FmtStr Text;
-    FmtStr Audio;
-    char const* LogoTexture;
-    char const* AudioName;
+    // The rest from news.ini [NewsItem] keys (content FUN_06eb40c0).
+    bool bBreaking;          // +0x04 "breaking"
+    bool bAutoselect;        // +0x05 "autoselect"
+    unsigned Icon;           // +0x08 "icon": critical 1, world 2, mission 3, system 4, faction 5, universe 6
+    FmtStr CategoryName;     // +0x0C "category"
+    FmtStr Headline;         // +0x24 "headline"
+    FmtStr Text;             // +0x3C "text"
+    char const* LogoTexture; // +0x54 "logo"
+    char const* AudioName;   // +0x58 "audio"
     // +0x5c. pub::GF::NewsBroadcastCreate's session filter (.text:06d1846a
     // `MOV EAX,[ESI+0x5c]`); init() does not touch it.
     unsigned Filter;
@@ -498,8 +502,8 @@ public:
     // and keys the offer by BaseId; retail has no setter or getter for either.
     int Key;                    // +0x00  default -1
     unsigned BaseId;            // +0x04
-    unsigned TargetId;          // +0x08
-    unsigned SystemId;          // +0x0C
+    unsigned OfferId;           // +0x08
+    unsigned OfferKind;         // +0x0C
     unsigned MissionClass;      // +0x10  1=destroy,2=destroyinstall,3=assassinate,...
     FmtStr Title;               // +0x14  sizeof 0x18 (6 DWORDs)
     FmtStr Description;         // +0x2C
@@ -564,14 +568,14 @@ public:
     // broadcast by BaseId.
     int Key;                    // +0x00  default -1
     unsigned BaseId;            // +0x04
-    bool bFlag1;                // +0x08  from NewsBroadcastDescription::bFlag1
-    bool bFlag2;                // +0x09  from NewsBroadcastDescription::bFlag2 (+2 bytes padding follows)
-    unsigned Category;          // +0x0C  from NewsBroadcastDescription::Category
-    FmtStr Headline;            // +0x10
-    FmtStr Body;                // +0x28
-    FmtStr Logo;                // +0x40
+    bool bBreaking;             // +0x08  from NewsBroadcastDescription::bBreaking
+    bool bAutoselect;           // +0x09  from NewsBroadcastDescription::bAutoselect (+2 bytes padding follows)
+    unsigned Icon;              // +0x0C  from NewsBroadcastDescription::Icon
+    FmtStr CategoryName;        // +0x10
+    FmtStr Headline;            // +0x28  the list entry and the story title (freelancer nn_news)
+    FmtStr Text;                // +0x40  the story text
     char* LogoTexture;          // +0x58  heap-owned (malloc_strcpy/malloc_strfree); nullptr => fall back to "genericnews"
-    unsigned LogoTextureId;     // +0x5C  CreateID() of NewsBroadcastDescription::AudioName
+    unsigned AudioId;           // +0x5C  CreateID() of NewsBroadcastDescription::AudioName
 };
 
 static_assert(sizeof(NewsBroadcastProperties) == 0x60, "NewsBroadcastProperties sizeof 0x60");
@@ -1452,7 +1456,7 @@ public:
     // Resolves HardpointNames[]/SetpointNames[] (hardpoints of the room's compound instance,
     // then room setpoints) into LightFrames[0..NumLights), then appends to FinalFrames:
     // Mode 1 copies LightFrames verbatim (add_light_csys inlined), Mode 2 interpolates
-    // NumLightsAlt steps between LightFrames[0] and LightFrames[1]. Called by
+    // NumLineLights steps between LightFrames[0] and LightFrames[1]. Called by
     // RoomData::fixup_FlashLight_list (0x06277000) and RoomData::fixup (0x06277ce5). The
     // Instance argument is not read.
     void fixup(long Instance, HardpointSummary const* HpSum, RoomData const* Room);
@@ -1464,18 +1468,19 @@ private:
 
 public:
 
-    // clear() (0x06273c30): 7 float params + a mode, defaulting to 1.0f, 1.0f, 1.0f, 2.0f,
-    // 0.1f, 0.2f, 1.0f, 0. The floats' meaning is not established (possibly colour/range/
-    // cone/intensity); only Mode is read by fixup().
-    float Param0;   // +0x00  0x3f800000 = 1.0f
-    float Param1;   // +0x04  0x3f800000 = 1.0f
-    float Param2;   // +0x08  0x3f800000 = 1.0f
-    float Param3;   // +0x0C  0x40000000 = 2.0f
-    float Param4;   // +0x10  0x3dcccccd = 0.1f
-    float Param5;   // +0x14  0x3e4ccccd = 0.2f
-    float Param6;   // +0x18  0x3f800000 = 1.0f
+    // clear() (0x06273c30): 7 floats + a mode, defaulting to 1.0f, 1.0f, 1.0f, 2.0f, 0.1f,
+    // 0.2f, 1.0f, 0. The floats are the [FlashlightSet] / [FlashlightLine] keys color (or
+    // icolor / 255), scale, gap, blink, endpause (read_FlashLightSet_block 0x06276c00); only
+    // Mode is read by fixup(), the rest by the client's room flashlights (freelancer 0044a3a0).
+    float ColorR;   // +0x00  0x3f800000 = 1.0f
+    float ColorG;   // +0x04  0x3f800000 = 1.0f
+    float ColorB;   // +0x08  0x3f800000 = 1.0f
+    float Scale;    // +0x0C  0x40000000 = 2.0f
+    float Gap;      // +0x10  0x3dcccccd = 0.1f
+    float Blink;    // +0x14  0x3e4ccccd = 0.2f
+    float EndPause; // +0x18  0x3f800000 = 1.0f
     long  Mode;     // +0x1C  0 -- fixup() branches on this: 1 = copy LightFrames verbatim,
-                    // 2 = interpolate LightFrames[0]/[1] over NumLightsAlt steps
+                    // 2 = interpolate LightFrames[0]/[1] over NumLineLights steps
 
     // +0x020/+0x120: 64 parallel malloc'd string slots. HardpointNames[i]/SetpointNames[i]
     // form a pair per light slot (fixup() resolves HardpointNames[i] against a
@@ -1490,7 +1495,7 @@ public:
     Csys LightFrames[64];            // +0x220
 
     long NumLights;      // +0xE20 -- count of valid HardpointNames/LightFrames slots
-    long NumLightsAlt;   // +0xE24 -- second count, only consulted by fixup() when Mode == 2
+    long NumLineLights;  // +0xE24 -- "numlights" ([FlashlightLine] only); fixup() reads it when Mode == 2
     long Cursor;         // +0xE28 -- write index into FinalFrames; reset to 0 by unfixup()
 
     // +0xE2C: second bank of 64 Csys, also default-identity. add_light_csys() appends to

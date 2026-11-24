@@ -1241,7 +1241,7 @@ static void RpcIdBlockWireCopy(FRpcIdArrayBlockWire** Out, const FRpcIdArrayBloc
     Block->Count = Source->Count;
     if ((unsigned int)Block->Count != 0) {
         Block->Ids = static_cast<unsigned int*>(
-            ::operator new((unsigned int)Block->Count << 2));
+            ::operator new((unsigned int)Block->Count << 2, std::nothrow));
         for (unsigned int i = 0; i < (unsigned int)Block->Count; ++i) {
             Block->Ids[i] = Source->Ids[i];
         }
@@ -2351,9 +2351,9 @@ bool RpcGetSizedBlock(FRpcMarshalStream& Stream, unsigned int& OutSize,
 // The CREATESHIP tail's one flag byte (built at 06d97d82, taken apart at 06d982d0). Bit 0x04
 // is a presence switch as well as a value bit: it decides between the wide display name and
 // the two flattened FmtStrs.
-static const unsigned char kCreateShipFlagField_0x7c = 0x01;  // bUsingTradelane
-static const unsigned char kCreateShipFlagField_0xc8 = 0x02;  // bMarkedBy
-static const unsigned char kCreateShipFlagField_0x9c = 0x04;  // OwnerPlayer != 0
+static const unsigned char kCreateShipFlagUsingTradelane = 0x01;  // payload +0x7c
+static const unsigned char kCreateShipFlagMarkedBy = 0x02;        // payload +0xc8
+static const unsigned char kCreateShipFlagOwnerPlayer = 0x04;     // payload +0x9c != 0
 
 // 0x06d97d20 -- CREATESHIP, packet vtable +0x04.
 unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** BufferHolder,
@@ -2370,13 +2370,13 @@ unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** Buff
 
     unsigned char Flags = 0;
     if (Wire->bUsingTradelane != 0) {                                         // byte test
-        Flags |= kCreateShipFlagField_0x7c;
+        Flags |= kCreateShipFlagUsingTradelane;
     }
     if (Wire->OwnerPlayer != 0) {                                         // DWORD test
-        Flags |= kCreateShipFlagField_0x9c;
+        Flags |= kCreateShipFlagOwnerPlayer;
     }
     if (Wire->bMarkedBy != 0) {                                         // byte test
-        Flags |= kCreateShipFlagField_0xc8;
+        Flags |= kCreateShipFlagMarkedBy;
     }
     if (!Stream.PutByte(Flags)) {
         return Stream.GetError();
@@ -2400,7 +2400,7 @@ unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** Buff
         return Stream.GetError();
     }
 
-    if ((Flags & kCreateShipFlagField_0x9c) != 0) {
+    if ((Flags & kCreateShipFlagOwnerPlayer) != 0) {
         // Only the LOW BYTE of the dword travels; the decoder zero-extends it back.
         if (!Stream.PutByte((unsigned char)(Wire->OwnerPlayer & 0xffu))) {
             return Stream.GetError();
@@ -2463,10 +2463,10 @@ unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char*
     }
     // Both bits store the literal 1, and a clear bit leaves the field alone rather than
     // zeroing it (the packet arrives zeroed).
-    if ((Flags & kCreateShipFlagField_0x7c) != 0) {
+    if ((Flags & kCreateShipFlagUsingTradelane) != 0) {
         Wire->bUsingTradelane = 1;
     }
-    if ((Flags & kCreateShipFlagField_0xc8) != 0) {
+    if ((Flags & kCreateShipFlagMarkedBy) != 0) {
         Wire->bMarkedBy = 1;
     }
 
@@ -2486,7 +2486,7 @@ unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char*
         return Stream.GetError();
     }
 
-    if ((Flags & kCreateShipFlagField_0x9c) != 0) {
+    if ((Flags & kCreateShipFlagOwnerPlayer) != 0) {
         unsigned char Narrow = 0;
         if (!Stream.GetByte(Narrow)) {
             return Stream.GetError();
@@ -3094,14 +3094,15 @@ unsigned int RpcDecodeClientDbgCreateShip(FPacketBase& Packet, const unsigned ch
 // common_net.h; restated so the codec's import is visible here (identical signature).
 COMMON_API bool __cdecl IsMPServer();
 
-static const unsigned int kPlayerTradeSubAccept = 0x01;
-static const unsigned int kPlayerTradeSubCash = 0x02;
-static const unsigned int kPlayerTradeSubOffer = 0x04;
-static const unsigned int kPlayerTradeSubAddEquip = 0x08;
-static const unsigned int kPlayerTradeSubRemoveEquip = 0x10;
-static const unsigned int kPlayerTradeSubClear = 0x20;
-static const unsigned int kPlayerTradeSubFlag = 0x40;
-static const unsigned int kPlayerTradeSubEnd = 0x80;
+// Sub-types, named after the IClient::SendCommonPlayerTrade* sender that sets each one.
+static const unsigned int kPlayerTradeInitiateTrade = 0x01;
+static const unsigned int kPlayerTradeTerminateTrade = 0x02;
+static const unsigned int kPlayerTradeSetTradeMoney = 0x04;
+static const unsigned int kPlayerTradeAddTradeEquip = 0x08;
+static const unsigned int kPlayerTradeDelTradeEquip = 0x10;
+static const unsigned int kPlayerTradeRequestTrade = 0x20;
+static const unsigned int kPlayerTradeAcceptTrade = 0x40;
+static const unsigned int kPlayerTradeStopTradeRequest = 0x80;
 
 // LAB_06da7030 -- PLAYER_TRADE, packet vtable +0x04.
 unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** BufferHolder,
@@ -3121,24 +3122,24 @@ unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** Buf
     bool bNeedTrailer = true;
 
     switch (Wire->SubType) {
-    case kPlayerTradeSubFlag:                        // 0x40
+    case kPlayerTradeAcceptTrade:                        // 0x40
         if (!Stream.PutByte(Wire->bAccepted)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
-    case kPlayerTradeSubCash:                        // 0x02
+    case kPlayerTradeTerminateTrade:                        // 0x02
         // The LOW BYTE of payload+0x04, and nothing more.
         if (!Stream.PutByte((unsigned char)(Wire->Reason & 0xffu))) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         bNeedTrailer = false;
         break;
-    case kPlayerTradeSubOffer:                       // 0x04
+    case kPlayerTradeSetTradeMoney:                       // 0x04
         if (!Stream.PutDword(Wire->Money)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
-    case kPlayerTradeSubAddEquip:                    // 0x08
+    case kPlayerTradeAddTradeEquip:                    // 0x08
         if (!Stream.PutDword(Wire->EquipArchId) ||
             !Stream.PutDword(Wire->EquipCount) ||
             !Stream.PutFloat(Wire->EquipStatus) ||
@@ -3146,7 +3147,7 @@ unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** Buf
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
-    case kPlayerTradeSubRemoveEquip:                 // 0x10
+    case kPlayerTradeDelTradeEquip:                 // 0x10
         // No status float on this branch.
         if (!Stream.PutDword(Wire->EquipArchId) ||
             !Stream.PutDword(Wire->EquipCount) ||
@@ -3154,9 +3155,9 @@ unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** Buf
             return FRpcMarshalStream::kEncodeOverflow;
         }
         break;
-    case kPlayerTradeSubAccept:                      // 0x01 / 0x80
-    case kPlayerTradeSubEnd:
-    case kPlayerTradeSubClear:                       // 0x20
+    case kPlayerTradeInitiateTrade:                      // 0x01 / 0x80
+    case kPlayerTradeStopTradeRequest:
+    case kPlayerTradeRequestTrade:                       // 0x20
         // These three reserve the trailer unconditionally, with no IsMPServer test.
         Stream.Reserve(4u, FRpcMarshalStream::kEncodeOverflow);
         if (Stream.Failed()) {
@@ -3211,7 +3212,7 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
     bool bNeedTrailer = true;
 
     switch (Wire->SubType) {
-    case kPlayerTradeSubCash: {                      // 0x02
+    case kPlayerTradeTerminateTrade: {                      // 0x02
         unsigned char Value = 0;
         if (!Stream.GetByte(Value)) {
             return FRpcMarshalStream::kDecodeOverrun;
@@ -3221,7 +3222,7 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
         bNeedTrailer = false;
         break;
     }
-    case kPlayerTradeSubFlag: {                      // 0x40
+    case kPlayerTradeAcceptTrade: {                      // 0x40
         unsigned char Value = 0;
         if (!Stream.GetByte(Value)) {
             return FRpcMarshalStream::kDecodeOverrun;
@@ -3243,12 +3244,12 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
         bNeedTrailer = false;
         break;
     }
-    case kPlayerTradeSubOffer:                       // 0x04
+    case kPlayerTradeSetTradeMoney:                       // 0x04
         if (!Stream.GetDword(Wire->Money)) {
             return FRpcMarshalStream::kDecodeOverrun;
         }
         break;
-    case kPlayerTradeSubAddEquip: {                  // 0x08
+    case kPlayerTradeAddTradeEquip: {                  // 0x08
         unsigned int Status = 0;
         if (!Stream.GetDword(Wire->EquipArchId) ||
             !Stream.GetDword(Wire->EquipCount) ||
@@ -3260,16 +3261,16 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
         memcpy(&Wire->EquipStatus, &Status, sizeof(float));
         break;
     }
-    case kPlayerTradeSubRemoveEquip:                 // 0x10
+    case kPlayerTradeDelTradeEquip:                 // 0x10
         if (!Stream.GetDword(Wire->EquipArchId) ||
             !Stream.GetDword(Wire->EquipCount) ||
             !Stream.GetWord(Wire->EquipId)) {
             return FRpcMarshalStream::kDecodeOverrun;
         }
         break;
-    case kPlayerTradeSubAccept:                      // 0x01 / 0x20
-    case kPlayerTradeSubClear:
-    case kPlayerTradeSubEnd:                         // 0x80
+    case kPlayerTradeInitiateTrade:                      // 0x01 / 0x20
+    case kPlayerTradeRequestTrade:
+    case kPlayerTradeStopTradeRequest:                         // 0x80
         Stream.Reserve(4u, FRpcMarshalStream::kDecodeOverrun);
         if (Stream.Failed()) {
             return Stream.GetError();

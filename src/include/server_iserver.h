@@ -70,10 +70,10 @@ struct IServer {
     // Slot 6 (+0x018) — RET 8
     virtual void GoTradelane(unsigned int PlayerId, const XGoTradelane& Info) = 0;
 
-    // Slot 7 (+0x01c) — RET 16. rpclocal 0x06d8e770 serializes Arg1/Arg2/Arg3 only,
-    // so SessionId is the FIRST argument here.
-    // TODO: Arg1..Arg3 semantics unproven (tradelane ring pair plus a third dword).
-    virtual void StopTradelane(unsigned int SessionId, unsigned int Arg1, unsigned int Arg2, unsigned int Arg3) = 0;
+    // Slot 7 (+0x01c) — RET 16. rpclocal 0x06d8e770 serializes the last three only, so
+    // SessionId is the FIRST argument here. The client sends {its ship, entrance ring, exit
+    // ring}; Server.dll hands them to StarSystem::notify_stop_tradelane in that order.
+    virtual void StopTradelane(unsigned int SessionId, unsigned int ShipId, unsigned int TradelaneRing1, unsigned int TradelaneRing2) = 0;
 
     // Slot 8 (+0x020) — RET 8
     virtual void JettisonCargo(unsigned int PlayerId, const XJettisonCargo& Info) = 0;
@@ -112,7 +112,7 @@ struct IServer {
     virtual void Login(const SLoginInfo& Info, unsigned int SessionId) = 0;
 
     // Slot 19 (+0x04c) — RET 8
-    virtual void CharacterInfoReq(unsigned int SessionId, bool bFullInfo) = 0;
+    virtual void CharacterInfoReq(unsigned int SessionId, bool bSendEmpty) = 0;
 
     // Slot 20 (+0x050) — RET 8
     virtual void CharacterSelect(const CHARACTER_ID& CharId, unsigned int SessionId) = 0;
@@ -184,8 +184,8 @@ struct IServer {
     virtual void GFGoodVaporized(const SGFGoodVaporizedInfo& Info, unsigned int SessionId) = 0;
 
     // Slot 43 (+0x0ac) — RET 16
-    // TODO: Arg0 semantics unproven; Arg1 is the mission id, Arg2 the accept flag.
-    virtual void MissionResponse(unsigned int Arg0, unsigned long MissionId, unsigned char bAccepted, unsigned int SessionId) = 0;
+    // The answer to a mission offer: OfferKind (EMissionOfferKind) says what OfferId identifies.
+    virtual void MissionResponse(unsigned int OfferId, unsigned long OfferKind, unsigned char bAccepted, unsigned int SessionId) = 0;
 
     // Slot 44 (+0x0b0) — RET 12. PBE => `unsigned char const *`.
     virtual void TradeResponse(const unsigned char* Data, int Size, unsigned int SessionId) = 0;
@@ -196,7 +196,7 @@ struct IServer {
     // Slot 46 (+0x0b8) — RET 8
     virtual void GFGoodSell(const SGFGoodSellInfo& Info, unsigned int SessionId) = 0;
 
-    // Slot 47 (+0x0bc) — RET 8. Arg0 is the player's SHIP, not the gate: Server.dll
+    // Slot 47 (+0x0bc) — RET 8. ShipObjectId is the player's SHIP, not the gate: Server.dll
     // .text:06cef67e looks it up and .text:06cef6b2 requires its CSimple+0xb4 owner to be
     // SessionId; the gate is the ship's +0x90 (.text:06cef6be).
     virtual void SystemSwitchOutComplete(unsigned int ShipObjectId, unsigned int SessionId) = 0;
@@ -205,14 +205,13 @@ struct IServer {
     virtual void PlayerLaunch(unsigned int ShipId, unsigned int SessionId) = 0;
 
     // Slot 49 (+0x0c4) — RET 8. BOTH arguments are serialized (ch3 op 0x3e), so
-    // neither is the implicit session id: Server.dll resolves the object from Arg1
-    // and passes Arg0 to that object's sub-object slot +0x70.
-    // TODO: Arg0 semantics unproven.
-    virtual void LaunchComplete(unsigned int Arg0, unsigned int ObjectId) = 0;
+    // neither is the implicit session id: Server.dll resolves the object from ObjectId
+    // and passes BaseObjId to its IObjAffect::launch_complete (+0x70).
+    virtual void LaunchComplete(unsigned int BaseObjId, unsigned int ObjectId) = 0;
 
-    // Slot 50 (+0x0c8) — RET 8. Same shape as LaunchComplete (ch3 op 0x43, sub-object +0x74).
-    // TODO: Arg0 semantics unproven.
-    virtual void JumpInComplete(unsigned int Arg0, unsigned int ObjectId) = 0;
+    // Slot 50 (+0x0c8) — RET 8. Same shape as LaunchComplete (ch3 op 0x43): SystemId goes to
+    // IObjAffect::jump_in_complete (+0x74).
+    virtual void JumpInComplete(unsigned int SystemId, unsigned int ObjectId) = 0;
 
     // Slot 51 (+0x0cc) — RET 12. All three arguments are serialized (ch3 op 0x3f);
     // Server.dll resolves the object from Arg0.
@@ -244,11 +243,13 @@ struct IServer {
     // session id is the FIRST argument.
     virtual void MissionSaveB(unsigned int SessionId, unsigned long MissionId) = 0;
 
-    // Slot 60 (+0x0f0) — RET 24
-    virtual void RequestEvent(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned int Arg3, unsigned long Arg4, unsigned int SessionId) = 0;
+    // Slot 60 (+0x0f0) — RET 24. Server.dll resolves ObjectId and calls its
+    // IObjAffect::request_event(EventType, &TargetId, &SecondId, bFlag, nullptr).
+    virtual void RequestEvent(int EventType, unsigned int ObjectId, unsigned int TargetId, unsigned int SecondId, unsigned long bFlag, unsigned int SessionId) = 0;
 
-    // Slot 61 (+0x0f4) — RET 20
-    virtual void RequestCancel(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned long Arg3, unsigned int SessionId) = 0;
+    // Slot 61 (+0x0f4) — RET 20. IObjAffect::request_cancel(EventType, &TargetId, Arg3) on
+    // ObjectId.
+    virtual void RequestCancel(int EventType, unsigned int ObjectId, unsigned int TargetId, unsigned long Arg3, unsigned int SessionId) = 0;
 
     // Slot 62 (+0x0f8) — RET 24
     virtual void MineAsteroid(unsigned int SystemId, const Vector& Position, unsigned int LootId, unsigned int SecondaryLoot, unsigned int Quantity, unsigned int SessionId) = 0;
@@ -286,12 +287,12 @@ struct IServer {
     // Slot 73 (+0x124) — RET 12
     virtual void RequestPlayerStats(unsigned int SessionId, unsigned char* Data, int Size) = 0;
 
-    // Slot 74 (+0x128) — RET 8. rpclocal serializes Arg1 only => session is first.
-    // Arg1 = the button the player answered a mission pop-up with: 1 yes, 2 no, 4 later,
+    // Slot 74 (+0x128) — RET 8. rpclocal serializes Buttons only => session is first.
+    // Buttons = the button the player answered a mission pop-up with: 1 yes, 2 no, 4 later,
     // 8 close/ok (freelancer.exe NeuroNetMissionMessage 0x0048affc / 0x0048b043 / 0x0048b08c /
     // 0x0048b0f0, and 4 when another panel takes the pop-up down, 0x0048ae2c) -- the same bits
     // Content's Cnd_PopUpDialog tests (YES 1 / NO 2 / LATER 4 / CLOSE 8).
-    virtual void PopUpDialog(unsigned int SessionId, unsigned int Arg1) = 0;
+    virtual void PopUpDialog(unsigned int SessionId, unsigned int Buttons) = 0;
 
     // Slot 75 (+0x12c) — RET 12
     virtual void RequestGroupPositions(unsigned int SessionId, unsigned char* Data, int Size) = 0;

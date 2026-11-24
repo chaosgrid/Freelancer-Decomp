@@ -45,7 +45,7 @@ PotionHelper::PotionHelper()
 // LAB_062e6400
 void HullHelper::SetType()
 {
-    Type = 0x1a;    // Archetype::AClassRepairKit
+    Type = Archetype::AClassRepairKit;
 }
 
 // FUN_062e6410. get_status's return code is ignored; 1.0f comes back when it writes nothing.
@@ -59,7 +59,7 @@ float HullHelper::GetRatio(IObjRW const* Object)
 // LAB_062e6430
 void ShieldHelper::SetType()
 {
-    Type = 0x1b;    // Archetype::AClassShieldBattery
+    Type = Archetype::AClassShieldBattery;
 }
 
 // LAB_062e6440. get_shield_status is IObjInspect slot 18; its return code is ignored.
@@ -121,18 +121,19 @@ RepairManager::RepairManager()
 {
 }
 
-// FUN_062ecf60. Cargo enumerator callback: tallies repair kits (0x1a) and shield batteries
-// (0x1b); never stops the walk. Arch is the cargo's archetype (enumerate_cargo pushes CEquip+0xc).
+// FUN_062ecf60. Cargo enumerator callback: tallies repair kits and shield batteries; never stops
+// the walk. Arch is the cargo's archetype (enumerate_cargo pushes CEquip+0xc).
 bool RepairManager::enumerate(unsigned short const& Id, Archetype::Equipment const* Arch, int InCount)
 {
     int const ClassType = static_cast<int>(Arch->get_class_type());
-    if (ClassType == 0x1a)
+    if (ClassType == Archetype::AClassRepairKit)
     {
         Hull.EquipId = Id;
         Hull.Count = Hull.Count + InCount;
         return true;
     }
-    if (ClassType == 0x1b)
+    if (ClassType == Archetype::AClassShieldBattery)
+
     {
         Shield.EquipId = Id;
         Shield.Count = Shield.Count + InCount;
@@ -144,7 +145,7 @@ bool RepairManager::enumerate(unsigned short const& Id, Archetype::Equipment con
 // FUN_062ecfb0. Copies the repair timings from the personality of the formation leader (when
 // bLeaderMakesMeTougher applies) or else of the owner. Structural twin of
 // RefreshWeaponFireControlConfig (FUN_062eb6c0, common_aifirecontrol.cpp), including the
-// Owner->Unknown14 = 1 latch. Retail does not test ExternalIface or the get_sys() result.
+// Owner->bLeaderParamsBorrowed = 1 latch. Retail does not test ExternalIface or the get_sys() result.
 // Ghidra names the get_sys() call CPlayerTradeOffer::GetTargetPlayerID (an ICF fold).
 // Returns true on every path.
 // ============================================================================
@@ -158,10 +159,10 @@ bool RefreshRepairManagerFromPersonality(RepairManager* Self)
 
     if (!Owner->SelfTarget.Iface->is_player()
         && Owner->PersonalityData.FormationParams.bLeaderMakesMeTougher != 0
-        && Owner->GunConvergenceStateBytes.bLeaderSuppressed == 0)
+        && Owner->FormationLeaders.bLeaderSuppressed == 0)
     {
         // +0x1370 watcher; the node is tested against null and the literal 8 (node - 8).
-        Watchable const* const Node = Owner->GunConvergenceStateBytes.FormationLeaderWatcher.target();
+        Watchable const* const Node = Owner->FormationLeaders.FormationLeaderWatcher.target();
         if (Node != nullptr && Node != (Watchable const*)8)
         {
             IObjRW* const Handle = ObjRwFromWatchable(const_cast<Watchable*>(Node));
@@ -174,7 +175,7 @@ bool RefreshRepairManagerFromPersonality(RepairManager* Self)
                 if (Iface != nullptr)
                 {
                     Source = Iface->get_sys();
-                    Owner->Unknown14 = 1;   // on the owner, not on Source
+                    Owner->bLeaderParamsBorrowed = 1;   // on the owner, not on Source
                 }
             }
         }

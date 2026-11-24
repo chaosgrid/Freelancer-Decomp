@@ -465,7 +465,7 @@ void __cdecl Update(float Dt)
     {
         CObject* const Obj = *It;
         int const Mode = GetTransformMode(Obj);  // CObject+0x74
-        if (Mode == 1)
+        if (Mode == PhySys::ANIM_TECHNIQUE_GOLEM)
         {
             // Mode 1: tell the golem controller (+0x60) "be here, at rest" with the live
             // position, IVP-ordered orientation and one PhySys time; the controller's own tick
@@ -491,7 +491,7 @@ void __cdecl Update(float Dt)
             }
             continue;
         }
-        if (Mode != 2)
+        if (Mode != PhySys::ANIM_TECHNIQUE_MERGED)
             continue;
 
         Vector const Pos = Obj->WorldPosition;  // +0x2c..+0x34

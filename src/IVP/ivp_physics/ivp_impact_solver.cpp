@@ -157,10 +157,10 @@ void IVP_Impact_Solver::PushContactPoint(const Vector* PushVector, int32_t bNorm
         IVP_U_Point ImpulseOS;
         MWorldFCore[0]->vimult(AsPoint(&Impulse), &ImpulseOS);
         Cores[0]->calc_impulse_deltas(ContactCoordsOS[0], AsVector(&ImpulseOS), &Impulse,
-                                      &SpeedDelta0, &AngularDelta0Scratch);
-        RotSpeed0.x = AngularDelta0Scratch.x + RotSpeed0.x;
-        RotSpeed0.y = AngularDelta0Scratch.y + RotSpeed0.y;
-        RotSpeed0.z = AngularDelta0Scratch.z + RotSpeed0.z;
+                                      &SpeedDelta0, &RotSpeedDelta0);
+        RotSpeed0.x = RotSpeedDelta0.x + RotSpeed0.x;
+        RotSpeed0.y = RotSpeedDelta0.y + RotSpeed0.y;
+        RotSpeed0.z = RotSpeedDelta0.z + RotSpeed0.z;
         Speed0.x = SpeedDelta0.x + Speed0.x;
         Speed0.y = SpeedDelta0.y + Speed0.y;
         Speed0.z = SpeedDelta0.z + Speed0.z;
@@ -174,29 +174,27 @@ void IVP_Impact_Solver::PushContactPoint(const Vector* PushVector, int32_t bNorm
         Impulse.z = Push0.z * Magnitude;
         IVP_U_Point ImpulseOS;
         MWorldFCore[1]->vimult(AsPoint(&Impulse), &ImpulseOS);
-        // RotDelta1 (+0x94) receives the linear and RotDelta0 (+0x74) the
-        // angular delta here.
         Cores[1]->calc_impulse_deltas(ContactCoordsOS[1], AsVector(&ImpulseOS), &Impulse,
-                                      &RotDelta1, &RotDelta0);
-        RotSpeed1.x = RotDelta0.x + RotSpeed1.x;
-        RotSpeed1.y = RotDelta0.y + RotSpeed1.y;
-        RotSpeed1.z = RotDelta0.z + RotSpeed1.z;
-        Speed1.x = RotDelta1.x + Speed1.x;
-        Speed1.y = RotDelta1.y + Speed1.y;
-        Speed1.z = RotDelta1.z + Speed1.z;
+                                      &SpeedDelta1, &RotSpeedDelta1);
+        RotSpeed1.x = RotSpeedDelta1.x + RotSpeed1.x;
+        RotSpeed1.y = RotSpeedDelta1.y + RotSpeed1.y;
+        RotSpeed1.z = RotSpeedDelta1.z + RotSpeed1.z;
+        Speed1.x = SpeedDelta1.x + Speed1.x;
+        Speed1.y = SpeedDelta1.y + Speed1.y;
+        Speed1.z = SpeedDelta1.z + Speed1.z;
     }
 }
 
-// FUN_06356f30: SpeedDelta1 = point speed of core 1 - point speed of core 0.
+// FUN_06356f30: RelativePointSpeed = point speed of core 1 - point speed of core 0.
 void IVP_Impact_Solver::UpdateRelativeSpeed()
 {
     Vector PointSpeed0;
     Vector PointSpeed1;
     Cores[0]->calc_point_speed_ws(ContactCoordsOS[0], &Speed0, &RotSpeed0, &PointSpeed0);
     Cores[1]->calc_point_speed_ws(ContactCoordsOS[1], &Speed1, &RotSpeed1, &PointSpeed1);
-    SpeedDelta1.x = PointSpeed1.x - PointSpeed0.x;
-    SpeedDelta1.y = PointSpeed1.y - PointSpeed0.y;
-    SpeedDelta1.z = PointSpeed1.z - PointSpeed0.z;
+    RelativePointSpeed.x = PointSpeed1.x - PointSpeed0.x;
+    RelativePointSpeed.y = PointSpeed1.y - PointSpeed0.y;
+    RelativePointSpeed.z = PointSpeed1.z - PointSpeed0.z;
 }
 
 // FUN_06358560. Core 1 first; the normal is negated between the two cores.
@@ -242,16 +240,15 @@ double IVP_Impact_Solver::CalcImpulseNeeded2()
 {
     PopulateEffectiveMasses(NormalVectorWS);
 
-    const double NegDot = -IVP_ImpactSolver_DotZYX(NormalVectorWS, &SpeedDelta1);
+    const double NegDot = -IVP_ImpactSolver_DotZYX(NormalVectorWS, &RelativePointSpeed);
     const double Scaled = NegDot * EffectiveMass1;
     const double Doubled = Scaled + Scaled;
     const double InvSum = 1.0 / ((double)(EffectiveMass0) + EffectiveMass1);
     return (Doubled * InvSum) * EffectiveMass0;
 }
 
-// FUN_06358350. Core 0's deltas land in SpeedDelta0 (+0x84) /
-// AngularDelta0Scratch (+0x64); core 1 gets the negated impulse into
-// RotDelta1 (+0x94, linear) / RotDelta0 (+0x74, angular). The adds are
+// FUN_06358350. Core 0's deltas land in SpeedDelta0 / RotSpeedDelta0; core 1
+// gets the negated impulse into SpeedDelta1 / RotSpeedDelta1. The adds are
 // FUN_06355020 except core 1's linear one, which is inline.
 void IVP_Impact_Solver::StepImpulse2(float ImpulseMagnitude)
 {
@@ -265,10 +262,10 @@ void IVP_Impact_Solver::StepImpulse2(float ImpulseMagnitude)
         Vector ImpulseOS;
         IVP_ImpactSolver_RotateWSToOSInline(MWorldFCore[0], Impulse.x, Impulse.y, Impulse.z, &ImpulseOS);
         Cores[0]->calc_impulse_deltas(ContactCoordsOS[0], &ImpulseOS, &Impulse, &SpeedDelta0,
-                                      &AngularDelta0Scratch);
-        RotSpeed0.x = RotSpeed0.x + AngularDelta0Scratch.x;
-        RotSpeed0.y = RotSpeed0.y + AngularDelta0Scratch.y;
-        RotSpeed0.z = RotSpeed0.z + AngularDelta0Scratch.z;
+                                      &RotSpeedDelta0);
+        RotSpeed0.x = RotSpeed0.x + RotSpeedDelta0.x;
+        RotSpeed0.y = RotSpeed0.y + RotSpeedDelta0.y;
+        RotSpeed0.z = RotSpeed0.z + RotSpeedDelta0.z;
         Speed0.x = Speed0.x + SpeedDelta0.x;
         Speed0.y = Speed0.y + SpeedDelta0.y;
         Speed0.z = Speed0.z + SpeedDelta0.z;
@@ -282,14 +279,14 @@ void IVP_Impact_Solver::StepImpulse2(float ImpulseMagnitude)
         NegImpulse.z = -Impulse.z;
         Vector ImpulseOS;
         IVP_ImpactSolver_RotateWSToOSInline(MWorldFCore[1], NegImpulse.x, NegImpulse.y, NegImpulse.z, &ImpulseOS);
-        Cores[1]->calc_impulse_deltas(ContactCoordsOS[1], &ImpulseOS, &NegImpulse, &RotDelta1,
-                                      &RotDelta0);
-        RotSpeed1.x = RotSpeed1.x + RotDelta0.x;
-        RotSpeed1.y = RotSpeed1.y + RotDelta0.y;
-        RotSpeed1.z = RotSpeed1.z + RotDelta0.z;
-        Speed1.x = RotDelta1.x + Speed1.x;
-        Speed1.y = RotDelta1.y + Speed1.y;
-        Speed1.z = RotDelta1.z + Speed1.z;
+        Cores[1]->calc_impulse_deltas(ContactCoordsOS[1], &ImpulseOS, &NegImpulse, &SpeedDelta1,
+                                      &RotSpeedDelta1);
+        RotSpeed1.x = RotSpeed1.x + RotSpeedDelta1.x;
+        RotSpeed1.y = RotSpeed1.y + RotSpeedDelta1.y;
+        RotSpeed1.z = RotSpeed1.z + RotSpeedDelta1.z;
+        Speed1.x = SpeedDelta1.x + Speed1.x;
+        Speed1.y = SpeedDelta1.y + Speed1.y;
+        Speed1.z = SpeedDelta1.z + Speed1.z;
     }
 }
 
@@ -298,9 +295,9 @@ void IVP_Impact_Solver::UndoLastStepImpulse()
 {
     if ((Cores[0]->Flags & 0x0C) == 0)
     {
-        RotSpeed0.x = RotSpeed0.x - AngularDelta0Scratch.x;
-        RotSpeed0.y = RotSpeed0.y - AngularDelta0Scratch.y;
-        RotSpeed0.z = RotSpeed0.z - AngularDelta0Scratch.z;
+        RotSpeed0.x = RotSpeed0.x - RotSpeedDelta0.x;
+        RotSpeed0.y = RotSpeed0.y - RotSpeedDelta0.y;
+        RotSpeed0.z = RotSpeed0.z - RotSpeedDelta0.z;
         Speed0.x = Speed0.x - SpeedDelta0.x;
         Speed0.y = Speed0.y - SpeedDelta0.y;
         Speed0.z = Speed0.z - SpeedDelta0.z;
@@ -308,19 +305,19 @@ void IVP_Impact_Solver::UndoLastStepImpulse()
 
     if ((Cores[1]->Flags & 0x0C) == 0)
     {
-        RotSpeed1.x = RotSpeed1.x - RotDelta0.x;
-        RotSpeed1.y = RotSpeed1.y - RotDelta0.y;
-        RotSpeed1.z = RotSpeed1.z - RotDelta0.z;
-        Speed1.x = Speed1.x - RotDelta1.x;
-        Speed1.y = Speed1.y - RotDelta1.y;
-        Speed1.z = Speed1.z - RotDelta1.z;
+        RotSpeed1.x = RotSpeed1.x - RotSpeedDelta1.x;
+        RotSpeed1.y = RotSpeed1.y - RotSpeedDelta1.y;
+        RotSpeed1.z = RotSpeed1.z - RotSpeedDelta1.z;
+        Speed1.x = Speed1.x - SpeedDelta1.x;
+        Speed1.y = Speed1.y - SpeedDelta1.y;
+        Speed1.z = Speed1.z - SpeedDelta1.z;
     }
 }
 
 // FUN_06356fb0. The sign test uses the unrounded dot; the rest uses its float.
 void IVP_Impact_Solver::UpdateFrictionPushDirection()
 {
-    PushDirection = SpeedDelta1;
+    PushDirection = RelativePointSpeed;
     AsPoint(&PushDirection)->normize();
 
     const Vector* Normal = NormalVectorWS;
@@ -547,7 +544,7 @@ void IVP_Impact_Solver::FinalizeImpact(IVP_Core* CoresOut[2])
         return;
     }
 
-    Cores[0]->Environment->counter_5c++; // always Cores[0]
+    Cores[0]->Environment->impact_deferred_commit_count++; // always Cores[0]
 
     CoresOut[WinnerIdx] = nullptr;
     ClearPendingCoreChanges();
@@ -558,7 +555,7 @@ void IVP_Impact_Solver::FinalizeImpact(IVP_Core* CoresOut[2])
 
 // The velocity-sanity block retail inlines once per core in DoImpactSystem's
 // tail, on the solver's working velocities. SpinClipping (+0x4C) clamps per
-// axis; otherwise (unless AxisLock is set and SpeedLimit is 0 or NaN) the
+// axis; otherwise (unless AxisLock is set and MaxSurfaceDeviation is 0 or NaN) the
 // anomaly manager's slot 1 limits the angular speed. Slot 0 then always limits
 // the linear speed. Both limit calls also fire on unordered compares.
 static void ClampResolvedCoreVelocities(IVP_Core* Core, Vector* WorkingRotSpeed, Vector* WorkingSpeed)
@@ -596,7 +593,7 @@ static void ClampResolvedCoreVelocities(IVP_Core* Core, Vector* WorkingRotSpeed,
             WorkingRotSpeed->z = -PerAxisRotLimit->z;
         }
     }
-    else if (Core->AxisLock == nullptr || Core->SpeedLimit < 0.0f || Core->SpeedLimit > 0.0f)
+    else if (Core->AxisLock == nullptr || Core->MaxSurfaceDeviation < 0.0f || Core->MaxSurfaceDeviation > 0.0f)
     {
         const double MaxRotSpeed = (double)(Env->inv_delta_time) * Limits->MaxAngularVelocityPerPsi;
         const double RotX = WorkingRotSpeed->x;
@@ -641,7 +638,7 @@ void IVP_Impact_Solver::DoImpactSystem(IVP_Core* CoresOut[2], int32_t bAllowDefe
     CoresOut[0] = Cores[0];
     CoresOut[1] = Cores[1];
 
-    Cores[0]->Environment->counter_4c++;
+    Cores[0]->Environment->impact_solver_count++;
 
     MWorldFCore[0] = &Cores[0]->MWorldFCore;
     MWorldFCore[1] = &Cores[1]->MWorldFCore;
@@ -664,13 +661,13 @@ void IVP_Impact_Solver::DoImpactSystem(IVP_Core* CoresOut[2], int32_t bAllowDefe
 
     // ---- 2. initial relative contact velocity ------------------------------
     UpdateRelativeSpeed();
-    *FrictionVectorWS = SpeedDelta1;
+    *FrictionVectorWS = RelativePointSpeed;
 
     int32_t Iter = 0;
     const float ImpulseStep = (float)(CalcImpulseNeeded2() * (double)(0.1f));
 
     // ---- 3. already-separating contact -------------------------------------
-    if (IVP_ImpactSolver_DotZYX(NormalVectorWS, &SpeedDelta1) > (double)(-0.0001f))
+    if (IVP_ImpactSolver_DotZYX(NormalVectorWS, &RelativePointSpeed) > (double)(-0.0001f))
     {
         Vector NegNormal;
         NegNormal.x = -NormalVectorWS->x;
@@ -688,7 +685,7 @@ void IVP_Impact_Solver::DoImpactSystem(IVP_Core* CoresOut[2], int32_t bAllowDefe
         UpdateFrictionPushDirection();
         FrictionImpulse = Vector{0.0f, 0.0f, 0.0f};
 
-        float ClosingSpeed = (float)(-IVP_ImpactSolver_DotZYX(NormalVectorWS, &SpeedDelta1));
+        float ClosingSpeed = (float)(-IVP_ImpactSolver_DotZYX(NormalVectorWS, &RelativePointSpeed));
         const float TargetSpeed = (float)(
             std::sqrt((double)(RestitutionFactor)) * ClosingSpeed +
             std::sqrt((double)(ImpactCounterF)) * (double)(0.01f));
@@ -702,7 +699,7 @@ void IVP_Impact_Solver::DoImpactSystem(IVP_Core* CoresOut[2], int32_t bAllowDefe
             ++Iter;
             StepImpulse2(ImpulseStep);
             UpdateRelativeSpeed();
-            ClosingSpeed = (float)(-IVP_ImpactSolver_DotZYX(NormalVectorWS, &SpeedDelta1));
+            ClosingSpeed = (float)(-IVP_ImpactSolver_DotZYX(NormalVectorWS, &RelativePointSpeed));
             UpdateFrictionPushDirection();
         }
 
@@ -721,7 +718,7 @@ void IVP_Impact_Solver::DoImpactSystem(IVP_Core* CoresOut[2], int32_t bAllowDefe
             UpdateRelativeSpeed();
 
             const double SpeedPerUnitImpulse =
-                IVP_ImpactSolver_DotZYX(NormalVectorWS, &SpeedDelta1) + (double)(ClosingSpeed);
+                IVP_ImpactSolver_DotZYX(NormalVectorWS, &RelativePointSpeed) + (double)(ClosingSpeed);
             float Scale;
             if (std::fabs(SpeedPerUnitImpulse) > (double)(0.0001f))
             {
@@ -750,7 +747,7 @@ void IVP_Impact_Solver::DoImpactSystem(IVP_Core* CoresOut[2], int32_t bAllowDefe
         return;
     }
 
-    Cores[0]->Environment->counter_64++;
+    Cores[0]->Environment->impact_flagged_core_count++;
 
     for (int32_t Idx = 0; Idx < 2; ++Idx)
     {

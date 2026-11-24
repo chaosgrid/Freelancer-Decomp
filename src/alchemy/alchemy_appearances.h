@@ -20,8 +20,8 @@
 //
 // Particle list: each node has one list, FGenericFxObjectBase::InstanceListHead_/Tail_/
 // LiveInstanceCount_ (node+0xd8/+0xdc, pool +0xe0, count +0xe4), filled by
-// SpawnListParticle from Pad47 (IGenericFx slot 47, +0xBC; rect: FUN_0623b410 ->
-// FUN_0623a2e0) and aged by UpdateListAppearance from each leaf's Pad5. Pad47 is
+// SpawnListParticle from SpawnParticle (IGenericFx slot 47, +0xBC; rect: FUN_0623b410 ->
+// FUN_0623a2e0) and aged by each leaf's UpdateNode. SpawnParticle is
 // (Six, Age, Duration): retail RET 0x10, Age lands at item+0x24 and Duration at +0x28
 // (1/Duration at +0x2c). Basic/rect/oriented/perp draw from their per-type pools
 // G_PoolBasic/Rect/Oriented/Perp (DAT_06257a04/b68/a9c/b14). Mesh and particle use a
@@ -30,11 +30,11 @@
 // None of the 8 overrides Release: retail's per-leaf copies (e.g. FUN_06218630 basic,
 // FUN_0623a190 rect) are identical to FGenericFxObjectBase::Release.
 //
-// ComposeAppearanceWorldTransform (FUN_062401a0), installed at vtable +0x18/+0x60 by six
-// classes' descriptor+4 helpers, has no caller inside alchemy.dll: those vtables
-// (PTR_FUN_0624b658/c040/cac8/e160/e858/ee90) are referenced only by their constructors.
-// It is presumably called from another module and is left unwired here. (Mesh's and
-// particle's own direct calls to FUN_062401a0 are ported.)
+// The six billboard classes' node vtables (PTR_FUN_0624b658/c040/cac8/e160/e858/ee90, at
+// outer+0xc) hold the node-base compose FUN_062401a0 at +0x60, but nothing dispatches that
+// slot: each outer IGenericFx +0x10 thunk (basic 06218d80, rect 0623ac10, oriented
+// 0622e990, beam 0620de10, perp 062356c0, dust 06212200) adds 0xc and jumps straight to
+// FUN_062401a0, which is FGenericFxObjectBase::ComposeNodeTransform here.
 // Retail list ops for the four list leaves: ctors FUN_06238050 (rect) / 06215d80 (basic) /
 // 0622bb10 (oriented) / 06232950 (perp); erase FUN_06239f80 / 06239f00; age FUN_06238780 ->
 // FUN_0623a4a0 (dispatched on the node sub-object at outer+0xC, vtable PTR_FUN_0624eee8).
@@ -135,7 +135,7 @@ namespace AlchemyImpl
         FxBasicAppearance(const char* PrimaryIid, const char* FactoryName);
         ~FxBasicAppearance() override;
 
-        GENRESULT DACOM_API Pad47(const float* Six, float Age, float Duration) override;
+        GENRESULT DACOM_API SpawnParticle(const float* Six, float Age, float Duration) override;
 
         // FUN_06217640: draw now, or queue on batch list 0 when the material batcher is on.
         GENRESULT DACOM_API DrawOrEnqueue() override;
@@ -146,7 +146,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API EndBatchedDraw() override;
 
         // Outer +0x14 (FUN_06216420), +0x8C (FUN_06216090). See the .cpp.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         GENRESULT DACOM_API GetBoundingSphere(float* OutSphere) override;
 
         // FUN_06215d80 (outer thunk 06218df0).
@@ -203,14 +203,14 @@ namespace AlchemyImpl
         // Outer +0x10 FUN_06231da0 -> FUN_0622fcf0: death effects, then FUN_062401a0.
         GENRESULT DACOM_API ComposeNodeTransform(void* Unused, const float* Parent12) override;
         // Outer +0x14 FUN_06231dc0 -> FUN_06230370: age, fields, records.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // Outer +0x5C FUN_06231f40 -> FUN_0622f8b0 / +0x88 FUN_06232090 -> FUN_0622f960.
         GENRESULT DACOM_API SetNodeOuterTime(float OuterTime) override;
         GENRESULT DACOM_API SetNodeLodInput(float LodInput) override;
         // Outer +0x8C FUN_062320b0 -> FUN_0622fa10: the children's bounds merged.
         GENRESULT DACOM_API GetBoundingSphere(float* OutSphere) override;
         // Outer +0xBC FUN_06232270 -> FUN_0622f6a0: spawn one record + life effect.
-        GENRESULT DACOM_API Pad47(const float* Six, float Age, float Duration) override;
+        GENRESULT DACOM_API SpawnParticle(const float* Six, float Age, float Duration) override;
 
         // FUN_0622f480 (outer thunk 06231e10).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
@@ -247,7 +247,7 @@ namespace AlchemyImpl
     // Set FUN_06237840 (create FUN_06238150).
     //
     // List-driven (see file header). GetBoundingSphere is FUN_06238280, the side-length
-    // member of the list-bounds family (ListBoundsSphere, alchemy_appearances.cpp): the
+    // member of the billboard bounds family (see FxBasicAppearance::GetBoundingSphere): the
     // radius is the larger side ramp (+0x7c / +0x80, B > C ? B : C) times the
     // +0x78 ramp times the EffectScaleRamp value.
     class FxRectAppearance final : public FFxBillboardAppearance
@@ -256,7 +256,7 @@ namespace AlchemyImpl
         FxRectAppearance(const char* PrimaryIid, const char* FactoryName);
         ~FxRectAppearance() noexcept(false) override;
 
-        GENRESULT DACOM_API Pad47(const float* Six, float Age, float Duration) override;
+        GENRESULT DACOM_API SpawnParticle(const float* Six, float Age, float Duration) override;
 
         // FUN_062388b0: draw now, or queue on batch list 1 when the material batcher is on.
         GENRESULT DACOM_API DrawOrEnqueue() override;
@@ -266,7 +266,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API FillBatchedGeometry() override;
 
         // Outer +0x14 (FUN_06238780), +0x8C (FUN_06238280). See the .cpp.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         GENRESULT DACOM_API GetBoundingSphere(float* OutSphere) override;
         // FUN_0623b2c0, outer +0xA8: fixed unsupported result, no side effects.
         GENRESULT DACOM_API Pad42() override { return static_cast<GENRESULT>(0xfffffff9); }
@@ -295,7 +295,7 @@ namespace AlchemyImpl
         FxPerpAppearance(const char* PrimaryIid, const char* FactoryName);
         ~FxPerpAppearance() override;
 
-        GENRESULT DACOM_API Pad47(const float* Six, float Age, float Duration) override;
+        GENRESULT DACOM_API SpawnParticle(const float* Six, float Age, float Duration) override;
         // FUN_06233170: draw now, or queue on batch list 2 when the material batcher is on.
         GENRESULT DACOM_API DrawOrEnqueue() override;
         // Outer +0x9C FUN_06235a40, +0xA0 FUN_06235a60, +0xA4 FUN_06235b40 (-> FUN_06233330).
@@ -304,7 +304,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API FillBatchedGeometry() override;
 
         // Outer +0x14 (FUN_06233040), +0x8C (FUN_06232cc0). See the .cpp.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         GENRESULT DACOM_API GetBoundingSphere(float* OutSphere) override;
 
         // FUN_06232a00 (outer thunk 06235730).
@@ -338,14 +338,14 @@ namespace AlchemyImpl
         GENRESULT DACOM_API EmitOne(const float* Six, unsigned long Extra,
                                     float Duration) override;
         // Outer +0xBC is FUN_06227330, the this+0xc thunk into FUN_06224c20 (EmitOne).
-        GENRESULT DACOM_API Pad47(const float* Six, float Age, float Duration) override
+        GENRESULT DACOM_API SpawnParticle(const float* Six, float Age, float Duration) override
         {
             unsigned long AgeBits = 0;
             std::memcpy(&AgeBits, &Age, sizeof(AgeBits));
             return EmitOne(Six, AgeBits, Duration);
         }
         // Outer +0x14 -> FUN_06225470. See the .cpp.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
 
         // FUN_06225240 (node vtable 0x0624dd90 slot 2; outer thunk FUN_06226e60,
         // this+0xc): FUN_062401a0, then pose every instance's IFxMesh.
@@ -384,14 +384,14 @@ namespace AlchemyImpl
         FxOrientedAppearance(const char* PrimaryIid, const char* FactoryName);
         ~FxOrientedAppearance() override;
 
-        GENRESULT DACOM_API Pad47(const float* Six, float Age, float Duration) override;
+        GENRESULT DACOM_API SpawnParticle(const float* Six, float Age, float Duration) override;
 
         // FUN_0622c500: one function that draws every particle of the node immediately
         // (oriented has no material-batcher branch -- the four FUN_06201c70 call sites
         // are basic/rect/perp/beam). See the .cpp.
         GENRESULT DACOM_API DrawOrEnqueue() override;
         // Outer +0x14 (FUN_0622c3d0), +0x8C (FUN_0622bed0 via FUN_0622eca0). See the .cpp.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         GENRESULT DACOM_API GetBoundingSphere(float* OutSphere) override;
 
         GENRESULT DACOM_API GetQueuedVertCount(unsigned long* Out) override;
@@ -424,9 +424,11 @@ namespace AlchemyImpl
         FLDustAppearance(const char* PrimaryIid, const char* FactoryName);
 
         // Outer +0x14 -> FUN_0620fb70, the per-node update. See the .cpp.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
+        // Outer +0x8C -> FUN_0620f830 (thunk 06212510). See the .cpp.
+        GENRESULT DACOM_API GetBoundingSphere(float* OutSphere) override;
         // Outer +0xBC FUN_06212700, the spawn. See the .cpp.
-        GENRESULT DACOM_API Pad47(const float* Six, float Age, float Duration) override;
+        GENRESULT DACOM_API SpawnParticle(const float* Six, float Age, float Duration) override;
         // Outer +0x18 -> FUN_0620fcb0: draws every particle at once, in view space (no
         // batcher branch). See the .cpp.
         GENRESULT DACOM_API DrawOrEnqueue() override;
@@ -469,11 +471,11 @@ namespace AlchemyImpl
     public:
         FLBeamAppearance(const char* PrimaryIid, const char* FactoryName);
 
-        GENRESULT DACOM_API Pad47(const float* Six, float Age, float Duration) override;
+        GENRESULT DACOM_API SpawnParticle(const float* Six, float Age, float Duration) override;
 
         // FUN_0620de30: the per-node update on outer +0x14, run every frame by the
         // IAlchemy UpdateNodes walk. `*(outer+0x90) += Dt` is Age_.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // Outer +0x8C FUN_0620e1b0 (`ADD [ESP+4],0xc; JMP`) -> FUN_062050c0. See the .cpp.
         GENRESULT DACOM_API GetBoundingSphere(float* OutSphere) override;
 

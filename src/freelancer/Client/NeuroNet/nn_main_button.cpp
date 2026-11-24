@@ -20,7 +20,7 @@
 #include "NeuroNet/NavMap/nn_navmap.h"           // NavMapPostPendingOpen (FUN_004a2a80)
 #include "NeuroNet/nn_story_star.h"       // StoryStarTick (FUN_004bc990), StoryStarRequeueLastObjective
 #include "NeuroNet/nn_trade.h"            // G_NnTrade (DAT_006724b4)
-#include "NeuroNet/nn_ui_pulse.h"         // G_NnPaletteArgb_679ba8 (DAT_00679ba8)
+#include "NeuroNet/nn_ui_pulse.h"         // G_NnPaletteRed (DAT_00679ba8)
 #include "Space/player_spawn.h"        // GetPlayerConnectionId (DAT_00673344)
 #include "Space/space_letterbox.h"     // SetLetterboxTarget (FUN_0041a0f0), IsLetterboxVisible (FUN_0041a3e0)
 #include "Interface/win3d.h"               // Win3DFindByName, Win3DReparent, Win3DDeleteTree, Win3DDrawChildrenOf
@@ -797,8 +797,8 @@ void NN_MainButton::SetGroupButtonAlert(bool bAlert)
 {
     // FUN_0045da10 (RET 4). No null test (only the multiplayer group control calls it).
     uintptr_t const Flag = bAlert ? 1u : 0u;
-    GroupButton->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba8), Flag);
-    GroupRoot->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba8), Flag);
+    GroupButton->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), Flag);
+    GroupRoot->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), Flag);
 }
 
 void NN_MainButton::SetGroupButtonMesh(int Mode)

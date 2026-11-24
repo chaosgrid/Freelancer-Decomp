@@ -18,7 +18,7 @@
 
 #include "ivp_mindist.h"
 
-// Ipion's IVP_Old_Sync_Rot_Z: the 0x24-byte record IVP_Core::FastSimUnitData
+// Ipion's IVP_Old_Sync_Rot_Z: the 0x24-byte record IVP_Core::OldSyncInfo
 // (+0x1b4) points at while an impact system runs. FUN_06347240 allocates it
 // from the environment's frozen core arena (FUN_06347380) and fills it;
 // FUN_063473b0 restores the core from it.
@@ -31,7 +31,7 @@ struct IVP_Old_Sync_Rot_Z
     // pushes the core.
     int32_t WasPushedDuringImpactSystem;
 };
-static_assert(sizeof(IVP_Old_Sync_Rot_Z) == 0x24, "retail allocation size, .text:06347251 PUSH 0x24");
+static_assert(sizeof(IVP_Old_Sync_Rot_Z) == 0x24, "retail allocation size, FUN_06347240 PUSH 0x24");
 static_assert(offsetof(IVP_Old_Sync_Rot_Z, OldSyncQWorldFCore) == 0x10, "IVP_Old_Sync_Rot_Z+0x10");
 static_assert(offsetof(IVP_Old_Sync_Rot_Z, WasPushedDuringImpactSystem) == 0x20, "IVP_Old_Sync_Rot_Z+0x20");
 

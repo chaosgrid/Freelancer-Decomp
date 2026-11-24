@@ -79,7 +79,8 @@ namespace
         State->bIdle = 1;
         State->bFirstFramePending = 1;
         G_bMissionBriefingContinue = 0;
-        State->ParentWindow->Flags = static_cast<unsigned char>(State->ParentWindow->Flags & 0xfc);
+        State->ParentWindow->Flags = static_cast<unsigned char>(
+            State->ParentWindow->Flags & ~(kWin3DActive | kWin3DVisible));
         SetPlayerBaseIdRetail(0);
         NnSystemShutdown();
     }
@@ -179,7 +180,8 @@ namespace
         float const Position[3] = {-0.62f, 0.3f, -1.25f};
         State->ParentWindow->SetPosition(Position);
         // Hidden until the first frame.
-        State->ParentWindow->Flags = static_cast<unsigned char>(State->ParentWindow->Flags & 0xfc);
+        State->ParentWindow->Flags = static_cast<unsigned char>(
+            State->ParentWindow->Flags & ~(kWin3DActive | kWin3DVisible));
     }
 
     // Slot 9 (LAB_0043d260) -- Win3DDeleteTree's body inlined.
@@ -262,14 +264,16 @@ namespace
             // No NN_MainButton.
             State->bFirstFramePending = 0;
             NnSystemInit(false);
-            State->ParentWindow->Flags = static_cast<unsigned char>(State->ParentWindow->Flags | 3);
+            State->ParentWindow->Flags = static_cast<unsigned char>(
+                State->ParentWindow->Flags | kWin3DActive | kWin3DVisible);
             SetPlayerBaseIdRetail(GetGameflowLocationBase());
             // The nav map's Create reads the "being built" flag. No null test on the create.
             G_bMissionBriefingNavMapUp = 1;
             Win3D* const NavMap = WinFactoryCreate("NeuroNetNavMap", "NeuroNetNavMap",
                                                    State->ParentWindow, nullptr);
             NavMap->ProcessMessage(0xef01, 0, 0);
-            NavMap->Flags = static_cast<unsigned char>(NavMap->Flags | 3);
+            NavMap->Flags =
+                static_cast<unsigned char>(NavMap->Flags | kWin3DActive | kWin3DVisible);
             G_bMissionBriefingNavMapUp = 0;
             MouseSetCursor("arrow", false);
             SetClientMouseCursorDrawFlag(1);

@@ -221,7 +221,7 @@ namespace
                                         ControllerId);
             SpacePopSetAttackClamp(1);                // DAT_06fd1c78 = 1
             bBaseEnterHandled = 1;
-            FStoryMissionListNode_0x2f4 Node;
+            FMissionRtc Node;
             char const* Path = "missions\\m01a\\M001a_s006x_Li01_02_nrml.ini";
             size_t Length = strlen(Path);
             if (Length >= 0x80)
@@ -230,7 +230,7 @@ namespace
             Node.Path[Length] = '\0';
             Node.PathLength = static_cast<unsigned int>(Length);
             StartRtcScript(&Node);
-            List_0x2f4.push_back(Node);
+            RtcScripts.push_back(Node);
             return;
         }
         if (MessageId == EMessage::PlayerSave)

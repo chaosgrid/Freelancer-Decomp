@@ -13,7 +13,7 @@
 #include "common_iface.h"          // IObjInspect, IObjRW, IBehaviorManager, ObjInspectOf, ObjRwFromWatchable
 #include "common_misc.h"           // PlayerTrailAvailable
 #include "common_pub.h"            // pub::AI::ContentCallback, TrailUseStruct
-#include "common_systemmanager.h"  // SystemManager -- what NavHelper points at
+#include "common_systemmanager.h"  // SystemManager -- what SysMgr points at
 #include "x86math.h"               // I3DMathEngine::TransformMatrix (+0x2c)
 
 #include <cmath>
@@ -75,19 +75,7 @@ namespace
 // FUN_062ca350.
 // ----------------------------------------------------------------------------
 TrailBehavior::TrailBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , OwnerContext(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime(0.0f)
-    , BehaviorMgrPtr(nullptr)
-    , NavHelper(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
+    : Behavior(InTypeId)
     , MatchThrottle()               // FUN_062d5aa0
     , Face()                        // FUN_062d6750
     , Move()                        // FUN_062d4e60
@@ -127,7 +115,6 @@ TrailBehavior::TrailBehavior(int InTypeId)
     , Field240(20.0f)
     , CatchUpRange244(1500.0f)
 {
-    ConstructBase(InTypeId);        // FUN_062d2020
     unsigned const Field224Bits = 0x3d1de9e7u;
     std::memcpy(&Field224, &Field224Bits, sizeof(Field224));
 }
@@ -149,15 +136,15 @@ bool TrailBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 
     // Every idea gets (Object = +0x14, Handle = +0x24, Context = Manager). Results unread.
     bHasDirectiveTarget1e0 = 0;
-    Face.SetContext(OwnerContext, NavHelper, Manager);
-    MatchThrottle.SetContext(OwnerContext, NavHelper, Manager);
+    Face.SetContext(OwnerContext, SysMgr, Manager);
+    MatchThrottle.SetContext(OwnerContext, SysMgr, Manager);
     MatchThrottle.SetMaxBearing(3.14159274f);                       // ICF fold 063275d0
     MatchThrottle.SetCatchUpRange(CatchUpRange244);                 // FUN_062d6740
     if (!ObjInspectOf(OwnerContext)->is_player())
         MatchThrottle.SetFlag3b(true);                              // FUN_062d6730
-    Move.SetContext(OwnerContext, NavHelper, Manager);
+    Move.SetContext(OwnerContext, SysMgr, Manager);
     Move.SetMode(1);                                                // FUN_062d5980
-    Afterburner.SetContext(OwnerContext, NavHelper, Manager);
+    Afterburner.SetContext(OwnerContext, SysMgr, Manager);
     return bOk;
 }
 
@@ -167,10 +154,10 @@ bool TrailBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 void TrailBehavior::OnEngage()
 {
     Behavior::OnEngage();
-    SetCruiseLock(1, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
 
     // The owner's target, else the directive target.
-    IObjRW* Leader = NavHelper->Targeting.GetTarget();              // FUN_062ed5a0
+    IObjRW* Leader = SysMgr->Targeting.GetTarget();              // FUN_062ed5a0
     if (Leader == nullptr)
         Leader = WatchedObject(DirectiveTarget);
 
@@ -178,11 +165,11 @@ void TrailBehavior::OnEngage()
     LagTimer1f4 = 0.0f;
     AxisTimer1f8 = 0.0f;
 
-    if (OwnShipIsPlayer(NavHelper))
+    if (OwnShipIsPlayer(SysMgr))
     {
         // The owner's own cruise state into MatchThrottle's +0x38.
         bool bCruise = false;
-        static_cast<IObjRW*>(OwnerContext)->is_cruise_active(bCruise);
+        OwnerContext->is_cruise_active(bCruise);
         MatchThrottle.SetFlag38(bCruise);                           // FUN_062d6700
     }
 
@@ -205,7 +192,7 @@ void TrailBehavior::OnEngage()
     }
 
     // The personality's TrailUseStruct (Sys+0x16ac).
-    pub::AI::Personality::TrailUseStruct const& P = TrailParamsOf(NavHelper);
+    pub::AI::Personality::TrailUseStruct const& P = TrailParamsOf(SysMgr);
     FacingCos1f0 = X87CosF(static_cast<double>(P.TrailLockConeAngle));
     LagTime1fc = P.TrailBreakTime;
     AxisTime204 = P.TrailMinNoLockTime;
@@ -238,10 +225,10 @@ void TrailBehavior::OnDisengage()
 int TrailBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     int Result = 2;
 
-    if (!Sys->GunConvergenceStateBytes.FollowerDirectiveGateA())     // FUN_062ecb20
+    if (!Sys->FormationLeaders.FollowerDirectiveGateA())     // FUN_062ecb20
     {
         IObjRW* const Leader = Sys->Targeting.GetTarget();
         if (Leader != nullptr)
@@ -254,16 +241,16 @@ int TrailBehavior::OnEvaluateReadiness(float Unused)
                 Leader->get_type(LeaderType);
                 if ((LeaderType & 0x380000u) != 0)
                 {
-                    ModeSelector0xc = Flag29 ? 3 : Result;
-                    return ModeSelector0xc;
+                    Readiness = Flag29 ? 3 : Result;
+                    return Readiness;
                 }
                 if ((RefreshNavFlags(NavOf(Sys)) & 0x7f0000u) != 0)
                     Result = 1;
                 // FUN_062e1aa0 against pi/2 (.rdata:0639f5d4); >= or unordered falls through.
                 if (BearingAngleToIface(Leader, OwnerContext) < 1.5707964f)
                 {
-                    ModeSelector0xc = Flag29 ? 3 : 2;
-                    return ModeSelector0xc;
+                    Readiness = Flag29 ? 3 : 2;
+                    return Readiness;
                 }
             }
         }
@@ -271,8 +258,8 @@ int TrailBehavior::OnEvaluateReadiness(float Unused)
             Result = 1;
     }
 
-    ModeSelector0xc = Flag29 ? 3 : Result;
-    return ModeSelector0xc;
+    Readiness = Flag29 ? 3 : Result;
+    return Readiness;
 }
 
 // ----------------------------------------------------------------------------
@@ -284,7 +271,7 @@ EvaluateResult TrailBehavior::evaluate(unsigned int Context)
     if (!PlayerTrailAvailable)
         return EvalSkip;
 
-    IObjRW* const Owner = static_cast<IObjRW*>(OwnerContext);
+    IObjRW* const Owner = OwnerContext;
     IObjRW* Target = nullptr;
     Owner->get_target(Target);
     if (Target == nullptr)
@@ -312,7 +299,7 @@ EvaluateResult TrailBehavior::evaluate(unsigned int Context)
     if ((TypeAgain & 0x7f0000u) == 0 || (TypeAgain & 0x600de0u) != 0)
         return EvalSkip;
 
-    NavHelper->Targeting.RetargetOwner(Target, SUBOBJ_ID_NONE);     // FUN_062ee940
+    SysMgr->Targeting.RetargetOwner(Target, SUBOBJ_ID_NONE);     // FUN_062ee940
     return EvalBlocked;
 }
 
@@ -332,14 +319,14 @@ int TrailBehavior::OnUpdate()
 {
     if (OwnerContext == nullptr)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
 
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     if (Sys->Timers.IsTimer0Active())                              // FUN_062e8810
     {
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
@@ -354,7 +341,7 @@ int TrailBehavior::OnUpdate()
     {
         if (Sys->Targeting.GetTarget() == nullptr)
         {
-            UpdateResult10 = 2;
+            UpdateResult = 2;
             return 2;
         }
         Leader = Sys->Targeting.GetTarget();
@@ -362,14 +349,14 @@ int TrailBehavior::OnUpdate()
         if (!OwnShipIsPlayer(Sys) && Leader != nullptr &&
             GetIfaceVectorMagnitude(Sys->Targeting.GetTarget()) < 20.0f)
         {
-            UpdateResult10 = 3;
+            UpdateResult = 3;
             return 3;
         }
         bTrailTarget = true;
     }
     if (Leader == nullptr)
     {
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
@@ -418,7 +405,7 @@ int TrailBehavior::OnUpdate()
                 Axis.z = AxisZ208;
                 Face.SetAxis(Axis);                                 // FUN_062d75e0
                 Face.Update(DeltaTime);
-                UpdateResult10 = 1;
+                UpdateResult = 1;
                 return 1;
             }
             AxisTimer1f8 = static_cast<float>(static_cast<double>(DeltaTime) + AxisTimer1f8);
@@ -445,7 +432,7 @@ int TrailBehavior::OnUpdate()
             Move.SetDirectionFrom(&Sys->SelfTarget.Iface->get_transform());   // FUN_062d58f0
             Move.SetAngle38(3.14159274f);                           // ICF fold 063275f0
             Move.Update(DeltaTime);
-            UpdateResult10 = 0;
+            UpdateResult = 0;
             return 0;
         }
 
@@ -489,7 +476,7 @@ int TrailBehavior::OnUpdate()
         static_cast<double>(Behavior_GetIfaceMaxScalarAttribute(Leader)) + TrailOffset1e4);
 
     bool bOwnCruise = false;                                        // never read again
-    static_cast<IObjRW*>(OwnerContext)->is_cruise_active(bOwnCruise);
+    OwnerContext->is_cruise_active(bOwnCruise);
 
     Matrix const LeaderRotation = Leader->get_transform().Rotation; // FUN_062e61f0, the 3x3 only
     Vector LeaderCenter;
@@ -531,7 +518,7 @@ int TrailBehavior::OnUpdate()
     Driver->Update(DeltaTime);
 
     // FUN_062e4bb0 for effect, unless a player owner has the camera-level status cleared.
-    if (!OwnShipIsPlayer(Sys) || BehaviorMgrPtr->get_camera_level_status())
+    if (!OwnShipIsPlayer(Sys) || BehaviorMgr->get_camera_level_status())
         (void)GetInterceptClearanceOfIface(NavOf(Sys), Leader);
 
     // Face the leader, upright when the timer table asks for it.
@@ -545,7 +532,7 @@ int TrailBehavior::OnUpdate()
         Face.SetUpVector(Up);                                       // FUN_062d7640
     }
     Face.Update(DeltaTime);
-    UpdateResult10 = 1;
+    UpdateResult = 1;
     return 1;
 }
 
@@ -556,9 +543,9 @@ bool TrailBehavior::OnApplyDirective(void* DirectiveOp)
 {
     if (DirectiveOp != nullptr)
     {
-        unsigned char* const Op = static_cast<unsigned char*>(DirectiveOp);
-        TrailDistance1e8 = *reinterpret_cast<float const*>(Op + 0x10);   // DirectiveTrailOp+0x10
-        void* const Target = NavHelper->Timers.FindVerifiedObject((unsigned const*)(Op + 0xc));   // FUN_062e74a0
+        pub::AI::DirectiveTrailOp const* const Op = static_cast<pub::AI::DirectiveTrailOp const*>(DirectiveOp);
+        TrailDistance1e8 = Op->TrailDistance;
+        void* const Target = SysMgr->Timers.FindVerifiedObject(&Op->TargetId);   // FUN_062e74a0
         if (Target != nullptr)
         {
             DirectiveTarget.set(reinterpret_cast<Watchable const*>(static_cast<char*>(Target) + 8));
@@ -583,7 +570,7 @@ void TrailBehavior::set_direction(Vector const& Dir)
 
     // FUN_062d4b20. Only a strictly positive factor rescales, by 1/factor kept on the x87
     // stack.
-    float const Factor = BehaviorMgrPtr->get_turn_sensitivity_factor();
+    float const Factor = BehaviorMgr->get_turn_sensitivity_factor();
     if (Factor > 0.0f)
     {
         double const Rescale = 1.0 / static_cast<double>(Factor);

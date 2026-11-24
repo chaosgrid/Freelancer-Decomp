@@ -93,7 +93,7 @@ public:
     int LeaveDirection;                      // +0x114 -- 1 connect (Result 2), -1 back (1)
     int FirstVisible;                        // +0x118 -- ftol(scroll value) at the last rebuild
     RenderDisplayList ColumnHeaders[8];      // +0x11c -- IDS table 0x005e2604 (0x747..0x74c)
-    RenderDisplayList Text729;               // +0x17c -- IDS 0x729. TODO: no reader found yet
+    RenderDisplayList ServerNameText;        // +0x17c -- IDS 0x729 "SERVER NAME"; no reader
     RenderDisplayList DetailsHeader;         // +0x188 -- IDS 0x744
     RenderDisplayList DetailsRestricted;     // +0x194 -- IDS 0x6007c, trailing paragraph cut
     RenderDisplayList PingUnknown;           // +0x1a0 -- TextNode u"????" (ping -2)
@@ -101,16 +101,16 @@ public:
     RenderDisplayList TextYes;               // +0x1b8 -- IDS 0x727
     RenderDisplayList TextNo;                // +0x1c4 -- IDS 0x728
     RenderDisplayList DetailsPassword;       // +0x1d0 -- IDS 0x750 (server +0x94 set)
-    RenderDisplayList DetailsField95;        // +0x1dc -- IDS 0x74f (server +0x95 clear)
+    RenderDisplayList DetailsNoNewPlayers;   // +0x1dc -- IDS 0x74f (server +0x95 clear)
     RenderDisplayList TitleText;             // +0x1e8 -- style 0x1df5 + IDS 0x60072
     RenderDisplayList SubTitleText;          // +0x1f4 -- style 0x43e0 + IDS 0x6007d
     RenderDisplayList LegendSkullText;       // +0x200 -- IDS 0x6007b
     RenderDisplayList LegendLockText;        // +0x20c -- IDS 0x6007a
-    RenderDisplayList StatusText60058;       // +0x218 -- style 0xbb80 + IDS 0x60058 (other)
-    RenderDisplayList StatusText60057;       // +0x224 -- style 0xbb80 + IDS 0x60057 (1 / 4)
-    RenderDisplayList StatusText60055;       // +0x230 -- style 0x9ca4 + IDS 0x60055 (2)
-    RenderDisplayList StatusText60056;       // +0x23c -- style 0xbb80 + IDS 0x60056. TODO: reader
-    RenderDisplayList Text601eb;             // +0x248 -- style 0x5724 + IDS 0x601eb. TODO: reader
+    RenderDisplayList StatusDisconnected;    // +0x218 -- style 0xbb80 + IDS 0x60058 (other)
+    RenderDisplayList StatusConnecting;      // +0x224 -- style 0xbb80 + IDS 0x60057 (1 / 4)
+    RenderDisplayList StatusConnected;       // +0x230 -- style 0x9ca4 + IDS 0x60055 (2)
+    RenderDisplayList StatusConnectFailed;   // +0x23c -- style 0xbb80 + IDS 0x60056. TODO: reader
+    RenderDisplayList EsrbNoticeText;        // +0x248 -- style 0x5724 + IDS 0x601eb. TODO: reader
     RenderDisplayList SubTitleLan;           // +0x254 -- style 0xc9b7 + IDS 0x601ef
     RenderDisplayList SubTitleInternet;      // +0x260 -- style 0xc9b7 + IDS 0x601ee
     TextRenderContext::Image* UpPip;         // +0x26c -- interface\intro\images\uppip.bmp

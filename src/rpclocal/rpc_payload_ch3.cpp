@@ -52,29 +52,13 @@ IChatServer* GRealChatServer = nullptr;
 
 // ---------------------------------------------------------------------------
 // Shared helpers. The block writers FUN_06d9a160, FUN_06d9a5f0, FUN_06d9aab0 and the blob
-// writer FUN_06d97b00 (shared with channel 2) all do a bare operator new(N), copy, and store
-// block and length in two payload fields; the packet owns the block. The three block writers
-// add `if (size == 0 || src == 0) return` (their callers carry that test here);
-// FUN_06d97b00 has none.
+// writer FUN_06d97b00 (shared with channel 2) all do RpcCopyBlock (rpc_payloads.h) and store
+// block and length in two payload fields. The three block writers add
+// `if (size == 0 || src == 0) return` (their callers carry that test here); FUN_06d97b00
+// has none.
 // ---------------------------------------------------------------------------
-static void* RpcCh3CopyBlock(const void* Source, unsigned int InSize) {
-    unsigned char* Block = static_cast<unsigned char*>(::operator new(InSize, std::nothrow));
-    const unsigned char* Src = static_cast<const unsigned char*>(Source);
-    for (unsigned int i = 0; i < InSize; ++i) {
-        Block[i] = Src[i];
-    }
-    return Block;
-}
 
-// Inline strlen / wcslen; retail tests neither pointer.
-static unsigned int RpcCh3StringLength(const char* Text) {
-    unsigned int Length = 0;
-    while (Text[Length] != '\0') {
-        ++Length;
-    }
-    return Length;
-}
-
+// Inline wcslen; retail does not test the pointer. (Inline strlen is RpcStringLength.)
 static unsigned int RpcCh3WideLength(const wchar_t* Text) {
     unsigned int Length = 0;
     while (Text[Length] != 0) {
@@ -131,14 +115,10 @@ static bool MarshalCh3StructHead(FPacketBase* Packet, const unsigned int* Args, 
 // the flag to +0xc0.
 // ===========================================================================
 
-// Byte-addressed at the offsets the retail code uses.
-static const unsigned int kLoginAccountOffset = 0x00;   // cap 0x28 wide chars
-static const unsigned int kLoginPasswordOffset = 0xa0;  // cap 0x10 wide chars
-static const unsigned int kLoginFlagOffset = 0xc0;
-static unsigned char GStaticLoginInfo[sizeof(SLoginInfo)];   // retail .data:0x06dbba38
+static SLoginInfo GStaticLoginInfo;   // retail .data:0x06dbba38
 
 static bool MarshalLogin(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const unsigned char* Info = reinterpret_cast<const unsigned char*>(Args[0]);
+    const SLoginInfo* Info = reinterpret_cast<const SLoginInfo*>(Args[0]);
     // IServerImpl::Login 0x06d8cc70: two unbounded wcscpy calls into a 0x404-byte stack
     // window (to +0x000 and +0x200), the flag byte to +0x400, then 0x402 bytes copied into
     // the payload. Window bytes neither wcscpy reaches are uninitialised in retail; zeroed
@@ -147,29 +127,28 @@ static bool MarshalLogin(FPacketBase* Packet, const unsigned int* Args, unsigned
     for (unsigned int i = 0; i < (unsigned int)sizeof(Wire); ++i) {
         reinterpret_cast<unsigned char*>(&Wire)[i] = 0;
     }
-    wcscpy(Wire.AccountName, reinterpret_cast<const wchar_t*>(Info + kLoginAccountOffset));
-    wcscpy(Wire.Password, reinterpret_cast<const wchar_t*>(Info + kLoginPasswordOffset));
-    Wire.CreateFlag = Info[kLoginFlagOffset];
+    wcscpy(Wire.AccountName, Info->AccountName);
+    wcscpy(Wire.Password, Info->Password);
+    // Retail reads the single byte at +0xc0.
+    Wire.CreateFlag = *reinterpret_cast<const unsigned char*>(&Info->CreateFlag);
     // Exactly 0x402 bytes; +0x402/+0x403 keep what the constructor left.
     memcpy(Packet->Payload(), &Wire, 0x402u);
     return true;
 }
 
 static bool DeliverLogin(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const unsigned char* Payload = Packet->Payload();
+    const FPayloadClientLogin* Wire =
+        reinterpret_cast<const FPayloadClientLogin*>(Packet->Payload());
     // wcsncpy pads with NULs up to the count. Retail never clears the static; bytes not
     // overwritten keep their zero .data image.
-    wcsncpy(reinterpret_cast<wchar_t*>(GStaticLoginInfo + kLoginAccountOffset),
-            reinterpret_cast<const wchar_t*>(Payload + 0x000), 0x28);
-    wcsncpy(reinterpret_cast<wchar_t*>(GStaticLoginInfo + kLoginPasswordOffset),
-            reinterpret_cast<const wchar_t*>(Payload + 0x200), 0x10);
-    GStaticLoginInfo[kLoginFlagOffset] = Payload[0x400];
+    wcsncpy(GStaticLoginInfo.AccountName, Wire->AccountName, 0x28);
+    wcsncpy(GStaticLoginInfo.Password, Wire->Password, 0x10);
+    // A byte store at +0xc0; the flag's upper three bytes stay as they were.
+    *reinterpret_cast<unsigned char*>(&GStaticLoginInfo.CreateFlag) = Wire->CreateFlag;
     // Retail's two explicit terminator stores, +0x4e and +0xbe.
-    GStaticLoginInfo[0x4e] = 0;
-    GStaticLoginInfo[0x4f] = 0;
-    GStaticLoginInfo[0xbe] = 0;
-    GStaticLoginInfo[0xbf] = 0;
-    Server->Login(*reinterpret_cast<const SLoginInfo*>(GStaticLoginInfo), SessionId);
+    GStaticLoginInfo.AccountName[0x27] = 0;
+    GStaticLoginInfo.Password[0x0f] = 0;
+    Server->Login(GStaticLoginInfo, SessionId);
     return true;
 }
 
@@ -456,7 +435,7 @@ static bool DeliverGFGoodBuy(const FPacketBase* Packet, IServer* Server, unsigne
 static bool MarshalMissionResponse(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientMissionResponse Wire;
     Wire.OfferId = Args[0];
-    Wire.MissionId = Args[1];
+    Wire.OfferKind = Args[1];
     Wire.bAccepted = (unsigned char)(Args[2] & 0xffu);
     Wire.Pad_0x09[0] = 0;
     Wire.Pad_0x09[1] = 0;
@@ -467,7 +446,7 @@ static bool MarshalMissionResponse(FPacketBase* Packet, const unsigned int* Args
 static bool DeliverMissionResponse(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientMissionResponse Wire =
         RpcPayloadRead<FPayloadClientMissionResponse>(Packet, 0);
-    Server->MissionResponse(Wire.OfferId, Wire.MissionId, Wire.bAccepted, SessionId);
+    Server->MissionResponse(Wire.OfferId, Wire.OfferKind, Wire.bAccepted, SessionId);
     return true;
 }
 
@@ -478,7 +457,7 @@ static bool DeliverMissionResponse(const FPacketBase* Packet, IServer* Server, u
 // ===========================================================================
 static bool MarshalReqAddItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const char* Hardpoint = reinterpret_cast<const char*>(Args[1]);
-    const unsigned int Length = RpcCh3StringLength(Hardpoint) + 1u;
+    const unsigned int Length = RpcStringLength(Hardpoint) + 1u;
     FPayloadClientReqAddItem Wire;
     Wire.ArchId = Args[0];
     Wire.Count = (int)Args[2];
@@ -491,7 +470,7 @@ static bool MarshalReqAddItem(FPacketBase* Packet, const unsigned int* Args, uns
     // FUN_06d9a160(hardpoint, strlen + 1), with its own guard.
     Wire.Hardpoint = nullptr;
     if (Length != 0 && Hardpoint != nullptr) {
-        Wire.Hardpoint = static_cast<char*>(RpcCh3CopyBlock(Hardpoint, Length));
+        Wire.Hardpoint = static_cast<char*>(RpcCopyBlock(Hardpoint, Length));
         Wire.HardpointSize = Length;
     }
     return RpcPayloadWrite(Packet, 0, Wire);
@@ -506,7 +485,7 @@ static bool DeliverReqAddItem(const FPacketBase* Packet, IServer* Server, unsign
 
 static bool MarshalReqModifyItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const char* Hardpoint = reinterpret_cast<const char*>(Args[1]);
-    const unsigned int Length = RpcCh3StringLength(Hardpoint) + 1u;
+    const unsigned int Length = RpcStringLength(Hardpoint) + 1u;
     FPayloadClientReqModifyItem Wire;
     Wire.Count = (int)Args[2];
     Wire.HardpointSize = 0u;
@@ -519,7 +498,7 @@ static bool MarshalReqModifyItem(FPacketBase* Packet, const unsigned int* Args, 
     // FUN_06d9a5f0(hardpoint, strlen + 1), with its own guard.
     Wire.Hardpoint = nullptr;
     if (Length != 0 && Hardpoint != nullptr) {
-        Wire.Hardpoint = static_cast<char*>(RpcCh3CopyBlock(Hardpoint, Length));
+        Wire.Hardpoint = static_cast<char*>(RpcCopyBlock(Hardpoint, Length));
         Wire.HardpointSize = Length;
     }
     return RpcPayloadWrite(Packet, 0, Wire);
@@ -538,15 +517,15 @@ static bool DeliverReqModifyItem(const FPacketBase* Packet, IServer* Server, uns
 // The sender zero-extends the ushort into a dword; the receiver reads it back as a word.
 // ===========================================================================
 static bool MarshalReqRemoveItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    FPayloadClientDwordPair Wire;
-    Wire.Field_0x00 = Args[0] & 0xffffu;
-    Wire.Field_0x04 = Args[1];
+    FPayloadClientReqRemoveItem Wire;
+    Wire.EquipId = Args[0] & 0xffffu;
+    Wire.Count = Args[1];
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverReqRemoveItem(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientDwordPair Wire = RpcPayloadRead<FPayloadClientDwordPair>(Packet, 0);
-    Server->ReqRemoveItem((unsigned short)(Wire.Field_0x00 & 0xffffu), (int)Wire.Field_0x04, SessionId);
+    const FPayloadClientReqRemoveItem Wire = RpcPayloadRead<FPayloadClientReqRemoveItem>(Packet, 0);
+    Server->ReqRemoveItem((unsigned short)(Wire.EquipId & 0xffffu), (int)Wire.Count, SessionId);
     return true;
 }
 
@@ -563,7 +542,7 @@ static bool MarshalSaveGame(FPacketBase* Packet, const unsigned int* Args, unsig
     wchar_t* Block = nullptr;
     unsigned int StoredCount = 0u;
     if (Count != 0 && Description != nullptr) {
-        Block = static_cast<wchar_t*>(RpcCh3CopyBlock(Description, Count * 2u));
+        Block = static_cast<wchar_t*>(RpcCopyBlock(Description, Count * 2u));
         StoredCount = Count;
     }
     RpcPayloadWrite(Packet, 0x200, Block);
@@ -622,7 +601,7 @@ static bool MarshalTradeResponse(FPacketBase* Packet, const unsigned int* Args, 
     FPayloadClientBlob Wire;
     Wire.Size = Args[1];
     // FUN_06d97b00: bare operator new(len) and the copy, no guard at all.
-    Wire.Buffer = RpcCh3CopyBlock(reinterpret_cast<const void*>(Args[0]), Args[1]);
+    Wire.Buffer = RpcCopyBlock(reinterpret_cast<const void*>(Args[0]), Args[1]);
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
@@ -638,15 +617,16 @@ static bool DeliverTradeResponse(const FPacketBase* Packet, IServer* Server, uns
 // references, so the packet's own storage backs them.
 // ===========================================================================
 static bool MarshalSPScanCargo(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    FPayloadClientDwordPair Wire;
-    Wire.Field_0x00 = *reinterpret_cast<const unsigned int*>(Args[0]);
-    Wire.Field_0x04 = *reinterpret_cast<const unsigned int*>(Args[1]);
+    FPayloadClientScanCargo Wire;
+    Wire.ScannerId = *reinterpret_cast<const unsigned int*>(Args[0]);
+    Wire.TargetId = *reinterpret_cast<const unsigned int*>(Args[1]);
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverSPScanCargo(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const unsigned int* Fields = reinterpret_cast<const unsigned int*>(Packet->Payload());
-    Server->SPScanCargo(Fields[0], Fields[1], SessionId);
+    const FPayloadClientScanCargo* Wire =
+        reinterpret_cast<const FPayloadClientScanCargo*>(Packet->Payload());
+    Server->SPScanCargo(Wire->ScannerId, Wire->TargetId, SessionId);
     return true;
 }
 
@@ -687,7 +667,7 @@ static bool MarshalRequestEvent(FPacketBase* Packet, const unsigned int* Args, u
     Wire.ShipId = Args[1];
     Wire.TargetId = Args[2];
     Wire.SecondId = Args[3];
-    Wire.Field_0x10 = (unsigned char)(Args[4] & 0xffu);
+    Wire.bFlag = (unsigned char)(Args[4] & 0xffu);
     Wire.Pad_0x11[0] = 0;
     Wire.Pad_0x11[1] = 0;
     Wire.Pad_0x11[2] = 0;
@@ -697,7 +677,7 @@ static bool MarshalRequestEvent(FPacketBase* Packet, const unsigned int* Args, u
 static bool DeliverRequestEvent(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientRequestEvent Wire = RpcPayloadRead<FPayloadClientRequestEvent>(Packet, 0);
     Server->RequestEvent((int)Wire.EventType, Wire.ShipId, Wire.TargetId, Wire.SecondId,
-                         (unsigned long)Wire.Field_0x10, SessionId);
+                         (unsigned long)Wire.bFlag, SessionId);
     return true;
 }
 
@@ -728,18 +708,17 @@ static bool DeliverRequestCancel(const FPacketBase* Packet, IServer* Server, uns
 // payload values and no session id.
 // ===========================================================================
 static bool MarshalCommComplete(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    FPayloadClientDwordQuad Wire;
-    Wire.Field_0x00 = Args[0];
-    Wire.Field_0x04 = Args[1];
-    Wire.Field_0x08 = Args[2];
-    Wire.Field_0x0c = Args[3];
+    FPayloadClientCommComplete Wire;
+    Wire.SenderId = Args[0];
+    Wire.ReceiverId = Args[1];
+    Wire.MsgId = Args[2];
+    Wire.Result = Args[3];
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverCommComplete(const FPacketBase* Packet, IServer* Server, unsigned int) {
-    const FPayloadClientDwordQuad Wire = RpcPayloadRead<FPayloadClientDwordQuad>(Packet, 0);
-    Server->CommComplete(Wire.Field_0x00, Wire.Field_0x04, Wire.Field_0x08,
-                         (CommResult)Wire.Field_0x0c);
+    const FPayloadClientCommComplete Wire = RpcPayloadRead<FPayloadClientCommComplete>(Packet, 0);
+    Server->CommComplete(Wire.SenderId, Wire.ReceiverId, Wire.MsgId, (CommResult)Wire.Result);
     return true;
 }
 
@@ -789,14 +768,16 @@ static bool MarshalDwordPair(FPacketBase* Packet, const unsigned int* Args, unsi
 }
 
 static bool DeliverLaunchComplete(const FPacketBase* Packet, IServer* Server, unsigned int) {
-    const FPayloadClientDwordPair Wire = RpcPayloadRead<FPayloadClientDwordPair>(Packet, 0);
-    Server->LaunchComplete(Wire.Field_0x00, Wire.Field_0x04);
+    const FPayloadClientLaunchComplete Wire =
+        RpcPayloadRead<FPayloadClientLaunchComplete>(Packet, 0);
+    Server->LaunchComplete(Wire.BaseObjId, Wire.ShipId);
     return true;
 }
 
 static bool DeliverJumpInComplete(const FPacketBase* Packet, IServer* Server, unsigned int) {
-    const FPayloadClientDwordPair Wire = RpcPayloadRead<FPayloadClientDwordPair>(Packet, 0);
-    Server->JumpInComplete(Wire.Field_0x00, Wire.Field_0x04);
+    const FPayloadClientJumpInComplete Wire =
+        RpcPayloadRead<FPayloadClientJumpInComplete>(Packet, 0);
+    Server->JumpInComplete(Wire.SystemId, Wire.ShipId);
     return true;
 }
 
@@ -804,17 +785,17 @@ static bool DeliverJumpInComplete(const FPacketBase* Packet, IServer* Server, un
 // ch3 0x3f HAIL -- sender 0x06d8d980, IServer slot 51 (+0xcc). All three arguments
 // travel; no session is appended.
 // ===========================================================================
-static bool MarshalDwordTriple(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    FPayloadClientDwordTriple Wire;
-    Wire.Field_0x00 = Args[0];
-    Wire.Field_0x04 = Args[1];
-    Wire.Field_0x08 = Args[2];
+static bool MarshalHail(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+    FPayloadClientHail Wire;
+    Wire.ShipId = Args[0];
+    Wire.TargetId = Args[1];
+    Wire.SystemId = Args[2];
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 static bool DeliverHail(const FPacketBase* Packet, IServer* Server, unsigned int) {
-    const FPayloadClientDwordTriple Wire = RpcPayloadRead<FPayloadClientDwordTriple>(Packet, 0);
-    Server->Hail(Wire.Field_0x00, Wire.Field_0x04, Wire.Field_0x08);
+    const FPayloadClientHail Wire = RpcPayloadRead<FPayloadClientHail>(Packet, 0);
+    Server->Hail(Wire.ShipId, Wire.TargetId, Wire.SystemId);
     return true;
 }
 
@@ -1090,7 +1071,7 @@ const FRpcServerCodec GChannel3Codecs[] = {
     { 3, 0x3e, "FLPACKET_CLIENT_LAUNCHCOMPLETE",             0x08,
       MarshalDwordPair,               DeliverLaunchComplete },
     { 3, 0x3f, "FLPACKET_CLIENT_HAIL",                       0x0c,
-      MarshalDwordTriple,             DeliverHail },
+      MarshalHail,             DeliverHail },
     { 3, 0x40, "FLPACKET_CLIENT_REQUEST_USE_ITEM",           0x08,
       MarshalSPRequestUseItem,        DeliverSPRequestUseItem },
     { 3, 0x41, "FLPACKET_CLIENT_ABORT_MISSION",              0x04,

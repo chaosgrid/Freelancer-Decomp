@@ -74,42 +74,19 @@ public:
     // FUN_062ce870 (RET 4, non-virtual): pick the nearest collectable loot into Slot.
     bool AcquireLootTarget(FLootTarget* Slot);
 
-    // ---- Behavior's own +0x04..+0x2b block, still declared per class ----
-    int TypeId;                     // +0x04
-    unsigned CachedHandle08;        // +0x08
-    int ModeSelector0xc;            // +0x0c, OnEvaluateReadiness's result.
-    int UpdateResult10;             // +0x10, OnUpdate's result.
-    void* OwnerContext;             // +0x14, the owner IObjRW* (binder).
-    IObjDB* ObjectDb;
-    float DeltaTime;                // +0x1c
-    IBehaviorManager* BehaviorMgrPtr; // +0x20 (binder)
-    SystemManager* NavHelper;       // +0x24 (binder)
-    unsigned char Flags28;          // +0x28
-    unsigned char Flag29;           // +0x29
-    unsigned char Pad2a[0x2c - 0x2a];
-
     // ---- LootBehavior's own fields ----
     MoveIdea Move;                  // +0x2c
     FaceIdea Face;                  // +0xa4
     unsigned char bHasTractor164;   // +0x164, SetContext: the owner carries tractor equipment
     unsigned char Pad165[3];
     float TractorReach168;          // +0x168, SetContext: tractor range * 0.75
-    unsigned char Flag16c;          // +0x16c, ctor 1; OnApplyDirective's failure path copies op+0x10
+    unsigned char Flag16c;          // +0x16c, ctor 1; OnApplyDirective's failure path copies DirectiveTractorBeamOp::Field_10
     unsigned char Pad16d[3];
     float Field170;                 // +0x170, ctor 13.0f; no reader in this class's code
     FLootTarget Target;             // +0x174
 };
 
 static_assert(sizeof(LootBehavior::FLootTarget) == 0x0c, "LootBehavior::FLootTarget size");
-static_assert(offsetof(LootBehavior, TypeId) == 0x04, "LootBehavior::TypeId offset");
-static_assert(offsetof(LootBehavior, ModeSelector0xc) == 0x0c, "LootBehavior::ModeSelector0xc offset");
-static_assert(offsetof(LootBehavior, UpdateResult10) == 0x10, "LootBehavior::UpdateResult10 offset");
-static_assert(offsetof(LootBehavior, OwnerContext) == 0x14, "LootBehavior::OwnerContext offset");
-static_assert(offsetof(LootBehavior, DeltaTime) == 0x1c, "LootBehavior::DeltaTime offset");
-static_assert(offsetof(LootBehavior, BehaviorMgrPtr) == 0x20, "LootBehavior::BehaviorMgrPtr offset");
-static_assert(offsetof(LootBehavior, NavHelper) == 0x24, "LootBehavior::NavHelper offset");
-static_assert(offsetof(LootBehavior, Flags28) == 0x28, "LootBehavior::Flags28 offset");
-static_assert(offsetof(LootBehavior, Flag29) == 0x29, "LootBehavior::Flag29 offset");
 static_assert(offsetof(LootBehavior, Move) == 0x2c, "LootBehavior::Move offset");
 static_assert(offsetof(LootBehavior, Face) == 0xa4, "LootBehavior::Face offset");
 static_assert(offsetof(LootBehavior, bHasTractor164) == 0x164, "LootBehavior::bHasTractor164 offset");

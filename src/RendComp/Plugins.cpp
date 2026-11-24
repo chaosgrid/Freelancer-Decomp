@@ -30,7 +30,7 @@ static int IrcHandleOk(void* Handle)
 }
 
 // LAB_06c215a0's QueryGeometry test: the mode is argument A, the flags B, the out pointer D.
-static int IrcSlot12CanWrite(int QueryMode, unsigned long Flags, void* Out)
+static int QueryGeometryCanWrite(int QueryMode, unsigned long Flags, void* Out)
 {
     if (QueryMode != 0 && QueryMode != 2 && QueryMode != 3)
         return 0;
@@ -165,7 +165,7 @@ public:
             return 0;
         const int QueryMode = (int)((intptr_t)A);
         const unsigned long Flags = (unsigned long)((uintptr_t)B);
-        if (IrcSlot12CanWrite(QueryMode, Flags, Out) == 0)
+        if (QueryGeometryCanWrite(QueryMode, Flags, Out) == 0)
             return 0;
         return 1;
     }
@@ -871,7 +871,7 @@ public:
             return 0;
         const int QueryMode = (int)((intptr_t)A);
         const unsigned long Flags = (unsigned long)((uintptr_t)B);
-        if (IrcSlot12CanWrite(QueryMode, Flags, Out) == 0)
+        if (QueryGeometryCanWrite(QueryMode, Flags, Out) == 0)
             return 0;
         FTriMeshArch* Mesh = (FTriMeshArch*)Handle;
         int* CountOut = (int*)Out;
@@ -2347,7 +2347,7 @@ public:
             return 0;
         const int QueryMode = (int)((intptr_t)A);
         const unsigned long Flags = (unsigned long)((uintptr_t)B);
-        if (IrcSlot12CanWrite(QueryMode, Flags, Out) == 0)
+        if (QueryGeometryCanWrite(QueryMode, Flags, Out) == 0)
             return 0;
         *(int*)Out = 0;
         return 1;

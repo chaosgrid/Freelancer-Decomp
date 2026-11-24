@@ -45,7 +45,7 @@ CEEngine::CEEngine(CShip* OwnerObj, unsigned short EquipId, Archetype::Engine co
     // FUN_06295c40. Deviation: retail leaves Opaque48 (+0x48) unwritten; the port zeroes it.
     LastWakeThrottle = 0.0f;
     memset(Opaque48, 0, sizeof(Opaque48));
-    CruiseChargeRate = 0.0f;
+    CruiseRampElapsed = 0.0f;
     CruiseChargeTimeElapsed = 0.0f;
     bCruiseActive = 0;
 
@@ -91,7 +91,7 @@ CEEngine::CEEngine(CEEngine const& Other)
 {
     LastWakeThrottle = Other.LastWakeThrottle;
     memcpy(Opaque48, Other.Opaque48, sizeof(Opaque48));
-    CruiseChargeRate = Other.CruiseChargeRate;
+    CruiseRampElapsed = Other.CruiseRampElapsed;
     CruiseChargeTimeElapsed = Other.CruiseChargeTimeElapsed;
     bCruiseActive = Other.bCruiseActive;
 }
@@ -267,7 +267,7 @@ bool CEEngine::EngageCruise(bool Engage, bool Instant)
         float const Thrust = EngineArch->ThrustMultiplier;
         double const Drag = (double)(OwnerShipOrNull(Owner)->get_linear_drag()) *
                             EngineEquipConsts::CRUISING_SPEED;
-        CruiseChargeRate = (float)(
+        CruiseRampElapsed = (float)(
             (double)(EngineEquipConsts::CRUISE_ACCEL_TIME) * Thrust / Drag);
         // A disrupted (negative) or NaN timer only wakes; no charge-time test.
         if (CruiseChargeTimeElapsed >= 0.0f)
@@ -294,7 +294,7 @@ bool CEEngine::EngageCruise(bool Engage, bool Instant)
         Code = 0;
     }
     Notify(INotify::EngineCruiseStateChanged, &Code);
-    CruiseChargeRate = 0.0f;
+    CruiseRampElapsed = 0.0f;
     wakeup();
     return bCruiseActive != 0;
 }
@@ -425,11 +425,11 @@ void CEEngine::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IV
         }
         else
         {
-            // Charged: CruiseChargeRate (+0x4c) is reused as the ramp timer. The sum is stored
-            // but compared and divided unrounded.
+            // Charged: CruiseRampElapsed (+0x4c) advances. The sum is stored but compared and
+            // divided unrounded.
             float Ramp = 1.0f;
-            double const Accel = (double)(CruiseChargeRate) + Dt;
-            CruiseChargeRate = (float)(Accel);
+            double const Accel = (double)(CruiseRampElapsed) + Dt;
+            CruiseRampElapsed = (float)(Accel);
             if (Accel < EngineEquipConsts::CRUISE_ACCEL_TIME)
                 Ramp = (float)(Accel / EngineEquipConsts::CRUISE_ACCEL_TIME);
             // The throttle is read before the call.

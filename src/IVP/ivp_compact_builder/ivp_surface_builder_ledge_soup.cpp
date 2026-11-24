@@ -143,8 +143,8 @@ IVP_SurfaceBuilder_Ledge_Soup::IVP_SurfaceBuilder_Ledge_Soup()
     , m_LeafByteTotal(0)
     , m_BuildTreeScratch(nullptr)
     , m_Ledges()
-    , m_VectorB()
-    , m_VectorC()
+    , m_HullNodes()
+    , m_LeafNodes()
     , m_BBoxMin{ BitsToFloat(0x49742400), BitsToFloat(0x49742400), BitsToFloat(0x49742400), 0.0f }
     , m_BBoxMax{ BitsToFloat(0xc9742400), BitsToFloat(0xc9742400), BitsToFloat(0xc9742400), 0.0f }
     , m_SplitAxis(0)
@@ -159,7 +159,7 @@ IVP_SurfaceBuilder_Ledge_Soup::IVP_SurfaceBuilder_Ledge_Soup()
     , m_VertexDedupIndex(nullptr)
     , m_CompactNodeCursor(nullptr)
     , m_Unknown84{}
-    , m_VectorF()
+    , m_AllNodes()
 {
 }
 
@@ -241,7 +241,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::ComputeLedgeBounds(const IVP_Compact_Ledge* 
 //     m_LeafCount = n; m_BuildTreeScratch = FUN_06343f80(n+1, 8) (calloc);
 //     entry[0].NextIndexOrCount = 1.
 //  2. For each ledge i = 0..n-1 (EBP = i+1):
-//     a. node = operator_new(0x28) zeroed, appended to m_VectorF (retail's
+//     a. node = operator_new(0x28) zeroed, appended to m_AllNodes (retail's
 //        null-allocation branch is dropped: `new` throws).
 //     b. FUN_0635aa60(ledge, &min = local_10, &max = local_30);
 //        node.Center = set_interpolate(p1 = max, p2 = min, 0.5f)
@@ -257,7 +257,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::ComputeLedgeBounds(const IVP_Compact_Ledge* 
 //        m_LeafByteTotal += 0x28; scratch[EBP] = {EBP-1, EBP+1, node}.
 //     g. m_MinRadius: copied when it equals 0.0f (or is unordered), else
 //        when Radius < m_MinRadius or unordered.
-//     h. node appended to m_VectorC.
+//     h. node appended to m_LeafNodes.
 //  3. scratch[EBP-1].NextIndexOrCount = 0 (EBP == n+1 here, entry[0] for n
 //     == 0). When the loop counter > 1: extentX stays on the x87 stack,
 //     extentY / extentZ are spilled as floats; the cascade (less or
@@ -280,7 +280,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::BuildLeafNodes()
         IVP_Compact_Ledge* ledge = m_Ledges[LoopIndex];
 
         BuildNode* node = new BuildNode();
-        m_VectorF.Add(node);
+        m_AllNodes.Add(node);
 
         IVP_U_Point LedgeMin; // local_10 (12 bytes used)
         IVP_U_Point LedgeMax; // local_30
@@ -334,7 +334,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::BuildLeafNodes()
         else if (!(node->Radius >= m_MinRadius))
             m_MinRadius = node->Radius;
 
-        m_VectorC.Add(node);
+        m_LeafNodes.Add(node);
     }
 
     // :0636a5b4: scratch[EBP-1].NextIndexOrCount = 0, unconditionally.
@@ -438,17 +438,17 @@ void IVP_SurfaceBuilder_Ledge_Soup::CompileTree()
     Scratch[0].NextIndexOrCount = 0;
 }
 
-// FUN_0636a2b0: m_VectorC's array only (its nodes are shared with m_VectorF),
-// then every node of m_VectorF and its array, then m_BuildTreeScratch.
+// FUN_0636a2b0: m_LeafNodes's array only (its nodes are shared with m_AllNodes),
+// then every node of m_AllNodes and its array, then m_BuildTreeScratch.
 void IVP_SurfaceBuilder_Ledge_Soup::FreeBuildState()
 {
-    m_VectorC.Clear();
+    m_LeafNodes.Clear();
 
     // FUN_06391d5a (operator delete) on every node; the count is re-read
     // each pass.
-    for (int i = 0; i < m_VectorF.Len(); ++i)
-        delete m_VectorF[i];
-    m_VectorF.Clear();
+    for (int i = 0; i < m_AllNodes.Len(); ++i)
+        delete m_AllNodes[i];
+    m_AllNodes.Clear();
 
     if (m_BuildTreeScratch != nullptr)
     {
@@ -466,7 +466,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::FreeBuildState()
 //    its 4th dword is never written in retail (uninitialised stack).
 //  - v = max - center as floats (local_3c); radius = float(real_length(v))
 //    (local_b8); scaled = float(DAT_063ee788 * radius) (local_c4).
-//  - node = operator_new(0x28) zeroed, appended to m_VectorF; +0x14 =
+//  - node = operator_new(0x28) zeroed, appended to m_AllNodes; +0x14 =
 //    radius, +0x00 = 0, +0x04..+0x10 = the 4 dwords of local_78 (the 4th
 //    is retail stack garbage -- deterministic 0 here, see the body),
 //    +0x1c = 0.
@@ -523,7 +523,7 @@ IVP_SurfaceBuilder_Ledge_Soup::BuildNode* IVP_SurfaceBuilder_Ledge_Soup::SplitBu
     const float Scaled = (float)((double)(BitsToFloat(0x3B83126Fu)) * Radius);       // DAT_063ee788, FSTP local_c4
 
     BuildNode* node = new BuildNode();
-    m_VectorF.Add(node);
+    m_AllNodes.Add(node);
 
     node->Radius = Radius;                                            // :0636a969
     node->ScratchIndex = 0;                                           // :0636a96c
@@ -759,11 +759,11 @@ uint32_t IVP_SurfaceBuilder_Ledge_Soup::CopyLedgeIntoSurface(const void* sourceL
 }
 
 // FUN_0636b520, called from BuildCompactSurface().
-//  - m_VectorC (only when options[2] == 0): each node's Ledge is replaced by
+//  - m_LeafNodes (only when options[2] == 0): each node's Ledge is replaced by
 //    the output cursor before the copy, CopyLedgeIntoSurface() advances the
 //    cursor, and the source ledge is freed (FUN_06343ff0) when options[1]
 //    == 1 and it is non-null.
-//  - m_VectorB (the root hull of BuildRootConvexHull()) the same way, with
+//  - m_HullNodes (the root hull of BuildRootConvexHull()) the same way, with
 //    no options tests: the source is freed whenever it is non-null.
 //  - Then m_Ledges is cleared.
 void IVP_SurfaceBuilder_Ledge_Soup::MergeLedgesIntoSurface()
@@ -773,9 +773,9 @@ void IVP_SurfaceBuilder_Ledge_Soup::MergeLedgesIntoSurface()
 
     if (options[2] == 0)
     {
-        for (int i = 0; i < m_VectorC.Len(); ++i)
+        for (int i = 0; i < m_LeafNodes.Len(); ++i)
         {
-            BuildNode* node = m_VectorC[i];
+            BuildNode* node = m_LeafNodes[i];
             IVP_Compact_Ledge* sourceLedge = node->Ledge;
             node->Ledge = (IVP_Compact_Ledge*)cursor;
             const uint32_t size = CopyLedgeIntoSurface(sourceLedge, cursor);
@@ -785,9 +785,9 @@ void IVP_SurfaceBuilder_Ledge_Soup::MergeLedgesIntoSurface()
         }
     }
 
-    for (int i = 0; i < m_VectorB.Len(); ++i)
+    for (int i = 0; i < m_HullNodes.Len(); ++i)
     {
-        BuildNode* node = m_VectorB[i];
+        BuildNode* node = m_HullNodes[i];
         IVP_Compact_Ledge* sourceLedge = node->Ledge;
         node->Ledge = (IVP_Compact_Ledge*)cursor;
         const uint32_t size = CopyLedgeIntoSurface(sourceLedge, cursor);
@@ -813,30 +813,30 @@ bool IVP_SurfaceBuilder_Ledge_Soup::BuildCompactSurface()
     int32_t TriangleTotal = 0;    // EDI: summed ledge NTriangles (MOVSX).
     int32_t totalNodeCount = 0;   // local_18
 
-    // m_VectorC only when options[2] == 0.
+    // m_LeafNodes only when options[2] == 0.
     if (options[2] == 0)
     {
-        const int32_t CountC = m_VectorC.Len();
+        const int32_t CountC = m_LeafNodes.Len();
         if (CountC > 0)
         {
             totalNodeCount = CountC;
             for (int32_t i = 0; i < CountC; ++i)
             {
-                const IVP_Compact_Ledge* ledge = m_VectorC.elems[i]->Ledge;
+                const IVP_Compact_Ledge* ledge = m_LeafNodes.elems[i]->Ledge;
                 byteTotal += (ledge->SizeAndFlags >> 8) << 4;
                 TriangleTotal += ledge->NTriangles;
             }
         }
     }
 
-    // m_VectorB always.
-    const int32_t CountB = m_VectorB.Len();
+    // m_HullNodes always.
+    const int32_t CountB = m_HullNodes.Len();
     if (CountB > 0)
     {
         totalNodeCount += CountB;
         for (int32_t i = 0; i < CountB; ++i)
         {
-            const IVP_Compact_Ledge* ledge = m_VectorB.elems[i]->Ledge;
+            const IVP_Compact_Ledge* ledge = m_HullNodes.elems[i]->Ledge;
             byteTotal += (ledge->SizeAndFlags >> 8) << 4;
             TriangleTotal += ledge->NTriangles;
         }
@@ -1283,10 +1283,10 @@ bool IVP_SurfaceBuilder_Ledge_Soup::ComputeSurfaceMassProperties(const void* Com
 // FUN_0635ac10. Per triangle: N = FUN_0635b940(edge0), inv = 1 / |N|^2; per edge start
 // point: d = p - com, local_28 = max(|d|^2), local_24 = max(|d x N|^2 * inv)
 // (squared distance from the line com + t*N). Tail (also reached with no
-// triangles): *upper = max(*upper, sqrt(local_28)); when the aux POINTER is
-// non-null, *aux = max(*aux, sqrt(local_24)).
+// triangles): *upper = max(*upper, sqrt(local_28)); when the dev POINTER is
+// non-null, *dev = max(*dev, sqrt(local_24)).
 void IVP_SurfaceBuilder_Ledge_Soup::AccumulateLeafLedgeRadii(const IVP_Compact_Ledge* leaf, const float centerOfMass[3],
-                                                               float* upperLimitRadiusAccum, float* auxRadiusMetricAccum)
+                                                               float* upperLimitRadiusAccum, float* maxSurfaceDeviationAccum)
 {
     float MaxDistSq = 0.0f; // local_28
     float MaxAuxSq = 0.0f;  // local_24
@@ -1325,10 +1325,10 @@ void IVP_SurfaceBuilder_Ledge_Soup::AccumulateLeafLedgeRadii(const IVP_Compact_L
     const double Dist = std::sqrt((double)(MaxDistSq));
     if (Dist > *upperLimitRadiusAccum) *upperLimitRadiusAccum = (float)(Dist);
 
-    if (auxRadiusMetricAccum != nullptr)
+    if (maxSurfaceDeviationAccum != nullptr)
     {
         const double Aux = std::sqrt((double)(MaxAuxSq));
-        if (Aux > *auxRadiusMetricAccum) *auxRadiusMetricAccum = (float)(Aux);
+        if (Aux > *maxSurfaceDeviationAccum) *maxSurfaceDeviationAccum = (float)(Aux);
     }
 }
 
@@ -1336,24 +1336,24 @@ void IVP_SurfaceBuilder_Ledge_Soup::AccumulateLeafLedgeRadii(const IVP_Compact_L
 // {0x400, 0, FUN_06343f70(0x1000)} vector (FUN_0635abf0, get_all_ledges) and
 // runs AccumulateLeafLedgeRadii() on each, descending.
 void IVP_SurfaceBuilder_Ledge_Soup::ComputeSurfaceRadii(const void* CompiledSurface, const float centerOfMass[3],
-                                                          float* outUpperLimitRadius, float* outAuxRadiusMetric)
+                                                          float* outUpperLimitRadius, float* outMaxSurfaceDeviation)
 {
     *outUpperLimitRadius = 0.0f; // :0635adc6
-    *outAuxRadiusMetric = 0.0f;  // :0635adcd
+    *outMaxSurfaceDeviation = 0.0f;  // :0635adcd
 
     FLedgeSoupLeafList Leaves(0x400); // {0x400, 0, FUN_06343f70(0x1000)}
     IVP_Compact_Ledge_Solver::get_all_ledges(static_cast<const IVP_Compact_Surface*>(CompiledSurface), &Leaves.List); // :0635adf2 FUN_0635abf0
 
     for (int32_t i = Leaves.List.Count - 1; i >= 0; --i)
         AccumulateLeafLedgeRadii(static_cast<const IVP_Compact_Ledge*>(Leaves.List.Elems[i]), centerOfMass,
-                                 outUpperLimitRadius, outAuxRadiusMetric);
+                                 outUpperLimitRadius, outMaxSurfaceDeviation);
 }
 
 // FUN_0636b6a0: Compile()'s mass-property
 // step between CompileTree() and FreeBuildState(). Writes centerOfMass
 // (+0x0), rotationInertia (+0xc), upper_limit_radius (+0x18) into the
-// compiled surface header and splices a bucket byte into the low byte of the
-// packed size/flags dword at +0x1c.
+// compiled surface header and splices max_factor_surface_deviation into the
+// low byte of the packed size/flags dword at +0x1c.
 void IVP_SurfaceBuilder_Ledge_Soup::ApplyMassPropertyHeader()
 {
     // FUN_0636d650; its return value is ignored.
@@ -1362,8 +1362,8 @@ void IVP_SurfaceBuilder_Ledge_Soup::ApplyMassPropertyHeader()
     ComputeSurfaceMassProperties(m_CompactSurface, CenterOfMass, RotationInertia);
 
     float UpperLimitRadius;
-    float AuxRadiusMetric;
-    ComputeSurfaceRadii(m_CompactSurface, CenterOfMass, &UpperLimitRadius, &AuxRadiusMetric);
+    float MaxSurfaceDeviation;
+    ComputeSurfaceRadii(m_CompactSurface, CenterOfMass, &UpperLimitRadius, &MaxSurfaceDeviation);
 
     // Dword copies, inertia to +0xc..+0x14 first,
     // then com to +0x0..+0x8, then upper to +0x18.
@@ -1372,10 +1372,10 @@ void IVP_SurfaceBuilder_Ledge_Soup::ApplyMassPropertyHeader()
     std::memcpy(Blob + 0x0, CenterOfMass, sizeof(CenterOfMass));
     std::memcpy(Blob + 0x18, &UpperLimitRadius, sizeof(UpperLimitRadius));
 
-    // byte(ftol(aux / (upper * DAT_063a54b4) + 1.0f)) into the low byte of
-    // [+0x1c], all on the x87 stack.
+    // byte(ftol(dev / (upper * DAT_063a54b4) + 1.0f)) into the low byte of
+    // [+0x1c], all on the x87 stack: the deviation in units of upper / 250.
     const double Scaled = (double)(UpperLimitRadius) * (double)(BitsToFloat(0x3B83126Fu));
-    const double Bucket = (double)(AuxRadiusMetric) / Scaled + 1.0;
+    const double Bucket = (double)(MaxSurfaceDeviation) / Scaled + 1.0;
     const uint32_t ClassifiedByte = static_cast<uint32_t>(static_cast<int32_t>(Bucket)) & 0xffu;
 
     uint32_t PackedSizeAndFlags;
@@ -1408,7 +1408,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::CollectNodeLedges(IVP_U_Vector<IVP_Compact_L
 // (FUN_0636ca00: ledge vector with 0x80 preallocated slots) collects every
 // ledge below the root (FUN_0636a190) and FUN_0636cf70 builds their convex
 // hull; the hull is appended to m_Ledges, stored as the root's ledge and the
-// root is appended to m_VectorB; the builder's vector is released by
+// root is appended to m_HullNodes; the builder's vector is released by
 // FUN_063449d0 (EH state 0 -> RAII here).
 void IVP_SurfaceBuilder_Ledge_Soup::BuildRootConvexHull()
 {
@@ -1422,7 +1422,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::BuildRootConvexHull()
 
     m_Ledges.Add(Hull);
     Root->Ledge = Hull;
-    m_VectorB.Add(Root);
+    m_HullNodes.Add(Root);
 }
 
 // FUN_0636a0b0.

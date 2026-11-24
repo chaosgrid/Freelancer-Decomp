@@ -9,7 +9,7 @@
 #include "NeuroNet/Chat/chat_init.h"
 #include "Core/event_handler.h"
 
-#include "Interface/Pages/character_select_equip.h"   // GetPlayerSpawnSystemIdRetail (FUN_004c4670)
+#include "Interface/Pages/character_select_equip.h"   // GetPlayerRepVibeRetail (FUN_004c4670)
 #include "NeuroNet/Chat/chat_msg_win.h"
 #include "NeuroNet/Chat/chat_text_input.h"          // ChatTextInputDisplay ("CTID")
 #include "Space/HUD/hud_command_dispatch.h"     // HudRegisterCommandHandler / HudDestroyEventHandler
@@ -17,7 +17,7 @@
 #include "Common/Fonts/ids_strings.h"              // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "Interface/menu_ui_widgets.h"
 #include "NeuroNet/nn_group_control.h"
-#include "NeuroNet/nn_ui_pulse.h"              // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteArgb_679ba4
+#include "NeuroNet/nn_ui_pulse.h"              // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteAmber
 #include "Space/player_spawn.h"             // GetPlayerConnectionId (DAT_00673344)
 #include "Interface/rich_text_win.h"
 #include "Interface/win_factory.h"
@@ -49,32 +49,32 @@ namespace
     // 0x0060f4a0): byte +0 = the flags byte, the dword at +1 = (old & 0xff000000) | RGB over
     // zeroed .data -- so Packed = flags | RGB << 8. Retail spaces them 8 bytes apart; only the
     // first dword is ever read (StyleCollection::set_style copies Packed).
-    TextRenderAttributes G_ChatStyle_66da14 = {0xffffff10u}; // LAB_0045df30
-    TextRenderAttributes G_ChatStyle_66da0c = {0x1dbf3b16u}; // LAB_0045df50
-    TextRenderAttributes G_ChatStyle_66da04 = {0xffffff00u}; // LAB_0045df70
-    TextRenderAttributes G_ChatStyle_66d9fc = {0xe0c38700u}; // LAB_0045df90
-    TextRenderAttributes G_ChatStyle_66d9f4 = {0x1dbf3b00u}; // LAB_0045dfb0
-    TextRenderAttributes G_ChatStyle_66d9ec = {0x1dbf3b02u}; // LAB_0045dfd0
-    TextRenderAttributes G_ChatStyle_66d9e4 = {0xffffff01u}; // LAB_0045dff0
-    TextRenderAttributes G_ChatStyle_66d9dc = {0x1d1dbf01u}; // LAB_0045e010
-    TextRenderAttributes G_ChatStyle_66d9d4 = {0xfd7eff00u}; // LAB_0045e030
-    TextRenderAttributes G_ChatStyle_66d9cc = {0x52eaf501u}; // LAB_0045e050
-    TextRenderAttributes G_ChatStyle_66d9c4 = {0x52eaf506u}; // LAB_0045e070
-    TextRenderAttributes G_ChatStyle_66d9bc = {0xffffff00u}; // LAB_0045e090
-    TextRenderAttributes G_ChatStyle_66d9b4 = {0xe0c38708u}; // LAB_0045e0b0
-    TextRenderAttributes G_ChatStyle_66d9ac = {0xe0c38718u}; // LAB_0045e0d0
-    TextRenderAttributes G_ChatStyle_66d9a4 = {0xe0c38718u}; // LAB_0045e0f0
-    TextRenderAttributes G_ChatStyle_66d99c = {0xe0c38708u}; // LAB_0045e110
-    TextRenderAttributes G_ChatStyle_66d994 = {0x52eaf508u}; // LAB_0045e130
-    TextRenderAttributes G_ChatStyle_66d98c = {0xe0c38700u}; // LAB_0045e150
-    TextRenderAttributes G_ChatStyle_66d984 = {0x52eaf500u}; // LAB_0045e170
-    TextRenderAttributes G_ChatStyle_66d97c = {0xb6b6b600u}; // LAB_0045e190
-    TextRenderAttributes G_ChatStyle_66d974 = {0xe0c38708u}; // LAB_0045e1b0
-    TextRenderAttributes G_ChatStyle_66d96c = {0x52eaf508u}; // LAB_0045e1d0
-    TextRenderAttributes G_ChatStyle_66d964 = {0xb6b6b608u}; // LAB_0045e1f0
-    TextRenderAttributes G_ChatStyle_66d95c = {0xe0c38700u}; // LAB_0045e210
-    TextRenderAttributes G_ChatStyle_66d954 = {0xe0c38728u}; // LAB_0045e230
-    TextRenderAttributes G_ChatStyle_66d94c = {0xe0c38701u}; // LAB_0045e250
+    TextRenderAttributes G_ChatStyleAttrs_d5ec = {0xffffff10u}; // DAT_0066da14, LAB_0045df30
+    TextRenderAttributes G_ChatStyleAttrsConsole = {0x1dbf3b16u}; // DAT_0066da0c, LAB_0045df50
+    TextRenderAttributes G_ChatStyleAttrsUniverse = {0xffffff00u}; // DAT_0066da04, LAB_0045df70
+    TextRenderAttributes G_ChatStyleAttrsSystem = {0xe0c38700u}; // DAT_0066d9fc, LAB_0045df90
+    TextRenderAttributes G_ChatStyleAttrsLocal = {0x1dbf3b00u}; // DAT_0066d9f4, LAB_0045dfb0
+    TextRenderAttributes G_ChatStyleAttrsPlayer = {0x1dbf3b02u}; // DAT_0066d9ec, LAB_0045dfd0
+    TextRenderAttributes G_ChatStyleAttrs_e784 = {0xffffff01u}; // DAT_0066d9e4, LAB_0045dff0
+    TextRenderAttributes G_ChatStyleAttrsNotice = {0x1d1dbf01u}; // DAT_0066d9dc, LAB_0045e010
+    TextRenderAttributes G_ChatStyleAttrsGroup = {0xfd7eff00u}; // DAT_0066d9d4, LAB_0045e030
+    TextRenderAttributes G_ChatStyleAttrs_66b7 = {0x52eaf501u}; // DAT_0066d9cc, LAB_0045e050
+    TextRenderAttributes G_ChatStyleAttrs_2b34 = {0x52eaf506u}; // DAT_0066d9c4, LAB_0045e070
+    TextRenderAttributes G_ChatStyleAttrs_66ac = {0xffffff00u}; // DAT_0066d9bc, LAB_0045e090
+    TextRenderAttributes G_ChatStyleAttrsButton = {0xe0c38708u}; // DAT_0066d9b4, LAB_0045e0b0
+    TextRenderAttributes G_ChatStyleAttrsScreenTitle = {0xe0c38718u}; // DAT_0066d9ac, LAB_0045e0d0
+    TextRenderAttributes G_ChatStyleAttrsScreenSubtitle = {0xe0c38718u}; // DAT_0066d9a4, LAB_0045e0f0
+    TextRenderAttributes G_ChatStyleAttrsColumnHeader = {0xe0c38708u}; // DAT_0066d99c, LAB_0045e110
+    TextRenderAttributes G_ChatStyleAttrsColumnHeaderSorted = {0x52eaf508u}; // DAT_0066d994, LAB_0045e130
+    TextRenderAttributes G_ChatStyleAttrsRow = {0xe0c38700u}; // DAT_0066d98c, LAB_0045e150
+    TextRenderAttributes G_ChatStyleAttrsRowSelected = {0x52eaf500u}; // DAT_0066d984, LAB_0045e170
+    TextRenderAttributes G_ChatStyleAttrsDisabled = {0xb6b6b600u}; // DAT_0066d97c, LAB_0045e190
+    TextRenderAttributes G_ChatStyleAttrsRowDetail = {0xe0c38708u}; // DAT_0066d974, LAB_0045e1b0
+    TextRenderAttributes G_ChatStyleAttrsRowDetailSelected = {0x52eaf508u}; // DAT_0066d96c, LAB_0045e1d0
+    TextRenderAttributes G_ChatStyleAttrs_867f = {0xb6b6b608u}; // DAT_0066d964, LAB_0045e1f0
+    TextRenderAttributes G_ChatStyleAttrsBody = {0xe0c38700u}; // DAT_0066d95c, LAB_0045e210
+    TextRenderAttributes G_ChatStyleAttrs_686c = {0xe0c38728u}; // DAT_0066d954, LAB_0045e230
+    TextRenderAttributes G_ChatStyleAttrsCardTitle = {0xe0c38701u}; // DAT_0066d94c, LAB_0045e250
 
     // FUN_00468c20's colour copy: bytes 0..2 of a palette colour into bytes 1..3 of the
     // attributes; the flags byte stays.
@@ -87,44 +87,44 @@ namespace
 void ChatRegisterTextStyles()
 {
     // FUN_00468c20.
-    StyleCollection::set_style(0xd5ec, G_ChatStyle_66da14);
-    StyleCollection::set_style(0x73f7, G_ChatStyle_66da0c);
-    StyleCollection::set_style(0xd681, G_ChatStyle_66da04);
-    StyleCollection::set_style(0xd801, G_ChatStyle_66d9fc);
-    StyleCollection::set_style(0x1d9d, G_ChatStyle_66d9f4);
-    StyleCollection::set_style(0x8283, G_ChatStyle_66d9ec);
-    StyleCollection::set_style(0xe784, G_ChatStyle_66d9e4);
-    StyleCollection::set_style(0x3ea8, G_ChatStyle_66d9dc);
-    StyleCollection::set_style(0xba28, G_ChatStyle_66d9d4);
-    StyleCollection::set_style(0x66b7, G_ChatStyle_66d9cc);
-    StyleCollection::set_style(0x2b34, G_ChatStyle_66d9c4);
-    StyleCollection::set_style(0x66ac, G_ChatStyle_66d9bc);
-    StyleCollection::set_style(0x828b, G_ChatStyle_66d9b4);
-    StyleCollection::set_style(0x1df5, G_ChatStyle_66d9ac);
-    StyleCollection::set_style(0x43e0, G_ChatStyle_66d9a4);
-    StyleCollection::set_style(0xd824, G_ChatStyle_66d99c);
-    StyleCollection::set_style(0xd190, G_ChatStyle_66d994);
-    StyleCollection::set_style(0x69f5, G_ChatStyle_66d98c);
-    StyleCollection::set_style(0x3343, G_ChatStyle_66d984);
-    StyleCollection::set_style(0xbb80, G_ChatStyle_66d97c);
-    StyleCollection::set_style(0x5203, G_ChatStyle_66d974);
-    StyleCollection::set_style(0x3dbc, G_ChatStyle_66d96c);
-    StyleCollection::set_style(0x867f, G_ChatStyle_66d964);
+    StyleCollection::set_style(0xd5ec, G_ChatStyleAttrs_d5ec);
+    StyleCollection::set_style(kTextStyleChatConsole, G_ChatStyleAttrsConsole);
+    StyleCollection::set_style(kTextStyleChatUniverse, G_ChatStyleAttrsUniverse);
+    StyleCollection::set_style(kTextStyleChatSystem, G_ChatStyleAttrsSystem);
+    StyleCollection::set_style(kTextStyleChatLocal, G_ChatStyleAttrsLocal);
+    StyleCollection::set_style(kTextStyleChatPlayer, G_ChatStyleAttrsPlayer);
+    StyleCollection::set_style(0xe784, G_ChatStyleAttrs_e784);
+    StyleCollection::set_style(kTextStyleNotice, G_ChatStyleAttrsNotice);
+    StyleCollection::set_style(kTextStyleChatGroup, G_ChatStyleAttrsGroup);
+    StyleCollection::set_style(0x66b7, G_ChatStyleAttrs_66b7);
+    StyleCollection::set_style(0x2b34, G_ChatStyleAttrs_2b34);
+    StyleCollection::set_style(0x66ac, G_ChatStyleAttrs_66ac);
+    StyleCollection::set_style(kTextStyleButton, G_ChatStyleAttrsButton);
+    StyleCollection::set_style(kTextStyleScreenTitle, G_ChatStyleAttrsScreenTitle);
+    StyleCollection::set_style(kTextStyleScreenSubtitle, G_ChatStyleAttrsScreenSubtitle);
+    StyleCollection::set_style(kTextStyleColumnHeader, G_ChatStyleAttrsColumnHeader);
+    StyleCollection::set_style(kTextStyleColumnHeaderSorted, G_ChatStyleAttrsColumnHeaderSorted);
+    StyleCollection::set_style(kTextStyleRow, G_ChatStyleAttrsRow);
+    StyleCollection::set_style(kTextStyleRowSelected, G_ChatStyleAttrsRowSelected);
+    StyleCollection::set_style(kTextStyleDisabled, G_ChatStyleAttrsDisabled);
+    StyleCollection::set_style(kTextStyleRowDetail, G_ChatStyleAttrsRowDetail);
+    StyleCollection::set_style(kTextStyleRowDetailSelected, G_ChatStyleAttrsRowDetailSelected);
+    StyleCollection::set_style(0x867f, G_ChatStyleAttrs_867f);
 
-    // Four styles take the HUD chrome colour (DAT_00679bb4), and one more reuses the 66d95c
-    // record with the pulse amber (DAT_00679ba4).
+    // Four styles take the HUD chrome colour (DAT_00679bb4), and one more reuses the body
+    // record (DAT_0066d95c) with the pulse amber (DAT_00679ba4).
     unsigned long const Chrome = static_cast<unsigned long>(G_HudChromeColorRgba[0]) |
                                  (static_cast<unsigned long>(G_HudChromeColorRgba[1]) << 8) |
                                  (static_cast<unsigned long>(G_HudChromeColorRgba[2]) << 16);
-    ChatStyleTakeColor(G_ChatStyle_66d95c, Chrome);
-    StyleCollection::set_style(0x9ca4, G_ChatStyle_66d95c);
-    StyleCollection::set_style(0x76ec, G_ChatStyle_66d95c);
-    ChatStyleTakeColor(G_ChatStyle_66d954, Chrome);
-    StyleCollection::set_style(0x686c, G_ChatStyle_66d954);
-    ChatStyleTakeColor(G_ChatStyle_66d94c, Chrome);
-    StyleCollection::set_style(0xf64, G_ChatStyle_66d94c);
-    ChatStyleTakeColor(G_ChatStyle_66d95c, G_NnPaletteArgb_679ba4);
-    StyleCollection::set_style(0x3d0a, G_ChatStyle_66d95c);
+    ChatStyleTakeColor(G_ChatStyleAttrsBody, Chrome);
+    StyleCollection::set_style(kTextStyleBody, G_ChatStyleAttrsBody);
+    StyleCollection::set_style(0x76ec, G_ChatStyleAttrsBody);
+    ChatStyleTakeColor(G_ChatStyleAttrs_686c, Chrome);
+    StyleCollection::set_style(0x686c, G_ChatStyleAttrs_686c);
+    ChatStyleTakeColor(G_ChatStyleAttrsCardTitle, Chrome);
+    StyleCollection::set_style(kTextStyleCardTitle, G_ChatStyleAttrsCardTitle);
+    ChatStyleTakeColor(G_ChatStyleAttrsBody, G_NnPaletteAmber);
+    StyleCollection::set_style(kTextStyleBodyHighlight, G_ChatStyleAttrsBody);
 
     // Style 0x4433 is a list; retail clones each node twice and deletes the first clone.
     RenderDisplayList Style;
@@ -142,15 +142,15 @@ void ChatRegisterTextStyles()
         RdlAppendNode(Style, JustifyClone->Clone());
         delete JustifyClone;
     }
-    StyleCollection::set_style(0x4433, Style);
+    StyleCollection::set_style(kTextStyleList, Style);
 }
 
 FChatMessageStore* G_ChatMessageStore = nullptr;
 FChatDisplaySnapshot* G_ChatAllMessages = nullptr;
 FChatDisplaySnapshot* G_ChatRecentMessages = nullptr;
-std::map<unsigned, RenderDisplayList*>* G_ChatNameCache70 = nullptr;
-std::map<unsigned, RenderDisplayList*>* G_ChatNameCache74 = nullptr;
-std::map<unsigned, RenderDisplayList*>* G_ChatNameCache78 = nullptr;
+std::map<unsigned, RenderDisplayList*>* G_ChatSystemNameCache = nullptr;
+std::map<unsigned, RenderDisplayList*>* G_ChatShipArchNameCache = nullptr;
+std::map<unsigned, RenderDisplayList*>* G_ChatBaseNameCache = nullptr;
 FChatChannelTable* G_ChatChannelTable = nullptr;
 MsgWin* G_ChatMsgWin = nullptr;
 NnGroupControl* G_ChatGroupControl = nullptr;
@@ -176,9 +176,6 @@ namespace
     // the input line's X. (LAB_0045def0 copies it into DAT_0066da2c, which nothing reads.)
     float const G_ChatInputX = 0.46f * -0.5f;
 
-    // The prefix style (0x3ea8) every system notice opens with.
-    const unsigned short kChatNoticeStyle = 0x3ea8;
-
     // The clock()/1000*1000 stamp every chat path computes (0x10624dd3 multiply = signed /1000).
     int ChatNowMsRounded()
     {
@@ -195,7 +192,7 @@ namespace
     // trailing paragraph stripped, or JustifyNode(1) + the debug text.
     void BuildPrefix(RenderDisplayList& Prefix, unsigned Ids, wchar_t const* DebugText)
     {
-        StyleNode Style(kChatNoticeStyle);
+        StyleNode Style(kTextStyleNotice);
         RdlAppendNode(Prefix, Style.Clone());
         LoadIdsTextIntoRdl(Ids, Prefix, DebugText);
     }
@@ -302,6 +299,13 @@ void ChatAppendRdlCopy(RenderDisplayList& Dst, RenderDisplayList const& Source)
     {
         RdlAppendNode(Dst, static_cast<RDLNode*>(Cell[2])->Clone());
     }
+}
+
+void ChatAppendNodeClone(RenderDisplayList& List, RDLNode const& Node)
+{
+    RDLNode* const Temp = Node.Clone();
+    RdlAppendNode(List, Temp->Clone());
+    delete Temp;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -520,9 +524,9 @@ void ChatInit()
     G_ChatImageRoot.assign("Interface\\NeuroNet\\Chat\\");
 
     // The three name caches (FUN_004c5a10).
-    G_ChatNameCache70 = new std::map<unsigned, RenderDisplayList*>();
-    G_ChatNameCache74 = new std::map<unsigned, RenderDisplayList*>();
-    G_ChatNameCache78 = new std::map<unsigned, RenderDisplayList*>();
+    G_ChatSystemNameCache = new std::map<unsigned, RenderDisplayList*>();
+    G_ChatShipArchNameCache = new std::map<unsigned, RenderDisplayList*>();
+    G_ChatBaseNameCache = new std::map<unsigned, RenderDisplayList*>();
 
     G_ChatMessageStore = new FChatMessageStore(kChatMessageStoreCapacity,
                                                kChatMessageStoreMaxCount,
@@ -592,9 +596,9 @@ void ChatShutdown()
         G_ChatAllMessages = nullptr;
         G_ChatRecentMessages = nullptr;
     }
-    DestroyNameCache(G_ChatNameCache70);
-    DestroyNameCache(G_ChatNameCache74);
-    DestroyNameCache(G_ChatNameCache78);
+    DestroyNameCache(G_ChatSystemNameCache);
+    DestroyNameCache(G_ChatShipArchNameCache);
+    DestroyNameCache(G_ChatBaseNameCache);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -956,7 +960,7 @@ void MsgWin::Update()
             // The map holds the affiliation the client had; Vibe::GetAffiliation the one it has.
             unsigned const Lost = It->second;
             unsigned Current = 0xffffffffu;
-            int const PlayerVibe = GetPlayerSpawnSystemIdRetail();   // FUN_004c4670
+            int const PlayerVibe = GetPlayerRepVibeRetail();   // FUN_004c4670
             Reputation::Vibe::GetAffiliation(PlayerVibe, Current, false);
             if (Lost != 0xffffffffu)
             {
@@ -1069,36 +1073,36 @@ void ChatSetServerMotd(const wchar_t* Text)
 RenderDisplayList* ChatGetSystemName(unsigned SystemId)
 {
     // FUN_0046b6a0 -> FUN_00466770 on DAT_0066da70.
-    RenderDisplayList* const Cached = CacheFindName(*G_ChatNameCache70, SystemId);
+    RenderDisplayList* const Cached = CacheFindName(*G_ChatSystemNameCache, SystemId);
     if (Cached != nullptr)
         return Cached;
     RenderDisplayList* const Name = new RenderDisplayList();
     Universe::ISystem const* const System = Universe::get_system(SystemId);
-    return CacheNewName(*G_ChatNameCache70, SystemId, Name, System != nullptr,
+    return CacheNewName(*G_ChatSystemNameCache, SystemId, Name, System != nullptr,
                         System != nullptr ? (unsigned)System->GetStridName() : 0);
 }
 
 RenderDisplayList* ChatGetShipArchName(unsigned ShipArchId)
 {
     // FUN_0046b6c0 -> FUN_0046b6e0 on DAT_0066da74.
-    RenderDisplayList* const Cached = CacheFindName(*G_ChatNameCache74, ShipArchId);
+    RenderDisplayList* const Cached = CacheFindName(*G_ChatShipArchNameCache, ShipArchId);
     if (Cached != nullptr)
         return Cached;
     RenderDisplayList* const Name = new RenderDisplayList();
     Archetype::Ship* const Ship = Archetype::GetShip(ShipArchId);
-    return CacheNewName(*G_ChatNameCache74, ShipArchId, Name, Ship != nullptr,
+    return CacheNewName(*G_ChatShipArchNameCache, ShipArchId, Name, Ship != nullptr,
                         Ship != nullptr ? static_cast<unsigned>(Ship->IdsName) : 0);
 }
 
 RenderDisplayList* ChatGetBaseName(unsigned BaseId)
 {
     // FUN_0046b890 -> FUN_0046b8b0 on DAT_0066da78.
-    RenderDisplayList* const Cached = CacheFindName(*G_ChatNameCache78, BaseId);
+    RenderDisplayList* const Cached = CacheFindName(*G_ChatBaseNameCache, BaseId);
     if (Cached != nullptr)
         return Cached;
     RenderDisplayList* const Name = new RenderDisplayList();
     Universe::IBase* const Base = Universe::get_base(BaseId);
-    return CacheNewName(*G_ChatNameCache78, BaseId, Name, Base != nullptr,
+    return CacheNewName(*G_ChatBaseNameCache, BaseId, Name, Base != nullptr,
                         Base != nullptr ? static_cast<unsigned>(Base->StridName) : 0);
 }
 

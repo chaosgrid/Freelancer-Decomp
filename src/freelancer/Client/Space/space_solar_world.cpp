@@ -43,7 +43,7 @@ bool SpawnWorldSolarFromObjectSection(INI_Reader& Reader)
     // the rest.
     CSolar::CreateParms Parms{};
     InitCreateParmsScratchRetail(&Parms);
-    Parms.DockingCount = 0;
+    Parms.DockingBaseId = 0;
     Parms.VibeId = 0xffffffffu;
     Parms.SpaceCostume.PartIds[0] = 0;
     Parms.SpaceCostume.PartIds[1] = 0;

@@ -68,7 +68,7 @@ struct RPCLOCAL_API IServerImpl : public IServer, public IChatServer {
     void SetTarget(unsigned int PlayerId, const XSetTarget& Info) override;
     void TractorObjects(unsigned int PlayerId, const XTractorObjects& Info) override;
     void GoTradelane(unsigned int PlayerId, const XGoTradelane& Info) override;
-    void StopTradelane(unsigned int SessionId, unsigned int Arg1, unsigned int Arg2, unsigned int Arg3) override;
+    void StopTradelane(unsigned int SessionId, unsigned int ShipId, unsigned int TradelaneRing1, unsigned int TradelaneRing2) override;
     void JettisonCargo(unsigned int PlayerId, const XJettisonCargo& Info) override;
     bool Startup(const SStartupInfo& Info) override;
     void Shutdown() override;
@@ -80,7 +80,7 @@ struct RPCLOCAL_API IServerImpl : public IServer, public IChatServer {
     void DisConnect(unsigned int SessionId, EFLConnection Type) override;
     void OnConnect(unsigned int SessionId) override;
     void Login(const SLoginInfo& Info, unsigned int SessionId) override;
-    void CharacterInfoReq(unsigned int SessionId, bool bFullInfo) override;
+    void CharacterInfoReq(unsigned int SessionId, bool bSendEmpty) override;
     void CharacterSelect(const CHARACTER_ID& CharId, unsigned int SessionId) override;
     void NewCharacterInfoReq(unsigned int SessionId) override;
     void CreateNewCharacter(const SCreateCharacterInfo& Info, unsigned int SessionId) override;
@@ -104,14 +104,14 @@ struct RPCLOCAL_API IServerImpl : public IServer, public IChatServer {
     void LocationInfoRequest(unsigned int LocationId, unsigned int SessionId, bool bFull) override;
     void GFObjSelect(unsigned int ObjectId, unsigned int SessionId) override;
     void GFGoodVaporized(const SGFGoodVaporizedInfo& Info, unsigned int SessionId) override;
-    void MissionResponse(unsigned int Arg0, unsigned long MissionId, unsigned char bAccepted, unsigned int SessionId) override;
+    void MissionResponse(unsigned int OfferId, unsigned long OfferKind, unsigned char bAccepted, unsigned int SessionId) override;
     void TradeResponse(const unsigned char* Data, int Size, unsigned int SessionId) override;
     void GFGoodBuy(const SGFGoodBuyInfo& Info, unsigned int SessionId) override;
     void GFGoodSell(const SGFGoodSellInfo& Info, unsigned int SessionId) override;
-    void SystemSwitchOutComplete(unsigned int GateObjectId, unsigned int SessionId) override;
+    void SystemSwitchOutComplete(unsigned int ShipObjectId, unsigned int SessionId) override;
     void PlayerLaunch(unsigned int ShipId, unsigned int SessionId) override;
-    void LaunchComplete(unsigned int Arg0, unsigned int ObjectId) override;
-    void JumpInComplete(unsigned int Arg0, unsigned int ObjectId) override;
+    void LaunchComplete(unsigned int BaseObjId, unsigned int ObjectId) override;
+    void JumpInComplete(unsigned int SystemId, unsigned int ObjectId) override;
     void Hail(unsigned int ObjectId, unsigned int Arg1, unsigned int Arg2) override;
     void SPObjUpdate(const SSPObjUpdateInfo& Info, unsigned int SessionId) override;
     void SPMunitionCollision(const SSPMunitionCollisionInfo& Info, unsigned int SessionId) override;
@@ -121,8 +121,8 @@ struct RPCLOCAL_API IServerImpl : public IServer, public IChatServer {
     void SPRequestInvincibility(unsigned int ShipId, unsigned char bInvincible, InvincibilityReason Reason, unsigned int SessionId) override;
     void SaveGame(const CHARACTER_ID& CharId, const wchar_t* Description, unsigned int SessionId) override;
     void MissionSaveB(unsigned int SessionId, unsigned long MissionId) override;
-    void RequestEvent(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned int Arg3, unsigned long Arg4, unsigned int SessionId) override;
-    void RequestCancel(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned long Arg3, unsigned int SessionId) override;
+    void RequestEvent(int EventType, unsigned int ObjectId, unsigned int TargetId, unsigned int SecondId, unsigned long bFlag, unsigned int SessionId) override;
+    void RequestCancel(int EventType, unsigned int ObjectId, unsigned int TargetId, unsigned long Arg3, unsigned int SessionId) override;
     void MineAsteroid(unsigned int SystemId, const Vector& Position, unsigned int LootId, unsigned int SecondaryLoot, unsigned int Quantity, unsigned int SessionId) override;
     void CommComplete(unsigned int Arg0, unsigned int Arg1, unsigned int Arg2, CommResult Result) override;
     void RequestCreateShip(unsigned int SessionId) override;
@@ -135,7 +135,7 @@ struct RPCLOCAL_API IServerImpl : public IServer, public IChatServer {
     void SetVisitedState(unsigned int SessionId, unsigned char* Data, int Size) override;
     void RequestBestPath(unsigned int SessionId, unsigned char* Data, int Size) override;
     void RequestPlayerStats(unsigned int SessionId, unsigned char* Data, int Size) override;
-    void PopUpDialog(unsigned int SessionId, unsigned int Arg1) override;
+    void PopUpDialog(unsigned int SessionId, unsigned int Buttons) override;
     void RequestGroupPositions(unsigned int SessionId, unsigned char* Data, int Size) override;
     void SetMissionLog(unsigned int SessionId, unsigned char* Data, int Size) override;
     void SetInterfaceState(unsigned int SessionId, unsigned char* Data, int Size) override;

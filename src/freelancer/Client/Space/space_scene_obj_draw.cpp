@@ -31,7 +31,6 @@
 #include "Space/HUD/hud_element_list.h"
 #include "Space/Effects/jump_effect.h"    // FJumpShipEffect::Tunnel (+0x24)
 #include "Space/HUD/hud_waypoint.h"   // HudWaypointGetObjectCount / HudWaypointGetObject (FUN_004c83c0 / 83e0)
-#include "Interface/menu_ui_draw.h"
 #ifdef FREELANCER_RP9
 #include "Space/nebula_volume.h"  // NebulaVolume (port-only Direct3D 9 volumetric nebula)
 #endif
@@ -44,7 +43,6 @@
 #include "Common/Graphics/render_ex.h"      // RenderEx::AfterSpaceScene (port-only Direct3D 9 extensions)
 #endif
 #include "Common/Graphics/screen_quad_state.h"
-#include "Space/space_scene_draw.h"
 #include "Space/star_sphere.h"    // StarSphereList (FUN_0050c620)
 #include "Space/star_sys.h"
 #include "Common/Graphics/texture_panels.h"
@@ -111,8 +109,8 @@ namespace
     //   ZItemGameObject    vftable 0x005dc364 {LAB_0051f7a0 Draw, LAB_0051f780}  size 0x10
     // Allocation is FUN_0051ec80 (ZItemAlloc) by size; release is plain free() (FUN_0051ed20,
     // FUN_0051fbc0) -- no destructor slot, and nothing ever returns a node to either Heap.
-    // The drain FUN_0051f810 calls slot 0. Slot 1 has no caller in the draw queue; its body is
-    // ported as is, the name stays Slot04 until a caller settles it.
+    // The drain FUN_0051f810 calls slot 0. Slot 1 has no caller in the draw queue; it returns
+    // the item's category (game objects: ship 0, solar 1; everything else 2).
     enum EDrawNodeKind : uintptr_t
     {
         kDrawNodeGameobj = 0,
@@ -123,7 +121,7 @@ namespace
     struct FZItem
     {
         virtual void Draw(FSpaceCamera* Cam) = 0; // vt+0x00
-        virtual int Slot04() = 0;                 // vt+0x04
+        virtual int GetCategory() = 0;                 // vt+0x04
         float DistSq;           // +0x04  sort key
         void* Object;           // +0x08  Gameobj* / FNebulaEffect* / FCliAsteroid* / FTexturePanels*
     };
@@ -133,10 +131,10 @@ namespace
     struct FZItemNebula final : FZItem
     {
         // LAB_0051ba00: Object vt+0x10 (DrawFogShell)(Cam), then Object vt+0x14
-        // (DrawBoltsPass)(Cam). No test of the object or either slot.
+        // (DrawExteriorBitsPass)(Cam). No test of the object or either slot.
         void Draw(FSpaceCamera* Cam) override;
         // LAB_00517320: return 2.
-        int Slot04() override { return 2; }
+        int GetCategory() override { return 2; }
     };
     static_assert(sizeof(FZItemNebula) == 0xc, "ZItemNebula sizeof 0xc");
 
@@ -146,7 +144,7 @@ namespace
         // LAB_0051f7a0: Object->vt+0x188(discarded OutLod, Cam, LodWord, 0, 0).
         void Draw(FSpaceCamera* Cam) override;
         // LAB_0051f780: Object +0x1c (ManagerKind) 1 -> 0, 2 -> 1, anything else -> 2.
-        int Slot04() override;
+        int GetCategory() override;
         unsigned LodWord;       // +0x0c  packed LOD
     };
     static_assert(sizeof(FZItemGameObject) == 0x10, "ZItemGameObject sizeof 0x10");
@@ -157,7 +155,7 @@ namespace
         // LAB_0051bdf0: FUN_00522850(this = Object, Cam, LodWord).
         void Draw(FSpaceCamera* Cam) override;
         // LAB_00517320: return 2.
-        int Slot04() override { return 2; }
+        int GetCategory() override { return 2; }
         unsigned LodWord;       // +0x0c  piece index
     };
     static_assert(sizeof(FZItemAsteroidField) == 0x10, "ZItemAsteroidField sizeof 0x10");
@@ -169,7 +167,7 @@ namespace
         // through the object's vtable by TexturePanelsDrawPiece (texture_panels.h).
         void Draw(FSpaceCamera* Cam) override;
         // LAB_00517320: return 2.
-        int Slot04() override { return 2; }
+        int GetCategory() override { return 2; }
         unsigned LodWord;       // +0x0c  piece index
     };
     static_assert(sizeof(FZItemPlanetRing) == 0x10, "ZItemPlanetRing sizeof 0x10");
@@ -224,7 +222,7 @@ namespace
     // below is a StarSys.cpp function that reads and writes them.
     unsigned char (&G_AmbientBaseRgb)[3] = G_StarSysAmbientRgb;
     unsigned char (&G_AmbientWorkRgb)[3] = G_StarSysAmbientWorkRgb;
-    // DAT_00679868/69/6a — lerped ambient when DrawStateA object supplies RGB.
+    // DAT_00679868/69/6a — lerped ambient when the object's nebula supplies RGB.
     unsigned char G_AmbientLerpRgb[3] = {0, 0, 0};
 
     // DAT_00678980..9c — embedded light-grid root node (FUN_00537c30 / FUN_00537d20).
@@ -325,12 +323,6 @@ namespace
         if (GetGameOption(kGameOptNebula) == 0)
             return;
 
-        typedef void*(__thiscall* FFieldGetZoneFn)(void* Self);                // +0x4c
-        typedef float(__thiscall* FFieldEncloseFn)(void* Self, float const* Pos); // +0x20
-        typedef float(__thiscall* FFieldRadiusFn)(void* Self);                // +0x40
-        typedef float const*(__thiscall* FZoneGetPosFn)(void* Self);          // IZone +0x10
-        typedef float(__thiscall* FZoneProbeFn)(void* Self, float const* Dir3); // IZone +0x40
-
         ICamera* const Camera = AsCamera(Cam);
 
         // FUN_005553a0's list.
@@ -391,7 +383,7 @@ namespace
             {
                 G_FieldEnclosure = 2;
                 G_FieldController = Field;
-                const double Radius = Field->GetFloat2B0();
+                const double Radius = Field->GetFogEnd();
                 G_FieldRadiusSq = static_cast<float>(Radius * Radius);
                 ClearBuckets();
                 return;
@@ -405,7 +397,7 @@ namespace
                     PushNebulaZItem(G_FieldBestScore, G_FieldController);
                 G_FieldEnclosure = 1;
                 G_FieldController = Field;
-                const double Radius = Field->GetFloat2B0();
+                const double Radius = Field->GetFogEnd();
                 G_FieldRadiusSq = static_cast<float>(Radius * Radius);
                 continue;
             }
@@ -842,10 +834,10 @@ namespace
     // FUN_00422440 is FogApplyColorAndRange (cli_nebula.cpp) and FUN_004102c0 is
     // EngineLightApplyList (engine_light.cpp).
 
-    // FUN_005554d0: DrawStateA is the containing nebula (Gameobj +0x38), DrawStateB the float
+    // FUN_005554d0: NebulaBits is the containing nebula (Gameobj +0x38), FogFactorBits the float
     // lerp factor (Gameobj +0x3c); Camera is handed on to FUN_004104e0.
     void StarSysApplyObjectLighting(float const* Pos3, float Radius, void* Camera,
-                                    unsigned DrawStateA, unsigned DrawStateB,
+                                    unsigned NebulaBits, unsigned FogFactorBits,
                                     unsigned char Flag)
     {
         Win3DDisable(kWin3DFog); // FUN_00421ed0(0xb60)
@@ -869,12 +861,11 @@ namespace
 
         // No nebula -> straight to the tail.
         unsigned char const* AmbientPtr = G_AmbientWorkRgb;
-        FNebulaEffect* const Nebula = (FNebulaEffect*)(uintptr_t)DrawStateA;
+        FNebulaEffect* const Nebula = (FNebulaEffect*)(uintptr_t)NebulaBits;
         if (Nebula != nullptr)
         {
 
             // The nebula's ambient bytes, or null (which skips the lerp but not the fog block).
-            using FSlot48 = unsigned char const*(__thiscall*)(void*);
             unsigned char const* const Src = Nebula->GetAmbientBytes();
             if (Src != nullptr)
             {
@@ -882,7 +873,7 @@ namespace
                 // of the truncated int is kept. The product of a 9-bit int and a float is exact
                 // in double, as in the x87 register.
                 float T = 0.0f;
-                memcpy(&T, &DrawStateB, sizeof(float));
+                memcpy(&T, &FogFactorBits, sizeof(float));
                 for (int C = 0; C < 3; ++C)
                 {
                     int const Work = static_cast<int>(G_AmbientWorkRgb[C]);
@@ -897,9 +888,6 @@ namespace
             // FUN_00422440 with the arguments evaluated right to left: the fog end for a
             // position (FUN_00509680), the fog start (LAB_00509660), the fog colour
             // (LAB_00509480).
-            using FSlot3c = float(__thiscall*)(void*, float const*);
-            using FSlot38 = float(__thiscall*)(void*);
-            using FSlot30 = float const*(__thiscall*)(void*, float*);
 #ifdef FREELANCER_RP9
             // Port-only: while the Direct3D 9 volumetric nebula draws this nebula's inside
             // (nebula_volume.cpp) it fogs the object by its depth; the D3D fog stays off (the
@@ -908,7 +896,7 @@ namespace
 #endif
             {
                 float const FogEnd = Nebula->FogFactor(Pos3);
-                float const FogStart = Nebula->GetFloat2AC();
+                float const FogStart = Nebula->GetFogStart();
                 float FogColor[3];
                 float const* const FogRgb = Nebula->CopyFogRgb(FogColor);
                 FogApplyColorAndRange(FogRgb, FogStart, FogEnd);
@@ -989,8 +977,11 @@ namespace
             Flag = 0;
 
         Vector const& Pos = Self->get_position();
-        StarSysApplyObjectLighting(&Pos.x, Radius, Camera, Self->DrawStateA, Self->DrawStateB,
-                                   Flag);
+        unsigned FogBits = 0;
+        memcpy(&FogBits, &Self->NebulaFogFactor, sizeof(FogBits));
+        StarSysApplyObjectLighting(&Pos.x, Radius, Camera,
+                                   static_cast<unsigned>(reinterpret_cast<uintptr_t>(Self->CurrentNebula)),
+                                   FogBits, Flag);
     }
 
 
@@ -1090,9 +1081,9 @@ namespace
             if (static_cast<short>(Lod >> 16) >= 2)
                 return;
 
-            // vt+0x18c (DrawStateA) must be 0.
-            unsigned DrawStateB = 0;
-            if (Go->GetNebula(&DrawStateB) != 0)
+            // vt+0x18c (the nebula) must be 0.
+            unsigned FogFactorBits = 0;
+            if (Go->GetNebula(&FogFactorBits) != 0)
                 return;
 
             PushNode(2, Go, DistSq, Lod); // DAT_00675310, bucket 2
@@ -1122,12 +1113,12 @@ namespace
         if (G_FieldController != nullptr)
         {
             unsigned EncloseBits = 0;
-            const unsigned DrawStateA = Go->GetNebula(&EncloseBits);
+            const unsigned NebulaBits = Go->GetNebula(&EncloseBits);
             float Enclose = 0.0f;
             memcpy(&Enclose, &EncloseBits, sizeof(float));
 
             float E;
-            if (reinterpret_cast<void*>(static_cast<uintptr_t>(DrawStateA)) != G_FieldController)
+            if (reinterpret_cast<void*>(static_cast<uintptr_t>(NebulaBits)) != G_FieldController)
             {
                 // Another nebula -- above 0.25 (double 0x005cbf58) is dropped.
                 if (static_cast<double>(Enclose) > 0.25)
@@ -1447,10 +1438,6 @@ namespace
             }
 
             // Slot +0x14 (update/visibility).
-            typedef unsigned char(__thiscall * FSlot14)(void*, float, FSpaceCamera*);
-            typedef unsigned char(__thiscall * FSlot18)(void*, float, FSpaceCamera*);
-            typedef void(__thiscall * FSlot1c)(void*, FSpaceCamera*);
-            typedef unsigned char(__thiscall * FSlot10)(void*);
             FEffectBase* const TypedEffect = (FEffectBase*)Effect;
             unsigned char const UpdateOk = TypedEffect->UpdateVisibility(Dt, Cam);
 
@@ -1563,7 +1550,7 @@ namespace
                 bDidBeamBatch = 1;
                 G_EffectVertexBatch.VertCount = 0;
                 G_EffectVertexBatch.bStripMode = 0;
-                G_EffectVertexBatch.Flag28 = 0;
+                G_EffectVertexBatch.bCloseLoop = 0;
                 G_EffectVertexBatch.StripCounter = 0;
                 G_EffectVertexBatch.IndexCount = 0;
                 EffectVertexBatchGrowVertices(&G_EffectVertexBatch);
@@ -1605,7 +1592,7 @@ namespace
             ->SubmitDraw(&OutLod, Cam, LodWord, nullptr, nullptr);
     }
 
-    int FZItemGameObject::Slot04()
+    int FZItemGameObject::GetCategory()
     {
         int const ManagerKind = static_cast<FClientGameobj*>(static_cast<IObjInspect*>(Object))->ManagerKind;
         if (ManagerKind == 1)
@@ -1616,9 +1603,8 @@ namespace
     void FZItemNebula::Draw(FSpaceCamera* Cam)
     {
         // LAB_0051ba00
-        typedef void(__thiscall* FNebulaCamSlot)(void* Self, FSpaceCamera* C);
         ((FNebulaEffect*)Object)->DrawFogShell(Cam);
-        ((FNebulaEffect*)Object)->DrawBoltsPass(Cam);
+        ((FNebulaEffect*)Object)->DrawExteriorBitsPass(Cam);
 #ifdef FREELANCER_RP9
         // Port-only: a nebula the Direct3D 9 volumetric nebula draws from beyond the opaque
         // scene's far plane is ray-marched here, in this bucket's painter order (its retail
@@ -1681,9 +1667,6 @@ namespace
     // star entry or its slot.
     void DrainMeshAndAsteroids(FSpaceCamera* Cam)
     {
-        typedef void(__thiscall* FFieldCamSlot)(void* Self, FSpaceCamera* C);
-        typedef float(__thiscall* FFieldFloatSlot)(void* Self);
-
         ICamera* const Camera = AsCamera(Cam);
         IRenderPipeline* const Pipe = DALib::Pipeline;
 
@@ -1702,7 +1685,7 @@ namespace
                 CameraSetNearFar(Cam, Camera->GetZNear(), G_DrawCtxZFar);
                 DrainBucket(Cam, 1, false);
                 CameraSetNearFar(Cam, Camera->GetZNear(), kDefaultZFar);
-                G_FieldController->DrawBoltsPass(Cam);
+                G_FieldController->DrawExteriorBitsPass(Cam);
                 CameraSetNearFar(Cam, Camera->GetZNear(), G_DrawCtxZFar);
             }
             // FUN_00509f30 (TexturePanels list), FUN_00520170.
@@ -1732,9 +1715,9 @@ namespace
         for (FStarSphereListNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
         {
             FStarSphere* const Star = Node->Sphere;
-            float const B = G_FieldController->GetFloat2C8();
-            float const Scale28 = G_FieldController->GetFloat2C4();
-            float const Factor24 = G_FieldController->GetFloat294();
+            float const B = G_FieldController->GetSunBurnthroughScaler();
+            float const Scale28 = G_FieldController->GetSunBurnthroughIntensity();
+            float const Factor24 = G_FieldController->GetInsideFade();
             float const A = static_cast<float>(static_cast<double>(Factor24) * Scale28);
             Star->DrawBillboard(Cam, A, B);
         }
@@ -1742,7 +1725,7 @@ namespace
         if (G_FieldEnclosure == 1)
         {
             CameraSetNearFar(Cam, Camera->GetZNear(), kDefaultZFar);
-            G_FieldController->DrawBoltsPass(Cam);
+            G_FieldController->DrawExteriorBitsPass(Cam);
             CameraSetNearFar(Cam, Camera->GetZNear(), G_DrawCtxZFar);
         }
 
@@ -2053,11 +2036,11 @@ double SpaceEffectPerfOneMinus()
     return EffectPerfOneMinus();
 }
 
-void SpaceApplyObjectLighting(float const* Pos3, float Radius, void* Camera, unsigned DrawStateA,
-                              unsigned DrawStateB, unsigned char Flag)
+void SpaceApplyObjectLighting(float const* Pos3, float Radius, void* Camera, unsigned NebulaBits,
+                              unsigned FogFactorBits, unsigned char Flag)
 {
     // FUN_005554d0 -- the body is StarSysApplyObjectLighting above.
-    StarSysApplyObjectLighting(Pos3, Radius, Camera, DrawStateA, DrawStateB, Flag);
+    StarSysApplyObjectLighting(Pos3, Radius, Camera, NebulaBits, FogFactorBits, Flag);
 }
 
 void SpaceCameraSetNearFar(FSpaceCamera* Cam, float ZNear, float ZFar)
@@ -2137,7 +2120,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
                                   unsigned CachedLod, void* Matrix, void* Extra)
 {
     // FUN_00539980
-    Self->Slot180();
+    Self->PreSubmitDraw();
 
     // The pick is written back over the CachedLod argument, which every later read uses.
     unsigned PickedLod = 0;
@@ -2296,14 +2279,6 @@ namespace
         return *reinterpret_cast<unsigned char const**>(static_cast<unsigned char*>(JumpFx) +
                                                         0x20);
     }
-
-    // The field controller's (DAT_00675244, a nebula) slots this pass calls, retail arity.
-    typedef float(__thiscall* FFieldFloatFn)(void* Self);                  // +0x24, +0x38
-    typedef void(__thiscall* FFieldRgbFn)(void* Self, float* OutRgb3);     // +0x34
-    typedef float(__thiscall* FFieldFogEndFn)(void* Self, float* CamPos3); // +0x3c
-    typedef float(__thiscall* FFieldFarFn)(void* Self, float Unused);      // +0x44
-
-
 }
 
 void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
@@ -2542,7 +2517,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
                 const float FogEnd =
                     G_FieldController->FogFactor(CamPos);
                 const float FogStart =
-                    G_FieldController->GetFloat2AC();
+                    G_FieldController->GetFogStart();
                 FogApplyColorAndRange(Rgb, FogStart, FogEnd);
             }
             else
@@ -2571,7 +2546,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
         // Port-only (FREELANCER_RP9): with the volumetric nebula's real_background the clear
         // stays the space colour; FillFogRgb still runs (it advances the background-lightning
         // timer and rand()).
-        if (G_FieldController->GetFloat294() >= 1.0f)
+        if (G_FieldController->GetInsideFade() >= 1.0f)
         {
             float Col[3];
             G_FieldController->FillFogRgb(Col);

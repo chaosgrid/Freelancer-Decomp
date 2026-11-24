@@ -82,8 +82,8 @@ namespace NebulaVolume
     bool ReplacesObjectFog(FNebulaEffect const* Nebula);
     bool ReplacesFogOverlay(FNebulaEffect const* Nebula);
     bool ReplacesClouds(FNebulaEffect const* Nebula);
-    // FNebulaEffect::DrawBoltsPass -> NebulaDrawBolts (the exterior billboards, FUN_00507ed0) and
-    // FNebulaEffect::DrawFogShell -> NebulaUpdateBoltCamera (the two crossing fill sheets,
+    // FNebulaEffect::DrawExteriorBitsPass -> NebulaDrawExteriorBits (the exterior billboards, FUN_00507ed0) and
+    // FNebulaEffect::DrawFogShell -> NebulaDrawFillSheets (the two crossing fill sheets,
     // FUN_005074e0), both for the controller and for the far-bucket ZItemNebula nodes.
     bool ReplacesExteriorBits(FNebulaEffect const* Nebula);
     bool ReplacesFillSheets(FNebulaEffect const* Nebula);

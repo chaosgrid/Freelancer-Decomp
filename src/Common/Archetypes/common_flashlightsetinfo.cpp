@@ -43,13 +43,13 @@ void FlashLightSetInfo::destroy()
 void FlashLightSetInfo::clear()
 {
     // Common.dll.c 0x13c30.
-    Param0 = 1.0f;
-    Param1 = 1.0f;
-    Param2 = 1.0f;
-    Param3 = 2.0f;
-    Param4 = 0.1f;
-    Param5 = 0.2f;
-    Param6 = 1.0f;
+    ColorR = 1.0f;
+    ColorG = 1.0f;
+    ColorB = 1.0f;
+    Scale = 2.0f;
+    Gap = 0.1f;
+    Blink = 0.2f;
+    EndPause = 1.0f;
     Mode = 0;
 
     for (int I = 0; I < 64; ++I)
@@ -60,7 +60,7 @@ void FlashLightSetInfo::clear()
     }
 
     NumLights = 0;
-    NumLightsAlt = 0;
+    NumLineLights = 0;
     Cursor = 0;
 
     for (int I = 0; I < 64; ++I)
@@ -155,11 +155,11 @@ void FlashLightSetInfo::fixup(long Instance, HardpointSummary const* HpSum, Room
     }
     else if (Mode == 2)
     {
-        // NumLightsAlt frames interpolated from LightFrames[0] to [1]; the quotient is formed
+        // NumLineLights frames interpolated from LightFrames[0] to [1]; the quotient is formed
         // unrounded and rounded once.
-        for (long Step = 0; Step < NumLightsAlt; ++Step)
+        for (long Step = 0; Step < NumLineLights; ++Step)
         {
-            float const T = (float)((double)Step / (NumLightsAlt - 1));
+            float const T = (float)((double)Step / (NumLineLights - 1));
             FinalFrames[Cursor] = Csys_interpolate(LightFrames[0], LightFrames[1], T);
             ++Cursor;
         }

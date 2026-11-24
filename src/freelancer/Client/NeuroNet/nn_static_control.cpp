@@ -10,7 +10,7 @@
 #include "Common/engine_light.h"         // EngineLightClearRegisteredList (FUN_004101e0)
 #include "Core/game_options.h"         // GetGameOption (FUN_005792b0)
 #include "Core/globals.h"              // GetClientFrameTimeCapped, G_RenderSurfaceWidth / Height
-#include "NeuroNet/nn_ui_pulse.h"          // G_NnPaletteArgb_679bb0 / _679b94
+#include "NeuroNet/nn_ui_pulse.h"          // G_NnPaletteCyan / _679b94
 #include "Interface/tooltip_hover.h"        // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
 #include "Interface/win3d.h"
 #include "Interface/win3d_engine_submit.h"  // FUN_0059efa0 / FUN_00434630 / FUN_00434670
@@ -192,9 +192,9 @@ NnStaticControl::~NnStaticControl()
 void NnStaticControl::SetPosition(float const* NewPosition)
 {
     // LAB_005896b0 (RET 4).
-    Field2e0[0] = NewPosition[0];
-    Field2e0[1] = NewPosition[1];
-    Field2e0[2] = NewPosition[2];
+    RequestedPosition[0] = NewPosition[0];
+    RequestedPosition[1] = NewPosition[1];
+    RequestedPosition[2] = NewPosition[2];
 
     float Placed[3];
     if ((PositionFlags & 1) != 0)
@@ -457,7 +457,7 @@ void NnStaticControl::Draw()
     EngineLightClearRegisteredList(); // FUN_004101e0
     if (!HasInstance(this))
     {
-        Slot39(); // slot 39 (+0x9c), 0x00588ce2
+        PostDraw(); // slot 39 (+0x9c), 0x00588ce2
         return;
     }
 
@@ -472,11 +472,11 @@ void NnStaticControl::Draw()
     }
     else
     {
-        memcpy(Mesh, &G_NnPaletteArgb_679bb0, sizeof(Mesh));
-        memcpy(Wire, &G_NnPaletteArgb_679bb0, sizeof(Wire));
+        memcpy(Mesh, &G_NnPaletteCyan, sizeof(Mesh));
+        memcpy(Wire, &G_NnPaletteCyan, sizeof(Wire));
     }
     if ((Flags & kWin3DActive) == 0)
-        memcpy(Wire, &G_NnPaletteArgb_679b94, sizeof(Wire));
+        memcpy(Wire, &G_NnPaletteGrey, sizeof(Wire));
     if (bNoColoring != 0)
     {
         Mesh[0] = 0xff;
@@ -615,21 +615,21 @@ void NnStaticControl::Draw()
         ClientMeshHolderSetPosition(&MeshHolder, Placed);
     }
     Win3DDisable(0xb71);
-    Slot39();
+    PostDraw();
 }
 
 bool NnStaticControl::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // FUN_00588fe0 (RET 4): a button event (Field0 -1) is taken; the parent (as a WinControl)
-    // hears 0x1b for a right press (Field1 3), 0x1a otherwise.
-    if (Event->Field0 != -1)
+    // FUN_00588fe0 (RET 4): a left-button event is taken; the parent (as a WinControl) hears
+    // 0x1b for a double click, 0x1a otherwise (release included).
+    if (Event->Button != kWin3DMouseLeft)
         return false;
     if (Parent == nullptr)
         return true;
     WinControl* const ParentControl = Parent->AsWinControl();
     if (ParentControl == nullptr)
         return true;
-    int const Msg = (Event->Field1 == 3) ? 0x1b : 0x1a;
+    int const Msg = (Event->Action == kWin3DMouseDoubleClick) ? 0x1b : 0x1a;
     ParentControl->SetProperty(Msg, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
     return true;
 }

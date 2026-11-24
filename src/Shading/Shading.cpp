@@ -13,26 +13,13 @@
 
 namespace
 {
-    enum EComponentKind
-    {
-        KindTextureLibrary = 0,
-        KindMaterialLibrary,
-        KindMaterialBatcher,
-        KindMaterialAnimation,
-        KindBatchedMaterial,
-        KindMaterialType
-    };
-
-    struct FComponentSpec
-    {
-        const char* Name;
-        EComponentKind Kind;
-    };
-
-    class FComponentFactory final : public IComponentFactory
+    // The part every Shading component factory shares: retail's 0xC-byte object {vtable,
+    // reference count, registered name}. QueryInterface, AddRef and Release are one body for all
+    // 21 factory classes; each class adds only its CreateInstance.
+    class FComponentFactory : public IComponentFactory
     {
     public:
-        explicit FComponentFactory(const FComponentSpec& Spec) : RefCount(1), Spec(Spec) {}
+        explicit FComponentFactory(const char* Name) : RefCount(1), Name(Name) {}
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
         {
@@ -45,245 +32,255 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override { return ++RefCount; }
+        unsigned long DACOM_API AddRef() override { return ++RefCount; } // 06ecb930
 
         unsigned long DACOM_API Release() override
         {
+            // FUN_06eb1090: saturates at zero. A factory has no destructor; the block is freed
+            // directly.
             if (RefCount > 0)
                 --RefCount;
             const unsigned long Next = RefCount;
             if (Next == 0)
             {
                 RefCount = 1;
-                delete this;
+                ::operator delete(this);
             }
             return Next;
         }
 
+        unsigned long RefCount; // +4
+        const char* Name;       // +8  the registered component name
+    };
+    static_assert(sizeof(FComponentFactory) == 0xC, "a retail factory is 0xC bytes");
+
+    // The sixteen material factory classes, one per material class. Each retail CreateInstance is
+    // this body with the class's constructor inlined: Atmosphere 06eb10c0, BtDetailMap 06eb4840,
+    // BtDetailMapTwo 06eb5430, DcDtEt 06eb5c70, DetailMap2Pass 06eb6670, DetailMap 06eb7b90,
+    // EcEt 06eb8630, EcEtTwo 06eb8c40, IllumDetailMap 06eb9260, LightMap 06eba400,
+    // Masked2DetailMap 06ebaca0, Nebula 06ebc2b0, NebulaTwo 06ebc800, Null 06ebce10,
+    // SinglePass (the four DcDt names) 06ebd2d0, SinglePassTwo (the four DcDt*Two names) 06ebde50.
+    template <class TMaterial>
+    class TMaterialFactory final : public FComponentFactory
+    {
+    public:
+        using FComponentFactory::FComponentFactory;
+
+        GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
+        {
+            FMaterialAggregateDesc* MaterialDesc = (FMaterialAggregateDesc*)Desc;
+            if (MaterialDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                std::strcmp(MaterialDesc->NameAt4, Name) != 0)
+            {
+                *Instance = nullptr;
+                return GR_INTERFACE_UNSUPPORTED;
+            }
+            TMaterialObject<TMaterial>* Material = new (std::nothrow) TMaterialObject<TMaterial>();
+            if (Material == nullptr)
+            {
+                *Instance = nullptr;
+                return GR_OUT_OF_MEMORY;
+            }
+            Material->ConfigureAggregation(MaterialDesc);
+            const GENRESULT Result = Material->InitializeFromDescriptor(MaterialDesc);
+            if (Result != GR_OK)
+            {
+                if (MaterialDesc->InnerOutAtC != nullptr)
+                    *MaterialDesc->InnerOutAtC = nullptr;
+                Material->ScalarDeletingDestructor(1);
+                *Instance = nullptr;
+                return Result;
+            }
+            *Instance = (IMaterial*)Material;
+            return Result;
+        }
+    };
+
+    // "BatchedMaterial" (factory vtable 06ed1310).
+    class FBatchedMaterialFactory final : public FComponentFactory
+    {
+    public:
+        using FComponentFactory::FComponentFactory;
+
+        GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
+        {
+            // 06eb4530: FUN_06eb3e80 runs after the controller is published.
+            FMaterialAggregateDesc* BatchedDesc = (FMaterialAggregateDesc*)Desc;
+            if (BatchedDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                std::strcmp(BatchedDesc->NameAt4, Name) != 0)
+            {
+                *Instance = nullptr;
+                return GR_INTERFACE_UNSUPPORTED;
+            }
+            FBatchedMaterial* Batched = new (std::nothrow) FBatchedMaterial();
+            if (Batched == nullptr)
+            {
+                *Instance = nullptr;
+                return GR_OUT_OF_MEMORY;
+            }
+            Batched->ConfigureAggregation(BatchedDesc);
+            const GENRESULT Result = Batched->InitializeFromDescriptor(BatchedDesc);
+            if (Result != GR_OK)
+            {
+                if (BatchedDesc->InnerOutAtC != nullptr)
+                    *BatchedDesc->InnerOutAtC = nullptr;
+                delete Batched;
+                *Instance = nullptr;
+                return Result;
+            }
+            *Instance = (IMaterial*)Batched;
+            return Result;
+        }
+    };
+
+    // "TextureLibrary" (factory vtable 06ed29ec).
+    class FTextureLibraryFactory final : public FComponentFactory
+    {
+    public:
+        using FComponentFactory::FComponentFactory;
+
+        GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
+        {
+            // FUN_06ec6760: descriptor initialization is distinct from aggregate Initialize.
+            FSystemAggDesc* TextureDesc = (FSystemAggDesc*)Desc;
+            if (TextureDesc->Size != sizeof(FSystemAggDesc) ||
+                std::strcmp(TextureDesc->Name, Name) != 0)
+            {
+                *Instance = nullptr;
+                return GR_INTERFACE_UNSUPPORTED;
+            }
+            FTextureLibrary* Texture = new (std::nothrow) FTextureLibrary();
+            if (Texture == nullptr)
+            {
+                *Instance = nullptr;
+                return GR_OUT_OF_MEMORY;
+            }
+            Texture->Outer = TextureDesc->Outer;
+            if (Texture->Outer != nullptr)
+                *TextureDesc->InnerOut = (IDAComponent*)(&Texture->Controller);
+            const GENRESULT Result = Texture->InitializeFromDescriptor(TextureDesc);
+            if (Result != GR_OK)
+            {
+                if (TextureDesc->InnerOut != nullptr)
+                    *TextureDesc->InnerOut = nullptr;
+                delete Texture;
+                *Instance = nullptr;
+                return Result;
+            }
+            *Instance = (ITextureLibrary2*)Texture;
+            return Result;
+        }
+    };
+
+    // "MaterialAnimation" (factory vtable 06ed2b2c).
+    class FMaterialAnimationFactory final : public FComponentFactory
+    {
+    public:
+        using FComponentFactory::FComponentFactory;
+
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // LAB_06ec6d40.
-            if (Spec.Kind == KindMaterialAnimation)
+            FMaterialAggregateDesc* AnimationDesc = (FMaterialAggregateDesc*)Desc;
+            if (AnimationDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                std::strcmp(AnimationDesc->NameAt4, Name) != 0)
             {
-                FMaterialAggregateDesc* AnimationDesc = (FMaterialAggregateDesc*)Desc;
-                if (AnimationDesc->Size != sizeof(FMaterialAggregateDesc) ||
-                    std::strcmp(AnimationDesc->NameAt4, Spec.Name) != 0)
-                {
-                    *Instance = nullptr;
-                    return GR_INTERFACE_UNSUPPORTED;
-                }
-                FMaterialAnimation* Animation = new (std::nothrow) FMaterialAnimation();
-                if (Animation == nullptr)
-                {
-                    *Instance = nullptr;
-                    return GR_OUT_OF_MEMORY;
-                }
-                Animation->Outer = AnimationDesc->OuterAt8;
-                if (Animation->Outer != nullptr)
-                    *AnimationDesc->InnerOutAtC = (IDAComponent*)(&Animation->Controller);
-                *Instance = (IMatAnimLibrary*)Animation;
-                return GR_OK;
+                *Instance = nullptr;
+                return GR_INTERFACE_UNSUPPORTED;
             }
-
-            // FUN_06ecb940: controller publication precedes descriptor init.
-            if (Spec.Kind == KindMaterialBatcher)
+            FMaterialAnimation* Animation = new (std::nothrow) FMaterialAnimation();
+            if (Animation == nullptr)
             {
-                FMaterialAggregateDesc* BatcherDesc = (FMaterialAggregateDesc*)Desc;
-                if (BatcherDesc->Size != sizeof(FMaterialAggregateDesc) ||
-                    std::strcmp(BatcherDesc->NameAt4, Spec.Name) != 0)
-                {
-                    *Instance = nullptr;
-                    return GR_INTERFACE_UNSUPPORTED;
-                }
-                FMaterialBatcher* Batcher = new (std::nothrow) FMaterialBatcher();
-                if (Batcher == nullptr)
-                {
-                    *Instance = nullptr;
-                    return GR_OUT_OF_MEMORY;
-                }
-                Batcher->ControllingUnknown = BatcherDesc->OuterAt8 != nullptr
-                    ? BatcherDesc->OuterAt8 : (IDAComponent*)(&Batcher->Controller);
-                if (BatcherDesc->OuterAt8 != nullptr)
-                    *BatcherDesc->InnerOutAtC = (IDAComponent*)(&Batcher->Controller);
-                const GENRESULT Result = Batcher->InitializeFromDescriptor(BatcherDesc);
-                if (Result != GR_OK)
-                {
-                    if (BatcherDesc->InnerOutAtC != nullptr)
-                        *BatcherDesc->InnerOutAtC = nullptr;
-                    delete Batcher;
-                    *Instance = nullptr;
-                    return Result;
-                }
-                *Instance = (IMaterialBatcher2*)Batcher;
-                return Result;
+                *Instance = nullptr;
+                return GR_OUT_OF_MEMORY;
             }
-
-            // 06eceff0: the nondelegating face is published only when aggregated;
-            // descriptor initialization runs either way.
-            if (Spec.Kind == KindMaterialLibrary)
-            {
-                FMaterialAggregateDesc* LibraryDesc = (FMaterialAggregateDesc*)Desc;
-                if (LibraryDesc->Size != sizeof(FMaterialAggregateDesc) ||
-                    std::strcmp(LibraryDesc->NameAt4, Spec.Name) != 0)
-                {
-                    *Instance = nullptr;
-                    return GR_INTERFACE_UNSUPPORTED;
-                }
-                FMaterialLibrary* Library = new (std::nothrow) FMaterialLibrary();
-                if (Library == nullptr)
-                {
-                    *Instance = nullptr;
-                    return GR_OUT_OF_MEMORY;
-                }
-                Library->ControllingUnknown = LibraryDesc->OuterAt8 != nullptr
-                    ? LibraryDesc->OuterAt8 : (IDAComponent*)(&Library->Controller);
-                if (LibraryDesc->OuterAt8 != nullptr)
-                    *LibraryDesc->InnerOutAtC = (IDAComponent*)(&Library->Controller);
-                const GENRESULT Result = Library->InitializeFromDescriptor(LibraryDesc);
-                if (Result != GR_OK)
-                {
-                    if (LibraryDesc->InnerOutAtC != nullptr)
-                        *LibraryDesc->InnerOutAtC = nullptr;
-                    delete Library;
-                    *Instance = nullptr;
-                    return Result;
-                }
-                *Instance = (IMaterialLibrary*)Library;
-                return Result;
-            }
-
-            // FUN_06ec6760: descriptor initialization is distinct from aggregate Initialize.
-            if (Spec.Kind == KindTextureLibrary)
-            {
-                FSystemAggDesc* TextureDesc = (FSystemAggDesc*)Desc;
-                if (TextureDesc->Size != sizeof(FSystemAggDesc) ||
-                    std::strcmp(TextureDesc->Name, Spec.Name) != 0)
-                {
-                    *Instance = nullptr;
-                    return GR_INTERFACE_UNSUPPORTED;
-                }
-                FTextureLibrary* Texture = new (std::nothrow) FTextureLibrary();
-                if (Texture == nullptr)
-                {
-                    *Instance = nullptr;
-                    return GR_OUT_OF_MEMORY;
-                }
-                Texture->Outer = TextureDesc->Outer;
-                if (Texture->Outer != nullptr)
-                    *TextureDesc->InnerOut = (IDAComponent*)(&Texture->Controller);
-                const GENRESULT Result = Texture->InitializeFromDescriptor(TextureDesc);
-                if (Result != GR_OK)
-                {
-                    if (TextureDesc->InnerOut != nullptr)
-                        *TextureDesc->InnerOut = nullptr;
-                    delete Texture;
-                    *Instance = nullptr;
-                    return Result;
-                }
-                *Instance = (ITextureLibrary2*)Texture;
-                return Result;
-            }
-
-            // Retail has one factory callback per family, all with this descriptor check:
-            // 06eb10c0, 4840, 5430, 5c70, 6670, 7b90, 8630, 8c40,
-            // 9260, a400, aca0, c2b0, c800, ce10, d2d0 and de50.
-            if (Spec.Kind == KindMaterialType)
-            {
-                FMaterialAggregateDesc* MaterialDesc = (FMaterialAggregateDesc*)Desc;
-                if (MaterialDesc->Size != sizeof(FMaterialAggregateDesc) ||
-                    std::strcmp(MaterialDesc->NameAt4, Spec.Name) != 0)
-                {
-                    *Instance = nullptr;
-                    return GR_INTERFACE_UNSUPPORTED;
-                }
-                FMaterial* Material = CreateMaterialInstance(Spec.Name);
-                if (Material == nullptr)
-                {
-                    *Instance = nullptr;
-                    return GR_OUT_OF_MEMORY;
-                }
-                Material->ConfigureAggregation(MaterialDesc);
-                const GENRESULT Result = Material->InitializeFromDescriptor(MaterialDesc);
-                if (Result != GR_OK)
-                {
-                    if (MaterialDesc->InnerOutAtC != nullptr)
-                        *MaterialDesc->InnerOutAtC = nullptr;
-                    Material->ScalarDeletingDestructor(1);
-                    *Instance = nullptr;
-                    return Result;
-                }
-                *Instance = (IMaterial*)Material;
-                return Result;
-            }
-
-            // 06eb4530: FUN_06eb3e80 runs after the controller is published.
-            if (Spec.Kind == KindBatchedMaterial)
-            {
-                FMaterialAggregateDesc* BatchedDesc = (FMaterialAggregateDesc*)Desc;
-                if (BatchedDesc->Size != sizeof(FMaterialAggregateDesc) ||
-                    std::strcmp(BatchedDesc->NameAt4, Spec.Name) != 0)
-                {
-                    *Instance = nullptr;
-                    return GR_INTERFACE_UNSUPPORTED;
-                }
-                FBatchedMaterial* Batched = new (std::nothrow) FBatchedMaterial();
-                if (Batched == nullptr)
-                {
-                    *Instance = nullptr;
-                    return GR_OUT_OF_MEMORY;
-                }
-                Batched->ConfigureAggregation(BatchedDesc);
-                const GENRESULT Result = Batched->InitializeFromDescriptor(BatchedDesc);
-                if (Result != GR_OK)
-                {
-                    if (BatchedDesc->InnerOutAtC != nullptr)
-                        *BatchedDesc->InnerOutAtC = nullptr;
-                    delete Batched;
-                    *Instance = nullptr;
-                    return Result;
-                }
-                *Instance = (IMaterial*)Batched;
-                return Result;
-            }
-
-            *Instance = nullptr;
-            return GR_INTERFACE_UNSUPPORTED;
+            Animation->Outer = AnimationDesc->OuterAt8;
+            if (Animation->Outer != nullptr)
+                *AnimationDesc->InnerOutAtC = (IDAComponent*)(&Animation->Controller);
+            *Instance = (IMatAnimLibrary*)Animation;
+            return GR_OK;
         }
-
-        const char* Name() const { return Spec.Name; }
-
-        unsigned long RefCount;
-        FComponentSpec Spec;
     };
 
-    const FComponentSpec G_Specs[] = {
-        {"TextureLibrary", KindTextureLibrary},
-        {"MaterialLibrary", KindMaterialLibrary},
-        {"MaterialBatcher", KindMaterialBatcher},
-        {"MaterialAnimation", KindMaterialAnimation},
-        {"BatchedMaterial", KindBatchedMaterial},
-        {"DcDt", KindMaterialType},
-        {"DcDtEc", KindMaterialType},
-        {"DcDtOcOt", KindMaterialType},
-        {"DcDtEcOcOt", KindMaterialType},
-        {"DcDtTwo", KindMaterialType},
-        {"DcDtEcTwo", KindMaterialType},
-        {"DcDtOcOtTwo", KindMaterialType},
-        {"DcDtEcOcOtTwo", KindMaterialType},
-        {"DcDtEt", KindMaterialType},
-        {"EcEt", KindMaterialType},
-        {"EcEtTwo", KindMaterialType},
-        {"AtmosphereMaterial", KindMaterialType},
-        {"Nebula", KindMaterialType},
-        {"NebulaTwo", KindMaterialType},
-        {"NullMaterial", KindMaterialType},
-        {"LightMap", KindMaterialType},
-        {"DetailMapMaterial", KindMaterialType},
-        {"DetailMap2Dm1Msk2PassMaterial", KindMaterialType},
-        {"IllumDetailMapMaterial", KindMaterialType},
-        {"Masked2DetailMapMaterial", KindMaterialType},
-        {"BtDetailMapMaterial", KindMaterialType},
-        {"BtDetailMapTwoMaterial", KindMaterialType},
+    // "MaterialBatcher" (factory vtable 06ed2c1c).
+    class FMaterialBatcherFactory final : public FComponentFactory
+    {
+    public:
+        using FComponentFactory::FComponentFactory;
+
+        GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
+        {
+            // FUN_06ecb940: controller publication precedes descriptor init.
+            FMaterialAggregateDesc* BatcherDesc = (FMaterialAggregateDesc*)Desc;
+            if (BatcherDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                std::strcmp(BatcherDesc->NameAt4, Name) != 0)
+            {
+                *Instance = nullptr;
+                return GR_INTERFACE_UNSUPPORTED;
+            }
+            FMaterialBatcher* Batcher = new (std::nothrow) FMaterialBatcher();
+            if (Batcher == nullptr)
+            {
+                *Instance = nullptr;
+                return GR_OUT_OF_MEMORY;
+            }
+            Batcher->ControllingUnknown = BatcherDesc->OuterAt8 != nullptr
+                ? BatcherDesc->OuterAt8 : (IDAComponent*)(&Batcher->Controller);
+            if (BatcherDesc->OuterAt8 != nullptr)
+                *BatcherDesc->InnerOutAtC = (IDAComponent*)(&Batcher->Controller);
+            const GENRESULT Result = Batcher->InitializeFromDescriptor(BatcherDesc);
+            if (Result != GR_OK)
+            {
+                if (BatcherDesc->InnerOutAtC != nullptr)
+                    *BatcherDesc->InnerOutAtC = nullptr;
+                delete Batcher;
+                *Instance = nullptr;
+                return Result;
+            }
+            *Instance = (IMaterialBatcher2*)Batcher;
+            return Result;
+        }
+    };
+
+    // "MaterialLibrary" (factory vtable 06ed2e60).
+    class FMaterialLibraryFactory final : public FComponentFactory
+    {
+    public:
+        using FComponentFactory::FComponentFactory;
+
+        GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
+        {
+            // 06eceff0: the nondelegating face is published only when aggregated;
+            // descriptor initialization runs either way.
+            FMaterialAggregateDesc* LibraryDesc = (FMaterialAggregateDesc*)Desc;
+            if (LibraryDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                std::strcmp(LibraryDesc->NameAt4, Name) != 0)
+            {
+                *Instance = nullptr;
+                return GR_INTERFACE_UNSUPPORTED;
+            }
+            FMaterialLibrary* Library = new (std::nothrow) FMaterialLibrary();
+            if (Library == nullptr)
+            {
+                *Instance = nullptr;
+                return GR_OUT_OF_MEMORY;
+            }
+            Library->ControllingUnknown = LibraryDesc->OuterAt8 != nullptr
+                ? LibraryDesc->OuterAt8 : (IDAComponent*)(&Library->Controller);
+            if (LibraryDesc->OuterAt8 != nullptr)
+                *LibraryDesc->InnerOutAtC = (IDAComponent*)(&Library->Controller);
+            const GENRESULT Result = Library->InitializeFromDescriptor(LibraryDesc);
+            if (Result != GR_OK)
+            {
+                if (LibraryDesc->InnerOutAtC != nullptr)
+                    *LibraryDesc->InnerOutAtC = nullptr;
+                delete Library;
+                *Instance = nullptr;
+                return Result;
+            }
+            *Instance = (IMaterialLibrary*)Library;
+            return Result;
+        }
     };
 
     // 06ec3810: only the texture registration acquires before allocation.
@@ -292,51 +289,70 @@ namespace
         ICOManager* Manager = DACOM_Acquire();
         if (Manager == nullptr)
             return;
-        FComponentFactory* Factory = new (std::nothrow) FComponentFactory(G_Specs[0]);
+        FTextureLibraryFactory* Factory = new (std::nothrow) FTextureLibraryFactory("TextureLibrary");
         if (Factory == nullptr)
             return;
         // Opaque priority token: keep const removal explicit.
-        Manager->RegisterComponent(Factory, Factory->Name(), const_cast<void*>(kRegisterPriority));
+        Manager->RegisterComponent(Factory, Factory->Name, const_cast<void*>(kRegisterPriority));
         Factory->Release();
     }
 
-    // The 26 registration callees of FUN_06ecf440 allocate before acquiring the manager.
-    // BatchedMaterial's name pointer is DAT_06ed4278.
-    bool RegisterMaterialComponent(const FComponentSpec& Spec)
+    // Each of the 26 registration callees of FUN_06ecf440 is this body with its own factory
+    // class and name; they allocate before acquiring the manager.
+    template <class TFactory>
+    bool RegisterComponent(const char* Name)
     {
-        FComponentFactory* Factory = new (std::nothrow) FComponentFactory(Spec);
+        TFactory* Factory = new (std::nothrow) TFactory(Name);
         if (Factory == nullptr)
             return false;
         ICOManager* Manager = DACOM_Acquire();
         // Opaque priority token: keep const removal explicit.
-        Manager->RegisterComponent(Factory, Factory->Name(), const_cast<void*>(kRegisterPriority));
+        Manager->RegisterComponent(Factory, Factory->Name, const_cast<void*>(kRegisterPriority));
         Factory->Release();
         return true;
     }
 
+    template <class TMaterial>
+    bool RegisterMaterial(const char* Name)
+    {
+        return RegisterComponent<TMaterialFactory<TMaterial>>(Name);
+    }
+
     void RegisterMaterialComponents()
     {
-        // Retail order (FUN_06ecf440); callees bd20,83f0,6cf0,3dc0,d140,d280,d0a0,d1e0,
-        // 5c20,d050,d190,d0f0,d230,8590,85e0.
-        static const unsigned long First[] = {1, 2, 3, 4, 8, 12, 6, 10, 13, 5, 9, 7, 11, 14, 15};
-        for (unsigned long Index = 0; Index < sizeof(First) / sizeof(First[0]); ++Index)
-            RegisterMaterialComponent(G_Specs[First[Index]]);
+        // FUN_06ecf440, in retail order; each line's address is its registration function.
+        RegisterComponent<FMaterialLibraryFactory>("MaterialLibrary");              // 06ecbd20
+        RegisterComponent<FMaterialBatcherFactory>("MaterialBatcher");              // 06ec83f0
+        RegisterComponent<FMaterialAnimationFactory>("MaterialAnimation");          // 06ec6cf0
+        RegisterComponent<FBatchedMaterialFactory>("BatchedMaterial");              // 06eb3dc0
+        RegisterMaterial<FSinglePassMaterial>("DcDtEcOcOt");                        // 06ebd140
+        RegisterMaterial<FSinglePassTwoMaterial>("DcDtEcOcOtTwo");                  // 06ebd280
+        RegisterMaterial<FSinglePassMaterial>("DcDtEc");                            // 06ebd0a0
+        RegisterMaterial<FSinglePassTwoMaterial>("DcDtEcTwo");                      // 06ebd1e0
+        RegisterMaterial<FDcDtEtMaterial>("DcDtEt");                                // 06eb5c20
+        RegisterMaterial<FSinglePassMaterial>("DcDt");                              // 06ebd050
+        RegisterMaterial<FSinglePassTwoMaterial>("DcDtTwo");                        // 06ebd190
+        RegisterMaterial<FSinglePassMaterial>("DcDtOcOt");                          // 06ebd0f0
+        RegisterMaterial<FSinglePassTwoMaterial>("DcDtOcOtTwo");                    // 06ebd230
+        RegisterMaterial<FEcEtMaterial>("EcEt");                                    // 06eb8590
+        RegisterMaterial<FEcEtTwoMaterial>("EcEtTwo");                              // 06eb85e0
         ActivateMaterialGlobalRecord(2);
         ActivateMaterialGlobalRecord(1);
 
-        // Callees 1000,c210,c260,cdc0,a3b0.
-        static const unsigned long Second[] = {16, 17, 18, 19, 20};
-        for (unsigned long Index = 0; Index < sizeof(Second) / sizeof(Second[0]); ++Index)
-            RegisterMaterialComponent(G_Specs[Second[Index]]);
+        RegisterMaterial<FAtmosphereMaterial>("AtmosphereMaterial");                // 06eb1000
+        RegisterMaterial<FNebulaMaterial>("Nebula");                                // 06ebc210
+        RegisterMaterial<FNebulaTwoMaterial>("NebulaTwo");                          // 06ebc260
+        RegisterMaterial<FNullMaterial>("NullMaterial");                            // 06ebcdc0
+        RegisterMaterial<FLightMapMaterial>("LightMap");                            // 06eba3b0
         ActivateMaterialGlobalRecord(3);
 
-        // Callees 7b40,6620,ac50,9210.
-        static const unsigned long Third[] = {21, 22, 24, 23};
-        for (unsigned long Index = 0; Index < sizeof(Third) / sizeof(Third[0]); ++Index)
-            RegisterMaterialComponent(G_Specs[Third[Index]]);
+        RegisterMaterial<FDetailMapMaterial>("DetailMapMaterial");                  // 06eb7b40
+        RegisterMaterial<FDetailMap2PassMaterial>("DetailMap2Dm1Msk2PassMaterial"); // 06eb6620
+        RegisterMaterial<FMasked2DetailMapMaterial>("Masked2DetailMapMaterial");    // 06ebac50
+        RegisterMaterial<FIllumDetailMapMaterial>("IllumDetailMapMaterial");        // 06eb9210
         ActivateMaterialGlobalRecord(0);
-        RegisterMaterialComponent(G_Specs[25]); // 47a0
-        RegisterMaterialComponent(G_Specs[26]); // 47f0
+        RegisterMaterial<FBtDetailMapMaterial>("BtDetailMapMaterial");              // 06eb47a0
+        RegisterMaterial<FBtDetailMapTwoMaterial>("BtDetailMapTwoMaterial");        // 06eb47f0
     }
 }
 

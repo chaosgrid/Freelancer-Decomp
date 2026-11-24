@@ -18,25 +18,13 @@
 
 // FUN_062cf230. Embedded ops: GotoOp at +0x68, FollowOp at +0xd8 (common_pub.h).
 GuideBehavior::GuideBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , OwnerContextPtr14(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime1c(0.0f)
-    , BehaviorMgrPtr20(nullptr)
-    , NavHelperPtr24(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
-    , WatcherA()
+    : Behavior(InTypeId)
+    , EscortWatcher()
     , GuideRange(0.0f)
-    , Flag38(1)
+    , bStartFollowing(1)
     , Pad39{}
     , EscortMaxClearance(0.0f)
-    , Field40(0)
+    , TetherFarRangeBits(0)
     , EscortMinClearance(0.0f)
     , GuideDestination{}
     , ArrivalRadius(0.0f)
@@ -46,27 +34,26 @@ GuideBehavior::GuideBehavior(int InTypeId)
     , FollowDelegate(nullptr)
     , GotoOp()
     , FollowOp()
-    , WatcherB()
+    , DestinationWatcher()
     , SampleInterval(10.0f)
     , SampleElapsed(0.0f)
     , LastSampleDistance(0.0f)
     , Field110(0.0f)
-    , FieldLow114(-10.0f)
-    , FieldHigh118(10.0f)
-    , AngleThreshold11c(0.39269909f)
-    , Flag120(0)
+    , ProgressLowThreshold(-10.0f)
+    , ProgressHighThreshold(10.0f)
+    , CourseAngleThreshold(0.39269909f)
+    , bEscortFollowing(0)
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
-    // Not reproduced: retail then tests WatcherB (+0xfc) and set_pointer(nullptr)s it, which
+    // Not reproduced: retail then tests DestinationWatcher (+0xfc) and set_pointer(nullptr)s it, which
     // is dead because the ctor has just zeroed it.
 }
 
-// FUN_062cf360 (scalar deleting FUN_062cf340): WatcherB (+0xfc) is cleared before WatcherA
+// FUN_062cf360 (scalar deleting FUN_062cf340): DestinationWatcher (+0xfc) is cleared before EscortWatcher
 // (+0x2c); ~Behavior (FUN_062d2080) chains after.
 GuideBehavior::~GuideBehavior()
 {
-    WatcherB.set(nullptr);
-    WatcherA.set(nullptr);
+    DestinationWatcher.set(nullptr);
+    EscortWatcher.set(nullptr);
 }
 
 // Slot 1, LAB_062cf3e0: jumps to FUN_062d2090.
@@ -79,8 +66,8 @@ bool GuideBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 void GuideBehavior::OnEngage()
 {
     Behavior::OnEngage();
-    GotoDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[2];       // Manager+0x17c (Goto)
-    FollowDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[17];      // Manager+0x1b8 (Follow)
+    GotoDelegate = BehaviorMgr->BehaviorDispatchTable[2];       // Manager+0x17c (Goto)
+    FollowDelegate = BehaviorMgr->BehaviorDispatchTable[17];      // Manager+0x1b8 (Follow)
     (void)GotoDelegate->OnApplyDirective(&GotoOp);
     GotoDelegate->OnEngage();
     (void)FollowDelegate->OnApplyDirective(&FollowOp);
@@ -91,15 +78,15 @@ void GuideBehavior::OnEngage()
     Follow->Move.SetField44(2);
     FollowDelegate->OnEngage();
     GuideDestination = GotoOp.Destination;
-    ArrivalRadius = GotoOp.Field_50;
+    ArrivalRadius = GotoOp.ArrivalRange;
     SampleElapsed = 0.0f;
     // Summed (x, z, y) and square-rooted in double, rounded once.
     Vector Pos{ 0.0f, 0.0f, 0.0f };
-    GetIfacePositionOrZero(&Pos, ObjRwFromWatchable(const_cast<Watchable*>(WatcherA.target())));
+    GetIfacePositionOrZero(&Pos, ObjRwFromWatchable(const_cast<Watchable*>(EscortWatcher.target())));
     double const Dx = static_cast<double>(Pos.x) - GuideDestination.x;
     double const Dy = static_cast<double>(Pos.y) - GuideDestination.y;
     double const Dz = static_cast<double>(Pos.z) - GuideDestination.z;
-    Flag120 = Flag38;
+    bEscortFollowing = bStartFollowing;
     ProgressDelta = 0.0f;
     ApproachAngleRad = 0.0f;
     LastSampleDistance = static_cast<float>(std::sqrt((Dx * Dx + Dz * Dz) + Dy * Dy));
@@ -127,62 +114,59 @@ int GuideBehavior::OnEvaluateReadiness(float Value)
     (void)Value;
     if ((Flags28 & 0x2) != 0)
     {
-        IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(WatcherA.target()));
+        IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(EscortWatcher.target()));
         if (Lead != nullptr)
         {
-            if (IsWithinInterceptRangeOfIface(&NavHelperPtr24->SelfTarget, Lead, GuideRange))
-                ModeSelector0xc = (Flag29 != 0) ? 3 : 1;
+            if (IsWithinInterceptRangeOfIface(&SysMgr->SelfTarget, Lead, GuideRange))
+                Readiness = (Flag29 != 0) ? 3 : 1;
             else
-                ModeSelector0xc = (Flag29 != 0) ? 3 : 0;
-            return ModeSelector0xc;
+                Readiness = (Flag29 != 0) ? 3 : 0;
+            return Readiness;
         }
-        BehaviorMgrPtr20->SetDirectiveResult(0xe, 1);
+        BehaviorMgr->SetDirectiveResult(0xe, 1);
     }
-    ModeSelector0xc = (Flag29 != 0) ? 3 : 2;
-    return ModeSelector0xc;
+    Readiness = (Flag29 != 0) ? 3 : 2;
+    return Readiness;
 }
 
-// Slot 10, LAB_062cfc70. The argument is a pub::AI::DirectiveGuideOp; the FollowParams fields
-// it reads (+0x8c/+0x90..+0x98) and the GotoParams fields (+0x68/+0x6c/+0x70) are taken by
-// raw offset off the op.
+// Slot 10, LAB_062cfc70. The argument is a pub::AI::DirectiveGuideOp. The escort is the goto's
+// tether object (op+0x68); its follow fields are read straight off the op (+0x8c..+0x98).
 bool GuideBehavior::OnApplyDirective(void* DirectiveOp)
 {
     pub::AI::DirectiveGuideOp const* const Op = static_cast<pub::AI::DirectiveGuideOp const*>(DirectiveOp);
-    unsigned char const* const OpBytes = static_cast<unsigned char const*>(DirectiveOp);
-    GotoDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[2];
-    FollowDelegate = BehaviorMgrPtr20->BehaviorDispatchTable[17];
+    GotoDelegate = BehaviorMgr->BehaviorDispatchTable[2];
+    FollowDelegate = BehaviorMgr->BehaviorDispatchTable[17];
     // Whole-object copies (0x1c and 9 dwords), vptr included.
     std::memcpy(static_cast<void*>(&GotoOp), &Op->GotoParams, sizeof(GotoOp));
     std::memcpy(static_cast<void*>(&FollowOp), &Op->FollowParams, sizeof(FollowOp));
     bool bResult = true;
-    // WatcherB = the object GotoOp+0x1c names (FUN_062e74a0).
-    IObjRW* const GotoTarget = NavHelperPtr24->Timers.FindVerifiedObject(
-        (unsigned const*)((unsigned char*)this + 0x84));
-    WatcherB.set(GotoTarget != nullptr ? static_cast<Watchable const*>(GotoTarget) : nullptr);
-    SampleInterval = Op->Field_A4;
-    AngleThreshold11c = Op->Field_A8;
+    // DestinationWatcher = the object the copied GotoOp's TargetId names (FUN_062e74a0).
+    IObjRW* const GotoTarget = SysMgr->Timers.FindVerifiedObject(
+        reinterpret_cast<unsigned const*>(&GotoOp.TargetId));
+    DestinationWatcher.set(GotoTarget != nullptr ? static_cast<Watchable const*>(GotoTarget) : nullptr);
+    SampleInterval = Op->SampleInterval;
+    CourseAngleThreshold = Op->CourseAngleThreshold;
     Field110 = static_cast<float>(Op->Field_AC);                    // int -> float (FILD)
-    FieldHigh118 = Op->Field_B0;
-    FieldLow114 = Op->Field_B4;
-    if (*reinterpret_cast<int const*>(OpBytes + 0x68) != 0)
+    ProgressHighThreshold = Op->ProgressHighThreshold;
+    ProgressLowThreshold = Op->ProgressLowThreshold;
+    if (Op->GotoParams.TetherObjectId != 0)
     {
-        IObjRW* const Escort = NavHelperPtr24->Timers.FindVerifiedObject(
-            (unsigned const*)(OpBytes + 0x68));
-        WatcherA.set(Escort != nullptr ? static_cast<Watchable const*>(Escort) : nullptr);
-        if (ObjRwFromWatchable(const_cast<Watchable*>(WatcherA.target())) != nullptr)
+        IObjRW* const Escort = SysMgr->Timers.FindVerifiedObject(&Op->GotoParams.TetherObjectId);
+        EscortWatcher.set(Escort != nullptr ? static_cast<Watchable const*>(Escort) : nullptr);
+        if (ObjRwFromWatchable(const_cast<Watchable*>(EscortWatcher.target())) != nullptr)
         {
-            EscortMaxClearance = *reinterpret_cast<float const*>(OpBytes + 0x6c);
-            Field40 = *reinterpret_cast<unsigned const*>(OpBytes + 0x70);
-            // A positive |op+0x90| gives len + 100.0f (DAT_0639fb58), rounded once; otherwise
-            // op+0x8c.
-            float const* const V = reinterpret_cast<float const*>(OpBytes + 0x90);
-            double const Len = std::sqrt((static_cast<double>(V[0]) * V[0]
-                                          + static_cast<double>(V[1]) * V[1])
-                                         + static_cast<double>(V[2]) * V[2]);
+            EscortMaxClearance = Op->GotoParams.TetherNearRange;
+            TetherFarRangeBits = *reinterpret_cast<unsigned const*>(&Op->GotoParams.TetherFarRange);
+            // A positive |FollowOffset| gives len + 100.0f (DAT_0639fb58), rounded once;
+            // otherwise FollowDistance.
+            pub::AI::DirectiveFollowOp const& Follow = Op->FollowParams;
+            double const Len = std::sqrt((static_cast<double>(Follow.FollowOffsetX) * Follow.FollowOffsetX
+                                          + static_cast<double>(Follow.FollowOffsetY) * Follow.FollowOffsetY)
+                                         + static_cast<double>(Follow.FollowOffsetZ) * Follow.FollowOffsetZ);
             if (Len > 0.0)
                 EscortMinClearance = static_cast<float>(Len + 100.0);
             else
-                EscortMinClearance = *reinterpret_cast<float const*>(OpBytes + 0x8c);
+                EscortMinClearance = Follow.FollowDistance;
             if (!GotoDelegate->OnApplyDirective(&GotoOp))
                 bResult = false;
             if (!FollowDelegate->OnApplyDirective(&FollowOp))
@@ -193,8 +177,8 @@ bool GuideBehavior::OnApplyDirective(void* DirectiveOp)
             bResult = false;
         }
     }
-    GuideRange = Op->Field_B8;
-    Flag38 = Op->Field_A0;
+    GuideRange = Op->GuideRange;
+    bStartFollowing = Op->bStartFollowing;
     Flags28 = static_cast<unsigned char>((Flags28 & ~0x2u) | (bResult ? 0x2u : 0u));
     return bResult;
 }
@@ -203,17 +187,17 @@ bool GuideBehavior::OnApplyDirective(void* DirectiveOp)
 void GuideBehavior::OnObjectLeftSystem(void* Arg)
 {
     unsigned int const LeftId = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg));
-    IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(WatcherA.target()));
+    IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(EscortWatcher.target()));
     if (Lead == nullptr)
         return;
     if (Lead->get_id() == LeftId)
-        WatcherA.set(nullptr);
+        EscortWatcher.set(nullptr);
 }
 
 // Slot 24, LAB_062cf2f0.
 IObjRW const* GuideBehavior::get_target()
 {
-    return ObjRwFromWatchable(const_cast<Watchable*>(WatcherA.target()));
+    return ObjRwFromWatchable(const_cast<Watchable*>(EscortWatcher.target()));
 }
 
 // ===========================================================================
@@ -248,39 +232,39 @@ void GuideBehavior::FireGuideEvent(IObjRW* Watched, FAiTarget* NavElem, int Even
 {
     unsigned const SelfId = NavElem->Iface->get_id();   // fetched first
     unsigned const WatchedId = ObjInspectOf(Watched)->get_id();
-    NotifyManagerGuideEvent(BehaviorMgrPtr20, SelfId, WatchedId, EventCode, Clearance, &GuideDestination);
+    NotifyManagerGuideEvent(BehaviorMgr, SelfId, WatchedId, EventCode, Clearance, &GuideDestination);
 }
 
 int GuideBehavior::Update()
 {
     // ---- entry guards ----
-    IObjRW* const ObjA = ObjRwFromWatchable(const_cast<Watchable*>(WatcherA.target()));
+    IObjRW* const ObjA = ObjRwFromWatchable(const_cast<Watchable*>(EscortWatcher.target()));
     if (ObjA == nullptr)
     {
         // Only this exit clears the flag bit.
         Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
-    if (OwnerContextPtr14 == nullptr)
+    if (OwnerContext == nullptr)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
-    // Retail re-reads WatcherA and repeats both tests here; nothing in between can change it.
+    // Retail re-reads EscortWatcher and repeats both tests here; nothing in between can change it.
 
-    FAiTarget* const NavElem = &NavHelperPtr24->SelfTarget;
+    FAiTarget* const NavElem = &SysMgr->SelfTarget;
 
     // ---- refresh the guide destination point ----
-    int const GotoMode = GotoOp.Field_0C;
+    int const GotoMode = GotoOp.GotoKind;
     if (GotoMode == 0)
     {
-        IObjRW* const ObjB = ObjRwFromWatchable(const_cast<Watchable*>(WatcherB.target()));
+        IObjRW* const ObjB = ObjRwFromWatchable(const_cast<Watchable*>(DestinationWatcher.target()));
         if (ObjB == nullptr)
         {
             Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-            BehaviorMgrPtr20->SetDirectiveResult(0xe, 1);
-            UpdateResult10 = 2;
+            BehaviorMgr->SetDirectiveResult(0xe, 1);
+            UpdateResult = 2;
             return 2;
         }
         // Retail re-tests the mode here (062cf66d), which is always zero: dead, not reproduced.
@@ -294,7 +278,7 @@ int GuideBehavior::Update()
     }
     // Any other mode keeps last tick's destination.
 
-    ArrivalRadius = GotoOp.Field_50;
+    ArrivalRadius = GotoOp.ArrivalRange;
 
     // ---- this tick's three steering measurements, each rounded to float ----
     Vector WatchedAPos;
@@ -317,17 +301,17 @@ int GuideBehavior::Update()
             unsigned const NavSelfId = NavElem->Iface->get_id();
             if (ObjInspectOf(Leader)->get_id() == NavSelfId)
             {
-                Flag120 = 0;
+                bEscortFollowing = 0;
                 bLeaderIsSelf = true;
             }
         }
     }
 
     // ---- ... or listed among my own formation followers ----
-    if (NavHelperPtr24->GunConvergenceStateBytes.IsIdAmongOwnerFormationFollowers(
+    if (SysMgr->FormationLeaders.IsIdAmongOwnerFormationFollowers(
             ObjInspectOf(ObjA)->get_id())) // FUN_062ec520
     {
-        Flag120 = 0;
+        bEscortFollowing = 0;
     }
 
     // ---- sample the escort's progress, at most once per SampleInterval ----
@@ -359,33 +343,33 @@ int GuideBehavior::Update()
     }
     else
     {
-        SampleElapsed = SampleElapsed + DeltaTime1c;
+        SampleElapsed = SampleElapsed + DeltaTime;
     }
 
     bool bSkipRadialTermination = false;
 
-    if (Flag120 != 0)
+    if (bEscortFollowing != 0)
     {
         // ---- event table for the "escort is following me" state ----
         if (bSampled)
         {
-            if (ProgressDelta < FieldLow114)
+            if (ProgressDelta < ProgressLowThreshold)
             {
                 if (!bInsideRadial)
                     FireGuideEvent(ObjA, NavElem, 8, Clearance);
-                Flag120 = 0; // whether or not the event fired
+                bEscortFollowing = 0; // whether or not the event fired
             }
-            else if (ProgressDelta > FieldHigh118)
+            else if (ProgressDelta > ProgressHighThreshold)
             {
-                if (ApproachAngleRad > AngleThreshold11c)
+                if (ApproachAngleRad > CourseAngleThreshold)
                 {
                     if (!bInsideRadial)
                         FireGuideEvent(ObjA, NavElem, 6, Clearance);
-                    Flag120 = 0;
+                    bEscortFollowing = 0;
                 }
                 else
                 {
-                    // The one arm that neither checks bInsideRadial nor clears Flag120.
+                    // The one arm that neither checks bInsideRadial nor clears bEscortFollowing.
                     FireGuideEvent(ObjA, NavElem, 5, Clearance);
                 }
             }
@@ -393,16 +377,16 @@ int GuideBehavior::Update()
             {
                 if (!bInsideRadial)
                     FireGuideEvent(ObjA, NavElem, 7, Clearance);
-                Flag120 = 0;
+                bEscortFollowing = 0;
             }
         }
 
         // ---- hand the flying to the right sibling ----
-        if (Flag120 != 0)
+        if (bEscortFollowing != 0)
         {
             // Still following. Retail discards the slot-7 result here (the mirror branch below
             // tests it against 2).
-            *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(FollowDelegate) + 0x1c) = DeltaTime1c;
+            FollowDelegate->DeltaTime = DeltaTime;
             FollowDelegate->OnUpdate();
         }
         else
@@ -422,7 +406,7 @@ int GuideBehavior::Update()
             {
                 FireGuideEvent(ObjA, NavElem, 4, Clearance);
             }
-            else if (ProgressDelta < FieldLow114 && !bInsideRadial)
+            else if (ProgressDelta < ProgressLowThreshold && !bInsideRadial)
             {
                 FireGuideEvent(ObjA, NavElem, 3, Clearance);
             }
@@ -431,7 +415,7 @@ int GuideBehavior::Update()
                 // Retail evaluates both compares up front and reads the Clearance one twice:
                 // once as "less" (TEST AH,0x5) and once as C0 alone (TEST AH,0x1, also set on
                 // unordered).
-                bool const bFarAhead = (ProgressDelta > FieldHigh118);
+                bool const bFarAhead = (ProgressDelta > ProgressHighThreshold);
                 bool const bInsideField3c = (Clearance < EscortMaxClearance);
                 bool const bField3cC0 = !(Clearance >= EscortMaxClearance);
 
@@ -440,10 +424,10 @@ int GuideBehavior::Update()
                     if (bInsideField3c)
                     {
                         // Unordered skips the event.
-                        if (ApproachAngleRad <= AngleThreshold11c)
+                        if (ApproachAngleRad <= CourseAngleThreshold)
                         {
                             FireGuideEvent(ObjA, NavElem, 1, Clearance);
-                            Flag120 = 1;
+                            bEscortFollowing = 1;
                         }
                     }
                     else if (bInsideRadial)
@@ -454,13 +438,13 @@ int GuideBehavior::Update()
                 else if (!bField3cC0 && !bInsideRadial)
                 {
                     FireGuideEvent(ObjA, NavElem, 2, Clearance);
-                    Flag120 = 1;
+                    bEscortFollowing = 1;
                 }
             }
         }
 
         // ---- hand the flying to the right sibling ----
-        if (Flag120 != 0)
+        if (bEscortFollowing != 0)
         {
             // Transition to following.
             GotoDelegate->OnDisengage();
@@ -470,7 +454,7 @@ int GuideBehavior::Update()
         else
         {
             // Still leading: tick GotoDelegate. A result of 2 skips the radial termination test.
-            *reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(GotoDelegate) + 0x1c) = DeltaTime1c;
+            GotoDelegate->DeltaTime = DeltaTime;
             if (GotoDelegate->OnUpdate() == 2)
                 bSkipRadialTermination = true;
         }
@@ -483,18 +467,18 @@ int GuideBehavior::Update()
     {
         if (!(GetSignedRadialClearanceToPoint(NavElem, GuideDestination) <= ArrivalRadius))
         {
-            UpdateResult10 = 1;
+            UpdateResult = 1;
             return 1;
         }
     }
-    if (!(GetInterceptClearanceOfIface(NavElem, ObjA) <= GotoOp.Field_60))
+    if (!(GetInterceptClearanceOfIface(NavElem, ObjA) <= GotoOp.TetherNearRange))
     {
-        UpdateResult10 = 1;
+        UpdateResult = 1;
         return 1;
     }
 
     Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-    BehaviorMgrPtr20->SetDirectiveResult(0xe, 0);
-    UpdateResult10 = 2;
+    BehaviorMgr->SetDirectiveResult(0xe, 0);
+    UpdateResult = 2;
     return 2;
 }

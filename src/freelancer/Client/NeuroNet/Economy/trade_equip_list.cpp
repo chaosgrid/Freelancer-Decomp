@@ -221,7 +221,7 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
         G_TradeWidgetName, kItemViewMesh, kItemViewMesh, nullptr, nullptr, At, nullptr, Zero, 1,
         0, 0, 1, 0, 0, 0));
     IconFrame->OwnerData = PointerField(this);
-    IconFrame->SetByte337(1);
+    IconFrame->SetGlow(1);
     WinControlHalfExtentsFromMesh(IconFrame->HalfExtents, &IconFrame->MeshHolder);
 
     // The icon at the same place, a StaticControl.
@@ -313,10 +313,10 @@ void CTradeEquipListLine::SetHighlight(unsigned char bOn)
     // FUN_004bee70.
     unsigned char const Bit2 = static_cast<unsigned char>(bOn << 2);
     unsigned char const Bit3 = static_cast<unsigned char>(bOn << 3);
-    IconFrame->SetFlags331(MergeBits(IconFrame->GetFlags331(), Bit2, 0x04));
-    IconFrame->SetFlags331(MergeBits(IconFrame->GetFlags331(), Bit3, 0x08));
-    InfoFrame->SetFlags331(MergeBits(InfoFrame->GetFlags331(), Bit2, 0x04));
-    InfoFrame->SetFlags331(MergeBits(InfoFrame->GetFlags331(), Bit3, 0x08));
+    IconFrame->SetButtonBits2(MergeBits(IconFrame->GetButtonBits2(), Bit2, 0x04));
+    IconFrame->SetButtonBits2(MergeBits(IconFrame->GetButtonBits2(), Bit3, 0x08));
+    InfoFrame->SetButtonBits2(MergeBits(InfoFrame->GetButtonBits2(), Bit2, 0x04));
+    InfoFrame->SetButtonBits2(MergeBits(InfoFrame->GetButtonBits2(), Bit3, 0x08));
 }
 
 void CTradeEquipListLine::SetItem(EquipDesc* NewItem)
@@ -360,13 +360,13 @@ void CTradeEquipListLine::SetItem(EquipDesc* NewItem)
     Item = NewItem;
     unsigned char const Selection = static_cast<unsigned char>(NewItem->Cached & 0xff);
     unsigned char const Bit6 = static_cast<unsigned char>(Selection << 6);
-    IconFrame->SetFlags330(MergeBits(IconFrame->GetFlags330(), Bit6, 0x40));
-    InfoFrame->SetFlags330(MergeBits(InfoFrame->GetFlags330(), Bit6, 0x40));
+    IconFrame->SetButtonBits(MergeBits(IconFrame->GetButtonBits(), Bit6, 0x40));
+    InfoFrame->SetButtonBits(MergeBits(InfoFrame->GetButtonBits(), Bit6, 0x40));
 
     unsigned Layer;
     if (Selection != 0)
         Layer = 2;
-    else if ((IconFrame->GetFlags330() & 0x01) != 0)
+    else if ((IconFrame->GetButtonBits() & 0x01) != 0)
         Layer = 1;
     else
         Layer = 0;

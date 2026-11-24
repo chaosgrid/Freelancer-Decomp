@@ -33,6 +33,20 @@ struct FContentBase;      // BaseDB.h (TU17)
 struct FNnPathLeg;        // MissionObject.h (TU38; built by the TU53 path builder, SpacePaths.h)
 struct FPatrolPath;       // PatrolPaths.h (the zone path of FSpawnPlan kind 7)
 
+// The guide types (FGuideDescBase::Type, FContentGuide::Type), named after the behavior
+// names of ParseGuideBehavior. CreateGuide builds 1..6; type 7 gets no guide.
+enum EGuideType
+{
+    GUIDE_TYPE_NONE = 0,           // the empty name
+    GUIDE_TYPE_NOTHING = 1,        // "nothing", and any unknown name
+    GUIDE_TYPE_TRADE = 2,          // "trade"
+    GUIDE_TYPE_PATROL_PATH = 3,    // "patrol_path"
+    GUIDE_TYPE_WANDER = 4,         // "wander"
+    GUIDE_TYPE_GOTO = 5,           // "goto_guide" (MB_GOTOGUIDE)
+    GUIDE_TYPE_DOCK = 6,           // "dock_guide" (MB_DOCKGUIDE)
+    GUIDE_TYPE_PATROL_GUIDE = 7,   // "patrol_guide"
+};
+
 // FUN_06f07a80 (cdecl): "behavior = name" -> the guide type. Case-sensitive exact
 // compares: trade 2, patrol_path 3, nothing 1, wander 4, goto_guide 5, dock_guide 6,
 // patrol_guide 7; the empty string 0; anything else 1. Caller TU29 06ef615e.
@@ -71,12 +85,20 @@ using FContentGuideHandle = TRefHandle<FContentGuide>;
 // FUN_06ef54e0 builds it on its stack (06ef57c7-06ef5832, the defaults below), TU53
 // FUN_06f65f10 (PlaceSpawnFormation) fills it, TU29 FUN_06ef4eb0 copies it into the leader's
 // guide description and TU53 FUN_06f63cc0 (the leader's trade targets) reads it.
+// FSpawnPlan::Kind: the encounter's arrival method that placed the formation (the trade lane,
+// cruise and buzz kinds equal their EArrivalMethod index; every object arrival gives 2).
+enum ESpawnPlanKind
+{
+    SPAWN_PLAN_NONE = 0,         // not placed
+    SPAWN_PLAN_TRADELANE = 1,    // FUN_06f65d20
+    SPAWN_PLAN_DOCK = 2,         // FUN_06f65900; TU58 CreateNpcShips launches from DockTarget
+    SPAWN_PLAN_CRUISE = 7,       // FUN_06f64800
+    SPAWN_PLAN_BUZZ = 8,         // FUN_06f64fc0
+};
+
 struct FSpawnPlan
 {
-    // +0x00: how the formation arrives -- 0 not placed, 1 trade lane (FUN_06f65d20), 2 dock
-    // launch (FUN_06f65900; TU58 CreateNpcShips launches from DockTarget), 7 cruise
-    // (FUN_06f64800), 8 buzz (FUN_06f64fc0).
-    int Kind = 0;
+    int Kind = SPAWN_PLAN_NONE;         // +0x00 ESpawnPlanKind
     unsigned int RingId = 0;            // +0x04 kind 1: the ring the ships leave the lane at
     unsigned int NextRingId = 0;        // +0x08 kind 1: the ring they were heading for
     unsigned int DockTarget = 0;        // +0x0c kind 2: the launching object
@@ -205,8 +227,10 @@ public:
     Vector Destination = {};                     // +0x130 values 4-6 (goto only)
     float Range = 0.0f;                          // +0x13c value 7 (int); dock guide: value 5
     TString<0x30> TargetName;                    // +0x140 value 0
-    unsigned char Field_0x174 = 0;               // +0x174 guide +0x16c (bCruise). TODO: writer
-    unsigned char Field_0x175 = 0;               // +0x175 guide +0x16d (bNoCruise). TODO: writer
+    // Retail: only the ctor writes +0x174 / +0x175 (FUN_06f07b60, the loader's inlined copy
+    // 06f066c5); no value of the line sets them, so the guide's cruise flags are always 0.
+    unsigned char bCruise = 0;                   // +0x174 guide +0x16c
+    unsigned char bNoCruise = 0;                 // +0x175 guide +0x16d
     unsigned char bStartFollowing = 1;               // +0x176 value 8 (bool); guide +0x16e
 };
 
@@ -272,7 +296,7 @@ public:
     virtual void Reset() = 0;
     // +0x18 purecall. Name from the caller: the ship's DirectiveCallback forwards here when
     // its own directive list is empty (06f33fbe); 06f0af30 restarts (Start).
-    virtual void OnDirectivesDone(int ResultWord11c, int ResultWord118) = 0;
+    virtual void OnDirectivesDone(int CompletedBehavior, int DirectiveResult) = 0;
     // +0x1c, 06ea1490 (RET 8). Name from the caller: SpaceSupport's message id and parms,
     // forwarded by FUN_06f34c30; the goto guide switches on message ids (06f08d0f).
     virtual void HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)

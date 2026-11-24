@@ -58,28 +58,7 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
     FSpaceCamera* const Space = SpaceCameraOf(Hud);
 
     // Only with a watched client ship (CObject mask 0x503); HUDCamera's update runs either way.
-    bool bShip = false;
-    {
-        unsigned char* const Held = const_cast<unsigned char*>(
-            reinterpret_cast<const unsigned char*>(Hud->Watched.target()));
-        if (Held != nullptr)
-        {
-            unsigned char* const Object = Held - 8;
-            if (Object != nullptr)
-            {
-                unsigned char* const Plus0c = Object + 0xc;
-                if (Plus0c != nullptr)
-                {
-                    CEqObj* const EqObj = *reinterpret_cast<CEqObj**>(Plus0c + 4);
-                    if (EqObj != nullptr &&
-                        (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) == 0x503u)
-                        bShip = true;
-                }
-            }
-        }
-    }
-
-    if (bShip)
+    if (GameCameraWatchedShip(Hud) != nullptr)
     {
         IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
 

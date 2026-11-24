@@ -296,12 +296,12 @@ void CAsteroidCube::init(Vector const& PosIn, unsigned long CubeIdValue,
         Parms.bMine = Entry.bMine;
         Parms.bInstantKill = Entry.bInstantKill;
 
-        // No null test on Alloc. CollisionGroupId (+0xf4) is set directly, not via CreateParms.
+        // No null test on Alloc. SystemId (+0xf4) is set directly, not via CreateParms.
         // create_instance's result is discarded (the engine writes the id through
         // initialize_instance).
         CObject* NewObj = CObject::Alloc(CObject::ClassAsteroid);
         CAsteroid* NewAsteroid = (CAsteroid*)NewObj;
-        NewAsteroid->CollisionGroupId = SystemId;
+        NewAsteroid->SystemId = SystemId;
         NewAsteroid->open(Entry.Arch);
         Entry.Arch->create_instance(NewObj);
         NewAsteroid->init(Parms); // non-virtual CAsteroid::init

@@ -262,7 +262,6 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
 
     unsigned int Channel = Packet->GetChannel();
     unsigned int Opcode = Packet->GetOpcode();
-    const unsigned char* Payload = (const unsigned char*)Packet + 0x20;
 
     if (Channel == 1)
     {

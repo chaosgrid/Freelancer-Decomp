@@ -1517,7 +1517,7 @@ double ZONE::GetDistance(Vector const& Point) const
     default:
     {
         // The length of vt+0x44's surface point relative to Pos, negative when vt+0x34 says
-        // the point is inside.
+        // the point is inside. Retail: measured from the zone centre, not from Point.
         Vector const Surface = GetSurfacePoint(Point);
         Vector const Delta = Vec3Sub(Surface, Pos);
         float const Length = (float)(sqrt(((double)(Delta.z) * Delta.z +

@@ -38,7 +38,7 @@
 //          (bit 0 top, 1 right, 2 bottom, 3 left; Init: 0xf when zero)
 //   size 0x388
 // WireButtonControl adds +0x388 button bits (factory: bit 0 cleared, bit 2 set) -- 0 captured,
-// 1 right button, 2 enabled -- and +0x38c the KeyMap command posted on a click (0: the parent
+// 1 double click, 2 enabled -- and +0x38c the KeyMap command posted on a click (0: the parent
 // hears 0x26); size 0x390.
 // RichTextWireButtonControl adds +0x390 the caption RichTextWin (built by Init) and +0x394 a
 // pointer to +0x390; size 0x398.
@@ -53,6 +53,33 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string>
+
+// WireStaticControl::WireState (+0x35c) bits.
+enum EWireState
+{
+    kWireHovered = 0x01,
+    kWireFocused = 0x02,           // properties 0x2c / 0x2d
+    kWirePressed = 0x04,
+    kWireAlwaysWhite = 0x08,       // Init
+    kWireLit = 0x10,               // property 0xc
+    kWireLitWhilePressed = 0x20,   // ctor
+    kWirePulseWhileHovered = 0x40, // ctor
+    kWireDrawInactive = 0x80,      // property 0x34
+};
+
+// WireStaticControl::WireState2 (+0x35d) bits.
+enum EWireState2
+{
+    kWire2FlushBatchers = 0x01,    // flush both line batchers at the end of Draw
+};
+
+// WireButtonControl::ButtonState (+0x388) bits.
+enum EWireButtonState
+{
+    kWireButtonCaptured = 0x01,
+    kWireButtonDoubleClick = 0x02,
+    kWireButtonEnabled = 0x04,
+};
 
 class WireStaticControl : public WinControl
 {

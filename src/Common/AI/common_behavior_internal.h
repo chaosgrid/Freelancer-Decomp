@@ -11,11 +11,13 @@
 
 #include "common_systemmanager.h" // SystemManager, IObjRW, CObject
 
+struct CShip; // common_cobject.h
+
 namespace CmnBehavior
 {
-    // IObjInspect::is_player on Sys->ExternalIface (no null tests, as retail).
-    bool FollowerExternalIfaceIsPlayer(SystemManager* Sys);
+    // IObjInspect::is_player on the owner (Sys->SelfTarget.Iface); no null tests, as retail.
+    bool OwnerIsPlayer(SystemManager* Sys);
 
-    // `[obj+0x4c] & 0x503 == 0x503` -- the object if it is a ship, else null.
-    CObject const* FollowerPlayerShipOrNull(CObject const* Object);
+    // `[obj+0x4c] & 0x503 == 0x503` -- the object as a CShip if it is a ship, else null.
+    CShip const* ShipOrNull(CObject const* Object);
 }

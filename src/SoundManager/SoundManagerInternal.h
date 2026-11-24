@@ -314,7 +314,7 @@ public:
     int CoordScale;                 // +0xA4
     FVec3 Front;                    // +0xA8
     FVec3 Up;                       // +0xB4
-    unsigned long PadC0[3];         // +0xC0 ctor zeros
+    unsigned long PadC0[3];         // +0xC0 only the ctor writes it (zeros, 06ee1d49)
     FVec3 Position;                 // +0xCC
     FVec3 Velocity;                 // +0xD8
     float DistanceFactor;           // +0xE4
@@ -327,11 +327,12 @@ public:
     unsigned long ArchCap;          // +0x100
     unsigned char bArchEmpty;       // +0x104
     unsigned char Pad105[3];
-    unsigned long Pad108;
-    FAttachedNode* AttachedUnused;  // +0x10C list this (FUN_06ee7d80 size 0xC)
+    unsigned long Pad108;           // +0x108 retail's map size (06ee485e); unused by the array
+    FAttachedNode* AttachedListAllocator; // +0x10C VC6 std::list allocator slot; retail passes
+                                          // +0x10C as the list (FUN_06ee7d80 node size 0xC)
     FAttachedNode* AttachedSentinel;// +0x110
     unsigned long AttachedCount;    // +0x114
-    FSoundInstanceNode* InstanceUnused;   // +0x118 list this (FUN_06ee7d50 size 0x60)
+    FSoundInstanceNode* InstanceListAllocator; // +0x118 likewise (FUN_06ee7d50 node size 0x60)
     FSoundInstanceNode* InstanceSentinel; // +0x11C
     unsigned long InstanceEmbeddedCount;  // +0x120 (play count is DAT_06eeaf08)
     unsigned long NextArchId;       // +0x124
@@ -367,8 +368,8 @@ static_assert(offsetof(FSoundManager, Front) == 0xA8, "Front +0xA8");
 static_assert(offsetof(FSoundManager, Up) == 0xB4, "Up +0xB4");
 static_assert(offsetof(FSoundManager, Position) == 0xCC, "Position +0xCC");
 static_assert(offsetof(FSoundManager, Window) == 0xF4, "Window +0xF4");
-static_assert(offsetof(FSoundManager, AttachedUnused) == 0x10C, "attached list +0x10C");
-static_assert(offsetof(FSoundManager, InstanceUnused) == 0x118, "instance list +0x118");
+static_assert(offsetof(FSoundManager, AttachedListAllocator) == 0x10C, "attached list +0x10C");
+static_assert(offsetof(FSoundManager, InstanceListAllocator) == 0x118, "instance list +0x118");
 static_assert(offsetof(FSoundManager, NextArchId) == 0x124, "NextArchId +0x124");
 static_assert(offsetof(FSoundManager, DirectSound) == 0x12C, "DirectSound +0x12C");
 static_assert(offsetof(FSoundManager, Parser) == 0x134, "Parser +0x134");

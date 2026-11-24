@@ -316,7 +316,6 @@ namespace AlchemyImpl
 
     // ---- ALE node-lib parsing helpers (shared by FAlchemy / FFxEffectArchetype
     //      / FFxEffectObject / FGenericFxObject) ------------------------------
-    IGenericFx* QueryGenericFx(IDAComponent* Node);
     // FUN_0623f6b0 (cos -> Out[0], sin -> Out[1]); FUN_0623f590 when the CPU has SSE.
     void ComputeSinCosPair(float AngleRadians, float* OutCos, float* OutSin);
     using FnAlchemySinCos = void (*)(float, float*);
@@ -338,15 +337,8 @@ namespace AlchemyImpl
     IGenericFx* AsFxNode(void* Node);
     IDAComponent* CallGetAttachParent(void* Node);
     IDAComponent* CallGetFirstChild(void* Node);
-    IDAComponent* CallGetPrevSibling(void* Node);
     IDAComponent* CallGetNextSibling(void* Node);
-    int CallGetSortKey(void* Node);
-    void CallSetParent(IDAComponent* Node, IDAComponent* Parent);
-    void CallSetFirstChild(IDAComponent* Node, IDAComponent* Child);
-    void CallSetPrevSibling(IDAComponent* Node, IDAComponent* Prev);
-    void CallSetNextSibling(IDAComponent* Node, IDAComponent* Next);
     void LinkNodeTree(IDAComponent* Parent, IDAComponent* Child);
-    GENRESULT UnlinkNodeTree(IDAComponent* Node);
     unsigned long RemapNodeLibHash(unsigned long Hash);
     unsigned long RemapNodeLibKind(unsigned long Kind, unsigned long VersionBits);
     // The node library's property stream: the loader's loop over FUN_062291a0 and the

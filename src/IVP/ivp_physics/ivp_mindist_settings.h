@@ -31,8 +31,8 @@ public:
     float real_coll_dist;      // +0x000 = D * 0.1f
     float min_coll_dists;      // +0x004 = D * 0.9f + D * 0.1f
     float CollDistRamp[0x40];  // +0x008..+0x104: [k] = k * (1/64) * (max_coll_dist - min_coll_dists) + min_coll_dists
-                               // Readers index it with `(StateFlags >> 22) & 0xff`, i.e. past its end
-                               // into the fields below -- see G_IVP_MindistSettingsStorage.
+                               // Read with `(StateFlags >> 22) & 0xff`, which stays <= 0x3f
+                               // (see IVP_MindistSettingsRamp).
     float max_coll_dist;       // +0x108 = min_coll_dists (same x87 value, stored twice)
     // +0x10c: the gap a friction contact is driven to (the friction solver's
     // desired distance), every new contact point's starting gap, and the
@@ -80,23 +80,14 @@ static_assert(offsetof(IVP_Mindist_Settings, max_spawned_mindist_count) == 0x12C
 static_assert(offsetof(IVP_Mindist_Settings, ToleranceDecayCounter) == 0x134, "IVP_Mindist_Settings+0x134");
 static_assert(sizeof(IVP_Mindist_Settings) == 0x138, "IVP_Mindist_Settings is 0x138 bytes");
 
-// The ramp index is `(StateFlags >> 22) & 0xff` (0634f3bc, 0634fe77), so retail
-// can address CollDistRamp[0xff], far past the 0x138-byte object into whatever
-// .data follows. Port deviation: out-of-range reads see zero here instead of
-// the neighbouring globals. Open: whether the index ever exceeds 0x3f.
-struct FIVP_MindistSettingsStorage
-{
-    IVP_Mindist_Settings Settings;
-    float Tail[0x102 - 0x4e];
-};
+// The global object (retail .data:0658aa10).
+extern IVP_Mindist_Settings G_IVP_MindistSettings;
 
-extern FIVP_MindistSettingsStorage G_IVP_MindistSettingsStorage;
-
-// The global object itself (retail .data:0658aa10).
-extern IVP_Mindist_Settings& G_IVP_MindistSettings;
-
-// DAT_0658aa18[Index] -- the ramp read with retail's unclamped index.
+// DAT_0658aa18[Index], Index = `(StateFlags >> 22) & 0xff` (0634f3bc, 0634fe77),
+// unclamped as in retail. The index never leaves the ramp: the mindist ctor
+// (FUN_0634db70) sets bits 22-29 to 0x3f and the only other writer, 0634f592,
+// decrements them only while they are nonzero.
 inline float IVP_MindistSettingsRamp(uint32_t Index)
 {
-    return (&G_IVP_MindistSettingsStorage.Settings.CollDistRamp[0])[Index];
+    return G_IVP_MindistSettings.CollDistRamp[Index];
 }

@@ -55,9 +55,9 @@ struct DisplaySettings
     FClientPathString movie_files[3]; // +0x350  [Startup] movie_file, first three only
     FClientPathString gate_tunnels;   // +0x668  [Data] gate_tunnels
     FClientPathString jump_effect;    // +0x770  [Data] jump_effect
-    char field_878;                   // +0x878  (DAT_0067a438) cleared by FUN_005621a0 through `this`;
-                                      //         read once, by ClientWndProc -- modelled there as
-                                      //         window.cpp's kActivateOverrideByte (always 0)
+    char present_when_inactive;       // +0x878  (DAT_0067a438) cleared by FUN_005621a0 through `this`,
+                                      //         never set; ClientWndProc's WM_ACTIVATEAPP keeps a
+                                      //         windowed single-player session presenting with it
     char quick_flag;                  // +0x879  "+Q"/"-Q": set to 1, never read anywhere in the PE
     char pad87a[2];
 };

@@ -19,7 +19,7 @@
 // below are NODE-relative.
 //
 // Per frame: IAlchemy UpdateNodes (LAB_06201870 / FUN_06201810) calls outer +0x14
-// (IGenericFx::Pad5) on every node. For an emitter that is the per-type update
+// (IGenericFx::UpdateNode) on every node. For an emitter that is the per-type update
 // (cone LAB_0621b9d0, cube LAB_0621d360, sphere LAB_0623bcf0): evaluate the
 // shape properties at (node+0x8c, Dt + Age), cache them at node+0xf4.., then
 // run the shared emitter body FUN_06245bf0 (FFxEmitterBase::UpdateEmitter),
@@ -163,7 +163,7 @@ namespace AlchemyImpl
         // velocity W (both already FSTP float). Q = W * AgeOffset (float); position =
         // (Q + P) + PosOffset with x and y kept in the FPU and z rounded after Q + P;
         // velocity = W + VelIn; then Rotate / TransformXform by +0xbc and the
-        // appearance's outer +0xB8 (Pad46) and, when that is >= 0, +0xBC (Pad47) with
+        // appearance's outer +0xB8 (TestParticleSpawn) and, when that is >= 0, +0xBC (SpawnParticle) with
         // (Six = {Pos, Vel}, AgeOffset, InitLifeSpan).
         void SubmitParticle(const float* Pos3, const float* Vel3, const float& AgeOffset,
                             const float* PosOffset3, const float* VelIn3,
@@ -185,7 +185,7 @@ namespace AlchemyImpl
         ~FxConeEmitter() override;
 
         // LAB_0621b9d0 (outer thunk LAB_0621c140).
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_0621b890 (outer thunk 0621c190).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
 
@@ -214,7 +214,7 @@ namespace AlchemyImpl
         ~FxCubeEmitter() override;
 
         // LAB_0621d360.
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_0621d220 (outer thunk 0621d970).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
 
@@ -244,7 +244,7 @@ namespace AlchemyImpl
         ~FxSphereEmitter() override;
 
         // LAB_0623bcf0 (outer slot 5 LAB_0623c2f0 is an inlined copy of it).
-        GENRESULT DACOM_API Pad5(float Dt) override;
+        GENRESULT DACOM_API UpdateNode(float Dt) override;
         // FUN_0623ba50 (outer thunk 0623c390).
         GENRESULT DACOM_API CloneNode(IDAComponent** Out) override;
 

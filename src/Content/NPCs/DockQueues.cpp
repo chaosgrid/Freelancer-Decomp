@@ -151,9 +151,9 @@ FDockQueueEntry::FDockQueueEntry()
     , ShipId(0)
     , DockTargetId(0)
     , DockIndex(-1)
-    , bField_0x10(false)
+    , bFinishOnClear(false)
     , Time(GetContentGameTime())
-    , bField_0x20(false)
+    , bNoTimeout(false)
 {
 }
 
@@ -542,7 +542,7 @@ void __cdecl UpdateDockQueues()
     while (It != GDockingShips.end())
     {
         FDockQueueEntry& Entry = *It;
-        if (!Entry.bField_0x20 && !Entry.bField_0x10)
+        if (!Entry.bNoTimeout && !Entry.bFinishOnClear)
         {
             double Now = GetContentGameTime();
             // x87: unordered does not time out.
@@ -582,7 +582,7 @@ void __cdecl UpdateDockQueues()
             ++It;
             continue;
         }
-        if (Entry.bField_0x10)
+        if (Entry.bFinishOnClear)
         {
             FinishDocking(&It);
             continue;
@@ -629,9 +629,9 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
         if (pub::SpaceObj::GetType(Wait->DockTargetId, TargetType) == 0)
         {
             if ((TargetType & 0x20) != 0)
-                DockIndex = Wait->bField_0x10 ? 1 : 0;
+                DockIndex = Wait->bFinishOnClear ? 1 : 0;
             Response = TryStartDocking(Wait->SystemId, &Wait->ShipId, &Wait->DockTargetId,
-                                       &DockIndex, Wait->bField_0x20);
+                                       &DockIndex, Wait->bNoTimeout);
             if (Response == DOCK_HOST_RESPONSE_4)
             {
                 // The radio chatter of a granted dock (DAT_06fd1c08, FUN_06ee8d70; its float
@@ -694,7 +694,7 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
 
 // FUN_06f6d820. FindSystemInfo is not null-tested.
 int __cdecl TryStartDocking(unsigned int SystemId, unsigned int const* ShipId,
-                            unsigned int const* DockTargetId, int* DockIndex, bool bField_0x20)
+                            unsigned int const* DockTargetId, int* DockIndex, bool bNoTimeout)
 {
     FSystemInfo* System = FindSystemInfo(&SystemId);
     FContentShipBase* Ship = static_cast<FContentShipBase*>(System->FindShip(*ShipId));
@@ -715,8 +715,8 @@ int __cdecl TryStartDocking(unsigned int SystemId, unsigned int const* ShipId,
     Entry.ShipId = Ship->SpaceObjId;
     Entry.DockTargetId = *DockTargetId;
     Entry.DockIndex = *DockIndex;
-    Entry.bField_0x10 = false;
-    Entry.bField_0x20 = bField_0x20;
+    Entry.bFinishOnClear = false;
+    Entry.bNoTimeout = bNoTimeout;
     GDockingShips.push_back(Entry);
     return Response;
 }
@@ -1019,8 +1019,8 @@ void __cdecl DockFormationFollowers(unsigned int const* SystemId, unsigned int c
         Entry.ShipId = Members[Index]->SpaceObjId;
         Entry.DockTargetId = *DockTargetId;
         Entry.DockIndex = *DockIndex;
-        Entry.bField_0x10 = false;
-        Entry.bField_0x20 = false;
+        Entry.bFinishOnClear = false;
+        Entry.bNoTimeout = false;
         GDockingShips.push_back(Entry);
         unsigned int MemberId = Members[Index]->SpaceObjId;
         pub::SpaceObj::Dock(MemberId, *DockTargetId, *DockIndex, DOCK_HOST_RESPONSE_4);
@@ -1070,8 +1070,8 @@ void __cdecl FollowLeaderIntoDock(FContentShipBase* Ship)
     Entry.ShipId = Ship->SpaceObjId;
     Entry.DockTargetId = DockTargetId;
     Entry.DockIndex = DockIndex;
-    Entry.bField_0x10 = false;
-    Entry.bField_0x20 = false;
+    Entry.bFinishOnClear = false;
+    Entry.bNoTimeout = false;
     GDockingShips.push_back(Entry);
     unsigned int ShipId = Ship->SpaceObjId;
     pub::SpaceObj::Dock(ShipId, DockTargetId, DockIndex, DOCK_HOST_RESPONSE_4);
@@ -1248,7 +1248,7 @@ int HandleDockRequest(FDockRequest const* Request)
     int DockIndex = (TargetType & 0x20) != 0 ? 0 : -1;
     int const Response = TryStartDocking(Request->SystemId, &Request->ShipId,
                                          &Request->DockTargetId, &DockIndex,
-                                         Request->bField_0x0c);
+                                         Request->bNoTimeout);
     FSystemInfo* System = FindSystemInfo(&Request->SystemId);
 
     if (Response != DOCK_HOST_RESPONSE_5)
@@ -1303,8 +1303,8 @@ int HandleDockRequest(FDockRequest const* Request)
         Entry.ShipId = Request->ShipId;
         Entry.DockTargetId = Request->DockTargetId;
         Entry.DockIndex = DockIndex;
-        Entry.bField_0x10 = false;
-        Entry.bField_0x20 = false;
+        Entry.bFinishOnClear = false;
+        Entry.bNoTimeout = false;
 
         bool bBehindPlayers = FindContentPlayerStateByShip(&Entry.ShipId) != nullptr ||
                               IsPlayerInShipFormation(System, Entry.ShipId);
@@ -1409,7 +1409,7 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
                 if (Entry != GDockingShips.end())
                 {
                     Op.DockObjectId = Entry->DockTargetId;
-                    Op.Field_14 = 1;
+                    Op.bHasDockPortIndex = 1;
                     Op.DockPortIndex = Entry->DockIndex;
                 }
                 pub::AI::SubmitDirective(Player->SpaceObjId, &Op);
@@ -1420,7 +1420,7 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
             pub::AI::DirectiveDockOp Op;
             Op.Priority = 1;
             Op.DockObjectId = Entry->DockTargetId;
-            Op.Field_14 = 1;
+            Op.bHasDockPortIndex = 1;
             Op.DockPortIndex = Entry->DockIndex;
             pub::AI::SubmitDirective(Player->SpaceObjId, &Op);
         }
@@ -1467,7 +1467,7 @@ int __cdecl CountNpcShipsNear(FSystemInfo* System, FSpaceObjPlacement const* Pla
          It != System->SpaceObjs.end(); ++It)
     {
         FContentNpcShip* Ship = static_cast<FContentNpcShip*>(*It);
-        if (Ship->Field_0x5a8 != 0)
+        if (Ship->bExcludeFromShipCount != 0)
             continue;
         Vector Position;
         Ship->GetPosition(&Position);
@@ -1531,8 +1531,9 @@ bool __cdecl CanUseDockTarget(std::vector<unsigned int> const* ClassIds, int con
         return false;
 
     // Retail keeps the out-values in argument slots it no longer needs, and GetRep's result is
-    // not checked: a failed GetRep (it writes only on success) leaves the slot's argument bits
-    // in place, and the next call reads them as the rep. GetAffiliation always writes its
+    // not checked: a failed GetRep (it writes only on success) leaves the argument pointer's own
+    // value in the slot, and the next call reads it as the rep. The build is Win32 only, so the
+    // seeds below carry exactly retail's 32-bit value. GetAffiliation always writes its
     // out-value (-1 on failure).
     float Attitude = 1.0f;
     if (*ShipRep != -1)
@@ -1832,7 +1833,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 if (Params.FormationSlot == 0 || Params.FormationId == 0xffffffffu)
                 {
                     TRefHandle<FObjListDirective> Directive;
-                    CreateObjListDirective(1, &Directive.Pointer);
+                    CreateObjListDirective(OBJLIST_DELAY, &Directive.Pointer);
                     static_cast<FObjListDelay*>(Directive.Pointer)->SetDelay(2.0f);
                     AddLeadingDirective(&Params, Directive);
                 }
@@ -1878,7 +1879,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 if (Params.Longevity != -1.0f || bOpenTerminal)
                 {
                     TRefHandle<FObjListDirective> Directive;
-                    CreateObjListDirective(0x15, &Directive.Pointer);
+                    CreateObjListDirective(OBJLIST_LAUNCH, &Directive.Pointer);
                     static_cast<FObjListLaunch*>(Directive.Pointer)->SetLaunch(
                         DockTargetId, DockIndex, static_cast<int>(Info.Value));
                     AddLeadingDirective(&Params, Directive);
@@ -1907,7 +1908,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 Entry.DockIndex = DockIndex;
                 Entry.DockTargetId = *DockTargetId;
                 Entry.ShipId = Ship->SpaceObjId;
-                Entry.bField_0x10 = true;
+                Entry.bFinishOnClear = true;
                 GDockingShips.push_back(Entry);
 
                 if ((TargetType & 0x200100) != 0)

@@ -208,7 +208,7 @@ void IServerImpl::Shutdown() {
         Server_SubsystemShutdown();
         Server_ControllerCleanup();
         DataConfig::shutdown();
-        if (g_pClientInterface) {
+        if (g_pClientInterface) { // retail's own null test (06d451eb)
             // IClient slot 15 (+0x3c): tears the real client interface down.
             g_pClientInterface->Shutdown();
             Server_FreeClientDll();
@@ -218,8 +218,8 @@ void IServerImpl::Shutdown() {
     }
 
 int IServerImpl::Update() {
-        // IClient slot 16 (+0x40): the client-side pump.
-        if (g_pClientInterface) g_pClientInterface->Update();
+        // IClient slot 16 (+0x40): the client-side pump, with no null test.
+        g_pClientInterface->Update();
         return 1;
     }
 
@@ -336,15 +336,15 @@ void IServerImpl::GoTradelane(unsigned int player_id, const XGoTradelane& info) 
     }
     // Slot 7: StopTradelane -- retail .text:06cf0af0; as GoTradelane, ending in
     // StarSystem::notify_stop_tradelane (FUN_06d0e120).
-void IServerImpl::StopTradelane(unsigned int session_id, unsigned int arg1, unsigned int arg2, unsigned int arg3) {
-        if (arg1 != Players[session_id].ship_object_id) return;
+void IServerImpl::StopTradelane(unsigned int session_id, unsigned int ship_id, unsigned int tradelane_ring1, unsigned int tradelane_ring2) {
+        if (ship_id != Players[session_id].ship_object_id) return;
         GameObject* Obj = nullptr;
         StarSystem* Sys = nullptr;
-        if (!Server_FindObject(arg1, Obj, Sys))
+        if (!Server_FindObject(ship_id, Obj, Sys))
             return;
         if (Sys == nullptr)
             return;
-        Sys->notify_stop_tradelane(arg1, arg2, arg3);
+        Sys->notify_stop_tradelane(ship_id, tradelane_ring1, tradelane_ring2);
     }
     // Slot 8: JettisonCargo -- retail .text:06cf0d50.
 void IServerImpl::JettisonCargo(unsigned int player_id, const XJettisonCargo& info) {
@@ -398,8 +398,7 @@ void IServerImpl::Login(const SLoginInfo& info, unsigned int session_id) {
         unsigned char result = Players.login(info, session_id);
         if (result == 3) Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerLogin, &session_id);
         // IClient slot 12, FLPACKET_SERVER_LOGINRESPONSE; the status byte travels by reference.
-        if (g_pClientInterface)
-            g_pClientInterface->SendServerLoginResponse(session_id, result);
+        g_pClientInterface->SendServerLoginResponse(session_id, result);
         // Retail reads back the stored login result here (Ghidra shows it as the high byte of
         // param_2).
         if (result == 3) {
@@ -409,15 +408,15 @@ void IServerImpl::Login(const SLoginInfo& info, unsigned int session_id) {
         }
     }
 
-void IServerImpl::CharacterInfoReq(unsigned int session_id, bool full_info) {
+void IServerImpl::CharacterInfoReq(unsigned int session_id, bool bSendEmpty) {
         // Retail .text:06d45220.
         if (!Players.is_valid(session_id)) return;
 
         CCharacterSet Set;
 
         // Only when the bool is false does the slot fill it (FUN_06d499c0); with the bool
-        // set, the list goes out empty (the name `full_info` says the opposite).
-        if (!full_info)
+        // set (CreateNewCharacter's failure path), the list goes out empty.
+        if (!bSendEmpty)
             PlayerData_BuildCharacterSet(Players[session_id], Set);
 
         // IClient slot 13, FLPACKET_SERVER_CHARACTERINFO; no null test on the interface.
@@ -569,7 +568,7 @@ void IServerImpl::ReqAddItem(unsigned int arch_id, const char* hardpoint, int co
         CacheString Hp;
         Hp.Value = StringAlloc(hardpoint, false);
         PlayerData_AddEquipment(Players[session_id], arch_id, Hp, count, health, b_mounted,
-                                /*bNoCombine*/false, /*bNotify*/true);
+                                /*bMission*/false, /*bNotify*/true);
     }
     // ReqRemoveItem -- retail .text:06d174e0, tail call to FUN_06d4f100 with bNotify = 0:
     // no IClient slot 27, the client asked for the removal and already knows.
@@ -738,19 +737,19 @@ void IServerImpl::GFGoodVaporized(const SGFGoodVaporizedInfo& info, unsigned int
         Server_ControllerDispatch(0, pub::Controller::EMessage::GFGoodVaporized, msg_data);
     }
 // Retail .text:06d45770 writes a BYTE at +8; bytes +9..+b stay unwritten.
-void IServerImpl::MissionResponse(unsigned int Arg0, unsigned long MissionId,
+void IServerImpl::MissionResponse(unsigned int OfferId, unsigned long OfferKind,
                                  unsigned char bAccepted, unsigned int SessionId) {
     struct FMissionResponseMessage {
-        unsigned int Field_0x00; // TODO: forwarded first argument's meaning.
-        unsigned long MissionId;
+        unsigned int OfferId;
+        unsigned long OfferKind;
         unsigned char bAccepted;
         unsigned char Padding[3];
         unsigned int SessionId;
     };
     static_assert(sizeof(FMissionResponseMessage) == 0x10, "MissionResponse message size");
     FMissionResponseMessage Message;
-    Message.MissionId = MissionId;
-    Message.Field_0x00 = Arg0;
+    Message.OfferKind = OfferKind;
+    Message.OfferId = OfferId;
     Message.bAccepted = bAccepted;
     Message.SessionId = SessionId;
     Server_ControllerDispatch(0, pub::Controller::EMessage::MissionResponse, &Message);
@@ -817,20 +816,19 @@ void IServerImpl::SystemSwitchOutComplete(unsigned int ship_id, unsigned int ses
         // (& 3) accessor's result without a null test.
         CObject* const ShipRaw = Obj->Object;
         CSimple* const ShipSimple = (ShipRaw != nullptr &&
-                                     (static_cast<unsigned int>(ShipRaw->ObjectClass) & 3u) == 3u)
+                                     (static_cast<unsigned int>(ShipRaw->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
                                         ? static_cast<CSimple*>(ShipRaw) : nullptr;
         if (ShipSimple->OwnerPlayer != session_id) return;
 
-        // The gate is the ship's +0x90 (read with no class test), found under type mask
-        // 0xc40; its CObject must be a CSolar (0x303). The port calls Ship+0x90
-        // DeathSequenceObjId, a misnomer: its writer (right after controller event 0x11)
-        // stores the jump object's id.
-        unsigned int* const GateIdField = &static_cast<Ship*>(Obj)->DeathSequenceObjId;
+        // The gate is the ship's DockedObjId (+0x90, read with no class test; complete_dock
+        // stores the jump object's id right after controller event 0x11), found under type
+        // mask 0xc40; its CObject must be a CSolar (0x303).
+        unsigned int* const GateIdField = &static_cast<Ship*>(Obj)->DockedObjId;
         GameObject* const Gate = Sys->find_object(*GateIdField, 0xc40);
         if (Gate == nullptr) return;
         CObject* const GateRaw = Gate->Object;
         if (GateRaw == nullptr) return;
-        if ((static_cast<unsigned int>(GateRaw->ObjectClass) & 0x303u) != 0x303u) return;
+        if ((static_cast<unsigned int>(GateRaw->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar) return;
         CSolar* const GateSolar = static_cast<CSolar*>(GateRaw);
 
         // Retail calls get_type_bits and drops the result.
@@ -864,9 +862,9 @@ void IServerImpl::SystemSwitchOutComplete(unsigned int ship_id, unsigned int ses
         Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
         Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
         Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-        Parms.CollisionGroupId = 0;                                        // +0x14
+        Parms.SystemId = 0;                                                // +0x14
         Parms.Type = 2;                                                    // +0x18
-        Parms.bFlag1c = 0;
+        Parms.bPhysicalUnmoveable = 0;
         Parms.bEnableCollisions = 1;
         Parms.Name[0] = '\0';                                              // +0x1e
         Parms.bHasInertia = 0;                                             // +0x26
@@ -1051,7 +1049,7 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
             CObject* Raw = nullptr;
             if (NewShip != nullptr) {
                 CObject* const Obj = NewShip->Object;
-                if (Obj != nullptr && (static_cast<unsigned int>(Obj->ObjectClass) & 1u) == 1u)
+                if (Obj != nullptr && (static_cast<unsigned int>(Obj->ObjectClass) & CObject::ClassObject) == CObject::ClassObject)
                     Raw = Obj;
             }
             Raw->beam_object(Req.Position, LaunchOrient, false);
@@ -1068,29 +1066,30 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
         Server_ControllerDispatch(0, pub::Controller::EMessage::SpaceEnter, msg36);
     }
 
-void IServerImpl::LaunchComplete(unsigned int arg0, unsigned int object_id) {
+void IServerImpl::LaunchComplete(unsigned int base_obj_id, unsigned int object_id) {
         // Retail .text:06cefaa0. rpclocal serializes both arguments, so neither is an
-        // implicit session id; arg0 goes to IObjAffect slot 28 (Ship::slot_70 sends it as the
-        // first dword of controller event 0x28). No controller message of its own.
+        // implicit session id; base_obj_id goes to IObjAffect slot 28 (Ship::launch_complete
+        // sends it as the first dword of controller event 0x28). No controller message of its
+        // own.
         GameObject* Obj = nullptr;
         StarSystem* Sys = nullptr;
         if (!Server_FindObject(object_id, Obj, Sys))
             return;
         if (Obj == nullptr)
             return;
-        static_cast<IObjAffect*>(Obj)->slot_70(arg0);
+        static_cast<IObjAffect*>(Obj)->launch_complete(base_obj_id);
     }
 
-void IServerImpl::JumpInComplete(unsigned int arg0, unsigned int object_id) {
-        // Retail .text:06cefae0, as LaunchComplete with IObjAffect slot 29 (Ship::slot_74
-        // sends arg0 in controller event 0x26).
+void IServerImpl::JumpInComplete(unsigned int system_id, unsigned int object_id) {
+        // Retail .text:06cefae0, as LaunchComplete with IObjAffect slot 29 (Ship::jump_in_complete
+        // sends system_id in controller event 0x26).
         GameObject* Obj = nullptr;
         StarSystem* Sys = nullptr;
         if (!Server_FindObject(object_id, Obj, Sys))
             return;
         if (Obj == nullptr)
             return;
-        static_cast<IObjAffect*>(Obj)->slot_74(arg0);
+        static_cast<IObjAffect*>(Obj)->jump_in_complete(system_id);
     }
 
     // Hail -- retail .text:06cf0800. Only the found flag is tested. All three arguments are
@@ -1262,24 +1261,24 @@ void IServerImpl::MissionSaveB(unsigned int session_id, unsigned long mission_id
         if (!p) return;
         PlayerData_MissionSave(*p, static_cast<unsigned int>(mission_id));
     }
-    // RequestEvent -- retail .text:06cf08e0: IObjAffect +0x5c with no RequestCB. p5 is never
-    // read; no controller message.
-void IServerImpl::RequestEvent(int event_type, unsigned int p1, unsigned int p2, unsigned int p3, unsigned long p4, unsigned int p5) {
-        (void)p5;
-        GameObject* const Obj = Server_LookupGameObject(p1);
+    // RequestEvent -- retail .text:06cf08e0: IObjAffect +0x5c with no RequestCB. session_id is
+    // never read; no controller message.
+void IServerImpl::RequestEvent(int event_type, unsigned int object_id, unsigned int target_id, unsigned int second_id, unsigned long b_flag, unsigned int session_id) {
+        (void)session_id;
+        GameObject* const Obj = Server_LookupGameObject(object_id);
         if (Obj == nullptr)
             return;
-        static_cast<IObjAffect*>(Obj)->request_event(event_type, &p2, &p3, static_cast<int>(p4),
-                                               nullptr);
+        static_cast<IObjAffect*>(Obj)->request_event(event_type, &target_id, &second_id,
+                                                     static_cast<int>(b_flag), nullptr);
     }
-    // RequestCancel -- retail .text:06cf0930: IObjAffect +0x60. p4 is never read; no
+    // RequestCancel -- retail .text:06cf0930: IObjAffect +0x60. session_id is never read; no
     // controller message.
-void IServerImpl::RequestCancel(int event_type, unsigned int p1, unsigned int p2, unsigned long p3, unsigned int p4) {
-        (void)p4;
-        GameObject* const Obj = Server_LookupGameObject(p1);
+void IServerImpl::RequestCancel(int event_type, unsigned int object_id, unsigned int target_id, unsigned long arg3, unsigned int session_id) {
+        (void)session_id;
+        GameObject* const Obj = Server_LookupGameObject(object_id);
         if (Obj == nullptr)
             return;
-        static_cast<IObjAffect*>(Obj)->request_cancel(event_type, &p2, static_cast<int>(p3));
+        static_cast<IObjAffect*>(Obj)->request_cancel(event_type, &target_id, static_cast<int>(arg3));
     }
     // MineAsteroid -- retail .text:06cf07d0: the SysDB lookup is not null-tested;
     // StarSystem::spawn_mined_loot is FUN_06d0d9b0. session_id is never read; no controller
@@ -1344,7 +1343,7 @@ void IServerImpl::SetManeuver(unsigned int session_id, const XSetManeuver& info)
         if (Obj == nullptr) return;
         CObject* const Raw = Obj->Object;
         if (Raw == nullptr) return;
-        if ((static_cast<unsigned int>(Raw->ObjectClass) & 0x103u) != 0x103u) return;
+        if ((static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj) return;
         IBehaviorManager* const Manager =
             static_cast<CEqObj*>(Raw)->get_behavior_interface();
         if (Manager != nullptr) {
@@ -1444,8 +1443,8 @@ void IServerImpl::RequestPlayerStats(unsigned int session_id, unsigned char* dat
         Server_ControllerDispatch(0, pub::Controller::EMessage::RequestPlayerStats, &session_id);
     }
     // PopUpDialog -- retail .text:06cf0ff0, unconditional; message 0x30.
-void IServerImpl::PopUpDialog(unsigned int session_id, unsigned int arg1) {
-        unsigned int msg_data[2] = { session_id, arg1 };
+void IServerImpl::PopUpDialog(unsigned int session_id, unsigned int buttons) {
+        unsigned int msg_data[2] = { session_id, buttons };
         Server_ControllerDispatch(0, pub::Controller::EMessage::PopUpDialog, msg_data);
     }
     // RequestGroupPositions -- retail .text:06cf1020, ordinal 380. The reply buffer is a
@@ -1684,14 +1683,14 @@ void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
         CBase* const OwnBase = OwnObj;
         if (OwnBase != nullptr) {
             CObject* const Cobj = OwnBase->Object;
-            if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) == 0x503u)
+            if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 OwnShip = static_cast<CShip*>(Cobj);
         }
         CShip* PartnerShip = nullptr;
         CBase* const PartnerBase = PartnerObj;
         if (PartnerBase != nullptr) {
             CObject* const Cobj = PartnerBase->Object;
-            if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) == 0x503u)
+            if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 PartnerShip = static_cast<CShip*>(Cobj);
         }
 
@@ -1746,13 +1745,13 @@ void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
         for (It = OwnItems.begin(); It != OwnItems.end(); ++It) {
             PlayerData_RemoveCargo(Own, It->ArchId, It->Count, It->Health, true);
             PlayerData_AddEquipment(Partner, It->ArchId, EquipDesc::CARGO_BAY_HP_NAME, It->Count,
-                                    It->Health, /*bEquipped*/false, /*bNoCombine*/false,
+                                    It->Health, /*bEquipped*/false, /*bMission*/false,
                                     /*bNotify*/true);
         }
         for (It = PartnerItems.begin(); It != PartnerItems.end(); ++It) {
             PlayerData_RemoveCargo(Partner, It->ArchId, It->Count, It->Health, true);
             PlayerData_AddEquipment(Own, It->ArchId, EquipDesc::CARGO_BAY_HP_NAME, It->Count,
-                                    It->Health, /*bEquipped*/false, /*bNoCombine*/false,
+                                    It->Health, /*bEquipped*/false, /*bMission*/false,
                                     /*bNotify*/true);
         }
 
@@ -1879,7 +1878,7 @@ unsigned int IServerImpl::GetServerID() { return Players.GetServerID(); }
     // Players + 0x10.
 const char* IServerImpl::GetServerSig() { return Players.GetServerSig(); }
     // DumpPacketStats -- retail .text:06cf23b0: forwards to IClient slot 125, the same code as
-    // rpclocal's ?DumpPacketStats@IServerImpl@@UAEXPBD@Z.
+    // rpclocal's ?DumpPacketStats@IServerImpl@@UAEXPBD@Z; the null test is retail's.
 void IServerImpl::DumpPacketStats(const char* name) {
         if (g_pClientInterface) g_pClientInterface->DumpPacketStats(name);
     }
@@ -2136,11 +2135,13 @@ struct FControllerNode {
     FControllerNode* Next;        // +0x04
     IDLL* InterfacePtr;           // +0x08  CreateInstance result (Content.dll's IDLL)
     HMODULE ModuleHandle;         // +0x0C
-    float HeartbeatAccum;         // +0x10  accumulator
-    float HeartbeatTimer;         // +0x14  period
+    float HeartbeatPeriod;        // +0x10  seconds between Heartbeat messages; < 0 = none
+    float HeartbeatAccum;         // +0x14  time accumulated towards the next one
     unsigned int FLID;            // +0x18  unique controller ID
     unsigned int Priority;        // +0x1C  sort order
 };
+static_assert(sizeof(FControllerNode) == 0x20, "FControllerNode is 0x20 bytes");
+static_assert(offsetof(FControllerNode, HeartbeatPeriod) == 0x10, "SetHeartbeatInterval stores the period at +0x10");
 
 // Timer node of the FUN_06d5df60 timer list.
 struct FTimerNode {
@@ -2284,13 +2285,10 @@ extern "C" int __cdecl Server_ControllerDispatch(unsigned int Flid, pub::Control
 // (the period, also the gate: the heartbeat walk FUN_06d43680 runs it when >= 0.0), node+0x14
 // = rand() / 32768 * Interval, so freshly configured controllers do not all fire on the
 // same frame; -2 when not found.
-// NOTE: the port's FControllerNode names the two the other way round (HeartbeatTimer at
-// +0x14 is the period, HeartbeatAccum at +0x10 the accumulator). The node is private to
-// Server.dll, so the swap is harmless, but this code follows the PORT's convention.
 extern "C" int __cdecl Server_ControllerSetHeartbeat(unsigned int Flid, float Interval) {
     FControllerNode* node = Server_ControllerFind(Flid);
     if (node == nullptr) return -2;
-    node->HeartbeatTimer = Interval;
+    node->HeartbeatPeriod = Interval;
     node->HeartbeatAccum = (float)rand() * (1.0f / 32768.0f) * Interval;
     return 0;
 }
@@ -2331,7 +2329,7 @@ unsigned int Server_ControllerCreate(const char* dll_path, const char* instance_
     node->InterfacePtr = nullptr;
     node->ModuleHandle = hMod;
     node->HeartbeatAccum = 0.0f;
-    node->HeartbeatTimer = -1.0f;
+    node->HeartbeatPeriod = -1.0f;
     node->FLID = flid;
     node->Priority = priority;
 
@@ -2559,7 +2557,7 @@ static void StarSystem_UpdateNearShips(StarSystem* Sys, float Step)
     }
 
     FSystemListNode* It = nullptr;
-    while (Sys->ListD4.traverse(It, true))
+    while (Sys->DockingSolars.traverse(It, true))
     {
         if (It->Data == nullptr)
             continue;
@@ -2647,7 +2645,7 @@ static void StarSystem_ResolveCollisionSide(StarSystem* Sys, CObject* Part, unsi
 
     // Anything but a CEqObj was hit on its root.
     CObject* const Obj = Found->Object;
-    if (Obj == nullptr || (static_cast<unsigned int>(Obj->ObjectClass) & 0x103u) != 0x103u)
+    if (Obj == nullptr || (static_cast<unsigned int>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         *OutSubObjId = SUBOBJ_ID_ROOT;
         return;
@@ -2690,7 +2688,7 @@ static void StarSystem_ProcessCollisions(StarSystem* Sys)
         {
             CObject* const BeamObject = Data->Object;
             if (BeamObject != nullptr &&
-                (static_cast<unsigned int>(BeamObject->ObjectClass) & 0x67u) == 0x67u)
+                (static_cast<unsigned int>(BeamObject->ObjectClass) & CObject::ClassBeam) == CObject::ClassBeam)
                 Beam = static_cast<CBeam*>(BeamObject);
         }
         PhySys::GenerateCollisions(Beam);
@@ -2776,14 +2774,14 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
             // Every FUN_06cf4f40 call gets the block at +0xe8 as the deferred list.
             ObjectList* const Deferred = &Sys->Deferred;
             StarSystem_TickObjectList(&Sys->Ships, CurStep, Deferred);
-            StarSystem_TickObjectList(&Sys->List70, CurStep, Deferred);
+            StarSystem_TickObjectList(&Sys->GuidedMunitions, CurStep, Deferred);
 
             StarSystem_UpdateNearShips(Sys, CurStep);
 
             StarSystem_TickObjectList(&Sys->Loot, CurStep, Deferred);
             StarSystem_TickObjectList(&Sys->Beams, CurStep, Deferred);
-            StarSystem_TickObjectList(&Sys->List98, CurStep, Deferred);
-            StarSystem_TickObjectList(&Sys->ListAC, CurStep, Deferred);
+            StarSystem_TickObjectList(&Sys->Mines, CurStep, Deferred);
+            StarSystem_TickObjectList(&Sys->CounterMeasures, CurStep, Deferred);
 
             // COMMON.DLL::CmnAsteroid::Update (cdecl): StarSystem is the IObjDB it walks.
             CmnAsteroid::Update(Sys, CurStep);
@@ -2792,7 +2790,7 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
             // SrvAsteroid::SrvAsteroidSystem map at DAT_06d8d980 (server_classes.cpp).
             SrvAsteroid::SrvAsteroid_UpdateSystem(Sys);
 
-            StarSystem_TickObjectList(&Sys->ListC0, CurStep, Deferred);
+            StarSystem_TickObjectList(&Sys->MedAsteroids, CurStep, Deferred);
 
             // (a) Drain the deferred block, which the passes above fill with the objects
             // whose update() answered false. The node removed is always the head, so the
@@ -2814,14 +2812,14 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
 
             // (b) The dock queue at +0x14 (server_sysdb.h, SystemDockNode), skipped while
             // empty.
-            if (Sys->ObjectListSize != 0)
+            if (Sys->DockQueueSize != 0)
             {
                 // The players whose ships land this step.
                 std::list<unsigned int> Landed;
 
                 // The end test re-reads the head every pass.
-                SystemDockNode* Node = static_cast<SystemDockNode*>(Sys->ObjectListHead)->Next;
-                while (Node != static_cast<SystemDockNode*>(Sys->ObjectListHead))
+                SystemDockNode* Node = static_cast<SystemDockNode*>(Sys->DockQueueHead)->Next;
+                while (Node != static_cast<SystemDockNode*>(Sys->DockQueueHead))
                 {
                     GameObject* const Obj = FSystemDockEntry::WatchedObject(Node->Entry.Object);
                     GameObject* const DockTarget = FSystemDockEntry::WatchedObject(Node->Entry.Target);
@@ -2835,7 +2833,7 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
                         CObject* const TargetObject = DockTarget->Object;
                         CEqObj* TargetEq = nullptr;
                         if (TargetObject != nullptr &&
-                            (static_cast<unsigned int>(TargetObject->ObjectClass) & 0x103u) == 0x103u)
+                            (static_cast<unsigned int>(TargetObject->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
                             TargetEq = static_cast<CEqObj*>(TargetObject);
                         if (TargetEq->DockingBaseId == 0)
                             TargetId = DockTarget->get_id();
@@ -2899,7 +2897,7 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
                 }
 
                 Landed.clear();
-                SystemDockNode* const DockHead = static_cast<SystemDockNode*>(Sys->ObjectListHead);
+                SystemDockNode* const DockHead = static_cast<SystemDockNode*>(Sys->DockQueueHead);
                 Sys->erase_docks(DockHead->Next, DockHead);   // FUN_06d0f410
             }
 
@@ -2917,7 +2915,7 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
                         (BeamWrapper != nullptr) ? BeamWrapper->Object : nullptr;
                     CBeam* Beam = nullptr;
                     if (BeamObject != nullptr &&
-                        (static_cast<unsigned int>(BeamObject->ObjectClass) & 0x67u) == 0x67u)
+                        (static_cast<unsigned int>(BeamObject->ObjectClass) & CObject::ClassBeam) == CObject::ClassBeam)
                         Beam = static_cast<CBeam*>(BeamObject);
                     Beam->move(CurStep);
                 }
@@ -3002,22 +3000,22 @@ static void Server_StepSystems(float dt) {
 }
 
 // FUN_06d001d0 (cdecl), called only by ElapseTime: step the systems, pump the phantom
-// events (FUN_06cffdc0), then controller event 0x25 for every dying ship (DAT_06d8d8e4)
+// events (FUN_06cffdc0), then controller event 0x25 for every dock-exited ship (DAT_06d8d8e4)
 // and empty that list. The system id is read BEFORE get_id.
 static void Server_PhysicsUpdate(float dt) {
     Server_StepSystems(dt);
 
     Server_PumpPhantomEvents();
 
-    for (std::list<Ship*>::iterator It = GDyingShips.begin(); It != GDyingShips.end(); ++It) {
-        Ship* const Dying = *It;
+    for (std::list<Ship*>::iterator It = GDockExitedShips.begin(); It != GDockExitedShips.end(); ++It) {
+        Ship* const Exited = *It;
         unsigned int Event[3];
-        Event[2] = Dying->OwnerSystem->SystemInfo->NicknameId;
-        Event[0] = Dying->get_id();
-        Event[1] = Dying->DeathSequenceObjId;                    // +0x90, the jump object
+        Event[2] = Exited->OwnerSystem->SystemInfo->NicknameId;
+        Event[0] = Exited->get_id();
+        Event[1] = Exited->DockedObjId;                           // +0x90, the dock object
         Server_ControllerDispatch(0, pub::Controller::EMessage::Msg0x25, Event);
     }
-    GDyingShips.clear();
+    GDockExitedShips.clear();
 }
 
 // FUN_06d43c00, called by Shutdown: sort the active list by Flid (FUN_06d441c0, unsigned,
@@ -3054,8 +3052,7 @@ static void Server_ControllerCleanup() {
 // FUN_06d43680 (cdecl): the controller heartbeat walk, called every ElapseTime and once by
 // the cleanup. First the queued Destroys are torn down (GetModuleFileNameA's result
 // unused), then, under the re-entrancy guard, every node with a period >= 0 accumulates dt
-// and gets 0x20 Heartbeat with the whole periods elapsed. The port's HeartbeatTimer is
-// retail's +0x10 period and HeartbeatAccum its +0x14 accumulator (see SetHeartbeat).
+// and gets 0x20 Heartbeat with the whole periods elapsed.
 static void Server_TimerTick(float dt) {
     for (std::list<FControllerNode*>::iterator It = g_DestroyPending.begin();
          It != g_DestroyPending.end(); ++It) {
@@ -3075,12 +3072,12 @@ static void Server_TimerTick(float dt) {
     g_ReentrancyGuard++;
     FControllerNode* cur = g_ControllerListSentinel.Next;
     while (cur != &g_ControllerListSentinel) {
-        if (cur->HeartbeatTimer >= 0.0f) {
+        if (cur->HeartbeatPeriod >= 0.0f) {
             // x87: the compare and the divide use the unrounded sum; only the store is
             // rounded.
             const double Sum = static_cast<double>(dt) + static_cast<double>(cur->HeartbeatAccum);
             cur->HeartbeatAccum = static_cast<float>(Sum);
-            const double Period = static_cast<double>(cur->HeartbeatTimer);
+            const double Period = static_cast<double>(cur->HeartbeatPeriod);
             if (Sum >= Period) {
                 float WrapTime = static_cast<float>(floor(Sum / Period) * Period);
                 cur->InterfacePtr->HandleMessage(pub::Controller::EMessage::Heartbeat, &WrapTime);

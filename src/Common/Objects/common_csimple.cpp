@@ -47,8 +47,8 @@ CSimple::CSimple(Class ObjectClass)
 {
     // FUN_062b5850. AttachedDamageObjs (+0xbc) and SelfWatchable (+0x9c) default-construct.
     FlagsA0 = 1;
-    ZoneAtA4 = nullptr;
-    ScannerInterference = 0.0f;
+    CurrentZone = nullptr;
+    ZoneImmersion = 0.0f;
     ObjectDb = nullptr;
     Id = 0;
     OwnerPlayer = 0;
@@ -65,8 +65,8 @@ CSimple::CSimple(CSimple const& Other)
     // Retail's XOR/AND/XOR copies only bit 0 (targetable) into a byte assumed to be zero; the
     // port copies bit 0 directly.
     , FlagsA0((unsigned char)(Other.FlagsA0 & 0x1))
-    , ZoneAtA4(Other.ZoneAtA4)
-    , ScannerInterference(Other.ScannerInterference)
+    , CurrentZone(Other.CurrentZone)
+    , ZoneImmersion(Other.ZoneImmersion)
     , ObjectDb(Other.ObjectDb)
     , Id(Other.Id)
     , OwnerPlayer(Other.OwnerPlayer)
@@ -167,11 +167,11 @@ float CSimple::get_scanner_interference() const
     // FUN_062b5e00. The zone's own interference (zone slot +0x60, ZONE 0633ad90) scales the
     // immersion cached by update_zones; the result is clamped to 1.0 (NaN gives 1.0).
     float Result = 0.0f;
-    if (ZoneAtA4 != nullptr)
+    if (CurrentZone != nullptr)
     {
-        float Modifier = ZoneAtA4->GetInterference();
+        float Modifier = CurrentZone->GetInterference();
         if (Modifier > 0.0f)
-            Result = Modifier * ScannerInterference;
+            Result = Modifier * ZoneImmersion;
     }
     if (!(Result < 1.0f))
         return 1.0f;
@@ -268,14 +268,14 @@ void CSimple::init(CreateParms const& Parms)
 
 void CSimple::update_zones(float Dt, unsigned int Flags)
 {
-    // FUN_062b5d00. Neither argument is read. ScannerInterference is +0xa8, ZoneAtA4 +0xa4.
+    // FUN_062b5d00. Neither argument is read. ZoneImmersion is +0xa8, CurrentZone +0xa4.
     (void)Dt;
     (void)Flags;
 
     if (ObjectDb == nullptr)
     {
-        ScannerInterference = 0.0f;
-        ZoneAtA4 = nullptr;
+        ZoneImmersion = 0.0f;
+        CurrentZone = nullptr;
         return;
     }
 
@@ -292,7 +292,7 @@ void CSimple::update_zones(float Dt, unsigned int Flags)
             // No client sample yet: only the zone is cleared; the interference is kept.
             if (Remote->GetSampleCount() == 0)
             {
-                ZoneAtA4 = nullptr;
+                CurrentZone = nullptr;
                 return;
             }
             // Controller +0xe0 (GetLatestUpdate, inlined).
@@ -311,13 +311,13 @@ void CSimple::update_zones(float Dt, unsigned int Flags)
     // ISystem slot 11 (SYSTEM 0633b4b0); the system is used without a null check.
     Universe::ISystem const* const ZoneDb = ObjectDb->GetZoneDb();
     Universe::IZone const* const Zone = ZoneDb->GetSmallestPhysicalZoneAt(&Pos);
-    ZoneAtA4 = const_cast<Universe::IZone*>(Zone);
+    CurrentZone = const_cast<Universe::IZone*>(Zone);
     if (Zone == nullptr)
     {
-        ScannerInterference = 0.0f;
+        ZoneImmersion = 0.0f;
         return;
     }
-    ScannerInterference = Zone->GetImmersion(Pos);   // zone slot 0
+    ZoneImmersion = Zone->GetImmersion(Pos);   // zone slot 0
 }
 
 float CSimple::get_physical_radius_r(Vector& OutCenter) const

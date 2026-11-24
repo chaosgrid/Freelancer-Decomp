@@ -23,6 +23,8 @@ void Win3DIdentityRotation3x3(float* Out9);
 // ObjectOrNull is a camera (TexturePanelsDrawPiece) or null (DrawClouds, the UI tables).
 void Win3DBindModelview(void* ObjectOrNull, float const* Matrix12);
 
+struct FTexShape;
+
 // Star-glow CacheString-ish record (0x50). Shape name: length@+0, chars@+4 (0x20).
 struct FStarGlowDesc
 {
@@ -32,26 +34,91 @@ struct FStarGlowDesc
     float InnerColor[3];     // +0x28
     float OuterColor[3];     // +0x34
     float Alpha;             // +0x40
-    unsigned Field44;        // +0x44
-    unsigned Field48;        // +0x48
-    unsigned char Field4C;   // +0x4c
+    unsigned Field44;        // +0x44  zeroed by the ctor, never read
+    FTexShape const* Shape;  // +0x48  resolved from ShapeName on first use (LAB_00511690)
+    unsigned char bShapeAlpha; // +0x4c the shape's texture has alpha
     unsigned char Pad4D[3];
 };
 static_assert(sizeof(FStarGlowDesc) == 0x50, "star_glow desc 0x50");
 
-// SunEffect body at StarSphere+0x14 (operator_new 0x30c, FUN_0050d300).
+// One corona sample of the lens glow (0x18): a screen offset around the sun, its UV, and the
+// visibility alpha the occlusion pass (FUN_0050da20) approaches.
+struct FSunCoronaSlot
+{
+    float X;                 // +0x00
+    float Y;                 // +0x04
+    float U;                 // +0x08
+    float V;                 // +0x0c
+    float Alpha;             // +0x10
+    unsigned char bTouched;  // +0x14 set by the pass that updated Alpha this frame
+    unsigned char Pad15[3];
+};
+static_assert(sizeof(FSunCoronaSlot) == 0x18, "corona slot 0x18");
+
+// SunEffect body at StarSphere+0x14 (operator_new 0x30c, FUN_0050d300); the [lens_glow] keys
+// of FUN_0050d420.
 struct FSunEffectBody
 {
-    unsigned char Raw[0x30c];
+    FSunCoronaSlot Slots[13];          // +0x000 the centre (0) and the rim ring (1..12)
+    FSunCoronaSlot InteriorSlots[12];  // +0x138 between the centre and the rim, interior_tween
+    int EdgeFlags[12];                 // +0x258 diagonal choice per interior quad (LOD >= 3)
+    float InnerColor[3];               // +0x288 inner_color
+    float InteriorColor[3];            // +0x294 inner / outer lerp by interior_tween
+    float OuterColor[3];               // +0x2a0 outer_color
+    float RadiusScale;                 // +0x2ac radius_scale
+    int Lod;                           // +0x2b0 0..MaxLod, from the pixel size
+    int MaxLod;                        // +0x2b4 max_LOD
+    int LodReduction;                  // +0x2b8 from the SunEffect perf option (LAB_00510bf0)
+    unsigned ShapeLen;                 // +0x2bc
+    char ShapeName[0x20];              // +0x2c0 shape
+    FTexShape const* Shape;            // +0x2e0 resolved on first draw
+    unsigned char bShapeAlpha;         // +0x2e4
+    unsigned char Pad2E5[3];
+    float GlowFadeIn;                  // +0x2e8 glow_fade_in_seconds
+    float GlowFadeOut;                 // +0x2ec glow_fade_out_seconds
+    float InteriorTween;               // +0x2f0 interior_tween
+    float InteriorRayTween;            // +0x2f4 interior_ray_tween
+    int LodPixelThresholds[5];         // +0x2f8 8, 15, 25, 40, 60
 };
 static_assert(sizeof(FSunEffectBody) == 0x30c, "SunEffect body 0x30c");
+static_assert(offsetof(FSunEffectBody, InteriorSlots) == 0x138, "interior slots +0x138");
+static_assert(offsetof(FSunEffectBody, InnerColor) == 0x288, "inner_color +0x288");
+static_assert(offsetof(FSunEffectBody, ShapeName) == 0x2c0, "shape +0x2c0");
+static_assert(offsetof(FSunEffectBody, LodPixelThresholds) == 0x2f8, "LOD thresholds +0x2f8");
 
 // Lens-flare / spines child shell (0x40). Load parsers FUN_0050f3a0 / 0050fba0 fill
-// the element ranges; draw (FUN_0050f850 / 00510160) walks [Begin, End).
+// the element ranges; draw (FUN_0050f850 / 00510160) walks [Begin, End). The lens flare keeps
+// a vector of float[6] bead pointers {along, size, r, g, b, alpha}, the spines a vector of
+// 0x2c records {cos, sin, length, width, inner rgb, outer rgb, alpha}.
 struct FStarFxChild40
 {
-    unsigned char Raw[0x40];
+    unsigned char AllocatorByte; // +0x00
+    unsigned char Pad01[3];
+    union                        // +0x04 vector begin
+    {
+        float** BeadBegin;       // lens flare: float[6] bead pointers
+        unsigned char* SpineBegin; // spines: 0x2c records
+    };
+    union                        // +0x08 vector end
+    {
+        float** BeadEnd;
+        unsigned char* SpineEnd;
+    };
+    union                        // +0x0c vector capacity end
+    {
+        float** BeadCapacity;
+        unsigned char* SpineCapacity;
+    };
+    unsigned ShapeLen;           // +0x10
+    char ShapeName[0x20];        // +0x14 shape
+    FTexShape const* Shape;      // +0x34 resolved on first draw
+    float MinRadius;             // +0x38 min_radius (the pixel scale's floor)
+    float MaxRadius;             // +0x3c max_radius (its ceiling)
 };
+static_assert(sizeof(FStarFxChild40) == 0x40, "lens flare / spines 0x40");
+static_assert(offsetof(FStarFxChild40, SpineEnd) == 0x08, "child vector end +0x08");
+static_assert(offsetof(FStarFxChild40, Shape) == 0x34, "child shape +0x34");
+
 
 struct IObjInspect;
 struct FStarSphere;
@@ -81,7 +148,7 @@ struct FStarSphere
     float ZoneOcclusionFadeOut;      // +0x2c  default 2
     float Field30;                   // +0x30  pi
     float ZoneOcclusion;             // +0x34  approaches FUN_00511b90
-    float Field38;                   // +0x38  1 − FUN_0050f2a0(SunBody)
+    float CoronaOcclusion;           // +0x38  1 − FUN_0050f2a0(SunBody), the hidden corona share
     unsigned char Pad3C[0x24];       // +0x3c .. +0x5f
     float Dt;                        // +0x60  UpdateIntensity stores Dt
     float Intensity;                 // +0x64  default 1

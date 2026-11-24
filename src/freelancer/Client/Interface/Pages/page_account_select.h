@@ -61,7 +61,8 @@ public:
     UiRichTextWin* Explain;        // +0xec -- "Explain"
     Win3D* AccountBox;             // +0xf0 -- "AccountBoxShort" (UIWinObject)
     RenderDisplayList ExplainText; // +0xf4 -- StyleNode 0x9ca4 + IDS 0x60005
-    RenderDisplayList Text601eb;   // +0x100 -- StyleNode 0x9ca4 + IDS 0x601eb; no reader here
+    // +0x100 -- StyleNode 0x9ca4 + IDS 0x601eb (the ESRB online-play notice); no reader here
+    RenderDisplayList EsrbNoticeText;
 
 private:
     // The leave sequence retail inlines at four sites in ProcessMessage and OnEvent: leaving from

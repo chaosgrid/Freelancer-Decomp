@@ -19,7 +19,7 @@
 #include "NeuroNet/nn_error.h"              // NnErrorOpen (FUN_00473c00)
 #include "NeuroNet/nn_modal.h"              // NnModalPauseGame / NnModalResumeGame, NnFloatBits
 #include "NeuroNet/nn_text_control.h"       // NnTextControl (+0x381 / +0x385)
-#include "NeuroNet/nn_ui_pulse.h"           // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteArgb_679ba4
+#include "NeuroNet/nn_ui_pulse.h"           // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteAmber
 #include "Space/player_spawn.h"          // GetPlayerConnectionId (DAT_00673344)
 #include "Interface/rich_text_win.h"         // RichTextEditWin
 #include "Interface/ui_scroll.h"             // UiScroll::SetRange (FUN_00595d60)
@@ -201,7 +201,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     {
         NnTextControl* const Text = static_cast<NnTextControl*>(ButtonTexts[Index]);
         memcpy(Text->BlinkColourOn, G_HudChromeColorRgba, 4);
-        memcpy(Text->BlinkColourOff, &G_NnPaletteArgb_679ba4, 4);
+        memcpy(Text->BlinkColourOff, &G_NnPaletteAmber, 4);
     }
 
     // {-0.33, -0.2, -1.05}
@@ -402,15 +402,7 @@ void NnLoadSave::ResumeAndDelete()
     NameList.Destroy();
     TimeList.Destroy();
     ReleaseMouse();
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child);
-        Child = Next;
-    }
-    Destroy();
-    delete this;
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
 }
 
 void NnLoadSave::ClearListsAndSelection()
@@ -655,7 +647,8 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (A == reinterpret_cast<uintptr_t>(Buttons[4]))
         {
-            // Resume: unlike the other closes, retail deletes the tree only (FUN_0043d2a0(this)).
+            // Resume: ResumeAndDelete's steps; here retail calls FUN_0043d2a0(this) rather than
+            // inlining it.
             if (bButtonEnabled[4] == 0)
                 return 0;
             NnModalResumeGame(bCursorDrawFlag);

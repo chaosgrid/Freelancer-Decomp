@@ -668,12 +668,12 @@ public:
     // +0x110  0x06d88fc0  ch2 op 0x4f  FLPACKET_SERVER_SENDCOMM
     // MarshalSendComm reads the retail frame image (RpcSendCommFrameDword): the 23
     // argument dwords exactly as they sit on retail's stack -- ClientId,
-    // SenderId, ReceiverId, VoiceId, the thirteen dwords of the by-value Costume, CommType,
-    // TextIds, TextCount, Mood, Duration's bits, the bool's slot -- plus the one other dword
+    // SenderId, ReceiverId, VoiceId, the thirteen dwords of the by-value Costume, CaptionIds,
+    // TextIds, TextCount, PermutationIds, Duration's bits, the bool's slot -- plus the one other dword
     // retail's Ids loop can reach in this frame: the return address into the caller.
     void SendServerSendComm(unsigned int ClientId, unsigned int SenderId, unsigned int ReceiverId,
-                            unsigned int VoiceId, Costume CommCostume, unsigned int CommType,
-                            const unsigned int* TextIds, int TextCount, unsigned int Mood,
+                            unsigned int VoiceId, Costume CommCostume, unsigned int CaptionIds,
+                            const unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
                             float Duration, bool bReceiverIsOwnShip) override {
         unsigned int Args[24];
         Args[0] = ClientId;
@@ -681,10 +681,10 @@ public:
         Args[2] = ReceiverId;
         Args[3] = VoiceId;
         std::memcpy(&Args[4], &CommCostume, sizeof(Costume));      // Args[4..16]
-        Args[17] = CommType;
+        Args[17] = CaptionIds;
         Args[18] = RpcArgPointer(TextIds);
         Args[19] = static_cast<unsigned int>(TextCount);
-        Args[20] = Mood;
+        Args[20] = PermutationIds;
         Args[21] = RpcArgFloatBits(Duration);
         // The sender keeps one byte of this slot (06d890db); a bool argument is 0 or 1.
         Args[22] = bReceiverIsOwnShip ? 1u : 0u;

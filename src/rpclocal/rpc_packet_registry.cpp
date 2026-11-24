@@ -6,8 +6,8 @@
 
 // The 162 retail packet classes and the three registrators.
 //
-// Generated from EXE/Disasm/rpclocal.dll.txt; every number below is an instruction
-// operand, quoted with its address.
+// Transcribed from the rpclocal.dll disassembly and maintained as source; every number
+// below is an instruction operand, quoted with its address.
 //
 // THE HIERARCHY (from the .rdata vtables):
 //   * the refcounted root, vtable 06db3c54 = { LAB_06d8f4d0 }       -> FRpcRefObject

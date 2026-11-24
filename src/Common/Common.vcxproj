@@ -394,7 +394,6 @@
     <ClInclude Include="..\IVP\ivp_utility\ivp_math.h" />
     <ClInclude Include="..\IVP\ivp_utility\ivp_u_memory.h" />
     <ClInclude Include="..\IVP\ivp_utility\ivp_u_vector.h" />
-    <ClInclude Include="..\IVP\ivp_utility\ivp_vector_math.h" />
     <ClInclude Include="Core\msvcrt_atof.h" />
   </ItemGroup>
   <ItemGroup>

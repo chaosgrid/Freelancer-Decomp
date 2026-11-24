@@ -150,7 +150,7 @@ namespace
     // (class & 0x503) == 0x503, else null.
     CShip const* AsShip(CObject const* Object)
     {
-        if (Object == nullptr || !IsClass(Object, 0x503u))
+        if (Object == nullptr || !IsClass(Object, CObject::ClassShip))
         {
             return nullptr;
         }
@@ -170,7 +170,7 @@ namespace
     // A CEqObj (0x103) whose archetype (+0x88) has the nomad byte (+0x80) set.
     bool IsNomadEqObj(CObject const* Object)
     {
-        if (!IsClass(Object, 0x103u))
+        if (!IsClass(Object, CObject::ClassEqObj))
         {
             return false;
         }
@@ -178,14 +178,11 @@ namespace
         return Arch != nullptr && Arch->bNomad;
     }
 
-    // CShip +0x1b4 -- the player group id (the PhySys::Controller tail slot the port keeps
-    // opaque). Retail reads it with no test of the ship pointer: a null ship faults on
-    // [0 + 0x1b4], as it does here.
+    // CShip::GroupId (+0x1b4), the player group id. Retail reads it with no test of the ship
+    // pointer: a null ship faults on [0 + 0x1b4], as it does here.
     unsigned ShipGroupId(CObject const* Ship)
     {
-        unsigned Value = 0;
-        memcpy(&Value, reinterpret_cast<unsigned char const*>(Ship) + 0x1b4, sizeof(Value));
-        return Value;
+        return static_cast<CShip const*>(Ship)->GroupId;
     }
 
     // The player ship through the inline chain: a non-ship gives null, which the caller then
@@ -193,7 +190,7 @@ namespace
     CObject const* PlayerShipForGroup(IObjRW* Player)
     {
         CObject* const Object = InlineCObjectOf(Player);
-        if (Object == nullptr || !IsClass(Object, 0x503u))
+        if (Object == nullptr || !IsClass(Object, CObject::ClassShip))
         {
             return nullptr;
         }
@@ -294,7 +291,7 @@ namespace
     void SendSelectTarget(unsigned ObjectId)
     {
         FSpaceCommand Command = {};
-        Command.Id = 0x1c;
+        Command.Id = USER_SET_TARGET;
         Command.ObjectId = ObjectId;
         Command.SubObjectId = SUBOBJ_ID_NONE;
         Command.Byte26 = 1;
@@ -676,8 +673,8 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
     SetHiddenWithChildren(true);
 
     // Previous / next contact.
-    RegisterEvent(0x1d);
-    RegisterEvent(0x1e);
+    RegisterEvent(USER_NEXT_TARGET);
+    RegisterEvent(USER_PREV_TARGET);
 
     for (int Kind = 0; Kind < 16; ++Kind)
     {
@@ -906,7 +903,7 @@ bool HUD_ContactList::OnEvent(unsigned MsgId)
         }
         if (It != Contacts.end())
         {
-            if (MsgId == 0x1e)
+            if (MsgId == USER_PREV_TARGET)
             {
                 // The previous row, wrapping; a row that is the player is stepped over once
                 // more.
@@ -931,7 +928,7 @@ bool HUD_ContactList::OnEvent(unsigned MsgId)
                 SelectEntry(Row);
                 return true;
             }
-            if (MsgId == 0x1d)
+            if (MsgId == USER_NEXT_TARGET)
             {
                 // The next row, the same way.
                 int Row = Found + 1;
@@ -972,7 +969,7 @@ int HUD_ContactList::ClassifyContact(CSimple const* Object)
         return -1;
     }
     unsigned const TypeBits = Object->TypeBits;
-    if (IsClass(Object, 0x503u))
+    if (IsClass(Object, CObject::ClassShip))
     {
         CShip const* const Ship = static_cast<CShip const*>(Object);
         if (Ship->bIsPlayer != 0)
@@ -1335,14 +1332,14 @@ void HUD_ContactList::RebuildContacts()
                 CObject* const Object = InlineCObjectOf(Gameobj);
                 CEqObj const* EqObj = nullptr;
                 CSolar const* Solar = nullptr;
-                if (Object != nullptr && IsClass(Object, 0x103u))
+                if (Object != nullptr && IsClass(Object, CObject::ClassEqObj))
                 {
                     EqObj = static_cast<CEqObj const*>(Object);
                     if (EqObj->CloakPercent >= 1.0f)
                     {
                         continue;
                     }
-                    if (IsClass(Object, 0x303u))
+                    if (IsClass(Object, CObject::ClassSolar))
                     {
                         Solar = static_cast<CSolar const*>(Object);
                         if (!Solar->GetParentNickname().IsEmpty())
@@ -1477,7 +1474,7 @@ void HUD_ContactList::RebuildContacts()
                     }
                     CObject const* const Object = Gameobj->cobject();
                     CEqObj const* EqObj = nullptr;
-                    if (Object != nullptr && IsClass(Object, 0x103u))
+                    if (Object != nullptr && IsClass(Object, CObject::ClassEqObj))
                     {
                         if (static_cast<CEqObj const*>(Object)->CloakPercent >= 1.0f)
                         {
@@ -1490,7 +1487,7 @@ void HUD_ContactList::RebuildContacts()
                     {
                         continue;
                     }
-                    if (EqObj != nullptr && IsClass(EqObj, 0x303u) &&
+                    if (EqObj != nullptr && IsClass(EqObj, CObject::ClassSolar) &&
                         !static_cast<CSolar const*>(EqObj)->GetParentNickname().IsEmpty())
                     {
                         continue;
@@ -1851,17 +1848,17 @@ void HUD_ContactList::Draw()
 
             // Waypoints violet, the rest by reputation; a white NPC ship with no faction marks
             // the list dirty and is not shown.
-            unsigned long Colour = G_NnPaletteArgb_679bb0;
+            unsigned long Colour = G_NnPaletteCyan;
             if (Entry.Kind == 4 || Entry.Kind == 3)
             {
-                Colour = G_NnPaletteArgb_679b80;
+                Colour = G_NnPaletteViolet;
             }
             else
             {
                 unsigned long RepColour = 0;
                 HudReputationColor(&RepColour, Player, Entry.Object());   // FUN_0045a4e0
                 Colour = RepColour;
-                if ((Colour & 0xffffffu) == (G_NnPaletteArgb_679b84 & 0xffffffu))
+                if ((Colour & 0xffffffu) == (G_NnPaletteWhite & 0xffffffu))
                 {
                     CShip const* const Ship = AsShip(Obj->cobject());
                     if (Ship != nullptr && Ship->bIsPlayer == 0)
@@ -1880,7 +1877,7 @@ void HUD_ContactList::Draw()
             }
             if (bTarget != 0)
             {
-                Colour = G_NnPaletteArgb_679ba4;
+                Colour = G_NnPaletteAmber;
             }
             else
             {
@@ -1909,7 +1906,7 @@ void HUD_ContactList::Draw()
         SwapRowLabels(this);
         WinControl::Draw();                          // FUN_005a0760
         SwapRowLabels(this);
-        Slot39();                                    // slot 39 (+0x9c)
+        PostDraw();                                  // slot 39 (+0x9c)
         return;
     }
 
@@ -2247,10 +2244,10 @@ void HUD_ContactList::Draw()
         }
 
         // The colour (no faction test in this pass).
-        unsigned long Colour = G_NnPaletteArgb_679bb0;
+        unsigned long Colour = G_NnPaletteCyan;
         if (Entry.Kind == 4 || Entry.Kind == 3)
         {
-            Colour = G_NnPaletteArgb_679b80;
+            Colour = G_NnPaletteViolet;
         }
         else
         {
@@ -2260,7 +2257,7 @@ void HUD_ContactList::Draw()
         }
         if (bTarget != 0)
         {
-            Colour = G_NnPaletteArgb_679ba4;
+            Colour = G_NnPaletteAmber;
         }
         else
         {
@@ -2300,7 +2297,7 @@ void HUD_ContactList::Draw()
     SwapRowLabels(this);
     WinControl::Draw();
     SwapRowLabels(this);
-    Slot39();
+    PostDraw();
 }
 
 namespace

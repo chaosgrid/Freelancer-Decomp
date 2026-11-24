@@ -124,13 +124,13 @@ namespace
         // Each handle is returned only if bound, and reset to -1.
         if (Cam->CameraEntity != -1)
         {
-            Script->Slot13Detach(Cam->CameraEntity);
+            Script->DetachEntity(Cam->CameraEntity);
             Cam->CameraEntity = -1;
         }
         if (Cam->ObjectEntity != -1)
         {
             // Retail re-reads Script from the object here rather than reusing the register.
-            ScriptOf(Cam->Script)->Slot13Detach(Cam->ObjectEntity);
+            ScriptOf(Cam->Script)->DetachEntity(Cam->ObjectEntity);
             Cam->ObjectEntity = -1;
         }
 
@@ -415,7 +415,7 @@ bool ScriptCameraIsFinished(const FScriptCamera* Cam)
         return true;
 
     // Lets the camera controller take the view back when a cutscene ends.
-    const GENRESULT State = ScriptOf(Cam->Script)->Slot21GetState();
+    const GENRESULT State = ScriptOf(Cam->Script)->GetPlayState();
     return State == kScriptStateFinished;
 }
 
@@ -468,7 +468,7 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     // The stored name is a DATA-relative path.
     const char* const FullPath = GetFullFilename(Cam->Name);
 
-    const GENRESULT LoadResult = ScriptOf(Cam->Script)->Slot43LoadPath(FullPath);
+    const GENRESULT LoadResult = ScriptOf(Cam->Script)->LoadFromPath(FullPath);
     if (LoadResult != GR_OK)
     {
         FDUMP(0x100002, "%s(%d) : *** WARNING: ScriptCamera load failed: %s\n",
@@ -479,17 +479,17 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     }
 
     // Walk every entity once and bind the two sinks.
-    const unsigned long EntityCount = ScriptOf(Cam->Script)->Slot6EntityCount();
+    const unsigned long EntityCount = ScriptOf(Cam->Script)->GetEntityCount();
 
     for (int Index = 0; Index < static_cast<int>(EntityCount); ++Index)
     {
         // The FIRST dword is the entity type; dereferenced without a test.
         const int* const Entity =
-            static_cast<const int*>(ScriptOf(Cam->Script)->Slot8EntitySnapInorder(Index));
+            static_cast<const int*>(ScriptOf(Cam->Script)->GetEntityDescInOrder(Index));
 
         if (*Entity == kScriptEntityTypeCamera)
         {
-            ScriptOf(Cam->Script)->Slot12Attach(Index, Cam->CameraTransform);
+            ScriptOf(Cam->Script)->AttachEntity(Index, Cam->CameraTransform);
             Cam->CameraEntity = Index;
         }
 
@@ -499,13 +499,13 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
             reinterpret_cast<IScriptEngine*>(Cam->Script), Index, kMainObjectProperty);
         if (MainObject != nullptr)
         {
-            ScriptOf(Cam->Script)->Slot12Attach(Index, Cam->ObjectTransform);
+            ScriptOf(Cam->Script)->AttachEntity(Index, Cam->ObjectTransform);
             Cam->ObjectEntity = Index;
         }
     }
 
     // The script starts at time zero.
-    ScriptOf(Cam->Script)->Slot22Start(0);
+    ScriptOf(Cam->Script)->StartPlayback(0);
 
     // FGameCamera's activate (FUN_0051b450), which also runs the slot-0x5c viewport reset.
     const bool bBaseResult = GameCameraActivate((FGameCamera*)Cam, ViewRect4);
@@ -538,7 +538,7 @@ void ScriptCameraUpdate(FScriptCamera* Cam, float DeltaSeconds)
 
     // Whole milliseconds, truncated.
     const int DeltaMs = static_cast<int>(static_cast<double>(DeltaSeconds) * kSecondsToMilliseconds);
-    ScriptOf(Cam->Script)->Slot26Tick(DeltaMs);
+    ScriptOf(Cam->Script)->TickPlayback(DeltaMs);
 
     // The camera sink (+0xfc, no null test) is read back through its slots, not off the fields.
     float LocalPosition[3];

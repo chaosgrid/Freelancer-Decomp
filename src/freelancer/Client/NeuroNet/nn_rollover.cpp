@@ -131,8 +131,8 @@ bool NnRolloverControl::Create(Win3D* NewParent, void* /*Data*/)
     DrawSubLayer = 7;         // +0x78
     FlagE0 = 0;               // +0xe0
     TextScale = 0.0011f;      // +0xb0 = 0x3a902de0
-    FlagE1 = 1;               // +0xe1
-    ColorD8 = 0xff434343u;    // +0xd8, bytes 43 43 43 ff
+    bDrawBackground = 1;      // +0xe1
+    BackgroundColor = 0xff434343u; // +0xd8, bytes 43 43 43 ff
     ColorIdle = 0xffe0c387u;  // +0xcc, bytes 87 c3 e0 ff
 
     // FUN_005b0880: in the intro menu +0x188, else +0x184.
@@ -421,7 +421,7 @@ void NnRolloverControl::Draw()
     float ScreenY = 0.0f;
     TextWinProjectPoint(Position, &ScreenX, &ScreenY); // FUN_00417730(+0x60)
 
-    if (FlagE1 != 0)
+    if (bDrawBackground != 0)
     {
         // The box: floored origin, extent + {3, 2} (DAT_005d4f28 / DAT_005d55b4), in the 2D
         // projection. Retail's OnDisconnect(0x1701) calls around it are the ICF-folded bare RET
@@ -432,7 +432,8 @@ void NnRolloverControl::Draw()
         float const PadH = Height + 2.0f;
         Win3DPushProjection(); // FUN_00422a70
         Win3DSetOrtho2D();     // FUN_004225e0
-        Win3DColor4ubv(reinterpret_cast<unsigned char const*>(&ColorD8)); // FUN_00421ba0(+0xd8)
+        // FUN_00421ba0(+0xd8)
+        Win3DColor4ubv(reinterpret_cast<unsigned char const*>(&BackgroundColor));
         Win3DDisable(kWin3DTexture2D); // FUN_00421ed0(0xde1)
         float const X1 = X0 + PadW;
         float const Y1 = Y0 + PadH;

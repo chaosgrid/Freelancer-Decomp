@@ -72,7 +72,7 @@ namespace
     }
 
     // FUN_00565db0 -- column 1, the address (+0x10).
-    bool CompareField10Asc(FServerInfo const* A, FServerInfo const* B)
+    bool CompareAddressAsc(FServerInfo const* A, FServerInfo const* B)
     {
         return static_cast<unsigned>(A->IpAddress) < static_cast<unsigned>(B->IpAddress);
     }
@@ -117,7 +117,7 @@ namespace
     }
 
     // FUN_00565f00 -- column 6: LAN (+0x3e) first; ties fall back to the pointers.
-    bool CompareField3eAsc(FServerInfo const* A, FServerInfo const* B)
+    bool CompareLanAsc(FServerInfo const* A, FServerInfo const* B)
     {
         if (A->bLan != 0)
         {
@@ -162,7 +162,7 @@ namespace
     }
 
     // FUN_00565fa0.
-    bool CompareField10Desc(FServerInfo const* A, FServerInfo const* B)
+    bool CompareAddressDesc(FServerInfo const* A, FServerInfo const* B)
     {
         return static_cast<unsigned>(B->IpAddress) < static_cast<unsigned>(A->IpAddress);
     }
@@ -206,7 +206,7 @@ namespace
     }
 
     // FUN_005660e0.
-    bool CompareField3eDesc(FServerInfo const* A, FServerInfo const* B)
+    bool CompareLanDesc(FServerInfo const* A, FServerInfo const* B)
     {
         if (A->bLan != 0)
         {
@@ -246,11 +246,11 @@ namespace
 
     // .data:00614aa0 / .data:00614ac0.
     FServerCompare const kAscendingCompare[8] = {
-        CompareNameAsc,    CompareField10Asc, CompareKnownAsc,  ComparePingAsc,
-        ComparePlayersAsc, CompareVersionAsc, CompareField3eAsc, CompareLockAsc};
+        CompareNameAsc,    CompareAddressAsc, CompareKnownAsc,  ComparePingAsc,
+        ComparePlayersAsc, CompareVersionAsc, CompareLanAsc, CompareLockAsc};
     FServerCompare const kDescendingCompare[8] = {
-        CompareNameDesc,    CompareField10Desc, CompareKnownDesc,  ComparePingDesc,
-        ComparePlayersDesc, CompareVersionDesc, CompareField3eDesc, CompareLockDesc};
+        CompareNameDesc,    CompareAddressDesc, CompareKnownDesc,  ComparePingDesc,
+        ComparePlayersDesc, CompareVersionDesc, CompareLanDesc, CompareLockDesc};
 
 }
 
@@ -468,20 +468,20 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
         TextNode const Node(L"-", -1); // DAT_005e2c7c
         AppendNodeClone(PingNone, Node);
     }
-    LoadIds(Text729, 0x729);
+    LoadIds(ServerNameText, 0x729);
     LoadIds(DetailsHeader, 0x744);
     LoadIds(DetailsPassword, 0x750);
-    LoadIds(DetailsField95, 0x74f);
+    LoadIds(DetailsNoNewPlayers, 0x74f);
     LoadIdsCut(DetailsRestricted, 0x6007c);
-    LoadStyledIds(SubTitleText, 0x43e0, 0x6007d);
-    LoadStyledIds(TitleText, 0x1df5, 0x60072);
-    LoadStyledIds(StatusText60058, 0xbb80, 0x60058);
-    LoadStyledIds(StatusText60057, 0xbb80, 0x60057);
-    LoadStyledIds(StatusText60055, 0x9ca4, 0x60055);
-    LoadStyledIds(StatusText60056, 0xbb80, 0x60056);
+    LoadStyledIds(SubTitleText, kTextStyleScreenSubtitle, 0x6007d);
+    LoadStyledIds(TitleText, kTextStyleScreenTitle, 0x60072);
+    LoadStyledIds(StatusDisconnected, kTextStyleDisabled, 0x60058);
+    LoadStyledIds(StatusConnecting, kTextStyleDisabled, 0x60057);
+    LoadStyledIds(StatusConnected, kTextStyleBody, 0x60055);
+    LoadStyledIds(StatusConnectFailed, kTextStyleDisabled, 0x60056);
     LoadIdsCut(LegendSkullText, 0x6007b);
     LoadIdsCut(LegendLockText, 0x6007a);
-    LoadStyledIds(Text601eb, 0x5724, 0x601eb);
+    LoadStyledIds(EsrbNoticeText, 0x5724, 0x601eb);
     LoadStyledIds(SubTitleLan, 0xc9b7, 0x601ef);
     LoadStyledIds(SubTitleInternet, 0xc9b7, 0x601ee);
 
@@ -657,13 +657,13 @@ void PageServerSelect::SetCell(unsigned Row, unsigned Column, RenderDisplayList 
     {
         if (Column == SortColumn)
         {
-            StyleNode const Style(0xd190);
+            StyleNode const Style(kTextStyleColumnHeaderSorted);
             AppendNodeClone(Cell->Source, Style);
             bSortArrow = true;
         }
         else
         {
-            StyleNode const Style(0xd824);
+            StyleNode const Style(kTextStyleColumnHeader);
             AppendNodeClone(Cell->Source, Style);
         }
         JustifyNode const Justify(TextJustifyCenter);
@@ -672,9 +672,9 @@ void PageServerSelect::SetCell(unsigned Row, unsigned Column, RenderDisplayList 
     else
     {
         unsigned short const StyleId =
-            !bVersionMatch ? static_cast<unsigned short>(0xbb80)
-                           : (bSelected ? static_cast<unsigned short>(0x3343)
-                                        : static_cast<unsigned short>(0x69f5));
+            !bVersionMatch ? kTextStyleDisabled
+                           : (bSelected ? kTextStyleRowSelected
+                                        : kTextStyleRow);
         {
             StyleNode const Style(StyleId);
             AppendNodeClone(Cell->Source, Style);
@@ -699,7 +699,7 @@ void PageServerSelect::RefreshDetailsText()
     // FUN_0056f610.
     ServerDetails->ClearContent();
     {
-        StyleNode const Style(0x4433);
+        StyleNode const Style(kTextStyleList);
         ServerDetails->AppendNode(Style);
     }
     {
@@ -721,18 +721,18 @@ void PageServerSelect::RefreshListStatus()
     }
     if (ListStatus == 1 || ListStatus == 4)
     {
-        RDLRefNode const Ref(StatusText60057);
+        RDLRefNode const Ref(StatusConnecting);
         ListServerStatus->AppendNode(Ref);
     }
     else if (ListStatus == 2)
     {
-        RDLRefNode const Ref(StatusText60055);
+        RDLRefNode const Ref(StatusConnected);
         ListServerStatus->AppendNode(Ref);
         Refresh->bInteractive = 1; // redundant store, as retail
     }
     else
     {
-        RDLRefNode const Ref(StatusText60058);
+        RDLRefNode const Ref(StatusDisconnected);
         ListServerStatus->AppendNode(Ref);
     }
 }
@@ -1068,7 +1068,7 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
     }
 
     {
-        StyleNode const Style(0x4433);
+        StyleNode const Style(kTextStyleList);
         ServerDetails->AppendNode(Style);
     }
     {
@@ -1096,7 +1096,7 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
     if (Server->bAllowNewPlayers != 0 && Server->bPassword == 0)
         return;
     {
-        StyleNode const Style(0x4433);
+        StyleNode const Style(kTextStyleList);
         ServerDetails->AppendNode(Style);
     }
     {
@@ -1114,7 +1114,7 @@ void PageServerSelect::ShowServerDetails(FServerInfo const* Server, bool bNewSer
     if (Server->bAllowNewPlayers == 0)
     {
         {
-            RDLRefNode const Ref(DetailsField95);
+            RDLRefNode const Ref(DetailsNoNewPlayers);
             ServerDetails->AppendNode(Ref);
         }
         ParagraphNode const Paragraph;

@@ -44,7 +44,7 @@
 #include "render/IFLAppearance.h" // FUN_005462d0 / 00546380 / 00546400
 #include "Space/HUD/hud_waypoint.h"        // GetHudWaypoint (DAT_00674bc8), FUN_004f4d20 / 004f4ca0
 #include "Common/input_manager.h"       // GetClientMouseCursorDrawFlag (FUN_0041dd90)
-#include "NeuroNet/nn_ui_pulse.h"         // G_NnPaletteArgb_679b80 (DAT_00679b80)
+#include "NeuroNet/nn_ui_pulse.h"         // G_NnPaletteViolet (DAT_00679b80)
 #include "Interface/win3d_engine_submit.h" // FUN_00433f40 / FUN_00434630 (Solar waypoint marker)
 #include "Space/client_land_action.h"  // Action_Land (FUN_00542b70)
 #include "Space/Effects/particle_effect.h"     // FParticleEffect, ParticleEffectArmDeath / Release
@@ -259,8 +259,8 @@ FClientGameobj::FClientGameobj(EClientGameobjKind Kind)
     // held.
     Flags = static_cast<unsigned char>(Flags & 0xf0u);
     NebulaUpdateTimer = 0.0f;
-    DrawStateA = 0;
-    DrawStateB = 0;
+    CurrentNebula = nullptr;
+    NebulaFogFactor = 0.0f;
     ExplosionArch = nullptr;
     // HudLabel: FUN_004144b0 -- FFontString's own constructor, run as a member.
     HudLabelSurfaceWidth = 0;
@@ -421,7 +421,7 @@ unsigned* FClientGameobj::PickLod(unsigned* OutLod, void* Camera, unsigned const
     return GameobjPickLodRetail(this, OutLod, Camera, CachedLod);
 }
 
-void FClientGameobj::Slot180()
+void FClientGameobj::PreSubmitDraw()
 {
     // LAB_00401e90: empty.
 }
@@ -442,15 +442,15 @@ unsigned* FClientGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigned Ca
 unsigned FClientGameobj::GetNebula(unsigned* OutB)
 {
     // LAB_00524e50
-    *OutB = DrawStateB;
-    return DrawStateA;
+    memcpy(OutB, &NebulaFogFactor, sizeof(float));
+    return static_cast<unsigned>(reinterpret_cast<uintptr_t>(CurrentNebula));
 }
 
 void FClientGameobj::ResetNebula()
 {
     // LAB_00524e60
-    DrawStateA = 0;
-    DrawStateB = 0;
+    CurrentNebula = nullptr;
+    NebulaFogFactor = 0.0f;
     NebulaUpdateTimer = 10.0f;
 }
 
@@ -873,8 +873,8 @@ int FClientGameobj::request_cancel(int, unsigned const*, int) { return -3; }    
 int FClientGameobj::go_tradelane(IObjInspect const*, IObjInspect const*, bool, float) { return -3; }  // 0053a920
 int FClientGameobj::stop_tradelane() { return -3; }                                      // 0053a930
 int FClientGameobj::slot_6c(int, int) { return -3; }                                     // 0053a940
-int FClientGameobj::slot_70(unsigned) { return -3; }                                     // 0053a950
-int FClientGameobj::slot_74(unsigned) { return -3; }                                     // 0053a950
+int FClientGameobj::launch_complete(unsigned) { return -3; }                             // 0053a950
+int FClientGameobj::jump_in_complete(unsigned) { return -3; }                            // 0053a950
 
 // ===========================================================================
 // Simple
@@ -1212,7 +1212,7 @@ unsigned* FClientEquippedObj::PickLod(unsigned* OutLod, void* Camera, unsigned c
     return GameobjPickLodRetail(this, OutLod, Camera, CachedLod);
 }
 
-void FClientEquippedObj::Slot180()
+void FClientEquippedObj::PreSubmitDraw()
 {
     // LAB_0051b480: a jump to the empty LAB_00401e90 -- the same body as GameObject's slot 96.
 }
@@ -1711,8 +1711,8 @@ void FClientSolarGameobj::PostCreateInit()
     // (FUN_005553b0).
     FClientEquippedObj::PostCreateInit();
     FNebulaEffect* const Nebula =
-        StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+        StarSysFindNebula(&get_position(), &NebulaFogFactor, nullptr);
+    CurrentNebula = Nebula;
 }
 
 void FClientSolarGameobj::update(float Dt)
@@ -1729,7 +1729,6 @@ void FClientSolarGameobj::update(float Dt)
     // The star's slot 2 (LAB_00511690).
     if (StarSphere != nullptr)
     {
-        typedef void(__thiscall * FStarUpdate)(FStarSphere*, float);
         StarSphere->UpdateIntensity(Dt);
     }
 }
@@ -1788,7 +1787,6 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
             *OutLod = Lod;
             return OutLod;
         }
-        typedef void(__thiscall * FStarDrawSimple)(FStarSphere*, void*);
         StarSphere->DrawSimple(Camera);
         *OutLod = 0xffff0004u;
         return OutLod;
@@ -1861,7 +1859,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
 
     // Size: distance beyond 2500 (DAT_005db7d8) * 0.0005 (DAT_005e04d8), capped at 99
     // (DAT_005e04d4).
-    unsigned long Color = G_NnPaletteArgb_679b80;
+    unsigned long Color = G_NnPaletteViolet;
     float Size = 1.0f;
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (Player != nullptr)
@@ -1989,15 +1987,14 @@ void FClientSolarGameobj::ReadIni(INI_Reader& Reader)
             StarSphere = StarSphereCreateListed(this);
             char Path[0x104];
             GetFileSysPath(Path, "solar\\stararch.ini", DALib::Data);
-            using FStarLoad = int(__thiscall*)(FStarSphere*, char const*, char const*);
             StarSphere->Load(Path, Reader.get_value_string());
         }
     }
 
     // The nebula into +0x38, its fog factor into +0x3c (FUN_005553b0).
     FNebulaEffect* const Nebula =
-        StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+        StarSysFindNebula(&get_position(), &NebulaFogFactor, nullptr);
+    CurrentNebula = Nebula;
 }
 
 // ===========================================================================
@@ -2169,7 +2166,7 @@ namespace
         ISoundSource* const Sound = static_cast<ISoundSource*>(Companion[1]);
         if (Sound != nullptr)
         {
-            Sound->SetLooping(static_cast<unsigned char>(Arch->Flags50 & 1u));
+            Sound->SetLooping(static_cast<unsigned char>(Arch->Flags & 1u));
             if (Arch->SndEffect == nullptr || Sound->Start(Arch->SndEffect, 0) == 0)
             {
                 Sound->Release();
@@ -3090,8 +3087,8 @@ void FClientShipGameobj::UpdateNebula(float Dt)
     // In the tunnel: no nebula, no factor.
     if (JumpState == 2 || JumpState == 3)
     {
-        DrawStateA = 0;
-        DrawStateB = 0;
+        CurrentNebula = nullptr;
+        NebulaFogFactor = 0.0f;
         return;
     }
 
@@ -3100,7 +3097,7 @@ void FClientShipGameobj::UpdateNebula(float Dt)
     float Period = 1.0f;
     if (this == GetPlayerObjRW())
     {
-        float const Factor = *reinterpret_cast<float const*>(&DrawStateB);
+        float const Factor = NebulaFogFactor;
         if (Factor > 0.0f && Factor < 1.0f)
             Period = 0.1f;
         else
@@ -3111,10 +3108,10 @@ void FClientShipGameobj::UpdateNebula(float Dt)
         return;
 
     // FUN_005553b0 with the previous nebula as the hint.
-    FNebulaEffect* const Hint = reinterpret_cast<FNebulaEffect*>(static_cast<uintptr_t>(DrawStateA));
+    FNebulaEffect* const Hint = CurrentNebula;
     FNebulaEffect* const Nebula =
-        StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), Hint);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+        StarSysFindNebula(&get_position(), &NebulaFogFactor, Hint);
+    CurrentNebula = Nebula;
 
     // The clock is reloaded, reduced on the FPU and stored once.
     double Clock = NebulaUpdateTimer;
@@ -3619,19 +3616,19 @@ void FClientShipGameobj::RequestReturned(int Result, int Code, int Extra)
         NnVoiceEnqueue(VoiceId, 0);
 }
 
-int FClientShipGameobj::slot_70(unsigned Id)
+int FClientShipGameobj::launch_complete(unsigned BaseObjId)
 {
     // LAB_005471f0: IServer::LaunchComplete.
     unsigned const SelfId = get_id();
-    LocalServer()->LaunchComplete(Id, SelfId);
+    LocalServer()->LaunchComplete(BaseObjId, SelfId);
     return 0;
 }
 
-int FClientShipGameobj::slot_74(unsigned Arg)
+int FClientShipGameobj::jump_in_complete(unsigned SystemId)
 {
     // LAB_00547220: IServer::JumpInComplete.
     unsigned const SelfId = get_id();
-    LocalServer()->JumpInComplete(Arg, SelfId);
+    LocalServer()->JumpInComplete(SystemId, SelfId);
     return 0;
 }
 
@@ -4261,9 +4258,8 @@ namespace
     {
         if (!(Self->NebulaUpdateTimer == 0.0f))
             return;
-        FNebulaEffect* const Nebula = StarSysFindNebula(
-            &Self->get_position(), reinterpret_cast<float*>(&Self->DrawStateB), nullptr);
-        Self->DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+        FNebulaEffect* const Nebula = StarSysFindNebula(&Self->get_position(), &Self->NebulaFogFactor, nullptr);
+        Self->CurrentNebula = Nebula;
         Self->NebulaUpdateTimer = 1.0f;
     }
 
@@ -4657,8 +4653,8 @@ void FClientLootGameobj::PostCreateInit()
     }
     // FUN_005553b0
     FNebulaEffect* const Nebula =
-        StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+        StarSysFindNebula(&get_position(), &NebulaFogFactor, nullptr);
+    CurrentNebula = Nebula;
 }
 
 void FClientLootGameobj::update(float Dt)

@@ -46,14 +46,14 @@ double SpaceEffectPerfOneMinus();
 // FUN_005554d0 -- the StarSys per-object lighting: ambient (with the containing nebula's lerp
 // and fog), then the nearby lights. Callers: the cockpit pass, the asteroid ambient and
 // FUN_00539b40.
-void SpaceApplyObjectLighting(float const* Pos3, float Radius, void* Camera, unsigned DrawStateA,
-                              unsigned DrawStateB, unsigned char Flag);
+void SpaceApplyObjectLighting(float const* Pos3, float Radius, void* Camera, unsigned NebulaBits,
+                              unsigned FogFactorBits, unsigned char Flag);
 
 // FUN_0040fb60 -- ZNear (+0xa4) and ZFar (+0xa8) written.
 void SpaceCameraSetNearFar(FSpaceCamera* Cam, float ZNear, float ZFar);
 
 // FUN_00539980 -- GameObject's vt+0x188 body (the draw submit), for FClientGameobj::SubmitDraw:
-// Slot180, the PickLod LOD pick written back over CachedLod, the gate (low word < 3 or high
+// PreSubmitDraw, the PickLod LOD pick written back over CachedLod, the gate (low word < 3 or high
 // word >= 2 returns the LOD), the effect-list sweep FUN_004fd040 (high word < 1), UpdateDrawLighting, the
 // player flags, the IFLAppearance envmap arm, IRenderer2::Slot7(Camera, get_index, 1.0f, Flags,
 // Matrix, Extra), FlushAll(1) on a result >= 3; *OutLod = {result, 0xffff}. The draw drain

@@ -237,7 +237,7 @@ bool HUD_Core::Create(Win3D* NewParent, void* Data)
     HitOffset[1] = 0.0f;
     HitOffset[2] = 0.0f;
 
-    RegisterEvent(0x6d);
+    RegisterEvent(USER_MINIMIZE_HUD);
 
     SetOffset(0.005f, -0.365f, -1.0f);
     SetPosition(Position);
@@ -251,7 +251,7 @@ bool HUD_Core::OnEvent(unsigned MsgId)
     {
         return false;
     }
-    if (MsgId != 0x6d)
+    if (MsgId != USER_MINIMIZE_HUD)
     {
         return false;
     }
@@ -415,7 +415,7 @@ void HUD_Core::Draw()
     {
         return;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
     {
         return;
     }
@@ -435,7 +435,7 @@ void HUD_Core::Draw()
     float ShieldMax = 0.0f;
     float ShieldCur = 0.0f;
     if (Base != nullptr && Base->Object != nullptr &&
-        (static_cast<unsigned>(Base->Object->ObjectClass) & 0x103u) == 0x103u)
+        (static_cast<unsigned>(Base->Object->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
     {
         HudSampleShieldHitPoints(static_cast<CEqObj*>(Base->Object), &ShieldMax, &ShieldCur,
                                  nullptr);
@@ -462,7 +462,7 @@ void HUD_Core::Draw()
     {
         return;
     }
-    if ((static_cast<unsigned>(HullObject->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(HullObject->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         return;
     }
@@ -534,11 +534,11 @@ void HUD_Core::Draw()
         LastThrust = Thrust;
         if (Thrust < 25)
         {
-            ThrustText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba8), 1);
+            ThrustText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), 1);
         }
         else
         {
-            ThrustText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679bb0), 1);
+            ThrustText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteCyan), 1);
         }
         sprintf(Text, "%d%%%%", Thrust);
         // "NN%%" prints as "NN%" through the NumberString's own printf.
@@ -547,7 +547,7 @@ void HUD_Core::Draw()
 
     VelocityText->Draw();
     ThrustText->Draw();
-    Slot39();
+    PostDraw();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -861,7 +861,7 @@ void HUD_Status::RebuildWeaponList()
     {
         CObject* const Object = const_cast<CObject*>(Player->cobject());
         if (Object != nullptr &&
-            (static_cast<unsigned>(Object->ObjectClass) & 0x103u) == 0x103u)
+            (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
         {
             CEqObj* const Owner = static_cast<CEqObj*>(Object);
             CEquipTraverser Walk(EquipTypeMineDropper | EquipTypeCmDropper | EquipTypeGun);
@@ -1005,10 +1005,10 @@ void HUD_Status::RefreshWeaponRows()
     }
     for (int Slot = 0;;)
     {
-        unsigned long Color = G_NnPaletteArgb_679bb0;
+        unsigned long Color = G_NnPaletteCyan;
         if (Weapons[Row].bActive != 0)
         {
-            Color = G_NnPaletteArgb_679bac;
+            Color = G_NnPaletteGreen;
         }
         if (WeaponNumberText[Slot]->HitTest(Ray) || WeaponText[Slot]->HitTest(Ray) ||
             AmmoText[Slot]->HitTest(Ray))
@@ -1245,7 +1245,7 @@ void HUD_Status::ToggleLauncher(unsigned short SubId)
     FSpaceCommand Command;
     memset(&Command, 0, sizeof(Command));
     Command.Byte26 = 1;
-    Command.Id = 0x19;
+    Command.Id = USER_ACTIVATE_ITEM;
     Command.SubObjectId = 2;
     Command.ObjectId = SubId;
     SpaceSendCommand(&Command);
@@ -1277,11 +1277,11 @@ void HUD_Status::ToggleLauncher(unsigned short SubId)
 bool HUD_Status::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // LAB_004db8f0 (this = the WinControl face). Always consumed.
-    if (Event->Field0 == -1)
+    if (Event->Button == kWin3DMouseLeft)
     {
         NnToolTipHideGlobal();
         unsigned short const SubId = SubTargetId;
-        if (SubId != SUBOBJ_ID_NONE && Event->Field1 == 2)
+        if (SubId != SUBOBJ_ID_NONE && Event->Action == kWin3DMousePress)
         {
             ToggleLauncher(SubId);
         }
@@ -1504,7 +1504,7 @@ void HUD_Status::Update()
                         // for their ammo count; both answers are dropped (as retail).
                         CObject* const Object = const_cast<CObject*>(Player->cobject());
                         if (Object != nullptr &&
-                            (static_cast<unsigned>(Object->ObjectClass) & 0x103u) == 0x103u)
+                            (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
                         {
                             CEqObj* const Owner = static_cast<CEqObj*>(Object);
                             CEquipTraverser MineWalk(EquipTypeMineDropper);
@@ -1761,7 +1761,7 @@ bool HUD_Status::IsLootInReach()
             CBase* const Base = static_cast<CBase*>(static_cast<IObjInspectImpl*>(Loot));
             CObject* LootObject = nullptr;
             if (Base != nullptr && Base->Object != nullptr &&
-                (static_cast<unsigned>(Base->Object->ObjectClass) & 0x803u) == 0x803u)
+                (static_cast<unsigned>(Base->Object->ObjectClass) & CObject::ClassLoot) == CObject::ClassLoot)
             {
                 LootObject = Base->Object;
             }
@@ -1888,7 +1888,7 @@ void HUD_Status::FireSeekerGuns(int Mode)
     {
         return;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
     {
         return;
     }
@@ -2045,7 +2045,7 @@ void HUD_Status::TractorInAllLoot()
     {
         float Value = 0.0f;
         CObject const* const Object = Loot[Index]->cobject();
-        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x803u) == 0x803u)
+        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassLoot) == CObject::ClassLoot)
         {
             Archetype::Equipment const* const Contents =
                 static_cast<CLoot const*>(Object)->ContentsArch;
@@ -2117,7 +2117,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
     }
     if (HudIsMousePickBlocked())
     {
-        if (MsgId == 0x3a && HudCommandRecord()->Byte18 == 0)
+        if (MsgId == USER_AFTERBURN && HudCommandRecord()->bKeyDown == 0)
         {
             SetPlayerAfterburner(false);
         }
@@ -2145,51 +2145,52 @@ bool HUD_Status::OnEvent(unsigned MsgId)
     // Ids outside the switch answer false; every case answers true.
     switch (MsgId)
     {
-    case 0x3a:
-        // Afterburner key -- post 0x3c while it is down, 0x3b once it is up.
-        HudPostCommand(HudCommandRecord()->Byte18 != 0 ? 0x3cu : 0x3bu, 0);
+    case USER_AFTERBURN:
+        // Afterburner key -- post AFTERBURN_ON while it is down, AFTERBURN_OFF once it is up.
+        HudPostCommand(HudCommandRecord()->bKeyDown != 0 ? USER_AFTERBURN_ON : USER_AFTERBURN_OFF,
+                       0);
         return true;
 
-    case 0x3b:
+    case USER_AFTERBURN_OFF:
         SetPlayerAfterburner(false);
         return true;
 
-    case 0x3c:
+    case USER_AFTERBURN_ON:
         SetPlayerAfterburner(true);
         return true;
 
-    case 0x3d:
+    case USER_TOGGLE_AUTO_AVOIDANCE:
         G_StatusAutoAvoidance = (G_StatusAutoAvoidance == 0) ? 1 : 0;
         SetPlayerAutoAvoidance(G_StatusAutoAvoidance != 0);
         return true;
 
-    case 0x3e:
+    case USER_TOGGLE_AUTO_LEVEL:
         G_StatusAutoLevel = (G_StatusAutoLevel == 0) ? 1 : 0;
         SetPlayerAutoLevel(G_StatusAutoLevel != 0);
         return true;
 
-    case 0x56:
-    case 0x57:
+    case USER_SWITCH_TO_PLAYER_SHIP:
+    case USER_SWITCH_TO_WEAPON_LIST:
         // Open the panel when it is closed, then hide (0x56) or show (0x57) the weapon list --
         // bShowWeaponList and session flag 4.
         if (bExpanded == 0)
         {
             ToggleExpanded();
         }
-        bShowWeaponList = (MsgId == 0x57) ? 1 : 0;
-        SetGameSessionFlags(4, MsgId == 0x57);
+        bShowWeaponList = (MsgId == USER_SWITCH_TO_WEAPON_LIST) ? 1 : 0;
+        SetGameSessionFlags(4, MsgId == USER_SWITCH_TO_WEAPON_LIST);
         return true;
 
-    case 0x5e:
-    case 0x6d:
+    case USER_STATUS:
+    case USER_MINIMIZE_HUD:
         ToggleExpanded();
         return true;
 
-    case 0x6f:
+    case USER_COLLECT_LOOT:
         TractorInAllLoot();
         return true;
 
-    case 0x8f:
+    case USER_REPAIR_HEALTH:
     {
         // Nanobots -- used (UI sound 0x28) unless there are none or the hull is exactly whole
         // (NaN uses them); else UI sound 0x2a.
@@ -2205,7 +2206,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0x90:
+    case USER_REPAIR_SHIELD:
     {
         // Shield batteries -- used (UI sound 0x29) on the first shield whose relative health is
         // below 1 and whose max hit points are above 0; else UI sound 0x2b.
@@ -2231,15 +2232,15 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0x91:
-    case 0x92:
-    case 0x93:
-    case 0x94:
-    case 0x95:
-    case 0x96:
+    case USER_WEAPON_GROUP1:
+    case USER_WEAPON_GROUP2:
+    case USER_WEAPON_GROUP3:
+    case USER_WEAPON_GROUP4:
+    case USER_WEAPON_GROUP5:
+    case USER_WEAPON_GROUP6:
     {
         // Select weapon group 0..5 -- the current one is stored first.
-        int const Group = static_cast<int>(MsgId - 0x91);
+        int const Group = static_cast<int>(MsgId - USER_WEAPON_GROUP1);
         G_WeaponGroups.StoreActive(G_WeaponGroups.GetCurrent());
         G_WeaponGroups.SetCurrent(Group);
         G_WeaponGroups.Activate(Group);
@@ -2248,19 +2249,19 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0x97:
-    case 0x98:
-    case 0x99:
-    case 0x9a:
-    case 0x9b:
-    case 0x9c:
-    case 0x9d:
-    case 0x9e:
-    case 0x9f:
-    case 0xa0:
+    case USER_TOGGLE_WEAPON1:
+    case USER_TOGGLE_WEAPON2:
+    case USER_TOGGLE_WEAPON3:
+    case USER_TOGGLE_WEAPON4:
+    case USER_TOGGLE_WEAPON5:
+    case USER_TOGGLE_WEAPON6:
+    case USER_TOGGLE_WEAPON7:
+    case USER_TOGGLE_WEAPON8:
+    case USER_TOGGLE_WEAPON9:
+    case USER_TOGGLE_WEAPON10:
     {
         // Toggle launcher 0..9 of Weapons (no WeaponTopRow offset) and restart RefreshTimer.
-        unsigned const Row = MsgId - 0x97;
+        unsigned const Row = MsgId - USER_TOGGLE_WEAPON1;
         if (Weapons.size() > Row)
         {
             ToggleLauncher(Weapons[Row].SubId);
@@ -2269,19 +2270,19 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0xa1:
-    case 0xa2:
-    case 0xa3:
-    case 0xa4:
-    case 0xa5:
-    case 0xa6:
-    case 0xa7:
-    case 0xa8:
-    case 0xa9:
-    case 0xaa:
+    case USER_FIRE_WEAPON1:
+    case USER_FIRE_WEAPON2:
+    case USER_FIRE_WEAPON3:
+    case USER_FIRE_WEAPON4:
+    case USER_FIRE_WEAPON5:
+    case USER_FIRE_WEAPON6:
+    case USER_FIRE_WEAPON7:
+    case USER_FIRE_WEAPON8:
+    case USER_FIRE_WEAPON9:
+    case USER_FIRE_WEAPON10:
     {
         // Fire launcher 0..9 of Weapons alone at the aim point.
-        unsigned const Row = MsgId - 0xa1;
+        unsigned const Row = MsgId - USER_FIRE_WEAPON1;
         if (Weapons.size() > Row)
         {
             IObjRW* const Shooter = static_cast<IObjRW*>(GetPlayerObjRW());
@@ -2298,7 +2299,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0xab:
+    case USER_FIRE_WEAPON_GROUP1:
     {
         // Fire weapon group 0 -- FireWeaponGroup(0) inlined.
         IObjRW* const Shooter = static_cast<IObjRW*>(GetPlayerObjRW());
@@ -2324,57 +2325,60 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0xac:
-    case 0xad:
-    case 0xae:
-    case 0xaf:
-    case 0xb0:
+    case USER_FIRE_WEAPON_GROUP2:
+    case USER_FIRE_WEAPON_GROUP3:
+    case USER_FIRE_WEAPON_GROUP4:
+    case USER_FIRE_WEAPON_GROUP5:
+    case USER_FIRE_WEAPON_GROUP6:
         // Fire weapon group 1..5.
-        FireWeaponGroup(static_cast<int>(MsgId - 0xab));
+        FireWeaponGroup(static_cast<int>(MsgId - USER_FIRE_WEAPON_GROUP1));
         return true;
 
-    case 0xb1:
-    case 0xb2:
-    case 0xb3:
-    case 0xb4:
-    case 0xb5:
-    case 0xb6:
+    case USER_ASSIGN_WEAPON_GROUP1:
+    case USER_ASSIGN_WEAPON_GROUP2:
+    case USER_ASSIGN_WEAPON_GROUP3:
+    case USER_ASSIGN_WEAPON_GROUP4:
+    case USER_ASSIGN_WEAPON_GROUP5:
+    case USER_ASSIGN_WEAPON_GROUP6:
         // Store the active launchers as weapon group 0..5.
-        G_WeaponGroups.StoreActive(static_cast<int>(MsgId - 0xb1));
+        G_WeaponGroups.StoreActive(static_cast<int>(MsgId - USER_ASSIGN_WEAPON_GROUP1));
         return true;
 
-    case 0xb7:
-    case 0xb8:
-    case 0xb9:
-    case 0xba:
+    case USER_REMAPPABLE_LEFT:
+    case USER_REMAPPABLE_RIGHT:
+    case USER_REMAPPABLE_UP:
+    case USER_REMAPPABLE_DOWN:
     {
-        // Nothing in the rear view; else post (skipping modifiers) the turret command
-        // 0x32..0x35 in the turret view, or 0x2c / 0x2d / 0x2a / 0x2b.
-        static unsigned const kTurretCommands[4] = {0x32, 0x33, 0x34, 0x35};
-        static unsigned const kShipCommands[4] = {0x2c, 0x2d, 0x2a, 0x2b};
+        // Nothing in the rear view; else post (skipping modifiers) the camera look command in
+        // the turret view, or the ship rotation command.
+        static unsigned const kTurretCommands[4] = {
+            USER_LOOK_ROTATE_CAMERA_LEFT, USER_LOOK_ROTATE_CAMERA_RIGHT,
+            USER_LOOK_ROTATE_CAMERA_UP, USER_LOOK_ROTATE_CAMERA_DOWN};
+        static unsigned const kShipCommands[4] = {USER_Y_ROTATE, USER_Y_UNROTATE, USER_X_ROTATE,
+                                                  USER_X_UNROTATE};
         if (bRearView != 0)
         {
             return true;
         }
-        unsigned const Slot = MsgId - 0xb7;
+        unsigned const Slot = MsgId - USER_REMAPPABLE_LEFT;
         HudPostCommand(bTurretView != 0 ? kTurretCommands[Slot] : kShipCommands[Slot], 1);
         return true;
     }
 
-    case 0xbc:
+    case USER_LAUNCH_MISSILES:
         FireSeekerGuns(0); // missiles
         return true;
 
-    case 0xc0:
+    case USER_LAUNCH_TORPEDOS:
         FireSeekerGuns(1); // torpedoes
         return true;
 
-    case 0xc1:
+    case USER_LAUNCH_CRUISE_DISRUPTORS:
         FireSeekerGuns(2); // cruise disruptors
         return true;
 
-    case 0xbd:
-    case 0xbe:
+    case USER_LAUNCH_MINES:
+    case USER_LAUNCH_COUNTERMEASURES:
     {
         // Drop from every mine dropper (0xbd) or every countermeasure dropper (0xbe) of the
         // player's CEqObj -- the ids into a 24-slot frame buffer (no bound test, as retail),
@@ -2389,12 +2393,12 @@ bool HUD_Status::OnEvent(unsigned MsgId)
         {
             return true;
         }
-        if ((static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+        if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         {
             return true;
         }
         CEqObj* const Owner = static_cast<CEqObj*>(Object);
-        CEquipTraverser Walk(MsgId == 0xbd ? EquipTypeMineDropper : EquipTypeCmDropper);
+        CEquipTraverser Walk(MsgId == USER_LAUNCH_MINES ? EquipTypeMineDropper : EquipTypeCmDropper);
         CEquip* Equip = Owner->EquipManager.Traverse(Walk);
         if (Equip == nullptr)
         {

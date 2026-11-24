@@ -73,7 +73,7 @@ namespace
     // rebase the manager once its reset time (+0x1c, an int) is behind its edit time.
     void CheckHullSynapsesAndReset(IVP_Hull_Manager* Hull)
     {
-        double Delta = (double)(Hull->PoolKeyThreshold) - Hull->AccumulatedDeltaA;
+        double Delta = (double)(Hull->PoolMinKey) - Hull->AccumulatedDeltaA;
         float DeltaStored = (float)(Delta);
         int32_t LoopsLeft = 100;
         if (!(Delta >= GIvpZero))
@@ -89,7 +89,7 @@ namespace
                 {
                     break;
                 }
-                Delta = (double)(Hull->PoolKeyThreshold) - Hull->AccumulatedDeltaA;
+                Delta = (double)(Hull->PoolMinKey) - Hull->AccumulatedDeltaA;
                 DeltaStored = (float)(Delta);
                 if (Delta >= GIvpZero)
                 {
@@ -116,7 +116,7 @@ void IVP_Calc_Next_PSI_Solver::calc_next_PSI_matrix(IVP_Event_Sim* EventSim, IVP
     IVP_Core* Core = core;
 
     // A car wheel with max_surface_deviation == 0 (or NaN) skips every speed limit.
-    if (!(Core->AxisLock != nullptr && IsEqualOrUnordered(Core->SpeedLimit, GIvpZero)))
+    if (!(Core->AxisLock != nullptr && IsEqualOrUnordered(Core->MaxSurfaceDeviation, GIvpZero)))
     {
         IVP_Anomaly_Limits* Limits = Core->Environment->anomaly_limits;
         Vector& RotSpeed = Core->RotSpeed;
@@ -153,7 +153,7 @@ void IVP_Calc_Next_PSI_Solver::calc_next_PSI_matrix(IVP_Event_Sim* EventSim, IVP
                 RotSpeed.z = -Clip->z;
             }
         }
-        else if (!(Core->AxisLock != nullptr && IsEqualOrUnordered(Core->SpeedLimit, GIvpZero)))
+        else if (!(Core->AxisLock != nullptr && IsEqualOrUnordered(Core->MaxSurfaceDeviation, GIvpZero)))
         {
             // Retail re-tests the outer condition (always true here; kept as written).
             // Fire when |rot_speed|^2 > m*m, m = inv_delta_time * max_angular_velocity_per_psi.
@@ -176,7 +176,7 @@ void IVP_Calc_Next_PSI_Solver::calc_next_PSI_matrix(IVP_Event_Sim* EventSim, IVP
     }
 
     // current_speed, i_delta_time.
-    Core->Margin = (float)(RealLength(Core->Speed));
+    Core->CurrentSpeed = (float)(RealLength(Core->Speed));
     Core->IDeltaTime = EventSim->i_delta_time;
 
     IVP_U_Quat QCoreFCore;
@@ -232,7 +232,7 @@ void IVP_Calc_Next_PSI_Solver::calc_next_PSI_matrix(IVP_Event_Sim* EventSim, IVP
 
     // (max_surface_rot_speed + current_speed) * 1.00001f becomes every object's hull
     // gradient. The sum is formed before the empty-objects test and dropped there.
-    const double SurfaceSpeed = (double)(Core->BoundingRadius) + Core->Margin;
+    const double SurfaceSpeed = (double)(Core->MaxSurfaceRotSpeed) + Core->CurrentSpeed;
     const int32_t LastObject = static_cast<int32_t>(Core->Objects.n_elems) - 1;
     if (LastObject < 0)
     {
@@ -243,7 +243,7 @@ void IVP_Calc_Next_PSI_Solver::calc_next_PSI_matrix(IVP_Event_Sim* EventSim, IVP
     for (int32_t Index = LastObject; Index >= 0; --Index)
     {
         IVP_Hull_Manager* Hull = &Core->Objects.elems[Index]->hull_manager; // object + 0x44
-        const double CurrentSpeed = Core->Margin;                            // core + 0x144
+        const double CurrentSpeed = Core->CurrentSpeed;                            // core + 0x144
         IVP_Environment* EventEnv = EventSim->environment;
         const float TimeHi = EventEnv->current_time.time_base;
         const float TimeLo = EventEnv->current_time.time_offset;
@@ -267,7 +267,7 @@ void IVP_Calc_Next_PSI_Solver::calc_next_PSI_matrix(IVP_Event_Sim* EventSim, IVP
         const double NextValue = (double)(HullGradient) * DeltaTime + Hull->OuterValueAtLastEdit;
         Hull->AccumulatedDeltaA = (float)(NextValue);
 
-        if (!((double)(Hull->PoolKeyThreshold) - NextValue >= GIvpZero))
+        if (!((double)(Hull->PoolMinKey) - NextValue >= GIvpZero))
         {
             ActiveHullManagers->Add(Hull); // FUN_06352140 + inline append
         }
@@ -281,7 +281,7 @@ void IVP_Calc_Next_PSI_Solver::calc_rotation_matrix(float DeltaTime, IVP_U_Quat*
 {
     IVP_Core* Core = core;
 
-    if ((Core->Flags & 0xC0u) == 0 && Core->Environment->sim_substate != 5)
+    if ((Core->Flags & IVP_CORE_ROT_INERTIAS_ARE_EQUAL) == 0 && Core->Environment->sim_substate != 5)
     {
         Vector& RotSpeed = Core->RotSpeed;
         const IVP_U_Point* RotSpeedPoint = reinterpret_cast<const IVP_U_Point*>(&RotSpeed);
@@ -346,7 +346,7 @@ void IVP_Calc_Next_PSI_Solver::calc_rotation_matrix(float DeltaTime, IVP_U_Quat*
     }
 
     // Car wheel with max_surface_deviation == 0 (or NaN).
-    if (Core->AxisLock != nullptr && IsEqualOrUnordered(Core->SpeedLimit, GIvpZero))
+    if (Core->AxisLock != nullptr && IsEqualOrUnordered(Core->MaxSurfaceDeviation, GIvpZero))
     {
         // The wheel's axis index (0..2).
         const int32_t Axis = *reinterpret_cast<const int32_t*>(
@@ -423,7 +423,7 @@ void IVP_Calc_Next_PSI_Solver::calc_psi_rotation_axis(const IVP_U_Quat* QCoreFCo
         const double Length5 = Length3 * Length2;
         const double Series = Length5 * GIvpAsinFifthOrder + Length3 * GIvpOneSixth;
         const double AbsOmega = (Length + Series) * Core->IDeltaTime;
-        Core->MaxSurfaceDeviation = (float)(AbsOmega + AbsOmega);
+        Core->AbsOmega = (float)(AbsOmega + AbsOmega);
 
         // Rotation axis = m_world_f_core rows . q.xyz / |q.xyz|;
         // row 0 stays on the stack, rows 1 and 2 go through dword locals.
@@ -434,20 +434,20 @@ void IVP_Calc_Next_PSI_Solver::calc_psi_rotation_axis(const IVP_U_Quat* QCoreFCo
                                               (double)(M.rows[1].k[1]) * Qy);
         const float Row2 = (float)(((double)(M.rows[2].k[0]) * Qx + (double)(M.rows[2].k[2]) * Qz) +
                                               (double)(M.rows[2].k[1]) * Qy);
-        Core->RotAxisOS.x = (float)(Row0 * InvLength);
-        Core->RotAxisOS.y = (float)(Row1 * InvLength);
-        Core->RotAxisOS.z = (float)(Row2 * InvLength);
+        Core->RotAxisWS.x = (float)(Row0 * InvLength);
+        Core->RotAxisWS.y = (float)(Row1 * InvLength);
+        Core->RotAxisWS.z = (float)(Row2 * InvLength);
     }
     else
     {
-        Core->MaxSurfaceDeviation = 0.0f;
-        Core->RotAxisOS.x = 1.0f;
-        Core->RotAxisOS.y = 0.0f;
-        Core->RotAxisOS.z = 0.0f;
+        Core->AbsOmega = 0.0f;
+        Core->RotAxisWS.x = 1.0f;
+        Core->RotAxisWS.y = 0.0f;
+        Core->RotAxisWS.z = 0.0f;
     }
 
     // max_surface_rot_speed = abs_omega * max_surface_deviation.
-    Core->BoundingRadius = (float)((double)(Core->MaxSurfaceDeviation) * Core->SpeedLimit);
+    Core->MaxSurfaceRotSpeed = (float)((double)(Core->AbsOmega) * Core->MaxSurfaceDeviation);
 }
 
 // ============================================================================
@@ -513,11 +513,11 @@ void IVP_Calc_Next_PSI_Solver::set_transformation(const IVP_U_Quat* Rotation, co
 
     if (bOptimizeForRepeatedCalls != 0)
     {
-        Core->Margin = (float)((double)(Distance) * Core->IDeltaTime);
+        Core->CurrentSpeed = (float)((double)(Distance) * Core->IDeltaTime);
     }
     else
     {
-        Core->Margin = 0.0f;
+        Core->CurrentSpeed = 0.0f;
         QDelta.x = 0.0f;
         QDelta.y = 0.0f;
         QDelta.z = 0.0f;
@@ -526,7 +526,7 @@ void IVP_Calc_Next_PSI_Solver::set_transformation(const IVP_U_Quat* Rotation, co
     calc_psi_rotation_axis(&QDelta);
 
     // growth = max_surface_rot_speed * max_surface_deviation * dt + distance.
-    const float Growth = (float)((double)(Core->BoundingRadius) * Core->SpeedLimit * SinceLastPsi + Distance);
+    const float Growth = (float)((double)(Core->MaxSurfaceRotSpeed) * Core->MaxSurfaceDeviation * SinceLastPsi + Distance);
     for (int32_t Index = static_cast<int32_t>(Core->Objects.n_elems) - 1; Index >= 0; --Index)
     {
         IVP_Real_Object* Object = Core->Objects.elems[Index];
@@ -555,9 +555,9 @@ void IVP_Calc_Next_PSI_Solver::set_transformation(const IVP_U_Quat* Rotation, co
     }
 
     // Reached on both paths.
-    Core->Margin = 0.0f;
-    Core->MaxSurfaceDeviation = 0.0f;
-    Core->BoundingRadius = 0.0f;
+    Core->CurrentSpeed = 0.0f;
+    Core->AbsOmega = 0.0f;
+    Core->MaxSurfaceRotSpeed = 0.0f;
 }
 
 // ============================================================================

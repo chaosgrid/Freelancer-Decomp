@@ -21,12 +21,12 @@ struct FHudCmdRecord
     unsigned MsgId;          // +0x00
     unsigned Key;            // +0x04 -- key code (event 1)
     unsigned Modifiers;      // +0x08 -- DAT_0067c280: Shift 1 / Ctrl 4 / Alt 0x10 (FUN_005763b0)
-    unsigned Field0C;        // +0x0c -- DAT_0067c284: raw window message (FUN_00577850)
+    unsigned WindowMessage;  // +0x0c -- DAT_0067c284: raw window message (FUN_00577850)
     unsigned Arg10;          // +0x10 -- DAT_0067c288: wParam (event 2 first argument)
     unsigned Arg14;          // +0x14 -- DAT_0067c28c: lParam (event 2 second argument)
-    unsigned char Byte18;    // +0x18 -- DAT_0067c290: key down (FUN_00577850) / set by FUN_005763b0
-    unsigned char Byte19;    // +0x19 -- DAT_0067c291: auto-repeat key event (FUN_00577850)
-    unsigned char Byte1A;    // +0x1a -- mouse events: second flag (FUN_0059d140 0059d184)
+    unsigned char bKeyDown;  // +0x18 -- DAT_0067c290: key down (FUN_00577850) / set by FUN_005763b0
+    unsigned char bRepeat;   // +0x19 -- DAT_0067c291: auto-repeat key event (FUN_00577850)
+    unsigned char bDoubleClick; // +0x1a -- mouse events: double click (FUN_0059d140 0059d184)
     unsigned char Byte1B;    // +0x1b
 };
 

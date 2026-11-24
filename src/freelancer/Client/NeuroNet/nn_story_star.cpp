@@ -29,13 +29,14 @@
 #include "NeuroNet/nn_modal.h"             // G_NnMainButton, G_bNnScreenUp, NnFloatBits, ...
 #include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_text_scratch.h"      // G_NnTextScratchA / B (DAT_0066dc60 / DAT_0066fc60)
-#include "NeuroNet/nn_ui_pulse.h"          // G_NnPaletteArgb_679bb0
+#include "NeuroNet/nn_ui_pulse.h"          // G_NnPaletteCyan
 #include "Space/player_spawn.h"         // GetPlayerConnectionId (DAT_00673344)
 #include "Interface/rich_text_win.h"
 #include "Network/server_connect.h"       // ShutdownServerConnection (FUN_005a8260)
 #include "Space/space_letterbox.h"      // SetLetterboxTarget (FUN_0041a0f0), IsLetterboxVisible
 #include "Interface/win3d.h"
 #include "Interface/win_factory.h"
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_goods.h"         // GoodList::find_by_id
 #include "common_reputation.h"    // Reputation::get_name, Reputation::Vibe::GetName
@@ -672,7 +673,7 @@ void MissionObjectiveWindow::Update()
     }
 
     // The alpha of DAT_00679bb0 (its top byte) scaled by the phase.
-    unsigned long Colour = G_NnPaletteArgb_679bb0;
+    unsigned long Colour = G_NnPaletteCyan;
     unsigned char Bytes[4];
     memcpy(Bytes, &Colour, sizeof(Bytes));
     unsigned char const BaseAlpha = Bytes[3];
@@ -1094,7 +1095,7 @@ void NeuroNetStoryStar::RebuildHistoryText()
     Target->ClearContent();
     RenderDisplayList Rdl;
     {
-        StyleNode Style(0x9ca4);
+        StyleNode Style(kTextStyleBody);
         AppendNodeClone(Rdl, Style);
     }
 
@@ -1149,12 +1150,12 @@ void NeuroNetStoryStar::RebuildHistoryText()
                 if (bMatch)
                 {
                     bCurrentFound = true;
-                    StyleNode Style(0x3d0a);
+                    StyleNode Style(kTextStyleBodyHighlight);
                     AppendNodeClone(Rdl, Style);
                 }
                 else
                 {
-                    StyleNode Style(0x9ca4);
+                    StyleNode Style(kTextStyleBody);
                     AppendNodeClone(Rdl, Style);
                 }
             }
@@ -1178,7 +1179,7 @@ void NeuroNetStoryStar::RebuildHistoryText()
             if (Entry->MadLibId == kIdsLogHeading)
             {
                 bHeading = true;
-                StyleNode Style(0x3d0a);
+                StyleNode Style(kTextStyleBodyHighlight);
                 AppendNodeClone(Rdl, Style);
             }
 

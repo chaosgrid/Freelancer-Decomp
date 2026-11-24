@@ -12,7 +12,7 @@
 #include "common_goods.h"
 #include "common_physys.h"
 #include "common_iface.h"
-#include "common_universe.h" // Universe::ISystem (CmnCobject::GetObjectDbCollisionGroup)
+#include "common_universe.h" // Universe::ISystem (CmnCobject::GetObjectDbSystemId)
 #include "common_misc.h"     // Heap (CObject::operator new/delete pools)
 
 #include "DALib.h"
@@ -129,7 +129,7 @@ namespace CmnCobject
     // The system id: IObjDB slot 2 (GetZoneDb) then ISystem slot 0 (SYSTEM 062969c0, +0x4c),
     // both __thiscall with no arguments. Inlined in the init_physics of CGuided, CMine,
     // CCounterMeasure, CLoot, CShip and CSolar; none tests the database or the system for null.
-    unsigned GetObjectDbCollisionGroup(IObjDB* Db)
+    unsigned GetObjectDbSystemId(IObjDB* Db)
     {
         Universe::ISystem const* const System = Db->GetZoneDb();
         return System->GetId();
@@ -170,7 +170,7 @@ CObject::CObject(Class ObjectClass)
     PhyPart = nullptr;
     SurfaceManager = nullptr;
     GolemController = nullptr;
-    PhysicsControlMode = 0;
+    PhysicsControlMode = PhySys::ANIM_TECHNIQUE_NONE;
     CollisionStateMgr = nullptr;
     Archetype = nullptr;
     RefCount = 0;

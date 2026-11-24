@@ -11,6 +11,7 @@
 #include "common_goods.h"
 #include "Archetypes/common_goods_internal.h" // kPathChars, MallocCopy
 #include "msvcrt_compat.h"         // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
+#include "Core/msvcrt_atof.h"      // MsvcrtAtof
 #include "thorn_iface.h"
 #include "common_fuses.h"   // PetalInterfaceDatabase::get_category (prop categories)
 #include "common_id.h"
@@ -65,33 +66,33 @@ namespace
         {
             if (Reader.is_value("color"))
             {
-                Set.Param0 = Reader.get_value_float(0);
-                Set.Param1 = Reader.get_value_float(1);
-                Set.Param2 = Reader.get_value_float(2);
+                Set.ColorR = Reader.get_value_float(0);
+                Set.ColorG = Reader.get_value_float(1);
+                Set.ColorB = Reader.get_value_float(2);
             }
             else if (Reader.is_value("icolor"))
             {
                 // Values 0 and 1 are rounded to float before the multiply; value 2 is still
                 // the unrounded x87 result when its multiply runs (value_num).
-                Set.Param0 = Reader.get_value_float(0) * kByteToUnit;
-                Set.Param1 = Reader.get_value_float(1) * kByteToUnit;
-                Set.Param2 = static_cast<float>(Reader.value_num(2) * static_cast<double>(kByteToUnit));
+                Set.ColorR = Reader.get_value_float(0) * kByteToUnit;
+                Set.ColorG = Reader.get_value_float(1) * kByteToUnit;
+                Set.ColorB = static_cast<float>(Reader.value_num(2) * static_cast<double>(kByteToUnit));
             }
             else if (Reader.is_value("scale"))
             {
-                Set.Param3 = Reader.get_value_float(0);   // +0x0c
+                Set.Scale = Reader.get_value_float(0);   // +0x0c
             }
             else if (Reader.is_value("gap"))
             {
-                Set.Param4 = Reader.get_value_float(0);   // +0x10
+                Set.Gap = Reader.get_value_float(0);   // +0x10
             }
             else if (Reader.is_value("blink"))
             {
-                Set.Param5 = Reader.get_value_float(0);   // +0x14
+                Set.Blink = Reader.get_value_float(0);   // +0x14
             }
             else if (Reader.is_value("endpause"))
             {
-                Set.Param6 = Reader.get_value_float(0);   // +0x18
+                Set.EndPause = Reader.get_value_float(0);   // +0x18
             }
             else if (Reader.is_value("hardpoint"))
             {
@@ -112,7 +113,7 @@ namespace
             else if (bAcceptNumLights && Reader.is_value("numlights"))
             {
                 // Line blocks only. +0xe24, truncated from the unrounded x87 value.
-                Set.NumLightsAlt = static_cast<long>(Reader.value_num(0));
+                Set.NumLineLights = static_cast<long>(Reader.value_num(0));
             }
             // Retail's final else calls get_file_name and discards the result (a gutted
             // diagnostic).
@@ -124,9 +125,9 @@ char const* __cdecl ThornGetUserString(IScriptEngine* Engine, int Index, char co
 {
     // 0627bc60: slot 7 (+0x1c, entity name by index), slot 33 (+0x84, user property). No null
     // test on anything.
-    void* EntityName = Engine->Slot7EntityHandle(Index);
+    void* EntityName = Engine->GetEntityHandle(Index);
     char* Out = nullptr;
-    GENRESULT Cr = Engine->Slot33UserProp(EntityName, Key, &Out);
+    GENRESULT Cr = Engine->GetUserProp(EntityName, Key, &Out);
     if (Cr != 0)
         return nullptr;
     return Out;
@@ -148,7 +149,7 @@ bool __cdecl ThornGetUserFloat(IScriptEngine* Engine, int Index, char const* Key
     char const* Text = ThornGetUserString(Engine, Index, Key);
     if (Text == nullptr)
         return false;
-    *Out = static_cast<float>(atof(Text));
+    *Out = static_cast<float>(MsvcrtAtof(Text)); // MSVCRT.DLL atof, IAT 063992f0
     return true;
 }
 
@@ -198,7 +199,7 @@ IScriptEngine* __cdecl ThornScriptLoad(char const* Path)
     if (Filesys != nullptr)
     {
         // Slot 4 (+0x10) hands the script file to the engine.
-        Engine->Slot4Load(Filesys);
+        Engine->Load(Filesys);
         DAEngine_release_filesystem(&Filesys);
         return Engine;
     }
@@ -229,19 +230,19 @@ Csys __cdecl ThornScriptGetCsys(IScriptEngine* Engine, char const* ActorName)
     if (Engine == nullptr)
         return Out;
 
-    int const Count = static_cast<int>(Engine->Slot6EntityCount());
+    int const Count = static_cast<int>(Engine->GetEntityCount());
     int Index = 0;
     for (Index = 0; Index < Count; ++Index)
     {
-        ThornEntity const* const Entity = static_cast<ThornEntity const*>(Engine->Slot9Entity(Index));
+        ThornEntity const* const Entity = static_cast<ThornEntity const*>(Engine->GetEntityDesc(Index));
         if (Entity == nullptr || Entity->Type != kThornEntityDeformable)
             continue;
 
         float const FloorHeight = Entity->FloorHeight; // +0x44
-        void* const Name = Engine->Slot7EntityHandle(Index);
+        void* const Name = Engine->GetEntityHandle(Index);
         char* Value = nullptr;
         char const* Actor = nullptr;
-        if (Engine->Slot33UserProp(Name, "actor", &Value) == 0)
+        if (Engine->GetUserProp(Name, "actor", &Value) == 0)
             Actor = Value;
 
         bool bMatch = false;
@@ -378,11 +379,11 @@ void RoomData::read_set_script(char const* RelPath)
     if (Engine == nullptr)
         return;
 
-    int const EntityCount = static_cast<int>(Engine->Slot6EntityCount());
+    int const EntityCount = static_cast<int>(Engine->GetEntityCount());
     int Index = 0;
     for (Index = 0; Index < EntityCount; ++Index)
     {
-        ThornEntity const* const Entity = static_cast<ThornEntity const*>(Engine->Slot9Entity(Index));
+        ThornEntity const* const Entity = static_cast<ThornEntity const*>(Engine->GetEntityDesc(Index));
         Csys Frame;
         CsysFromPosOrient(Frame, Entity->Pos, Entity->Orient);
         char const* const Template = Entity->TemplateName;

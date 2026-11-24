@@ -49,30 +49,16 @@ struct IVP_U_Point
         k[2] = p->k[2];
     }
 
-    void mult(const IVP_U_Point *p, float f)
-    {
-        k[0] = p->k[0] * f;
-        k[1] = p->k[1] * f;
-        k[2] = p->k[2] * f;
-    }
-
-    float dot_product(const IVP_U_Point *p) const
-    {
-        return k[0] * p->k[0] + k[1] * p->k[1] + k[2] * p->k[2];
-    }
-
-    void add_mult(const IVP_U_Point *v1, const IVP_U_Point *v2, float f)
-    {
-        k[0] = v1->k[0] + v2->k[0] * f;
-        k[1] = v1->k[1] + v2->k[1] * f;
-        k[2] = v1->k[2] + v2->k[2] * f;
-    }
-
+    // FUN_0628bea0: this = v1 - v2, one rounding per component; every operand is read
+    // before the first store.
     void subtract(const IVP_U_Point *v1, const IVP_U_Point *v2)
     {
-        k[0] = v1->k[0] - v2->k[0];
-        k[1] = v1->k[1] - v2->k[1];
-        k[2] = v1->k[2] - v2->k[2];
+        const float Y = v1->k[1] - v2->k[1];
+        const float Z = v1->k[2] - v2->k[2];
+        const float X = v1->k[0] - v2->k[0];
+        k[0] = X;
+        k[1] = Y;
+        k[2] = Z;
     }
 
     // The cross product is IVP_CalcCrossProduct below (FUN_0628bed0).

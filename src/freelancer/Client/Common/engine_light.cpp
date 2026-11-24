@@ -418,11 +418,11 @@ void EngineLightSetTransform(FEngineLight* Light, float const* Orient9, float co
     EngineLightSetOrientation(Light, Orient9);
 }
 
-void EngineLightSetType(FEngineLight* Light, int LightType, bool Bit0)
+void EngineLightSetType(FEngineLight* Light, int LightType, bool bDynamic)
 {
     // FUN_004110c0 (thiscall, RET 8): the argument's bit 0 into Flags bit 0, then the type
     // switch. No null test.
-    Light->Flags = static_cast<unsigned char>((Light->Flags & 0xfeu) | (Bit0 ? 1u : 0u));
+    Light->Flags = static_cast<unsigned char>((Light->Flags & 0xfeu) | (bDynamic ? 1u : 0u));
     StoreType(Light, LightType, true);
 }
 

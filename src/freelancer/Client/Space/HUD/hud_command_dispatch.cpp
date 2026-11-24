@@ -228,7 +228,7 @@ int HudDispatchCommand(unsigned MsgId, int Mode)
     // Mode 1, USER_CANCEL (0xf), a key-down event and a non-empty cancel stack (DAT_0067c274).
     if (Mode != 1 || MsgId != 0xfu)
         return 0;
-    if (G_HudCmdRecord.Byte18 == 0)
+    if (G_HudCmdRecord.bKeyDown == 0)
         return 0;
     if (G_HudCmdCancelCount <= 0)
         return 0;
@@ -258,7 +258,7 @@ int HudPostCommand(unsigned MsgId, int bSkipMods)
             Mods = Mods | 0x10u;
 
         G_HudCmdRecord.Modifiers = Mods;
-        G_HudCmdRecord.Byte18 = 1;
+        G_HudCmdRecord.bKeyDown = 1;
     }
 
     return HudDispatchCommand(MsgId, 0);

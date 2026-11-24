@@ -191,7 +191,6 @@ public:
     // 10/11 (LAB_06f38950 / LAB_06f38a80), and so the serializer, read these.
     float LoadPos[3];
     float LoadOrient[9];
-    void* EngineObj;
     FThornCsys* ParentCsys;
     int BindState;
     unsigned char bBound;
@@ -257,20 +256,15 @@ public:
     std::size_t PathTypeCapacity;
     const char* MotionPathBoundType; // Retail +0xe4: constructor cache of PathType.
     char* PathData;
-    int SceneUpAxis;
-    int SceneFrontAxis;
     int SceneAmbient[3];
-    int SceneFogMask;
-    // Entity +0x11c: the 15-dword scene blob (ambient 0..2, up/front axes 5/6,
-    // the 8-dword fog block at [7] = +0x138).
-    unsigned int SceneFogPacked[15];
-    int SceneStartTime;
-    float SceneReverb[4];
-    int SceneReverbMask;
-    // FUN_06f431d0 mirrors packed words 5/6 (+0x130/+0x134, the up/front
-    // axes) through these; the scene binds them to its own axis fields.
-    unsigned int* SceneFogOutputA;
-    unsigned int* SceneFogOutputB;
+    // Entity +0x11c: the live 15-dword scene blob (ambient 0..2, up/front axes
+    // 5/6, the 8-dword fog block at [7] = +0x138); Snap.SceneBlob is the
+    // descriptor's copy.
+    unsigned int LiveSceneBlob[15];
+    // FUN_06f431d0 mirrors blob words 5/6 (+0x130/+0x134, the up/front axes)
+    // through these; the scene binds them to its own axis fields.
+    unsigned int* UpAxisSink;
+    unsigned int* FrontAxisSink;
 };
 
 class FThornScene;
@@ -416,16 +410,10 @@ public:
     // FUN_06f43af0: START_MOTION descriptor.
     void ApplyMotionDesc(const void* Desc);
 
-    // Payload steps for camera, PSYS, fog and reverb; DescriptorType keeps the
-    // retail type-mismatch branch. The *Payload helpers have no callers.
-    void ApplyCameraPropAnimPayload(int DescriptorType, int Mask, const float* Target4);
-    void ApplyPsysPropAnimPayload(int DescriptorType, int Mask, float Target);
+    // FUN_06f48cc0 / FUN_06f49150: types 16 / 17, mask plus eight / four words
+    // after the common eleven.
     void ApplyFogPropAnimDesc(const void* DescIn);
     void ApplyReverbPropAnimDesc(const void* DescIn);
-    void ApplyFogPropAnimPayload(int DescriptorType, int Mask, const FThornFog8* Target);
-
-    // FUN_06f49150: type 17, mask plus four words after the common eleven.
-    void ApplyReverbPropAnimPayload(int DescriptorType, int Mask, const FThornReverb4* Target4);
 
     FThornCsys* ParentCsys;
     unsigned char bOwnsParentCsys;

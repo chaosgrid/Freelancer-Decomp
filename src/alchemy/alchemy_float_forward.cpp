@@ -53,13 +53,13 @@ namespace AlchemyImpl
     __declspec(noinline) GENRESULT ForwardEmitterPad46(
         IGenericFx* Appearance, const float* Six, const float& AgeOffset, const float& LifeSpan)
     {
-        return Appearance->Pad46(Six, AgeOffset, LifeSpan);
+        return Appearance->TestParticleSpawn(Six, AgeOffset, LifeSpan);
     }
 
     __declspec(noinline) GENRESULT ForwardEmitterPad47(
         IGenericFx* Appearance, const float* Six, const float& AgeOffset, const float& LifeSpan)
     {
-        return Appearance->Pad47(Six, AgeOffset, LifeSpan);
+        return Appearance->SpawnParticle(Six, AgeOffset, LifeSpan);
     }
 
     // LAB_0621f7f0: node+0x64, with the original argument.

@@ -10,22 +10,10 @@
 // CruiseBehavior; layout notes are in common_cruisebehavior.h.
 
 // ----------------------------------------------------------------------------
-// FUN_062ce360. Only FUN_062d2020 (ConstructBase) and the vptr; no own field is written.
+// FUN_062ce360. Only FUN_062d2020 (Behavior's ctor) and the vptr; no own field is written.
 CruiseBehavior::CruiseBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)   // deviation: retail leaves this unset until SetContext()
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , OwnerContextPtr14(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime1c(0.0f)
-    , BehaviorMgrPtr20(nullptr)
-    , NavHelperPtr24(nullptr)
-    , Flags28(0)
-    , Flag29(0)
+    : Behavior(InTypeId)
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
 }
 
 // Slot 0 is FUN_062c7090, the scalar-deleting-dtor thunk shared by 7 vtables; no own cleanup.
@@ -43,13 +31,13 @@ bool CruiseBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 void CruiseBehavior::Engage()
 {
     Behavior::OnEngage();                                               // FUN_062d20d0
-    NavHelperPtr24->Thrust.engage_cruise(true);
+    SysMgr->Thrust.engage_cruise(true);
 }
 
 // Slot 4, FUN_062ce3a0.
 void CruiseBehavior::Disengage()
 {
-    NavHelperPtr24->Thrust.engage_cruise(false);
+    SysMgr->Thrust.engage_cruise(false);
     Behavior::OnDisengage();                                               // FUN_062d20f0
 }
 
@@ -57,14 +45,14 @@ void CruiseBehavior::Disengage()
 int CruiseBehavior::SetModeFromFlags()
 {
     int const Mode = (Flag29 != 0) ? 3 : 1;
-    ModeSelector0xc = Mode;
+    Readiness = Mode;
     return Mode;
 }
 
 // Slot 7, LAB_062ce3e0.
 int CruiseBehavior::Update()
 {
-    UpdateResult10 = (OwnerContextPtr14 != nullptr) ? 1 : 3;
-    return UpdateResult10;
+    UpdateResult = (OwnerContext != nullptr) ? 1 : 3;
+    return UpdateResult;
 }
 

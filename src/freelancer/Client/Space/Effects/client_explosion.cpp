@@ -314,9 +314,9 @@ void Action_Explode::Shatter()
             Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
             Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
             Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-            Parms.CollisionGroupId = 0;
+            Parms.SystemId = 0;
             Parms.Type = 2;
-            Parms.bFlag1c = 0;
+            Parms.bPhysicalUnmoveable = 0;
             Parms.bEnableCollisions = 1;
             Parms.bHasInertia = 0;
             Parms.Inertia.x = 0.0f;
@@ -325,7 +325,7 @@ void Action_Explode::Shatter()
             Parms.Name[0] = '\0';
             Vector MassCenter;
             Parms.Mass = Piece->get_physical_radius_r(MassCenter) * kPieceMassPerRadius;
-            Parms.CollisionGroupId = StarSysGetActiveSystemId();
+            Parms.SystemId = StarSysGetActiveSystemId();
             // The exploding object's collision group copied into the name (an inline strcpy,
             // no length limit).
             char const* Group = PhySys::GetCollisionGroup(NarrowGameobjObject(Gameobj, 1u));

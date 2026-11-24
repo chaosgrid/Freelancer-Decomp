@@ -40,29 +40,29 @@ bool RemovePlayerEquipRetail(unsigned char UnusedFlag, unsigned short Id, int Co
 // (FUN_00446be0 / FUN_004477d0). Callers: IClient slots 26 and 86.
 void AddPlayerEquipRetail(unsigned char UnusedFlag, EquipDesc const* Desc);
 std::list<CollisionGroupDesc>& GetPlayerCollisionGroupListRetail(); // FUN_004c3f00
-unsigned const* GetPlayerRepVibeScratchRetail();    // FUN_004c3de0 → &DAT_006728e4
-int GetPlayerRepVibeScratchCountRetail();           // count at DAT_00672914
-unsigned const* GetPlayerRepVibeScratchTailRetail(); // up to 8 rank/accessory dwords after header
-unsigned GetPlayerSpawnScratchScalarRetail();       // FUN_004c4650 → DAT_00673360
-int GetPlayerSpawnSystemIdRetail();                 // FUN_004c4670 → DAT_0061226c
+// The comm Costume DAT_006728e4 (FUN_004c3de0 hands out its address): the four part ids, the
+// accessory count (+0x30, DAT_00672914) and the accessory ids (+0x10).
+unsigned const* GetPlayerComCostumePartsRetail();      // FUN_004c3de0 → &DAT_006728e4
+int GetPlayerComCostumeAccessoryCountRetail();         // DAT_00672914
+unsigned const* GetPlayerComCostumeAccessoriesRetail(); // DAT_006728f4
+unsigned GetPlayerVoiceIdRetail();                  // FUN_004c4650 → DAT_00673360
+int GetPlayerRepVibeRetail();                       // FUN_004c4670 → DAT_0061226c
 float GetPlayerHealthScaleRetail();                 // FUN_004c4f70 → DAT_00673380
 int GetPlayerRankLevelRetail();                     // FUN_004c55d0 → DAT_0067338c
 void SetPlayerRankLevelRetail(int Level);           // FUN_004c55e0 → DAT_0067338c
 unsigned GetPlayerCreditsRetail();                  // FUN_004c4ce0 → DAT_00673364
 unsigned GetPlayerStarSystemIdRetail();             // FUN_004c4830 → DAT_00673354
 unsigned GetPlayerBaseIdRetail();                   // DAT_00673358 (FUN_004c4910)
-unsigned GetPlayerFactionScratchRetail();           // DAT_0067335c (FUN_004c4a10)
+unsigned GetPlayerLocationIdRetail();               // FUN_004c4a00 → DAT_0067335c
 
 // --- Setters / sync (CharacterSelect field extractors) ---
 void SetPlayerShipArchetypeIdRetail(unsigned ShipArchId); // FUN_004c3e20
 void SyncPlayerEquipDescListRetail(EquipDescList const& Source); // FUN_004c4070
 void SyncPlayerCollisionGroupListRetail(std::list<CollisionGroupDesc> const& Source); // FUN_004c3f30
-void SetPlayerRepRankBufferRetail(unsigned const* SourceHeader4, int Count,
-                                  unsigned const* TailDwords); // FUN_004c3d20
-void SetPlayerRepVibeScratchRetail(unsigned const* SourceHeader4, int Count,
-                                   unsigned const* TailDwords); // FUN_004c3d80
-void SetPlayerSpawnScratchScalarRetail(unsigned Value); // FUN_004c4660
-void SetPlayerSpawnSystemIdRetail(int SystemId);        // FUN_004c4680
+void SetPlayerBaseCostumeRetail(Costume const& Source); // FUN_004c3d20 → DAT_00672918
+void SetPlayerComCostumeRetail(Costume const& Source);  // FUN_004c3d80 → DAT_006728e4
+void SetPlayerVoiceIdRetail(unsigned VoiceId);          // FUN_004c4660
+void SetPlayerRepVibeRetail(int Vibe);                  // FUN_004c4680
 void SetPlayerHealthScaleRetail(float Scale);           // FUN_004c4f80
 void SetPlayerCreditsRetail(unsigned Credits, int bFromCharacterSelect); // FUN_004c4cf0
 void SetPlayerNumKillsRetail(unsigned Kills);           // FUN_004c4d70 → DAT_00673368
@@ -70,7 +70,7 @@ void SetPlayerMissionSuccessesRetail(unsigned Successes); // FUN_004c4d80 → DA
 void SetPlayerMissionFailuresRetail(unsigned Failures); // FUN_004c4d90 → DAT_00673370
 void SetPlayerStarSystemIdRetail(unsigned SystemId);    // FUN_004c4840
 void SetPlayerBaseIdRetail(unsigned BaseId);            // FUN_004c4910
-void SetPlayerFactionScratchRetail(unsigned Value);     // FUN_004c4a10
+void SetPlayerLocationIdRetail(unsigned LocationId);    // FUN_004c4a10
 
 // The player ship's last position (DAT_006732e4, 3 floats) and orientation (DAT_006732c0,
 // 9 floats), refreshed every space frame from the watched ship.
@@ -98,7 +98,8 @@ void CharacterSelect_ReceiveCharacterInfo(CCharacterSet const& Set);
 OwnerList<CCharacterSet::CharacterInfo>& CharacterSelect_GetConnectCharacters();
 
 // FUN_005ab380 after the completion flag (CLoginMgr::OnCharacterSelectResponse sets it):
-// spawn system id, Reputation::Vibe::SetClientID (multiplayer only), two scratch dwords.
+// the player's reputation vibe, Reputation::Vibe::SetClientID (multiplayer only), the client
+// clock.
 void NotifyCharacterSelectComplete(unsigned const Response4[4]);
 
 // DAT_006732f0 -- the name of the selected character (wcscpy'd by FUN_005ab250; read by

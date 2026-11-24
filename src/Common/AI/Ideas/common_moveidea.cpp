@@ -214,13 +214,13 @@ int MoveIdea::Update(float DeltaTime)
 
         if (StopStyle == 0)
         {
-            Speed = Behavior_QueryFixedFalloffEffect(Object, Magnitude);   // FUN_062e5ab0
+            Speed = Behavior_GetCoastDistance(Object, Magnitude);   // FUN_062e5ab0
         }
         else
         {
             // FUN_062e58f0(Object, -1.0f, Magnitude, 0.0f, Type).
             ThrustEquipType const Type = (Mode == 1) ? ThrustEquipTradelane : ThrustEquipEngine;
-            Speed = Behavior_QueryFalloffEffect(ObjInspectOf(Object), -1.0f, Magnitude, 0.0f, Type);
+            Speed = Behavior_GetDistanceTravelled(ObjInspectOf(Object), -1.0f, Magnitude, 0.0f, Type);
         }
     }
 
@@ -552,7 +552,7 @@ void MoveIdea::SetThrottleScale(float Value)
     }
     }
 
-    Throttle = Behavior_InvokeManagerSlotD4(ObjInspectOf(Object), Value, Type);
+    Throttle = Behavior_GetProjectedThrottle(ObjInspectOf(Object), Value, Type);
 }
 
 // Folded at .text:062d88b0 -- `MOV [ECX+0x44],EAX; RET 4`. Takes an int: every

@@ -21,37 +21,11 @@ namespace AlchemyImpl
         return Filesys->OpenNode(Name);
     }
 
-    // OpenByDesc opens the same-named data leaf inside the entered directory
-    // (UTF layout: \AlchemyNodeLibrary\AlchemyNodeLibrary).
-    bool FAleChunk::OpenNamedChunk(IFileSystem* Fs, const char* Name, unsigned char bWrite)
+    // IFileSystem +0x54 (name, 0): the savers create the directory before entering it
+    // (effect library FUN_06220140 at 0622016c).
+    void FAleChunk::CreateNode(const char* Name)
     {
-        bEntered_ = 0;
-        Filesys = Fs;
-        if (Fs == nullptr || Name == nullptr)
-            return false;
-        const int Entered = OpenNode(Name);
-        if (Entered == 0)
-            return false;
-        bEntered_ = 1;
-        if (OpenChunk(Fs, Name, bWrite))
-            return true;
-        OpenNode(kAleLeaveNode);
-        bEntered_ = 0;
-        return false;
-    }
-
-    void FAleChunk::LeaveNamedNode()
-    {
-        if (bEntered_ != 0)
-        {
-            OpenNode(kAleLeaveNode);
-            bEntered_ = 0;
-        }
-    }
-
-    void FAleChunk::DeleteNode(const char* Name)
-    {
-        Filesys->RejectOperation54(Name, 0);
+        Filesys->CreateNode(Name, 0);
     }
 
     bool FAleChunk::OpenChunk(IFileSystem* Fs, const char* Name, unsigned char bWrite)

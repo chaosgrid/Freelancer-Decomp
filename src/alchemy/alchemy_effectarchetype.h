@@ -63,7 +63,11 @@ namespace AlchemyImpl
         GENRESULT DACOM_API GetHeader16(unsigned char* Out16) override;
         GENRESULT DACOM_API SetHeader16(const unsigned char* Header16) override;
 
-        GENRESULT DACOM_API Slot20(void* /*Arg*/) override { return ResetRecords(); }
+        GENRESULT DACOM_API Initialize(AGGDESC* /*Desc*/) override
+        {
+            ResetRecords();
+            return GR_OK;
+        }
 
     private:
         void AppendRec16(const FAleRec16& Record);

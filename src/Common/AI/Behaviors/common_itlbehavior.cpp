@@ -8,20 +8,13 @@
 #include "common_cobject.h"  // CObject::ObjectClass, CShip::request_exit_tradelane
 #include "common_systemmanager.h"  // SystemManager::Thrust -- TurnOff
 
-// The ctor FUN_062cee50 first runs FUN_062d2020 with its own type-id argument.
-InstantTradeLaneBehaviorFields::InstantTradeLaneBehaviorFields(int InTypeId)
-    : TypeId(InTypeId)
-{
-    ConstructBase(InTypeId);   // FUN_062d2020
-}
-
-// FUN_062cee50. Deviation: retail installs the two vtables and writes nothing else; the port
-// zero-initialises every field.
+// FUN_062cee50. Behavior's ctor FUN_062d2020 runs first. Deviation: retail then installs the
+// two vtables and writes nothing else; the port zero-initialises every field.
 InstantTradeLaneBehavior::InstantTradeLaneBehavior(int InTypeId)
-    : InstantTradeLaneBehaviorFields(InTypeId)
+    : Behavior(InTypeId)
     , State30(0)
-    , SubObjPtr34(nullptr)
-    , LanePtr38(nullptr)
+    , EntranceRing(nullptr)
+    , ExitRing(nullptr)
     , LaneStart3c()
     , LaneEnd48()
     , Flags54(0)
@@ -48,8 +41,8 @@ bool InstantTradeLaneBehavior::SetContext(void* Param1, void* Param2, void* Para
         Flag55 = 0;
         Flag56 = 0;
         Flags54 = 0;
-        SubObjPtr34 = nullptr;
-        LanePtr38 = nullptr;
+        EntranceRing = nullptr;
+        ExitRing = nullptr;
         LaneSpeed = 0;
     }
 
@@ -59,19 +52,19 @@ bool InstantTradeLaneBehavior::SetContext(void* Param1, void* Param2, void* Para
 // Slot 3, FUN_062cef10.
 void InstantTradeLaneBehavior::TurnOff()
 {
-    if (TargetPtr14 == nullptr)
+    if (OwnerContext == nullptr)
         return;
-    SetCruiseLock(0, 3);                                                    // FUN_062d21d0
+    SetAvoidanceAllowed(0, 3);                                                    // FUN_062d21d0
     State30 = 0;
     Behavior::OnEngage();
-    NavHelperPtr24->Thrust.engage_cruise(false);
+    SysMgr->Thrust.engage_cruise(false);
 }
 
 // Slot 4, FUN_062cef40.
 void InstantTradeLaneBehavior::RequestExitTradeLane()
 {
     // The null test gates the whole body, tail included.
-    if (TargetPtr14 == nullptr)
+    if (OwnerContext == nullptr)
         return;
 
     bool const bWasStatusSet = (Flags54 != 0);
@@ -83,7 +76,7 @@ void InstantTradeLaneBehavior::RequestExitTradeLane()
     {
         Flags54 = 0;
 
-        CObject const* const Obj = TargetPtr14->cobject();
+        CObject const* const Obj = OwnerContext->cobject();
 
         CShip* Ship = nullptr;
         if (Obj != nullptr && (Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
@@ -95,8 +88,8 @@ void InstantTradeLaneBehavior::RequestExitTradeLane()
     }
 
     Behavior::OnDisengage();
-    SubObjPtr34 = nullptr;
-    SetCruiseLock(0, 3);
+    EntranceRing = nullptr;
+    SetAvoidanceAllowed(0, 3);
 }
 
 // Slot 5, LAB_062ceeb0.
@@ -104,17 +97,17 @@ int InstantTradeLaneBehavior::UpdateMode()
 {
     int Mode = 2;
 
-    if (TargetPtr14 != nullptr)
+    if (OwnerContext != nullptr)
     {
         if (Flags54 != 0)
             Mode = 1;
 
-        if (SubObjPtr34 != nullptr)
+        if (EntranceRing != nullptr)
         {
             // Retail tests only the sign bit of the out-parameter's low byte (`TEST AL,AL;
             // JNS`); get_type's return value is discarded.
             unsigned SubObjectType = 0;
-            SubObjPtr34->get_type(SubObjectType);
+            EntranceRing->get_type(SubObjectType);
             if ((SubObjectType & 0x80u) != 0)
                 Mode = 1;
         }
@@ -123,7 +116,7 @@ int InstantTradeLaneBehavior::UpdateMode()
     if (Flag29 != 0)
         Mode = 3;
 
-    ModeSelector0xc = Mode;
+    Readiness = Mode;
     return Mode;
 }
 
@@ -133,38 +126,38 @@ int InstantTradeLaneBehavior::Update()
     // The exit-tradelane bit is already set.
     if (Flags28 & 0x1)
     {
-        UpdateResult10 = 2;
-        return UpdateResult10;
+        UpdateResult = 2;
+        return UpdateResult;
     }
 
-    if (TargetPtr14 == nullptr)
+    if (OwnerContext == nullptr)
     {
-        UpdateResult10 = 3;
-        return UpdateResult10;
+        UpdateResult = 3;
+        return UpdateResult;
     }
 
-    // States above 6 join case 1. The vtable calls below are on TargetPtr14 (ECX is never
+    // States above 6 join case 1. The vtable calls below are on OwnerContext (ECX is never
     // reloaded after the guard), not on this object.
     switch (State30)
     {
     case 0:
     {
-        if (LanePtr38 == nullptr)
+        if (ExitRing == nullptr)
         {
             IObjInspect const* OutLane = nullptr;
-            int const LaneResult = TargetPtr14->get_lane_start(
-                SubObjPtr34, OutLane, LaneStart3c, LaneEnd48);
+            int const LaneResult = OwnerContext->get_lane_start(
+                EntranceRing, OutLane, LaneStart3c, LaneEnd48);
 
             // Zero is success.
             if (LaneResult != 0)
             {
-                UpdateResult10 = 3;
+                UpdateResult = 3;
                 return 3;
             }
-            LanePtr38 = OutLane;
+            ExitRing = OutLane;
         }
 
-        UpdateResult10 = 1;
+        UpdateResult = 1;
         State30 = 3;
         Flag56 = 1;
         Flag55 = 0;
@@ -173,22 +166,22 @@ int InstantTradeLaneBehavior::Update()
 
     case 3:
     {
-        // IObjAffect slot 25 on TargetPtr14+4.
-        int const AffectResult = TargetPtr14->go_tradelane(SubObjPtr34, LanePtr38, true, LaneSpeed);
+        // IObjAffect slot 25 on OwnerContext+4.
+        int const AffectResult = OwnerContext->go_tradelane(EntranceRing, ExitRing, true, LaneSpeed);
 
         // Zero is success; the failure path still returns 1.
         if (AffectResult != 0)
         {
-            UpdateResult10 = 1;
+            UpdateResult = 1;
             State30 = 6;
             return 1;
         }
 
-        // FUN_062d4520 with Extra 0 and Duration 0.0f: TargetPtr14's formation followers get
+        // FUN_062d4520 with Extra 0 and Duration 0.0f: OwnerContext's formation followers get
         // notification 0 at once. No null test on the manager.
-        BehaviorMgrPtr20->QueueNotification(TargetPtr14, 0, 0.0f);
+        BehaviorMgr->QueueNotification(OwnerContext, 0, 0.0f);
 
-        UpdateResult10 = 0;
+        UpdateResult = 0;
         Flags54 = 1;
         State30 = 4;
         return 0;
@@ -203,8 +196,8 @@ int InstantTradeLaneBehavior::Update()
 
         Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
         OnDisengage();
-        BehaviorMgrPtr20->SetDirectiveResult(9, ManagerArg118);    // FUN_062d29a0
-        UpdateResult10 = 2;
+        BehaviorMgr->SetDirectiveResult(9, ManagerArg118);    // FUN_062d29a0
+        UpdateResult = 2;
         return 2;
     }
 
@@ -213,31 +206,32 @@ int InstantTradeLaneBehavior::Update()
     case 4:
     default:
         // Still running.
-        UpdateResult10 = 1;
+        UpdateResult = 1;
         return 1;
     }
 }
 
-// Slot 10, LAB_062cf0f0. Both lookups (FUN_062e74a0) go through the NavHelper (+0x24), not
+// Slot 10, LAB_062cf0f0. Both lookups (FUN_062e74a0) go through the SysMgr (+0x24), not
 // the manager at +0x20.
 bool InstantTradeLaneBehavior::AttachDirective(void* Directive)
 {
     Flags28 &= ~0x1;
 
-    char* const DirectiveBytes = static_cast<char*>(Directive);
-    SystemManagerTimerTable const* const LookupThis = &NavHelperPtr24->Timers;
+    pub::AI::DirectiveInstantTradelaneOp const* const Op =
+        static_cast<pub::AI::DirectiveInstantTradelaneOp const*>(Directive);
+    SystemManagerTimerTable const* const LookupThis = &SysMgr->Timers;
 
-    SubObjPtr34 = LookupThis->FindVerifiedObject((unsigned const*)(DirectiveBytes + 0xc));
-    LanePtr38 = LookupThis->FindVerifiedObject((unsigned const*)(DirectiveBytes + 0x10));
+    EntranceRing = LookupThis->FindVerifiedObject(&Op->TradeLaneId);
+    ExitRing = LookupThis->FindVerifiedObject(reinterpret_cast<unsigned const*>(&Op->ExitRingId));
 
-    LaneSpeed = *reinterpret_cast<float*>(DirectiveBytes + 0x14);
+    LaneSpeed = *reinterpret_cast<float const*>(&Op->LaneSpeed);   // float bits
 
-    if (SubObjPtr34 != nullptr)
+    if (EntranceRing != nullptr)
         Flags28 |= 0x2;
     else
         Flags28 &= ~0x2;
 
-    return SubObjPtr34 != nullptr;
+    return EntranceRing != nullptr;
 }
 
 // Slot 22, LAB_062cf1d0. Proceeds only for Tag 4 with a zero first payload byte.
@@ -249,18 +243,18 @@ void InstantTradeLaneBehavior::HandleTargetEvent(void* Event)
     if (Ev->Tag != 4 || Ev->Payload[0] != 0)                         // no null test
         return;
 
-    if (TargetPtr14->get_id() != *reinterpret_cast<unsigned const*>(Ev->Payload + 0xc))
+    if (OwnerContext->get_id() != *reinterpret_cast<unsigned const*>(Ev->Payload + 0xc))
         return;
 
-    // Set regardless of SubObjPtr34; its null test gates only the cancel below.
+    // Set regardless of EntranceRing; its null test gates only the cancel below.
     State30 = 5;
 
-    if (SubObjPtr34 == nullptr)
+    if (EntranceRing == nullptr)
         return;
 
     // Retail uses its own incoming parameter slot as the id scratch.
-    unsigned SavedId = SubObjPtr34->get_id();
-    (void)TargetPtr14->request_cancel(2, &SavedId, 0);
+    unsigned SavedId = EntranceRing->get_id();
+    (void)OwnerContext->request_cancel(2, &SavedId, 0);
 }
 
 // IObjAffect::RequestCB override, the secondary vtable's single slot (LAB_062cf150); retail
@@ -283,8 +277,8 @@ bool InstantTradeLaneBehavior::OnResult(int /*Param1*/, int /*Param2*/, int Para
     if (Flag56 != 0)
     {
         // Same (2, &SavedId, 0) shape as HandleTargetEvent; both calls unguarded in retail.
-        unsigned SavedId = SubObjPtr34->get_id();
-        (void)TargetPtr14->request_cancel(2, &SavedId, 0);
+        unsigned SavedId = EntranceRing->get_id();
+        (void)OwnerContext->request_cancel(2, &SavedId, 0);
 
         Flag55 = 0;
         Flag56 = 0;

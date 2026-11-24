@@ -155,7 +155,7 @@ namespace
             ShutdownServerConnection();      // FUN_005a8260
             ResetMissionOfferAnswerRetail(); // FUN_004c55b0
             G_LoginMgr.Reset();              // FUN_005a9300
-            Nav.Flag20c = 0;
+            Nav.bHasCharacterPick = 0;
             Nav.PrevState = 0;
 
             // Latch DAT_0067c1fc = request DAT_0067c200, request = 0.
@@ -200,8 +200,8 @@ namespace
 
                 MouseSetCursor("Arrow", true);   // FUN_0041dde0
                 SetClientMouseCursorDrawFlag(1); // FUN_0041dda0
-                Nav.Flag22c = 0;
-                Nav.Field230 = 0.0f;
+                Nav.bLoadingScreenSettled = 0;
+                Nav.ScriptTimeRemainder = 0.0f;
                 SetClientAudioMode(3);           // FUN_00428030
                 SetFadeImmediate(1.0f);          // FUN_00412070
                 // FUN_00412050(0, (float)(1.0 / DAT_0061650c)).
@@ -209,7 +209,7 @@ namespace
                               static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
                 // FUN_004564d0 on DAT_0066d2d0 -- the Gf script manager takes id 0xf.
                 G_GfScriptManager.RegisterEvents();
-                Nav.Field230 = 0.0f;
+                Nav.ScriptTimeRemainder = 0.0f;
                 ResetClientLocationController(); // FUN_00439200 on DAT_00668708
                 EnterClientLocationBase(BaseId); // FUN_0043b290
                 NavBarDestroy();                 // FUN_00442130
@@ -255,17 +255,17 @@ namespace
                   "IntroFocus +0x08 previous state");
     static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.CharacterId) == 0x0c,
                   "IntroFocus +0x0c CHARACTER_ID");
-    static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.Flag20c) == 0x20c,
+    static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.bHasCharacterPick) == 0x20c,
                   "IntroFocus +0x20c");
     static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.LogoImage) == 0x210,
                   "IntroFocus +0x210 logo Image");
     static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.ActivePage) == 0x228,
                   "IntroFocus +0x228 active page");
-    static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.Flag22c) == 0x22c,
+    static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.bLoadingScreenSettled) == 0x22c,
                   "IntroFocus +0x22c");
-    static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.Flag22d) == 0x22d,
+    static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.bFromMultiplayer) == 0x22d,
                   "IntroFocus +0x22d");
-    static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.Field230) == 0x230,
+    static_assert(sizeof(void*) != 4 || offsetof(IntroFocus, Nav.ScriptTimeRemainder) == 0x230,
                   "IntroFocus +0x230");
 
     // The previous state's slot 13 as every case of FUN_005b2a30 sends it.

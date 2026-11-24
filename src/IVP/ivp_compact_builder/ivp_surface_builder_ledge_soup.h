@@ -30,9 +30,10 @@ struct IVP_U_Matrix;               // ivp_math.h
 //
 // Layout from the ctor (0x6369e70, zeroes 0x94 bytes) and dtor (0x6369f20).
 // The six 8-byte {word cap, word count, elems} headers are IVP_U_Vector<T>.
-//   m_Ledges  (A): the inserted ledges.
-//   m_VectorB/C/F: BuildNode lists. B's only writer is FUN_0636a1e0 (the
-//     options[0] root hull), so it is always empty in retail.
+//   m_Ledges: the inserted ledges.
+//   m_LeafNodes / m_AllNodes / m_HullNodes: BuildNode lists (one leaf per
+//     ledge; every node, owning; the root hull). m_HullNodes' only writer is
+//     FUN_0636a1e0 (the options[0] root hull), so it is always empty in retail.
 //   m_VectorD/E: never read or written by any code in the class; element type
 //     unknown.
 class IVP_SurfaceBuilder_Ledge_Soup
@@ -53,7 +54,7 @@ private:
 
     // Port-local name: the 0x28-byte node operator_new'd per inserted ledge
     // (leaf, FUN_0636a350) or per internal split (FUN_0636a860), held in
-    // m_VectorC / m_VectorF and compiled recursively by FUN_0636b5e0.
+    // m_LeafNodes / m_AllNodes and compiled recursively by FUN_0636b5e0.
     struct BuildNode
     {
         uint32_t ScratchIndex;  // +0x00: the node's 1-based slot in m_BuildTreeScratch (leaves only); never read.
@@ -138,8 +139,8 @@ private:
 
     void* m_BuildTreeScratch;                   // +0x14: calloc(n+1, sizeof(BuildTreeScratchEntry)) from BuildLeafNodes(); walked by CompileTree(), freed by FreeBuildState().
     IVP_U_Vector<IVP_Compact_Ledge> m_Ledges;   // +0x18: the inserted ledges.
-    IVP_U_Vector<BuildNode> m_VectorB;          // +0x20: always empty in retail (only writer: FUN_0636a1e0).
-    IVP_U_Vector<BuildNode> m_VectorC;          // +0x28
+    IVP_U_Vector<BuildNode> m_HullNodes;        // +0x20: always empty in retail (only writer: FUN_0636a1e0).
+    IVP_U_Vector<BuildNode> m_LeafNodes;        // +0x28: one leaf per ledge, appended by BuildLeafNodes().
     RawPoint3f m_BBoxMin;                       // +0x30: ctor sets 0x49742400 (1e6f) per axis; SplitBuildNodeList reuses it as scratch.
     RawPoint3f m_BBoxMax;                       // +0x40: ctor sets 0xc9742400 (-1e6f) per axis; same scratch reuse.
     int32_t m_SplitAxis;                        // +0x50: axis (0/1/2) of the largest bbox extent, set by BuildLeafNodes() only when m_LeafCount > 1; never read.
@@ -156,7 +157,7 @@ private:
 
     IVP_Compact_Ledgetree_Node* m_CompactNodeCursor; // +0x80: bump cursor into the blob's ledgetree node array; CompileNode() advances it by 0x1c.
     uint8_t m_Unknown84[0x8];                   // +0x84..+0x8b: unidentified.
-    IVP_U_Vector<BuildNode> m_VectorF;          // +0x8c: owns the BuildNodes (FreeBuildState frees them).
+    IVP_U_Vector<BuildNode> m_AllNodes;         // +0x8c: owns the BuildNodes (FreeBuildState frees them).
 
     // FUN_0636a720: AABB of a BuildNode list into caller-supplied outMin /
     // outMax (SplitBuildNodeList passes m_BBoxMin / m_BBoxMax as scratch).
@@ -185,8 +186,8 @@ private:
     // via CompileNode(), then clears the root index.
     void CompileTree();
 
-    // FUN_0636a2b0: frees m_VectorC's array (its nodes are shared with
-    // m_VectorF), every BuildNode in m_VectorF and its array, and
+    // FUN_0636a2b0: frees m_LeafNodes's array (its nodes are shared with
+    // m_AllNodes), every BuildNode in m_AllNodes and its array, and
     // m_BuildTreeScratch.
     void FreeBuildState();
 
@@ -216,10 +217,10 @@ private:
 
     // Retail FUN_0636a1e0: Compile()'s options[0] step - convex hull of every
     // ledge below the root build node, added to m_Ledges, stored as the
-    // root's ledge and queued in m_VectorB.
+    // root's ledge and queued in m_HullNodes.
     void BuildRootConvexHull();
 
-    // FUN_0636b520: walks m_VectorC then m_VectorB, copying each node's
+    // FUN_0636b520: walks m_LeafNodes then m_HullNodes, copying each node's
     // ledge into the blob via CopyLedgeIntoSurface() and repointing the
     // node at the copy; frees the source ledges when m_CompileOptions[1]
     // == 1 (the default), then clears m_Ledges.
@@ -281,18 +282,19 @@ private:
     static bool ComputeSurfaceMassProperties(const void* CompiledSurface,
                                               float outCenterOfMass[3], float outRotationInertia[3]);
 
-    // FUN_0635ac10 (cdecl, leaf, &com, &upper, &aux): folds the farthest
-    // vertex distance from com into *upper and, when the aux pointer is
+    // FUN_0635ac10 (cdecl, leaf, &com, &upper, &dev): folds the farthest
+    // vertex distance from com into *upper and, when the dev pointer is
     // non-null, the largest distance of a vertex from the line com + t*N of
-    // its triangle (N = FUN_0635b940) into *aux.
+    // its triangle (N = FUN_0635b940) into *dev -- the lever arm that bounds
+    // the normal speed of a rotating surface (Ipion's max_surface_deviation).
     static void AccumulateLeafLedgeRadii(const IVP_Compact_Ledge* leaf, const float centerOfMass[3],
-                                          float* upperLimitRadiusAccum, float* auxRadiusMetricAccum);
+                                          float* upperLimitRadiusAccum, float* maxSurfaceDeviationAccum);
 
-    // FUN_0635ada0 (cdecl, surface, &com, &upper, &aux): zeroes both
+    // FUN_0635ada0 (cdecl, surface, &com, &upper, &dev): zeroes both
     // outputs, collects the leaves (get_all_ledges into a {0x400} big
     // vector) and runs FUN_0635ac10 on each, descending. com is input only.
     static void ComputeSurfaceRadii(const void* CompiledSurface, const float centerOfMass[3],
-                                     float* outUpperLimitRadius, float* outAuxRadiusMetric);
+                                     float* outUpperLimitRadius, float* outMaxSurfaceDeviation);
 
     // FUN_0636b6a0: FUN_0636d650 + FUN_0635ada0, then com / inertia / upper
     // into the compiled surface header and a classification byte into the

@@ -1266,9 +1266,9 @@ namespace
         return &GRaymarchConstants[Index * 4];
     }
 
-    // The first [Clouds] block of the nebula (FNebulaClouds raw offsets, cli_nebula.cpp
-    // LocalNebulaCloudsParseIni): puff_radius +0xa8, puff_colora +0x78, puff_colorb +0x84,
-    // puff_drift +0xb0, puff_max_alpha +0xb4, near_fade_distance +0xe4 / +0xe8.
+    // The first [Clouds] block of the nebula (FNebulaClouds, cli_nebula.h): puff_radius,
+    // puff_colora / puff_colorb, puff_drift, puff_max_alpha, near_fade_distance.
+
     struct FCloudParams
     {
         float PuffRadius;
@@ -1295,19 +1295,18 @@ namespace
         FNebulaCloudsListNode* const Sentinel = Nebula->Clouds.Sentinel;
         if (Sentinel == nullptr || Sentinel->Next == Sentinel || Sentinel->Next->Clouds == nullptr)
             return;
-        unsigned char const* const C = Sentinel->Next->Clouds->Raw;
-        float Value = 0.0f;
-        memcpy(&Value, C + 0xa8, sizeof(float));
+        FNebulaClouds const* const C = Sentinel->Next->Clouds;
+        float const Value = C->PuffRadius;
         if (Value > 1.0f)
             Out->PuffRadius = Value;
-        memcpy(&Out->Drift, C + 0xb0, sizeof(float));
-        memcpy(&Out->MaxAlpha, C + 0xb4, sizeof(float));
-        memcpy(&Out->NearFadeA, C + 0xe4, sizeof(float));
-        memcpy(&Out->NearFadeB, C + 0xe8, sizeof(float));
+        Out->Drift = C->PuffDrift;
+        Out->MaxAlpha = C->PuffMaxAlpha;
+        Out->NearFadeA = C->NearFadeStart;
+        Out->NearFadeB = C->NearFadeEnd;
         float ColourA[3];
         float ColourB[3];
-        memcpy(ColourA, C + 0x78, sizeof(ColourA));
-        memcpy(ColourB, C + 0x84, sizeof(ColourB));
+        memcpy(ColourA, C->PuffColorA, sizeof(ColourA));
+        memcpy(ColourB, C->PuffColorB, sizeof(ColourB));
         if (ColourA[0] + ColourA[1] + ColourA[2] > 0.0f)
         {
             for (int Channel = 0; Channel < 3; ++Channel)
@@ -2135,7 +2134,7 @@ namespace
         double KeyDir[3] = {0.0, 1.0, 0.0};
         float KeyColour[3] = {0.0f, 0.0f, 0.0f};
         bool bStarKey = false;
-        const float Burn = Nebula->GetFloat2C4();
+        const float Burn = Nebula->GetSunBurnthroughIntensity();
         FStarSphereList* const Stars = StarSphereList();
         if (S.KeyLightSource < 0.5f && Stars != nullptr && Stars->Sentinel != nullptr &&
             Stars->Sentinel->Next != Stars->Sentinel && Stars->Sentinel->Next->Sphere != nullptr &&
@@ -2548,7 +2547,6 @@ namespace
     void ReadLightningSource(FNebulaEffect const* Nebula, FNebulaVolumeSettings const& S,
                              FLightningSource* Out)
     {
-        unsigned char const* const B = reinterpret_cast<unsigned char const*>(Nebula);
         Out->Gap = 0.0;
         Out->Duration = 0.0;
         Out->Intensity = 1.0f;
@@ -2556,14 +2554,11 @@ namespace
         FNebulaCloudsListNode* const Sentinel = Nebula->Clouds.Sentinel;
         if (Sentinel != nullptr && Sentinel->Next != Sentinel && Sentinel->Next->Clouds != nullptr)
         {
-            unsigned char const* const C = Sentinel->Next->Clouds->Raw;
-            float Gap = 0.0f;
-            float Duration = 0.0f;
-            float Intensity = 0.0f;
-            memcpy(&Gap, C + 0x9c, sizeof(float));
-            memcpy(&Duration, C + 0xa0, sizeof(float));
-            memcpy(&Intensity, C + 0xdc, sizeof(float));
-            memcpy(CloudColour, C + 0x90, sizeof(CloudColour));
+            FNebulaClouds const* const C = Sentinel->Next->Clouds;
+            float const Gap = C->LightningGap;
+            float const Duration = C->LightningDuration;
+            float const Intensity = C->LightningIntensity;
+            memcpy(CloudColour, C->LightningColor, sizeof(CloudColour));
             if (Gap > 0.0f && Duration > 0.0f)
             {
                 Out->Gap = (double)(Gap) / kCloudLightningSources;
@@ -2571,14 +2566,11 @@ namespace
                 Out->Intensity = Intensity > 0.0f ? Intensity : 1.0f;
             }
         }
-        float BackGap = 0.0f;
-        float BackDuration = 0.0f;
-        float BackIntensity = 0.0f;
-        float BackColour[3] = {0.0f, 0.0f, 0.0f};
-        memcpy(&BackGap, B + 0x250, sizeof(float));
-        memcpy(&BackDuration, B + 0x254, sizeof(float));
-        memcpy(BackColour, B + 0x25c, sizeof(BackColour));
-        memcpy(&BackIntensity, B + 0x268, sizeof(float));
+        float const BackGap = Nebula->BackLightningGap;
+        float const BackDuration = Nebula->BackLightningDuration;
+        float const BackIntensity = Nebula->BackLightningIntensity;
+        float BackColour[3];
+        memcpy(BackColour, Nebula->BackLightningColor, sizeof(BackColour));
         if (!(Out->Gap > 0.0) && BackGap > 0.0f && BackDuration > 0.0f)
         {
             Out->Gap = (double)(BackGap);
@@ -2591,10 +2583,9 @@ namespace
             Out->Duration = 0.4;
         }
 
-        float DynamicDuration = 0.0f;
-        float DynamicColour[3] = {0.0f, 0.0f, 0.0f};
-        memcpy(&DynamicDuration, B + 0x278, sizeof(float));
-        memcpy(DynamicColour, B + 0x280, sizeof(DynamicColour));
+        float const DynamicDuration = Nebula->DynLightningDuration;
+        float DynamicColour[3];
+        memcpy(DynamicColour, Nebula->DynLightningColor, sizeof(DynamicColour));
         float const* Tint = nullptr;
         bool bWhiten = true;
         if (ColourPeak(S.LightningColour) > 0.0f)
@@ -2948,12 +2939,8 @@ namespace
     {
         if (Nebula == nullptr)
             return nullptr;
-        unsigned char const* const B = reinterpret_cast<unsigned char const*>(Nebula);
-        FGameLight* Light = nullptr;
-        float Duration = 0.0f;
-        memcpy(&Light, B + 0x270, sizeof(Light));
-        memcpy(&Duration, B + 0x278, sizeof(float));
-        return Duration > 0.0f ? Light : nullptr;
+        return Nebula->DynLightningDuration > 0.0f ? Nebula->DynamicLight : nullptr;
+
     }
 
     // A lit GameLight (Flags bit 3) goes dark through its vtable slot 2, as retail does it.
@@ -3043,7 +3030,7 @@ namespace
         FNebulaEffect* Driven = nullptr;
         FVolumeEntry const* const ControllerEntry = FindEntry(GController);
         if (ControllerEntry != nullptr && ControllerEntry->bInside &&
-            GController->GetFloat294() >= 1.0f &&
+            GController->GetInsideFade() >= 1.0f &&
             ControllerEntry->Settings.LightningEnabled > 0.5f &&
             ControllerEntry->Settings.LightningLightsShips > 0.5f &&
             RetailNebulaLight(GController) != nullptr)
@@ -3422,7 +3409,7 @@ namespace
             FNebulaVolumeSettings const& Settings = SettingsFor(Nebula);
             if (!(Settings.Enabled > 0.5f))
                 continue;
-            const bool bInside = Nebula->GetFloat294() > 0.0f;
+            const bool bInside = Nebula->GetInsideFade() > 0.0f;
             // The drawn bound is the halo's end plus the shell noise, not the zone surface:
             // the distances (exterior fade, far bucket, the key light's reference) count from it.
             FShellFrame Shell;

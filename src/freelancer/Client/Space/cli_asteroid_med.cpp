@@ -24,7 +24,7 @@ namespace
     // .rdata:005dc47c -- CliAsteroid.cpp's FDUMP file argument.
     char const kCliAsteroidSourceFile[] = "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp";
 
-    static_assert(sizeof(FCliAsteroidCubeMap) <= sizeof(FCliAsteroid::MapAt08),
+    static_assert(sizeof(FCliAsteroidCubeMap) <= sizeof(FCliAsteroid::CubeMapStorage),
                   "the cube map must fit the retail 0x14 bytes at FCliAsteroid+0x08");
     static_assert(alignof(FCliAsteroidCubeMap) <= 8, "FCliAsteroid+0x08 is 8-aligned");
 }
@@ -204,14 +204,14 @@ void FCliAsteroidCube::ApplyEvent(CmnAsteroid::asteroid_marker const* Event)
 
 FCliAsteroidCubeMap& CliAsteroidCubeMap(FCliAsteroid* Field)
 {
-    return *reinterpret_cast<FCliAsteroidCubeMap*>(Field->MapAt08);
+    return *reinterpret_cast<FCliAsteroidCubeMap*>(Field->CubeMapStorage);
 }
 
 void CliAsteroidCubeMapConstruct(FCliAsteroid* Field)
 {
     // Retail's allocator bytes (+0x08, +0x09), the byte at +0x14 and the head node -- one
     // std::map here.
-    new (Field->MapAt08) FCliAsteroidCubeMap();
+    new (Field->CubeMapStorage) FCliAsteroidCubeMap();
 }
 
 void CliAsteroidCubeMapDestruct(FCliAsteroid* Field)

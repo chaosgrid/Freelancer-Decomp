@@ -243,7 +243,7 @@ namespace Archetype
             void ReleaseHitEffects() override;
 
             // FUN_00407310 — public non-virtual thunk into FUN_00407100.
-            bool PreloadMaterials(bool bLatchSlot10) { return BuildMaterialCache(bLatchSlot10); }
+            bool PreloadMaterials(bool bApplyNow) { return BuildMaterialCache(bApplyNow); }
 
             // FUN_00407450 — not a vtable slot; distance-threshold pick into record payload.
             void* PickDistanceRecord(float Distance);
@@ -273,7 +273,7 @@ namespace Archetype
             // (LodHead shallow), the three vectors assigned, the +0x50 flag bits and then the
             // whole +0x50 dword. Every derived Inherit (slot 7) runs it, inlined or called.
             void AssignRootMembers(FCliObj const* Src);
-            bool BuildMaterialCache(bool bLatchSlot10); // FUN_00407100
+            bool BuildMaterialCache(bool bApplyNow); // FUN_00407100
             void PushResolvedEntry(FCliMaterialEntry* Entry);
             void FreeVectorBuffers();
             // Not an ICliObj slot — appended after Slot13 so retail 0–13 stay aligned.
@@ -303,17 +303,17 @@ namespace Archetype
         public:
             // Layout public for offsetof static_asserts (same pattern as FCliObj).
             unsigned Pad54;              // +0x54
-            ID_String Id58;              // +0x58
-            ID_String Id5C;              // +0x5C
+            ID_String BayDoorsOpenSnd;   // +0x58 bay_doors_open_snd
+            ID_String BayDoorsCloseSnd;  // +0x5C bay_doors_close_snd
             CacheString CockpitIni;      // +0x60 shiparch cockpit = …
-            ID_String Id64;              // +0x64
+            ID_String PilotMesh;         // +0x64 pilot_mesh
             float CameraOffsetX;         // +0x68
             float CameraOffsetY;         // +0x6C
             float CamAngularAccel;       // +0x70
             float CamAngularSlerp;       // +0x74
-            float TurnAngle78;           // +0x78
-            float TurnAngle7C;           // +0x7C
-            float TurnAngle80;           // +0x80
+            float CamHorizontalTurnAngle;   // +0x78 camera_horizontal_turn_angle (radians)
+            float CamVerticalTurnUpAngle;   // +0x7C camera_vertical_turn_up_angle
+            float CamVerticalTurnDownAngle; // +0x80 camera_vertical_turn_down_angle
             float CamTurnLookAhead;      // +0x84
         };
 
@@ -336,25 +336,25 @@ namespace Archetype
             // +0x54 open_sound / +0x58 close_sound, read raw by the solar notify FUN_005478f0.
             ID_String const* DoorSound(bool bOpen) const
             {
-                return bOpen ? &Id54 : &Id58;
+                return bOpen ? &OpenSound : &CloseSound;
             }
 
             // +0x60 shape_name (default "DEFAULT_TEXTURE"), read raw by the nav map.
             char const* ShapeName() const
             {
-                return DefaultTexture;
+                return ShapeNameText;
             }
 
         protected:
             void DestroyMostDerived() override;
 
         private:
-            ID_String Id54;            // +0x54
-            ID_String Id58;            // +0x58
-            unsigned TextureLen;       // +0x5C
-            char DefaultTexture[32];   // +0x60
-            unsigned Unk80;            // +0x80
-            unsigned char Unk84;       // +0x84
+            ID_String OpenSound;        // +0x54 open_sound
+            ID_String CloseSound;       // +0x58 close_sound
+            unsigned ShapeNameLen;      // +0x5C
+            char ShapeNameText[32];     // +0x60 shape_name
+            unsigned IdsInfo;           // +0x80 infocard_ids / ids_info
+            unsigned char bAnimatedTextures; // +0x84 animated_textures
             unsigned char Pad85[3];
         };
 
@@ -1381,15 +1381,6 @@ namespace Archetype
 
         // FUN_00402580 is BindRendererLods (part_cache.h); this file has no caller of it.
 
-        // FUN_004024d0 — free chain through head slot.
-        void FreeLodChain(FLodNode** HeadSlot)
-        {
-            if (HeadSlot == nullptr)
-                return;
-            FreeLodList(*HeadSlot);
-            *HeadSlot = nullptr;
-        }
-
         // FUN_00402500 (cdecl; every Redefine and the base Inherit 00406970). Frees the chain
         // in *DestSlot, then copies Source node by node -- but retail uses *DestSlot itself as
         // the walking cursor: each pass stores the new node there, links it after the previous
@@ -1885,6 +1876,7 @@ namespace Archetype
 
         FCliObj::~FCliObj()
         {
+            // FUN_00406b80: FUN_004024d0 on the LOD head slot first, then the vectors.
             FreeLodList(LodHead);
             LodHead = nullptr;
             FreeVectorBuffers();
@@ -1958,8 +1950,7 @@ namespace Archetype
 
         void FCliObj::Lod(INI_Reader* Reader)
         {
-            if (Reader == nullptr)
-                return;
+            // FUN_00407030: a straight forward to FUN_004023f0, no test of Reader.
             ApplyLodSection(&LodHead, Reader);
         }
 
@@ -2121,15 +2112,17 @@ namespace Archetype
             ResolvedEntries.End += 1;
         }
 
-        bool FCliObj::BuildMaterialCache(bool bLatchSlot10)
+        bool FCliObj::BuildMaterialCache(bool bApplyNow)
         {
-            // FUN_00407100(this, param_1). param_1==0 → latch bit1 + force-apply on resolve.
+            // FUN_00407100. bApplyNow is retail's argument negated: retail's zero applies each
+            // entry on resolve (FUN_0041aa50's second argument is `arg == 0`) and latches
+            // CliObjFlagMaterialsRealized.
             if ((StateFlags & CliObjFlagCacheBuilt) != 0)
                 return true;
 
             StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagCacheBuilt);
 
-            bool bForceApply = bLatchSlot10;
+            bool const bForceApply = bApplyNow;
 
             FCliMaterialPathPair* Pair = MaterialPaths.Begin;
             FCliMaterialPathPair* PairEnd = MaterialPaths.End;
@@ -2152,7 +2145,7 @@ namespace Archetype
             if (RootEntry != nullptr)
                 PushResolvedEntry(RootEntry);
 
-            if (bLatchSlot10)
+            if (bApplyNow)
                 StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagMaterialsRealized);
 
             return true;
@@ -2348,19 +2341,19 @@ namespace Archetype
             , CameraOffsetX(0.0f)
             , CameraOffsetY(0.0f)
         {
-            Id58.clear();
-            Id5C.clear();
+            BayDoorsOpenSnd.clear();
+            BayDoorsCloseSnd.clear();
             CockpitIni.clear();
-            Id64.clear();
+            PilotMesh.clear();
             unsigned const AccelBits = 0x3d8f5c29u;
             unsigned const SlerpBits = 0x3d23d70au;
             unsigned const TurnBits = 0x3e4ccccdu;
             unsigned const LookBits = 0x3f000000u;
             memcpy(&CamAngularAccel, &AccelBits, sizeof(float));
             memcpy(&CamAngularSlerp, &SlerpBits, sizeof(float));
-            memcpy(&TurnAngle78, &TurnBits, sizeof(float));
-            memcpy(&TurnAngle7C, &TurnBits, sizeof(float));
-            memcpy(&TurnAngle80, &TurnBits, sizeof(float));
+            memcpy(&CamHorizontalTurnAngle, &TurnBits, sizeof(float));
+            memcpy(&CamVerticalTurnUpAngle, &TurnBits, sizeof(float));
+            memcpy(&CamVerticalTurnDownAngle, &TurnBits, sizeof(float));
             memcpy(&CamTurnLookAhead, &LookBits, sizeof(float));
         }
 
@@ -2374,13 +2367,13 @@ namespace Archetype
 
             if (Reader->is_value("bay_doors_open_snd"))
             {
-                Id58.Id = CreateID(Reader->get_value_string());
+                BayDoorsOpenSnd.Id = CreateID(Reader->get_value_string());
                 return true;
             }
 
             if (Reader->is_value("bay_doors_close_snd"))
             {
-                Id5C.Id = CreateID(Reader->get_value_string());
+                BayDoorsCloseSnd.Id = CreateID(Reader->get_value_string());
                 return true;
             }
 
@@ -2392,7 +2385,7 @@ namespace Archetype
 
             if (Reader->is_value("pilot_mesh"))
             {
-                Id64.Id = CreateID(Reader->get_value_string());
+                PilotMesh.Id = CreateID(Reader->get_value_string());
                 return true;
             }
 
@@ -2417,19 +2410,19 @@ namespace Archetype
 
             if (Reader->is_value("camera_horizontal_turn_angle"))
             {
-                TurnAngle78 = ShipCameraClampTurnAngle(Reader->get_value_float(0));
+                CamHorizontalTurnAngle = ShipCameraClampTurnAngle(Reader->get_value_float(0));
                 return true;
             }
 
             if (Reader->is_value("camera_vertical_turn_up_angle"))
             {
-                TurnAngle7C = ShipCameraClampTurnAngle(Reader->get_value_float(0));
+                CamVerticalTurnUpAngle = ShipCameraClampTurnAngle(Reader->get_value_float(0));
                 return true;
             }
 
             if (Reader->is_value("camera_vertical_turn_down_angle"))
             {
-                TurnAngle80 = ShipCameraClampTurnAngle(Reader->get_value_float(0));
+                CamVerticalTurnDownAngle = ShipCameraClampTurnAngle(Reader->get_value_float(0));
                 return true;
             }
 
@@ -2453,20 +2446,20 @@ namespace Archetype
             FCliObj::Redefine(Donor);
 
             FCliShip* Src = AsCliShip(Donor);
-            if (Src->Id58.Id != Id58.Id)
-                Id58.Id = Src->Id58.Id;
-            if (Src->Id5C.Id != Id5C.Id)
-                Id5C.Id = Src->Id5C.Id;
+            if (Src->BayDoorsOpenSnd.Id != BayDoorsOpenSnd.Id)
+                BayDoorsOpenSnd.Id = Src->BayDoorsOpenSnd.Id;
+            if (Src->BayDoorsCloseSnd.Id != BayDoorsCloseSnd.Id)
+                BayDoorsCloseSnd.Id = Src->BayDoorsCloseSnd.Id;
             if (Src->CamAngularSlerp != CamAngularSlerp)
                 CamAngularSlerp = Src->CamAngularSlerp;
             if (Src->CamAngularAccel != CamAngularAccel)
                 CamAngularAccel = Src->CamAngularAccel;
-            if (Src->TurnAngle78 != TurnAngle78)
-                TurnAngle78 = Src->TurnAngle78;
-            if (Src->TurnAngle7C != TurnAngle7C)
-                TurnAngle7C = Src->TurnAngle7C;
-            if (Src->TurnAngle80 != TurnAngle80)
-                TurnAngle80 = Src->TurnAngle80;
+            if (Src->CamHorizontalTurnAngle != CamHorizontalTurnAngle)
+                CamHorizontalTurnAngle = Src->CamHorizontalTurnAngle;
+            if (Src->CamVerticalTurnUpAngle != CamVerticalTurnUpAngle)
+                CamVerticalTurnUpAngle = Src->CamVerticalTurnUpAngle;
+            if (Src->CamVerticalTurnDownAngle != CamVerticalTurnDownAngle)
+                CamVerticalTurnDownAngle = Src->CamVerticalTurnDownAngle;
             if (Src->CamTurnLookAhead != CamTurnLookAhead)
                 CamTurnLookAhead = Src->CamTurnLookAhead;
             if (Src->CameraOffsetX != CameraOffsetX || Src->CameraOffsetY != CameraOffsetY)
@@ -2487,30 +2480,30 @@ namespace Archetype
             AssignRootMembers(DonorShip);
 
             Pad54 = DonorShip->Pad54;
-            Id58.Id = DonorShip->Id58.Id;
-            Id5C.Id = DonorShip->Id5C.Id;
+            BayDoorsOpenSnd.Id = DonorShip->BayDoorsOpenSnd.Id;
+            BayDoorsCloseSnd.Id = DonorShip->BayDoorsCloseSnd.Id;
             CockpitIni.Value = DonorShip->CockpitIni.Value;
-            Id64.Id = DonorShip->Id64.Id;
+            PilotMesh.Id = DonorShip->PilotMesh.Id;
             CameraOffsetX = DonorShip->CameraOffsetX;
             CameraOffsetY = DonorShip->CameraOffsetY;
             CamAngularAccel = DonorShip->CamAngularAccel;
             CamAngularSlerp = DonorShip->CamAngularSlerp;
-            TurnAngle78 = DonorShip->TurnAngle78;
-            TurnAngle7C = DonorShip->TurnAngle7C;
-            TurnAngle80 = DonorShip->TurnAngle80;
+            CamHorizontalTurnAngle = DonorShip->CamHorizontalTurnAngle;
+            CamVerticalTurnUpAngle = DonorShip->CamVerticalTurnUpAngle;
+            CamVerticalTurnDownAngle = DonorShip->CamVerticalTurnDownAngle;
             CamTurnLookAhead = DonorShip->CamTurnLookAhead;
 
             RefCount = SavedRef;
         }
 
         FCliSolar::FCliSolar()
-            : TextureLen(0)
-            , Unk80(0)
-            , Unk84(0)
+            : ShapeNameLen(0)
+            , IdsInfo(0)
+            , bAnimatedTextures(0)
         {
-            Id54.clear();
-            Id58.clear();
-            memset(DefaultTexture, 0, sizeof(DefaultTexture));
+            OpenSound.clear();
+            CloseSound.clear();
+            memset(ShapeNameText, 0, sizeof(ShapeNameText));
             memset(Pad85, 0, sizeof(Pad85));
 
             char const* Src = "DEFAULT_TEXTURE";
@@ -2519,9 +2512,9 @@ namespace Archetype
                 Len += 1;
             if (Len > 0x1F)
                 Len = 0x1F;
-            memcpy(DefaultTexture, Src, Len);
-            DefaultTexture[Len] = '\0';
-            TextureLen = Len;
+            memcpy(ShapeNameText, Src, Len);
+            ShapeNameText[Len] = '\0';
+            ShapeNameLen = Len;
         }
 
         void FCliSolar::DestroyMostDerived()
@@ -2540,41 +2533,41 @@ namespace Archetype
                 char const* Text = Reader->get_value_string();
                 if (Text == nullptr)
                 {
-                    TextureLen = 0;
-                    DefaultTexture[0] = '\0';
+                    ShapeNameLen = 0;
+                    ShapeNameText[0] = '\0';
                     return true;
                 }
 
                 unsigned Len = 0;
                 while (Text[Len] != '\0' && Len < 0x1F)
                     Len += 1;
-                memcpy(DefaultTexture, Text, Len);
-                DefaultTexture[Len] = '\0';
-                TextureLen = Len;
+                memcpy(ShapeNameText, Text, Len);
+                ShapeNameText[Len] = '\0';
+                ShapeNameLen = Len;
                 return true;
             }
 
             if (Reader->is_value("infocard_ids") || Reader->is_value("ids_info"))
             {
-                Unk80 = static_cast<unsigned>(Reader->get_value_int(0));
+                IdsInfo = static_cast<unsigned>(Reader->get_value_int(0));
                 return true;
             }
 
             if (Reader->is_value("open_sound"))
             {
-                Id54.Id = CreateID(Reader->get_value_string());
+                OpenSound.Id = CreateID(Reader->get_value_string());
                 return true;
             }
 
             if (Reader->is_value("close_sound"))
             {
-                Id58.Id = CreateID(Reader->get_value_string());
+                CloseSound.Id = CreateID(Reader->get_value_string());
                 return true;
             }
 
             if (Reader->is_value("animated_textures"))
             {
-                Unk84 = Reader->get_value_bool(0);
+                bAnimatedTextures = Reader->get_value_bool(0);
                 return true;
             }
 
@@ -2592,18 +2585,18 @@ namespace Archetype
 
             AssignRootMembers(DonorSolar);
 
-            Id54 = DonorSolar->Id54;
-            Id58 = DonorSolar->Id58;
+            OpenSound = DonorSolar->OpenSound;
+            CloseSound = DonorSolar->CloseSound;
 
             unsigned Len = 0;
-            while (Len < 0x1F && DonorSolar->DefaultTexture[Len] != '\0')
+            while (Len < 0x1F && DonorSolar->ShapeNameText[Len] != '\0')
                 Len += 1;
-            memcpy(DefaultTexture, DonorSolar->DefaultTexture, Len);
-            DefaultTexture[Len] = '\0';
-            TextureLen = Len;
+            memcpy(ShapeNameText, DonorSolar->ShapeNameText, Len);
+            ShapeNameText[Len] = '\0';
+            ShapeNameLen = Len;
 
-            Unk80 = DonorSolar->Unk80;
-            Unk84 = DonorSolar->Unk84;
+            IdsInfo = DonorSolar->IdsInfo;
+            bAnimatedTextures = DonorSolar->bAnimatedTextures;
 
             RefCount = SavedRef;
         }
@@ -4348,7 +4341,8 @@ namespace Archetype
     {
         // FUN_00407310. Retail calls it directly (not through the vtable) on Root+0x04, which
         // FCliObjFactory::Create always fills with an FCliObj or a subclass of it. Retail's zero
-        // means apply now and latch slot 10.
+        // means apply now and latch CliObjFlagMaterialsRealized, so slot 10 (RealizeMaterials)
+        // then skips its walk.
         return static_cast<FCliObj*>(Companion)->PreloadMaterials(!bDeferApply);
     }
 
@@ -4392,7 +4386,7 @@ namespace Archetype
         // The raw reads FUN_00545670 case 2 makes on a ship archetype's companion (a CliShip by
         // the factory table): +0x58 bay_doors_open_snd, +0x5c bay_doors_close_snd.
         FCliShip* const Ship = static_cast<FCliShip*>(static_cast<FCliObj*>(Companion));
-        return bOpen ? &Ship->Id58 : &Ship->Id5C;
+        return bOpen ? &Ship->BayDoorsOpenSnd : &Ship->BayDoorsCloseSnd;
     }
 
     ID_String const* CliSolarDoorSound(ICliObj* Companion, bool bOpen)

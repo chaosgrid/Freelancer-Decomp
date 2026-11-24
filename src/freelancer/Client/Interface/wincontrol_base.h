@@ -26,7 +26,8 @@
 //   +0x0d0 char[0x100] mesh path (slot 38)
 //   +0x1d0 char[0x100] hardpoint name (slot 35 attaches to the parent's hardpoint of this name)
 //   +0x2d0 bCaptured, +0x2d1 no_z_enable, +0x2d2 (property 9), +0x2d3 identity hit orientation
-//   +0x2e0 {0, 0, 10000.0f}, +0x2ec 0, +0x2f0 0 -- written by the ctor, read by subclasses
+//   +0x2e0 requested position {0, 0, 10000.0f}; +0x2ec 0, +0x2f0 0 -- written by the ctor,
+//          read by subclasses
 //   +0x2f4 flag byte: bit0 = add +0xa8 to the instance position (ctor sets it)
 //   +0x2f8 attach orientation[9], +0x31c attach position[3], +0x328 bAttached
 //   size 0x32c
@@ -42,9 +43,26 @@ class RichTextWin;
 class RichTextEditWin;
 class UiScroll;
 
+// The property ids WinControl's own SetProperty (slot 42, FUN_005a13c0) handles. Subclasses add
+// their own ids above 11 and pass these down.
+enum EWinControlProperty
+{
+    kWinPropHide = 1,            // A == 1 clears Flags bits 0..1, anything else sets them
+    kWinPropDisable = 2,         // Flags bit 0 = (A == 0)
+    kWinPropToolTip = 3,         // ToolTipIds = A
+    kWinPropMesh = 4,            // SetMesh(A, B)
+    kWinPropPosition = 5,        // SetPosition(A)
+    kWinPropOffset = 6,          // Offset = *A, the instance re-placed
+    kWinPropGetOffset = 7,       // *A = Offset
+    kWinPropOrientation = 8,     // the instance's rotation from A (9 floats)
+    kWinPropFlag2d2 = 9,         // +0x2d2 = (A != 0); nothing reads it
+    kWinPropGetInstance = 10,    // returns the mesh instance
+    kWinPropGetMeshPath = 11,    // strncpy(A, MeshPath, B)
+};
+
 // RTTI .?AUIDataViewOwner@@. The base vftable 0x005e5efc holds two _purecall entries; every
-// derived face seen so far (WinControl 0x005e5e38) fills them with LAB_0053aaa0 (RET 8) and
-// FUN_0053e4a0 (RET 4). Names unknown.
+// derived face (WinControl 0x005e5e38 and its subclasses) fills them with LAB_0053aaa0 (RET 8)
+// and FUN_0053e4a0 (RET 4), and nothing in the exe registers the face: names unknown.
 struct IDataViewOwner
 {
     virtual void DataViewSlot0(unsigned A, unsigned B) = 0; // +0x00
@@ -89,7 +107,8 @@ public:
     virtual void LoadIni(char const* Path);
     // slots 29 / 30 (+0x74 / +0x78) FUN_0053e4a0 -- no-op. Slot 29's argument is a FILE*: the
     // one override seen, NavBar's FUN_0043efd0, fprintf's its [NavBar] section into it (the
-    // counterpart of slot 28 LoadIni). Slot 30's purpose is unknown.
+    // counterpart of slot 28 LoadIni). Slot 30 is the no-op in every WinControl vftable and no
+    // caller is known: its purpose is unknown.
     virtual void SaveIni(FILE* File);
     virtual void Slot30(unsigned A);
     // slot 31 (+0x7c) FUN_005a0250
@@ -108,8 +127,9 @@ public:
     virtual WinControl* FindChild(char const* Name);
     // slot 38 (+0x98) FUN_0059fbd0 -- MaterialPath is FUN_0059ec80's second argument.
     virtual void SetMesh(char const* Path, char const* MaterialPath);
-    // slot 39 (+0x9c) FUN_00401e90 -- no-op; Draw's tail call
-    virtual void Slot39();
+    // slot 39 (+0x9c) FUN_00401e90 -- no-op in every WinControl vftable; every Draw ends by
+    // calling it
+    virtual void PostDraw();
     // slot 40 (+0xa0) FUN_005a1670
     virtual void GetAttachOrientation(float* OutOrientation9);
     // slot 41 (+0xa4) FUN_005a1750
@@ -142,22 +162,22 @@ public:
     // arguments land at +0xd0 (mesh), +0x350 (string), +0x360 (sound, slot at +0x374), the
     // FUN_0055a490 key lookup (+0x34c / +0xcc), +0xa8 (position), +0x1d0 (hardpoint), +0xb4
     // (half extents), +0x331 bit 0, +0x330 bits 3 and 5, +0x2d1, +0xcc, +0x32c and +0x34c.
-    WinControl* CreateButtonControl(char const* Name, char const* MeshPath, char const* String350,
+    WinControl* CreateButtonControl(char const* Name, char const* MeshPath, char const* Mesh2,
                                     char const* SoundName, char const* KeyCommandName,
                                     float const* Position, char const* Hardpoint,
-                                    float const* HalfExtents, unsigned char bFlag331,
-                                    unsigned char bFlag330Bit3, unsigned char bFlag330Bit5,
-                                    unsigned char bNoZEnable, int ToolTipIds, int Dword32c,
-                                    int Dword34c);
+                                    float const* HalfExtents, unsigned char bNoMeshRender,
+                                    unsigned char bActionButton, unsigned char bNoColorChange,
+                                    unsigned char bNoZEnable, int ToolTipIds, int ToolTip2Ids,
+                                    int CommandId);
     // FUN_005a0d00 (RET 0x24) -- "WireButtonControl" + WireButtonControl::Init FUN_005a3ee0.
     WinControl* CreateWireButtonControl(char const* Name, char const* SoundName,
                                         float const* Position, float const* HalfExtents,
-                                        unsigned char bFlag3, unsigned char bNoZEnable,
-                                        int ToolTipIds, int CommandId, int WireFlags);
+                                        unsigned char bAlwaysWhite, unsigned char bNoZEnable,
+                                        int ToolTipIds, int CommandId, int EdgeMask);
     // FUN_005a0d60 (RET 0x1c) -- "WireStaticControl" + WireStaticControl::Init FUN_005a3360.
     WinControl* CreateWireStaticControl(char const* Name, float const* Position,
-                                        float const* HalfExtents, unsigned char bFlag3,
-                                        unsigned char bNoZEnable, int ToolTipIds, int WireFlags);
+                                        float const* HalfExtents, unsigned char bAlwaysWhite,
+                                        unsigned char bNoZEnable, int ToolTipIds, int EdgeMask);
     // FUN_005a17e0 (RET 0x20) -- "UIScroll" with the FUiPayloadScrollCycle {Width, Height,
     // float(Min), float(Max), float(Page), 1.0f, bHorizontal}; on a non-null result
     // SetScrollOffset(Position) FUN_005972d0, SetValue(0) FUN_00595db0 and SetHorizontal
@@ -181,22 +201,26 @@ public:
     // FUN_005a1950 (RET 0x28) -- "RichTextWireButtonControl" + FUN_005a4810.
     WinControl* CreateRichTextWireButtonControl(char const* Name, char const* SoundName,
                                                 float const* Position, float const* HalfExtents,
-                                                unsigned char bFlag3, unsigned char bNoZEnable,
+                                                unsigned char bAlwaysWhite, unsigned char bNoZEnable,
                                                 int ToolTipIds, unsigned CaptionIds,
-                                                int CommandId, int WireFlags);
+                                                int CommandId, int EdgeMask);
     // FUN_005a0db0 (RET 0x40) -- "StaticControl" + StaticControl::Init FUN_00588540.
     WinControl* CreateStaticControl(char const* Name, char const* MeshPath, float const* Position,
                                     char const* Hardpoint, float const* HalfExtents,
-                                    unsigned char bNoZEnable, unsigned char Byte34c,
-                                    unsigned char Byte344, unsigned char Byte345,
-                                    unsigned char Byte346, unsigned char Byte34b,
-                                    unsigned char Byte34a, int Int418, int Int41c,
-                                    unsigned char Byte349, float const* Vector338);
-    // FUN_005a0e30 (RET 0x2c) -- "TextControl" + TextControl::Init FUN_0058a110.
+                                    unsigned char bNoZEnable, unsigned char bZClear,
+                                    unsigned char bNoMeshRender, unsigned char bNoWireRender,
+                                    unsigned char bNoColoring, unsigned char bRenderToWindow,
+                                    unsigned char bNoClearRender, int ForceRadius,
+                                    int RotationSpeed, unsigned char bEnableRotation,
+                                    float const* StartYpr);
+    // FUN_005a0e30 (RET 0x2c) -- "TextControl" + TextControl::Init FUN_0058a110. The arguments
+    // follow TextControl's ini keys (font, offset, hardpoint, width, height, font_scale,
+    // stringID, justification, tooltip); FontScale is never read. bTopLeftAnchor (+0x378) set:
+    // Position is the text rectangle's upper-left corner; clear: its centre.
     WinControl* CreateTextControl(char const* Name, char const* StyleName, float const* Position,
-                                  char const* Hardpoint, float Width, float Height, float Arg6,
-                                  unsigned Ids, int Dword358, int Dword344,
-                                  unsigned char Byte378);
+                                  char const* Hardpoint, float Width, float Height,
+                                  float FontScale, unsigned Ids, int Justification,
+                                  int TextToolTipIds, unsigned char bTopLeftAnchor);
     // FUN_005a1080 (RET 0x24) -- "CargoBarControl" + CargoBarControl::Init FUN_0055ee80
     // (cargo_bar_control.cpp). Color / HighlightColor are RGBA byte quads in a dword.
     WinControl* CreateCargoBarControl(char const* Name, char const* MeshPath,
@@ -213,20 +237,21 @@ public:
     // FUN_005a0e90 (RET 0x28) -- "EditControl" + FUN_0058a110 (TextControl::Init) with the
     // helper's arguments 2..10 and a trailing 0 for Init's last (byte +0x378) argument.
     WinControl* CreateEditControl(char const* Name, char const* StyleName, float const* Position,
-                                  char const* Hardpoint, float Width, float Height, float Arg6,
-                                  unsigned Ids, int Dword358, int Dword344);
+                                  char const* Hardpoint, float Width, float Height,
+                                  float FontScale, unsigned Ids, int Justification,
+                                  int TextToolTipIds);
     // FUN_005a0fb0 (RET 0x38) -- "ToggleButtonControl" + ToggleButtonControl::Init FUN_0055c1c0
     // with arguments 2..14. That Init sets byte +0x335 = 1, runs ButtonControl::Init
     // FUN_0055ac30(MeshPath, AltMeshPath, SoundName, KeyCommandName, Position, Hardpoint,
-    // HalfExtents, bFlag331, bFlag330Bit3, bFlag330Bit5, bNoZEnable, ToolTipIds, Dword32c, 0)
-    // and loads AltMeshPath into a second mesh holder at +0x378.
+    // HalfExtents, bNoMeshRender, bActionButton, bNoColorChange, bNoZEnable, ToolTipIds,
+    // ToolTip2Ids, 0) and loads AltMeshPath into a second mesh holder at +0x378.
     WinControl* CreateToggleButtonControl(char const* Name, char const* MeshPath,
                                           char const* AltMeshPath, char const* SoundName,
                                           char const* KeyCommandName, float const* Position,
                                           char const* Hardpoint, float const* HalfExtents,
-                                          unsigned char bFlag331, unsigned char bFlag330Bit3,
-                                          unsigned char bFlag330Bit5, unsigned char bNoZEnable,
-                                          int ToolTipIds, int Dword32c);
+                                          unsigned char bNoMeshRender, unsigned char bActionButton,
+                                          unsigned char bNoColorChange, unsigned char bNoZEnable,
+                                          int ToolTipIds, int ToolTip2Ids);
     // FUN_005a0ef0 (RET 0x70) -- "ScrollControl" + ScrollControl::Init FUN_00582120
     // (scroll_control.cpp) with the other 27 arguments. Callers: 0x004bf4ec, 0x004c1093.
     WinControl* CreateScrollControl(
@@ -255,7 +280,9 @@ public:
     // a child's rest Offset here (HUD_Target 0x004e0ee0.., HUD_ContactList 0x004d38e7) and hand
     // it to ButtonMover as the slide start (0x0045ce55, 0x004e4188).
     float HomeOffset[3];
-    float Field2e0[3];              // +0x2e0 -- ctor {0, 0, 10000.0f}
+    // +0x2e0 -- ctor {0, 0, 10000.0f}; the ButtonControl, StaticControl, TextControl and
+    // WireStaticControl SetPosition overrides store their NewPosition here. No reader found.
+    float RequestedPosition[3];
     int UserData;                   // +0x2ec -- ctor 0
     int OwnerData;                   // +0x2f0 -- ctor 0
     unsigned char PositionFlags;    // +0x2f4 -- bit0: instance position includes +0xa8
@@ -279,7 +306,7 @@ static_assert(offsetof(WinControl, ToolTipIds) == 0xcc, "WinControl +0xcc toolti
 static_assert(offsetof(WinControl, MeshPath) == 0xd0, "WinControl +0xd0 mesh path");
 static_assert(offsetof(WinControl, HardpointName) == 0x1d0, "WinControl +0x1d0 hardpoint");
 static_assert(offsetof(WinControl, bCaptured) == 0x2d0, "WinControl +0x2d0 captured");
-static_assert(offsetof(WinControl, Field2e0) == 0x2e0, "WinControl +0x2e0");
+static_assert(offsetof(WinControl, RequestedPosition) == 0x2e0, "WinControl +0x2e0");
 static_assert(offsetof(WinControl, PositionFlags) == 0x2f4, "WinControl +0x2f4 flags");
 static_assert(offsetof(WinControl, AttachOrientation) == 0x2f8, "WinControl +0x2f8 attach");
 static_assert(offsetof(WinControl, AttachPosition) == 0x31c, "WinControl +0x31c attach pos");

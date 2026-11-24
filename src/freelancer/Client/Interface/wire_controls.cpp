@@ -6,6 +6,7 @@
 
 #include "Interface/wire_controls.h"
 
+#include "NeuroNet/Chat/chat_init.h"        // kTextStyleButton
 #include "Core/game_options.h"        // GetGameOption (FUN_005792b0)
 #include "Core/globals.h"             // GetClientFrameTimeCapped (FUN_0042d680)
 #include "Space/HUD/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
@@ -139,11 +140,11 @@ WireStaticControl::WireStaticControl()
     bUseColour = 0;
     // Only bit 0 of +0x35d is cleared; the other bits keep whatever the allocation held. Only
     // bit 0 is ever read.
-    WireState2 = static_cast<unsigned char>(WireState2 & 0xfe);
+    WireState2 = static_cast<unsigned char>(WireState2 & ~kWire2FlushBatchers);
     bBlink = 0;
     bBlinkPhase = 0;
     BlinkTimer = 0.0f;
-    WireState = 0x60;
+    WireState = kWireLitWhilePressed | kWirePulseWhileHovered;
     // +0x364 (ToolTipAux) and +0x384 (EdgeMask) are not written here; Init writes the mask.
 }
 
@@ -161,9 +162,9 @@ bool WireStaticControl::HitTest(float const* Ray)
 void WireStaticControl::SetPosition(float const* NewPosition)
 {
     // LAB_005a3950 (RET 4).
-    Field2e0[0] = NewPosition[0];
-    Field2e0[1] = NewPosition[1];
-    Field2e0[2] = NewPosition[2];
+    RequestedPosition[0] = NewPosition[0];
+    RequestedPosition[1] = NewPosition[1];
+    RequestedPosition[2] = NewPosition[2];
     bAttached = 1;
 
     float Placed[3];
@@ -257,7 +258,7 @@ void WireStaticControl::Draw()
         return;
     if ((Flags & kWin3DVisible) == 0)
         return;
-    if ((WireState & 0x80) == 0 && (Flags & kWin3DActive) == 0)
+    if ((WireState & kWireDrawInactive) == 0 && (Flags & kWin3DActive) == 0)
         return;
     if (bBlink != 0 && bBlinkPhase != 0)
         return;
@@ -268,20 +269,20 @@ void WireStaticControl::Draw()
     unsigned char Rgba[4];
     if ((Flags & kWin3DActive) == 0)
     {
-        WireState = static_cast<unsigned char>(WireState & 0xeb);
+        WireState = static_cast<unsigned char>(WireState & ~(kWirePressed | kWireLit));
         Rgba[0] = 0x80;
         Rgba[1] = 0x80;
         Rgba[2] = 0x80;
         Rgba[3] = 0xff;
     }
-    else if (SavedLit != 0 || ((WireState & 0x20) != 0 && (WireState & 0x04) != 0))
+    else if (SavedLit != 0 || ((WireState & kWireLitWhilePressed) != 0 && (WireState & kWirePressed) != 0))
     {
         Rgba[0] = 0xff;
         Rgba[1] = 0xff;
         Rgba[2] = 0x00;
         Rgba[3] = 0xff;
     }
-    else if ((WireState & 0x02) != 0 || ((WireState & 0x01) != 0 && (WireState & 0x40) != 0))
+    else if ((WireState & kWireFocused) != 0 || ((WireState & kWireHovered) != 0 && (WireState & kWirePulseWhileHovered) != 0))
     {
         // FUN_00561da0 twice: the first result is the colour, the second lands in a scratch
         // dword nobody reads.
@@ -293,9 +294,9 @@ void WireStaticControl::Draw()
     }
     else
     {
-        memcpy(Rgba, &G_NnPaletteArgb_679bb0, sizeof(Rgba)); // DAT_00679bb0
+        memcpy(Rgba, &G_NnPaletteCyan, sizeof(Rgba)); // DAT_00679bb0
     }
-    if ((WireState & 0x08) != 0)
+    if ((WireState & kWireAlwaysWhite) != 0)
     {
         Rgba[0] = 0xff;
         Rgba[1] = 0xff;
@@ -365,11 +366,11 @@ void WireStaticControl::Draw()
     }
 
     // Bit 4 goes back to what it was before the inactive branch could clear it.
-    WireState = static_cast<unsigned char>((WireState & 0xef) | (SavedLit << 4));
-    Slot39(); // vt+0x9c
+    WireState = static_cast<unsigned char>((WireState & ~kWireLit) | (SavedLit << 4));
+    PostDraw(); // vt+0x9c
 
     // FUN_005a29b0 inlined: flush both batchers (DAT_0067dd90, DAT_0067dd68).
-    if ((WireState2 & 0x01) != 0)
+    if ((WireState2 & kWire2FlushBatchers) != 0)
     {
         Win3DImmedBatchFlushAll();
         Win3DImmedBatchReset();
@@ -388,22 +389,22 @@ intptr_t WireStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     switch (Msg)
     {
     case 0x0c:
-        WireState = static_cast<unsigned char>((WireState & 0xef) | ((A != 0) ? 0x10 : 0));
+        WireState = static_cast<unsigned char>((WireState & ~kWireLit) | ((A != 0) ? kWireLit : 0));
         return 0;
     case 0x2c:
-        WireState = static_cast<unsigned char>(WireState | 0x02);
+        WireState = static_cast<unsigned char>(WireState | kWireFocused);
         return 0;
     case 0x2d:
-        WireState = static_cast<unsigned char>(WireState & 0xfd);
+        WireState = static_cast<unsigned char>(WireState & ~kWireFocused);
         return 0;
     case 0x33:
         memcpy(Colour, reinterpret_cast<void const*>(A), sizeof(Colour));
         bUseColour = (B == 1) ? 1 : 0;
         return 0;
     case 0x34:
-        WireState = static_cast<unsigned char>(WireState & 0x7f);
+        WireState = static_cast<unsigned char>(WireState & ~kWireDrawInactive);
         if (A != 0)
-            WireState = static_cast<unsigned char>(WireState | 0x80);
+            WireState = static_cast<unsigned char>(WireState | kWireDrawInactive);
         return 0;
     case 0x51:
         bBlink = 0;
@@ -430,7 +431,7 @@ void WireStaticControl::Init(float const* NewOffset, float const* NewHalfExtents
     HalfExtents[0] = NewHalfExtents[0];
     HalfExtents[1] = NewHalfExtents[1];
     HalfExtents[2] = NewHalfExtents[2];
-    WireState = static_cast<unsigned char>((WireState & 0xf7) | ((bAlwaysWhite << 3) & 0x08));
+    WireState = static_cast<unsigned char>((WireState & ~kWireAlwaysWhite) | ((bAlwaysWhite << 3) & kWireAlwaysWhite));
     bNoZEnable = bNewNoZEnable;
     ToolTipIds = NewToolTipIds;
 }
@@ -443,14 +444,14 @@ WireButtonControl::WireButtonControl()
 {
     // Bits 1 and 3..7 keep what the allocation held (bit 1 is written by every press before it
     // is read).
-    ButtonState = static_cast<unsigned char>((ButtonState & 0xfe) | 0x04);
+    ButtonState = static_cast<unsigned char>((ButtonState & ~kWireButtonCaptured) | kWireButtonEnabled);
     CommandId = 0;
 }
 
 WireButtonControl::~WireButtonControl()
 {
     // FUN_005a3db0.
-    if ((ButtonState & 0x01) != 0)
+    if ((ButtonState & kWireButtonCaptured) != 0)
         Win3DRemoveCapture(this);
 }
 
@@ -467,7 +468,7 @@ void WireButtonControl::Update()
     UpdateBlink();
 
     // While the button holds the capture, light / unlight as the cursor moves on and off.
-    if ((ButtonState & 0x01) == 0)
+    if ((ButtonState & kWireButtonCaptured) == 0)
         return;
 
     FSpaceCamera* const Cam = Win3DGetCamera(); // DAT_0067dbf8
@@ -495,9 +496,9 @@ void WireButtonControl::Update()
 
     if (HitTest(Ray)) // slot 4
     {
-        if ((WireState & 0x04) != 0)
+        if ((WireState & kWirePressed) != 0)
             return;
-        WireState = static_cast<unsigned char>(WireState | 0x04);
+        WireState = static_cast<unsigned char>(WireState | kWirePressed);
         TellParent(this, 0x2b);
         if (Parent == nullptr)
             return;
@@ -505,9 +506,9 @@ void WireButtonControl::Update()
         TellParent(this, 0x2c);
         return;
     }
-    if ((WireState & 0x04) == 0)
+    if ((WireState & kWirePressed) == 0)
         return;
-    WireState = static_cast<unsigned char>(WireState & 0xfb);
+    WireState = static_cast<unsigned char>(WireState & ~kWirePressed);
     TellParent(this, 0x2a);
     TellParent(this, 0x2d);
 }
@@ -520,8 +521,8 @@ void WireButtonControl::MouseEnter(float const* /*Ray*/)
         NnUiPulseReset(); // FUN_0059d580
         TellParent(this, 0x2c);
     }
-    WireState = static_cast<unsigned char>(WireState | 0x01);
-    if ((ButtonState & 0x04) != 0)
+    WireState = static_cast<unsigned char>(WireState | kWireHovered);
+    if ((ButtonState & kWireButtonEnabled) != 0)
         PlayUiRolloverSound(); // FUN_00564700
 }
 
@@ -531,13 +532,13 @@ void WireButtonControl::MouseLeave(float const* /*Ray*/)
     if (ToolTipIds != 0)
         NnToolTipHideGlobal(); // FUN_004be390
     TellParent(this, 0x2d);
-    WireState = static_cast<unsigned char>(WireState & 0xfe);
+    WireState = static_cast<unsigned char>(WireState & ~kWireHovered);
 }
 
 bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // FUN_005a4380.
-    if ((ButtonState & 0x04) == 0)
+    if ((ButtonState & kWireButtonEnabled) == 0)
         return false;
     // While some control holds the mouse, a button whose WinControl parent does not hold it
     // ignores the event.
@@ -548,13 +549,13 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
             return false;
     }
 
-    if ((ButtonState & 0x01) != 0)
+    if ((ButtonState & kWireButtonCaptured) != 0)
     {
         // The release of a press this button captured.
-        if (Event->Field0 != -1 || Event->Field1 != 1)
+        if (Event->Button != kWin3DMouseLeft || Event->Action != kWin3DMouseRelease)
             return false;
-        WireState = static_cast<unsigned char>(WireState & 0xfb);
-        ButtonState = static_cast<unsigned char>(ButtonState & 0xfe);
+        WireState = static_cast<unsigned char>(WireState & ~kWirePressed);
+        ButtonState = static_cast<unsigned char>(ButtonState & ~kWireButtonCaptured);
         Win3DRemoveCapture(this); // FUN_0059d960
 
         // The cursor ray (FUN_004bdd40); unlike Update this goes through the math engine.
@@ -582,7 +583,7 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         {
             // Released off the button.
             TellParent(this, 0x29);
-            WireState = static_cast<unsigned char>(WireState & 0xfe);
+            WireState = static_cast<unsigned char>(WireState & ~kWireHovered);
             return true;
         }
 
@@ -599,9 +600,9 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
             PlayClientSoundArchIfIdle(Arch, nullptr, nullptr);          // FUN_004285f0
         }
 
-        if ((ButtonState & 0x02) != 0)
+        if ((ButtonState & kWireButtonDoubleClick) != 0)
         {
-            // A right click asks the parent 0x27 first; a zero answer becomes 0x26.
+            // A double click asks the parent 0x27 first; a zero answer becomes 0x26.
             if (Parent == nullptr)
                 return true;
             WinControl* const ParentControl = Parent->AsWinControl();
@@ -617,18 +618,18 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
     }
 
-    // A press, left (Field1 2) or right (3).
-    if (Event->Field0 != -1)
+    // A left press, single or double click.
+    if (Event->Button != kWin3DMouseLeft)
         return false;
-    if (Event->Field1 != 2 && Event->Field1 != 3)
+    if (Event->Action != kWin3DMousePress && Event->Action != kWin3DMouseDoubleClick)
         return false;
-    if (Event->Field1 == 3)
-        ButtonState = static_cast<unsigned char>(ButtonState | 0x02);
+    if (Event->Action == kWin3DMouseDoubleClick)
+        ButtonState = static_cast<unsigned char>(ButtonState | kWireButtonDoubleClick);
     else
-        ButtonState = static_cast<unsigned char>(ButtonState & 0xfd);
+        ButtonState = static_cast<unsigned char>(ButtonState & ~kWireButtonDoubleClick);
     TellParent(this, 0x28);
-    WireState = static_cast<unsigned char>(WireState | 0x04);
-    ButtonState = static_cast<unsigned char>(ButtonState | 0x01);
+    WireState = static_cast<unsigned char>(WireState | kWirePressed);
+    ButtonState = static_cast<unsigned char>(ButtonState | kWireButtonCaptured);
     if (Parent != nullptr)
     {
         NnUiPulseReset(); // FUN_0059d580
@@ -729,7 +730,7 @@ void RichTextWireButtonControl::Init(char const* NewSoundName, float const* NewO
 
     // FUN_0057da40 loads the ids without the trailing-paragraph trim; FUN_0057b3e0 appends.
     RenderDisplayList Caption;
-    StyleNode Style(0x828b);
+    StyleNode Style(kTextStyleButton);
     RdlAppendNode(Caption, Style.Clone());
     JustifyNode Justify(TextJustifyCenter);
     RdlAppendNode(Caption, Justify.Clone());
@@ -752,25 +753,25 @@ void WireControlsJoinColumn(WinControl* const* Controls, int Count)
         unsigned char const State = Cur->WireState;
         unsigned char const bFocused = static_cast<unsigned char>((State >> 1) & 1);
         unsigned char bAlone = 0;
-        if (bFocused != 0 || (State & 1) != 0)
+        if (bFocused != 0 || (State & kWireHovered) != 0)
         {
             bAlone = 1;
-            if (Next != nullptr && (Next->WireState & 0x10) != 0)
+            if (Next != nullptr && (Next->WireState & kWireLit) != 0)
                 bAlone = 0;
-            else if (Prev != nullptr && (Prev->WireState & 0x10) != 0)
+            else if (Prev != nullptr && (Prev->WireState & kWireLit) != 0)
                 bAlone = 0;
         }
 
         // The full box unless the next control is shown, this one is not lit and not
         // highlighted alone.
-        if (Next == nullptr || (Next->Flags & 2) == 0 || (Next->Flags & 1) == 0
-            || (Cur->WireState & 0x10) != 0 || bAlone != 0)
+        if (Next == nullptr || (Next->Flags & kWin3DVisible) == 0 || (Next->Flags & kWin3DActive) == 0
+            || (Cur->WireState & kWireLit) != 0 || bAlone != 0)
         {
             Cur->EdgeMask = 0xf;
         }
-        else if (bFocused == 0 && (Cur->WireState & 1) == 0)
+        else if (bFocused == 0 && (Cur->WireState & kWireHovered) == 0)
         {
-            if (Prev != nullptr && (Prev->WireState & 0x13) != 0)
+            if (Prev != nullptr && (Prev->WireState & (kWireHovered | kWireFocused | kWireLit)) != 0)
                 Cur->EdgeMask = 0xa;
             else
                 Cur->EdgeMask = 0xb;
@@ -778,9 +779,9 @@ void WireControlsJoinColumn(WinControl* const* Controls, int Count)
         else
         {
             Cur->EdgeMask = 0xa;
-            if (Prev == nullptr || (Prev->WireState & 0x10) == 0)
+            if (Prev == nullptr || (Prev->WireState & kWireLit) == 0)
                 Cur->EdgeMask = 0xb;
-            if ((Next->WireState & 0x10) == 0)
+            if ((Next->WireState & kWireLit) == 0)
                 Cur->EdgeMask |= 4;
         }
 

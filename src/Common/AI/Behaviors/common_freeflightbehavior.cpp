@@ -29,22 +29,22 @@ void FreeFlightBehavior::OnEngage()
     Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
     Flag365 = 1;
     Flag3fc = 0;
-    SubObjectA.SetAngle38(3.14159274f);                             // 0x40490fdb
+    Move.SetAngle38(3.14159274f);                             // 0x40490fdb
     ArrivalRange = 0.0f;
-    SubObjectA.SetRange3c(0.0f);
-    SubObjectA.SetEnabled(false);                                   // FUN_062d5a10
-    SubObjectA.SetField44(2);                                       // FUN_062d88b0
+    Move.SetRange3c(0.0f);
+    Move.SetEnabled(false);                                   // FUN_062d5a10
+    Move.SetField44(2);                                       // FUN_062d88b0
     // The lock value is ThrustManager::bAutoAvoidance, read through the ICF fold named
     // EquipDesc::get_temporary.
-    SystemManager* const Sys = NavHelperPtr24;
-    SetCruiseLock(Sys->Thrust.bAutoAvoidance, 3);                   // FUN_062d21d0
+    SystemManager* const Sys = SysMgr;
+    SetAvoidanceAllowed(Sys->Thrust.bAutoAvoidance, 3);                   // FUN_062d21d0
     GotoKind = 1;
     Flag2ea = 1;
     SteerAxisX = 0.0f;
     SteerAxisY = 0.0f;
     SteerAxisZ = 0.0f;
-    ObjInspectOf(OwnerContextPtr14)->get_throttle(UserThrottle);
-    ObjInspectOf(OwnerContextPtr14)->is_cruise_active(reinterpret_cast<bool&>(Flag2e8));
+    ObjInspectOf(OwnerContext)->get_throttle(UserThrottle);
+    ObjInspectOf(OwnerContext)->is_cruise_active(reinterpret_cast<bool&>(Flag2e8));
     // Unordered keeps the throttle.
     if (UserThrottle < 0.0f)
     {

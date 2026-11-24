@@ -202,12 +202,12 @@ namespace
     {
         // record+0x18 (key down) selects the keydown bit, else keyup.
         unsigned const NeedBit =
-            Record->Byte18 != 0 ? kKeyCmdStateKeyDown : kKeyCmdStateKeyUp;
+            Record->bKeyDown != 0 ? kKeyCmdStateKeyDown : kKeyCmdStateKeyUp;
         if ((Cmd->StateMask & NeedBit) == 0)
             return false;
 
         // An auto-repeat key-down (record+0x19) needs the `repeat` bit.
-        if (Record->Byte19 != 0 && (Cmd->StateMask & kKeyCmdStateRepeat) == 0)
+        if (Record->bRepeat != 0 && (Cmd->StateMask & kKeyCmdStateRepeat) == 0)
             return false;
 
         if ((Cmd->StateMask & kKeyCmdStateShiftIgnore) != 0)
@@ -574,7 +574,7 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
     // Every message clears the auto-repeat flag (record+0x19), including the ones that fall
     // out below.
     int Mode = 1;
-    Record->Byte19 = 0;
+    Record->bRepeat = 0;
 
     // Only 0x100..0x105; WM_DEADCHAR shares the "false" arm.
     unsigned Kind = 0;
@@ -584,27 +584,27 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
     case WM_SYSKEYDOWN:
         // Repeat = previous state down, transition 0, no context bit.
         Record->Key = Wparam;
-        Record->Byte19 = (Lparam & 0xF0000000u) == 0x40000000u ? 1 : 0;
+        Record->bRepeat = (Lparam & 0xF0000000u) == 0x40000000u ? 1 : 0;
         Kind = 1;
-        Record->Byte18 = 1;
+        Record->bKeyDown = 1;
         break;
     case WM_KEYUP:
     case WM_SYSKEYUP:
         Record->Key = Wparam;
-        Record->Byte18 = 0;
-        Record->Byte19 = (Lparam & 0xF0000000u) == 0x40000000u ? 1 : 0;
+        Record->bKeyDown = 0;
+        Record->bRepeat = (Lparam & 0xF0000000u) == 0x40000000u ? 1 : 0;
         Kind = 1;
         break;
     case WM_CHAR:
         Record->Key = 0;
         Kind = 2;
-        Record->Byte18 = 1;
+        Record->bKeyDown = 1;
         break;
     default:
         return false;
     }
 
-    Record->Field0C = Message;
+    Record->WindowMessage = Message;
     Record->Arg10 = Wparam;
     Record->Arg14 = Lparam;
 
@@ -637,9 +637,9 @@ bool KeyMapRouteInputMessage(unsigned Message, unsigned Wparam, unsigned Lparam)
         // Key events that are not Shift/Ctrl/Alt themselves and not an auto-repeat.
         unsigned const Key = Record->Key;
         if (Kind == 1 && Key != VK_SHIFT && Key != VK_CONTROL && Key != VK_MENU &&
-            Record->Byte19 == 0)
+            Record->bRepeat == 0)
         {
-            if (Record->Byte18 != 0)
+            if (Record->bKeyDown != 0)
             {
                 FKeyMapHeldKey Held;
                 Held.Key = Key;
@@ -747,7 +747,7 @@ bool KeyMapRouteMouseEvent(FHudCmdRecord const* Event)
     }
 
     *Record = *Event;
-    Record->Field0C = 0;
+    Record->WindowMessage = 0;
     Record->Arg10 = 0;
     Record->Arg14 = 0;
 

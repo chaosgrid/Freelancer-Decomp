@@ -610,7 +610,7 @@ void FRandEncTLParams::Spawn(bool bForced)
     // The list, then the directive holder (retail releases it while still empty, a no-op).
     FMissionDirectiveList LeaderDirectives;
     TRefHandle<FObjListDirective> Leader;
-    CreateObjListDirective(1, &Leader.Pointer);
+    CreateObjListDirective(OBJLIST_DELAY, &Leader.Pointer);
     FObjListDelay* const Delay = static_cast<FObjListDelay*>(Leader.Pointer);
     Delay->SetDelay(25.0f);                                                // FUN_06f27940
     Delay->Op.Priority = 1;                                                // +0x114
@@ -773,7 +773,7 @@ bool FRandEncTLParams::SpawnLaneFormation(FTransform const* Placement, int Count
     int const SegmentCount = static_cast<int>(Segments.size());
     FPatrolPathSegment const& Segment = Segments[std::rand() * SegmentCount / 32768];
     FSpawnPlan Plan;
-    Plan.Kind = 0;
+    Plan.Kind = SPAWN_PLAN_NONE;
     Plan.RingId = 0;
     Plan.NextRingId = 0;
     Plan.DockTarget = 0;
@@ -790,7 +790,7 @@ bool FRandEncTLParams::SpawnLaneFormation(FTransform const* Placement, int Count
     // reference from new is never dropped, as in retail), the plan copied into it and the
     // ring's zone.
     FContentNpcShipParams& Leader = Blocks.front();
-    FGuideDesc* const Desc = new FGuideDesc(3, nullptr);
+    FGuideDesc* const Desc = new FGuideDesc(GUIDE_TYPE_PATROL_PATH, nullptr);
     if (Leader.GuideDesc.Pointer != Desc)
     {
         if (Leader.GuideDesc.Pointer != nullptr)

@@ -15,21 +15,13 @@
 #include <cstdint>
 #include <cstring> // std::memcpy -- the GotoOp copy in OnApplyDirective (LAB_062fe670)
 
-// GotoBehavior's ctor FUN_062fd620 first runs the shared base-init helper FUN_062d2020 (it
-// writes +0x04..+0x29, see Behavior in common_behavior.h) with its own type-id argument.
-GotoBehaviorFields::GotoBehaviorFields(int InTypeId)
-    : TypeId(InTypeId)
-{
-    ConstructBase(InTypeId);   // FUN_062d2020
-}
-
-// FUN_062fd620. The sub-ideas are FUN_062d4e60 (MoveIdea), FUN_062d6750 (FaceIdea) and
+// FUN_062fd620. Behavior's ctor FUN_062d2020 runs first. The sub-ideas are FUN_062d4e60 (MoveIdea), FUN_062d6750 (FaceIdea) and
 // FUN_062d9bf0 (SplineMoveIdea); Watcher370 opens the FUN_062c29b0 POD.
 GotoBehavior::GotoBehavior(int InTypeId)
-    : GotoBehaviorFields(InTypeId)
-    , SubObjectA()
-    , SubObjectB()
-    , SubObjectC()
+    : Behavior(InTypeId)
+    , Move()
+    , Face()
+    , SplineMove()
     , SteerAxisX(0)
     , SteerAxisY(0)
     , SteerAxisZ(0)
@@ -47,16 +39,16 @@ GotoBehavior::GotoBehavior(int InTypeId)
     , Watcher310()
     , Spline()
     , ArrivalRange(200.0f)
-    , Field35c(-1.0f)
+    , MaxSpeed(-1.0f)
     , MaxThrottle(1.0f)
     , Flag364(0)    // not written by retail's ctor; Update writes it before any read
     , Flag365(1)
-    , Flag366(0)
+    , bFlyThrough(0)
     , Flag367(0)    // not written by retail's ctor; SetContext/OnApplyDirective set it before any read
     , Flag368(0)
     , Flag369(0)
-    , Flag36a(0)
-    , Flag36b(0)
+    , bGotoCruise(0)
+    , bGotoNoCruise(0)
     , Flag36c(1)
     , Pad36d{}
     , Watcher370()
@@ -75,16 +67,16 @@ GotoBehavior::GotoBehavior(int InTypeId)
 }
 
 // FUN_062fd7a0 (scalar deleting FUN_062fd780). Retail unwatches six watchers in this order:
-// +0x370, +0x310, +0x204 (SubObjectC.Face), +0x18c (SubObjectC.Move), +0xb8 (SubObjectB),
-// +0x40 (SubObjectA). ~Behavior (FUN_062d2080) chains after.
+// +0x370, +0x310, +0x204 (SplineMove.Face), +0x18c (SplineMove.Move), +0xb8 (Face),
+// +0x40 (Move). ~Behavior (FUN_062d2080) chains after.
 GotoBehavior::~GotoBehavior()
 {
     Watcher370.set(nullptr);
     Watcher310.set(nullptr);
-    SubObjectC.Face.Watcher.set(nullptr);
-    SubObjectC.Move.Watcher.set(nullptr);
-    SubObjectB.Watcher.set(nullptr);
-    SubObjectA.Watcher.set(nullptr);
+    SplineMove.Face.Watcher.set(nullptr);
+    SplineMove.Move.Watcher.set(nullptr);
+    Face.Watcher.set(nullptr);
+    Move.Watcher.set(nullptr);
 }
 
 // ============================================================================
@@ -95,7 +87,7 @@ GotoBehavior::~GotoBehavior()
 // ============================================================================
 
 // FUN_062c29f0. Only caller is GotoBehavior::OnApplyDirective.
-void ProxWatcherInit(unsigned char* Watcher, void* NavHelper, void* Target, float Near, float Far,
+void ProxWatcherInit(unsigned char* Watcher, SystemManager* SysMgr, void* Target, float Near, float Far,
                      float CruiseRatio)
 {
     BaseWatcher* const W = reinterpret_cast<BaseWatcher*>(Watcher);
@@ -118,11 +110,10 @@ void ProxWatcherInit(unsigned char* Watcher, void* NavHelper, void* Target, floa
     {
         // Own cruise speed (stored to float) over the watched object's engine speed; the
         // quotient is stored to float.
-        SystemManager* const Sys = static_cast<SystemManager*>(NavHelper);
-        IObjRW* const Self = ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()));
-        float const OwnSpeed = Behavior_InvokeManagerSlotD8(
+        IObjRW* const Self = ObjRwFromWatchable(const_cast<Watchable*>(SysMgr->Watcher.target()));
+        float const OwnSpeed = Behavior_GetSpeed(
             ObjInspectOf(Self), 1.0f, IObject::ThrustEquipCruise);
-        double const WatchedSpeed = Behavior_InvokeManagerSlotD8(
+        double const WatchedSpeed = Behavior_GetSpeed(
             ObjInspectOf(Watched), 1.0f, IObject::ThrustEquipEngine);
         *Ratio = static_cast<float>(OwnSpeed / WatchedSpeed);
     }
@@ -132,7 +123,7 @@ void ProxWatcherInit(unsigned char* Watcher, void* NavHelper, void* Target, floa
 }
 
 // FUN_062c2af0.
-void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, void* NavHelper, Vector const& RefPoint)
+void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, SystemManager* SysMgr, Vector const& RefPoint)
 {
     IObjRW* const Obj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
     if (Obj == nullptr)
@@ -149,7 +140,7 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, void* NavHelper, Vect
     float const Dy = Pos.y - RefPoint.y;
     float const Dz = Pos.z - RefPoint.z;
 
-    FAiTarget* const SteerElem = &((SystemManager*)NavHelper)->SelfTarget;
+    FAiTarget* const SteerElem = &SysMgr->SelfTarget;
     // Unrounded ST0 return.
     double const RadialClearance = GetSignedRadialClearanceToPoint(SteerElem, RefPoint); // FUN_062e4ea0
 
@@ -201,7 +192,7 @@ void ProxWatcherRecomputeZoneFlags(unsigned char* Watcher, void* NavHelper, Vect
 }
 
 // FUN_062c2c70.
-double ProxWatcherComputeSpeedCap(unsigned char* Watcher, void* OwnerContext, void* NavHelper,
+double ProxWatcherComputeSpeedCap(unsigned char* Watcher, IObjRW* OwnerContext, SystemManager* SysMgr,
                                   int Selector, float SelectorValue)
 {
     IObjRW* const Obj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
@@ -214,15 +205,15 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, void* OwnerContext, vo
     // passed on unchanged.
     float const QueryValue = (Selector == 1) ? SelectorValue : 1.0f;
     float const OwnerSpeed =
-        Behavior_InvokeManagerSlotD8(ObjInspectOf(OwnerContext), QueryValue, ThrustType); // FUN_062e5af0
+        Behavior_GetSpeed(ObjInspectOf(OwnerContext), QueryValue, ThrustType); // FUN_062e5af0
 
     unsigned const ZoneFlags = *reinterpret_cast<unsigned*>(Watcher + 0x14);
     double ZoneSpeed;
     if ((ZoneFlags & 3) != 0)
     {
         // Retail has two identical arms (one re-reads the watcher, one passes a null
-        // receiver); collapsed, since Behavior_InvokeManagerSlotD8 returns 0.0f on null.
-        ZoneSpeed = Behavior_InvokeManagerSlotD8(
+        // receiver); collapsed, since Behavior_GetSpeed returns 0.0f on null.
+        ZoneSpeed = Behavior_GetSpeed(
             ObjInspectOf(ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00))), 1.0f, ThrustType);
     }
     else if ((ZoneFlags & 4) == 0)
@@ -235,14 +226,14 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, void* OwnerContext, vo
         // ProxWatcherRecomputeZoneFlags, which cruise-scales them). Only Blend is rounded.
         float const NearThreshold = *reinterpret_cast<float*>(Watcher + 0x08);
         float const FarThreshold = *reinterpret_cast<float*>(Watcher + 0x0c);
-        FAiTarget* const SteerElem = &((SystemManager*)NavHelper)->SelfTarget;
+        FAiTarget* const SteerElem = &SysMgr->SelfTarget;
         double const Clearance = GetInterceptClearanceOfIface(SteerElem, Obj); // FUN_062e4bb0
         float const Blend = static_cast<float>(
             1.0 - ((Clearance - NearThreshold) / (static_cast<double>(FarThreshold) - NearThreshold))); // DAT_0639a1d0 = 1.0f
 
         // Retail really multiplies by Blend twice (a square), unrounded until the caller's
         // store.
-        float const FullSpeed = Behavior_InvokeManagerSlotD8(
+        float const FullSpeed = Behavior_GetSpeed(
             ObjInspectOf(ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00))), 1.0f, ThrustType);
         ZoneSpeed = (static_cast<double>(FullSpeed) * Blend) * Blend;
 
@@ -256,7 +247,7 @@ double ProxWatcherComputeSpeedCap(unsigned char* Watcher, void* OwnerContext, vo
 }
 
 // FUN_062c2d90.
-void ProxWatcherNotifyZoneChange(unsigned char* Watcher, void* NavHelper, void* BehaviorMgr,
+void ProxWatcherNotifyZoneChange(unsigned char* Watcher, SystemManager* SysMgr, IBehaviorManager* BehaviorMgr,
                                  Vector const& RefPoint)
 {
     IObjRW* const Obj = ObjRwFromWatchable(*reinterpret_cast<void**>(Watcher + 0x00));
@@ -278,12 +269,12 @@ void ProxWatcherNotifyZoneChange(unsigned char* Watcher, void* NavHelper, void* 
     else
         return;
 
-    unsigned const OwnerId = ((SystemManager*)NavHelper)->SelfTarget.Iface->get_id();
+    unsigned const OwnerId = SysMgr->SelfTarget.Iface->get_id();
 
     unsigned const WatchedId = ObjInspectOf(Obj)->get_id();
 
     // FUN_062d2a10.
-    (void)static_cast<IBehaviorManager*>(BehaviorMgr)->NotifyTetherEvent(
+    (void)BehaviorMgr->NotifyTetherEvent(
         OwnerId, WatchedId, static_cast<pub::AI::ContentCallback::TetherStatusType>(Code), RefPoint);
 }
 
@@ -311,11 +302,11 @@ void ProxWatcherNotifyZoneChange(unsigned char* Watcher, void* NavHelper, void* 
 
 namespace
 {
-    // The SystemManager's +0x08 watcher target, `-8` downcast. Retail re-walks this chain at
+    // The SystemManager's Watcher (+0x08) target, `-8` downcast. Retail re-walks this chain at
     // all seven sites that need the owner, hence a function rather than a hoisted local.
     IObjRW* OwnerObjOf(SystemManager* Sys)
     {
-        return ObjRwFromWatchable(*reinterpret_cast<void**>(reinterpret_cast<unsigned char*>(Sys) + 0x8));
+        return ObjRwFromWatchable(const_cast<Watchable*>(Sys->Watcher.target()));
     }
 
     // Once-per-tick physical-bounds cache (latch +0x157a), inlined twice (062ec05c,
@@ -330,7 +321,7 @@ namespace
     }
 }
 
-bool FGunConvergenceStateBlock::ComputeFormationFollowerEnvelope(FormationFollowerEnvelope* Out)
+bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEnvelope* Out)
 {
     SystemManager* const Sys = Owner;
     if (OwnerObjOf(Sys) == nullptr)
@@ -345,7 +336,7 @@ bool FGunConvergenceStateBlock::ComputeFormationFollowerEnvelope(FormationFollow
 
     ThrustEquipType const ThrustType = bCruise ? ThrustEquipCruise : ThrustEquipEngine;
     float MinFollowerSpeed =
-        Behavior_InvokeManagerSlotD8(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, ThrustType); // FUN_062e5af0
+        Behavior_GetSpeed(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, ThrustType); // FUN_062e5af0
 
     // Four of the five out fields are written before the follower-count early-out, so a
     // `false` return still leaves this partial result for the caller.
@@ -357,7 +348,7 @@ bool FGunConvergenceStateBlock::ComputeFormationFollowerEnvelope(FormationFollow
     // 0x503 is the "is a CShip" mask. Retail calls CShip::get_formation_followers
     // non-virtually even when the mask misses (this == 0), and so does the port.
     CObject const* const Obj = ObjInspectOf(OwnerObjOf(Sys))->cobject();
-    CShip* const Ship = (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+    CShip* const Ship = (Obj != nullptr && (Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
         ? static_cast<CShip*>(const_cast<CObject*>(Obj))
         : nullptr;
 
@@ -485,7 +476,7 @@ bool FGunConvergenceStateBlock::ComputeFormationFollowerEnvelope(FormationFollow
 
         // FUN_062e5b70.
         Out->Throttle =
-            Behavior_InvokeManagerSlotD4(ObjInspectOf(OwnerObjOf(Sys)), TargetSpeed, ThrustType);
+            Behavior_GetProjectedThrottle(ObjInspectOf(OwnerObjOf(Sys)), TargetSpeed, ThrustType);
 
         // The first compare uses the unrounded angle, the second the rounded copy.
         double const AngleExact = std::acos(static_cast<double>(MinAlignCos));
@@ -525,15 +516,15 @@ bool FGunConvergenceStateBlock::ComputeFormationFollowerEnvelope(FormationFollow
         Out->AngularSpeed = AngularTarget;
 
         // FUN_062e5ba0.
-        Out->AngularThrottle = Behavior_InvokeManagerSlotF8(ObjInspectOf(OwnerObjOf(Sys)), AngularTarget);
+        Out->AngularThrottle = Behavior_GetProjectedAxisThrottleXY(ObjInspectOf(OwnerObjOf(Sys)), AngularTarget);
     }
     else
     {
         // Nothing to hold back for: the owner's own full speed and turn rate.
-        Out->Speed = Behavior_InvokeManagerSlotD8(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, ThrustType);
+        Out->Speed = Behavior_GetSpeed(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, ThrustType);
         Out->Throttle = 1.0f;
         // FUN_062e5b20 with both arguments 1.0f, unlike the in-loop (1.0f, 0.0f).
-        Out->AngularSpeed = Behavior_InvokeManagerSlotF0(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, 1.0f);
+        Out->AngularSpeed = Behavior_GetAngularSpeedXY(ObjInspectOf(OwnerObjOf(Sys)), 1.0f, 1.0f);
         Out->AngularThrottle = 1.0f;
     }
 
@@ -559,10 +550,10 @@ bool GotoBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     if (bBound)
     {
         Flag367 = 1;
-        SubObjectA.SetContext(OwnerContextPtr14, NavHelperPtr24, Manager);
-        SubObjectA.SetEnabled(Flag367);                             // FUN_062d5a10 (raw byte)
-        SubObjectB.SetContext(OwnerContextPtr14, NavHelperPtr24, Manager);
-        SubObjectC.SetContext(OwnerContextPtr14, NavHelperPtr24, Manager);
+        Move.SetContext(OwnerContext, SysMgr, Manager);
+        Move.SetEnabled(Flag367);                             // FUN_062d5a10 (raw byte)
+        Face.SetContext(OwnerContext, SysMgr, Manager);
+        SplineMove.SetContext(OwnerContext, SysMgr, Manager);
     }
     return bBound;
 }
@@ -574,17 +565,17 @@ void GotoBehavior::OnEngage()
     Flag369 = 0;
     // Retail does not clear Flag368 before the call.
     int const CruiseResult =
-        ObjInspectOf(OwnerContextPtr14)->is_cruise_active(reinterpret_cast<bool&>(Flag368));
+        ObjInspectOf(OwnerContext)->is_cruise_active(reinterpret_cast<bool&>(Flag368));
     // Mode 2 only when the flag came back set AND the call returned 0.
-    SubObjectA.SetMode((Flag368 != 0 && CruiseResult == 0) ? 2 : 0);    // FUN_062d5980
+    Move.SetMode((Flag368 != 0 && CruiseResult == 0) ? 2 : 0);    // FUN_062d5980
     Flag365 = 1;
     Flag36c = 1;
-    SubObjectA.SetAngle38(3.14159274f);                             // 0x40490fdb
+    Move.SetAngle38(3.14159274f);                             // 0x40490fdb
     UserThrottle = MaxThrottle;
     Flag2ea = 0;
     Flag2ec = 0;
-    SetCruiseLock(1, 3);                                            // FUN_062d21d0
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
+    SystemManager* const Sys = SysMgr;
     if (Sys->SelfTarget.Iface->is_player())
         set_cruise(true);
 }
@@ -592,12 +583,12 @@ void GotoBehavior::OnEngage()
 // Slot 4, FUN_062fd9c0.
 void GotoBehavior::OnDisengage()
 {
-    SubObjectB.Commit();
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    Face.Commit();
+    SystemManager* const Sys = SysMgr;
     if (Sys->SelfTarget.Iface->is_player() && GotoKind == 0)
-        SubObjectA.SetField44(2);                                   // FUN_062d88b0
-    SubObjectA.Commit();
-    ((SystemManager*)NavHelperPtr24)->Thrust.SetStrafeDir(StrafeNone); // FUN_062e9030(+0x18, 0)
+        Move.SetField44(2);                                   // FUN_062d88b0
+    Move.Commit();
+    SysMgr->Thrust.SetStrafeDir(StrafeNone); // FUN_062e9030(+0x18, 0)
     Behavior::OnDisengage();
 }
 
@@ -610,7 +601,7 @@ int GotoBehavior::OnEvaluateReadiness(float Value)
         Result = (Flag29 != 0) ? 3 : 1;
     else if (Flag29 != 0)
         Result = 3;
-    ModeSelector0xc = Result;
+    Readiness = Result;
     return Result;
 }
 
@@ -618,7 +609,7 @@ int GotoBehavior::OnEvaluateReadiness(float Value)
 EvaluateResult GotoBehavior::evaluate(unsigned int Context)
 {
     (void)Context;
-    IObjInspect const* const Owner = ObjInspectOf(OwnerContextPtr14);
+    IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
     IObjRW* Target = nullptr;
     Owner->get_target(Target);
     if (Target == nullptr)
@@ -705,18 +696,18 @@ int GotoBehavior::Update()
     // A pending disengage request finishes the tick with 2.
     if ((Flags28 & 0x1) != 0)
     {
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
-    if (OwnerContextPtr14 == nullptr || (Flags28 & 0x2) == 0)
+    if (OwnerContext == nullptr || (Flags28 & 0x2) == 0)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
 
-    IObjInspect const* const Owner = ObjInspectOf(OwnerContextPtr14);
-    SystemManager* const Sys = static_cast<SystemManager*>(NavHelperPtr24);
+    IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
+    SystemManager* const Sys = SysMgr;
     FAiTarget* const Elem = &Sys->SelfTarget;
 
     // Nothing reads bOwnerCruise; retail issues the call anyway.
@@ -738,7 +729,7 @@ int GotoBehavior::Update()
     float Clearance = 0.0f;
     if (Elem->Iface->is_player())
     {
-        if (Flag2e8 != 0 && Flag36b == 0)
+        if (Flag2e8 != 0 && bGotoNoCruise == 0)
             Throttle = 1.0f;
         else
             Throttle = UserThrottle;
@@ -772,15 +763,15 @@ int GotoBehavior::Update()
             // faces the point ahead.
             Vector const& Steer = *reinterpret_cast<Vector const*>(&SteerAxisX);
             if (LengthSquaredXyz(Steer) > 0.0)
-                SubObjectB.SetAxis(Steer);
+                Face.SetAxis(Steer);
             else
-                SubObjectB.SetPosition(Ahead);
+                Face.SetPosition(Ahead);
 
-            SubObjectA.SetField44(2);
-            SubObjectA.SetDirection(Dir);
+            Move.SetField44(2);
+            Move.SetDirection(Dir);
 
-            // Flag366 is stored between the load and the compare.
-            Flag366 = 1;
+            // bFlyThrough is stored between the load and the compare.
+            bFlyThrough = 1;
             if (Clearance < ArrivalRange)
             {
                 // Arrived.
@@ -788,15 +779,15 @@ int GotoBehavior::Update()
                 Flag368 = 0;
                 OnDisengage();
                 Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-                BehaviorMgrPtr20->SetDirectiveResult(2, 0);
-                UpdateResult10 = 2;
+                BehaviorMgr->SetDirectiveResult(2, 0);
+                UpdateResult = 2;
                 return 2;
             }
         }
         else
         {
-            SubObjectB.SetPosition(Destination);
-            SubObjectA.SetPosition(Destination);
+            Face.SetPosition(Destination);
+            Move.SetPosition(Destination);
         }
 
         ActiveTargetPos = Destination;
@@ -809,17 +800,17 @@ int GotoBehavior::Update()
             Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
             OnDisengage();
             Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-            BehaviorMgrPtr20->SetDirectiveResult(2, 2);
+            BehaviorMgr->SetDirectiveResult(2, 2);
 
             if (Elem->Iface->is_player())
-                ObjAffectOf(OwnerContextPtr14)->slot_6c(3, 0);
+                ObjAffectOf(OwnerContext)->slot_6c(3, 0);
 
             Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
             Flag368 = 0;
             OnDisengage();
             Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-            BehaviorMgrPtr20->SetDirectiveResult(2, 2);
-            UpdateResult10 = Result;
+            BehaviorMgr->SetDirectiveResult(2, 2);
+            UpdateResult = Result;
             return Result;
         }
 
@@ -830,13 +821,13 @@ int GotoBehavior::Update()
             Vector const Velocity = GotoWatchedObject(Watcher310)->get_velocity();
             if (LengthSquaredXyz(Velocity) > 25.0)
             {
-                ObjAffectOf(OwnerContextPtr14)->slot_6c(2, 0);
+                ObjAffectOf(OwnerContext)->slot_6c(2, 0);
                 Flags28 = static_cast<unsigned char>(Flags28 | 0x1);
                 Flag368 = 0;
                 OnDisengage();
                 Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-                BehaviorMgrPtr20->SetDirectiveResult(2, 2);
-                UpdateResult10 = Result;
+                BehaviorMgr->SetDirectiveResult(2, 2);
+                UpdateResult = Result;
                 return Result;
             }
         }
@@ -850,8 +841,8 @@ int GotoBehavior::Update()
         {
             // Here the FaceIdea faces the steering triple unconditionally.
             Vector const Dir = NegatedColumn2(Elem->Iface->get_transform().Rotation);
-            SubObjectB.SetAxis(*reinterpret_cast<Vector const*>(&SteerAxisX));
-            SubObjectA.SetDirection(Dir);
+            Face.SetAxis(*reinterpret_cast<Vector const*>(&SteerAxisX));
+            Move.SetDirection(Dir);
 
             if (Clearance < ArrivalRange)
             {
@@ -859,43 +850,43 @@ int GotoBehavior::Update()
                 Flag368 = 0;
                 OnDisengage();
                 Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
-                BehaviorMgrPtr20->SetDirectiveResult(2, 0);
-                UpdateResult10 = 2;
+                BehaviorMgr->SetDirectiveResult(2, 0);
+                UpdateResult = 2;
                 return 2;
             }
         }
         else
         {
-            SubObjectA.SetWatchObject(GotoWatchedObject(Watcher310));
-            SubObjectB.SetWatchObject(GotoWatchedObject(Watcher310));
+            Move.SetWatchObject(GotoWatchedObject(Watcher310));
+            Face.SetWatchObject(GotoWatchedObject(Watcher310));
         }
     }
 
     // The proximity watcher at +0x370.
     unsigned char* const ProxWatcher = reinterpret_cast<unsigned char*>(&Watcher370);
-    ProxWatcherRecomputeZoneFlags(ProxWatcher, NavHelperPtr24, ActiveTargetPos);
-    ProxWatcherNotifyZoneChange(ProxWatcher, NavHelperPtr24, BehaviorMgrPtr20, ActiveTargetPos);
+    ProxWatcherRecomputeZoneFlags(ProxWatcher, SysMgr, ActiveTargetPos);
+    ProxWatcherNotifyZoneChange(ProxWatcher, SysMgr, BehaviorMgr, ActiveTargetPos);
 
     if (GotoKind == 2)
     {
         // The lead point is the spline's end point (+0x330).
         ActiveTargetPos = Spline.P2;
-        SubObjectC.SetBankBlendCap(Throttle);
+        SplineMove.SetBankBlendCap(Throttle);
 
         if (GotoWatchedObject(Watcher370) != nullptr)
         {
             // Clearance is reused for the speed cap.
             Clearance = static_cast<float>(
-                ProxWatcherComputeSpeedCap(ProxWatcher, OwnerContextPtr14, NavHelperPtr24, 1, MaxThrottle));
-            if (Behavior_InvokeManagerSlotD8(Owner, Throttle, ThrustEquipEngine) > Clearance)
-                SubObjectC.SetThrottleScale(Clearance);
+                ProxWatcherComputeSpeedCap(ProxWatcher, OwnerContext, SysMgr, 1, MaxThrottle));
+            if (Behavior_GetSpeed(Owner, Throttle, ThrustEquipEngine) > Clearance)
+                SplineMove.SetThrottleScale(Clearance);
         }
 
-        int const SplineResult = SubObjectC.Update(DeltaTime1c);
+        int const SplineResult = SplineMove.Update(DeltaTime);
         if (SplineResult == 0)
         {
             Result = 1;
-            UpdateResult10 = Result;
+            UpdateResult = Result;
             return Result;
         }
         if (SplineResult != 1)
@@ -905,11 +896,11 @@ int GotoBehavior::Update()
         else
         {
             // Done with the spline: keep going while the watcher still has an object outside
-            // zone 2 and Flag366 is clear.
-            if (GotoWatchedObject(Watcher370) != nullptr && (Flags384 & 0x2) == 0 && Flag366 == 0)
+            // zone 2 and bFlyThrough is clear.
+            if (GotoWatchedObject(Watcher370) != nullptr && (Flags384 & 0x2) == 0 && bFlyThrough == 0)
             {
                 Result = 1;
-                UpdateResult10 = Result;
+                UpdateResult = Result;
                 return Result;
             }
             Result = 2;
@@ -917,7 +908,7 @@ int GotoBehavior::Update()
     }
     else if (GotoKind == 0 || GotoKind == 1)
     {
-        SubObjectA.SetField44(Flag366 != 0 ? 2 : 0);
+        Move.SetField44(bFlyThrough != 0 ? 2 : 0);
 
         // Once per goto (Flag365); unordered gives 0.
         if (Flag365 != 0)
@@ -927,8 +918,8 @@ int GotoBehavior::Update()
         }
 
         // For the player, Flag364 only while Flag2e8 is set; a non-zero value is then
-        // confirmed by the pathfinder when there is one (FUN_062de160). Flag36a forces it on,
-        // Flag36b forces it off.
+        // confirmed by the pathfinder when there is one (FUN_062de160). bGotoCruise forces it on,
+        // bGotoNoCruise forces it off.
         unsigned char bCruise;
         if (Elem->Iface->is_player())
         {
@@ -940,31 +931,31 @@ int GotoBehavior::Update()
         {
             bCruise = Flag364;
         }
-        if (bCruise != 0 && BehaviorMgrPtr20->Pathfind != nullptr)
-            bCruise = BehaviorMgrPtr20->Pathfind->IsCruiseUnobstructed() ? 1 : 0;
-        if (Flag36a != 0)
+        if (bCruise != 0 && BehaviorMgr->Pathfind != nullptr)
+            bCruise = BehaviorMgr->Pathfind->IsCruiseUnobstructed() ? 1 : 0;
+        if (bGotoCruise != 0)
             bCruise = 1;
-        if (Flag36b != 0)
+        if (bGotoNoCruise != 0)
             bCruise = 0;
 
         // FUN_062ebf50. Retail zeroes only the out-struct's first four dwords; the flag byte
         // is value-initialised here too (the callee writes it on every path returning true).
         FormationFollowerEnvelope Envelope{};
-        if (Sys->GunConvergenceStateBytes.ComputeFormationFollowerEnvelope(&Envelope))
+        if (Sys->FormationLeaders.ComputeFormationFollowerEnvelope(&Envelope))
         {
-            SubObjectA.SetAngle38(3.14159274f);
+            Move.SetAngle38(3.14159274f);
             if (Envelope.Throttle < Throttle)
                 Throttle = Envelope.Throttle;
-            SubObjectA.SetScale40(Throttle);
+            Move.SetScale40(Throttle);
 
             // A clear envelope flag cancels cruise.
-            SubObjectB.SetThrottleScale(Envelope.AngularSpeed);
+            Face.SetThrottleScale(Envelope.AngularSpeed);
             if (Envelope.Flag10 == 0)
                 bCruise = 0;
         }
         else
         {
-            SubObjectB.SetScale94(1.0f);                            // FUN_062d9490
+            Face.SetScale94(1.0f);                            // FUN_062d9490
         }
 
         unsigned char bTargetCruise = 0;
@@ -977,9 +968,9 @@ int GotoBehavior::Update()
 
         // Unless forced, a watched object that is not cruising and is not one of our formation
         // followers (FUN_062c2ab0, FUN_062ec520) cancels cruise.
-        if (Flag36a == 0 && GotoWatchedObject(Watcher370) != nullptr && bTargetCruise == 0)
+        if (bGotoCruise == 0 && GotoWatchedObject(Watcher370) != nullptr && bTargetCruise == 0)
         {
-            if (!Sys->GunConvergenceStateBytes.IsIdAmongOwnerFormationFollowers(Watcher370.get_watched_id()))
+            if (!Sys->FormationLeaders.IsIdAmongOwnerFormationFollowers(Watcher370.get_watched_id()))
                 bCruise = 0;
         }
 
@@ -987,14 +978,14 @@ int GotoBehavior::Update()
         {
             if (bCruise != 0)
             {
-                SubObjectA.SetMode(2);
+                Move.SetMode(2);
                 Flag368 = 1;
             }
             else
             {
                 // SetRange3c is the DeviceTRC::bind_to_dc ICF fold.
-                SubObjectA.SetRange3c(ArrivalRange);
-                SubObjectA.SetMode(0);
+                Move.SetRange3c(ArrivalRange);
+                Move.SetMode(0);
                 Flag368 = 0;
             }
         }
@@ -1004,14 +995,14 @@ int GotoBehavior::Update()
         if (GotoWatchedObject(Watcher370) != nullptr)
         {
             Clearance = static_cast<float>(ProxWatcherComputeSpeedCap(
-                ProxWatcher, OwnerContextPtr14, NavHelperPtr24, Flag368 != 0 ? 4 : 1, MaxThrottle));
+                ProxWatcher, OwnerContext, SysMgr, Flag368 != 0 ? 4 : 1, MaxThrottle));
             ThrustEquipType const QueryType =
                 (Flag368 != 0 && bTargetCruise != 0) ? ThrustEquipCruise : ThrustEquipEngine;
-            if (Behavior_InvokeManagerSlotD8(Owner, Throttle, QueryType) > Clearance)
-                Throttle = Behavior_InvokeManagerSlotD4(Owner, Clearance, QueryType);
+            if (Behavior_GetSpeed(Owner, Throttle, QueryType) > Clearance)
+                Throttle = Behavior_GetProjectedThrottle(Owner, Clearance, QueryType);
         }
 
-        int const FaceResult = SubObjectB.Update(DeltaTime1c);
+        int const FaceResult = Face.Update(DeltaTime);
 
         // For the player, Flag2ec sets throttle -1.0f (FUN_062e89a0) and a clear Flag2e9
         // deactivates the engine (FUN_062e91d0), both dispatching index 0. Otherwise the
@@ -1033,15 +1024,15 @@ int GotoBehavior::Update()
         }
         if (bRunMove)
         {
-            SubObjectA.SetScale40(Throttle);
-            Index = static_cast<unsigned int>(SubObjectA.Update(DeltaTime1c));
+            Move.SetScale40(Throttle);
+            Index = static_cast<unsigned int>(Move.Update(DeltaTime));
         }
 
         // Jump table PTR_LAB_062fe658; an index above 3 keeps Result 3.
         if (Index == 0)
         {
             Result = 1;
-            UpdateResult10 = Result;
+            UpdateResult = Result;
             return Result;
         }
         if (Index == 1)
@@ -1054,15 +1045,15 @@ int GotoBehavior::Update()
             if (Owner->is_player() && bCruise == 0 && !bFaceDone)
             {
                 Result = 1;
-                UpdateResult10 = Result;
+                UpdateResult = Result;
                 return Result;
             }
 
             // Same keep-going test as the spline arm.
-            if (GotoWatchedObject(Watcher370) != nullptr && (Flags384 & 0x2) == 0 && Flag366 == 0)
+            if (GotoWatchedObject(Watcher370) != nullptr && (Flags384 & 0x2) == 0 && bFlyThrough == 0)
             {
                 Result = 1;
-                UpdateResult10 = Result;
+                UpdateResult = Result;
                 return Result;
             }
             Result = 2;
@@ -1079,10 +1070,10 @@ int GotoBehavior::Update()
     OnDisengage();
     Flags28 = static_cast<unsigned char>(Flags28 & 0xfd);
     if (Result == 2)
-        BehaviorMgrPtr20->SetDirectiveResult(2, 0);
+        BehaviorMgr->SetDirectiveResult(2, 0);
     else
-        BehaviorMgrPtr20->SetDirectiveResult(2, 2);
-    UpdateResult10 = Result;
+        BehaviorMgr->SetDirectiveResult(2, 2);
+    UpdateResult = Result;
     return Result;
 }
 
@@ -1093,37 +1084,37 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
     // The whole op (0x1c dwords, vptr included).
     std::memcpy(static_cast<void*>(&GotoOp), DirectiveOp, sizeof(GotoOp));
     pub::AI::DirectiveGotoOp const& Op = *static_cast<pub::AI::DirectiveGotoOp const*>(DirectiveOp);
-    SystemManagerTimerTable const* const ObjDb = &static_cast<SystemManager*>(NavHelperPtr24)->Timers;
-    GotoKind = Op.Field_0C;
+    SystemManagerTimerTable const* const ObjDb = &SysMgr->Timers;
+    GotoKind = Op.GotoKind;
 
-    switch (Op.Field_0C)
+    switch (Op.GotoKind)
     {
     case 0:
     {
-        // FUN_062e74a0: watch the object Op.Field_1C names.
+        // FUN_062e74a0: watch the object Op.TargetId names.
         IObjRW* const Dest = static_cast<IObjRW*>(
-            ObjDb->FindVerifiedObject((unsigned const*)&GotoOp.Field_1C));
+            ObjDb->FindVerifiedObject((unsigned const*)&GotoOp.TargetId));
         Watcher310.set(Dest != nullptr ? static_cast<Watchable const*>(Dest) : nullptr);
-        SubObjectA.SetRange3c(ArrivalRange);
+        Move.SetRange3c(ArrivalRange);
         IObjRW* const Watched = ObjRwFromWatchable(const_cast<Watchable*>(Watcher310.target()));
-        SubObjectA.SetWatchObject(Watched);
-        SubObjectB.SetWatchObject(Watched);
+        Move.SetWatchObject(Watched);
+        Face.SetWatchObject(Watched);
         break;
     }
     case 1:
         Destination = Op.Destination;
-        SubObjectA.SetPosition(Destination);
-        SubObjectB.SetPosition(Destination);
+        Move.SetPosition(Destination);
+        Face.SetPosition(Destination);
         break;
     case 2:
         // The spline's control points come from op+0x38/+0x20/+0x2c/+0x44, in that order.
-        Spline.P0 = *reinterpret_cast<Vector const*>(&Op.Field_38);
-        Spline.P1 = *reinterpret_cast<Vector const*>(&Op.Field_20);
-        Spline.P2 = *reinterpret_cast<Vector const*>(&Op.Field_2C);
-        Spline.P3 = *reinterpret_cast<Vector const*>(&Op.Field_44);
+        Spline.P0 = *reinterpret_cast<Vector const*>(&Op.SplineP0X);
+        Spline.P1 = *reinterpret_cast<Vector const*>(&Op.SplineP1X);
+        Spline.P2 = *reinterpret_cast<Vector const*>(&Op.SplineP2X);
+        Spline.P3 = *reinterpret_cast<Vector const*>(&Op.SplineP3X);
         Spline.calculate_arclength();
-        SubObjectC.SetSpline(&Spline);                              // FUN_062da380
-        SubObjectC.SetWideMode(Op.Field_5A);                        // FUN_062da410 (raw byte)
+        SplineMove.SetSpline(&Spline);                              // FUN_062da380
+        SplineMove.SetWideMode(Op.bGotoCruise);                        // FUN_062da410 (raw byte)
         ActiveTargetPos = Spline.P2;
         break;
     default:
@@ -1131,23 +1122,23 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
         return false;
     }
 
-    ArrivalRange = Op.Field_50;
-    SubObjectA.SetRange3c(ArrivalRange);
-    Field35c = Op.Field_54;
+    ArrivalRange = Op.ArrivalRange;
+    Move.SetRange3c(ArrivalRange);
+    MaxSpeed = Op.MaxSpeed;
     // DAT_0639f418 = 1.0e-5 (double); greater or unordered takes the projected throttle.
-    if (!(static_cast<double>(Op.Field_54) <= 1.0e-5))
-        MaxThrottle = Behavior_InvokeManagerSlotD4(ObjInspectOf(OwnerContextPtr14), Op.Field_54,
+    if (!(static_cast<double>(Op.MaxSpeed) <= 1.0e-5))
+        MaxThrottle = Behavior_GetProjectedThrottle(ObjInspectOf(OwnerContext), Op.MaxSpeed,
                                                 IObject::ThrustEquipEngine);
     else
         MaxThrottle = 1.0f;
     Flag367 = Op.Field_59;
-    SubObjectA.SetEnabled(Flag367);                                 // raw byte
-    Flag366 = Op.Field_58;
-    SubObjectA.SetField44(Op.Field_58 != 0 ? 2 : 0);
-    SubObjectC.SetStopStyle(Op.Field_58 != 0 ? 2 : 0);               // FUN_062da400
-    SetCruiseLock(Op.Field_6C == 0 ? 1 : 0, 3);
-    Flag36a = Op.Field_5A;
-    Flag36b = Op.Field_5B;
+    Move.SetEnabled(Flag367);                                 // raw byte
+    bFlyThrough = Op.bFlyThrough;
+    Move.SetField44(Op.bFlyThrough != 0 ? 2 : 0);
+    SplineMove.SetStopStyle(Op.bFlyThrough != 0 ? 2 : 0);               // FUN_062da400
+    SetAvoidanceAllowed(Op.bDisableAvoidance == 0 ? 1 : 0, 3);
+    bGotoCruise = Op.bGotoCruise;
+    bGotoNoCruise = Op.bGotoNoCruise;
 
     // Only a nonzero op+0x5c is looked up, and only then are op+0x60/+0x64/+0x68 passed;
     // otherwise all four arguments are zero.
@@ -1155,14 +1146,14 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
     float ProxNear = 0.0f;
     float ProxFar = 0.0f;
     float ProxRatio = 0.0f;
-    if (Op.Field_5C != 0)
+    if (Op.TetherObjectId != 0)
     {
-        ProxTarget = ObjDb->FindVerifiedObject((unsigned const*)&GotoOp.Field_5C);
-        ProxNear = Op.Field_60;
-        ProxFar = Op.Field_64;
-        ProxRatio = *reinterpret_cast<float const*>(&Op.Field_68);
+        ProxTarget = ObjDb->FindVerifiedObject((unsigned const*)&GotoOp.TetherObjectId);
+        ProxNear = Op.TetherNearRange;
+        ProxFar = Op.TetherFarRange;
+        ProxRatio = *reinterpret_cast<float const*>(&Op.TetherCruiseRatio);
     }
-    ProxWatcherInit(reinterpret_cast<unsigned char*>(&Watcher370), NavHelperPtr24, ProxTarget,
+    ProxWatcherInit(reinterpret_cast<unsigned char*>(&Watcher370), SysMgr, ProxTarget,
                     ProxNear, ProxFar, ProxRatio);                  // FUN_062c29f0
 
     Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
@@ -1170,12 +1161,12 @@ bool GotoBehavior::OnApplyDirective(void* DirectiveOp)
     return true;
 }
 
-// CopyGotoOp (thiscall in retail): copies the 0x70-byte op back out of +0x38c (the inverse of
-// OnApplyDirective's copy) and returns Flags28 bit 0x2.
-extern "C" bool __fastcall CopyGotoOp(unsigned char* param_1, void* outBuffer)
+// FUN_062fe940: copies the 0x70-byte op back out (the inverse of OnApplyDirective's copy),
+// vptr included, and returns Flags28 bit 0x2.
+bool GotoBehavior::CopyGotoOp(pub::AI::DirectiveGotoOp* Out) const
 {
-    std::memcpy(outBuffer, param_1 + 0x38c, 0x70);
-    return (param_1[0x28] & 0x2) != 0;
+    std::memcpy(static_cast<void*>(Out), static_cast<void const*>(&GotoOp), sizeof(GotoOp));
+    return ((Flags28 >> 1) & 1) != 0;
 }
 
 // Retail's clamp to [-1, 1] (062fea1a, again for +0x2dc): NaN becomes -1.0f.
@@ -1216,7 +1207,7 @@ void GotoBehavior::set_direction(Vector const& Dir)
     SteerAxisY = -Dir.x;
     // Only a strictly positive factor scales; the reciprocal stays on the x87 stack and each
     // product is rounded once.
-    double const Factor = BehaviorMgrPtr20->get_turn_sensitivity_factor();
+    double const Factor = BehaviorMgr->get_turn_sensitivity_factor();
     if (Factor > 0.0)
     {
         double const InvFactor = 1.0 / Factor;
@@ -1248,7 +1239,7 @@ void GotoBehavior::set_cruise(bool bOn)
     }
     if (Flag2e8 != 0)
         UserThrottle = MaxThrottle;
-    static_cast<SystemManager*>(NavHelperPtr24)->Thrust.engage_cruise(false);
+    SysMgr->Thrust.engage_cruise(false);
     Flag2e8 = 0;
     Flag2e9 = 1;
 }

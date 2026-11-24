@@ -124,7 +124,7 @@ void __fastcall IVP_Core_StopMovementWithoutCollisionRecheck(IVP_Core* Core)
 // info, 063562d0).
 static void IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(IVP_Core* Core)
 {
-    IVP_U_Memory* const Arena = Core->Environment->vector_cores_frozen; // :063464a9-:063464ac (+0xa4)
+    IVP_U_Memory* const Arena = Core->Environment->sim_unit_mem; // :063464a9-:063464ac (+0xa4)
     ++Arena->State;                                                      // :063464b2
 
     IVP_Impact_Solver_Long_Term Info; // the stack long-term info (ESP+0x14), only +0x52 / +0x54 reset per use
@@ -145,7 +145,7 @@ static void IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(IVP_Core* Core)
                 OtherCore = Record->Object2->core;                                         // :06346504-:06346507
             }
 
-            if ((static_cast<uint8_t>(OtherCore->Flags) & 0xcu) != 0)                      // :0634650d
+            if ((static_cast<uint8_t>(OtherCore->Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)                      // :0634650d
             {
                 if (Record != nullptr)                                                     // :06346512
                 {
@@ -175,14 +175,14 @@ static void IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(IVP_Core* Core)
 void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core)
 {
     // :063465a9-:063465ca: inertia terms inside an arena bracket.
-    ++Core->Environment->vector_cores_frozen->State;
+    ++Core->Environment->sim_unit_mem->State;
     Core->RecomputeInverseInertia();                    // FUN_06347410
-    --Core->Environment->vector_cores_frozen->State;
-    Core->Environment->vector_cores_frozen->reset_chunks(); // FUN_06344070
+    --Core->Environment->sim_unit_mem->State;
+    Core->Environment->sim_unit_mem->reset_chunks(); // FUN_06344070
 
     // :063465cf-:0634660b: the movement byte every object takes over.
     int32_t ObjectMovement;
-    if ((static_cast<uint8_t>(Core->Flags) & 0xcu) != 0)
+    if ((static_cast<uint8_t>(Core->Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
     {
         Core->MovementState = (Core->MovementState & 0xffffff08u) | 0x8u;
         ObjectMovement = 0x10;
@@ -204,7 +204,7 @@ void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core)
         Object->flags = ((Object->flags ^ static_cast<uint32_t>(ObjectMovement)) & 0xffu) ^ Object->flags;
     }
 
-    if ((static_cast<uint8_t>(Core->Flags) & 0xcu) != 0) // :06346632 (re-tested)
+    if ((static_cast<uint8_t>(Core->Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0) // :06346632 (re-tested)
     {
         // :0634672b-:06346732.
         IVP_Core_StopMovementWithoutCollisionRecheck(Core);
@@ -217,7 +217,7 @@ void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core)
 
     // :0634663d-:06346721.
     Core->wake_or_ensure_simulation(); // FUN_06347d80
-    ++Core->Environment->vector_cores_frozen->State;
+    ++Core->Environment->sim_unit_mem->State;
     for (int32_t ObjIndex = static_cast<int32_t>(Core->Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex) // count read once (:06346651)
     {
         char* Node = static_cast<char*>(Core->Objects.elems[ObjIndex]->mindist_list); // :06346661-:06346667
@@ -247,8 +247,8 @@ void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core)
             Node = IVP_Contact_Node_Next(Node); // :063466f5, read after the calls
         } while (Node != nullptr);
     }
-    --Core->Environment->vector_cores_frozen->State;        // :0634670f-:06346718
-    Core->Environment->vector_cores_frozen->reset_chunks(); // :0634671c
+    --Core->Environment->sim_unit_mem->State;        // :0634670f-:06346718
+    Core->Environment->sim_unit_mem->reset_chunks(); // :0634671c
 }
 
 // IVP_Core_UnionFindGetFather: IVP_Core::get_master_core() equivalent. Cores can be merged
@@ -297,10 +297,10 @@ void IVP_Core_Remove_Object(IVP_Core* Core, IVP_Real_Object* Object)
         // Step 1: dequeue Core from Environment->event_queue (clears Flags 0x30).
         IVP_Environment_Dequeue_Core(Core->Environment, Core);
 
-        // Step 2: (Flags & 0xC) == 4 -> destroy ObjectHashMap (FUN_06352620) and free
-        // it (FUN_06391d5a). Otherwise every controller gets
+        // Step 2: (Flags & 0xC) == 4 -> destroy ObjectHashMap (FUN_06352620) and
+        // free it (FUN_06391d5a). Otherwise every controller gets
         // core_is_going_to_be_deleted_event(Core) (vtable slot 0).
-        if ((Core->Flags & 0xC) == 4)
+        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
         {
             if (Core->ObjectHashMap != nullptr)
             {
@@ -384,18 +384,18 @@ IVP_Core::IVP_Core(IVP_Real_Object* Owner, const IVP_U_Quat* InitialOrientation,
     QWorldFCore.set_matrix(&MWorldFCore); // FUN_06350bc0, writes rows only, not vv
     MWorldFCore.vv.set(InitialPosition);
 
-    // Step 8: retail default speed limits.
-    SetSpeedLimits(1000.0f, 1000.0f); // FUN_06346870
+    // Step 8: retail's default radii.
+    SetRadius(1000.0f, 1000.0f); // FUN_06346870
 
     // Step 9: Flags bits [1:0] from FlagsLo.
     Flags = (Flags & ~0x3u) | (FlagsLo & 0x3u);
 }
 
 // FUN_06346870.
-void IVP_Core::SetSpeedLimits(float NewUpperLimitRadius, float NewSpeedLimit)
+void IVP_Core::SetRadius(float NewUpperLimitRadius, float NewMaxSurfaceDeviation)
 {
     UpperLimitRadius = NewUpperLimitRadius;
-    SpeedLimit = NewSpeedLimit;
+    MaxSurfaceDeviation = NewMaxSurfaceDeviation;
 }
 
 // The tail of FUN_06347d80 (:06347d9b): FUN_063494f0 on OwningSimUnit, with
@@ -441,13 +441,13 @@ void IVP_Core::synchronize_simulation_time_snapshot(float DeltaTime, float InvDe
     DeltaWorldFCore.y = 0.0f;
     DeltaWorldFCore.z = 0.0f;
 
-    MaxSurfaceDeviation = 0.0f;
-    Margin = 0.0f;
-    BoundingRadius = 0.0f;
+    AbsOmega = 0.0f;
+    CurrentSpeed = 0.0f;
+    MaxSurfaceRotSpeed = 0.0f;
 
-    RotAxisOS.x = 1.0f;
-    RotAxisOS.y = 0.0f;
-    RotAxisOS.z = 0.0f;
+    RotAxisWS.x = 1.0f;
+    RotAxisWS.y = 0.0f;
+    RotAxisWS.z = 0.0f;
 }
 
 // FUN_06347170 (no null tests, as retail).
@@ -552,7 +552,7 @@ void IVP_Core::calc_impulse_deltas(const Vector* LeverArmOS, const Vector* Point
 
 // FUN_06346790. Caller FUN_06358560 passes, per core, the same normal in object
 // space (vimult) and world space.
-//   1. Flags & 0x300 (meaning unknown; not the 0x0C mask) -> 1.0f.
+//   1. Flags & 0x300 (IVP_CORE_PINNED) -> 1.0f.
 //   2. calc_impulse_deltas, then calc_point_speed_ws -- the chain
 //      PushContactPoint uses too.
 //   3. 1.0f / |PointVelDelta| (FUN_06347e60, real_length): the response per
@@ -563,7 +563,7 @@ double IVP_Core::calc_effective_mass_along_direction(const Vector* LeverArmOS,
                                                        const Vector* ImpulseDirOS,
                                                        const Vector* ImpulseDirWS) const
 {
-    if ((Flags & 0x300) != 0)
+    if ((Flags & IVP_CORE_PINNED) != 0)
         return (double)(1.0f); // DAT_063a53d0
 
     Vector LinDelta, AngDelta;
@@ -597,7 +597,7 @@ double IVP_Core::calc_conservative_effective_mass(const Vector* LeverArm) const
     if (TermZ > Max)
         Max = TermZ;
 
-    if ((Flags & 0x300) != 0)
+    if ((Flags & IVP_CORE_PINNED) != 0)
         return 1.0 / ((double)(Max) + 1.0);
     return 1.0 / ((double)(Max) + InvMass);
 }
@@ -613,7 +613,7 @@ double IVP_Core::calc_conservative_effective_mass(const Vector* LeverArm) const
 //   - FUN_0628be60: add_mult, dst.c = float(scale*dir.c + base.c), inline below.
 //
 // Retail control flow (Ipion IVP_Core::synchronize_with_rot_z):
-//   FastSimUnitData = Env->vector_cores_frozen (+0xa4)
+//   OldSyncInfo = Env->sim_unit_mem (+0xa4)
 //     ->GetMem(0x24) (FUN_06347380); record +0x20 = 0; record +0x00..+0x08 =
 //     RotSpeed; record +0x10 = QWorldFCoreNext (raw 16 bytes). Record +0x0c is
 //     not written.
@@ -626,7 +626,7 @@ double IVP_Core::calc_conservative_effective_mass(const Vector* LeverArm) const
 //     IDeltaTime factor is the scale of add_mult(&MWorldFCore.vv,
 //     &PosWorldFCore, &DeltaWorldFCore) -- DeltaWorldFCore is the linear
 //     velocity, so the scale is seconds, not Alpha.
-//   If (byte Flags & 0xc0) == 0: TwoIDT = float(IDT +
+//   If (byte Flags & IVP_CORE_ROT_INERTIAS_ARE_EQUAL) == 0: TwoIDT = float(IDT +
 //     IDT); RotSpeed.c = float(_CIasin(DeltaQuat.c) * TwoIDT) for x, y, z.
 // The record is arena memory (the destructor never frees +0x1b4); it is read
 // by the impact system (ivp_impact.cpp) and restored by FUN_063473b0.
@@ -637,8 +637,8 @@ void IVP_Core::recalc_interpolated_frame()
     // The sync record, from the environment's frozen-core arena (Env+0xa4),
     // filled before anything below changes the core.
     IVP_Old_Sync_Rot_Z* Sync =
-        static_cast<IVP_Old_Sync_Rot_Z*>(Env->vector_cores_frozen->GetMem(static_cast<int>(sizeof(IVP_Old_Sync_Rot_Z))));
-    FastSimUnitData = Sync;
+        static_cast<IVP_Old_Sync_Rot_Z*>(Env->sim_unit_mem->GetMem(static_cast<int>(sizeof(IVP_Old_Sync_Rot_Z))));
+    OldSyncInfo = Sync;
     Sync->WasPushedDuringImpactSystem = 0;
     Sync->OldSyncRotSpeed.x = RotSpeed.x;
     Sync->OldSyncRotSpeed.y = RotSpeed.y;
@@ -667,7 +667,7 @@ void IVP_Core::recalc_interpolated_frame()
     MWorldFCore.vv.z = (float)((double)(Elapsed) * DeltaWorldFCore.z + PosWorldFCore.z);
     MWorldFCore.vv.x = (float)((double)(Elapsed) * DeltaWorldFCore.x + PosWorldFCore.x);
 
-    if ((Flags & 0xC0) == 0)
+    if ((Flags & IVP_CORE_ROT_INERTIAS_ARE_EQUAL) == 0)
     {
         const float TwoIDeltaTime = (float)((double)(IDeltaTime) + IDeltaTime);
         RotSpeed.x = (float)(std::asin((double)(DeltaQuat.x)) * TwoIDeltaTime);
@@ -689,7 +689,7 @@ void IVP_Core::recalc_interpolated_frame()
 //     06352cf0 (DispatchNarrowPhaseSolve); StateFlags & 0xc000 -> skip; go on
 //     only when the gap (+0x54) is below DAT_0658ab2c
 //     (max_distance_for_friction) or unordered.
-//   ++vector_cores_frozen->State (the arena at env +0xa4);
+//   ++sim_unit_mem->State (the arena at env +0xa4);
 //     06356bc0(Mdist, &Fs, &HavingNew, OwningSimUnit, 1); --State and
 //     reset_chunks (06344070) on the arena re-read through the environment;
 //     HavingNew == 1 -> Result = 1, Other->update_time_of_last_motion()
@@ -712,9 +712,9 @@ int IVP_Core::grow_friction_system()
                     Other = Mdist->synapse[1].l_obj->core;
                 }
 
-                if ((static_cast<uint8_t>(Other->Flags) & 0xcu) != 0)
+                if ((static_cast<uint8_t>(Other->Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
                 {
-                    if ((static_cast<uint8_t>(Flags) & 0xcu) != 0)
+                    if ((static_cast<uint8_t>(Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
                     {
                         delete Mdist; // slot 4 (deleting dtor) with 1
                     }
@@ -725,11 +725,11 @@ int IVP_Core::grow_friction_system()
                     if ((Mdist->StateFlags & 0xc000u) == 0 &&
                         !(Mdist->SeparationGap >= G_IVP_MindistSettings.max_distance_for_friction))
                     {
-                        ++Environment->vector_cores_frozen->State;
+                        ++Environment->sim_unit_mem->State;
                         IVP_ListManager* FrictionSystem = nullptr;
                         int32_t HavingNew = 0;
                         IVP_Try_To_Generate_Managed_Friction(Mdist, &FrictionSystem, &HavingNew, OwningSimUnit, 1);
-                        IVP_U_Memory* const Arena = Environment->vector_cores_frozen;
+                        IVP_U_Memory* const Arena = Environment->sim_unit_mem;
                         --Arena->State;
                         Arena->reset_chunks(); // FUN_06344070
                         if (HavingNew == 1)
@@ -770,8 +770,8 @@ int IVP_Core::revive_pass()
     mark_active_and_sync_objects(); // FUN_06347170
 
     IVP_Environment* const Env = this->Environment;
-    const double CurrentTimeBase = (double)(*reinterpret_cast<const float*>(&Env->current_time.time_base));
-    const double CurrentTimeOffset = (double)(*reinterpret_cast<const float*>(&Env->current_time.time_offset));
+    const double CurrentTimeBase = (double)(Env->current_time.time_base);
+    const double CurrentTimeOffset = (double)(Env->current_time.time_offset);
     const double Alpha = (((double)(Env->next_psi_time_base) - CurrentTimeBase) +
                           (double)(Env->next_psi_time_offset)) - CurrentTimeOffset;
 
@@ -797,7 +797,7 @@ int IVP_Core::revive_pass()
         IVP_Environment_Object_Notify_Event RevivedEvent{ this->Environment, Obj };
         this->Environment->cluster_manager->fire_event_object_revived(&RevivedEvent); // FUN_0634afd0
         IVP_Environment_Object_Notify_Event ListenerEvent{ this->Environment, Obj };
-        IVP_Environment_Notify_Object_Listeners(this->Environment, &ListenerEvent);  // FUN_0634cf30
+        IVP_Environment_Fire_Event_Object_Revived(this->Environment, &ListenerEvent);  // FUN_0634cf30
     }
 
     return Result;
@@ -834,7 +834,7 @@ void IVP_Core::detach_controller(IVP_Controller* Controller)
 // 06356d1d) are ported.
 void* IVP_Core::find_object_hash_entry(unsigned Key) const
 {
-    if ((this->Flags & 0xC) == 4)
+    if ((this->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
     {
         if (this->ObjectHashMap == nullptr)
             return nullptr;
@@ -856,7 +856,7 @@ void* IVP_Core::find_object_hash_entry(unsigned Key) const
 // Candidate (no free; the slot never owns it).
 void IVP_Core::register_object_hash_entry(void* Candidate)
 {
-    if ((this->Flags & 0xC) == 4)
+    if ((this->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
     {
         if (this->ObjectHashMap == nullptr)
         {
@@ -879,7 +879,7 @@ void IVP_Core::register_object_hash_entry(void* Candidate)
 // Candidate is the cached one.
 void IVP_Core::unregister_object_hash_entry(void* Candidate)
 {
-    if ((this->Flags & 0xC) == 4)
+    if ((this->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
     {
         unsigned CandidateKey = *reinterpret_cast<unsigned*>(reinterpret_cast<uintptr_t>(Candidate) + 0x8);
         ((IVP_VHash_Store*)this->ObjectHashMap)->RemoveElem((void*)CandidateKey); // FUN_063527e0
@@ -1195,13 +1195,13 @@ void IVP_Core::clear_speed_change()
 }
 
 // FUN_063473b0, Ipion IVP_Core::undo_synchronize_rot_z: RotSpeed and
-// QWorldFCoreNext from the record, then FastSimUnitData = 0 (arena memory,
+// QWorldFCoreNext from the record, then OldSyncInfo = 0 (arena memory,
 // not freed).
 // Sole caller FUN_063596b0 runs this when the record's +0x20 is 0 and does
-// not null-check FastSimUnitData either.
+// not null-check OldSyncInfo either.
 void IVP_Core::restore_fast_sim_snapshot()
 {
-    const IVP_Old_Sync_Rot_Z* Sync = static_cast<const IVP_Old_Sync_Rot_Z*>(FastSimUnitData);
+    const IVP_Old_Sync_Rot_Z* Sync = static_cast<const IVP_Old_Sync_Rot_Z*>(OldSyncInfo);
 
     RotSpeed.x = Sync->OldSyncRotSpeed.x;
     RotSpeed.y = Sync->OldSyncRotSpeed.y;
@@ -1209,7 +1209,7 @@ void IVP_Core::restore_fast_sim_snapshot()
 
     QWorldFCoreNext = Sync->OldSyncQWorldFCore;
 
-    FastSimUnitData = nullptr;
+    OldSyncInfo = nullptr;
 }
 
 // FUN_06347630: Objects.Clear(). Sole caller a tail-jump thunk at 06397b83.
@@ -1238,9 +1238,8 @@ void IVP_Core::clear_objects_vector()
 //      fall through into the long-term check below (retail does NOT return
 //      here).
 //   2. Else (both short-term deltas small): return 2 if elapsed time since
-//      the (unchanged) TimeOfLastMotion is <= Environment->default_friction
-//      (+0x88 -- an elapsed TIME compared against a field named as a
-//      friction value; see the findings), else return 3.
+//      the (unchanged) TimeOfLastMotion is <= Environment->freeze_check_dtime
+//      (+0x88), else return 3.
 //   3. Long-term check (reached only via step 1's fallthrough): if EITHER
 //      long-term delta exceeds its threshold, update the long-term
 //      checkpoint (QLastLongMotion=QWorldFCore, PosLastLongMotion=
@@ -1284,7 +1283,7 @@ int IVP_Core::classify_motion_state(float CurrentTimeBase, float CurrentTimeOffs
         // against Environment+0x88; not greater (or unordered) -> 2, else 3.
         const double Elapsed = (((double)(CurrentTimeBase) - TimeOfLastMotion.time_base) + CurrentTimeOffset) -
                                TimeOfLastMotion.time_offset;
-        return !(Elapsed > Environment->default_friction) ? 2 : 3;
+        return !(Elapsed > Environment->freeze_check_dtime) ? 2 : 3;
     }
 
     // Short-term checkpoint. Sum = offset + base stays on
@@ -1334,13 +1333,13 @@ int IVP_Core::classify_motion_state(float CurrentTimeBase, float CurrentTimeOffs
     return 1;
 }
 
-// FUN_06347be0: Unconfirmed_0x1B8 = Environment->field_114 (raw dword), then
+// FUN_06347be0: MindistEventStamp = Environment->mindist_event_stamp (raw dword), then
 // IVP_Real_Object::recheck_mindists_of_other_cores (06344f50) on each object,
 // last first. No null tests.
 void IVP_Core::notify_objects_and_cache_env_field()
 {
-    const uint32_t RawBits = *reinterpret_cast<const uint32_t*>(&Environment->field_114);
-    Unconfirmed_0x1B8 = reinterpret_cast<void*>(static_cast<uintptr_t>(RawBits));
+    const uint32_t RawBits = *reinterpret_cast<const uint32_t*>(&Environment->mindist_event_stamp);
+    MindistEventStamp = reinterpret_cast<void*>(static_cast<uintptr_t>(RawBits));
 
     for (int32_t I = static_cast<int32_t>(Objects.n_elems) - 1; I >= 0; --I)
     {
@@ -1352,7 +1351,7 @@ void IVP_Core::notify_objects_and_cache_env_field()
 // 0634663d, 0634bbfc.
 void IVP_Core::wake_or_ensure_simulation()
 {
-    if ((Flags & 0xCu) != 0)
+    if ((Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
         return;
 
     if ((MovementState & 0xFFu) == 8u)
@@ -1451,7 +1450,7 @@ void IVP_Core::fire_event_object_frozen()
         FIvpEventObject EnvironmentEvent;
         EnvironmentEvent.Environment = Environment;
         EnvironmentEvent.RealObject = Object;
-        IVP_Environment_Notify_Object_Listeners_Slot3(Environment, &EnvironmentEvent); // FUN_0634cf00
+        IVP_Environment_Fire_Event_Object_Frozen(Environment, &EnvironmentEvent); // FUN_0634cf00
     }
 }
 

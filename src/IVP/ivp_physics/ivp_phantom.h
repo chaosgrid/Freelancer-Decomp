@@ -22,7 +22,7 @@
 //
 // A phantom is the volume controller an IVP_Real_Object gets from
 // convert_to_phantom (06345f10); it is stored in the object's IVP_Object
-// +0x1c slot (first_child). The mindist manager hands it every mindist that
+// +0x1c slot (controller_phantom). The mindist manager hands it every mindist that
 // enters or leaves the object (06350310 / 06350350 -> 06344400 / 06344580);
 // it keeps the set of those mindists and, on request, reference-counted sets
 // of the intruding objects and cores, and tells its listeners.

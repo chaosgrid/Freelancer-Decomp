@@ -126,8 +126,8 @@ struct FStreamingSound
     unsigned short FmtPad;           // +0xEA
     unsigned long AlignedSize;       // +0xEC
     unsigned long BytesPerSec;       // +0xF0
-    unsigned long EndMarkF4;         // +0xF4 drain start (play cursor at EOF)
-    unsigned long EndMarkF8;         // +0xF8 drain end (write cursor); -1 = not armed
+    unsigned long DrainStartCursor;  // +0xF4 play cursor at EOF
+    unsigned long DrainEndCursor;    // +0xF8 write cursor at EOF; -1 = not armed
     unsigned long SilenceBytes;      // +0xFC FUN_06ef1ee0 remaining silence
     void* LockPtr1;                  // +0x100
     unsigned long LockBytes1;        // +0x104
@@ -226,6 +226,6 @@ static_assert(offsetof(FStreamingSound, FmtBlob) == 0xD4, "fmt +0xD4");
 static_assert(offsetof(FStreamingSound, PcmTag) == 0xD8, "pcm tag +0xD8");
 static_assert(offsetof(FStreamingSound, AlignedSize) == 0xEC, "aligned +0xEC");
 static_assert(offsetof(FStreamingSound, BytesPerSec) == 0xF0, "bytes/sec +0xF0");
-static_assert(offsetof(FStreamingSound, EndMarkF4) == 0xF4, "drain start +0xF4");
-static_assert(offsetof(FStreamingSound, EndMarkF8) == 0xF8, "drain end +0xF8");
+static_assert(offsetof(FStreamingSound, DrainStartCursor) == 0xF4, "drain start +0xF4");
+static_assert(offsetof(FStreamingSound, DrainEndCursor) == 0xF8, "drain end +0xF8");
 static_assert(offsetof(FStreamingSound, SilenceBytes) == 0xFC, "silence +0xFC");

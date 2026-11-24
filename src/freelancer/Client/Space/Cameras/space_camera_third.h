@@ -63,14 +63,14 @@ struct FThirdPersonCamera : FHudCamera
 
     // The look offset vector {+0x140, +0x144, +0x148}: {0, camera_offset[0], camera_offset[1]}
     // from the ship companion (ctor default {0, 7, 60}).
-    float Field140;                     // +0x140
-    float OffsetX;                      // +0x144  ICliObj camera_offset[0]
-    float OffsetY;                      // +0x148  ICliObj camera_offset[1]
+    float LookOffsetX;                  // +0x140  always 0
+    float LookOffsetY;                  // +0x144  ICliObj camera_offset[0]
+    float LookOffsetZ;                  // +0x148  ICliObj camera_offset[1]
     // A second offset vector added to it; zeroed by the ctor and on every attach, never
     // written otherwise.
-    float Field14C;                     // +0x14c
-    float Field150;                     // +0x150
-    float Field154;                     // +0x154
+    float ExtraOffsetX;                 // +0x14c
+    float ExtraOffsetY;                 // +0x150
+    float ExtraOffsetZ;                 // +0x154
     float ResetOrient[9];               // +0x158  the camera orientation as of the last solve;
                                         //         seeded from the target on a reset
 
@@ -95,7 +95,7 @@ struct FThirdPersonCamera : FHudCamera
     float TurnRateScale;                // +0x200  ctor 2.0f
 
     float UpAxis[3];                    // +0x204  the up the camera levels towards
-    float Field210;                     // +0x210  zeroed by the ctor, never read
+    float Unused210;                    // +0x210  zeroed by the ctor, never read
     unsigned char bInitialised;         // +0x214  set on every exit from the attach; the next
                                         //         update skips its own solve and clears it
     unsigned char Pad215[3];
@@ -107,18 +107,18 @@ static_assert(sizeof(FThirdPersonCamera) == 0x218, "FThirdPersonCamera must be 0
 static_assert(offsetof(FThirdPersonCamera, HardpointPos) == 0x100, "TP +0x100");
 static_assert(offsetof(FThirdPersonCamera, HardpointOrient) == 0x10c, "TP +0x10c");
 static_assert(offsetof(FThirdPersonCamera, TranslationCache) == 0x130, "TP +0x130");
-static_assert(offsetof(FThirdPersonCamera, Field140) == 0x140, "TP +0x140");
-static_assert(offsetof(FThirdPersonCamera, OffsetX) == 0x144, "TP +0x144");
-static_assert(offsetof(FThirdPersonCamera, OffsetY) == 0x148, "TP +0x148");
-static_assert(offsetof(FThirdPersonCamera, Field14C) == 0x14c, "TP +0x14c");
-static_assert(offsetof(FThirdPersonCamera, Field154) == 0x154, "TP +0x154");
+static_assert(offsetof(FThirdPersonCamera, LookOffsetX) == 0x140, "TP +0x140");
+static_assert(offsetof(FThirdPersonCamera, LookOffsetY) == 0x144, "TP +0x144");
+static_assert(offsetof(FThirdPersonCamera, LookOffsetZ) == 0x148, "TP +0x148");
+static_assert(offsetof(FThirdPersonCamera, ExtraOffsetX) == 0x14c, "TP +0x14c");
+static_assert(offsetof(FThirdPersonCamera, ExtraOffsetZ) == 0x154, "TP +0x154");
 static_assert(offsetof(FThirdPersonCamera, TargetOrientB) == 0x17c, "TP +0x17c");
 static_assert(offsetof(FThirdPersonCamera, PrevAngularRate) == 0x1ac, "TP +0x1ac");
 static_assert(offsetof(FThirdPersonCamera, TargetOrientA) == 0x1b0, "TP +0x1b0");
 static_assert(offsetof(FThirdPersonCamera, AngularAcceleration) == 0x1d4, "TP +0x1d4");
 static_assert(offsetof(FThirdPersonCamera, TurnLookAheadSlerpAmount) == 0x1e8, "TP +0x1e8");
 static_assert(offsetof(FThirdPersonCamera, UpAxis) == 0x204, "TP +0x204");
-static_assert(offsetof(FThirdPersonCamera, Field210) == 0x210, "TP +0x210");
+static_assert(offsetof(FThirdPersonCamera, Unused210) == 0x210, "TP +0x210");
 static_assert(offsetof(FThirdPersonCamera, bInitialised) == 0x214, "TP +0x214");
 
 static_assert(offsetof(FThirdPersonCamera, bCameraLevelEnabled) == 0x13c, "TP +0x13c");

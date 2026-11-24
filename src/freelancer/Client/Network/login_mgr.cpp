@@ -1262,7 +1262,7 @@ void CLoginMgr::SetSelectCharacterName(wchar_t const* Name)
 }
 
 // .text:005aad30 (RET 4). Retail quirk: there is no end-of-list test; the step past the tail
-// reads node 0.
+// restarts at the head, so an absent name spins forever (and an empty list faults).
 CCharacterSet::CharacterInfo* CLoginMgr::FindCharacterByName(wchar_t const* Name)
 {
     MetaNode<CCharacterSet::CharacterInfo>* Node = nullptr;

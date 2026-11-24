@@ -48,7 +48,7 @@ struct FThornCompound : FThornComponent
     void* GetEngineInstance() override;                                  // 17 LAB_00451360
     void SetScene(void* Scene) override;                                 // 19 LAB_00451ed0
     void SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,
-                  unsigned char bFlag14) override;                       // 20 LAB_00451ef0
+                  unsigned char bRunningLights) override;                // 20 LAB_00451ef0
 
     // FUN_00451330 (thiscall, RET 4) -- the instance, and its hardpoints re-analyzed. The spawn
     // FUN_0044dd80 calls it.
@@ -62,7 +62,8 @@ struct FThornCompound : FThornComponent
     FRoomObject* Object;               // +0x6c the room object owning Instance, or null
     long Instance;                     // +0x70 -1
     void* AnimScript;                  // +0x74 IAnimation2 script, -1 = none
-    int Category;                      // +0x78 -1 (written by the spawn; TODO meaning)
+    int Category;                      // +0x78 -1; the spawn's Petal category (get_category of the
+                                       //       "category" property, 6 for a prop)
     unsigned char bUseScene;           // +0x7c not written by the ctor (the spawn sets it)
     Csys Offset;                       // +0x80 the entity's offset from its instance
     Csys Local;                        // +0xb0 identity; the last frame the script set

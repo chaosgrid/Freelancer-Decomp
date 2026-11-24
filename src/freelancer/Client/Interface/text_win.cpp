@@ -22,7 +22,7 @@ TextWin::TextWin()
     ColorIdle = 0;
     ColorPulse = 0;
     ColorD4 = 0;
-    ColorD8 = 0;
+    BackgroundColor = 0;
     ColorInactive = 0;
 }
 
@@ -30,7 +30,7 @@ TextWin::~TextWin()
 {
     // FUN_005a1af0: the text cleared and the Win3D Destroy body inlined.
     FontStringClearContents(&Text);
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Destroy();
     Win3DUnregister(this);
@@ -71,7 +71,7 @@ void TextWin::Destroy()
 {
     // FUN_005a1c10.
     FontStringClearContents(&Text);
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
         Child->Destroy();
     Win3DUnregister(this);
@@ -96,7 +96,7 @@ void TextWin::Draw()
     unsigned long Pulsed = 0;
     NnUiPulseBlendFromArgb(&Pulsed, ColorPulse);
     unsigned long const* Color = &ColorInactive;
-    if (bUsePalette != 0)
+    if (bEnabled != 0)
         Color = bHover ? &Pulsed : &ColorIdle;
     FontAtlasSetDrawColor(static_cast<unsigned>(*Color));
 
@@ -112,7 +112,7 @@ void TextWin::Draw()
     Origin.Y = ScreenY;
     Origin.Scale = ScreenWidth;
     Origin.Height = ScreenHeight;
-    Origin.HAlign = FieldE8;
+    Origin.HAlign = HAlign;
     Origin.VAlign = 0;
     FontStringDrawChildren(&Origin, &Text, nullptr, nullptr);
 }
@@ -128,14 +128,14 @@ void TextWin::InitTextDefaults()
     // FUN_005a1c50.
     FlagE0 = 0;
     FlagE3 = 0;
-    FlagE1 = 0;
+    bDrawBackground = 0;
     FlagE2 = 1;
-    bUsePalette = 1;
-    FieldE8 = 0;
+    bEnabled = 1;
+    HAlign = 0;
     TextScale = 0.002f; // DAT_005e5f88
-    ColorIdle = G_NnPaletteArgb_679bb0;
-    ColorPulse = G_NnPaletteArgb_679ba4;
-    ColorInactive = G_NnPaletteArgb_679b94;
+    ColorIdle = G_NnPaletteCyan;
+    ColorPulse = G_NnPaletteAmber;
+    ColorInactive = G_NnPaletteGrey;
 }
 
 void TextWin::SetFont(char const* FontName, float Scale)

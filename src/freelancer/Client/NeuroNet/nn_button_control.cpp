@@ -135,6 +135,31 @@ namespace
         Ray[2] = static_cast<float>(World.Z * Inv);
     }
 
+    // The mouse ray FUN_0055b950 and LAB_0055c690 build inline: the near-plane
+    // point (FUN_004bdd40), the 3DMathEngine's TransformMatrix (DAT_00679aec +0x2c) with a copy
+    // of the camera orientation (DAT_0067dbfc), normalised by 1 / sqrt.
+    void CursorRayThroughMathEngine(float* Ray)
+    {
+        FSpaceCamera* const Cam = Win3DGetCamera(); // DAT_0067dbf8
+        int CursorX = 0;
+        int CursorY = 0;
+        GetClientSoftwareCursor(&CursorX, &CursorY, nullptr); // DAT_00616840 / DAT_00616844
+        FVector Local;
+        Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
+                               static_cast<float>(CursorY));
+        FMatrix CamOrientation;
+        memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation));
+        FVector World;
+        ButtonMathEngine()->TransformMatrix(World, CamOrientation, Local);
+        double const Inv =
+            kOne / sqrt(static_cast<double>(World.X) * World.X +
+                        static_cast<double>(World.Y) * World.Y +
+                        static_cast<double>(World.Z) * World.Z);
+        Ray[0] = static_cast<float>(World.X * Inv);
+        Ray[1] = static_cast<float>(World.Y * Inv);
+        Ray[2] = static_cast<float>(World.Z * Inv);
+    }
+
     // The holder tint FUN_00559aa0 and Draw write before FUN_0059efa0: bytes 0..2 into +0x14 / +0x18 / +0x1c, byte 3 into +0x24,
     // each times 1/255.
     void SetHolderTint(FClientMeshHolder* Holder, unsigned char const* Rgba)
@@ -277,9 +302,9 @@ NnButtonControl::~NnButtonControl()
 void NnButtonControl::SetPosition(float const* NewPosition)
 {
     // FUN_0055b4a0 (RET 4).
-    Field2e0[0] = NewPosition[0];
-    Field2e0[1] = NewPosition[1];
-    Field2e0[2] = NewPosition[2];
+    RequestedPosition[0] = NewPosition[0];
+    RequestedPosition[1] = NewPosition[1];
+    RequestedPosition[2] = NewPosition[2];
     bAttached = 1;
 
     float Placed[3];
@@ -625,8 +650,8 @@ void NnButtonControl::Draw()
     else
     {
         // Idle: DAT_00679bb0.
-        memcpy(Glow, &G_NnPaletteArgb_679bb0, sizeof(Glow));
-        memcpy(Body, &G_NnPaletteArgb_679bb0, sizeof(Body));
+        memcpy(Glow, &G_NnPaletteCyan, sizeof(Glow));
+        memcpy(Body, &G_NnPaletteCyan, sizeof(Body));
     }
     if ((ButtonBits & 0x20) != 0)
         SetRgba(Body, 0xff, 0xff, 0xff, 0xff); // no_color_change
@@ -670,7 +695,7 @@ void NnButtonControl::Draw()
 
     // Bit 6 goes back to what it was before the inactive arm could clear it.
     ButtonBits = static_cast<unsigned char>((ButtonBits & 0xbf) | (SavedSelected << 6));
-    Slot39(); // vt+0x9c
+    PostDraw(); // vt+0x9c
 }
 
 void NnButtonControl::MouseEnter(float const* /*Ray*/)
@@ -712,31 +737,14 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
     if ((ButtonBits & 0x10) != 0)
     {
         // The release of a press this button captured.
-        if (Event->Field0 != -1 || Event->Field1 != 1)
+        if (Event->Button != kWin3DMouseLeft || Event->Action != kWin3DMouseRelease)
             return false;
         ButtonBits = static_cast<unsigned char>(ButtonBits & 0xeb);
         Win3DRemoveCapture(this); // FUN_0059d960
 
         // The cursor ray (FUN_004bdd40), through the math engine.
-        FSpaceCamera* const Cam = Win3DGetCamera();
-        int CursorX = 0;
-        int CursorY = 0;
-        GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
-        FVector Local;
-        Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
-                               static_cast<float>(CursorY));
-        FMatrix CamOrientation;
-        memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation));
-        FVector World;
-        ButtonMathEngine()->TransformMatrix(World, CamOrientation, Local);
-        double const Inv =
-            kOne / sqrt(static_cast<double>(World.X) * World.X +
-                        static_cast<double>(World.Y) * World.Y +
-                        static_cast<double>(World.Z) * World.Z);
         float Ray[3];
-        Ray[0] = static_cast<float>(World.X * Inv);
-        Ray[1] = static_cast<float>(World.Y * Inv);
-        Ray[2] = static_cast<float>(World.Z * Inv);
+        CursorRayThroughMathEngine(Ray);
 
         if (!HitTest(Ray)) // slot 4
         {
@@ -762,7 +770,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
 
         if ((ButtonBits & 0x80) != 0)
         {
-            // A right click only tells the parent 0x27 (its answer is ignored).
+            // A double click only tells the parent 0x27 (its answer is ignored).
             TellParent(this, 0x27);
             return true;
         }
@@ -770,12 +778,12 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
     }
 
-    // A press, left (Field1 2) or right (3).
-    if (Event->Field0 != -1)
+    // A left press, single or double click.
+    if (Event->Button != kWin3DMouseLeft)
         return false;
-    if (Event->Field1 != 2 && Event->Field1 != 3)
+    if (Event->Action != kWin3DMousePress && Event->Action != kWin3DMouseDoubleClick)
         return false;
-    if (Event->Field1 == 3)
+    if (Event->Action == kWin3DMouseDoubleClick)
         ButtonBits = static_cast<unsigned char>(ButtonBits | 0x80);
     else
         ButtonBits = static_cast<unsigned char>(ButtonBits & 0x7f);
@@ -1191,25 +1199,8 @@ void NnToggleButtonControl::Update()
     // written: on the button it tests bit 0 (not bit 2), off it tests bit 2.
     if ((ButtonBits & 0x10) != 0)
     {
-        FSpaceCamera* const Cam = Win3DGetCamera();
-        int CursorX = 0;
-        int CursorY = 0;
-        GetClientSoftwareCursor(&CursorX, &CursorY, nullptr); // DAT_00616840 / DAT_00616844
-        FVector Local;
-        Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
-                               static_cast<float>(CursorY));
-        FMatrix CamOrientation;
-        memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation)); // DAT_0067dbfc
-        FVector World;
-        ButtonMathEngine()->TransformMatrix(World, CamOrientation, Local); // DAT_00679aec +0x2c
-        double const Inv =
-            kOne / sqrt(static_cast<double>(World.X) * World.X +
-                        static_cast<double>(World.Y) * World.Y +
-                        static_cast<double>(World.Z) * World.Z);
         float Ray[3];
-        Ray[0] = static_cast<float>(World.X * Inv);
-        Ray[1] = static_cast<float>(World.Y * Inv);
-        Ray[2] = static_cast<float>(World.Z * Inv);
+        CursorRayThroughMathEngine(Ray);
 
         bool const bHit = HitTest(Ray); // slot 4
         unsigned char const Bits = ButtonBits; // read after the call (0x0055cb68)

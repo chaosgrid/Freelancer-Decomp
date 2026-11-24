@@ -1192,7 +1192,7 @@ FDirectX9::FDirectX9()
     : Parser_(nullptr), CreateFlags_(0), SwapFlags_(0), D3d_(nullptr), Device_(nullptr),
       LockBufferSurf_(nullptr), VidMem_(0), VbPoolBytes_(0), DeviceReady_(0),
       FormatCatalogBegin_(nullptr), FormatCatalogEnd_(nullptr), FormatCatalogCap_(nullptr),
-      AdapterIndex_(0xFFFFFFFF), DeviceType_(1), Field230_(0), BbPfIndex_(0), Hwnd_(nullptr),
+      AdapterIndex_(0xFFFFFFFF), DeviceType_(1), DisplayPfIndex_(0), BbPfIndex_(0), Hwnd_(nullptr),
       WindowX_(0), WindowY_(0), WindowW_(0), WindowH_(0), WindowOverride_(nullptr),
       bDepthRangeValid_(0), bViewportRectValid_(0), DeviceBaseVertex_(0), Outer_(nullptr),
       Ex_(new FRp9ExState())
@@ -1206,7 +1206,7 @@ FDirectX9::FDirectX9()
     memset(&ScratchIb_, 0, sizeof(ScratchIb_));
     ScratchIb_.Flags = 0x200 | 8;
     // +0x230 and +0x234 = FUN_06d5cc30(0).
-    Field230_ = PfIndex(0);
+    DisplayPfIndex_ = PfIndex(0);
     BbPfIndex_ = PfIndex(0);
     memset(MgsdbPath_, 0, sizeof(MgsdbPath_));
     memset(ModeBlob_, 0, sizeof(ModeBlob_));
@@ -1753,7 +1753,7 @@ bool FDirectX9::CheckTextureFormat(unsigned int Format, unsigned long Usage, D3D
         (int)(Format) <= 14)
         return false;
     // CheckDeviceFormat against the adapter format (+0x230); true only for hr == 0.
-    const unsigned int AdapterFormat = PfToD3d(Field230_);
+    const unsigned int AdapterFormat = PfToD3d(DisplayPfIndex_);
     const unsigned int CheckFormat = PfToD3d(Format);
     const HRESULT Hr = D3d_->CheckDeviceFormat(AdapterIndex_, (D3DDEVTYPE)(DeviceType_),
                                                (D3DFORMAT)(AdapterFormat), Usage, RType,
@@ -2315,7 +2315,7 @@ void FDirectX9::GrowPoolVb(FRp9Vb* Wrapper, unsigned int Fvf, unsigned int Count
     Wrapper->Fvf = Fvf;
     Wrapper->Count = NewCount;
     Wrapper->Used = 0;
-    Wrapper->Field1C = 0;
+    Wrapper->LockStartVertex = 0;
     Device_->CreateVertexBuffer(FvfStride(Wrapper->Fvf) * Wrapper->Count, Wrapper->Flags, Fvf,
                                 D3DPOOL_DEFAULT, &Wrapper->Gpu, nullptr);
     VbPoolBytes_ += FvfStride(Wrapper->Fvf) * Wrapper->Count;
@@ -3296,7 +3296,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     // the back buffer's; mode[0] >= 0 -> EnumAdapterModes of that index only.
     if (Desc->Fullscreen != 0)
     {
-        ModeIndex = Desc->Field00;
+        ModeIndex = Desc->ModeIndex;
         if (ModeIndex < 0)
         {
             FRp9Mode Wanted = *Desc;
@@ -3527,7 +3527,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
     }
 
     DeviceReady_ |= 1;
-    Field230_ = DisplayPf;
+    DisplayPfIndex_ = DisplayPf;
     BbPfIndex_ = PfIndex((unsigned int)(Present.BackBufferFormat));
     Hwnd_ = Hwnd;
     ModeBlob_[0] = ModeIndex;
@@ -6252,7 +6252,7 @@ GENRESULT DACOM_API FDirectX9::ResizeVb(void* Handle, unsigned int Fvf, unsigned
     Wrapper->Fvf = Fvf;
     Wrapper->Count = Count;
     Wrapper->Used = 0;
-    Wrapper->Field1C = 0;
+    Wrapper->LockStartVertex = 0;
     // FvfStride is inlined in retail.
     const unsigned int Stride = FvfStride(Wrapper->Fvf);
     const HRESULT Hr = Device->CreateVertexBuffer(
@@ -6371,7 +6371,7 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
             if (Wrapper->Used + RequestBytes > CapacityBytes)
             {
                 Wrapper->Used = 0;
-                Wrapper->Field1C = 0;
+                Wrapper->LockStartVertex = 0;
                 LockFlags |= 0x2000;
                 StartBytes = 0;
             }
@@ -6386,9 +6386,9 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
                                 (void**)(&Wrapper->Locked), LockFlags);
         if (Hr >= 0)
         {
-            Wrapper->Field1C = StartBytes / Stride;
+            Wrapper->LockStartVertex = StartBytes / Stride;
             if (Offset != nullptr)
-                *Offset = Wrapper->Field1C;
+                *Offset = Wrapper->LockStartVertex;
             *Out = (void*)((UINT_PTR)Wrapper->Locked);
             Wrapper->Used = StartBytes + RequestBytes;
         }

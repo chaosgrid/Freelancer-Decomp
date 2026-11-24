@@ -23,14 +23,14 @@ struct FBatchRecord
     unsigned long PrimType;                // +0xB8
     unsigned long Start;         // +0xBC
     unsigned long Count;         // +0xC0
-    unsigned long Zero;          // +0xC4
-    unsigned long Field;         // +0xC8
+    unsigned long IbStart;          // +0xC4
+    unsigned long IndexSpan;         // +0xC8
     FVbListing VertexBufferListing; // +0xCC
     FIbScratch IndexBufferScratch;  // +0xD8
     unsigned long Flags;         // +0xE0
     void* RecordTag;               // +0xE4
     void* RecordTagContext;               // +0xE8
-    void* Unused;                // +0xEC (Arg8; sort depth when flags&0x20)
+    void* SortDepth;             // +0xEC float bits, used when Flags & 0x20
 
     FBatchRecord();
 };
@@ -56,7 +56,7 @@ struct FBatchQueuedRecord
 
 struct FBatchBin
 {
-    long Pad0;
+    long OrderKey;
     unsigned long SortKind; // +4
     std::map<IMaterial*, std::list<FBatchQueuedRecord>> Queue;
     unsigned long RecordCount;
@@ -99,8 +99,8 @@ public:
     GENRESULT DACOM_API FlushAll(unsigned char Clear) override;
     GENRESULT DACOM_API Submit(IMaterial* Material, void* Context, unsigned long PrimType,
                                unsigned long Start, unsigned long Count,
-                               unsigned long Zero, unsigned long Field,
-                               void* Unused, unsigned long Flags) override;
+                               unsigned long IbStart, unsigned long IndexSpan,
+                               void* SortDepth, unsigned long Flags) override;
     GENRESULT DACOM_API ClearBins() override;
     GENRESULT DACOM_API NoOp(void* Arg) override;
     GENRESULT DACOM_API SetEvents(void* NewValue) override;

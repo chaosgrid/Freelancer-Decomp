@@ -790,6 +790,8 @@ int DACOM_API FVMeshPartRenderable::GetIndexCount(int* Out)
     return 0;
 }
 
+// LAB_06c30f10: copies from header + 0x10 + 6 * (FacegroupStart + 2 * FaceGroups). Retail
+// scales the facegroup index by 6 bytes, as in GetFaceGroupIndices, not IndexStart * 2.
 int DACOM_API FVMeshPartRenderable::CopyIndices(unsigned short** Dest, int Count)
 {
     const unsigned int Expected = Owner->Ref->IndexCount;
@@ -912,10 +914,10 @@ public:
         G_Engine->GetInstanceExtent(InstId, 1, &Radius, Center);
         if (Radius <= 0.0f)
         {
-            Center[0] = Part->Ref->Extra2C[0];
-            Center[1] = Part->Ref->Extra2C[1];
-            Center[2] = Part->Ref->Extra2C[2];
-            Radius = Part->Ref->Extra38;
+            Center[0] = Part->Ref->Center[0];
+            Center[1] = Part->Ref->Center[1];
+            Center[2] = Part->Ref->Center[2];
+            Radius = Part->Ref->Radius;
             G_Engine->SetInstanceExtent(InstId, 1, Radius, Center);
         }
         return 1;
@@ -980,7 +982,7 @@ public:
     {
         if (!VMeshHandleValid(Handle))
             return 0;
-        std::memcpy(Out, ((FVMeshPart*)Handle)->Ref->Box14, 6 * sizeof(unsigned long));
+        std::memcpy(Out, ((FVMeshPart*)Handle)->Ref->Bounds, 6 * sizeof(unsigned long));
         return 1;
     }
 
@@ -989,7 +991,7 @@ public:
     {
         if (!VMeshHandleValid(Handle))
             return 0;
-        std::memcpy(Out, ((FVMeshPart*)Handle)->Ref->Extra2C, 3 * sizeof(float));
+        std::memcpy(Out, ((FVMeshPart*)Handle)->Ref->Center, 3 * sizeof(float));
         return 1;
     }
 

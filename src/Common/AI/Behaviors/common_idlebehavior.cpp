@@ -8,22 +8,9 @@
 
 // FUN_062cd530 (vtable .rdata:0639fc5c).
 IdleBehavior::IdleBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , OwnerContextPtr14(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime1c(0.0f)
-    , BehaviorMgrPtr20(nullptr)
-    , NavHelperPtr24(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
+    : Behavior(InTypeId)
     , Watcher2c()   // FUN_062d9b10, IdleIdea's ctor
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
 }
 
 // Scalar deleting FUN_062c7090 (shared by 7 vtables) only chains to ~Behavior; no
@@ -37,7 +24,7 @@ bool IdleBehavior::SetContext(void* Param1, void* Param2, void* Param3)
 {
     bool const bOk = BindContext(Param1, Param2, Param3);
     if (bOk)
-        Watcher2c.SetContext(OwnerContextPtr14, NavHelperPtr24, Param2);
+        Watcher2c.SetContext(OwnerContext, SysMgr, Param2);
     return bOk;
 }
 
@@ -58,24 +45,24 @@ void IdleBehavior::Disengage()
 int IdleBehavior::SetModeFromFlags()
 {
     int const Mode = (Flag29 != 0) ? 3 : 1;
-    ModeSelector0xc = Mode;
+    Readiness = Mode;
     return Mode;
 }
 
 // Slot 7, FUN_062cd600.
 int IdleBehavior::Update()
 {
-    if (OwnerContextPtr14 == nullptr)
+    if (OwnerContext == nullptr)
     {
-        UpdateResult10 = 3;
-        return UpdateResult10;
+        UpdateResult = 3;
+        return UpdateResult;
     }
 
     // Result discarded.
-    Watcher2c.Update(DeltaTime1c);
+    Watcher2c.Update(DeltaTime);
 
-    UpdateResult10 = 1;
-    return UpdateResult10;
+    UpdateResult = 1;
+    return UpdateResult;
 }
 
 // Slot 10, LAB_062cd630 -- ICF-shared with FormationBehavior::OnApplyDirective; reproduced as

@@ -12,7 +12,7 @@
 #include "ivp_active_value.h"
 #include "ivp_real_object.h"
 #include "ivp_mindist.h" // IVP_Ledge_Mindist / IVP_Synapse_Real (IVP_Anomaly_Manager::inter_penetration)
-#include "../ivp_collision/ivp_collision.h" // IVP_Collision_Delegator_Root(_Mindist): vector_12c elements
+#include "../ivp_collision/ivp_collision.h" // IVP_Collision_Delegator_Root(_Mindist): collision_delegator_roots elements
 #include "../ivp_collision/ivp_mindist_minimize.h" // IVP_Mindist_Minimize_Solver::init_mms_function_table (06353940)
 #include "ivp_listener.h" // IVP_Collision_Filter(_Coll_Group_Ident): collision_filter (+0x18); IVP_Listener_PSI
 #include "ivp_ov_element.h" // IVP_Mindist_Manager (mindist_manager, +0x10)
@@ -47,25 +47,12 @@ void IVP_Environment_Process_Wake_Queue(IVP_Environment* env)
 {
     for (int i = static_cast<int>(env->event_queue.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Core* core = static_cast<IVP_Core*>(env->event_queue.elems[i]);
+        IVP_Core* core = env->event_queue.elems[i];
         core->wake_or_ensure_simulation(); // FUN_06347d80
         core->Flags &= ~0x30;
     }
 
-    if (env->event_queue.elems == reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(&env->event_queue) + 8))
-    {
-        env->event_queue.n_elems = 0;
-        return;
-    }
-
-    if (env->event_queue.elems != nullptr)
-    {
-        free(env->event_queue.elems); // FUN_06343fb0
-    }
-
-    env->event_queue.elems = nullptr;
-    env->event_queue.mem_size = 0;
-    env->event_queue.n_elems = 0;
+    env->event_queue.Clear();
 }
 
 // ============================================================================
@@ -76,7 +63,7 @@ void IVP_Environment_Process_Wake_Queue(IVP_Environment* env)
 // ============================================================================
 void IVP_Environment_Dequeue_Core(IVP_Environment* env, IVP_Core* core)
 {
-    IVP_U_Vector_Base& Queue = env->event_queue;
+    IVP_U_Vector<IVP_Core>& Queue = env->event_queue;
 
     int FoundIndex = -1;
     for (int i = static_cast<int>(Queue.n_elems) - 1; i >= 0; --i)
@@ -113,7 +100,7 @@ void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core)
         return;
     }
 
-    IVP_U_Vector_Base_Append(&env->event_queue, core);
+    env->event_queue.Add(core);
     core->Flags = (core->Flags & ~0x20u) | 0x10u;
 }
 
@@ -128,11 +115,11 @@ void IVP_Controller_Manager_Ensure_Core_To_Be_In_Simulation(IVP_Core* core)
 
 // FUN_0634cf60: top-down over the IVP_Listener_Collision vector, elems re-read
 // every pass, no null test; enabled_callbacks bit 0 gates event_pre_collision.
-void IVP_Environment_Notify_Listeners_C8(IVP_Environment* env, void* arg)
+void IVP_Environment_Fire_Event_Pre_Collision(IVP_Environment* env, void* arg)
 {
-    for (int i = static_cast<int>(env->vector_listeners_c8.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(env->collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->vector_listeners_c8.elems[i];
+        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & 1) != 0)
         {
             Listener->event_pre_collision((IVP_Event_Collision*)arg);
@@ -145,7 +132,7 @@ void IVP_Environment_Notify_Listeners_C8(IVP_Environment* env, void* arg)
 // (event_object_revived). Caller: IVP_Core::revive_pass (FUN_0634b480), which
 // builds the {Environment*, IVP_Real_Object*} record on its stack.
 // ============================================================================
-void IVP_Environment_Notify_Object_Listeners(IVP_Environment* env, void* event_data)
+void IVP_Environment_Fire_Event_Object_Revived(IVP_Environment* env, void* event_data)
 {
     for (int i = static_cast<int>(env->object_listeners.n_elems) - 1; i >= 0; --i)
     {
@@ -154,36 +141,15 @@ void IVP_Environment_Notify_Object_Listeners(IVP_Environment* env, void* event_d
 }
 
 // ============================================================================
-// Port helper: frees an IVP_U_Vector_Base's heap buffer unless elems still
-// points at the inline storage; retail inlines this six times in the destructor.
-// ============================================================================
-static void IVP_U_Vector_Base_Clear(IVP_U_Vector_Base& v)
-{
-    void* inlineStorage = reinterpret_cast<uint8_t*>(&v) + 8;
-    if (v.elems == inlineStorage)
-    {
-        v.n_elems = 0;
-        return;
-    }
-    if (v.elems != nullptr)
-    {
-        free(v.elems); // FUN_06343fb0
-    }
-    v.elems = nullptr;
-    v.mem_size = 0;
-    v.n_elems = 0;
-}
-
-// ============================================================================
-// FUN_0634caf0: top-down over vector_12c, elems re-read every pass, no gate;
+// FUN_0634caf0: top-down over collision_delegator_roots, elems re-read every pass, no gate;
 // slot 4 = object_is_removed_from_collision_detection.
 // ============================================================================
-void IVP_Environment_Notify_Vector12c_Slot4(IVP_Environment* env, void* arg)
+void IVP_Environment_Notify_Object_Removed_From_Collision_Detection(IVP_Environment* env, void* arg)
 {
-    for (int i = static_cast<int>(env->vector_12c.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(env->collision_delegator_roots.n_elems) - 1; i >= 0; --i)
     {
         IVP_Collision_Delegator_Root* Delegator =
-            static_cast<IVP_Collision_Delegator_Root*>(env->vector_12c.elems[i]);
+            static_cast<IVP_Collision_Delegator_Root*>(env->collision_delegator_roots.elems[i]);
         Delegator->object_is_removed_from_collision_detection(static_cast<IVP_Real_Object*>(arg));
     }
 }
@@ -228,14 +194,14 @@ void IVP_Environment_Free_Buffer_Node_List(IVP_Environment* env)
 // ============================================================================
 void IVP_Environment_Append_Object_Listener(IVP_Environment* env, void* listener)
 {
-    IVP_U_Vector_Base_Append(&env->object_listeners, listener);
+    env->object_listeners.Add(static_cast<IVP_Listener_Object*>(listener));
 }
 
 // ============================================================================
 // FUN_0634ced0 / FUN_0634cf00: top-down over object_listeners, no null test,
 // no gate; slots 0 and 3.
 // ============================================================================
-void IVP_Environment_Notify_Object_Listeners_Slot0(IVP_Environment* env, void* arg)
+void IVP_Environment_Fire_Event_Object_Deleted(IVP_Environment* env, void* arg)
 {
     for (int i = static_cast<int>(env->object_listeners.n_elems) - 1; i >= 0; --i)
     {
@@ -243,7 +209,7 @@ void IVP_Environment_Notify_Object_Listeners_Slot0(IVP_Environment* env, void* a
     }
 }
 
-void IVP_Environment_Notify_Object_Listeners_Slot3(IVP_Environment* env, void* arg)
+void IVP_Environment_Fire_Event_Object_Frozen(IVP_Environment* env, void* arg)
 {
     for (int i = static_cast<int>(env->object_listeners.n_elems) - 1; i >= 0; --i)
     {
@@ -252,7 +218,7 @@ void IVP_Environment_Notify_Object_Listeners_Slot3(IVP_Environment* env, void* a
 }
 
 // Notify each object listener of a newly created object, last to first.
-void IVP_Environment_Notify_Object_Listeners_Slot1(IVP_Environment* env, void* arg)
+void IVP_Environment_Fire_Event_Object_Created(IVP_Environment* env, void* arg)
 {
     for (int i = static_cast<int>(env->object_listeners.n_elems) - 1; i >= 0; --i)
     {
@@ -262,14 +228,14 @@ void IVP_Environment_Notify_Object_Listeners_Slot1(IVP_Environment* env, void* a
 }
 
 // ============================================================================
-// FUN_0634cfa0 / FUN_0634cfe0: like IVP_Environment_Notify_Listeners_C8 but
+// FUN_0634cfa0 / FUN_0634cfe0: like IVP_Environment_Fire_Event_Pre_Collision but
 // gated on enabled_callbacks bit 2 (&4); slots 2 and 3.
 // ============================================================================
 void IVP_Environment_Notify_Friction_Created(IVP_Environment* env, void* arg)
 {
-    for (int i = static_cast<int>(env->vector_listeners_c8.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(env->collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->vector_listeners_c8.elems[i];
+        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & 4) != 0)
         {
             Listener->event_friction_created(arg);
@@ -279,9 +245,9 @@ void IVP_Environment_Notify_Friction_Created(IVP_Environment* env, void* arg)
 
 void IVP_Environment_Notify_Friction_Deleted(IVP_Environment* env, void* arg)
 {
-    for (int i = static_cast<int>(env->vector_listeners_c8.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(env->collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->vector_listeners_c8.elems[i];
+        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & 4) != 0)
         {
             Listener->event_friction_deleted(arg);
@@ -292,9 +258,9 @@ void IVP_Environment_Notify_Friction_Deleted(IVP_Environment* env, void* arg)
 // ============================================================================
 // FUN_0634d050
 // ============================================================================
-void IVP_Environment_Append_Listener_C8(IVP_Environment* env, void* listener)
+void IVP_Environment_Add_Listener_Collision(IVP_Environment* env, void* listener)
 {
-    IVP_U_Vector_Base_Append(&env->vector_listeners_c8, listener);
+    env->collision_listeners.Add(static_cast<IVP_Listener_Collision*>(listener));
 }
 
 // ============================================================================
@@ -373,9 +339,9 @@ void IVP_Environment_Destructor(IVP_Environment* env)
     if (env->state_magic == 0x1e240)
     {
         // PSI listeners, last to first.
-        for (int i = static_cast<int>(env->vector_listeners_d0.n_elems) - 1; i >= 0; --i)
+        for (int i = static_cast<int>(env->psi_listeners.n_elems) - 1; i >= 0; --i)
         {
-            static_cast<IVP_Listener_PSI*>(env->vector_listeners_d0.elems[i])->environment_will_be_deleted(env);
+            static_cast<IVP_Listener_PSI*>(env->psi_listeners.elems[i])->environment_will_be_deleted(env);
         }
 
         // FUN_06345450: deleting destructor when set.
@@ -458,19 +424,19 @@ void IVP_Environment_Destructor(IVP_Environment* env)
         env->range_manager = nullptr;
 
         // n_elems read once, elems re-read per pass; slot 6 with the environment.
-        for (int i = static_cast<int>(env->vector_12c.n_elems) - 1; i >= 0; --i)
+        for (int i = static_cast<int>(env->collision_delegator_roots.n_elems) - 1; i >= 0; --i)
         {
             IVP_Collision_Delegator_Root* Delegator =
-                static_cast<IVP_Collision_Delegator_Root*>(env->vector_12c.elems[i]);
+                static_cast<IVP_Collision_Delegator_Root*>(env->collision_delegator_roots.elems[i]);
             Delegator->environment_is_going_to_be_deleted_event(env);
         }
-        IVP_U_Vector_Base_Clear(env->vector_12c);
+        env->collision_delegator_roots.Clear();
 
-        delete env->vector_cores_active; // ~IVP_U_Memory (06344000) + FUN_06391d5a
-        env->vector_cores_active = nullptr;
+        delete env->short_term_mem; // ~IVP_U_Memory (06344000) + FUN_06391d5a
+        env->short_term_mem = nullptr;
 
-        delete env->vector_cores_frozen; // ~IVP_U_Memory (06344000) + FUN_06391d5a
-        env->vector_cores_frozen = nullptr;
+        delete env->sim_unit_mem; // ~IVP_U_Memory (06344000) + FUN_06391d5a
+        env->sim_unit_mem = nullptr;
 
         IVP_Cache_Object_Manager* const CacheObjectManager = env->cache_object_manager;
         if (CacheObjectManager != nullptr)
@@ -514,12 +480,12 @@ void IVP_Environment_Destructor(IVP_Environment* env)
 
     // Shared tail, also reached directly when state_magic does not match: the
     // member vectors release their heap buffers.
-    IVP_U_Vector_Base_Clear(env->vector_12c);
-    IVP_U_Vector_Base_Clear(env->object_listeners);
-    IVP_U_Vector_Base_Clear(env->vector_e0);
-    IVP_U_Vector_Base_Clear(env->event_queue);
-    IVP_U_Vector_Base_Clear(env->vector_listeners_d0);
-    IVP_U_Vector_Base_Clear(env->vector_listeners_c8);
+    env->collision_delegator_roots.Clear();
+    env->object_listeners.Clear();
+    env->vector_e0.Clear();
+    env->event_queue.Clear();
+    env->psi_listeners.Clear();
+    env->collision_listeners.Clear();
 }
 
 // ============================================================================
@@ -531,9 +497,9 @@ static void IVP_Environment_Fire_Event_PSI(IVP_Environment* env)
 {
     IVP_Event_PSI Event;
     Event.environment = env;
-    for (int32_t I = static_cast<int32_t>(env->vector_listeners_d0.n_elems) - 1; I >= 0; --I)
+    for (int32_t I = static_cast<int32_t>(env->psi_listeners.n_elems) - 1; I >= 0; --I)
     {
-        IVP_Listener_PSI* Listener = static_cast<IVP_Listener_PSI*>(env->vector_listeners_d0.elems[I]);
+        IVP_Listener_PSI* Listener = static_cast<IVP_Listener_PSI*>(env->psi_listeners.elems[I]);
         Listener->event_PSI(&Event);
     }
 }
@@ -825,9 +791,9 @@ double IVP_Anomaly_Manager::get_push_speed_penetration(IVP_Real_Object* Object0,
 {
     IVP_Environment* Env = Object0->environment;
     const float DeltaTime = Env->delta_time;
-    const double X = Env->field_b4;
-    const double Y = Env->field_b8;
-    const double Z = Env->field_bc;
+    const double X = Env->gravity_x;
+    const double Y = Env->gravity_y;
+    const double Z = Env->gravity_z;
     const double Length = std::sqrt((X * X + Y * Y) + Z * Z);     // FUN_06347e60
     return (Length + Length) * DeltaTime;
 }
@@ -847,45 +813,6 @@ IVP_Anomaly_Manager::~IVP_Anomaly_Manager()
 // ############################################################################
 
 // ============================================================================
-// FUN_063441a0: IVP_U_Vector_Base realloc; the same retail function as
-// IVP_U_Vector<T>::Realloc.
-// ============================================================================
-void IVP_U_Vector_Base_Realloc(IVP_U_Vector_Base* v)
-{
-    // *8 + 8: room for the new capacity of 2*mem_size+1 pointers.
-    void** NewBuffer = static_cast<void**>(malloc(static_cast<size_t>(v->mem_size) * 8 + 8));
-
-    // Computed in 16 bits, so it wraps at 0xFFFF as in retail.
-    v->mem_size = static_cast<uint16_t>(static_cast<uint16_t>(v->mem_size << 1) + 1);
-
-    for (int i = 0; i < static_cast<int>(v->n_elems); ++i)
-    {
-        NewBuffer[i] = v->elems[i];
-    }
-
-    // Keep the inline buffer that sits right after the header.
-    void** InlineBuffer = reinterpret_cast<void**>(reinterpret_cast<char*>(v) + 8);
-    if (v->elems != InlineBuffer && v->elems != nullptr)
-    {
-        free(v->elems);
-        v->elems = nullptr; // redundant against the store below, but in retail
-    }
-
-    v->elems = NewBuffer;
-}
-
-void IVP_U_Vector_Base_Append(IVP_U_Vector_Base* v, void* elem)
-{
-    // Unsigned compare: grows on n_elems >= mem_size.
-    if (v->n_elems >= v->mem_size)
-    {
-        IVP_U_Vector_Base_Realloc(v);
-    }
-    v->elems[v->n_elems] = elem;
-    ++v->n_elems;
-}
-
-// ============================================================================
 // FUN_063505f0
 // ============================================================================
 void* IVP_Environment_Init_Block34(void* block34)
@@ -895,18 +822,19 @@ void* IVP_Environment_Init_Block34(void* block34)
 }
 
 // ============================================================================
-// FUN_0634bf40 / FUN_0634bf30. Only called on IVP_Environment+0x88
-// (default_friction) by the constructor. 0x3e99999a is 0.3f.
+// FUN_0634bf40 / FUN_0634bf30: the freeze manager's init and ctor, only
+// called on IVP_Environment+0x88 (freeze_check_dtime) by the constructor.
+// 0x3e99999a is 0.3f.
 // ============================================================================
-void IVP_Environment_Init_DefaultFriction(void* block88)
+void IVP_Freeze_Manager_Init(void* FreezeManager)
 {
-    *static_cast<float*>(block88) = 0.3f;
+    *static_cast<float*>(FreezeManager) = 0.3f;
 }
 
-void* IVP_Environment_Init_Block88(void* block88)
+void* IVP_Freeze_Manager_Construct(void* FreezeManager)
 {
-    IVP_Environment_Init_DefaultFriction(block88);
-    return block88;
+    IVP_Freeze_Manager_Init(FreezeManager);
+    return FreezeManager;
 }
 
 // ============================================================================
@@ -1024,18 +952,27 @@ void IVP_Sim_Unit_Manager::env_set_current_time(IVP_Environment* Environment, fl
     IVP_Environment_SetCurrentTime(Environment, TimeHi, TimeLo);
 }
 
-// FUN_06360a40. Retail sets x87 precision control to 64-bit mantissa around
-// the call and restores it; not reproduced (the port models x87 temporaries as
-// double, and the x87_trig.h instructions ignore precision control).
+// FUN_06360a40. The whole step runs with the x87 precision control set to a
+// 64-bit mantissa (FSTCW; OR 0x300; FLDCW) and the saved control word is
+// reloaded afterwards, so the caller's precision (the client runs at 24 or
+// 53 bits) does not reach the simulation.
 // Clamp: below 0.005f or NaN -> 0.005f; above 0.1f -> 0.1f.
 void IVP_Sim_Unit_Manager::simulate_variable_time_step(IVP_Environment* Environment, float DeltaTime)
 {
+    unsigned short SavedControl;
+    unsigned short ExtendedControl;
+    __asm fstcw SavedControl
+    ExtendedControl = static_cast<unsigned short>(SavedControl | 0x300);
+    __asm fldcw ExtendedControl
+
     if (!(DeltaTime >= 0.005f))
         DeltaTime = 0.005f;
     else if (DeltaTime > 0.1f)
         DeltaTime = 0.1f;
 
     EventManager->simulate_variable_time_step(this, Environment, PsiEvent, DeltaTime); // slot 1
+
+    __asm fldcw SavedControl
 }
 
 // ----------------------------------------------------------------------------
@@ -1049,7 +986,7 @@ void IVP_Event_Manager::simulate_time_events(IVP_Sim_Unit_Manager* TimeManager, 
     for (;;)
     {
         IVP_Priority_Pool* Pool = TimeManager->EventPool;
-        const float MinKey = Pool->PoolKeyThreshold;
+        const float MinKey = Pool->PoolMinKey;
         const double UntilRel = (((double)(UntilHi) - TimeManager->TimeBaseHi) + UntilLo) - TimeManager->TimeBaseLo;
         if (!(UntilRel > MinKey))
             break;
@@ -1088,7 +1025,7 @@ void IVP_Event_Manager::simulate_variable_time_step(IVP_Sim_Unit_Manager* TimeMa
     for (;;)
     {
         IVP_Priority_Pool* Pool = TimeManager->EventPool;
-        const float MinKey = Pool->PoolKeyThreshold;
+        const float MinKey = Pool->PoolMinKey;
         IVP_Time_Event* Event =
             static_cast<IVP_Time_Event*>(Pool->PoolEntries[Pool->PoolLiveIndex].Payload);
 
@@ -1152,7 +1089,7 @@ void IVP_Time_Event_PSI::simulate_time_event(IVP_Environment* Environment)
         Index = Entry->Next;
         Entry->Key = (float)(Entry->Key - Shift);
     }
-    Pool->PoolKeyThreshold = (float)(Pool->PoolKeyThreshold - Shift);
+    Pool->PoolMinKey = (float)(Pool->PoolMinKey - Shift);
 
     TimeManager->TimeBaseHi = Environment->time_of_last_psi.time_base;
     TimeManager->TimeBaseLo = Environment->time_of_last_psi.time_offset;
@@ -1210,14 +1147,14 @@ IVP_Ball* IVP_Environment_CreateBall(IVP_Environment* env, const float* BallRadi
 // FUN_0634cb20
 void IVP_Environment_SetGravity(IVP_Environment* env, const IVP_U_Point* Gravity)
 {
-    env->field_b4 = Gravity->x;
-    env->field_bc = Gravity->z;
-    env->field_b8 = Gravity->y;
+    env->gravity_x = Gravity->x;
+    env->gravity_z = Gravity->z;
+    env->gravity_y = Gravity->y;
     // FUN_06347e60: |g| on the x87 stack, rounded to float on store.
     const double X = Gravity->x;
     const double Y = Gravity->y;
     const double Z = Gravity->z;
-    env->field_c4 = (float)(std::sqrt(X * X + Y * Y + Z * Z));
+    env->gravity_length = (float)(std::sqrt(X * X + Y * Y + Z * Z));
     env->standard_gravity_controller->set_grav_vector(Gravity);
 }
 
@@ -1289,8 +1226,8 @@ void IVP_Range_Manager::get_coll_range_intra_objects(const IVP_Real_Object* Obje
     const IVP_Core* Core1 = Object1->core;
 
     const float Speed0 = (float)(
-        ((double)(Core0->BoundingRadius) + Core0->Margin) + 1.0e-10f);
-    const double Speed1Ext = ((double)(Core1->BoundingRadius) + Core1->Margin) + 1.0e-10f;
+        ((double)(Core0->MaxSurfaceRotSpeed) + Core0->CurrentSpeed) + 1.0e-10f);
+    const double Speed1Ext = ((double)(Core1->MaxSurfaceRotSpeed) + Core1->CurrentSpeed) + 1.0e-10f;
     const float Speed1 = (float)(Speed1Ext);                                 // FST, value stays on stack
     const float SpeedSum = (float)(Speed1Ext + Speed0);
 
@@ -1327,7 +1264,7 @@ double IVP_Range_Manager::get_coll_range_in_world(const IVP_Real_Object* Object)
 {
     const IVP_Core* Core = Object->core;
     const float Speed = (float)(
-        ((double)(Core->BoundingRadius) + Core->Margin) + 1.0e-10f);
+        ((double)(Core->MaxSurfaceRotSpeed) + Core->CurrentSpeed) + 1.0e-10f);
     const float Radius = Core->UpperLimitRadius;
 
     const double A = (double)(Speed) * look_ahead_time_world;
@@ -1462,18 +1399,18 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
 {
     // ---- compiler-emitted member constructors, before the body -------------
     IVP_Environment_Init_Block34(env->manager_context_34);         // FUN_063505f0
-    IVP_Environment_Init_Block88(&env->default_friction);          // FUN_0634bf30
+    IVP_Freeze_Manager_Construct(&env->freeze_check_dtime);          // FUN_0634bf30
 
-    env->vector_listeners_c8 = IVP_U_Vector_Base{0, 0, nullptr};   // +0xC8
-    env->vector_listeners_d0 = IVP_U_Vector_Base{0, 0, nullptr};   // +0xD0
-    env->event_queue         = IVP_U_Vector_Base{0, 0, nullptr};   // +0xD8
-    env->vector_e0           = IVP_U_Vector_Base{0, 0, nullptr};   // +0xE0
-    env->object_listeners    = IVP_U_Vector_Base{0, 0, nullptr};   // +0x124
-    env->vector_12c          = IVP_U_Vector_Base{0, 0, nullptr};   // +0x12C
+    new (&env->collision_listeners) IVP_U_Vector<IVP_Listener_Collision>();             // +0xC8
+    new (&env->psi_listeners) IVP_U_Vector<IVP_Listener_PSI>();                         // +0xD0
+    new (&env->event_queue) IVP_U_Vector<IVP_Core>();                                   // +0xD8
+    new (&env->vector_e0) IVP_U_Vector<void>();                                         // +0xE0
+    new (&env->object_listeners) IVP_U_Vector<IVP_Listener_Object>();                   // +0x124
+    new (&env->collision_delegator_roots) IVP_U_Vector<IVP_Collision_Delegator_Root>(); // +0x12C
 
     // ---- the constructor body proper ---------------------------------------
     std::memset(env, 0, sizeof(IVP_Environment));
-    IVP_Environment_Init_DefaultFriction(&env->default_friction);  // FUN_0634bf40
+    IVP_Freeze_Manager_Init(&env->freeze_check_dtime);  // FUN_0634bf40
 
     env->sim_substate = 5;
     // The +0x34 block's first dword is a back-pointer to the owner.
@@ -1514,14 +1451,14 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
         env->anomaly_limits = new IVP_Anomaly_Limits(1);
     }
 
-    // Same adopt-or-construct choice, but appended to vector_12c.
-    void* Vector12cElement = Parms->Vector12cElement;
-    if (Vector12cElement == nullptr)
+    // Same adopt-or-construct choice, but appended to collision_delegator_roots.
+    void* CollisionDelegatorRoot = Parms->CollisionDelegatorRoot;
+    if (CollisionDelegatorRoot == nullptr)
     {
         // operator new(4), FUN_06360df0: the default delegator (vtable 063a5760).
-        Vector12cElement = static_cast<IVP_Collision_Delegator_Root*>(new IVP_Collision_Delegator_Root_Mindist());
+        CollisionDelegatorRoot = static_cast<IVP_Collision_Delegator_Root*>(new IVP_Collision_Delegator_Root_Mindist());
     }
-    IVP_U_Vector_Base_Append(&env->vector_12c, Vector12cElement);
+    env->collision_delegator_roots.Add(static_cast<IVP_Collision_Delegator_Root*>(CollisionDelegatorRoot));
 
     // Adopted verbatim, never constructed here.
     env->universe_manager = Parms->UniverseManager;
@@ -1544,8 +1481,7 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
     }
 
     // Registers with Registry->Environments; the destructor removes it again.
-    IVP_U_Vector_Base_Append(
-        reinterpret_cast<IVP_U_Vector_Base*>(&Registry->Environments), env);
+    Registry->Environments.Add(env);
 
     // ---- controller_manager (+0x90): 4 bytes holding `this` ----------------
     {
@@ -1599,15 +1535,15 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
     }
 
     // ---- the two scratch arenas (+0xA0 / +0xA4) ----------------------------
-    env->vector_cores_active = new IVP_U_Memory; // new(0x14), FUN_06344120
-    env->vector_cores_frozen = new IVP_U_Memory; // new(0x14), FUN_06344120
+    env->short_term_mem = new IVP_U_Memory; // new(0x14), FUN_06344120
+    env->sim_unit_mem = new IVP_U_Memory; // new(0x14), FUN_06344120
 
     // One caller-supplied block split in half. SAR (arithmetic shift), so a
     // negative size rounds toward negative infinity, unlike a division.
     {
         const int32_t HalfSize = Parms->MemoryBlockSize >> 1;
-        env->vector_cores_active->init_mem(Parms->MemoryBlock, HalfSize);
-        env->vector_cores_frozen->init_mem(Parms->MemoryBlock + HalfSize, HalfSize);
+        env->short_term_mem->init_mem(Parms->MemoryBlock, HalfSize);
+        env->sim_unit_mem->init_mem(Parms->MemoryBlock + HalfSize, HalfSize);
     }
 
     // ---- damping factor and the two global dispatch tables -----------------
@@ -1615,7 +1551,7 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
 
     // pow(0.9, delta_time), open-coded in retail with FYL2X / F2XM1 / FSCALE.
     // DAT_063a5568 is (double)0.9f, not the double 0.9.
-    env->field_120 = (float)(
+    env->integrated_energy_damp = (float)(
         std::pow((double)(0.9f), (double)(env->delta_time)));
 
     IVP_Mindist_Minimize_Solver::init_mms_function_table();        // FUN_06353940

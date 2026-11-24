@@ -127,10 +127,6 @@ namespace
     bool G_bQuitDialogReady = false;
     bool G_bQuitDialogPending = false;
 
-    // DAT_0067a438 is read once in the whole PE and never written, so the WM_ACTIVATEAPP branch
-    // it guards always takes the zero path.
-    const bool kActivateOverrideByte = false;
-
     bool IsSinglePlayerSession()
     {
         // COMMON.DLL::SinglePlayer — retail default is true.
@@ -141,9 +137,10 @@ namespace
     {
         // LAB_005b264c. DAT_00615ba9 is the local "active" copy; the derived gate is
         // DAT_00615ba8, which stays 1 whenever the app is not a fullscreen single-player
-        // session (there is nothing to release then).
+        // session (there is nothing to release then). present_when_inactive (DAT_0067a438) is
+        // only ever cleared, so its branch never runs.
         const bool bFullscreen = g_display.fullscreen != 0;
-        if (!IsSinglePlayerSession() || (kActivateOverrideByte && !bFullscreen))
+        if (!IsSinglePlayerSession() || (g_display.present_when_inactive != 0 && !bFullscreen))
             G_bPresentAllowed = true;
         else
             G_bPresentAllowed = bActive;

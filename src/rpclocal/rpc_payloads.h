@@ -32,6 +32,7 @@
 #include "common_misc.h"        // DamageList, the DAMAGEOBJECT payload member
 
 #include <cstddef>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -87,6 +88,28 @@ inline T RpcPayloadRead(const FPacketBase* Packet, unsigned int Offset) {
     return Value;
 }
 
+// Bare operator new(N) -- a size of 0 included -- and a byte copy; the packet owns the
+// block. The block writers of channels 2 and 3 (FUN_06d97b00, FUN_06d90a00, FUN_06d97470,
+// FUN_06d989b0, FUN_06d9a160, FUN_06d9a5f0, FUN_06d9aab0) and the IServerImpl senders do
+// this; the writers that test `size == 0 || src == 0` first have that test in their callers.
+inline void* RpcCopyBlock(const void* Source, unsigned int InSize) {
+    unsigned char* Block = static_cast<unsigned char*>(::operator new(InSize, std::nothrow));
+    const unsigned char* Src = static_cast<const unsigned char*>(Source);
+    for (unsigned int i = 0; i < InSize; ++i) {
+        Block[i] = Src[i];
+    }
+    return Block;
+}
+
+// Retail's inline strlen; no null test (retail faults on null).
+inline unsigned int RpcStringLength(const char* Text) {
+    unsigned int Length = 0;
+    while (Text[Length] != '\0') {
+        ++Length;
+    }
+    return Length;
+}
+
 // ===========================================================================
 // Channel-1 payload structures.
 //
@@ -97,17 +120,19 @@ inline T RpcPayloadRead(const FPacketBase* Packet, unsigned int Offset) {
 // ch1 op 0x01 FLPACKET_COMMON_UPDATEOBJECT, packet size 0x4c -> payload 0x2c.
 // Sender 0x06d897c0 (IClient+0x0d8), receiver caseD_1 at 0x06d83a4a.
 struct FPayloadCommonUpdateObject {
-    // TODO: semantics unproven. <- argument struct +0x28 (byte).
+    // <- argument struct +0x28 (byte). freelancer.exe stores it as the ship's
+    // BehaviorIndex; the IServer direction sends SSPObjUpdateInfo::State.
     unsigned char State;
     unsigned char Pad_0x01[3];
     unsigned int ObjectId;       // +0x04  <- argument struct +0x00
     Vector Position;             // +0x08  <- FUN_06d8f510 (3-dword copier), struct +0x14
     Quaternion Orientation;      // +0x14  <- FUN_06d8f4f0 (4-dword copier), struct +0x04
-    // TODO: semantics unproven. Both floats (the receiver uses FLD/FST). SSPObjUpdateInfo
-    // (common_server_types.h, the IServer direction) narrows a double Timestamp into the
-    // first and carries an unidentified dword in the second -- a lead, not a proof.
-    float Timestamp;            // +0x24  <- argument struct +0x20
-    float Throttle;            // +0x28  <- argument struct +0x24
+    // Both floats (the receiver uses FLD/FST). freelancer.exe's handler passes the first to
+    // PhySys::RCSet as the update time and the second to CShip::set_throttle; the IServer
+    // direction narrows SSPObjUpdateInfo's double Timestamp into the first and copies its
+    // ThrottleBits into the second.
+    float Timestamp;             // +0x24  <- argument struct +0x20
+    float Throttle;              // +0x28  <- argument struct +0x24
 };
 static_assert(sizeof(FPayloadCommonUpdateObject) == 0x2c, "UPDATEOBJECT payload 0x2c");
 
@@ -181,7 +206,7 @@ struct FPayloadCommonGoTradelane {
     unsigned int ObjectId;       // +0x00
     unsigned int TradelaneRing1; // +0x04
     unsigned int TradelaneRing2; // +0x08
-    unsigned char bMidLane;    // +0x0c  TODO: semantics unproven (XGoTradelane +0x0c)
+    unsigned char bMidLane;    // +0x0c  XGoTradelane +0x0c; both builders pass go_tradelane's bFastExit
     unsigned char Pad_0x0d[3];   // +0x0d
 };
 static_assert(sizeof(FPayloadCommonGoTradelane) == 0x10, "GOTRADELANE payload 0x10");
@@ -230,8 +255,8 @@ struct FPayloadCommonPlayerTrade {
     unsigned int SubType;       // +0x00  1, 2, 4, 8, 0x10, 0x20, 0x40 or 0x80
     unsigned int Reason;    // +0x04  sub-type 2 only. TODO: semantics unproven.
     unsigned int ShipId;    // +0x08  every sub-type except 2. TODO: semantics unproven.
-    unsigned int Money;    // +0x0c  sub-type 4 only. TODO: semantics unproven.
-    unsigned char bAccepted;   // +0x10  sub-type 0x40 only. TODO: semantics unproven.
+    unsigned int Money;         // +0x0c  sub-type 4 only (SetTradeMoney)
+    unsigned char bAccepted;    // +0x10  sub-type 0x40 only (AcceptTrade)
     unsigned char Pad_0x11[3];  // +0x11
     unsigned int EquipArchId;   // +0x14  sub-types 8 / 0x10  <- EquipDesc +0x04
     unsigned int EquipCount;    // +0x18  sub-types 8 / 0x10  <- EquipDesc +0x14
@@ -270,7 +295,10 @@ struct FPayloadCommonPopUpDialog {
     void* BufferA;          // +0x04  flattened bytes of the 1st FmtStr
     unsigned int SizeB;     // +0x08  flattened size of the 2nd FmtStr
     void* BufferB;          // +0x0c  flattened bytes of the 2nd FmtStr
-    unsigned int Buttons;// +0x10  the sender's 4th argument. TODO: semantics unproven.
+    // +0x10  button bits (1 yes, 2 no, 4 later, 8 ok/close): server -> client the buttons
+    // to show (freelancer.exe NnMissionMessagePopUp), client -> server the one clicked
+    // (IServerImpl::PopUpDialog's only field).
+    unsigned int Buttons;
 };
 static_assert(sizeof(FPayloadCommonPopUpDialog) == 0x14, "POP_UP_DIALOG payload 0x14");
 
@@ -290,9 +318,11 @@ static_assert(sizeof(FPayloadCommonTractorObjects) == 0x18, "TRACTOROBJECTS payl
 // +0x04 and dword at +0x08 are written by the sender directly. Registry size 0x2c.
 struct FPayloadServerRemoteObjectCargoUpdate {
     unsigned int EquipHandle;    // +0x00, owned by the packet
-    unsigned char Field_0x04;    // +0x04  TODO: semantics unproven (a mode/flag byte)
+    // +0x04  IClient::SendServerRemoteObjectCargoUpdate's Flag: Server.dll always passes 1,
+    // freelancer.exe's FUN_0053deb0 never reads it. TODO: meaning.
+    unsigned char Flag;
     unsigned char Pad_0x05[3];   // +0x05
-    unsigned int ObjectId;     // +0x08  TODO: semantics unproven (an object id)
+    unsigned int ObjectId;       // +0x08  the ship whose cargo is synced (Server passes Ship->Id)
 };
 static_assert(sizeof(FPayloadServerRemoteObjectCargoUpdate) == 0x0c,
               "ch2 0x3d payload 0x0c");
@@ -369,7 +399,7 @@ static_assert(sizeof(FPayloadServerBlobReversed) == 0x08, "ch2 reversed-blob pay
 // second field as a zero-extended dword. FServerDestroyObjectInfo is in rpc_iclient_args.h.
 struct FPayloadServerDestroyObject {
     unsigned int ObjectId;      // +0x00  <- arg struct +0x00
-    unsigned char DestroyType;   // +0x04  <- arg struct +0x04. TODO: semantics unproven.
+    unsigned char DestroyType;   // +0x04  <- arg struct +0x04 (0 vanish, 1 destroyed)
     unsigned char Pad_0x05[3];
 };
 static_assert(sizeof(FPayloadServerDestroyObject) == 0x08, "DESTROYOBJECT payload 0x08");
@@ -380,9 +410,9 @@ static_assert(sizeof(FPayloadServerDestroyObject) == 0x08, "DESTROYOBJECT payloa
 // then the Quaternion from arg+0x0c (FUN_06d8f4f0, 4-dword copier); the receiver is the
 // strict inverse.
 struct FPayloadServerLaunch {
-    unsigned int ShipId;    // +0x00  <- arg +0x00. TODO: semantics unproven.
-    unsigned int LaunchObjId;    // +0x04  <- arg +0x04. TODO: semantics unproven.
-    unsigned int LaunchPosIndex;    // +0x08  <- arg +0x08. TODO: semantics unproven.
+    unsigned int ShipId;            // +0x00  <- arg +0x00
+    unsigned int LaunchObjId;       // +0x04  <- arg +0x04, the object launched from
+    unsigned int LaunchPosIndex;    // +0x08  <- arg +0x08, its launch_pos index (-1: none)
     Vector Position;            // +0x0c  <- arg +0x1c (FUN_06d8f510)
     Quaternion Orientation;     // +0x18  <- arg +0x0c (FUN_06d8f4f0)
 };
@@ -396,14 +426,24 @@ static_assert(sizeof(FPayloadServerLaunch) == 0x28, "LAUNCH payload 0x28");
 // .data:0x06dbb8f4 / 0x06dbb8f8 / 0x06dbb8fc). The payload is the argument struct, so
 // FPayloadServerActivateObject is declared in rpc_iclient_args.h.
 
-// ch2 0x0b FLPACKET_SERVER_LAND, size 0x2c -> payload 0x0c. Sender 0x06d8a990
-// (IClient+0x0ec), receiver caseD_b at 0x06d8237c. Three dwords, order preserved.
+// payload 0x0c: three dwords, the view of the shared shape-5 codec (rpc_wire_generic.cpp).
 struct FPayloadServerThreeDwords {
     unsigned int Field_0x00;
     unsigned int Field_0x04;
     unsigned int Field_0x08;
 };
 static_assert(sizeof(FPayloadServerThreeDwords) == 0x0c, "three-dword payload 0x0c");
+
+// ch2 0x0b FLPACKET_SERVER_LAND, size 0x2c -> payload 0x0c. Sender 0x06d8a990
+// (IClient+0x0ec), receiver caseD_b at 0x06d8237c. Three dwords, order preserved: the
+// payload is FServerLandInfo (rpc_iclient_args.h) as it stands.
+static_assert(sizeof(FServerLandInfo) == sizeof(FPayloadServerThreeDwords),
+              "LAND payload is FServerLandInfo");
+
+// ch2 0x21 FLPACKET_SERVER_SYSTEM_SWITCH_OUT, size 0x28 -> payload 0x08. The payload is
+// FServerSystemSwitchOutInfo (rpc_iclient_args.h) as it stands.
+static_assert(sizeof(FServerSystemSwitchOutInfo) == sizeof(FPayloadServerDwordPair),
+              "SYSTEM_SWITCH_OUT payload is FServerSystemSwitchOutInfo");
 
 // ch2 0x27 FLPACKET_SERVER_REQUESTCREATESHIPRESP, size 0x28 -> payload 0x08.
 // Sender 0x06d8a130 (IClient+0x0f4, three arguments), receiver caseD_27 at 0x06d819b1.
@@ -473,9 +513,7 @@ struct FPayloadServerSetRemoveItem {
 };
 static_assert(sizeof(FPayloadServerSetRemoveItem) == 0x0c, "SETREMOVEITEM payload 0x0c");
 
-// ch2 0x31 FLPACKET_SERVER_EXPLODEASTEROIDMINE, size 0x30 -> payload 0x10.
-// Sender 0x06d8a360 (IClient+0x0d0), receiver caseD_31 at 0x06d81b6d. Four dwords, order
-// preserved both ways.
+// payload 0x10: four dwords, the view of the shared shape-6 codec (rpc_wire_generic.cpp).
 struct FPayloadServerFourDwords {
     unsigned int Field_0x00;
     unsigned int Field_0x04;
@@ -483,6 +521,19 @@ struct FPayloadServerFourDwords {
     unsigned int Field_0x0c;
 };
 static_assert(sizeof(FPayloadServerFourDwords) == 0x10, "four-dword payload 0x10");
+
+// ch2 0x31 FLPACKET_SERVER_EXPLODEASTEROIDMINE, size 0x30 -> payload 0x10.
+// Sender 0x06d8a360 (IClient+0x0d0), receiver caseD_31 at 0x06d81b6d. Server.dll's
+// FMineExplosion (server_sysdb.h, built by MedMine::update), order preserved both ways,
+// the Vector as raw bits.
+struct FPayloadServerExplodeAsteroidMine {
+    unsigned int MineId;            // +0x00
+    unsigned int OffsetXBits;       // +0x04
+    unsigned int OffsetYBits;       // +0x08
+    unsigned int OffsetZBits;       // +0x0c
+};
+static_assert(sizeof(FPayloadServerExplodeAsteroidMine) == sizeof(FPayloadServerFourDwords),
+              "EXPLODEASTEROIDMINE payload 0x10");
 
 // ch2 0x33 FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE, size 0x2c -> payload 0x0c.
 // Sender 0x06d8ac40 (IClient+0x124), receiver caseD_33 at 0x06d823df.
@@ -544,14 +595,25 @@ struct FPayloadServerRequestReturned {
 };
 static_assert(sizeof(FPayloadServerRequestReturned) == 0x08, "REQUEST_RETURNED payload 0x08");
 
-// ch2 0x46 FLPACKET_SERVER_MARKOBJ, size 0x28 -> payload 0x08.
-// Sender 0x06d8ace0 (IClient+0x12c), receiver caseD_46 at 0x06d82420.
+// payload 0x08: a dword and a byte, the view of the shared shape-4 codec
+// (rpc_wire_generic.cpp).
 struct FPayloadServerDwordByte {
     unsigned int Field_0x00;
     unsigned char Field_0x04;
     unsigned char Pad_0x05[3];
 };
 static_assert(sizeof(FPayloadServerDwordByte) == 0x08, "dword+byte payload 0x08");
+
+// ch2 0x46 FLPACKET_SERVER_MARKOBJ, size 0x28 -> payload 0x08.
+// Sender 0x06d8ace0 (IClient+0x12c), receiver caseD_46 at 0x06d82420, which zero-extends
+// the byte into IClient::SendServerMarkObj's MarkType.
+struct FPayloadServerMarkObj {
+    unsigned int ObjectId;          // +0x00  <- 2nd argument
+    unsigned char MarkType;         // +0x04  <- 3rd argument, truncated to a byte
+    unsigned char Pad_0x05[3];
+};
+static_assert(sizeof(FPayloadServerMarkObj) == sizeof(FPayloadServerDwordByte),
+              "MARKOBJ payload 0x08");
 
 // ch2 0x47 FLPACKET_SERVER_CFGINTERFACENOTIFICATION, size 0x2c -> payload 0x0c.
 // Sender 0x06d8ad30 (IClient+0x130), receiver caseD_47 at 0x06d8244f. The payload is the
@@ -725,15 +787,15 @@ struct FPayloadServerMiscObjUpdate {
 // are not VC6's 0x10 bytes each); FPacket_FLPACKET_SERVER_MISCOBJUPDATE holds it as a
 // typed member, so the class is 0x20 + sizeof(this struct), not operator new(0x6c).
 
-const unsigned short kMiscObjUpdateFlagField_0x14 = 0x0001;
-const unsigned short kMiscObjUpdateFlagPair       = 0x0002;
-const unsigned short kMiscObjUpdateFlagField_0x04 = 0x0004;
-const unsigned short kMiscObjUpdateFlagField_0x08 = 0x0008;
-const unsigned short kMiscObjUpdateFlagText       = 0x0010;
-const unsigned short kMiscObjUpdateFlagField_0x34 = 0x0020;
-const unsigned short kMiscObjUpdateFlagField_0x0c = 0x0040;
-const unsigned short kMiscObjUpdateFlagField_0x10 = 0x0080;
-const unsigned short kMiscObjUpdateFlagIds        = 0x0100;
+const unsigned short kMiscObjUpdateFlagGroupId     = 0x0001;
+const unsigned short kMiscObjUpdateFlagMission     = 0x0002;
+const unsigned short kMiscObjUpdateFlagPlayerId    = 0x0004;
+const unsigned short kMiscObjUpdateFlagObjectId    = 0x0008;
+const unsigned short kMiscObjUpdateFlagText        = 0x0010;
+const unsigned short kMiscObjUpdateFlagAffiliation = 0x0020;
+const unsigned short kMiscObjUpdateFlagRank        = 0x0040;
+const unsigned short kMiscObjUpdateFlagSystemId    = 0x0080;
+const unsigned short kMiscObjUpdateFlagIds         = 0x0100;
 
 // The sender variant, prepended to the argument dwords the way SendTradePacket prepends
 // PLAYER_TRADE's sub-type. One value per retail sender slot (113..120), in slot order,
@@ -760,50 +822,13 @@ const unsigned int kMiscObjUpdateVariant_Formation   = 7u;   // slot 120
 // The tail is copied shallow both ways (never deep-copied or freed): four plain fields, not
 // a std::vector, whatever its { byte, ptr, ptr, ptr } shape suggests.
 
-// The 0x0c-byte list element. The create-object header codec FUN_06da4020 builds the
-// default value: +0x00 = COMMON.DLL SUBOBJ_ID_NONE stored as a word (a SubObjId in the low
-// half), +0x04 = -1.0f (DamageEntry's "untouched" health), +0x08 = 0. The encoder
-// FUN_06da3720 ships word(+0x00), dword(+0x08), float(+0x04). Types stay raw dwords.
-struct FRpcDamageEntryMirror {
-    unsigned int Field_0x00;        // +0x00  low half == SubObjId, SUBOBJ_ID_NONE default
-    unsigned int Field_0x04;        // +0x04  float health, -1.0f default, bit pattern
-    unsigned int Field_0x08;        // +0x08
-};
-static_assert(sizeof(FRpcDamageEntryMirror) == 0x0c, "damage entry is 0x0c (node 0x14 - 8 links)");
-
-// operator new(0x14) at 06d90413 / 06d90324.
-struct FRpcDamageEntryNode {
-    FRpcDamageEntryNode* Next;      // +0x00
-    FRpcDamageEntryNode* Prev;      // +0x04
-    FRpcDamageEntryMirror Value;    // +0x08
-};
-static_assert(sizeof(FRpcDamageEntryNode) == 0x14, "retail damage list node is operator new(0x14)");
-
-// Same 0x0c retail std::list header as the collision-group one in rpc_containers.h.
-struct FRpcDamageEntryList {
-    unsigned char Allocator;        // +0x00
-    unsigned char Pad_0x01[3];      // +0x01
-    FRpcDamageEntryNode* Head;      // +0x04  dummy node
-    unsigned int Size;              // +0x08
-};
-static_assert(sizeof(FRpcDamageEntryList) == 0x0c, "retail std::list header is 0x0c");
-
-// The 0x1c-byte retail image of Common.dll's DamageList (CREATESHIP's ctor calls
-// ??0DamageList@@QAE@XZ, .rdata:06db310c, at packet+0x80; the next store fixes the size).
-// Unused: DAMAGEOBJECT and the create-info records hold the real DamageList. Kept as the
-// documented retail layout. Tail meanings from common_misc.h: +0x0c bDestroyed (hence the
-// byte copy), +0x10 DamageCause, +0x14 InflictorId, +0x18 InflictorOwner. Names stay
-// Field_0xNN so nobody substitutes the port's DamageList, which has a different layout.
-struct FRpcDamageListMirror {
-    FRpcDamageEntryList Entries;    // +0x00  std::list<DamageEntry>, _Size at +0x08
-    unsigned char Field_0x0c;       // +0x0c  copied as a byte;
-                                    //        DamageList::is_destroyed / ::set_destroyed
-    unsigned char Pad_0x0d[3];      // +0x0d
-    unsigned int Field_0x10;        // +0x10  DamageList::get_cause / ::set_cause
-    unsigned int Field_0x14;        // +0x14  DamageList::get_inflictor_id
-    unsigned int Field_0x18;        // +0x18  DamageList::get_inflictor_owner_player
-};
-static_assert(sizeof(FRpcDamageListMirror) == 0x1c, "DAMAGEOBJECT argument struct 0x1c");
+// Retail's 0x1c-byte DamageList image: a 0x0c std::list header whose 0x14-byte nodes
+// (operator new(0x14) at 06d90413 / 06d90324) hold a 0x0c DamageEntry, then a byte at +0x0c
+// (bDestroyed, hence the byte copy) and three dwords +0x10 / +0x14 / +0x18 (DamageCause,
+// InflictorId, InflictorOwner). The create-object header codec FUN_06da4020 builds the
+// default entry: +0x00 = COMMON.DLL SUBOBJ_ID_NONE stored as a word, +0x04 = -1.0f
+// (DamageEntry's untouched health), +0x08 = 0; the encoder FUN_06da3720 ships
+// word(+0x00), dword(+0x08), float(+0x04).
 
 // ch2 0x05 DAMAGEOBJECT holds the real Common.dll DamageList (common_misc.h). Retail's packet
 // ctor 06d9c8d0 builds it in place at packet+0x24; the sender assigns into it
@@ -1283,11 +1308,11 @@ struct FPayloadServerSendComm {
     unsigned int ReceiverId;        // +0x04 <- A2
     unsigned int VoiceId;        // +0x08 <- A3
     FRpcIdArrayBlock Body;          // +0x0c .. +0x3f <- A4..A16
-    unsigned int CommType;        // +0x40 <- A17
+    unsigned int CaptionIds;        // +0x40 <- A17
     unsigned int* Buffer;           // +0x44    operator new(A19 << 2), copied from A18
     unsigned char BufferCount;      // +0x48 <- LOW BYTE of A19
     unsigned char Pad_0x49[3];      // +0x49
-    unsigned int Mood;        // +0x4c <- A20
+    unsigned int PermutationIds;        // +0x4c <- A20
     // A float, moved as its raw bits (FLD/FSTP in retail).
     unsigned int DurationBits;    // +0x50 <- A21
     unsigned char bReceiverIsOwnShip;       // +0x54 <- LOW BYTE of A22; never read back
@@ -1352,6 +1377,64 @@ struct FPayloadClientDwordQuad {
     unsigned int Field_0x0c;
 };
 static_assert(sizeof(FPayloadClientDwordQuad) == 0x10, "ch3 dword-quad payload 0x10");
+
+// --- per-opcode views of the generic shapes --------------------------------
+// The wire codecs keep the shapes above; the marshallers and receivers use these. Names
+// come from freelancer.exe's callers.
+
+// ch3 0x19 REQREMOVEITEM: IServer::ReqRemoveItem(ushort, int, uint), the equip id
+// zero-extended into the first dword.
+struct FPayloadClientReqRemoveItem {
+    unsigned int EquipId;         // +0x00  read back as a word
+    unsigned int Count;           // +0x04
+};
+static_assert(sizeof(FPayloadClientReqRemoveItem) == sizeof(FPayloadClientDwordPair),
+              "REQREMOVEITEM payload 0x08");
+
+// ch3 0x2b CARGOSCAN: IServer::SPScanCargo(uint const&, uint const&, uint).
+struct FPayloadClientScanCargo {
+    unsigned int ScannerId;       // +0x00
+    unsigned int TargetId;        // +0x04
+};
+static_assert(sizeof(FPayloadClientScanCargo) == sizeof(FPayloadClientDwordPair),
+              "CARGOSCAN payload 0x08");
+
+// ch3 0x3e LAUNCHCOMPLETE: Common's LaunchAction hands the ship IObjAffect slot 28 the base
+// object's id; freelancer.exe's LAB_005471f0 forwards it with the ship's own id.
+struct FPayloadClientLaunchComplete {
+    unsigned int BaseObjId;       // +0x00
+    unsigned int ShipId;          // +0x04
+};
+static_assert(sizeof(FPayloadClientLaunchComplete) == sizeof(FPayloadClientDwordPair),
+              "LAUNCHCOMPLETE payload 0x08");
+
+// ch3 0x43 JUMPINCOMPLETE: Common's JumpInAction hands IObjAffect slot 29 the arrival system's
+// id; freelancer.exe's LAB_00547220 forwards it with the ship's own id.
+struct FPayloadClientJumpInComplete {
+    unsigned int SystemId;        // +0x00
+    unsigned int ShipId;          // +0x04
+};
+static_assert(sizeof(FPayloadClientJumpInComplete) == sizeof(FPayloadClientDwordPair),
+              "JUMPINCOMPLETE payload 0x08");
+
+// ch3 0x3f HAIL: the target panel's comm button sends (own ship, hailed object, own system).
+struct FPayloadClientHail {
+    unsigned int ShipId;          // +0x00
+    unsigned int TargetId;        // +0x04
+    unsigned int SystemId;        // +0x08
+};
+static_assert(sizeof(FPayloadClientHail) == sizeof(FPayloadClientDwordTriple),
+              "HAIL payload 0x0c");
+
+// ch3 0x37 COMMCOMPLETE: the comm HUD reports (sender, receiver, last line's id, result).
+struct FPayloadClientCommComplete {
+    unsigned int SenderId;        // +0x00
+    unsigned int ReceiverId;      // +0x04
+    unsigned int MsgId;           // +0x08
+    unsigned int Result;          // +0x0c  CommResult
+};
+static_assert(sizeof(FPayloadClientCommComplete) == sizeof(FPayloadClientDwordQuad),
+              "COMMCOMPLETE payload 0x10");
 
 // --- per-opcode shapes ----------------------------------------------------
 
@@ -1424,8 +1507,8 @@ static_assert(sizeof(FPayloadClientObjCollision) == 0x14, "OBJCOLLISION payload 
 // ch3 0x14 FLPACKET_CLIENT_MISSIONRESPONSE, size 0x2c -> payload 0x0c.
 // Sender IServerImpl::MissionResponse 0x06d8da80, receiver caseD_14.
 struct FPayloadClientMissionResponse {
-    unsigned int OfferId;      // +0x00  <- 1st argument
-    unsigned int MissionId;       // +0x04  <- 2nd argument (ulong)
+    unsigned int OfferId;         // +0x00  <- 1st argument
+    unsigned int OfferKind;       // +0x04  <- 2nd argument (ulong)
     unsigned char bAccepted;      // +0x08  <- 3rd argument
     unsigned char Pad_0x09[3];
 };
@@ -1574,14 +1657,16 @@ static_assert(sizeof(FPayloadClientDbgConsole) == 0x84, "DBGCONSOLE payload 0x84
 
 // ch3 0x31 FLPACKET_CLIENT_REQUEST_EVENT, size 0x34 -> payload 0x14.
 // Sender IServerImpl::RequestEvent 0x06d8eaf0. Retail truncates the int first argument and
-// the ulong fifth argument to a byte each on the wire (a retail information loss).
+// the ulong fifth argument to a byte each on the wire (a retail information loss). The
+// fields are IObjAffect::request_event's arguments: freelancer.exe's LAB_00546df0 sends the
+// ship's own id, *TargetId, *SecondId and bFlag; Server.dll passes them on to the ship.
 struct FPayloadClientRequestEvent {
     unsigned char EventType;      // +0x00  <- int, truncated
     unsigned char Pad_0x01[3];
     unsigned int ShipId;
     unsigned int TargetId;
     unsigned int SecondId;
-    unsigned char Field_0x10;     // +0x10  <- ulong, truncated
+    unsigned char bFlag;          // +0x10  <- ulong, truncated
     unsigned char Pad_0x11[3];
 };
 static_assert(sizeof(FPayloadClientRequestEvent) == 0x14, "REQUEST_EVENT payload 0x14");

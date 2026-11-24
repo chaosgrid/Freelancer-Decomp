@@ -22,9 +22,10 @@ namespace CmnCobject
     // CCounterMeasure, CLoot and CShip.
     Vector RotateWorldToObjectSpace(Matrix const& Orient, Vector const& World);
 
-    // IObjDB slot 2 (GetZoneDb) -> Universe::ISystem slot 0: the system id used as the
-    // physics collision group in the init_physics family.
-    unsigned GetObjectDbCollisionGroup(IObjDB* Db);
+    // IObjDB slot 2 (GetZoneDb) -> Universe::ISystem slot 0: the system id the init_physics
+    // family puts in PhySys::CreateParms::SystemId.
+
+    unsigned GetObjectDbSystemId(IObjDB* Db);
 
     // Element-wise copy of the 3x3 rotation.
     void CopyMatrix9(Matrix& Dst, Matrix const& Src);

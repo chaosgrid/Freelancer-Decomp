@@ -41,6 +41,18 @@ class ShipViewControl;
 class NnDealer;
 class RichTextWin;
 
+// The inventory filter (NN_Inventory +0x32c, NnItemFilterMode FUN_0047e460): one per filter
+// button (FUN_0047e590 highlights the button of the current one), and 5 for an item none shows.
+enum ENnItemFilter
+{
+    kNnFilterWeapons = 0,   // "Weapons" filter button
+    kNnFilterAmmo = 1,
+    kNnFilterEquipment = 2,
+    kNnFilterCargoBay = 3,
+    kNnFilterCommodity = 4,
+    kNnFilterNone = 5,
+};
+
 // The member at NN_Inventory+0x330 (ctor FUN_004c6140, dtor FUN_004c6200). No vftable and no
 // RTTI; its methods sit at 0x004c6140..0x004c6f70. It pairs the ShipViewControl that shows the
 // ship with the ship archetype and the loadout being shown (the player's, copied in by
@@ -63,9 +75,9 @@ struct FInventoryShipModel
     // FUN_004c6250 -- empty the loadout, +0x28 = 0, and clear the view's selection.
     void Clear();
     // FUN_004c62b0 (RET 8) -- show the ship ShipArchId with Source's loadout: reset the view,
-    // store bFlag, load the hull and Source into the view, rebuild the loadout sorted, stamp
+    // store bDpConnect, load the hull and Source into the view, rebuild the loadout sorted, stamp
     // each good's owner, refresh the name label and the damage bar.
-    void LoadShip(EquipDescList const* Source, unsigned char bFlag);
+    void LoadShip(EquipDescList const* Source, unsigned char bNewDpConnect);
     // FUN_004c63e0 (RET 8) -- the ship's hold size and the space the loadout occupies.
     void GetCargoCapacityAndUsed(float* OutCapacity, float* OutUsed) const;
     // FUN_004c6430 (RET 8) -- take Count (0: all) of the loadout item Desc points at; false
@@ -96,7 +108,7 @@ struct FInventoryShipModel
     WinControl* InfoText;       // +0x14
     unsigned ShipArchId;        // +0x18
     EquipDescList Loadout;      // +0x1c
-    unsigned char bFlag28;      // +0x28
+    unsigned char bDpConnect;   // +0x28 -- LoadShip's flag for the view's LoadShip
 
 private:
     FInventoryShipModel(FInventoryShipModel const&) = delete;
@@ -161,7 +173,7 @@ public:
     // 3 cargo bay, 4 commodity.
     void SetMode(int NewMode, bool bPropagate);
     // FUN_0047d2f0 -- rebuild the item rows from List.
-    void RefreshItemList(EquipDescList const* List, int Arg2, unsigned char bArg3);
+    void RefreshItemList(EquipDescList const* List, int Arg2, unsigned char bResync);
     // FUN_0047af30 -- after a ship purchase: load the player's list into the dealer's model,
     // then move each of its items (most valuable first) onto this window's ship, as many as
     // fit; clear both windows' selection.
@@ -228,7 +240,7 @@ public:
                      unsigned char bAlwaysShowCount);
 
     // --- retail members, in order (retail offsets) ---
-    int Mode;                         // +0x32c -- 0 / 2 / 4 (Draw, 0x0047f6a4)
+    int Mode;                         // +0x32c -- the ENnItemFilter shown (Draw, 0x0047f6a4)
     FInventoryShipModel Ship;         // +0x330
     unsigned char bDealerMode;        // +0x35c -- NN_Dealer's ctor sets 1
     unsigned char Pad35d[3];
@@ -304,7 +316,8 @@ public:
     unsigned char Field4e2;           // +0x4e2 -- vestigial (only zeroed and passed to the empty 0x0053e4a0)
     unsigned char Field4e3;           // +0x4e3 -- vestigial jettison-lock flag (tested == 0, never set to 1 in retail)
     unsigned char Field4e4;           // +0x4e4 -- vestigial write-only confirm-dismissed flag
-    unsigned char Result4e5;          // +0x4e5 -- passed to the result callback
+    unsigned char bNoTransaction;     // +0x4e5 -- 1 on open (0x48), 0 after a buy or sale; the
+                                      // result callback's first argument
     unsigned char bSelectedSellable;           // +0x4e6
     unsigned char bNeedBind;          // +0x4e7 -- Create sets it; BindControls clears it
     unsigned ShownInfoArchId;                // +0x4e8
@@ -413,8 +426,7 @@ int NnLoadoutResaleValue(EquipDescList const* List, FInventoryShipModel const* O
 // there is no ship, the player is not docked or the ship has no good.
 int NnShipResaleValue(unsigned ShipArchId, bool bApplyCondition);
 
-// FUN_0047e460 (cdecl) -- the inventory filter an equipment archetype belongs to: 0 weapons,
-// 1 ammo, 2 equipment, 3 cargo bay, 4 commodity, 5 none.
+// FUN_0047e460 (cdecl) -- the inventory filter (ENnItemFilter) an equipment archetype belongs to.
 int NnItemFilterMode(unsigned ArchId);
 
 // FUN_00482d80 (cdecl) -- whether List holds a gun / mine dropper / countermeasure dropper

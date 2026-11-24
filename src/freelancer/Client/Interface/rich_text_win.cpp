@@ -426,7 +426,7 @@ void BaseRichTextWin::Draw()
     }
 
     Win3DDrawChildren(this);
-    Slot39();
+    PostDraw();
 }
 
 bool BaseRichTextWin::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
@@ -1295,7 +1295,7 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
 
     // A key-up leaves at once, without the IME forward.
     bool bResult = false;
-    if (Record->Byte18 == 0)
+    if (Record->bKeyDown == 0)
         return bResult;
 
     // Nothing is edited unless +0x4a0 == +0x4a4.
@@ -1506,7 +1506,7 @@ bool RichTextEditWin::OnEvent(unsigned MsgId)
     {
         // With a raw window message in the record, USER_CANCEL is posted again and the event
         // consumed.
-        if (HudCommandRecord()->Field0C != 0)
+        if (HudCommandRecord()->WindowMessage != 0)
         {
             HudPostCommand(0xf, 0);
             return true;
@@ -1657,7 +1657,7 @@ int RichTextEditWin::GetText(wchar_t* Buffer, int MaxChars)
 void RichTextEditWin::Activate()
 {
     // FUN_0057c750.
-    Flags = static_cast<unsigned char>(Flags | 3);
+    Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
     HudPushInputFocus(AsHudCmdHandler());
     RegisterEvent(1);
     RegisterEvent(2);
@@ -1683,7 +1683,7 @@ void RichTextEditWin::Deactivate(bool bHide)
     UnregisterEvent(0xf);
     HudPopInputFocus(AsHudCmdHandler());
     if (bHide)
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
     if (bImeEnabled != 0)
     {
         IMEFocus* const Focus = IMEFocus::GetSingleton();

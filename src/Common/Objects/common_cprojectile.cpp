@@ -6,7 +6,7 @@
 
 // CProjectile, CMunition, CGuided (retail CGuided.cpp) and CBeam (retail CBeam.cpp).
 #include "common_cobject.h"
-#include "Objects/common_cobject_internal.h" // CmnCobject::RotateWorldToObjectSpace, GetObjectDbCollisionGroup
+#include "Objects/common_cobject_internal.h" // CmnCobject::RotateWorldToObjectSpace, GetObjectDbSystemId
 
 #include "common_physys.h"
 #include "common_net.h"
@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-using CmnCobject::GetObjectDbCollisionGroup;
+using CmnCobject::GetObjectDbSystemId;
 using CmnCobject::RotateWorldToObjectSpace;
 
 namespace
@@ -211,11 +211,11 @@ void CGuided::init_physics(Vector const& Velocity, Vector const& AngularVelocity
     // _itoa(OwnerId, radix 24). The bytes retail leaves unwritten are zero here.
     PhySys::CreateParms Phy;
     memset(&Phy, 0, sizeof(Phy));
-    Phy.Type = 2;
+    Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     Phy.bEnableCollisions = 1;
     _itoa((int)OwnerId, Phy.Name, 0x18);
     Phy.Mass = Archetype->Mass;
-    Phy.CollisionGroupId = GetObjectDbCollisionGroup(ObjectDb);
+    Phy.SystemId = GetObjectDbSystemId(ObjectDb);
     PhySys::BuildIVP_Real(this, Phy);
     PhySys::AddToVelocity(this, Velocity);
     PhySys::AddToAngularVelocityOS(this, RotateWorldToObjectSpace(Orientation, AngularVelocity));

@@ -400,8 +400,8 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
 
     // The nebula at get_position() into +0x38, its fog factor into +0x3c (FUN_005553b0).
     FNebulaEffect* const Nebula =
-        StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+        StarSysFindNebula(&get_position(), &NebulaFogFactor, nullptr);
+    CurrentNebula = Nebula;
 }
 
 FClientDebrisGameobj* CreateDebrisGameobjForObject(CObject* Object, FDebrisArch const* Arch)
@@ -438,16 +438,16 @@ FClientDebrisGameobj* CreateDebrisGameobjFromArch(Archetype::Root* Arch,
     Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
     Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
     Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-    Parms.CollisionGroupId = 0;
+    Parms.SystemId = 0;
     Parms.Type = 2;
-    Parms.bFlag1c = 0;
+    Parms.bPhysicalUnmoveable = 0;
     Parms.bEnableCollisions = 1;
     Parms.bHasInertia = 0;
     Parms.Inertia.x = 0.0f;
     Parms.Inertia.y = 0.0f;
     Parms.Inertia.z = 0.0f;
     Parms.Name[0] = '\0';
-    Parms.CollisionGroupId = StarSysGetActiveSystemId();
+    Parms.SystemId = StarSysGetActiveSystemId();
     PhySys::BuildIVP_Real(Simple, Parms);
 
     Debris->Init(DebrisArch);

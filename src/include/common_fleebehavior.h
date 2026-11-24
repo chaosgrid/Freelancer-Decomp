@@ -32,7 +32,7 @@ class FleeBehavior : public Behavior
 {
 public:
     // Retail's ctor argument is the behavior type id (4, "Flee"), pushed by the factory out of
-    // the descriptor's +0x04 -- see Behavior::GetTypeId() in common_behavior.h.
+    // the descriptor's +0x04 -- see Behavior::TypeId in common_behavior.h.
     explicit FleeBehavior(int InTypeId);
     ~FleeBehavior() override;
 
@@ -86,25 +86,8 @@ private:
 
 public:
     // ------------------------------------------------------------------
-    // Fields, ascending offset. +0x04..+0x29 is Behavior's own block (see common_behavior.h),
-    // still declared here until the family-wide hoist.
+    // Fields, ascending offset; +0x04..+0x29 is Behavior's.
     // ------------------------------------------------------------------
-    int TypeId;                // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
-    unsigned CachedHandle08;   // +0x08. IObjInspect::get_id() of the owner (the binder).
-    int ModeSelector0xc;       // +0x0c. OnEvaluateReadiness's result.
-    int UpdateResult10;        // +0x10. Perform's result.
-    void* OwnerContextPtr14;   // +0x14. The owner (the binder).
-    IObjDB* ObjectDb;
-    float DeltaTime1c;
-    // +0x20. The IBehaviorManager (the binder). Receiver proof: .text:062c7572
-    // `MOV ECX,[EAX+0x20]` then [ECX+0x17c]/[ECX+0x190]/[ECX+0x19c] (the dispatch table), and
-    // .text:062c73dc/062c7472/062c769d/062c76d9 `MOV ECX,[ESI+0x20]; CALL
-    // IBehaviorManager::get_current_directive`.
-    IBehaviorManager* BehaviorMgrPtr20;
-    SystemManager* NavHelperPtr24; // +0x24. The SystemManager (the binder).
-    unsigned char Flags28;     // +0x28.
-    unsigned char Flag29;      // +0x29. OnEvaluateReadiness answers 3 while it is set.
-    unsigned char Pad2a[0x2c - 0x2a];
 
     unsigned char bFleeActive;     // +0x2c. "A flee is running": Perform latches it on the first
                                // tick and clears it when the delegate finishes; OnEvaluateReadiness sets it
@@ -128,14 +111,6 @@ public:
     pub::AI::DirectiveDockOp DockOp;  // +0xbc, 0x2c bytes, ends at +0xe8.
 };
 
-static_assert(offsetof(FleeBehavior, CachedHandle08) == 0x08, "FleeBehavior::CachedHandle08 offset");
-static_assert(offsetof(FleeBehavior, ModeSelector0xc) == 0x0c, "FleeBehavior::ModeSelector0xc offset");
-static_assert(offsetof(FleeBehavior, UpdateResult10) == 0x10, "FleeBehavior::UpdateResult10 offset");
-static_assert(offsetof(FleeBehavior, OwnerContextPtr14) == 0x14, "FleeBehavior::OwnerContextPtr14 offset");
-static_assert(offsetof(FleeBehavior, BehaviorMgrPtr20) == 0x20, "FleeBehavior::BehaviorMgrPtr20 offset");
-static_assert(offsetof(FleeBehavior, NavHelperPtr24) == 0x24, "FleeBehavior::NavHelperPtr24 offset");
-static_assert(offsetof(FleeBehavior, Flags28) == 0x28, "FleeBehavior::Flags28 offset");
-static_assert(offsetof(FleeBehavior, Flag29) == 0x29, "FleeBehavior::Flag29 offset");
 static_assert(offsetof(FleeBehavior, bFleeActive) == 0x2c, "FleeBehavior::bFleeActive offset");
 static_assert(offsetof(FleeBehavior, FleeReason) == 0x30, "FleeBehavior::FleeReason offset");
 static_assert(offsetof(FleeBehavior, FleeDestType) == 0x34, "FleeBehavior::FleeDestType offset");

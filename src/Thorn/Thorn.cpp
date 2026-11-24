@@ -33,14 +33,6 @@ void ThornFdump(const char* Message)
     }
 }
 
-void ThornLogStub(const char* What)
-{
-    char Line[256];
-    _snprintf(Line, sizeof(Line), "Thorn: stub %s\n", What != nullptr ? What : "?");
-    Line[sizeof(Line) - 1] = '\0';
-    ThornFdump(Line);
-}
-
 bool ThornNameEqual(const char* Left, const char* Right)
 {
     if (Left == nullptr || Right == nullptr)
@@ -57,7 +49,7 @@ I3DMathEngine* ThornAcquire3DMathEngine()
     FAggDescC Desc;
     Desc.Size = G_AggDescSizeMath;
     Desc.NameAt4 = G_Name3DMathEngine;
-    Desc.Field8 = nullptr;
+    Desc.Outer = nullptr;
     Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                             reinterpret_cast<void**>(&MathEngine));
     return MathEngine;
@@ -200,7 +192,7 @@ namespace
     public:
         // FUN_06f37b50 (0x118-byte object): +0/+4/+8 the three facet vtables,
         // +0xc a VC6 basic_string (ScriptPath_ -- assigned by LAB_06f38110
-        // Slot43LoadPath / LAB_06f38590 Slot44SavePath, read back only by
+        // LoadFromPath / LAB_06f38590 SaveToPath, read back only by
         // SavePath as the "FileSystem"/"DOS" AGGDESC DataPath), the scene
         // containers (+0xa4 map, +0xbc/+0xcc/+0xdc vectors, +0xe8/+0xf4
         // lists), +0x108 controlling unknown and +0x10c the embedded inner
@@ -228,7 +220,7 @@ namespace
         ~FScriptEngine() noexcept(false)
         {
             // FUN_06f37e00 releases the COM context twice, re-checking for null between calls;
-            // this pairs with Slot40SetCom's double AddRef.
+            // this pairs with SetComContext's double AddRef.
             if (ComContext_ != nullptr)
             {
                 ComContext_->Release();
@@ -300,7 +292,7 @@ namespace
             return GR_OK;
         }
 
-        GENRESULT DACOM_API Slot4Load(void* FileSystem) override
+        GENRESULT DACOM_API Load(void* FileSystem) override
         {
             // LAB_06f38250: a NULL FS returns 0 without creating a parser.
             if (Scene_.PlaybackState() != 0)
@@ -338,7 +330,7 @@ namespace
                 for (unsigned long Index = 0; Index < Scene_.EntityCount(); ++Index)
                 {
                     const int Handle = static_cast<int>(reinterpret_cast<std::intptr_t>(
-                        Slot7EntityHandle(static_cast<int>(Index))));
+                        GetEntityHandle(static_cast<int>(Index))));
                     const FThornEntity* Entity = Scene_.EntityAt(Handle);
                     if (Entity->Snap.Type == kThornEntityMonitor)
                     {
@@ -365,14 +357,14 @@ namespace
                         const void* TemporaryDesc = Temporary != nullptr
                             ? &Temporary->SetCameraDesc : nullptr;
                         int EventId;
-                        Slot38AddEvent(TemporaryDesc, &EventId);
+                        AddEvent(TemporaryDesc, &EventId);
                     }
                 }
             }
             return Result;
         }
 
-        GENRESULT DACOM_API Slot5Save(void* FileSystem) override
+        GENRESULT DACOM_API Save(void* FileSystem) override
         {
             if (FileSystem == nullptr)
                 return GR_GENERIC;
@@ -396,87 +388,87 @@ namespace
             return Hr;
         }
 
-        unsigned long DACOM_API Slot6EntityCount() override { return Scene_.LiveEntityCount(); }
+        unsigned long DACOM_API GetEntityCount() override { return Scene_.LiveEntityCount(); }
 
-        void* DACOM_API Slot7EntityHandle(int Index) override { return Scene_.EntityHandle(Index); }
+        void* DACOM_API GetEntityHandle(int Index) override { return Scene_.EntityHandle(Index); }
 
-        void* DACOM_API Slot8EntitySnapInorder(int Index) override
+        void* DACOM_API GetEntityDescInOrder(int Index) override
         {
             // LAB_06f388c0: same inorder walk as slot 7, inner vtable+0x1C snapshot; fail → 0.
             return Scene_.EntitySnapInorder(Index);
         }
 
-        void* DACOM_API Slot9Entity(int Index) override { return Scene_.EntitySnap(Index); }
+        void* DACOM_API GetEntityDesc(int Index) override { return Scene_.EntitySnap(Index); }
 
-        GENRESULT DACOM_API Slot10GetPos(int Index, float* OutVec3) override
+        GENRESULT DACOM_API GetEntityPosition(int Index, float* OutVec3) override
         {
             return Scene_.GetEntityPos(Index, OutVec3);
         }
 
-        GENRESULT DACOM_API Slot11GetOrient(int Index, float* OutMat9) override
+        GENRESULT DACOM_API GetEntityOrientation(int Index, float* OutMat9) override
         {
             return Scene_.GetEntityOrient(Index, OutMat9);
         }
 
-        GENRESULT DACOM_API Slot12Attach(int Index, void* EngineObj) override
+        GENRESULT DACOM_API AttachEntity(int Index, void* EngineObj) override
         {
             if (static_cast<unsigned int>(Index) >= Scene_.EntityCount())
                 return GR_GENERIC;
             return Scene_.Attach(Index, EngineObj);
         }
 
-        GENRESULT DACOM_API Slot13Detach(int Index) override
+        GENRESULT DACOM_API DetachEntity(int Index) override
         {
             if (static_cast<unsigned int>(Index) >= Scene_.EntityCount())
                 return GR_GENERIC;
             return Scene_.Detach(Index);
         }
 
-        unsigned long DACOM_API Slot14EventCount() override { return Scene_.EventCount(); }
+        unsigned long DACOM_API GetEventCount() override { return Scene_.EventCount(); }
 
-        void* DACOM_API Slot15EventByIndex(int Index) override
+        void* DACOM_API GetEventByIndex(int Index) override
         {
             return Scene_.EventDescByIndex(Index);
         }
 
-        void* DACOM_API Slot16EventById(int Id) override { return Scene_.EventDescById(Id); }
+        void* DACOM_API GetEventById(int Id) override { return Scene_.EventDescById(Id); }
 
-        int DACOM_API Slot17GetDuration() override { return Scene_.DurationMs(); }
+        int DACOM_API GetScriptDuration() override { return Scene_.DurationMs(); }
 
-        GENRESULT DACOM_API Slot18SetDuration(int Ms) override
+        GENRESULT DACOM_API SetScriptDuration(int Ms) override
         {
             Scene_.SetDuration(Ms);
             return GR_OK;
         }
 
-        int DACOM_API Slot19GetClock() override { return Scene_.ClockMs(); }
+        int DACOM_API GetClockMs() override { return Scene_.ClockMs(); }
 
-        GENRESULT __thiscall Slot20SetLoop(unsigned char Value) override
+        GENRESULT __thiscall SetLooping(unsigned char Value) override
         {
             // LAB_06f39430: byte at +0x30.
             Scene_.SetLoop(Value);
             return GR_OK;
         }
 
-        GENRESULT DACOM_API Slot21GetState() override
+        GENRESULT DACOM_API GetPlayState() override
         {
             // LAB_06f39440: return this+0x2c.
             return static_cast<GENRESULT>(Scene_.PlaybackState());
         }
 
-        GENRESULT DACOM_API Slot22Start(int Arg) override { return Scene_.StartPlayback(Arg); }
+        GENRESULT DACOM_API StartPlayback(int Arg) override { return Scene_.StartPlayback(Arg); }
 
-        GENRESULT DACOM_API Slot23Stop() override { return Scene_.StopPlayback(); }
+        GENRESULT DACOM_API StopPlayback() override { return Scene_.StopPlayback(); }
 
-        GENRESULT DACOM_API Slot24Pause() override { return Scene_.PausePlayback(); }
+        GENRESULT DACOM_API PausePlayback() override { return Scene_.PausePlayback(); }
 
         GENRESULT DACOM_API Slot25Start(int Arg) override
         {
             // LAB_06f39450: tail-jumps to slot 22 through the vtable.
-            return Slot22Start(Arg);
+            return StartPlayback(Arg);
         }
 
-        GENRESULT DACOM_API Slot26Tick(int DtMs) override { return Scene_.Tick(DtMs); }
+        GENRESULT DACOM_API TickPlayback(int DtMs) override { return Scene_.Tick(DtMs); }
 
         GENRESULT DACOM_API Slot27(void* A) override
         {
@@ -507,54 +499,54 @@ namespace
             return GR_GENERIC;
         }
 
-        unsigned long DACOM_API Slot31UserPropCount(int Index) override
+        unsigned long DACOM_API GetUserPropCount(int Index) override
         {
             // LAB_06f38ca0: lookup entity; return inner+0x80 (_Mysize of string userprops).
             return Scene_.UserPropCount(Index);
         }
 
-        const char* DACOM_API Slot32UserPropKey(int Index, int N) override
+        const char* DACOM_API GetUserPropKey(int Index, int N) override
         {
             // LAB_06f38d20: N-th inorder key of the same map as slots 33/34 (inner+0x74).
             return Scene_.UserPropKey(Index, N);
         }
 
-        GENRESULT DACOM_API Slot33UserProp(void* Handle, const char* Key, char** Out) override
+        GENRESULT DACOM_API GetUserProp(void* Handle, const char* Key, char** Out) override
         {
             return Scene_.UserProp(Handle, Key, Out);
         }
 
-        GENRESULT DACOM_API Slot34SetUserProp(int Index, const char* Key, const char* Value) override
+        GENRESULT DACOM_API SetUserProp(int Index, const char* Key, const char* Value) override
         {
             return Scene_.SetUserProp(Index, Key, Value);
         }
 
-        GENRESULT DACOM_API Slot35AddEntity(void* Desc, int* OutIndex) override
+        GENRESULT DACOM_API AddEntity(void* Desc, int* OutIndex) override
         {
             return Scene_.AddEntityFromDesc(Desc, OutIndex);
         }
 
-        GENRESULT DACOM_API Slot36RemoveEntity(int Index) override
+        GENRESULT DACOM_API RemoveEntity(int Index) override
         {
             return Scene_.RemoveEntityAt(Index);
         }
 
-        GENRESULT DACOM_API Slot37UpdateEntity(int Index, void* Desc) override
+        GENRESULT DACOM_API UpdateEntity(int Index, void* Desc) override
         {
             return Scene_.UpdateEntityFromDesc(Index, Desc);
         }
 
-        GENRESULT DACOM_API Slot38AddEvent(const void* Desc, int* OutId) override
+        GENRESULT DACOM_API AddEvent(const void* Desc, int* OutId) override
         {
             return Scene_.AddEventFromDesc(Desc, OutId);
         }
 
-        GENRESULT DACOM_API Slot39RemoveEvent(int Id) override
+        GENRESULT DACOM_API RemoveEvent(int Id) override
         {
             return Scene_.RemoveEventById(Id);
         }
 
-        GENRESULT DACOM_API Slot40SetCom(IThornComContext* Com) override
+        GENRESULT DACOM_API SetComContext(IThornComContext* Com) override
         {
             // FUN_06f3a380: the old context (+0x1c) is released twice and the new one AddRef'd
             // twice.
@@ -586,19 +578,19 @@ namespace
             return GR_GENERIC;
         }
 
-        GENRESULT DACOM_API Slot41SetLoadParser(IThornLoadParser* Parser) override
+        GENRESULT DACOM_API SetLoadParser(IThornLoadParser* Parser) override
         {
             LoadParser_ = Parser;
             return GR_OK;
         }
 
-        GENRESULT DACOM_API Slot42SetSaveParser(IThornSaveParser* Parser) override
+        GENRESULT DACOM_API SetSaveParser(IThornSaveParser* Parser) override
         {
             SaveParser_ = Parser;
             return GR_OK;
         }
 
-        GENRESULT DACOM_API Slot43LoadPath(const char* Path) override
+        GENRESULT DACOM_API LoadFromPath(const char* Path) override
         {
             // LAB_06f38110: a NULL path still goes to slot 4. The path is stored into the +0xc
             // string only on the non-NULL branch.
@@ -622,13 +614,13 @@ namespace
                 if (Result < 0)
                     return Result;
             }
-            const GENRESULT Hr = Slot4Load(FileSystem);
+            const GENRESULT Hr = Load(FileSystem);
             if (FileSystem != nullptr)
                 FileSystem->Release();
             return Hr;
         }
 
-        GENRESULT DACOM_API Slot44SavePath(const char* Path) override
+        GENRESULT DACOM_API SaveToPath(const char* Path) override
         {
             // LAB_06f38590: no null path gate; Release follows on both result paths, even when
             // the create failed.
@@ -647,7 +639,7 @@ namespace
             GENRESULT Result = Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
                                                        reinterpret_cast<void**>(&FileSystem));
             if (Result >= 0)
-                Result = Slot5Save(FileSystem);
+                Result = Save(FileSystem);
             FileSystem->Release();
             return Result;
         }
@@ -709,13 +701,13 @@ namespace
         // IScriptControl facet (+8, .rdata:06f5ad18). Each slot is an adjustor thunk into this
         // object's IScriptEngine slot.
         // Slot 3, LAB_06f3c080 -> +0x58, slot 22.
-        GENRESULT DACOM_API Start(int Arg) override { return Slot22Start(Arg); }
+        GENRESULT DACOM_API Start(int Arg) override { return StartPlayback(Arg); }
         // Slot 4, LAB_06f3c0a0 -> +0x68, slot 26.
-        GENRESULT DACOM_API Tick(int DtMs) override { return Slot26Tick(DtMs); }
+        GENRESULT DACOM_API Tick(int DtMs) override { return TickPlayback(DtMs); }
         // Slot 5, LAB_06f3c0c0 -> +0x5c, slot 23.
-        GENRESULT DACOM_API Stop() override { return Slot23Stop(); }
+        GENRESULT DACOM_API Stop() override { return StopPlayback(); }
         // Slot 6, LAB_06f3c0e0 -> +0x44, slot 17.
-        int DACOM_API GetDuration() override { return Slot17GetDuration(); }
+        int DACOM_API GetDuration() override { return GetScriptDuration(); }
 
         float* ScenePos() { return Scene_.ForwardCsys().Pos; }
         float* SceneOrient() { return Scene_.ForwardCsys().Orient; }

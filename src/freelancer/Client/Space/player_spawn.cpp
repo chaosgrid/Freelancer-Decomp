@@ -134,7 +134,7 @@ void RequestBestPathRetail(Vector const& From, Vector const& To, unsigned Tag, u
     G_PlayerWaypointTailTag = Tag;
     unsigned char Request[0x34];
     memset(Request, 0, sizeof(Request));
-    unsigned const Field00 = static_cast<unsigned>(GetPlayerSpawnSystemIdRetail()); // DAT_0061226c
+    unsigned const Field00 = static_cast<unsigned>(GetPlayerRepVibeRetail()); // DAT_0061226c
     unsigned const Field04 = 2;
     unsigned const Field1c = GetPlayerStarSystemIdRetail(); // DAT_00673354
     memcpy(Request + 0x00, &Field00, 4);
@@ -360,7 +360,7 @@ FClientShipGameobj* SpawnPlayerShip()
     // covers the rest of retail's stores.
     CShip::CreateParms Parms{};
     InitCreateParmsScratchRetail(&Parms);
-    Parms.DockingCount = 0;
+    Parms.DockingBaseId = 0;
     Parms.VibeId = 0xffffffffu;
 
     Parms.Id = G_PlayerCharacterId;
@@ -368,20 +368,20 @@ FClientShipGameobj* SpawnPlayerShip()
     Parms.OwnerPlayer = G_PlayerConnectionId;
 
     // FUN_004c4670: the player's reputation vibe (DAT_0061226c).
-    Parms.VibeId = static_cast<unsigned>(GetPlayerSpawnSystemIdRetail());
+    Parms.VibeId = static_cast<unsigned>(GetPlayerRepVibeRetail());
 
     // The costume from FUN_004c3de0 (DAT_006728e4).
-    unsigned const* const VibeHeader = GetPlayerRepVibeScratchRetail();
-    Parms.SpaceCostume.PartIds[0] = VibeHeader[0];
-    Parms.SpaceCostume.PartIds[1] = VibeHeader[1];
-    Parms.SpaceCostume.PartIds[2] = VibeHeader[2];
-    Parms.SpaceCostume.PartIds[3] = VibeHeader[3];
-    Parms.SpaceCostume.AccessoryCount = GetPlayerRepVibeScratchCountRetail();
-    unsigned const* const VibeTail = GetPlayerRepVibeScratchTailRetail();
+    unsigned const* const ComParts = GetPlayerComCostumePartsRetail();
+    Parms.SpaceCostume.PartIds[0] = ComParts[0];
+    Parms.SpaceCostume.PartIds[1] = ComParts[1];
+    Parms.SpaceCostume.PartIds[2] = ComParts[2];
+    Parms.SpaceCostume.PartIds[3] = ComParts[3];
+    Parms.SpaceCostume.AccessoryCount = GetPlayerComCostumeAccessoryCountRetail();
+    unsigned const* const ComAccessories = GetPlayerComCostumeAccessoriesRetail();
     for (int Index = 0; Index < (int)Parms.SpaceCostume.AccessoryCount; ++Index)
-        Parms.SpaceCostume.AccessoryIds[Index] = VibeTail[Index];
+        Parms.SpaceCostume.AccessoryIds[Index] = ComAccessories[Index];
 
-    Parms.VoiceId = GetPlayerSpawnScratchScalarRetail(); // FUN_004c4650 (DAT_00673360)
+    Parms.VoiceId = GetPlayerVoiceIdRetail(); // FUN_004c4650 (DAT_00673360)
     // FUN_004c4f70 (DAT_00673380) is a health fraction.
     Parms.HitPts = GetPlayerHealthScaleRetail() * ShipArch->HitPts;
 
@@ -389,7 +389,7 @@ FClientShipGameobj* SpawnPlayerShip()
     Parms.ArchGroupDescs = GetPlayerCollisionGroupListRetail();
 
     // GetRank's return value is ignored (it writes the out value on every path).
-    int const VibeId = GetPlayerSpawnSystemIdRetail();
+    int const VibeId = GetPlayerRepVibeRetail();
     unsigned Rank = 0;
     Reputation::Vibe::GetRank(VibeId, Rank);
     Parms.Rank = Rank;

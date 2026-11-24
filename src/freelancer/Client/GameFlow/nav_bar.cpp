@@ -470,7 +470,7 @@ void NavBar::LayoutTabs(bool bAnimate)
         if (Button.bRoomSwitch == 0)
             continue;
         Step = 0.0f;
-        if ((static_cast<NnButtonControl*>(Button.Control)->GetFlags330() & 0x40) != 0)
+        if ((static_cast<NnButtonControl*>(Button.Control)->GetButtonBits() & 0x40) != 0)
         {
             Selected = &Button;
             if (bFirst)
@@ -837,7 +837,7 @@ intptr_t NavBar::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
     if (IsAnimating())
         return 1;
     FRoomRuntime* const Room = CurrentRoomRuntime();
-    if (Room != nullptr && RoomControlGetField1338(Room) != 0)
+    if (Room != nullptr && RoomControlIsCameraMoving(Room) != 0)
         return 1;
 
     // The button whose control was clicked; none -> 0.
@@ -1119,7 +1119,7 @@ void NavBar::SelectRoomButton(FNavBarButton* Button)
         SetFadeTarget(1.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
         bFadingOut = 1;
         FadeTimer = 0.0f;
-        RoomControlClearField1338(CurrentRoomRuntime());
+        RoomControlClearCameraMoving(CurrentRoomRuntime());
         SetClientMouseCursorDrawFlag(0);
         NotifyServiceWindows();
         return;
@@ -1676,7 +1676,7 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
         // The bar camera.
         NnMainButtonOnModalOpen();
         NotifyServiceWindows();
-        RoomControlSetField1340(Room, 1);
+        RoomControlSetCameraMoveSkippable(Room, 1);
         if (RoomControlTrackCamera(Room, "Camera_Track_1", &NavBar::ScriptDone, this, nullptr))
         {
             SetClientMouseCursorDrawFlag(0);
@@ -1698,7 +1698,7 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
         char const* Camera = "Camera_Wide";
         if (VirtualRoom.size() != 0 && To->Hotspot->Behavior == 5)
             Camera = "Camera_Trader_Wide";
-        RoomControlSetField1340(Room, 1);
+        RoomControlSetCameraMoveSkippable(Room, 1);
         if (!RoomControlTrackCamera(Room, Camera, &NavBar::ScriptDone, this, nullptr))
         {
             OnButtonClicked(Current);
@@ -1728,8 +1728,8 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
             IsShownWindow(Win3DFindByName("NN_Inventory")))
             HudPostCommand(0x6b, 0);
         NotifyServiceWindow("NN_ShipTrader");
-        RoomControlSetField1340(Room, 1);
-        RoomControlClearField1338(Room);
+        RoomControlSetCameraMoveSkippable(Room, 1);
+        RoomControlClearCameraMoving(Room);
         if (!RoomControlTrackCamera(Room, Camera, &NavBar::ScriptDone, this, nullptr))
         {
             OnButtonClicked(Current);
@@ -1744,7 +1744,7 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
     case 0xa:
     {
         // The scripted camera track.
-        RoomControlSetField1340(Room, 0);
+        RoomControlSetCameraMoveSkippable(Room, 0);
         if (RoomControlTrackScriptCamera(Room, 0, &NavBar::ScriptDone, this, nullptr, 1))
             return;
         OnButtonClicked(Current);

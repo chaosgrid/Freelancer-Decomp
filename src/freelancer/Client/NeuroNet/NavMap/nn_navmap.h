@@ -527,7 +527,9 @@ public:
     WinControl* FactionLabels[4];       // +0xaf8 Liberty / Bretonia / Kusari / Rheinland
     WinControl* GridLetters[8];         // +0xb08 "NavMapGridLetter%c" A..H
     WinControl* GridNumbers[8];         // +0xb28 "NavMapGridNumber%d" 1..8
-    unsigned char Field_0xb48;          // +0xb48 ctor 0. TODO
+    unsigned char bOutlineTerrainZonesOnly; // +0xb48 ctor 0, never set; DrawZoneOutlines
+                                            //        (0049ad50) skips zones without 0xffc0
+                                            //        property bits while it is set
     unsigned char Padb49[3];
     WinControl* PatrolFilter;           // +0xb4c "NavMapPatrolFilter"
     WinControl* MissionFilter;          // +0xb50 "NavMapMissionFilter"

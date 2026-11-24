@@ -304,7 +304,7 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
 {
     // LAB_004d7f60 (this = the handler face at +0x364).
     // Brake key up.
-    if (MsgId == 0x78 && HudCommandRecord()->Byte18 == 0)
+    if (MsgId == USER_MANEUVER_BRAKE_REVERSE && HudCommandRecord()->bKeyDown == 0)
     {
         SetPlayerBrakeReverse(false);
         return true;
@@ -313,9 +313,10 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
     // With the pick blocked or the letterbox up only the strafe key-ups get through.
     if (HudIsMousePickBlocked() || IsLetterboxVisible())
     {
-        if (MsgId != 0x85 && MsgId != 0x86 && MsgId != 0x87 && MsgId != 0x88)
+        if (MsgId != USER_MANEUVER_SLIDE_EVADE_LEFT && MsgId != USER_MANEUVER_SLIDE_EVADE_RIGHT &&
+            MsgId != USER_MANEUVER_SLIDE_EVADE_UP && MsgId != USER_MANEUVER_SLIDE_EVADE_DOWN)
             return false;
-        if (HudCommandRecord()->Byte18 != 0)
+        if (HudCommandRecord()->bKeyDown != 0)
             return false;
         SetPlayerStrafeBurst(0);
         return true;
@@ -331,7 +332,7 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
 
     switch (MsgId)
     {
-    case 0x81:
+    case USER_MANEUVER_TRAIL_CLOSER:
         // Trail closer; the unrounded difference is compared.
         if (Current == 3)
         {
@@ -343,7 +344,7 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
         }
         return true;
 
-    case 0x82:
+    case USER_MANEUVER_TRAIL_FARTHER:
         // Trail farther; clamped only when above 2000.
         if (Current == 3)
         {
@@ -355,37 +356,37 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
         }
         return true;
 
-    case 0x83:
+    case USER_MANEUVER_CORKSCREW_EVADE:
         RequestManeuver(5, false);
         return true;
 
-    case 0x85:
-    case 0x86:
-    case 0x87:
-    case 0x88:
+    case USER_MANEUVER_SLIDE_EVADE_LEFT:
+    case USER_MANEUVER_SLIDE_EVADE_RIGHT:
+    case USER_MANEUVER_SLIDE_EVADE_UP:
+    case USER_MANEUVER_SLIDE_EVADE_DOWN:
         // Key down -- the direction of the key; key up -- the first strafe key still held
         // (KeyMap FUN_005784a0), else none.
-        if (HudCommandRecord()->Byte18 != 0)
+        if (HudCommandRecord()->bKeyDown != 0)
         {
-            SetPlayerStrafeBurst(static_cast<int>(MsgId) - 0x84);
+            SetPlayerStrafeBurst(static_cast<int>(MsgId) - USER_MANEUVER_SLIDE_EVADE);
             return true;
         }
-        if (KeyMapIsCommandHeld(0x85))
+        if (KeyMapIsCommandHeld(USER_MANEUVER_SLIDE_EVADE_LEFT))
         {
             SetPlayerStrafeBurst(1);
             return true;
         }
-        if (KeyMapIsCommandHeld(0x86))
+        if (KeyMapIsCommandHeld(USER_MANEUVER_SLIDE_EVADE_RIGHT))
         {
             SetPlayerStrafeBurst(2);
             return true;
         }
-        if (KeyMapIsCommandHeld(0x87))
+        if (KeyMapIsCommandHeld(USER_MANEUVER_SLIDE_EVADE_UP))
         {
             SetPlayerStrafeBurst(3);
             return true;
         }
-        if (KeyMapIsCommandHeld(0x88))
+        if (KeyMapIsCommandHeld(USER_MANEUVER_SLIDE_EVADE_DOWN))
         {
             SetPlayerStrafeBurst(4);
             return true;
@@ -393,18 +394,17 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
         SetPlayerStrafeBurst(0);
         return true;
 
-    case 0x45:
+    case USER_CRUISE:
         SetPlayerCruise(!GetPlayerEngineCruiseActive());
         return true;
 
-    case 0x0f:
+    case USER_CANCEL:
     {
-        // USER_CANCEL.
         if (NnMainButtonHasActivePanel())
             return false;
         if (!HudStatusIsRearView() && HudStatusIsTurretView())
         {
-            HudPostCommand(0xbf, 0);
+            HudPostCommand(USER_AUTO_TURRET, 0);
             return true;
         }
         IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
@@ -435,13 +435,13 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0x77:
+    case USER_MANEUVER_ENGINEKILL:
         SetPlayerEngageEngine(!GetPlayerEngineIsActive());
         return true;
 
-    case 0x78:
+    case USER_MANEUVER_BRAKE_REVERSE:
         // Key up was handled above; the record is read again here.
-        if (HudCommandRecord()->Byte18 == 0)
+        if (HudCommandRecord()->bKeyDown == 0)
         {
             SetPlayerBrakeReverse(false);
             return true;
@@ -449,17 +449,17 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
         SetPlayerBrakeReverse(true);
         return true;
 
-    case 0x43:
-        ThrottleRate = HudCommandRecord()->Byte18 != 0 ? 1.0f : 0.0f;
+    case USER_INC_THROTTLE:
+        ThrottleRate = HudCommandRecord()->bKeyDown != 0 ? 1.0f : 0.0f;
         return true;
 
-    case 0x44:
+    case USER_DEC_THROTTLE:
         if (GetPlayerEngineCruiseActive())
             SetPlayerCruise(false);
-        ThrottleRate = HudCommandRecord()->Byte18 != 0 ? -1.0f : 0.0f;
+        ThrottleRate = HudCommandRecord()->bKeyDown != 0 ? -1.0f : 0.0f;
         return true;
 
-    case 0x04:
+    case USER_WHEEL:
     {
         // The mouse wheel steps the throttle by 0.2 (DAT_005d8298); the unrounded value is
         // clamped.
@@ -485,15 +485,15 @@ bool HUD_Maneuvers::OnEvent(unsigned MsgId)
         return true;
     }
 
-    case 0x74:
-    case 0x76:
-    case 0x79:
-    case 0x7a:
-    case 0x7b:
-    case 0x7e:
-    case 0x7f:
-    case 0x80:
-    case 0xc6:
+    case USER_MANEUVER_TRAIL:
+    case USER_MANEUVER_EVADE:
+    case USER_MANEUVER_DOCK:
+    case USER_MANEUVER_GOTO:
+    case USER_MANEUVER_FACE:
+    case USER_MANEUVER_DRASTIC_EVADE:
+    case USER_MANEUVER_FORMATION:
+    case USER_MANEUVER_STRAFE:
+    case USER_MANEUVER_FREE_FLIGHT:
     {
         // The first of the first four maneuvers whose command this is.
         FHudManeuver* const First = Maneuvers.data();
@@ -680,7 +680,7 @@ void HUD_Maneuvers::UpdateButtons()
             ++Shown;
             Button->SetProperty(1, 0, 0);
             LastShown = Maneuver;
-            Button->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679b94), 0);
+            Button->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteGrey), 0);
             bool const bCurrent = Maneuver->BehaviorId == Current;
             Button->SetProperty(0xc, bCurrent ? 1u : 0u, 0);
 
@@ -708,7 +708,7 @@ void HUD_Maneuvers::UpdateButtons()
             Button->SetProperty(1, 0, 0);
             Button->SetProperty(4, reinterpret_cast<uintptr_t>(Maneuver->GrayMesh.Data), 0);
             static_cast<NnButtonControl*>(Button)->MontageTile = Maneuver->GrayMontageTile;
-            Button->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679b94), 1);
+            Button->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteGrey), 1);
             ++Shown;
         }
     }
@@ -844,7 +844,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
         {
             Op.TargetId = Target->get_id();
             Op.Mode = 1;
-            Op.Field_44 = 1;
+            Op.bKillEngine = 1;
         }
         else
         {
@@ -852,7 +852,7 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
             PointAlongShipZ(Ship, -10000.0f, Point);
             Op.Mode = 2;
             Op.TargetId = 0;
-            Op.Field_44 = 1;
+            Op.bKillEngine = 1;
             Op.FacePoint.x = Point[0];
             Op.FacePoint.y = Point[1];
             Op.FacePoint.z = Point[2];
@@ -865,12 +865,12 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
     {
         // Go to the target, or to a point 100000 ahead (DAT_005d8460).
         pub::AI::DirectiveGotoOp Op;
-        Op.Field_58 = 0;
+        Op.bFlyThrough = 0;
         IObjRW* const Target = Ship->get_target();
         if (Target != nullptr)
         {
-            Op.Field_0C = 0;
-            Op.Field_1C = static_cast<int32_t>(Target->get_id());
+            Op.GotoKind = 0;
+            Op.TargetId = static_cast<int32_t>(Target->get_id());
             float Radius = 0.0f;
             Vector Center;
             Target->get_physical_radius(Radius, Center);
@@ -890,18 +890,18 @@ bool HUD_Maneuvers::RequestManeuver(int BehaviorId, bool bFlag)
             else if ((Type & 0xfdffu) != 0)
                 Factor = 1.0f;                                     // DAT_005c75dc
             double const Range = static_cast<double>(Factor) * static_cast<double>(Radius);
-            Op.Field_50 = static_cast<float>(Range);
+            Op.ArrivalRange = static_cast<float>(Range);
             if (Range < 100.0)                                     // DAT_005ca320
-                Op.Field_50 = 100.0f;
+                Op.ArrivalRange = 100.0f;
             if (Type == 0x200u)
-                Op.Field_50 = 100.0f;
+                Op.ArrivalRange = 100.0f;
             else if (Type == 0x80u)
-                Op.Field_50 = 750.0f;                              // 0x443b8000
+                Op.ArrivalRange = 750.0f;                              // 0x443b8000
         }
         else
         {
-            Op.Field_0C = 1;
-            Op.Field_50 = 500.0f;                                  // 0x43fa0000
+            Op.GotoKind = 1;
+            Op.ArrivalRange = 500.0f;                                  // 0x43fa0000
             float Point[3];
             PointAlongShipZ(Ship, -100000.0f, Point);
             Op.Destination.x = Point[0];
@@ -1092,7 +1092,7 @@ bool HUD_Maneuvers::IsTargetTradeLaneDisrupted()
     if ((Type & 0x80u) == 0)
         return false;
     CObject const* const Object = Target->cobject();
-    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         return false;
     float MaxShield = 0.0f;
     float CurShield = 0.0f;

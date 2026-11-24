@@ -47,7 +47,7 @@ void PathfindManager::ObstacleReaction::ResetState()
 
 PathfindManager::PathfindManager(IBehaviorManager* NewOwner)
     // Members are built in declaration order, which is retail's order for every member with
-    // a constructor: Zone (FUN_062db740), DeflectionSlots, Watcher1C8, Watcher218
+    // a constructor: Zone (FUN_062db740), DeflectionSlots, Watcher1C8, AvoidObstacleWatcher
     // (FUN_062de190 with a null object), Avoidance.
 {
     // FUN_062db3b0. The stores follow retail's order; the member constructors have already
@@ -61,45 +61,45 @@ PathfindManager::PathfindManager(IBehaviorManager* NewOwner)
     Reaction.ResetState();
 
     Watcher1C8.set(nullptr);
-    Timer1E0 = 0.0f;
-    Period1E4 = 1.0f;
-    Timer1E8 = 0.0f;
-    Period1EC = 1.0f;
-    Timer20C = 0.0f;
-    Period210 = 1.0f;
+    ZoneProbeTimer = 0.0f;
+    ZoneProbePeriod = 1.0f;
+    AvoidanceTickTimer = 0.0f;
+    AvoidanceTickPeriod = 1.0f;
+    AvoidRecordTimer = 0.0f;
+    AvoidRecordPeriod = 1.0f;
 
-    Field_214 = 0;
-    Watcher218.set(nullptr);
-    Field_220.z = 0.0f;
-    Field_220.y = 0.0f;
-    Field_220.x = 0.0f;
-    Field_22C.z = 0.0f;
-    Field_22C.y = 0.0f;
-    Field_22C.x = 0.0f;
-    Field_238 = false;
-    Field_23C = 1.0f;
-    Field_240 = 0;
+    AvoidRecordKind = 0;
+    AvoidObstacleWatcher.set(nullptr);
+    AvoidNudgeDirection.z = 0.0f;
+    AvoidNudgeDirection.y = 0.0f;
+    AvoidNudgeDirection.x = 0.0f;
+    AvoidTargetPoint.z = 0.0f;
+    AvoidTargetPoint.y = 0.0f;
+    AvoidTargetPoint.x = 0.0f;
+    AvoidPointContact = false;
+    AvoidPointScale = 1.0f;
+    AvoidRecordSource = 0;
 
     CachedObstacleId = 0;
     bHasCachedObstacle = false;
 
     Owner = NewOwner;
     Field_1F0 = 0;
-    Flag245 = 1;
-    Field_248 = -1;
-    Field_24C = 1;
+    bObstacleAvoidanceEnabled = 1;
+    NudgeObstacleTypeMask = -1;
+    bObstacleNudgeAllowed = 1;
     Field_250 = 0x7f0000;
-    Field_254 = 1;
-    Field_064 = 0;
+    bAvoidPointAllowed = 1;
+    AvoidExcludeId = 0;
     Watcher1C8.set(nullptr);
     Field_1D0.z = 0.0f;
     Field_1D0.y = 0.0f;
     Field_1D0.x = 0.0f;
     Field_1DC = 0;
-    Field_000 = 0;
+    ZoneStatusFlags = 0;
     MaxEngineSpeed = 80.0f;
-    Field_1F8 = 0.0f;
-    Field_1FC = 0.0f;
+    MaxSpeedCoastDistance = 0.0f;
+    CoastDistanceFrom300 = 0.0f;
 
     PathfindOwnerObject(Owner)->get_type(OwnerType);
 
@@ -109,21 +109,21 @@ PathfindManager::PathfindManager(IBehaviorManager* NewOwner)
     CachedTargetPosition.z = 0.0f;
     CachedTargetPosition.y = 0.0f;
     CachedTargetPosition.x = 0.0f;
-    Period1E4 = 1.0f;
+    ZoneProbePeriod = 1.0f;
 
     // Three phase offsets, rand() * (1/32768) (DAT_063997d0) * Period, rand() called in
     // this order.
-    Timer1E0 = static_cast<float>(std::rand()) * 3.0517578e-05f * Period1E4;
-    Period1EC = 0.5f;
-    Timer1E8 = static_cast<float>(std::rand()) * 3.0517578e-05f * Period1EC;
-    Period210 = 0.1f;
-    Timer20C = static_cast<float>(std::rand()) * 3.0517578e-05f * Period210;
+    ZoneProbeTimer = static_cast<float>(std::rand()) * 3.0517578e-05f * ZoneProbePeriod;
+    AvoidanceTickPeriod = 0.5f;
+    AvoidanceTickTimer = static_cast<float>(std::rand()) * 3.0517578e-05f * AvoidanceTickPeriod;
+    AvoidRecordPeriod = 0.1f;
+    AvoidRecordTimer = static_cast<float>(std::rand()) * 3.0517578e-05f * AvoidRecordPeriod;
 
-    Field_244 = false;
-    Field_004 = 0;
-    Field_255 = false;
-    Field_258 = 0;
-    Field_25C = 0;
+    bBlendAvoidNudge = false;
+    ZoneProperties = 0;
+    bNudgeObstacleFound = false;
+    NudgeObstacleId = 0;
+    LastAvoidPointKind = 0;
     BlendTimer = 0.0f;
     bBlendEnabled = false;
 
@@ -132,15 +132,15 @@ PathfindManager::PathfindManager(IBehaviorManager* NewOwner)
     MaxEngineSpeed = Speed;
     if (Speed == -1.0f)
     {
-        Field_1F8 = 0.0f;
-        Field_1FC = 0.0f;
+        MaxSpeedCoastDistance = 0.0f;
+        CoastDistanceFrom300 = 0.0f;
     }
     else
     {
         // 1000.0f is DAT_063a05b4.
-        Field_1F8 = PathfindOwnerObject(Owner)->get_distance_travelled(
+        MaxSpeedCoastDistance = PathfindOwnerObject(Owner)->get_distance_travelled(
             0.0f, Speed, 1000.0f, IObject::ThrustEquipEngine);
-        Field_1FC = PathfindOwnerObject(Owner)->get_distance_travelled(
+        CoastDistanceFrom300 = PathfindOwnerObject(Owner)->get_distance_travelled(
             0.0f, 300.0f, 1000.0f, IObject::ThrustEquipEngine);
     }
 
@@ -191,20 +191,20 @@ bool PathfindManager::get_user_zone(UserZone& OutZone)
     return false;
 }
 
-void PathfindManager::SetCruiseLock(int Value, unsigned int Mask)
+void PathfindManager::SetAvoidanceAllowed(int Value, unsigned int Mask)
 {
     // FUN_062dd3d0
     unsigned char const Byte = static_cast<unsigned char>(Value);
     if ((Mask & 2) != 0)
-        Field_254 = Byte;
+        bAvoidPointAllowed = Byte;
     unsigned int const Bit0 = Mask & 1;
     if (Bit0 != 0)
-        Field_24C = Byte;
+        bObstacleNudgeAllowed = Byte;
     if (Byte != 0)
         return;
 
     // FUN_062e8ce0 on the owner's ThrustManager.
-    if (Bit0 != 0 && (Field_214 & 1) != 0)
+    if (Bit0 != 0 && (AvoidRecordKind & 1) != 0)
     {
         Vector Zero;
         Zero.x = 0.0f;
@@ -215,17 +215,17 @@ void PathfindManager::SetCruiseLock(int Value, unsigned int Mask)
 
     // Retail assigns the +0x214 record from a default-constructed temporary; field by field
     // that is the following (the temporary's watcher branches are never taken).
-    Field_214 = 0;
-    Watcher218.set(nullptr);
-    Field_220.x = 0.0f;
-    Field_220.y = 0.0f;
-    Field_220.z = 0.0f;
-    Field_22C.x = 0.0f;
-    Field_22C.y = 0.0f;
-    Field_22C.z = 0.0f;
-    Field_238 = false;
-    Field_23C = 1.0f;
-    Field_240 = 0;
+    AvoidRecordKind = 0;
+    AvoidObstacleWatcher.set(nullptr);
+    AvoidNudgeDirection.x = 0.0f;
+    AvoidNudgeDirection.y = 0.0f;
+    AvoidNudgeDirection.z = 0.0f;
+    AvoidTargetPoint.x = 0.0f;
+    AvoidTargetPoint.y = 0.0f;
+    AvoidTargetPoint.z = 0.0f;
+    AvoidPointContact = false;
+    AvoidPointScale = 1.0f;
+    AvoidRecordSource = 0;
 }
 
 void PathfindManager::Update(float Dt)
@@ -239,14 +239,14 @@ void PathfindManager::Update(float Dt)
 
     // The behaviour index is read before the probe.
     int const BehaviorIndex = Owner->CurrentBehaviorIndex;
-    double const ZoneClock = static_cast<double>(Dt) + Timer1E0;
+    double const ZoneClock = static_cast<double>(Dt) + ZoneProbeTimer;
     float const ZoneClockStored = static_cast<float>(ZoneClock);
-    Timer1E0 = ZoneClockStored;
-    if (ZoneClock > Period1E4)
+    ZoneProbeTimer = ZoneClockStored;
+    if (ZoneClock > ZoneProbePeriod)
     {
         // fmod of the stored (rounded) clock.
-        Timer1E0 = static_cast<float>(std::fmod(static_cast<double>(ZoneClockStored),
-                                                static_cast<double>(Period1E4)));
+        ZoneProbeTimer = static_cast<float>(std::fmod(static_cast<double>(ZoneClockStored),
+                                                static_cast<double>(ZoneProbePeriod)));
 
         // Zone properties of a 20.0f sphere around the owner.
         Vector const& Position = PathfindOwnerObject(Owner)->get_position();
@@ -256,15 +256,15 @@ void PathfindManager::Update(float Dt)
         Probe.Radius = 20.0f;
         unsigned const ZoneProps = System->GetSphereProperties(&Probe);
 
-        Field_004 = static_cast<int>(ZoneProps);
-        Field_000 = 0;
+        ZoneProperties = static_cast<int>(ZoneProps);
+        ZoneStatusFlags = 0;
         if ((ZoneProps & 0x7000) != 0)
         {
-            Field_000 = 1;
+            ZoneStatusFlags = 1;
         }
         if (Avoidance.HasContact == 1)
         {
-            Field_000 |= 8;
+            ZoneStatusFlags |= 8;
         }
     }
 
@@ -276,25 +276,25 @@ void PathfindManager::Update(float Dt)
         return;
     }
 
-    // Field_214 as it was before the refresh.
-    int const PreviousRecord = Field_214;
-    double const RecordClock = static_cast<double>(Dt) + Timer20C;
+    // AvoidRecordKind as it was before the refresh.
+    int const PreviousRecord = AvoidRecordKind;
+    double const RecordClock = static_cast<double>(Dt) + AvoidRecordTimer;
     float const RecordClockStored = static_cast<float>(RecordClock);
-    Timer20C = RecordClockStored;
-    if (RecordClock > Period210)
+    AvoidRecordTimer = RecordClockStored;
+    if (RecordClock > AvoidRecordPeriod)
     {
-        Timer20C = static_cast<float>(std::fmod(static_cast<double>(RecordClockStored),
-                                                static_cast<double>(Period210)));
+        AvoidRecordTimer = static_cast<float>(std::fmod(static_cast<double>(RecordClockStored),
+                                                static_cast<double>(AvoidRecordPeriod)));
         RefreshAvoidance();
     }
 
-    // A live nudge record is blended into the ThrustManager (FUN_062e8e60) when Field_244
+    // A live nudge record is blended into the ThrustManager (FUN_062e8e60) when bBlendAvoidNudge
     // allows; one that has just ended hands it a zero vector (FUN_062e8ce0).
-    if ((Field_214 & 1) != 0)
+    if ((AvoidRecordKind & 1) != 0)
     {
-        if (Field_244)
+        if (bBlendAvoidNudge)
         {
-            Owner->Sys->Thrust.BlendNudgeDirection(Field_220, Dt);
+            Owner->Sys->Thrust.BlendNudgeDirection(AvoidNudgeDirection, Dt);
         }
     }
     else if ((PreviousRecord & 1) != 0)
@@ -306,7 +306,7 @@ void PathfindManager::Update(float Dt)
         Owner->Sys->Thrust.SetNudgeDirection(Zero);
     }
 
-    if (Flag245 == 0 || Field_254 == 0)
+    if (bObstacleAvoidanceEnabled == 0 || bAvoidPointAllowed == 0)
     {
         return;
     }
@@ -315,21 +315,21 @@ void PathfindManager::Update(float Dt)
 
     // The avoidance runs on its own clock and is handed its period as its Dt; the period
     // becomes 0.1f (DAT_0639d20c) while it is active or has a contact, 0.5f otherwise.
-    double const AvoidClock = static_cast<double>(Dt) + Timer1E8;
+    double const AvoidClock = static_cast<double>(Dt) + AvoidanceTickTimer;
     float const AvoidClockStored = static_cast<float>(AvoidClock);
-    Timer1E8 = AvoidClockStored;
-    if (AvoidClock > Period1EC)
+    AvoidanceTickTimer = AvoidClockStored;
+    if (AvoidClock > AvoidanceTickPeriod)
     {
-        Timer1E8 = static_cast<float>(std::fmod(static_cast<double>(AvoidClockStored),
-                                                static_cast<double>(Period1EC)));
-        Avoidance.Update(Period1EC);
+        AvoidanceTickTimer = static_cast<float>(std::fmod(static_cast<double>(AvoidClockStored),
+                                                static_cast<double>(AvoidanceTickPeriod)));
+        Avoidance.Update(AvoidanceTickPeriod);
         if (Avoidance.Active != 0 || Avoidance.HasContact != 0)
         {
-            Period1EC = 0.1f;
+            AvoidanceTickPeriod = 0.1f;
         }
         else
         {
-            Period1EC = 0.5f;
+            AvoidanceTickPeriod = 0.5f;
         }
     }
 
@@ -340,24 +340,24 @@ void PathfindManager::Update(float Dt)
 void PathfindManager::RefreshAvoidance()
 {
     // FUN_062dd580
-    Watcher218.set(nullptr);
-    Field_214 = 0;
-    Field_22C.z = 0.0f;
-    Field_22C.y = 0.0f;
-    Field_22C.x = 0.0f;
-    Field_220.z = 0.0f;
-    Field_220.y = 0.0f;
-    Field_220.x = 0.0f;
-    Field_23C = 1.0f;
-    Field_240 = 0;
+    AvoidObstacleWatcher.set(nullptr);
+    AvoidRecordKind = 0;
+    AvoidTargetPoint.z = 0.0f;
+    AvoidTargetPoint.y = 0.0f;
+    AvoidTargetPoint.x = 0.0f;
+    AvoidNudgeDirection.z = 0.0f;
+    AvoidNudgeDirection.y = 0.0f;
+    AvoidNudgeDirection.x = 0.0f;
+    AvoidPointScale = 1.0f;
+    AvoidRecordSource = 0;
     int Kind;
-    if (SelectAvoidancePoint(&Field_22C, &Field_23C, &Kind) == 0)
+    if (SelectAvoidancePoint(&AvoidTargetPoint, &AvoidPointScale, &Kind) == 0)
     {
         // A point record.
-        Field_238 = Avoidance.HasContact;
-        Watcher218.set(nullptr);
-        Field_214 = 2;
-        Field_240 = Kind;
+        AvoidPointContact = Avoidance.HasContact;
+        AvoidObstacleWatcher.set(nullptr);
+        AvoidRecordKind = 2;
+        AvoidRecordSource = Kind;
         // Retail reads get_center_of_mass into a local that is never used.
         (void)PathfindOwnerObject(Owner)->get_center_of_mass();
         return;
@@ -370,40 +370,40 @@ void PathfindManager::RefreshAvoidance()
     }
     IObjRW* Obstacle = nullptr;
     Vector Direction;
-    if (SelectObstacleDirection(&Direction, &Obstacle, static_cast<unsigned>(Field_064)) != 0)
+    if (SelectObstacleDirection(&Direction, &Obstacle, static_cast<unsigned>(AvoidExcludeId)) != 0)
     {
         return;
     }
 
     // Watch the obstacle (its Watchable at +8).
-    Watcher218.set(Obstacle != nullptr ? static_cast<Watchable const*>(Obstacle) : nullptr);
-    Field_240 = 4;
+    AvoidObstacleWatcher.set(Obstacle != nullptr ? static_cast<Watchable const*>(Obstacle) : nullptr);
+    AvoidRecordSource = 4;
 
     bool bCruise = false;
     PathfindOwnerObject(Owner)->is_cruise_active(bCruise);
     unsigned ObstacleType = 0;
-    if (Watcher218.target() != nullptr
-        && ObjRwFromWatchable(const_cast<Watchable*>(Watcher218.target())) != nullptr)
+    if (AvoidObstacleWatcher.target() != nullptr
+        && ObjRwFromWatchable(const_cast<Watchable*>(AvoidObstacleWatcher.target())) != nullptr)
     {
-        ObjRwFromWatchable(const_cast<Watchable*>(Watcher218.target()))->get_type(ObstacleType);
+        ObjRwFromWatchable(const_cast<Watchable*>(AvoidObstacleWatcher.target()))->get_type(ObstacleType);
     }
 
     // Without blending the direction goes straight to the ThrustManager (FUN_062e8ce0).
     SystemManager* const Sys = Owner->Sys;
     bool const bBlend = (!bCruise || (ObstacleType & 0x7f0000) != 0);
-    Field_244 = bBlend;
+    bBlendAvoidNudge = bBlend;
     if (!bBlend)
     {
         Sys->Thrust.SetNudgeDirection(Direction);
     }
-    Field_220 = Direction;
-    Field_214 = 1;
+    AvoidNudgeDirection = Direction;
+    AvoidRecordKind = 1;
 }
 
 int PathfindManager::SelectAvoidancePoint(Vector* OutPoint, float* OutScale, int* OutKind)
 {
     // FUN_062dda10
-    if (Flag245 == 0 || Field_254 == 0)
+    if (bObstacleAvoidanceEnabled == 0 || bAvoidPointAllowed == 0)
     {
         return 2;
     }
@@ -416,7 +416,7 @@ int PathfindManager::SelectAvoidancePoint(Vector* OutPoint, float* OutScale, int
         // Kind 2: 100 units along the exit direction; *OutScale untouched. Retail calls
         // get_orientation, folded with get_transform.
         *OutKind = 2;
-        Field_25C = 2;
+        LastAvoidPointKind = 2;
         Transform const& Xform = Ship->get_transform();
         Vector const Reach{ ExitDirection.x * 100.0f, ExitDirection.y * 100.0f, ExitDirection.z * 100.0f };
         *OutPoint = Vector{ Reach.x + Xform.Translation.x, Reach.y + Xform.Translation.y,
@@ -456,7 +456,7 @@ int PathfindManager::SelectAvoidancePoint(Vector* OutPoint, float* OutScale, int
 
         // A point within 1 of the world origin still answers 2 (unordered too).
         *OutKind = 3;
-        Field_25C = 3;
+        LastAvoidPointKind = 3;
         double const LengthSq = static_cast<double>(OutPoint->x) * OutPoint->x
                                 + static_cast<double>(OutPoint->y) * OutPoint->y
                                 + static_cast<double>(OutPoint->z) * OutPoint->z;
@@ -467,46 +467,46 @@ int PathfindManager::SelectAvoidancePoint(Vector* OutPoint, float* OutScale, int
         return 0;
     }
 
-    // The avoidance point, unless its contact is the excluded Field_064.
+    // The avoidance point, unless its contact is the excluded AvoidExcludeId.
     Vector Point;
     unsigned ObjectId;
-    if (Avoidance.GetAvoidPoint(&Point, &ObjectId) && ObjectId != static_cast<unsigned>(Field_064))
+    if (Avoidance.GetAvoidPoint(&Point, &ObjectId) && ObjectId != static_cast<unsigned>(AvoidExcludeId))
     {
         *OutPoint = Point;
         *OutScale = Avoidance.GetCloseRateScale();
         *OutKind = 1;
-        Field_25C = 1;
+        LastAvoidPointKind = 1;
         return 0;
     }
     *OutKind = 0;
-    Field_25C = 0;
+    LastAvoidPointKind = 0;
     return 2;
 }
 
 int PathfindManager::SelectObstacleDirection(Vector* OutDirection, IObjRW** OutObstacle, unsigned ExcludeId)
 {
     // FUN_062de050
-    if (Flag245 == 0 || Field_24C == 0)
+    if (bObstacleAvoidanceEnabled == 0 || bObstacleNudgeAllowed == 0)
     {
         return 2;
     }
 
-    // The closest obstacle first (FUN_062e7a30, type mask Field_248).
+    // The closest obstacle first (FUN_062e7a30, type mask NudgeObstacleTypeMask).
     SystemManager* const Sys = Owner->Sys;
     OutDirection->z = 0.0f;
     OutDirection->y = 0.0f;
     OutDirection->x = 0.0f;
-    Field_255 = false;
+    bNudgeObstacleFound = false;
     IObjInspect* const Obstacle =
-        FindClosestObstacleToAvoid(&Sys->Timers, ExcludeId, static_cast<unsigned>(Field_248));
+        FindClosestObstacleToAvoid(&Sys->Timers, ExcludeId, static_cast<unsigned>(NudgeObstacleTypeMask));
     if (Obstacle != nullptr)
     {
         // The shape-biased direction around it (FUN_062e55b0).
         Vector Direction;
         *OutDirection = *ComputeShapeBiasedAvoidDirection(&Direction, &Sys->SelfTarget, Obstacle);
         *OutObstacle = static_cast<IObjRW*>(Obstacle);
-        Field_255 = true;
-        Field_258 = static_cast<int>(Obstacle->get_id());
+        bNudgeObstacleFound = true;
+        NudgeObstacleId = static_cast<int>(Obstacle->get_id());
         return 0;
     }
 
@@ -515,8 +515,8 @@ int PathfindManager::SelectObstacleDirection(Vector* OutDirection, IObjRW** OutO
     if (Avoidance.GetAvoidDirection(OutDirection, &ObjectId))
     {
         *OutObstacle = Owner->ObjectDb->FindById(&ObjectId);
-        Field_255 = true;
-        Field_258 = static_cast<int>(ObjectId);
+        bNudgeObstacleFound = true;
+        NudgeObstacleId = static_cast<int>(ObjectId);
         return 0;
     }
     return 2;

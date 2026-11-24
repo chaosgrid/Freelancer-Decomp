@@ -63,8 +63,11 @@ void __cdecl LoadLootProps(INI_Reader* Reader)
         FLootProps Record;
         Record.Nickname.clear();
         Record.DropChance = 0.0f;
-        for (int Index = 0; Index < 5; ++Index)
-            Record.DropProperties[Index] = 0;
+        Record.MinWorth = 0;
+        Record.WorthPerUnit = 0;
+        Record.BonusCount = 0;
+        Record.MaxCandidates = 0;
+        Record.MaxDrops = 0;
 
         while (Reader->read_value())
         {
@@ -76,11 +79,11 @@ void __cdecl LoadLootProps(INI_Reader* Reader)
             {
                 // 0.01f = DAT_06fb8064.
                 Record.DropChance = Reader->get_value_float(0) * 0.01f;
-                Record.DropProperties[0] = Reader->get_value_int(1);
-                Record.DropProperties[1] = Reader->get_value_int(2);
-                Record.DropProperties[2] = Reader->get_value_int(3);
-                Record.DropProperties[3] = Reader->get_value_int(4);
-                Record.DropProperties[4] = Reader->get_value_int(5);
+                Record.MinWorth = Reader->get_value_int(1);
+                Record.WorthPerUnit = Reader->get_value_int(2);
+                Record.BonusCount = Reader->get_value_int(3);
+                Record.MaxCandidates = Reader->get_value_int(4);
+                Record.MaxDrops = Reader->get_value_int(5);
             }
         }
 
@@ -388,8 +391,8 @@ namespace
     void InitMissionVendorOfferDescription(MissionVendorOfferDescription* Desc)
     {
         Desc->BaseId = 0;
-        Desc->TargetId = 0;
-        Desc->SystemId = 0;
+        Desc->OfferId = 0;
+        Desc->OfferKind = 0;
         Desc->MissionClass = 0;
         ResetVendorFmtStr(Desc->Title);
         ResetVendorFmtStr(Desc->Description);
@@ -431,16 +434,15 @@ void __cdecl BuildMissionVendorOffers(FContentBase* Base, FBaseVisit* Visit,
 
         // Loader slot 6 fills the description from the mission.
         Offer->Loader->GetOfferDescription(Offer->Mission, &Desc);
-        // +0x08 = 2 (the kind BaseSupport msg 0x2c reads back as 2 = vendor offer), +0x04 =
-        // the player's next offer id (FUN_06f48c50). The common_goods.h names of both fields
-        // (SystemId, TargetId) are the Server port's.
-        Desc.SystemId = 2;
-        Desc.TargetId = State->AllocateVendorOfferId();
+        // OfferKind = 2 (BaseSupport msg 0x2c reads it back as 2 = vendor offer), OfferId = the
+        // player's next offer id (FUN_06f48c50).
+        Desc.OfferKind = pub::Controller::MissionOfferVendor;
+        Desc.OfferId = State->AllocateVendorOfferId();
 
         // The loader reference moves into the record; nothing is AddRef'd.
         FBaseVendorOffer Record;
         Record.VendorHandle = pub::GF::MissionVendorOfferCreate(Desc);
-        Record.OfferId = Desc.TargetId;
+        Record.OfferId = Desc.OfferId;
         Record.Data = *Offer;
 
         Visit->VendorOffers.push_back(Record);                              // FUN_06f04b90

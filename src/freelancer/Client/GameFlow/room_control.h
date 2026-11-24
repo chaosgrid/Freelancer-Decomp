@@ -43,8 +43,8 @@ struct FRoomObject
     virtual ~FRoomObject();                                // 0  FUN_00559490 / FUN_005594b0
     virtual bool Slot1();                                  // 1  +0x04 FUN_0044fd00: false
     virtual bool IsVisible();                              // 2  +0x08 LAB_00444050: +0x10
-    virtual void SetFloat1C(float Value);                  // 3  +0x0c LAB_00443850
-    virtual float GetFloat1C();                            // 4  +0x10 LAB_00443860
+    virtual void SetFloorHeight(float Value);              // 3  +0x0c LAB_00443850
+    virtual float GetFloorHeight();                        // 4  +0x10 LAB_00443860
     virtual void Update(double DeltaSeconds) = 0;          // 5  +0x14 _purecall
     virtual void* GetEngineInstance();                     // 6  +0x18 FUN_00450870: -1
     virtual void DrawOpaque(ICamera* Camera);              // 7  +0x1c no-op
@@ -67,11 +67,11 @@ struct FRoomObject
     unsigned char bLit;           // +0x11 1 -- FUN_0044ae80 picks lights only when set
     unsigned char bFog;           // +0x12 1 -- D3DRS_FOGENABLE when room fog is active
     unsigned char bEnvMap;        // +0x13 0 -- FUN_0044af60 render mode 0 "envmapbasic"
-    unsigned char Flag14;         // +0x14 0
+    unsigned char bRunningLights; // +0x14 0 -- flashlights updated and drawn (RoomPropInfo)
     unsigned char LightGroup;     // +0x15 0 -- FUN_00557170 group filter
     unsigned char Layer;          // +0x16 0 -- the FUN_0044b570 sort key
     int RenderMode;               // +0x18 0 -- FUN_0044af60: 0 renderer, 1 / 2 appearance
-    float Float1C;                // +0x1c 0 -- slots 3 / 4
+    float FloorHeight;            // +0x1c 0 -- slots 3 / 4; the shadow plane (FUN_0044b370)
     // +0x20..+0x2f: a std::vector of MaterialLib entries (retail's allocator byte at +0x20
     // takes the low byte of the ctor argument); FUN_005594b0 releases every entry through
     // FUN_0041b030. Filled by FUN_0041c540 when the object loads its mesh.
@@ -163,15 +163,15 @@ void RoomControlAddProp(FRoomRuntime* Runtime, FObjectProp* Prop);
 // FUN_0044c4a0 -- Runtime+0x1338 (bCameraMoving): a room camera move is running. Callers: the
 // NavBar and the Gameflow tick FUN_00558ac0, which restores the software cursor only while it
 // is clear.
-unsigned char RoomControlGetField1338(FRoomRuntime* Runtime);
+unsigned char RoomControlIsCameraMoving(FRoomRuntime* Runtime);
 
 // FUN_0044c490 -- +0x1338 = 0 and DAT_0066d359 (G_bNnKeepPanelOpen, nn_main_button.h) = 0.
 // Callers: the NavBar (nav_bar.cpp).
-void RoomControlClearField1338(FRoomRuntime* Runtime);
+void RoomControlClearCameraMoving(FRoomRuntime* Runtime);
 
 // Runtime+0x1340 (bCameraMoveSkippable): the skip latch may end the camera move. Retail has no
 // accessor: NavBar's FUN_00441700 stores 1 or 0 into it right before a camera track starts.
-void RoomControlSetField1340(FRoomRuntime* Runtime, unsigned char Value);
+void RoomControlSetCameraMoveSkippable(FRoomRuntime* Runtime, unsigned char Value);
 
 // FUN_0044d240 -- with C != -1 and B == 3, slot 1 on every +0x1134 room controller whose +0x04
 // or +0x08 dword equals C. A is not read. Callers: the NavBar.
@@ -196,9 +196,9 @@ void RoomControlUpdateCameraMove(FRoomRuntime* Runtime, float Delta);
 bool RoomControlTrackScriptCamera(FRoomRuntime* Runtime, int Arg0, FRoomCameraDoneCallback Done,
                                   void* A, void* B, unsigned char bArg4);
 
-// Runtime+0x517 (Flags514[3]), set when a room character's start script ran. FUN_005588a0
-// reads it directly and skips the arrival text while it is set.
-unsigned char RoomControlGetField517(FRoomRuntime* Runtime);
+// Runtime+0x517, set when a room character's start script ran. FUN_005588a0 reads it directly
+// and skips the arrival text while it is set.
+unsigned char RoomControlStartScriptRan(FRoomRuntime* Runtime);
 
 // FUN_0044ad70 (thiscall) -- +0x516 = 1: the room update runs the room characters' start script
 // again. Caller: the Gf script sequence stop FUN_004554c0.

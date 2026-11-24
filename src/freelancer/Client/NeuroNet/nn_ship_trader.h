@@ -105,9 +105,6 @@ public:
     WinControl* RowClassTexts[3];    // +0x43c "ShipTraderShipClass%d"
 
 private:
-    // Port-only helper for the teardown KeyEvent, SetProperty 0x26 / 0x27 / 0x4e and OnEvent
-    // inline after the NavBar calls: delete the children, Destroy, delete this.
-    void Close();
     // Retail indexes the row arrays with Selected == -2 in SelectRow (0x004b8f29) and so reads
     // the dwords 8 bytes before the array; with retail's layout this reads the same fields.
     int RowDword(size_t ArrayOffset, int Index) const;

@@ -61,8 +61,9 @@ enum class EMessage : int
     CargoJettisoned       = 0x23, // Ship jettison request: {ship, word equip id, good, count}
     AbortMission          = 0x24, // IServerImpl::AbortMission: {player, mission}
     // TODO(name): sent by IServerImpl::SystemSwitchOutComplete as {ship, gate, system} and
-    // for every dying ship as {ship, death-sequence object, system}; SpaceSupport destroys
-    // Msg[0] when it is one of its system's objects.
+    // for every ship that finished leaving through its dock (Ship::DockedObjId) as {ship,
+    // dock object, system}; SpaceSupport destroys Msg[0] when it is one of its system's
+    // objects, MissionObject treats it as the ship's jump.
     Msg0x25               = 0x25,
     JumpInComplete        = 0x26, // Ship (vtable slot 0x74): {arg, ship} (Cnd_JumpInComplete)
     // TODO(name): StarSystem dock-list update: {ship, base, target, byte land}; SpaceSupport
@@ -72,7 +73,7 @@ enum class EMessage : int
     LocationEnter         = 0x29, // IServerImpl::LocationEnter: {location, player} (Cnd_LocEnter)
     LocationExit          = 0x2a, // IServerImpl::LocationExit: {location, player} (Cnd_LocExit)
     LootSpawned           = 0x2b, // StarSystem create_loot: {loot, source object, good, count}
-    MissionResponse       = 0x2c, // IServerImpl::MissionResponse; Content: FMissionOfferAcceptMsg {offer id, kind, byte accepted, player} (Cnd_MsnResponse)
+    MissionResponse       = 0x2c, // IServerImpl::MissionResponse; Content: FMissionOfferAcceptMsg {offer id, EMissionOfferKind, byte accepted, player} (Cnd_MsnResponse)
     PhantomEnter          = 0x2d, // phantom pump: {object, phantom, system}
     PhantomExit           = 0x2e, // phantom pump: {object, phantom, system}
     PlayerManeuver        = 0x2f, // IServerImpl::SetManeuver (single player): {player, object, value} (Cnd_PlayerManeuver)
@@ -126,6 +127,14 @@ SERVER_API unsigned int __cdecl Create(const char* DllPath, const char* Instance
 SERVER_API void __cdecl Destroy(unsigned int Flid);
 SERVER_API int __cdecl SetHeartbeatInterval(const unsigned int& Flid, float Interval);
 SERVER_API int __cdecl _SendMessage(const unsigned int& Flid, EMessage MsgId, const void* MsgData);
+
+// What the offer id of IServer::MissionResponse / EMessage::MissionResponse identifies.
+enum EMissionOfferKind : unsigned
+{
+    MissionOfferController   = 0, // a mission controller: a story script's offer, or a bar mission just created
+    MissionOfferBarCharacter = 1, // a bar character (Content's generic bar scripts)
+    MissionOfferVendor       = 2, // a mission vendor (job board) offer
+};
 
 } // namespace Controller
 

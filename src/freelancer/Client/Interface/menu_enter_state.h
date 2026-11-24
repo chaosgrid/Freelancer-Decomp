@@ -32,18 +32,21 @@ struct FMenuNavState
     int CurrentState;           // +0x004
     int PrevState;              // +0x008
     // +0x00c -- the character the next state works on: case 16 copies the new-game record's
-    // id here, poll indices 3 / 8 copy the page's pick; case 12 selects it when Flag20c is set.
+    // id here, poll indices 3 / 8 copy the page's pick; case 12 selects it when
+    // bHasCharacterPick is set.
     CHARACTER_ID CharacterId;
-    unsigned char Flag20c;      // +0x20c -- CharacterId holds a pick (Init clears it)
+    unsigned char bHasCharacterPick; // +0x20c -- CharacterId holds a pick (Init clears it)
     unsigned char Pad20d[3];
     // +0x210 -- the menu logo Image (vftable 0x005e2718, 0x18 bytes): Init loads DAT_0067bf4c
     // into it, Exit releases it, the Update frame tail draws it.
     Image LogoImage;
     Win3D* ActivePage;          // +0x228 -- Destroy on it before every page change
-    unsigned char Flag22c;      // +0x22c -- the first settled frame hid the loading screen
-    unsigned char Flag22d;      // +0x22d -- case 4 (multiplayer) set it: case 1 restarts SP
+    unsigned char bLoadingScreenSettled; // +0x22c -- the first settled frame hid the loading screen
+    unsigned char bFromMultiplayer; // +0x22d -- case 4 (multiplayer) set it: case 1 restarts SP
     unsigned char Pad22e[2];
-    float Field230;             // +0x230 -- Init zeroes it, the frame tail advances it
+    // +0x230 -- the sub-millisecond rest of the script clock: Init zeroes it, the frame tail
+    // hands the whole milliseconds to the script manager and keeps the remainder here.
+    float ScriptTimeRemainder;
 };
 
 // The Update poll reads the next-state fields of the ported intro pages directly:

@@ -596,7 +596,7 @@ bool CndDestroyed::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
     {
         // Retail takes the equal_range in the mission +0xec multimap: true unless more than
         // one entry is left.
-        return Mission->FormationMembers.count(Label) <= 1;
+        return Mission->LabelObjects.count(Label) <= 1;
     }
     ++Count;
     return Count == Needed;
@@ -1014,8 +1014,8 @@ bool CndDistVecLbl::Matches(pub::Controller::EMessage /*EventId*/, void const* E
 bool CndDistVecLbl::MatchesAny(float DeltaSeconds)
 {
     typedef std::multimap<unsigned int, unsigned int>::iterator FMemberIterator;
-    FMemberIterator It = Mission->FormationMembers.lower_bound(Label);
-    while (It != Mission->FormationMembers.upper_bound(Label))
+    FMemberIterator It = Mission->LabelObjects.lower_bound(Label);
+    while (It != Mission->LabelObjects.upper_bound(Label))
     {
         Vector Position;
         Matrix Orientation;
@@ -1049,8 +1049,8 @@ bool CndDistVecLbl::MatchesAll(float DeltaSeconds)
 {
     typedef std::multimap<unsigned int, unsigned int>::iterator FMemberIterator;
     int InRange = 0;
-    FMemberIterator It = Mission->FormationMembers.lower_bound(Label);
-    while (It != Mission->FormationMembers.upper_bound(Label))
+    FMemberIterator It = Mission->LabelObjects.lower_bound(Label);
+    while (It != Mission->LabelObjects.upper_bound(Label))
     {
         Vector Position;
         Matrix Orientation;
@@ -1067,7 +1067,7 @@ bool CndDistVecLbl::MatchesAll(float DeltaSeconds)
         }
         ++It;
     }
-    int const Total = static_cast<int>(Mission->FormationMembers.count(Label));
+    int const Total = static_cast<int>(Mission->LabelObjects.count(Label));
     if (InRange != Total)
     {
         TickTimer = TickInterval;
@@ -1163,7 +1163,7 @@ bool CndHasMsn::Matches(pub::Controller::EMessage /*EventId*/, void const* /*Eve
     FContentPlayerState* Player = GetMissionPlayerState(Mission);
     if (Player == nullptr)
         return false;
-    if ((Player->ValueD8 & GIdValueMask) != 0)
+    if ((Player->LiveMissionId & GIdValueMask) != 0)
         return Wanted == 0;
     return Wanted == 1;
 }
@@ -1592,7 +1592,7 @@ bool CndLootAcquired::Matches(pub::Controller::EMessage /*EventId*/, void const*
     // With no explicit count, done once every entry of the label in the mission +0xec
     // multimap is picked up.
     if (ShipId == Parms[1] && Needed == -1 &&
-        Count == static_cast<int>(Mission->FormationMembers.count(LootLabel)))
+        Count == static_cast<int>(Mission->LabelObjects.count(LootLabel)))
         return true;
     return Needed == Count;
 }
@@ -2277,15 +2277,15 @@ void CndRtcDone::Parse(INI_Reader& Reader)
     RtcFile = Reader.get_value_string(0);
 }
 
-// FUN_06ec1c50: the RTC records of mission +0x2f4 (script at node +0x90, its sequence id
+// FUN_06ec1c50: the mission's RtcScripts (script at node +0x90, its sequence id
 // +0x40).
 bool CndRtcDone::Matches(pub::Controller::EMessage /*EventId*/, void const* EventParms)
 {
     if (EventParms == nullptr)
         return false;
     unsigned int const* Parms = static_cast<unsigned int const*>(EventParms);
-    std::list<FStoryMissionListNode_0x2f4>::iterator It = Mission->List_0x2f4.begin();
-    while (It != Mission->List_0x2f4.end())
+    std::list<FMissionRtc>::iterator It = Mission->RtcScripts.begin();
+    while (It != Mission->RtcScripts.end())
     {
         FCharacterEncounter* Script = It->Encounter;
         if (Script != nullptr && Parms[1] == Script->SequenceId &&

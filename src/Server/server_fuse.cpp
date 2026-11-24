@@ -917,7 +917,7 @@ void TumbleAction::Trigger(unsigned SourceId, unsigned short SubObjId)
             // Ships only.
             CObject* Object = Owner->cobj();
             if (Object != nullptr &&
-                (static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u)
+                (static_cast<unsigned int>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
                 // A ship driven by a behaviour manager is left alone.
                 CEqObj* Cq = Owner->ceqobj();

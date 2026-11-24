@@ -703,11 +703,11 @@ namespace
                 Spec_ = SpecFor("SmoothPCurve", false);
             InsertDefaultKeys();
             KeysOwner_.bBaseConstructed = true;
-            Slot13Rebuild();
+            Rebuild();
             if (bDerivedHermiteConstruction)
             {
                 Spec_ = RequestedSpec;
-                Slot13Rebuild();
+                Rebuild();
             }
         }
 
@@ -796,8 +796,8 @@ namespace
             EvaluateToExtended(&Normalized, Output);
         }
 
-        unsigned char DACOM_API Slot4Replace(int Id, float F0, float F1, float F2,
-                                              float F3) override
+        unsigned char DACOM_API ReplaceKey(int Id, float F0, float F1, float F2,
+                                           float F3) override
         {
             // 2f3e7..2f41d: the tree is keyed by signed ID, not by time.
             FParamKey* Key = FindKeyById(Id);
@@ -867,12 +867,12 @@ namespace
             Key->Value = F1;
             Key->Extra1 = F3;
             Key->Extra0 = F2;
-            Slot13Rebuild();
+            Rebuild();
             return 1;
         }
 
-        unsigned char DACOM_API Slot5ReadKey(int Id, float* Out0, float* Out1, float* Out2,
-                                              float* Out3) override
+        unsigned char DACOM_API ReadKey(int Id, float* Out0, float* Out1, float* Out2,
+                                        float* Out3) override
         {
             FParamKey* Key = FindKeyById(Id);
             if (Key == nullptr)
@@ -937,15 +937,15 @@ namespace
             if (TimeClass == 0)
             {
                 // 2f5c3 overwrites the saved return ID before callbacks.
-                Slot4Replace(0, F0, F1, F2, F3);
-                Slot13Rebuild();
+                ReplaceKey(0, F0, F1, F2, F3);
+                Rebuild();
                 return 0;
             }
             if (TimeClass == 1)
             {
                 // 2f60c returns reserved endpoint ID 1, not NextId_.
-                Slot4Replace(1, F0, F1, F2, F3);
-                Slot13Rebuild();
+                ReplaceKey(1, F0, F1, F2, F3);
+                Rebuild();
                 return 1;
             }
 
@@ -968,11 +968,11 @@ namespace
                 std::memcpy(&NextId_, &NextBits, sizeof(NextId_));
             }
             while (NextId_ == -1 || NextId_ == 0 || NextId_ == 1);
-            Slot13Rebuild();
+            Rebuild();
             return ReturnedId;
         }
 
-        unsigned char DACOM_API Slot7DeleteKey(int Id) override
+        unsigned char DACOM_API DeleteKey(int Id) override
         {
             if (Id == 0 || Id == 1)
                 return 0;
@@ -984,7 +984,7 @@ namespace
             delete Payload;
             // 2f76b..2f78d removes the evaluation tail, not the ID node.
             EvaluationKeys_.pop_back();
-            Slot13Rebuild();
+            Rebuild();
             return 1;
         }
 
@@ -994,7 +994,7 @@ namespace
             return static_cast<unsigned int>(KeysOwner_.Items.size());
         }
 
-        int DACOM_API Slot9IdByIndex(int Index) override
+        int DACOM_API GetKeyId(int Index) override
         {
             FParamEvaluationList::const_iterator Key = EvaluationKeys_.begin();
             unsigned int Remaining = static_cast<unsigned int>(Index);
@@ -1006,19 +1006,19 @@ namespace
             return Key == EvaluationKeys_.end() ? -1 : Key->Id;
         }
 
-        const char* DACOM_API Slot10Clsid() override
+        const char* DACOM_API GetClassId() override
         {
             return Spec_ != nullptr ? Spec_->FactoryName : "";
         }
 
-        const char* DACOM_API Slot11Display() override
+        const char* DACOM_API GetDisplayName() override
         {
             return Spec_ != nullptr ? Spec_->DisplayName : "";
         }
 
 #pragma warning(push)
 #pragma warning(disable: 4716) // Virtual evaluator returns extended ST(0).
-        float DACOM_API Slot12WrapEvaluate(int A, int B) override
+        float DACOM_API WrapEvaluate(int A, int B) override
         {
             int Remainder;
             float Normalized;
@@ -1042,7 +1042,7 @@ namespace
         // synchronization and the exact 30d20 sort. Hermite derived records
         // are rebuilt separately in signed ID order, with tangents after
         // EACH insertion (2fb56..2fb96), not once after the entire map.
-        void DACOM_API Slot13Rebuild() override
+        void DACOM_API Rebuild() override
         {
             FParamEvaluationList::iterator Key = EvaluationKeys_.begin();
             for (FParamKeyMap::const_iterator Mapped = KeysOwner_.Items.begin();

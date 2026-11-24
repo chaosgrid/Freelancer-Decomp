@@ -37,22 +37,22 @@ namespace
     IMaterial* G_Overrides[kOverrideCount] = {};
 
     // Slot 6 writes these; no readers in this DLL. CRT-initialised defaults.
-    float G_Slot6First[3] = {0.0f, -1.0f, 0.0f};
-    float G_Slot6Second[3] = {1.0f, 1.0f, 1.0f};
-    unsigned char G_Slot6Flag = 0;
+    float G_DirectionalLightDir[3] = {0.0f, -1.0f, 0.0f};
+    float G_DirectionalLightColor[3] = {1.0f, 1.0f, 1.0f};
+    unsigned char G_bDirectionalLightEnabled = 0;
 
     // LAB_066fc980: native private unique-key map owns construction and CRT teardown.
     std::map<int, void*> G_IdValues;
 
     // Slot 11/12 flags: initialized DATA bytes are 1; BSS flag bytes stay zero.
-    unsigned char G_Slot11FlagA = 1; // DAT_0670406C
-    unsigned char G_Slot11FlagB = 1; // DAT_06704068
-    unsigned char G_Slot11FlagC = 0; // DAT_0670463C
-    unsigned char G_Slot11FlagD = 1; // DAT_06704064
-    unsigned char G_Slot12FlagA = 0; // DAT_0670464C
-    unsigned char G_Slot12FlagB = 0; // DAT_06704648
-    unsigned char G_Slot12FlagC = 1; // DAT_06704094
-    unsigned char G_Slot12FlagD = 0; // DAT_06704644
+    unsigned char G_FadingShadowFadeAlpha = 1; // DAT_0670406C
+    unsigned char G_FadingShadowScaleQuad = 1; // DAT_06704068
+    unsigned char G_FadingShadowAddExtent = 0; // DAT_0670463C
+    unsigned char G_FadingShadowUseBounds = 1; // DAT_06704064
+    unsigned char G_FixedShadowFadeAlpha = 0; // DAT_0670464C
+    unsigned char G_FixedShadowScaleQuad = 0; // DAT_06704648
+    unsigned char G_FixedShadowAddExtent = 1; // DAT_06704094
+    unsigned char G_FixedShadowUseBounds = 0; // DAT_06704644
 
     const unsigned long kShadowDrawRs[] = {0x89, 0, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
     const unsigned long kShadowDrawTss0[] = {1, 4, 2, 2, 3, 1, 4, 4, 5, 2, 6, 1, 0};
@@ -99,16 +99,16 @@ namespace
     {
     public:
         FCameraBlob()
-            : Inner_(nullptr), Byte8_(0), Byte9_(0), Pad0_(0), Pad1_(0), RefCount_(1)
+            : Inner_(nullptr), bBackdropClip_(0), bOwnTransform_(0), Pad0_(0), Pad1_(0), RefCount_(1)
         {
-            IdentityTransform(TransformA_);
-            IdentityTransform(TransformB_);
-            Vec6C_[0] = 1.0f;
-            Vec6C_[1] = 0.0f;
-            Vec6C_[2] = 0.0f;
-            Vec78_[0] = 0.0f;
-            Vec78_[1] = 1.0f;
-            Vec78_[2] = 0.0f;
+            IdentityTransform(CameraTransform_);
+            IdentityTransform(ViewTransform_);
+            SidePlaneX_[0] = 1.0f;
+            SidePlaneX_[1] = 0.0f;
+            SidePlaneX_[2] = 0.0f;
+            SidePlaneY_[0] = 0.0f;
+            SidePlaneY_[1] = 1.0f;
+            SidePlaneY_[2] = 0.0f;
         }
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
@@ -146,16 +146,16 @@ namespace
         // +0x0C LAB_066fdc60: byte+9 → this+0x30, else inner GetPosition.
         virtual float const* DACOM_API GetPosition()
         {
-            if (Byte9_ != 0)
-                return TransformA_ + 9;
+            if (bOwnTransform_ != 0)
+                return CameraTransform_ + 9;
             return Inner_->GetPosition();
         }
 
         // +0x10 LAB_066fdc80: byte+9 → this+0x0C, else inner GetOrientation.
         virtual float const* DACOM_API GetOrientation()
         {
-            if (Byte9_ != 0)
-                return TransformA_;
+            if (bOwnTransform_ != 0)
+                return CameraTransform_;
             return Inner_->GetOrientation();
         }
 
@@ -171,7 +171,7 @@ namespace
         // +0x20 LAB_066fdcf0: byte+8 → 1.0, else inner GetZNear.
         virtual float DACOM_API GetZNear()
         {
-            if (Byte8_ != 0)
+            if (bBackdropClip_ != 0)
                 return kCameraNearConst;
             return Inner_->GetZNear();
         }
@@ -179,7 +179,7 @@ namespace
         // +0x24 LAB_066fdd10: byte+8 → 200000, else inner GetZFar.
         virtual float DACOM_API GetZFar()
         {
-            if (Byte8_ != 0)
+            if (bBackdropClip_ != 0)
                 return kCameraFarConst;
             return Inner_->GetZFar();
         }
@@ -191,7 +191,7 @@ namespace
         virtual double DACOM_API GetXScaleOverNear()
         {
             const float First = (float)(Inner_->GetXScaleOverNear());
-            if (Byte8_ == 0)
+            if (bBackdropClip_ == 0)
                 return First;
             return (double)(Inner_->GetZNear()) * First;
         }
@@ -200,7 +200,7 @@ namespace
         virtual double DACOM_API GetYScaleOverNear()
         {
             const float First = (float)(Inner_->GetYScaleOverNear());
-            if (Byte8_ == 0)
+            if (bBackdropClip_ == 0)
                 return First;
             return (double)(Inner_->GetZNear()) * First;
         }
@@ -221,7 +221,7 @@ namespace
         // classifies against this object's near/far and the axes at +0x6C/+0x78.
         virtual int DACOM_API ClassifySphere(float const* Center, float Radius)
         {
-            if (Byte8_ == 0)
+            if (bBackdropClip_ == 0)
                 return Inner_->ClassifySphere(Center, Radius);
 
             const float ZNear = GetZNear();
@@ -241,15 +241,15 @@ namespace
             if (!(((double)Radius - ZFar) < Cz))
                 Rank = 3;
 
-            const double SumX = std::fabs((double)Cx) * Vec6C_[0]
-                + (double)Cz * Vec6C_[2];
+            const double SumX = std::fabs((double)Cx) * SidePlaneX_[0]
+                + (double)Cz * SidePlaneX_[2];
             if (SumX > Radius)
                 return 1;
             if (!(SumX < -Radius))
                 Rank = 3;
 
-            const double SumY = std::fabs((double)Cy) * Vec78_[1]
-                + (double)Cz * Vec78_[2];
+            const double SumY = std::fabs((double)Cy) * SidePlaneY_[1]
+                + (double)Cz * SidePlaneY_[2];
             if (SumY > Radius)
                 return 1;
             if (SumY < -Radius)
@@ -260,41 +260,41 @@ namespace
         // +0x40 LAB_066fdca0: byte+9 → this+0x3C, else inner GetViewTransform.
         virtual float const* DACOM_API GetViewTransform()
         {
-            if (Byte9_ != 0)
-                return TransformB_;
+            if (bOwnTransform_ != 0)
+                return ViewTransform_;
             return Inner_->GetViewTransform();
         }
 
-        void BindArg(void* Arg, unsigned char Flag8, unsigned char Flag9)
+        void BindArg(void* Arg, unsigned char bBackdropClip, unsigned char bOwnTransform)
         {
             Inner_ = (ICamera*)Arg;
-            Byte8_ = Flag8;
-            Byte9_ = Flag9;
+            bBackdropClip_ = bBackdropClip;
+            bOwnTransform_ = bOwnTransform;
         }
 
         void ClearArg()
         {
             Inner_ = nullptr;
-            Byte9_ = 0;
+            bOwnTransform_ = 0;
         }
 
-        void SetByte8(unsigned char Value) { Byte8_ = Value; }
-        unsigned char Byte8() const { return Byte8_; }
-        unsigned char Byte9() const { return Byte9_; }
-        float* TransformA() { return TransformA_; }
-        float* TransformB() { return TransformB_; }
-        float* Vec6C() { return Vec6C_; }
-        float* Vec78() { return Vec78_; }
+        void SetBackdropClip(unsigned char Value) { bBackdropClip_ = Value; }
+        unsigned char BackdropClip() const { return bBackdropClip_; }
+        unsigned char OwnTransform() const { return bOwnTransform_; }
+        float* CameraTransform() { return CameraTransform_; }
+        float* ViewTransform() { return ViewTransform_; }
+        float* SidePlaneX() { return SidePlaneX_; }
+        float* SidePlaneY() { return SidePlaneY_; }
         ICamera* Inner() const { return Inner_; }
 
         // FUN_066fe700: 9 floats from the orientation, then 3 from the second pointer, at +0x24.
         void SetOrientationAndTranslation(const float* Matrix9, const float* Translation)
         {
             for (int Index = 0; Index < 9; ++Index)
-                TransformA_[Index] = Matrix9[Index];
-            TransformA_[9] = Translation[0];
-            TransformA_[10] = Translation[1];
-            TransformA_[11] = Translation[2];
+                CameraTransform_[Index] = Matrix9[Index];
+            CameraTransform_[9] = Translation[0];
+            CameraTransform_[10] = Translation[1];
+            CameraTransform_[11] = Translation[2];
         }
 
         // FUN_066fe4b0: preserve source; write inverse to the separate output transform.
@@ -306,18 +306,18 @@ namespace
             float Dest[3];
             // These references view float storage without a numeric conversion.
             Math->TransposeTransform(reinterpret_cast<FVector&>(Dest[0]),
-                                     reinterpret_cast<const FMatrix&>(TransformA_[0]),
-                                     reinterpret_cast<const FVector&>(TransformA_[9]));
+                                     reinterpret_cast<const FMatrix&>(CameraTransform_[0]),
+                                     reinterpret_cast<const FVector&>(CameraTransform_[9]));
             float Transposed[12];
-            Transposed[0] = TransformA_[0];
-            Transposed[1] = TransformA_[3];
-            Transposed[2] = TransformA_[6];
-            Transposed[3] = TransformA_[1];
-            Transposed[4] = TransformA_[4];
-            Transposed[5] = TransformA_[7];
-            Transposed[6] = TransformA_[2];
-            Transposed[7] = TransformA_[5];
-            Transposed[8] = TransformA_[8];
+            Transposed[0] = CameraTransform_[0];
+            Transposed[1] = CameraTransform_[3];
+            Transposed[2] = CameraTransform_[6];
+            Transposed[3] = CameraTransform_[1];
+            Transposed[4] = CameraTransform_[4];
+            Transposed[5] = CameraTransform_[7];
+            Transposed[6] = CameraTransform_[2];
+            Transposed[7] = CameraTransform_[5];
+            Transposed[8] = CameraTransform_[8];
             Transposed[9] = -Dest[0];
             Transposed[10] = -Dest[1];
             Transposed[11] = -Dest[2];
@@ -327,14 +327,16 @@ namespace
 
     private:
         ICamera* Inner_;
-        unsigned char Byte8_;
-        unsigned char Byte9_;
+        // +0x08: backdrop draw: fixed near 1 / far 200000, scales times ZNear, own frustum test.
+        unsigned char bBackdropClip_;
+        // +0x09: starsphere draw: position / orientation / view come from the transforms below.
+        unsigned char bOwnTransform_;
         unsigned char Pad0_;
         unsigned char Pad1_;
-        float TransformA_[12];
-        float TransformB_[12];
-        float Vec6C_[3];
-        float Vec78_[3];
+        float CameraTransform_[12]; // +0x0C: orientation 3x3, then position
+        float ViewTransform_[12];   // +0x3C: inverse of CameraTransform_
+        float SidePlaneX_[3];       // +0x6C: unit normal of the left/right frustum planes
+        float SidePlaneY_[3];       // +0x78: unit normal of the top/bottom frustum planes
         unsigned long RefCount_;
     };
 
@@ -718,15 +720,15 @@ namespace
     GENRESULT DACOM_API FFLAppearanceBase::SetDirectionalLight(const float* First, const float* Second)
     {
         // LAB_066fe1f0: flag precedes both mandatory vector reads.
-        G_Slot6Flag = 1;
-        CopyVec3(G_Slot6First, First);
-        CopyVec3(G_Slot6Second, Second);
+        G_bDirectionalLightEnabled = 1;
+        CopyVec3(G_DirectionalLightDir, First);
+        CopyVec3(G_DirectionalLightColor, Second);
         return GR_OK;
     }
 
     GENRESULT DACOM_API FFLAppearanceBase::SetDirectionalLightEnabled(unsigned char Flag)
     {
-        G_Slot6Flag = Flag;
+        G_bDirectionalLightEnabled = Flag;
         return GR_OK;
     }
 
@@ -763,7 +765,7 @@ namespace
         const float HalfWidth = (float)((double)Width * kHalf);
         const float Horizontal = (float)((double)HalfWidth / Camera->GetXScaleOverNear());
         const float Vertical = (float)((double)Horizontal / Camera->GetAspect());
-        float* Right = Camera->Vec6C();
+        float* Right = Camera->SidePlaneX();
         Right[0] = 1.0f;
         Right[1] = 0.0f;
         Right[2] = Horizontal;
@@ -771,7 +773,7 @@ namespace
         Right[0] = (float)(RightScale * Right[0]);
         Right[1] = (float)(RightScale * Right[1]);
         Right[2] = (float)(RightScale * Right[2]);
-        float* Up = Camera->Vec78();
+        float* Up = Camera->SidePlaneY();
         Up[0] = 0.0f;
         Up[1] = 1.0f;
         Up[2] = Vertical;
@@ -946,8 +948,8 @@ namespace
         }
     }
 
-    GENRESULT DrawShadowLike(FFLAppearanceBase* Appearance, unsigned char FlagA, unsigned char FlagB,
-                             unsigned char FlagC, unsigned char FlagD, void* A, void* B, void* C,
+    GENRESULT DrawShadowLike(FFLAppearanceBase* Appearance, unsigned char bFadeAlpha, unsigned char bScaleQuad,
+                             unsigned char bAddExtent, unsigned char bUseBounds, void* A, void* B, void* C,
                              void* D)
     {
         (void)D;
@@ -1012,7 +1014,7 @@ namespace
                     Engine->ReleaseHandle(Archetype);
                     float Extents[6];
                     bool bUsedFallback = true;
-                    if (FlagD != 0 && Archetype != (void*)((unsigned long)-1))
+                    if (bUseBounds != 0 && Archetype != (void*)((unsigned long)-1))
                         bUsedFallback = Appearance->Renderer_->GetBounds(Archetype, 1.0f, Extents) < 0;
                     if (bUsedFallback)
                     {
@@ -1030,7 +1032,7 @@ namespace
                         PosZ = (float)((double)OffsetZ + PosZ);
                     }
                     float Radius = Instances[Index].Radius;
-                    if (FlagC != 0)
+                    if (bAddExtent != 0)
                         Radius = (float)((double)Radius + Extents[3]);
                     double Fade = (double)PosY - Radius;
                     // Unordered is kept; only negative becomes zero.
@@ -1042,10 +1044,10 @@ namespace
                     if (Fade > kShadowFadeRange)
                         continue;
                     Fade /= kShadowFadeRange;
-                    if (FlagB != 0)
+                    if (bScaleQuad != 0)
                         G_ShadowQuadScale = (float)((Fade * Fade) * kShadowFadeQuad + kShadowScaleBias);
                     double Alpha = kShadowAlphaConst;
-                    if (FlagA != 0)
+                    if (bFadeAlpha != 0)
                     {
                         Alpha = (double)kShadowAlphaSub - Fade;
                         // Negative skips; <= 1 and unordered are kept.
@@ -1108,13 +1110,13 @@ namespace
         Camera->BindArg(A, 1, 0);
         CallSetPerspective(Pipeline_, Camera);
         FillLocalAxes(Camera);
-        if (Camera->Byte9() != 0)
+        if (Camera->OwnTransform() != 0)
         {
             const float Translation[3] = {};
             Camera->SetOrientationAndTranslation(((ICamera*)A)->GetOrientation(), Translation);
             float Inverse[12];
             Camera->BuildInverseTransform(Inverse);
-            float* Dest = Camera->TransformB();
+            float* Dest = Camera->ViewTransform();
             for (int Index = 0; Index < 12; ++Index)
                 Dest[Index] = Inverse[Index];
         }
@@ -1123,9 +1125,9 @@ namespace
         Camera = (FCameraBlob*)Scratch88_;
         Renderer->RenderInstance(Camera, Extra, 1.0f, 0, nullptr, Override);
         Camera = (FCameraBlob*)Scratch88_;
-        if (Camera->Byte8() != 0)
+        if (Camera->BackdropClip() != 0)
         {
-            Camera->SetByte8(0);
+            Camera->SetBackdropClip(0);
             CallSetPerspective(Pipeline_, Camera);
         }
         Camera->ClearArg();
@@ -1150,7 +1152,7 @@ namespace
             Camera->SetOrientationAndTranslation(Orientation, Translation);
             float Inverse[12];
             Camera->BuildInverseTransform(Inverse);
-            float* Dest = Camera->TransformB();
+            float* Dest = Camera->ViewTransform();
             for (int Index = 0; Index < 12; ++Index)
                 Dest[Index] = Inverse[Index];
         }
@@ -1159,9 +1161,9 @@ namespace
         Camera = (FCameraBlob*)Scratch88_;
         Renderer->RenderInstance(Camera, Extra, 1.0f, 0x80, nullptr, Override);
         Camera = (FCameraBlob*)Scratch88_;
-        if (Camera->Byte8() != 0)
+        if (Camera->BackdropClip() != 0)
         {
-            Camera->SetByte8(0);
+            Camera->SetBackdropClip(0);
             CallSetPerspective(Pipeline_, Camera);
         }
         Camera->ClearArg();
@@ -1170,13 +1172,13 @@ namespace
 
     GENRESULT DACOM_API FFLAppearanceBase::DrawFadingShadows(void* A, void* B, void* C, void* D)
     {
-        DrawShadowLike(this, G_Slot11FlagA, G_Slot11FlagB, G_Slot11FlagC, G_Slot11FlagD, A, B, C, D);
+        DrawShadowLike(this, G_FadingShadowFadeAlpha, G_FadingShadowScaleQuad, G_FadingShadowAddExtent, G_FadingShadowUseBounds, A, B, C, D);
         return GR_OK;
     }
 
     GENRESULT DACOM_API FFLAppearanceBase::DrawFixedShadows(void* A, void* B, void* C, void* D)
     {
-        DrawShadowLike(this, G_Slot12FlagA, G_Slot12FlagB, G_Slot12FlagC, G_Slot12FlagD, A, B, C, D);
+        DrawShadowLike(this, G_FixedShadowFadeAlpha, G_FixedShadowScaleQuad, G_FixedShadowAddExtent, G_FixedShadowUseBounds, A, B, C, D);
         return GR_OK;
     }
 

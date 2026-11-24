@@ -600,12 +600,12 @@ namespace
         }
         if (DecodeHeapExhausted(Stream) == 0)
         {
-            Stream->EndMarkF8 = 0xFFFFFFFF;
+            Stream->DrainEndCursor = 0xFFFFFFFF;
             return;
         }
         Stream->State = 6;
-        Stream->EndMarkF4 = GetPlayCursor(Stream);
-        Stream->EndMarkF8 = Stream->WriteCursor;
+        Stream->DrainStartCursor = GetPlayCursor(Stream);
+        Stream->DrainEndCursor = Stream->WriteCursor;
         Stream->SilenceBytes = Stream->BytesPerSec >> 2;
         SilenceLocked(Stream);
         Stream->EncoderDelayBytes = -1;
@@ -858,15 +858,15 @@ namespace
                 Stream->State = 8;
                 return 0;
             }
-            if (Stream->EndMarkF8 == 0xFFFFFFFFu && DecodeHeapExhausted(Stream) != 0)
-                Stream->EndMarkF8 = Stream->WriteCursor;
+            if (Stream->DrainEndCursor == 0xFFFFFFFFu && DecodeHeapExhausted(Stream) != 0)
+                Stream->DrainEndCursor = Stream->WriteCursor;
             DWORD Play = 0;
             const HRESULT Hr = Stream->Buffer->GetCurrentPosition(&Play, nullptr);
             unsigned char bInside = 0;
             if (Hr >= 0)
             {
-                const unsigned long StartMark = Stream->EndMarkF4;
-                const unsigned long EndMark = Stream->EndMarkF8;
+                const unsigned long StartMark = Stream->DrainStartCursor;
+                const unsigned long EndMark = Stream->DrainEndCursor;
                 if (StartMark > EndMark)
                 {
                     if (Play < EndMark || Play >= StartMark)
@@ -951,10 +951,9 @@ FSoundStreamerFactory::FSoundStreamerFactory() : RefCount(1), Name(kComponentNam
 
 GENRESULT DACOM_API FSoundStreamerFactory::QueryInterface(const char* Iid, void** Out)
 {
-    if (Out == nullptr)
-        return GR_GENERIC;
+    // LAB_06ef3b80: REPE CMPSB over 0x17 bytes. No null checks.
     *Out = nullptr;
-    if (Iid == nullptr || memcmp(Iid, Iids::ComponentFactory, 0x17) != 0)
+    if (memcmp(Iid, Iids::ComponentFactory, 0x17) != 0)
         return GR_INTERFACE_UNSUPPORTED;
     *Out = static_cast<IComponentFactory*>(this);
     AddRef();
@@ -983,13 +982,10 @@ unsigned long DACOM_API FSoundStreamerFactory::Release()
 
 GENRESULT DACOM_API FSoundStreamerFactory::CreateInstance(AGGDESC* Desc, void** Instance)
 {
-    if (Instance == nullptr)
-        return GR_GENERIC;
+    // LAB_06ef3bf0. No null checks on Desc, its name or Instance.
     *Instance = nullptr;
     FStreamerAggDesc* StreamDesc = reinterpret_cast<FStreamerAggDesc*>(Desc);
-    if (StreamDesc == nullptr || StreamDesc->Size != kAggDescSize)
-        return GR_INTERFACE_UNSUPPORTED;
-    if (StreamDesc->Name == nullptr || strcmp(StreamDesc->Name, Name) != 0)
+    if (StreamDesc->Size != kAggDescSize || strcmp(StreamDesc->Name, Name) != 0)
         return GR_INTERFACE_UNSUPPORTED;
 
     FSoundStreamer* Object = new (std::nothrow) FSoundStreamer();
@@ -997,6 +993,7 @@ GENRESULT DACOM_API FSoundStreamerFactory::CreateInstance(AGGDESC* Desc, void** 
         return GR_OUT_OF_MEMORY;
 
     Object->BindOuter(StreamDesc);
+    // FUN_06ef2d80: a second streamer is refused with -1.
     if (G_Streamer != nullptr)
     {
         if (StreamDesc->InnerOut != nullptr)
@@ -1043,13 +1040,13 @@ FSoundStreamer::~FSoundStreamer()
 
 void FSoundStreamer::BindOuter(FStreamerAggDesc* Desc)
 {
+    // Inline in LAB_06ef3bf0; InnerOut is written unchecked when there is an outer.
     Inner.RefCount = 1;
     Inner.Self = this;
-    if (Desc != nullptr && Desc->Outer != nullptr)
+    if (Desc->Outer != nullptr)
     {
         Controlling = Desc->Outer;
-        if (Desc->InnerOut != nullptr)
-            *Desc->InnerOut = &Inner;
+        *Desc->InnerOut = &Inner;
     }
     else
     {
@@ -1619,6 +1616,7 @@ void* DACOM_API FSoundStreamer::CreateStream(const char* Path, IDAComponent* Fil
     if (FileSystem == nullptr)
     {
         // Create a FileSystem rooted at the path; the handle then gets a NULL name.
+        // Retail: FUN_06ef1200 runs repne scasb on that NULL (06ef123e), so this path faults.
         if (Path == nullptr)
             return nullptr;
         if (CreateFileSystem(Path, &OwnedFs) != GR_OK)

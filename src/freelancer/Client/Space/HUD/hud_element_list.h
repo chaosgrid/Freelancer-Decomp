@@ -28,6 +28,125 @@ struct IObjRW;
 struct FSpaceCamera;
 struct FTextureRef;
 
+// The USER_* commands the HUD panels register, handle and post. The id is the index of the
+// nickname in retail's KeyMap table (PTR_s_USER_NONE_00614dd8, FKeyCmd::NicknameId), which is
+// what the handler tree dispatches as the event id. Only the ids the HUD uses are listed.
+enum EUserCmd : unsigned
+{
+    USER_WHEEL                      = 0x04,
+    USER_BUTTON0                    = 0x06,
+    USER_CANCEL                     = 0x0f,
+    USER_ACTIVATE_ITEM              = 0x19,
+    USER_SET_TARGET                 = 0x1c,
+    USER_NEXT_TARGET                = 0x1d,
+    USER_PREV_TARGET                = 0x1e,
+    USER_NEXT_SUBTARGET             = 0x21,
+    USER_PREV_SUBTARGET             = 0x22,
+    USER_CLEAR_TARGET               = 0x23,
+    USER_NEXT_ENEMY                 = 0x24,
+    USER_PREV_ENEMY                 = 0x25,
+    USER_CLOSEST_ENEMY              = 0x26,
+    USER_X_ROTATE                   = 0x2a,
+    USER_X_UNROTATE                 = 0x2b,
+    USER_Y_ROTATE                   = 0x2c,
+    USER_Y_UNROTATE                 = 0x2d,
+    USER_LOOK_ROTATE_CAMERA_LEFT    = 0x32,
+    USER_LOOK_ROTATE_CAMERA_RIGHT   = 0x33,
+    USER_LOOK_ROTATE_CAMERA_UP      = 0x34,
+    USER_LOOK_ROTATE_CAMERA_DOWN    = 0x35,
+    USER_AFTERBURN                  = 0x3a,
+    USER_AFTERBURN_OFF              = 0x3b,
+    USER_AFTERBURN_ON               = 0x3c,
+    USER_TOGGLE_AUTO_AVOIDANCE      = 0x3d,
+    USER_TOGGLE_AUTO_LEVEL          = 0x3e,
+    USER_INC_THROTTLE               = 0x43,
+    USER_DEC_THROTTLE               = 0x44,
+    USER_CRUISE                     = 0x45,
+    USER_CONTACT_LIST               = 0x54,
+    USER_SWITCH_TO_PLAYER_SHIP      = 0x56,
+    USER_SWITCH_TO_WEAPON_LIST      = 0x57,
+    USER_SWITCH_TO_TARGET           = 0x58,
+    USER_FORMATION_LIST             = 0x59,
+    USER_STATUS                     = 0x5e,
+    USER_TARGET                     = 0x5f,
+    USER_MINIMIZE_HUD               = 0x6d,
+    USER_COLLECT_LOOT               = 0x6f,
+    USER_MANEUVER_TRAIL             = 0x74,
+    USER_MANEUVER_EVADE             = 0x76,
+    USER_MANEUVER_ENGINEKILL        = 0x77,
+    USER_MANEUVER_BRAKE_REVERSE     = 0x78,
+    USER_MANEUVER_DOCK              = 0x79,
+    USER_MANEUVER_GOTO              = 0x7a,
+    USER_MANEUVER_FACE              = 0x7b,
+    USER_MANEUVER_DRASTIC_EVADE     = 0x7e,
+    USER_MANEUVER_FORMATION         = 0x7f,
+    USER_MANEUVER_STRAFE            = 0x80,
+    USER_MANEUVER_TRAIL_CLOSER      = 0x81,
+    USER_MANEUVER_TRAIL_FARTHER     = 0x82,
+    USER_MANEUVER_CORKSCREW_EVADE   = 0x83,
+    USER_MANEUVER_SLIDE_EVADE       = 0x84,
+    USER_MANEUVER_SLIDE_EVADE_LEFT  = 0x85,
+    USER_MANEUVER_SLIDE_EVADE_RIGHT = 0x86,
+    USER_MANEUVER_SLIDE_EVADE_UP    = 0x87,
+    USER_MANEUVER_SLIDE_EVADE_DOWN  = 0x88,
+    USER_SCAN_CARGO                 = 0x8a,
+    USER_TRACTOR_BEAM               = 0x8b,
+    USER_REPAIR_HEALTH              = 0x8f,
+    USER_REPAIR_SHIELD              = 0x90,
+    USER_WEAPON_GROUP1              = 0x91,
+    USER_WEAPON_GROUP2              = 0x92,
+    USER_WEAPON_GROUP3              = 0x93,
+    USER_WEAPON_GROUP4              = 0x94,
+    USER_WEAPON_GROUP5              = 0x95,
+    USER_WEAPON_GROUP6              = 0x96,
+    USER_TOGGLE_WEAPON1             = 0x97,
+    USER_TOGGLE_WEAPON2             = 0x98,
+    USER_TOGGLE_WEAPON3             = 0x99,
+    USER_TOGGLE_WEAPON4             = 0x9a,
+    USER_TOGGLE_WEAPON5             = 0x9b,
+    USER_TOGGLE_WEAPON6             = 0x9c,
+    USER_TOGGLE_WEAPON7             = 0x9d,
+    USER_TOGGLE_WEAPON8             = 0x9e,
+    USER_TOGGLE_WEAPON9             = 0x9f,
+    USER_TOGGLE_WEAPON10            = 0xa0,
+    USER_FIRE_WEAPON1               = 0xa1,
+    USER_FIRE_WEAPON2               = 0xa2,
+    USER_FIRE_WEAPON3               = 0xa3,
+    USER_FIRE_WEAPON4               = 0xa4,
+    USER_FIRE_WEAPON5               = 0xa5,
+    USER_FIRE_WEAPON6               = 0xa6,
+    USER_FIRE_WEAPON7               = 0xa7,
+    USER_FIRE_WEAPON8               = 0xa8,
+    USER_FIRE_WEAPON9               = 0xa9,
+    USER_FIRE_WEAPON10              = 0xaa,
+    USER_FIRE_WEAPON_GROUP1         = 0xab,
+    USER_FIRE_WEAPON_GROUP2         = 0xac,
+    USER_FIRE_WEAPON_GROUP3         = 0xad,
+    USER_FIRE_WEAPON_GROUP4         = 0xae,
+    USER_FIRE_WEAPON_GROUP5         = 0xaf,
+    USER_FIRE_WEAPON_GROUP6         = 0xb0,
+    USER_ASSIGN_WEAPON_GROUP1       = 0xb1,
+    USER_ASSIGN_WEAPON_GROUP2       = 0xb2,
+    USER_ASSIGN_WEAPON_GROUP3       = 0xb3,
+    USER_ASSIGN_WEAPON_GROUP4       = 0xb4,
+    USER_ASSIGN_WEAPON_GROUP5       = 0xb5,
+    USER_ASSIGN_WEAPON_GROUP6       = 0xb6,
+    USER_REMAPPABLE_LEFT            = 0xb7,
+    USER_REMAPPABLE_RIGHT           = 0xb8,
+    USER_REMAPPABLE_UP              = 0xb9,
+    USER_REMAPPABLE_DOWN            = 0xba,
+    USER_FIRE_FORWARD               = 0xbb,
+    USER_LAUNCH_MISSILES            = 0xbc,
+    USER_LAUNCH_MINES               = 0xbd,
+    USER_LAUNCH_COUNTERMEASURES     = 0xbe,
+    USER_AUTO_TURRET                = 0xbf,
+    USER_LAUNCH_TORPEDOS            = 0xc0,
+    USER_LAUNCH_CRUISE_DISRUPTORS   = 0xc1,
+    USER_MANEUVER_FREE_FLIGHT       = 0xc6,
+    USER_GROUP_INVITE               = 0xc9,
+    USER_TRADE_REQUEST              = 0xca,
+};
+
 // -------------------------------------------------------------------------------------------
 // HUDItem (RTTI .?AVHUDItem@@, vftable 0x005d6eac, 11 slots, 0x38 bytes).
 //
@@ -50,6 +169,8 @@ struct FTextureRef;
 //  10 +0x28 FUN_00401e90  no-op
 // Slots 7 and 8 receive the command record FUN_0054bcb0 hands the active camera (a 0x28-byte
 // block whose first dword is the command id -- HUD_Button::MouseEvent 0x004c9430 builds one).
+// None of the twelve HUDItem-derived vftables overrides slots 7..10, and only HUD_Steer's
+// overrides slot 1, so their names stay open.
 // -------------------------------------------------------------------------------------------
 
 class HUDItem
@@ -93,9 +214,6 @@ private:
 };
 
 static_assert(sizeof(HUDItem) == 0x38, "retail HUDItem is 0x38 bytes");
-
-// Alias; nothing in the tree uses it.
-using IHudElement = HUDItem;
 
 // -------------------------------------------------------------------------------------------
 // HUDItem_Factory (RTTI .?AVHUDItem_Factory@@, vftable 0x005d6e30: two slots, both
@@ -143,9 +261,6 @@ public:
         return Element;
     }
 };
-
-// Alias; nothing in the tree uses it.
-using HudElementFactoryBase = HUDItem_Factory;
 
 // -------------------------------------------------------------------------------------------
 // HUD_Steer (RTTI .?AUHUD_Steer@@ : HUDItem, vftable 0x005d6e7c, 0x74 bytes).

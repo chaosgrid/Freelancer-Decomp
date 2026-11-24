@@ -334,7 +334,7 @@ bool FontImp::Init(FFontDesc const& Desc)
     return true;
 }
 
-char const* FontImp::Slot00()
+char const* FontImp::GetId()
 {
     // LAB_00416550
     return Id.Data;
@@ -352,7 +352,7 @@ float FontImp::GetFixedHeight()
     return FixedHeight;
 }
 
-HFONT__* FontImp::Slot03()
+HFONT__* FontImp::GetHFont()
 {
     // LAB_00416570
     RefreshScale(false);
@@ -389,10 +389,10 @@ int FontImp::GetLineHeight()
     {
         return Metrics.tmHeight;
     }
-    return Slot07();
+    return GetInitLineHeight();
 }
 
-int FontImp::Slot07()
+int FontImp::GetInitLineHeight()
 {
     // LAB_00416ae0
     return InitLineHeight;

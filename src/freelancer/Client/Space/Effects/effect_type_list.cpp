@@ -7,12 +7,11 @@
 #include "Space/Effects/effect_type_list.h"
 #include "Space/Effects/effect_base.h"
 
-#include <cstdint>
-
 FEffectTypeBucket G_EffectTypeBuckets[kEffectTypeBucketCount] = {};
 
 namespace
 {
+    // A bucket node is an effect's {LinkPrev, LinkNext, LinkSelf} triple (+0x60..+0x68).
     void** NodePrev(void* Node)
     {
         return reinterpret_cast<void**>(Node);
@@ -23,30 +22,15 @@ namespace
         return reinterpret_cast<void**>(static_cast<unsigned char*>(Node) + 4);
     }
 
-    void** EffectLinkSelf(void* Effect)
+    // Node +8, the owning effect's LinkSelf.
+    void* NodeOwner(void* Node)
     {
-        // Effect+0x68.
-        return reinterpret_cast<void**>(static_cast<unsigned char*>(Effect) + 0x68);
+        return *reinterpret_cast<void**>(static_cast<unsigned char*>(Node) + 8);
     }
 
-    unsigned* EffectTypeId(void* Effect)
+    void* EffectLinkNode(FEffectBase* Effect)
     {
-        return reinterpret_cast<unsigned*>(static_cast<unsigned char*>(Effect) + 0x5c);
-    }
-
-    unsigned* EffectRefCount(void* Effect)
-    {
-        return reinterpret_cast<unsigned*>(static_cast<unsigned char*>(Effect) + 0x58);
-    }
-
-    unsigned char* EffectFlags(void* Effect)
-    {
-        return static_cast<unsigned char*>(Effect) + 8;
-    }
-
-    void* EffectLinkNode(void* Effect)
-    {
-        return static_cast<unsigned char*>(Effect) + 0x60;
+        return &Effect->LinkPrev;
     }
 }
 
@@ -70,33 +54,35 @@ void EffectTypeBucketPushFront(FEffectTypeBucket* Bucket, void* Node)
     ++Bucket->Count;
 }
 
-void EffectTypeListLink(void* Effect)
+void EffectTypeListLink(void* EffectPtr)
 {
     // FUN_004f7af0: no null test, no range test on the type id.
-    if (*EffectLinkSelf(Effect) != nullptr)
+    FEffectBase* const Effect = static_cast<FEffectBase*>(EffectPtr);
+    if (Effect->LinkSelf != nullptr)
         return;
-    if ((*EffectFlags(Effect) & 2u) != 0)
+    if ((Effect->Flags08 & 2u) != 0)
         return;
 
-    unsigned const TypeId = *EffectTypeId(Effect);
+    unsigned const TypeId = Effect->EffectTypeId;
 
     void* const Node = EffectLinkNode(Effect);
-    *EffectLinkSelf(Effect) = Effect;
+    Effect->LinkSelf = Effect;
     EffectTypeBucketPushFront(&G_EffectTypeBuckets[TypeId], Node);
-    *EffectRefCount(Effect) += 1;
+    Effect->RefCount += 1;
 }
 
-void EffectTypeListUnlinkAndRelease(void* Effect)
+void EffectTypeListUnlinkAndRelease(void* EffectPtr)
 {
     // Inlined in retail's bucket walk, FUN_004f7140 and FUN_004f73c0: only a linked effect is
     // touched; +0x68 is cleared FIRST, the +0x60 node is unlinked from bucket[+0x5c], the bucket
     // count drops, then the link's reference is released (signed; below 1 deletes).
-    if (*EffectLinkSelf(Effect) == nullptr)
+    FEffectBase* const Effect = static_cast<FEffectBase*>(EffectPtr);
+    if (Effect->LinkSelf == nullptr)
         return;
 
-    FEffectTypeBucket* const Bucket = &G_EffectTypeBuckets[*EffectTypeId(Effect)];
+    FEffectTypeBucket* const Bucket = &G_EffectTypeBuckets[Effect->EffectTypeId];
     void* const Node = EffectLinkNode(Effect);
-    *EffectLinkSelf(Effect) = nullptr;
+    Effect->LinkSelf = nullptr;
 
     void* const Prev = *NodePrev(Node);
     void* const Next = *NodeNext(Node);
@@ -122,13 +108,10 @@ void EffectTypeListUnlinkAndRelease(void* Effect)
     *NodeNext(Node) = nullptr;
     --Bucket->Count;
 
-    int const Remaining = static_cast<int>(*EffectRefCount(Effect)) - 1;
-    *EffectRefCount(Effect) = static_cast<unsigned>(Remaining);
+    int const Remaining = static_cast<int>(Effect->RefCount) - 1;
+    Effect->RefCount = static_cast<unsigned>(Remaining);
     if (Remaining <= 0)
-    {
-        typedef void(__thiscall * FDeleteSlot)(void*, int);
-        delete (FEffectBase*)Effect;
-    }
+        delete Effect;
 }
 
 void EffectTypeListKillAll()
@@ -142,9 +125,8 @@ void EffectTypeListKillAll()
         FEffectTypeBucket* const Bucket = &G_EffectTypeBuckets[Index];
         while (Bucket->Head != nullptr)
         {
-            void* const Effect = *reinterpret_cast<void**>(static_cast<unsigned char*>(Bucket->Head) + 8);
-            typedef void(__thiscall * FKillSlot)(void*);
-            ((FEffectBase*)Effect)->Kill();
+            FEffectBase* const Effect = static_cast<FEffectBase*>(NodeOwner(Bucket->Head));
+            Effect->Kill();
             EffectTypeListUnlinkAndRelease(Effect);
         }
     }

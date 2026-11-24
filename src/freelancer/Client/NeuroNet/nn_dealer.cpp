@@ -12,7 +12,7 @@
                                     // queries FUN_00438060 / 00438160 / 004381c0 / 00438220
 #include "Interface/Pages/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830),
                                     // GetPlayerBaseIdRetail (DAT_00673358 via FUN_004c4900),
-                                    // GetPlayerSpawnSystemIdRetail (FUN_004c4670)
+                                    // GetPlayerRepVibeRetail (FUN_004c4670)
 #include "Space/HUD/hud_command_dispatch.h"   // HudPostCommand (FUN_005763b0)
 #include "Space/HUD/hud_weapon_groups.h"      // G_WeaponGroups (DAT_00674c0c)
 #include "Common/Fonts/ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
@@ -25,7 +25,7 @@
 #include "NeuroNet/nn_modal.h"               // NnFloatBits
 #include "NeuroNet/nn_text_scratch.h"        // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "NeuroNet/nn_text_control.h"        // NnTextControl::GetFontString (Font::String +0x334)
-#include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteArgb_679bac (DAT_00679bac)
+#include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteGreen (DAT_00679bac)
 #include "Space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
 #include "Interface/rich_text_win.h"
 #include "Interface/ship_view_control.h"
@@ -423,8 +423,8 @@ void NnDealer::CreateControls()
         float const DamageHalfExtents[3] = {0.03f, 0.003f, 0.0f};
         TransferItemDamage = CreateCargoBarControl("TransferItemDamage", "", DamagePosition,
                                                    nullptr, DamageHalfExtents, 1, 0x43c,
-                                                   G_NnPaletteArgb_679bac,
-                                                   G_NnPaletteArgb_679bac); // FUN_005a1080
+                                                   G_NnPaletteGreen,
+                                                   G_NnPaletteGreen); // FUN_005a1080
         TransferItemDamage->SetProperty(0x19, 0x10000, 0);
     }
     {
@@ -764,7 +764,7 @@ void NnDealer::Update()
                         // all (FUN_00585f20(GoodId, 1)) -- reason 7; with something to buy, no
                         // free one (FUN_00585f20(GoodId, 0)) -- reason 8.
                         int const Filter = Inventory->Mode;
-                        if (Filter == 0 || Filter == 2)
+                        if (Filter == kNnFilterWeapons || Filter == kNnFilterEquipment)
                         {
                             ShipViewControl* const View = Inventory->Ship.ShipView; // +0x330
                             if (View->FindHardpointForGood(GoodId, true) == nullptr)
@@ -1006,9 +1006,9 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Ship.ShipView->CollectHpTypes(Hardpoint.Value); // FUN_00586560
             int const Filter = NnItemFilterMode(Item->ArchId); // FUN_0047e460
             int Group = 0;
-            if (Filter == 0)
+            if (Filter == kNnFilterWeapons)
                 Group = 0;
-            else if (Filter == 2)
+            else if (Filter == kNnFilterEquipment)
                 Group = 1;
             else
                 return 0;
@@ -1030,9 +1030,9 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Ship.ShipView->CollectHpTypes(Hardpoint.Value); // FUN_00586560
         int const Filter = NnItemFilterMode(Item->ArchId);
         int Group = 0;
-        if (Filter == 0)
+        if (Filter == kNnFilterWeapons)
             Group = 0;
-        else if (Filter == 2)
+        else if (Filter == kNnFilterEquipment)
             Group = 1;
         else
             return 0;
@@ -1179,15 +1179,15 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // the ship view's info button.
         int NewMode = -1;
         if (Control == FilterCargoBay)
-            NewMode = 3;
+            NewMode = kNnFilterCargoBay;
         else if (Control == FilterWeapons)
-            NewMode = 0;
+            NewMode = kNnFilterWeapons;
         else if (Control == FilterEquipment)
-            NewMode = 2;
+            NewMode = kNnFilterEquipment;
         else if (Control == FilterCommodity)
-            NewMode = 4;
+            NewMode = kNnFilterCommodity;
         else if (Control == FilterAmmo)
-            NewMode = 1;
+            NewMode = kNnFilterAmmo;
         if (NewMode != -1)
         {
             SetMode(NewMode, true); // FUN_0047f240
@@ -1258,7 +1258,7 @@ void NnDealer::SelectDealerRow(int Row, int /*Unused*/)
     // argument's slot ([ESP+0x10]).
     bool const bFlag = TradeMode == 2 || TradeMode == 3;
     EquipDesc* const Item = GetSelectedItem(); // FUN_0047e790
-    Ship.ShowItem(Item, bFlag, Item != nullptr ? NnItemFilterMode(Item->ArchId) : 5); // FUN_004c6a50
+    Ship.ShowItem(Item, bFlag, Item != nullptr ? NnItemFilterMode(Item->ArchId) : kNnFilterNone); // FUN_004c6a50
 
     // A commodity dealer puts its partner on the cargo filter.
     if (Inventory != nullptr && TradeMode == 1 && Inventory->Mode != 4)
@@ -1381,7 +1381,7 @@ void NnDealer::RefreshMarketList()
         // while docked at a base whose market prices the good at exactly 0.0 (FCOMP 0, TEST
         // AH,0x44 + JP: only "equal" falls through to the 5).
         unsigned const ArchId = Good2Arch(Entry->Info.GoodId);
-        int Filter = 4;
+        int Filter = kNnFilterCommodity;
         if (TradeMode == 3)
             Filter = NnItemFilterMode(ArchId); // FUN_0047e460
         else
@@ -1393,7 +1393,7 @@ void NnDealer::RefreshMarketList()
                 if (BaseMarket != nullptr &&
                     static_cast<double>(ClientMarketGetPrice(BaseMarket, Arch2Good(ArchId))) ==
                         0.0)
-                    Filter = 5;
+                    Filter = kNnFilterNone;
             }
         }
 
@@ -1484,7 +1484,7 @@ bool NnDealer::CanBuyGood(unsigned GoodId)
     // The partner's weapons / equipment filters (+0x32c 0 or 2; the partner
     // is not null-tested): no hardpoint for the good at all (FUN_00585f20(GoodId, 1)) -- false.
     int const Filter = Inventory->Mode;
-    if (Filter == 0 || Filter == 2)
+    if (Filter == kNnFilterWeapons || Filter == kNnFilterEquipment)
     {
         if (Inventory->Ship.ShipView->FindHardpointForGood(GoodId, true) == nullptr)
             return false;
@@ -1982,7 +1982,7 @@ float NnDealer::GetBaseFactionFeeling()
 
         // The feeling of the player's group towards the object's
         // reputation group; a non-zero result means none, 1.0.
-        int const PlayerGroup = GetPlayerSpawnSystemIdRetail(); // FUN_004c4670, DAT_0061226c
+        int const PlayerGroup = GetPlayerRepVibeRetail(); // FUN_004c4670, DAT_0061226c
         TString<16> GroupName;
         GroupName = Object.Reputation.Data;
         unsigned const Group = Reputation::get_id(GroupName);

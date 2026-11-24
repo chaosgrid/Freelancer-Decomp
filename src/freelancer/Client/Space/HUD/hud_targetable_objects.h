@@ -113,15 +113,15 @@ static_assert(sizeof(FCameraRayHit) == 0x18, "FUN_0051dd20 result is 0x18 bytes"
 // FUN_0051ddd0 (cdecl, returns Out) -- cast a ray from the camera's position to *To through the
 // active system (PhySys::FindRayCollisions, at most 8 hits) and keep the first hit whose object
 // and root are not Ignore and whose part (the hit's +0x1c word) is not a shield part. With
-// bSkipFireBlocked, a hit whose root is a fully cloaked ship (CloakPercent >= 1.0) is passed over
+// bSkipCloaked, a hit whose root is a fully cloaked ship (CloakPercent >= 1.0) is passed over
 // too.
 // Retail keeps it with the space cameras; its only caller is FUN_0051dd20.
 FCameraRayHit* CameraRayPickTo(FCameraRayHit* Out, ICamera* Camera, Vector const* To,
-                               CObject const* Ignore, bool bSkipFireBlocked);
+                               CObject const* Ignore, bool bSkipCloaked);
 // FUN_0051dd20 (cdecl, returns Out) -- unproject the screen point through Camera, stretch the
 // direction to 1e7 and pick along it with FUN_0051ddd0. Callers: Render, PickUnderCursor.
 FCameraRayHit* CameraRayPick(FCameraRayHit* Out, ICamera* Camera, float ScreenX, float ScreenY,
-                             CObject const* Ignore, bool bSkipFireBlocked);
+                             CObject const* Ignore, bool bSkipCloaked);
 
 // The four float rectangles the ctor measures from the bar meshes (FUN_0059f0d0 extents:
 // maxX, minX, maxY, minY, maxZ, minZ).
@@ -320,8 +320,8 @@ private:
     // a caption that fails to build resets them to 0 / -1 / -1. The timer (float) runs only for
     // TypeBits 0x80 objects and drops the id after 10 s, forcing a rebuild.
     unsigned NameCacheSimpleId;                  // +0x844 0
-    int NameCacheKey848;                         // +0x848 -1 loot units
-    int NameCacheKey84c;                         // +0x84c -1 visited (1) / unvisited (0)
+    int NameCacheLootUnits;                         // +0x848 -1 loot units
+    int NameCacheVisited;                         // +0x84c -1 visited (1) / unvisited (0)
     float NameCacheTimer;                        // +0x850 0
     FFontString TargetNameText;                  // +0x854 caption, HudSmall
     FFontString TargetInfoText;                  // +0x888 caption of a player-owned ship, PlayerName

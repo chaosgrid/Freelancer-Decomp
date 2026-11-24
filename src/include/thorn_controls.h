@@ -138,6 +138,14 @@ struct IIKControl : IDAComponent
 
 // "1.11_ILightControl" -- light and scene entities. ThornScene sends the cone cutoff to slot 6
 // and the on/off flag to slot 7.
+//
+// NO RETAIL IMPLEMENTATION. ILightControl, ISubtitleControl and IUserEventControl have no
+// provider in any shipped binary: the IID strings exist only in thorn.dll, freelancer.exe's
+// Thorn objects answer E_NOINTERFACE for them, and thorn's own script engine answers only
+// IScriptEngine / IGeoTransformControl / IScriptControl ({IID, offset} table 06f5b010). In
+// retail these QIs always fail and the controls stay null. thorn.dll calls ILightControl
+// slots 3..14 and the other two interfaces' slots 3 and 4 only, so the slots after those have
+// neither a body nor a call site: their widths cannot be recovered and they keep placeholders.
 struct ILightControl : IDAComponent
 {
     virtual GENRESULT DACOM_API SetColor(int* Rgb) = 0;        // 3
@@ -151,13 +159,13 @@ struct ILightControl : IDAComponent
     virtual GENRESULT DACOM_API GetDirection(float* OutDir3) = 0; // 10
     virtual GENRESULT DACOM_API GetRange(float* OutRange) = 0;    // 11
     virtual GENRESULT DACOM_API GetCutoff(float* OutRadians) = 0; // 12
-    // 13 and 14: ThornScene reads both with a float*. Which
-    // property each returns is not recovered -- the port's callers only copy them into a
-    // light blob -- so they keep numeric names.
-    virtual GENRESULT DACOM_API GetOn(float* Out) = 0;
-    virtual GENRESULT DACOM_API GetInfinite(float* Out) = 0;
-    virtual GENRESULT DACOM_API Slot15() = 0;                  // 15 TODO
-    virtual GENRESULT DACOM_API Slot16(void* Arg) = 0;         // 16..19 TODO
+    // 13 / 14: the light GET (06f457bf..06f457e2) writes them to light props +0x20 (On) and
+    // +0x24 (Infinite), the words the SET sends to slots 7 / 8.
+    virtual GENRESULT DACOM_API GetOn(int* OutOn) = 0;
+    virtual GENRESULT DACOM_API GetInfinite(int* OutIsInfinite) = 0;
+    // 15..19: never called, never implemented (see above); widths unrecoverable.
+    virtual GENRESULT DACOM_API Slot15() = 0;
+    virtual GENRESULT DACOM_API Slot16(void* Arg) = 0;
     virtual GENRESULT DACOM_API Slot17(void* Arg) = 0;
     virtual GENRESULT DACOM_API Slot18(void* Arg) = 0;
     virtual GENRESULT DACOM_API Slot19(void* Arg) = 0;
@@ -261,9 +269,9 @@ struct ISoundControl : IDAComponent
     virtual GENRESULT DACOM_API GetAudioProps(float* Props8, int Mask) = 0;
 };
 
-// Thorn binds SubtitleControl separately from UserEventControl. Subtitle calls
-// pass a string ID; user-event calls pass a descriptor. A common foreign facet
-// has not been established by retail producer/consumer evidence.
+// "1.11_ISubtitleControl". Thorn binds it separately from UserEventControl: subtitle calls
+// pass a string ID, user-event calls a descriptor. No retail implementation (see
+// ILightControl); slots 5..15 are never called and keep placeholders.
 struct ISubtitleControl : IDAComponent
 {
     virtual GENRESULT DACOM_API ShowSubtitle(int StringId) = 0;   // 3
@@ -281,17 +289,16 @@ struct ISubtitleControl : IDAComponent
     virtual GENRESULT DACOM_API Slot15(void* Arg) = 0;
 };
 
-// Thorn requests this IID into its own UserEventControl field. The retail
-// client QI table does not establish a shared SubtitleControl/UserEventControl
-// facet; foreign providers remain unresolved.
+// "1.11_IUserEventControl", QI'd into every entity's UserEventControl field. No retail
+// implementation (see ILightControl); slots 5..15 are never called and keep placeholders.
 struct IUserEventControl : IDAComponent
 {
     virtual GENRESULT DACOM_API StartUserEvent(void* Desc) = 0; // 3
     // 4: ThornScene passes a descriptor.
     virtual GENRESULT DACOM_API StopUserEvent(void* Desc) = 0;
-    virtual GENRESULT DACOM_API Slot5() = 0;                   // 5, 6 TODO
+    virtual GENRESULT DACOM_API Slot5() = 0;
     virtual GENRESULT DACOM_API Slot6() = 0;
-    virtual GENRESULT DACOM_API Slot7(void* Arg) = 0;          // 7..15 TODO
+    virtual GENRESULT DACOM_API Slot7(void* Arg) = 0;
     virtual GENRESULT DACOM_API Slot8(void* Arg) = 0;
     virtual GENRESULT DACOM_API Slot9(void* Arg) = 0;
     virtual GENRESULT DACOM_API Slot10(void* Arg) = 0;

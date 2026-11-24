@@ -4,59 +4,6 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "common_physys.h"
-
-#include "common_archetype.h"
-#include "common_cobject.h"
-#include "common_cobjdb.h"
-#include "common_id.h"
-#include "common_universe.h"
-#include "common_net.h"
-#include "common_phyarch.h"
-#include "common_misc.h"     // SinglePlayer
-#include "common_server.h"
-
-#include "dacom.h"
-#include "DALib.h"
-#include "x86math.h"
-#include "ivp_collision/ivp_collision.h"
-#include "ivp_physics/ivp_core.h"
-#include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_environment.h"
-#include "ivp_physics/ivp_controller.h"
-#include "ivp_physics/ivp_material.h"
-#include "ivp_physics/ivp_listener.h"
-#include "ivp_physics/ivp_mindist_settings.h"
-#include "ivp_physics/ivp_mindist.h"
-#include "common_csys.h"
-#include "ivp_compact_builder/ivp_compact_ledge.h"
-#include "ivp_compact_builder/ivp_surface_builder_pointsoup.h"
-#include "ivp_compact_builder/ivp_surface_builder_ledge_soup.h"
-#include "ivp_physics/ivp_surman_polygon.h" // PhySys::PhySurfaceManager's base
-#include "ivp_collision/ivp_ray_solver.h"   // PhySys::RaySolver_MaskedSurface's base
-#include "ivp_collision/ivp_sphere_query.h"
-
-#include <assert.h>
-#include <float.h>
-#include <math.h>
-#include <new>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <map>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <mmsystem.h>
-
-// Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
-#ifdef GetCurrentTime
-#undef GetCurrentTime
-#endif
-
 #include "Physics/common_physys_internal.h"
 
 using namespace CmnPhySys;
@@ -221,7 +168,7 @@ namespace
         IVP_RealObjectConstructionTemplate Template;
         Template.set_short_name(Parms.Name);
         PhySys_FillTemplateDamping(Template, Parms);
-        Template.FlagsHi = Parms.bFlag1c;                       // +0x0c <- +0x1c
+        Template.FlagsHi = Parms.bPhysicalUnmoveable;           // +0x0c <- +0x1c
 
         // Outside single player the mass centre is pinned to the object origin: an identity
         // matrix becomes the template's override.
@@ -239,7 +186,7 @@ namespace
             PhySys_FillTemplateInertia(Template, Parms.Inertia);
 
         // A miss only reports.
-        std::map<unsigned, PhysicalSystem>::iterator SystemIt = G_PhysicalSystems.find(Parms.CollisionGroupId);
+        std::map<unsigned, PhysicalSystem>::iterator SystemIt = G_PhysicalSystems.find(Parms.SystemId);
         if (SystemIt == G_PhysicalSystems.end())
         {
             FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPhySysSource, 0x211,
@@ -329,11 +276,11 @@ void __cdecl PhySys::BuildIVP_Real(CObject* Object, CreateParms const& Parms)
         return;
     }
 
-    // The child parts get a copy without bFlag1c, with the golem-child (type 1) or default
-    // (type 2) mass and damping.
+    // The child parts get a copy without bPhysicalUnmoveable, with the golem-child (golem) or
+    // default (merged) mass and damping.
     CreateParms ChildParms = Parms;
-    ChildParms.bFlag1c = 0;
-    if (Parms.Type == 1)
+    ChildParms.bPhysicalUnmoveable = 0;
+    if (Parms.Type == PhySys::ANIM_TECHNIQUE_GOLEM)
     {
         ChildParms.Mass = GOLEM_CHILD_MASS;
         ChildParms.LinearDamping = GOLEM_CHILD_LINEAR_DAMP;
@@ -341,7 +288,7 @@ void __cdecl PhySys::BuildIVP_Real(CObject* Object, CreateParms const& Parms)
         ChildParms.AngularDamping[1] = GOLEM_CHILD_ANGULAR_DAMP.y;
         ChildParms.AngularDamping[2] = GOLEM_CHILD_ANGULAR_DAMP.z;
     }
-    else if (Parms.Type == 2)
+    else if (Parms.Type == PhySys::ANIM_TECHNIQUE_MERGED)
     {
         ChildParms.Mass = 1.0f;
         ChildParms.LinearDamping = DEFAULT_LINEAR_DAMPING;
@@ -371,7 +318,7 @@ void __cdecl PhySys::BuildIVP_Sphere(CObject* Object, float Radius, CreateParms 
     Template.set_short_name(Parms.Name);
 
     Template.MassInput = Parms.Mass;                        // +0x1c <- +0x00
-    Template.FlagsHi = Parms.bFlag1c;                       // +0x0c <- +0x1c
+    Template.FlagsHi = Parms.bPhysicalUnmoveable;           // +0x0c <- +0x1c
     Template.SpeedDampInput = Parms.LinearDamping;          // +0x38 <- +0x04
     Template.RotSpeedDampInputX = Parms.AngularDamping[0];  // +0x3c <- +0x08
     Template.RotSpeedDampInputY = Parms.AngularDamping[1];  // +0x40 <- +0x0c
@@ -380,7 +327,7 @@ void __cdecl PhySys::BuildIVP_Sphere(CObject* Object, float Radius, CreateParms 
 
     // No miss test: a miss builds into the map head node's unconstructed storage (retail
     // quirk, see PhySys_FindSystem).
-    PhysicalSystem& System = PhySys_FindSystem(Parms.CollisionGroupId);
+    PhysicalSystem& System = PhySys_FindSystem(Parms.SystemId);
 
     if (Template.Material == nullptr)
         Template.Material = G_PhySysMaterial;
@@ -431,7 +378,7 @@ namespace
 
         IVP_Merge_Object_Into_Core(ParentBody, ChildBody, -1.0f);
 
-        Child->PhysicsControlMode = 2;
+        Child->PhysicsControlMode = PhySys::ANIM_TECHNIQUE_MERGED;
     }
 
     // FUN_062847e0 (cdecl): detach Object's body from the core it shares, with DetachParms as
@@ -461,12 +408,12 @@ namespace
 
             // A ball (object_type 3) keeps its radius.
             if (Body->object_type == 3)
-                Template.Field_0x4c = Body->field_94;
+                Template.ExtraRadius = Body->extra_radius;
 
             IVP_Split_Object_From_Core(Body, &Template);
         }
 
-        Object->PhysicsControlMode = 0;
+        Object->PhysicsControlMode = PhySys::ANIM_TECHNIQUE_NONE;
     }
 
     // FUN_06284ae0 (cdecl): walk ObjId's children; an instance of another object (not null,
@@ -615,7 +562,7 @@ void __cdecl PhySys::Attach(CObject* Parent, CObject* Child)
 // the controller. Every mode ends at 0.
 void __cdecl PhySys::Detach(CObject* Object, DetachParms const& Parms)
 {
-    if (Object->PhysicsControlMode == 2)
+    if (Object->PhysicsControlMode == PhySys::ANIM_TECHNIQUE_MERGED)
     {
         FCollisionSaveList SaveList;
         PhySys_DisableCollisionsAndDetachSubtree(Object->EngineInstanceId, Object, SaveList);
@@ -642,11 +589,11 @@ void __cdecl PhySys::Detach(CObject* Object, DetachParms const& Parms)
         }
 
         PhySys_RestoreCollisionStates(SaveList);
-        Object->PhysicsControlMode = 0;
+        Object->PhysicsControlMode = PhySys::ANIM_TECHNIQUE_NONE;
         return;
     }
 
-    if (Object->PhysicsControlMode == 1)
+    if (Object->PhysicsControlMode == PhySys::ANIM_TECHNIQUE_GOLEM)
     {
         IVP_Controller* const Controller = Object->GolemController;
         if (Controller != nullptr)
@@ -654,7 +601,7 @@ void __cdecl PhySys::Detach(CObject* Object, DetachParms const& Parms)
         Object->GolemController = nullptr;
     }
 
-    Object->PhysicsControlMode = 0;
+    Object->PhysicsControlMode = PhySys::ANIM_TECHNIQUE_NONE;
 }
 
 // FUN_06345450: the body's virtual scalar deleting destructor, null-tested. Retail calls it
@@ -766,14 +713,14 @@ namespace
     {
         IVP_RealObjectConstructionTemplate Template;
         Template.set_short_name(Parms.Name);
-        // FlagsHi is 0 here (the build paths copy bFlag1c instead).
+        // FlagsHi is 0 here (the build paths copy bPhysicalUnmoveable instead).
         PhySys_FillTemplateDamping(Template, Parms);
         Template.FlagsHi = 0;
         if (Parms.bHasInertia != 0)
             PhySys_FillTemplateInertia(Template, Parms.Inertia);
 
         // A miss is not tested (retail quirk, see PhySys_FindSystem).
-        PhysicalSystem& System = PhySys_FindSystem(Parms.CollisionGroupId);
+        PhysicalSystem& System = PhySys_FindSystem(Parms.SystemId);
 
         if (Object->SurfaceManager != nullptr)
         {

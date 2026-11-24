@@ -139,14 +139,14 @@ public:
     // +0x38..0x47: filled by FUN_06358c50 / FUN_06358bb0 (IVP_PopulatePairRecordIntoOwner,
     // ivp_mindist_limiter.cpp).
     void*              Feature0;           // +0x38: tagged IVP_Compact_Edge* copy of Candidate->Feature1; mask
-                                            // `&0xfffffff0` before use, same convention as IVP_Ledge_Mindist::FeatureA/B.
+                                            // `&0xfffffff0` before use, as for IVP_Synapse_Real::edge.
     void*              Feature1;           // +0x3c: mirror of Feature0, Candidate->Feature2.
     IVP_Material*      Materials[2];       // +0x40, +0x44: per-side FUN_06358bb0 output (the object's material,
                                             // or the manager's get_material_by_index for a tagged feature).
     // +0x48 / +0x4C: per-core kinetic energy deltas across the impact system
     // (after - before), written by do_impact (FUN_06358680). No reader found.
-    float              _field48;           // +0x48
-    float              _field4c;           // +0x4C
+    float              EnergyDelta0;       // +0x48
+    float              EnergyDelta1;       // +0x4C
     // +0x50: the contact's index in the friction matrix (FUN_06368970), or 0xffff.
     int16_t            IndexInFs;          // +0x50
     int16_t            Status;             // +0x52: impact iteration count, incremented by FUN_063591a0 and passed as DoImpactSystem's ImpactCounter
@@ -181,9 +181,8 @@ public:
     float              EffectiveMassDenomRecip; // +0x68
     float              EffectiveMassDenom;      // +0x6C
     // +0x70/+0x74: each side's Objects[side]->core, or null when that core is
-    // kinematic (Flags & 0xc), set by FUN_0635a1e0. The name is legacy: these
-    // are per-side IVP_Core pointers, not "child candidates".
-    IVP_Core*          ChildCandidate[2];  // +0x70, +0x74
+    // kinematic (Flags & 0xc), set by FUN_0635a1e0.
+    IVP_Core*          ContactCores[2];    // +0x70, +0x74
     // +0x78 / +0x88: the friction basis, orthonormal with ContactNormalWS.
     // TangentAxis0 = normalize(cross(N, R)) with R = (1,0,0) when N.x*N.x < 0.9f
     // (DAT_063a53fc), else (0,0,1) (FUN_063599f0); TangentAxis1 =
@@ -198,7 +197,7 @@ public:
     // Ends exactly at the 0xD8 allocation size.
     IVP_Mindist_PadVec CoordOSCrossNormal[2]; // +0xB8 / +0xC8
 };
-static_assert(sizeof(IVP_Impact_Solver_Long_Term) >= 0xD8, "IVP_Impact_Solver_Long_Term must be at least as large as its confirmed retail fields (D-item3301 pass, 2026-09-10: FUN_0635a1e0's own operator_new(0xd8) call site confirms the real retail alloc size)");
+static_assert(sizeof(IVP_Impact_Solver_Long_Term) >= 0xD8, "IVP_Impact_Solver_Long_Term covers retail's 0xd8-byte allocation (FUN_0635a1e0)");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, SolverContactPointWS) == 0x20, "IVP_Impact_Solver_Long_Term+0x20");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, Feature0) == 0x38, "IVP_Impact_Solver_Long_Term+0x38");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, Feature1) == 0x3C, "IVP_Impact_Solver_Long_Term+0x3C");
@@ -209,7 +208,7 @@ static_assert(offsetof(IVP_Impact_Solver_Long_Term, TangentAxis1) == 0x88, "IVP_
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, CoordOS) == 0x98, "IVP_Impact_Solver_Long_Term+0x98");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, EffectiveMassDenomRecip) == 0x68, "IVP_Impact_Solver_Long_Term+0x68");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, EffectiveMassDenom) == 0x6C, "IVP_Impact_Solver_Long_Term+0x6C");
-static_assert(offsetof(IVP_Impact_Solver_Long_Term, ChildCandidate) == 0x70, "IVP_Impact_Solver_Long_Term+0x70");
+static_assert(offsetof(IVP_Impact_Solver_Long_Term, ContactCores) == 0x70, "IVP_Impact_Solver_Long_Term+0x70");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, CoordOSCrossNormal) == 0xB8, "IVP_Impact_Solver_Long_Term+0xB8");
 // Upper bound: retail allocates exactly 0xD8 bytes (rounded up here to the
 // class's 16-byte alignment).
@@ -248,15 +247,15 @@ public:
     uint8_t           _pad60[0x04];           // +0x60..0x63
     // +0x64 / +0x74 / +0x84 / +0x94: the deltas StepImpulse2 last applied,
     // read back by UndoLastStepImpulse (FUN_06357340).
-    Vector            AngularDelta0Scratch;   // +0x64: Cores[0] angular delta
+    Vector            RotSpeedDelta0;         // +0x64: Cores[0] angular delta
     uint8_t           _pad70[0x04];           // +0x70..+0x73: unconfirmed
-    Vector            RotDelta0;              // +0x74: misnamed -- Cores[1]'s ANGULAR delta
+    Vector            RotSpeedDelta1;         // +0x74: Cores[1] angular delta
     uint8_t           _pad80[0x04];           // +0x80..0x83
     Vector            SpeedDelta0;            // +0x84: Cores[0] linear delta
     uint8_t           _pad90[0x04];           // +0x90..0x93
-    Vector            RotDelta1;              // +0x94: misnamed -- Cores[1]'s LINEAR delta
+    Vector            SpeedDelta1;            // +0x94: Cores[1] linear delta
     uint8_t           _padA0[0x04];           // +0xA0..0xA3
-    Vector            SpeedDelta1;            // +0xA4: relative point speed (core 1 - core 0), UpdateRelativeSpeed
+    Vector            RelativePointSpeed;     // +0xA4: contact point speed of core 1 - core 0 (UpdateRelativeSpeed)
     uint8_t           _padB0[0x04];           // +0xB0..0xB3
     Vector            PushDirection;          // +0xB4: Normalized impulse push direction
     uint8_t           _padC0[0x04];           // +0xC0..0xC3
@@ -283,7 +282,7 @@ public:
     // from do_impact_long_term (FUN_06358d60), which passes bAllowDeferred = 1.
     void DoImpactSystem(IVP_Core* CoresOut[2], int32_t bAllowDeferred, int32_t ImpactCounter, float RescueSpeedAddon);
 
-    // FUN_06356f30: SpeedDelta1 = relative point velocity from the working
+    // FUN_06356f30: RelativePointSpeed = relative point velocity from the working
     // velocities.
     void UpdateRelativeSpeed();
 
@@ -305,7 +304,7 @@ public:
     void UpdateFrictionPushDirection();
 
     // FUN_06357120: clamps PushDirection to the elliptical friction cone.
-    // Dot = NormalVectorWS . normalize(SpeedDelta1).
+    // Dot = NormalVectorWS . normalize(RelativePointSpeed).
     void ClampPushDirectionToFrictionCone(float Dot);
 
     // FUN_063582f0: zeroes both cores' RotSpeedChange and SpeedChange.
@@ -333,11 +332,11 @@ static_assert(offsetof(IVP_Impact_Solver, RotSpeed0) == 0x24, "IVP_Impact_Solver
 static_assert(offsetof(IVP_Impact_Solver, RotSpeed1) == 0x34, "IVP_Impact_Solver+0x34");
 static_assert(offsetof(IVP_Impact_Solver, Speed0) == 0x44, "IVP_Impact_Solver+0x44");
 static_assert(offsetof(IVP_Impact_Solver, Speed1) == 0x54, "IVP_Impact_Solver+0x54");
-static_assert(offsetof(IVP_Impact_Solver, AngularDelta0Scratch) == 0x64, "IVP_Impact_Solver+0x64");
-static_assert(offsetof(IVP_Impact_Solver, RotDelta0) == 0x74, "IVP_Impact_Solver+0x74");
+static_assert(offsetof(IVP_Impact_Solver, RotSpeedDelta0) == 0x64, "IVP_Impact_Solver+0x64");
+static_assert(offsetof(IVP_Impact_Solver, RotSpeedDelta1) == 0x74, "IVP_Impact_Solver+0x74");
 static_assert(offsetof(IVP_Impact_Solver, SpeedDelta0) == 0x84, "IVP_Impact_Solver+0x84");
-static_assert(offsetof(IVP_Impact_Solver, RotDelta1) == 0x94, "IVP_Impact_Solver+0x94");
-static_assert(offsetof(IVP_Impact_Solver, SpeedDelta1) == 0xA4, "IVP_Impact_Solver+0xA4");
+static_assert(offsetof(IVP_Impact_Solver, SpeedDelta1) == 0x94, "IVP_Impact_Solver+0x94");
+static_assert(offsetof(IVP_Impact_Solver, RelativePointSpeed) == 0xA4, "IVP_Impact_Solver+0xA4");
 static_assert(offsetof(IVP_Impact_Solver, PushDirection) == 0xB4, "IVP_Impact_Solver+0xB4");
 static_assert(offsetof(IVP_Impact_Solver, FrictionImpulse) == 0xC4, "IVP_Impact_Solver+0xC4");
 static_assert(offsetof(IVP_Impact_Solver, UseFrictionConeBlend) == 0xD4, "IVP_Impact_Solver+0xD4");
@@ -392,15 +391,17 @@ struct IVP_Contact_Point
     void* Prev1; // +0x0C
     IVP_Real_Object* Object1;       // +0x10: one of the mindist's two objects, picked by StateFlags bit 0x100
     int16_t Delta1;                 // +0x14: self-relative link, base(this+0x8) to record base (always -0x8)
-    uint16_t _hash1;                 // +0x16: XOR-combined with side 1's shape type low byte at construction; purpose unknown
-    void* Feature1;                  // +0x18: tagged IVP_Compact_Edge* copy (Mindist->FeatureA/FeatureB, side-1-matched)
+    // +0x16: low byte = side 1's synapse status (shape type) at construction,
+    // read as a signed byte; the high byte is kept.
+    uint16_t Status1;                // +0x16
+    void* Feature1;                  // +0x18: tagged IVP_Compact_Edge* copy (side 1's synapse edge)
 
     // Node #2: mirror of node #1 for Object2.
     void* Next2; // +0x1C
     void* Prev2; // +0x20
     IVP_Real_Object* Object2;       // +0x24
     int16_t Delta2;                  // +0x28: self-relative link (always -0x1c)
-    uint16_t _hash2;                  // +0x2A: mirror of _hash1
+    uint16_t Status2;                 // +0x2A: mirror of Status1
     void* Feature2;                   // +0x2C: mirror of Feature1, other side
 
     // +0x30: 1 / reduced effective mass of the two cores (FUN_063562d0, via
@@ -425,8 +426,10 @@ struct IVP_Contact_Point
     // +0x48: zeroed at construction; the friction-cone clamp accumulates
     // (len - cone) * pressure * coefficient into it.
     float FrictionCorrection;    // +0x48
-    float _field4c;              // +0x4C: computed at construction only when side 2 is a polygon: 1.0f / FUN_06347e60()
-                                 // over the masked feature (FUN_0635b940). Otherwise left uninitialized, as in retail.
+    // +0x4C: 1 / |unnormalised face normal| of side 2, set at construction only
+    // when side 2 is a face (status 2); otherwise left uninitialized, as in
+    // retail. Scales the point-face hesse normal (FUN_06359850).
+    float InvFaceNormalLength;   // +0x4C
     // +0x50: zeroed at construction; FUN_06354120's running tangential work.
     float TangentWork;           // +0x50
     // +0x54: zeroed at construction; the solved friction impulse times
@@ -438,7 +441,11 @@ struct IVP_Contact_Point
     float GapDistance;           // +0x58
     int16_t _const5c;             // +0x5C: always 0x14 (20) at construction, no other writer found
     uint8_t _pad5e[0x02];         // +0x5E..0x5F: unconfirmed
-    uint32_t _flags60;            // +0x60: ctor forces bit0 = 1 and keeps the rest uninitialized; semantics unknown
+    // +0x60: low byte 1 = test the contact against its feature on the next
+    // contact-frame pass (and flag the owner's friction broken when it lies
+    // outside); the pass clears the byte. Set to 1 by the ctor, the friction-cone
+    // clamp and FUN_0635a1e0's shape-type-3 case. The upper bytes are never used.
+    uint32_t RecheckFeatureFlags;  // +0x60
     // +0x64: zeroed at construction. The friction solver's push counter:
     // FUN_063687b0 sets it to -1 / decrements it while the solved impulse is
     // positive, zeroes it on zero, and counts it up (wrapping past 9 to 0)
@@ -448,8 +455,8 @@ struct IVP_Contact_Point
     // +0x68/+0x6C: when this record last ran a contact-frame pass, a copy of
     // the environment's split current_time. Seeded from ObjectA's environment
     // at construction; FUN_0635a1e0 takes dt from it and restamps it.
-    float _envTick68;             // +0x68
-    float _envTick6c;             // +0x6C
+    float LastRecalcTimeBase;     // +0x68
+    float LastRecalcTimeOffset;   // +0x6C
     // +0x70: the IVP_ListManager this record is threaded onto (InsertCtx);
     // zeroed at construction.
     IVP_ListManager* ListManagerOwner; // +0x70
@@ -502,18 +509,18 @@ static_assert(offsetof(IVP_Contact_Point, FrictionCoefficient) == 0x44, "IVP_Con
 static_assert(offsetof(IVP_Contact_Point, FrictionCorrection) == 0x48, "IVP_Contact_Point+0x48");
 static_assert(offsetof(IVP_Contact_Point, TangentWork) == 0x50, "IVP_Contact_Point+0x50");
 static_assert(offsetof(IVP_Contact_Point, NowFrictionPressure) == 0x54, "IVP_Contact_Point+0x54");
-static_assert(offsetof(IVP_Contact_Point, _field4c) == 0x4C, "IVP_Contact_Point+0x4C");
+static_assert(offsetof(IVP_Contact_Point, InvFaceNormalLength) == 0x4C, "IVP_Contact_Point+0x4C");
 static_assert(offsetof(IVP_Contact_Point, GapDistance) == 0x58, "IVP_Contact_Point+0x58");
 static_assert(offsetof(IVP_Contact_Point, _const5c) == 0x5C, "IVP_Contact_Point+0x5C");
-static_assert(offsetof(IVP_Contact_Point, _flags60) == 0x60, "IVP_Contact_Point+0x60");
+static_assert(offsetof(IVP_Contact_Point, RecheckFeatureFlags) == 0x60, "IVP_Contact_Point+0x60");
 static_assert(offsetof(IVP_Contact_Point, HasNegativePullSince) == 0x64, "IVP_Contact_Point+0x64");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, IndexInFs) == 0x50, "IVP_Impact_Solver_Long_Term+0x50");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, FrictionIsBroken) == 0x55, "IVP_Impact_Solver_Long_Term+0x55");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, FrictionInfos) == 0x58, "IVP_Impact_Solver_Long_Term+0x58");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, HasNegativePullSince) == 0x60, "IVP_Impact_Solver_Long_Term+0x60");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, GapDistance) == 0x64, "IVP_Impact_Solver_Long_Term+0x64");
-static_assert(offsetof(IVP_Contact_Point, _envTick68) == 0x68, "IVP_Contact_Point+0x68");
-static_assert(offsetof(IVP_Contact_Point, _envTick6c) == 0x6C, "IVP_Contact_Point+0x6C");
+static_assert(offsetof(IVP_Contact_Point, LastRecalcTimeBase) == 0x68, "IVP_Contact_Point+0x68");
+static_assert(offsetof(IVP_Contact_Point, LastRecalcTimeOffset) == 0x6C, "IVP_Contact_Point+0x6C");
 static_assert(offsetof(IVP_Contact_Point, ListManagerOwner) == 0x70, "IVP_Contact_Point+0x70");
 
 // ---------------------------------------------------------------------------
@@ -565,9 +572,9 @@ struct IVP_ListManager_CorePairEntry
     // restamps it.
     IVP_Time LastImpactTime = { -1000.0f, 0.0f }; // +0x1c / +0x20
     // +0x24: the per-pair energy budget (a float): scaled by
-    // Environment->field_120 per tick (IVP_ListManager_TickCorePairBudget),
+    // Environment->integrated_energy_damp per tick (IVP_ListManager_TickCorePairBudget),
     // grown by RecalcAllContactPoints.
-    float _field24 = 0.0f;
+    float IntegratedAntiEnergy = 0.0f;
 
     // +0x28/+0x2c: written by FindOrAttachCorePairEntry right after
     // construction, not by the ctor.
@@ -581,7 +588,7 @@ struct IVP_ListManager_CorePairEntry
 static_assert(sizeof(IVP_ListManager_CorePairEntry) == 0x30, "retail operator_new(0x30), FUN_0634b900/FUN_06356240");
 static_assert(offsetof(IVP_ListManager_CorePairEntry, MergeCacheCountdown) == 0x18, "IVP_ListManager_CorePairEntry+0x18");
 static_assert(offsetof(IVP_ListManager_CorePairEntry, LastImpactTime) == 0x1C, "IVP_ListManager_CorePairEntry+0x1C");
-static_assert(offsetof(IVP_ListManager_CorePairEntry, _field24) == 0x24, "IVP_ListManager_CorePairEntry+0x24");
+static_assert(offsetof(IVP_ListManager_CorePairEntry, IntegratedAntiEnergy) == 0x24, "IVP_ListManager_CorePairEntry+0x24");
 static_assert(offsetof(IVP_ListManager_CorePairEntry, CoreA) == 0x28, "IVP_ListManager_CorePairEntry+0x28");
 static_assert(offsetof(IVP_ListManager_CorePairEntry, CoreB) == 0x2C, "IVP_ListManager_CorePairEntry+0x2C");
 
@@ -665,7 +672,7 @@ class IVP_ListManager : public IVP_Controller_Dependent
 {
 public:
     // +0x04: the ctor's argument. The friction solver reads its arena (+0xa0)
-    // and field_c4 through it.
+    // and gravity_length through it.
     IVP_Environment* Environment;     // +0x04
     IVP_Friction_Sys_Static StaticFsHandle; // +0x08 vptr / +0x0c back pointer
     IVP_Friction_Sys_Energy EnergyFsHandle; // +0x10 vptr / +0x14 back pointer
@@ -714,7 +721,7 @@ public:
 
     // FUN_0634b7d0: re-runs the contact frame of every dist (FUN_0635a1e0) and
     // adds the pressure-weighted gap closure of each core pair, when positive,
-    // into that pair's _field24.
+    // into that pair's IntegratedAntiEnergy.
     void RecalcAllContactPoints();
 
     // FUN_0634b9a0: insert at the head of CtxListHead; stamps
@@ -805,7 +812,7 @@ public:
     double MaxEnergyGain() const;
 };
 #pragma pack(pop)
-static_assert(sizeof(IVP_ListManager) == 0x4c, "retail operator_new(0x4c), FUN_0634b600/item 2992");
+static_assert(sizeof(IVP_ListManager) == 0x4c, "retail operator new(0x4c), FUN_06356bc0 (ctor FUN_0634b600)");
 static_assert(offsetof(IVP_ListManager, Environment) == 0x04, "IVP_ListManager+0x04");
 static_assert(offsetof(IVP_ListManager, ComplexNotNecessaryNumber) == 0x40, "IVP_ListManager+0x40");
 static_assert(offsetof(IVP_ListManager, StaticFsHandle) == 0x08, "IVP_ListManager+0x08 static handle (vtable 063a5500)");

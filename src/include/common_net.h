@@ -230,12 +230,15 @@ static_assert(sizeof(MarshalBuffer) == 0x18, "MarshalBuffer size");
 // STATE_MACHINE_EVENT_TYPE enum
 // ---------------------------------------------------------------------------
 
+// Enter goes to the new state after a change (and from start / add_state_machine), Exit to
+// the old state before it; Message is SMMessage's type, Controller SMControllerEvent's.
+// is_user_event() is type >= 4.
 enum STATE_MACHINE_EVENT_TYPE
 {
     SMET_None           = 0,
-    SMET_Tick           = 1,
-    SMET_Message         = 2,
-    SMET_UserEvent      = 3,
+    SMET_Enter          = 1,
+    SMET_Exit           = 2,
+    SMET_Message        = 3,
     SMET_Controller     = 4,
 };
 
@@ -784,9 +787,9 @@ private:
     friend struct ::FCliAsteroidExclusionInline;
 
     // Private in retail (AAE): ?is_cliasteroid_excluded@...@AAE_NABVVector@@PAM@Z etc.
-    bool is_cliasteroid_excluded(const Vector& Pos, float* OutDist);
-    bool is_cmnasteroid_excluded(const Vector& Pos, float* OutDist);
-    bool is_billboard_excluded(const Vector& Pos, float* OutDist);
+    bool is_cliasteroid_excluded(const Vector& Pos, float* OutFrequency);
+    bool is_cmnasteroid_excluded(const Vector& Pos, float* OutFrequency);
+    bool is_billboard_excluded(const Vector& Pos, float* OutDensity);
     bool is_dynamic_asteroid_excluded(const Vector& Pos);
 
     unsigned char           ZonesAllocator;       // +0x04 VC6 vector allocator byte, never read
@@ -825,7 +828,7 @@ public:
 
     NebulaExclusionZone* back();
     bool is_in_exclusion_zone(const Vector& Pos, NebulaExclusionZone** OutZone,
-                              float* OutDist, bool Flag);
+                              float* OutImmersion, bool bNearOnly);
     void set_max_distance(float Dist);
 
 private:

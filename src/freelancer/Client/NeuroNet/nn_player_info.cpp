@@ -6,7 +6,7 @@
 
 #include "NeuroNet/nn_player_info.h"
 
-#include "Interface/Pages/character_select_equip.h" // GetPlayerSpawnSystemIdRetail (FUN_004c4670, the player's
+#include "Interface/Pages/character_select_equip.h" // GetPlayerRepVibeRetail (FUN_004c4670, the player's
                                     // vibe DAT_0061226c), GetPlayerVisitFlagsRetail
                                     // (FUN_004c4da0), SetPlayerVisitFlagsRetail (FUN_004c4e00)
 #include "Core/game_options.h"           // GetGameOption (FUN_005792b0)
@@ -30,6 +30,7 @@
                                     // (FUN_0043d2a0), Win3DGetCamera (DAT_0067dbf8)
 #include "Interface/win3d_immediate.h"        // Win3DBegin / Win3DVertex3f / Win3DEnd / ...
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "DALib.h"
 #include "render/IRenderPipeline.h"
@@ -94,7 +95,7 @@ namespace
         unsigned Affiliation = 0xffffffffu;
         if (!SinglePlayer())
         {
-            int const PlayerVibe = GetPlayerSpawnSystemIdRetail(); // FUN_004c4670
+            int const PlayerVibe = GetPlayerRepVibeRetail(); // FUN_004c4670
             Reputation::Vibe::GetAffiliation(PlayerVibe, Affiliation, false);
         }
         return Affiliation;
@@ -403,15 +404,7 @@ bool NnPlayerInfo::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 
     // No parent test.
     Win3DReparent(this, nullptr); // FUN_0059dd00
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child); // FUN_0043d2a0
-        Child = Next;
-    }
-    Destroy();
-    delete this;
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
     return true;
 }
 
@@ -682,7 +675,7 @@ void NnPlayerInfo::ShowFactionInfocard(int Row)
 
     RenderDisplayList Card;
     {
-        StyleNode Style(0x9ca4);
+        StyleNode Style(kTextStyleBody);
         RdlAppendNode(Card, Style.Clone()); // vt+0x1c, FUN_0046ea00
     }
     LoadIdsIntoRdl(InfoCard, Card);        // FUN_0057da40

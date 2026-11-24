@@ -108,7 +108,7 @@ struct FGfScript
     // FUN_0044f720 (thiscall, RET 0x2c) -- bind the engine and play: spawn, the sound events,
     // IScriptEngine slots 20 (loop), 22 (start) and 26 (clock 0).
     void Start(IScriptEngine* InEngine, char const* InScriptFile, int InBindMode,
-               unsigned char bInLoop, unsigned char bInField55, unsigned char bInApplySpatial,
+               unsigned char bInLoop, unsigned char bInOwnScript, unsigned char bInApplySpatial,
                int InPriority, unsigned char bInFade, char const* InName,
                unsigned char bInPropsToRoom, unsigned char bInSoundsUseFade);
     // FUN_0044f7f0 (thiscall, RET 4) -- advance the clock by Ms (or run out a paused script);
@@ -166,9 +166,10 @@ struct FGfScript
     int SpawnedCount;                 // +0x4c
     int BindMode;                     // +0x50 how a DEFORMABLE's actor is found (FUN_0044e870)
     unsigned char bLoop;              // +0x54 IScriptEngine slot 20
-    unsigned char Field_0x55;         // +0x55 TODO: meaning not recovered; handed to
-                                      //       CharacterObject FUN_004454e0 by the spawn and to
-                                      //       FUN_00445540 by Thorn_Deformable's slot 14
+    unsigned char bOwnScript;         // +0x55 a character's own script (FUN_00445340); handed
+                                      //       to CharacterObject FUN_004454e0 by the spawn (the
+                                      //       own script is kept) and to FUN_00445540 by
+                                      //       Thorn_Deformable's slot 14 (it is let go)
     unsigned char bApplySpatial;      // +0x56 1: the spawn writes each entity's initial pose
     unsigned char Pad57;
     int Priority;                     // +0x58 camera pool priority ("priority" of the SCENE)
@@ -180,7 +181,7 @@ struct FGfScript
     unsigned char bPlayerActor;       // +0x61 a DEFORMABLE bound the player
     unsigned char Pad62[2];
     Csys PlayerCsys;                  // +0x64 that DEFORMABLE's character frame (FUN_00452e40)
-    float PlayerField94;              // +0x94 TODO: the character's slot 4 (+0x10) float
+    float PlayerFloorHeight;          // +0x94 the character's RoomObject floor height (slot 4)
     void* PlayerDeformInstance;       // +0x98 FUN_00452eb0
     FCharacterObject* PlayerCharacter; // +0x9c
     char* Name;                       // +0xa0 malloc'd (FUN_0044f720)
@@ -246,7 +247,7 @@ struct FGfScriptSequence
     // from the file when none is given. No capacity check (retail).
     void AddScript(char const* File, int InKind, Csys const* InFrame, IScriptEngine* InEngine);
     // FUN_00454f30 (thiscall, RET 0x14) -- +0xc8..+0xd0 and the two text blocks.
-    void SetDialog(int A, int B, int C, FmtStr const& TextA, FmtStr const& TextB);
+    void SetDialog(int InOfferType, int InOfferId, int InOfferKind, FmtStr const& TextA, FmtStr const& TextB);
     // FUN_00454f80 -- play: the setup (FUN_00455290), the first script, active.
     void Play();
     // FUN_00454fb0 (thiscall, RET 4) -- start entry Index.
@@ -307,7 +308,7 @@ struct FGfScriptSequence
 
     int BindMode;                  // +0x00 -> FGfScript +0x50
     unsigned char bLoop;           // +0x04 -> FGfScript +0x54
-    unsigned char Field_0x05;      // +0x05 -> FGfScript +0x55
+    unsigned char bOwnScript;      // +0x05 1 for a character's own script -> FGfScript +0x55
     unsigned char bLetterbox;      // +0x06 1: letterbox / cursor / hotspot lock around playback
     unsigned char bFade;           // +0x07 -> FGfScript +0x5d
     unsigned char bApplySpatial;   // +0x08 1 -> FGfScript +0x56
@@ -337,7 +338,7 @@ struct FGfScriptSequence
     unsigned char bPlayerSaved;    // +0x30 the player character's pose below was saved
     unsigned char Pad31[3];
     Csys PlayerCsys;               // +0x34 FGfScript +0x64
-    float PlayerField64;           // +0x64 FGfScript +0x94
+    float PlayerFloorHeight;       // +0x64 FGfScript +0x94
     void* PlayerDeformInstance;    // +0x68 FGfScript +0x98
     FCharacterObject* PlayerCharacter; // +0x6c FGfScript +0x9c
     float CameraPos[3];            // +0x70 the room camera at Setup
@@ -359,8 +360,8 @@ struct FGfScriptSequence
                                    //       NN_OfferDialog type and text (FUN_00455850); 3 is
                                    //       the multiplayer group offer (FUN_004559b0 /
                                    //       FUN_00455fc0)
-    int OfferArg;                  // +0xcc IServer::MissionResponse argument 0 (FUN_004559b0)
-    int OfferMissionId;            // +0xd0 IServer::MissionResponse MissionId (FUN_004559b0)
+    int OfferId;                   // +0xcc IServer::MissionResponse offer id (FUN_004559b0)
+    int OfferKind;                 // +0xd0 its pub::Controller::EMissionOfferKind
     FmtStr DialogTextA;            // +0xd4 the offer text of types 1, 3, 4
     FmtStr DialogTextB;            // +0xec the offer text of type 2; the info text (kind 4)
     unsigned char bOfferShown;     // +0x104 the kind-1 NN_OfferDialog is up

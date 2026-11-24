@@ -4,61 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "common_physys.h"
-
-#include "common_archetype.h"
-#include "common_cobject.h"
-#include "common_cobjdb.h"   // IObjDB::GetZoneDb (PhySys::GenerateCollisions)
-#include "common_id.h"
-#include "common_universe.h" // Universe::ISystem (PhySys::GenerateCollisions)
-#include "common_net.h"
-#include "common_phyarch.h"
-#include "common_misc.h"     // SinglePlayer
-#include "common_server.h"
-
-#include "dacom.h"
-#include "DALib.h"
-#include "x86math.h"
-#include "ivp_collision/ivp_collision.h"
-#include "ivp_physics/ivp_core.h"
-#include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_environment.h"
-#include "ivp_physics/ivp_controller.h"
-#include "ivp_physics/ivp_material.h"
-#include "ivp_physics/ivp_listener.h"
-#include "ivp_physics/ivp_mindist_settings.h"
-#include "ivp_physics/ivp_mindist.h"
-#include "common_csys.h"  // Acquire3DMathEngine
-#include "ivp_compact_builder/ivp_compact_ledge.h"
-#include "ivp_compact_builder/ivp_surface_builder_pointsoup.h"
-#include "ivp_compact_builder/ivp_surface_builder_ledge_soup.h"
-#include "ivp_physics/ivp_surman_polygon.h"
-#include "ivp_collision/ivp_ray_solver.h"
-#include "ivp_collision/ivp_sphere_query.h"
-#include "ivp_utility/ivp_core_trap.h"      // IVP_CoreTrap -- retail's `MOV [0],0`
-
-#include <assert.h>
-#include <float.h>
-#include <math.h>
-#include <new>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <map>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <mmsystem.h>
-
-// Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
-#ifdef GetCurrentTime
-#undef GetCurrentTime
-#endif
-
 #include "Physics/common_physys_internal.h"
+#include "ivp_utility/ivp_core_trap.h"      // IVP_CoreTrap -- retail's `MOV [0],0`
 
 using namespace CmnPhySys;
 
@@ -313,14 +260,14 @@ namespace
 {
     // FUN_062842e0 (cdecl): the radius of Object's own body. False without a body. A body with
     // a phantom controller answers true and leaves *OutRadius alone. Otherwise *OutRadius =
-    // field_94 + the shape radius: object_type 2 asks the surface manager for the radius around
+    // extra_radius + the shape radius: object_type 2 asks the surface manager for the radius around
     // its mass centre, object_type 3 takes |shift_core_f_object|.
     bool PhySys_GetBodyRadius(CObject const* Object, float* OutRadius)
     {
         IVP_Real_Object* const Body = Object->BodyPtr;
         if (Body == nullptr)
             return false;
-        if (Body->first_child != nullptr)
+        if (Body->controller_phantom != nullptr)
             return true;
 
         float ShapeRadius = 0.0f;
@@ -347,7 +294,7 @@ namespace
             IVP_CoreTrap();
         }
 
-        *OutRadius = (float)((double)(Body->field_94) + ShapeRadius);
+        *OutRadius = (float)((double)(Body->extra_radius) + ShapeRadius);
         return true;
     }
 
@@ -368,7 +315,7 @@ namespace
         uint32_t ObjectSlot = (uint32_t)(uintptr_t)Object; // its low byte is the flag
         switch (Object->PhysicsControlMode)
         {
-        case 0:
+        case PhySys::ANIM_TECHNIQUE_NONE:
             // With phantoms attached the body radius, else the core's.
             if (!Object->Phantoms.empty())
             {
@@ -381,14 +328,14 @@ namespace
                 ObjectSlot &= ~0xffu;
             }
             break;
-        case 1:
+        case PhySys::ANIM_TECHNIQUE_GOLEM:
             if (bIncludeChildren)
                 Radius = Object->BodyPtr->get_upper_limit_radius();
             else
                 Radius = 0.0f;
             ObjectSlot &= ~0xffu;
             break;
-        case 2:
+        case PhySys::ANIM_TECHNIQUE_MERGED:
             if ((uint8_t)UseHullSlot != 0)
             {
                 PhySys_GetBodyRadius(Object, &Radius);
@@ -566,11 +513,11 @@ namespace
             FTransform ChildNew;
             Math->MulTransform(ChildNew, *NewXform, Relative);
 
-            if (ChildObject->PhysicsControlMode == 1)
+            if (ChildObject->PhysicsControlMode == PhySys::ANIM_TECHNIQUE_GOLEM)
             {
                 PhySys_BeamObject(ChildObject, &ChildNew, bOptimize);
             }
-            else if (ChildObject->PhysicsControlMode == 2)
+            else if (ChildObject->PhysicsControlMode == PhySys::ANIM_TECHNIQUE_MERGED)
             {
                 PhySys_ObjectTransform(ChildObject) = ChildNew;
                 PhySys_UpdateJointedChildren(ChildInstance, ChildObject);

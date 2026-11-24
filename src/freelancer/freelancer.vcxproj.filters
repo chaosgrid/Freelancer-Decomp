@@ -399,9 +399,6 @@
     <ClCompile Include="Client\Space\space_dust.cpp">
       <Filter>Space</Filter>
     </ClCompile>
-    <ClCompile Include="Client\Space\space_scene_draw.cpp">
-      <Filter>Space</Filter>
-    </ClCompile>
     <ClCompile Include="Client\Space\space_scene_obj_draw.cpp">
       <Filter>Space</Filter>
     </ClCompile>
@@ -416,9 +413,6 @@
     </ClCompile>
     <ClCompile Include="Client\Space\space_solar_world.cpp">
       <Filter>Space</Filter>
-    </ClCompile>
-    <ClCompile Include="Client\Common\Graphics\scene_render_registry.cpp">
-      <Filter>Common\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Client\Space\space_state.cpp">
       <Filter>Space</Filter>
@@ -614,9 +608,6 @@
     </ClCompile>
     <ClCompile Include="Client\Core\perf_options.cpp">
       <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Client\Interface\menu_ui_draw.cpp">
-      <Filter>Interface</Filter>
     </ClCompile>
     <ClCompile Include="Client\Interface\menu_ui_widgets.cpp">
       <Filter>Interface</Filter>
@@ -1097,12 +1088,6 @@
     <ClInclude Include="Client\Common\Graphics\part_cache.h">
       <Filter>Common\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Client\Space\Effects\space_client_objects_fx.h">
-      <Filter>Space\Effects</Filter>
-    </ClInclude>
-    <ClInclude Include="Client\Space\Effects\ship_space_supt_fx.h">
-      <Filter>Space\Effects</Filter>
-    </ClInclude>
     <ClInclude Include="Client\Interface\menu_keymap_config.h">
       <Filter>Interface</Filter>
     </ClInclude>
@@ -1113,9 +1098,6 @@
       <Filter>Interface\Pages</Filter>
     </ClInclude>
     <ClInclude Include="Client\Space\space_dust.h">
-      <Filter>Space</Filter>
-    </ClInclude>
-    <ClInclude Include="Client\Space\space_scene_draw.h">
       <Filter>Space</Filter>
     </ClInclude>
     <ClInclude Include="Client\Space\space_scene_obj_draw.h">
@@ -1130,9 +1112,6 @@
     <ClInclude Include="Client\Space\space_scene_load.h">
       <Filter>Space</Filter>
     </ClInclude>
-    <ClInclude Include="Client\Common\Graphics\scene_render_registry.h">
-      <Filter>Common\Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="Client\Space\space_state.h">
       <Filter>Space</Filter>
     </ClInclude>
@@ -1144,9 +1123,6 @@
     </ClInclude>
     <ClInclude Include="Client\Network\intro_connect.h">
       <Filter>Network</Filter>
-    </ClInclude>
-    <ClInclude Include="Client\Interface\menu_ui_draw.h">
-      <Filter>Interface</Filter>
     </ClInclude>
     <ClInclude Include="Client\Interface\menu_ui_widgets.h">
       <Filter>Interface</Filter>
@@ -1497,9 +1473,6 @@
       <Filter>Space\Effects</Filter>
     </ClInclude>
     <ClInclude Include="Client\Space\Effects\client_fuse.h">
-      <Filter>Space\Effects</Filter>
-    </ClInclude>
-    <ClInclude Include="Client\Space\Effects\space_hud_comm_target_fx.h">
       <Filter>Space\Effects</Filter>
     </ClInclude>
     <ClInclude Include="Client\Space\cli_nebula.h">

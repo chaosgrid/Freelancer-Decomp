@@ -39,7 +39,7 @@ class FaceBehavior : public Behavior
 {
 public:
     // Retail's ctor argument is the behavior type id (15, "Face"), pushed by the factory out of
-    // the descriptor's +0x04 -- see Behavior::GetTypeId() in common_behavior.h.
+    // the descriptor's +0x04 -- see Behavior::TypeId in common_behavior.h.
     explicit FaceBehavior(int InTypeId);
 
     // ------------------------------------------------------------------
@@ -60,22 +60,22 @@ public:
     // ------------------------------------------------------------------
 
     // FUN_062c8a30 (called by the slot-0 thunk FUN_062c8a10): set_pointer(nullptr) on
-    // +0xf4 (SubObjectB's watcher), +0x7c (SubObjectA's), +0x30 (Watcher30), then
+    // +0xf4 (Face's watcher), +0x7c (Move's), +0x30 (Watcher30), then
     // FUN_062d2080.
     ~FaceBehavior() override;
 
     // Slot 1, LAB_062c8ac0. The binder; on success SetContext(Param1, Param3, Param2) on
-    // SubObjectB and SubObjectC (not SubObjectA), then
-    // Field1cc = Behavior_InvokeManagerSlotF0(ThreatSourcePtr14, 0, 1.0f) (FUN_062e5b20).
+    // Face and Afterburner (not Move), then
+    // Field1cc = Behavior_GetAngularSpeedXY(OwnerContext, 0, 1.0f) (FUN_062e5b20).
     bool SetContext(void* Param1, void* Param2, void* Param3) override;
 
     // Slot 3, FUN_062c9320: Behavior::OnEngage (FUN_062d20d0), zeroes
     // Flag1c5/EngineKillStateElapsed/Flag1b4/FaceAxisX/Y/Z/AfterburnerElapsed,
-    // SetCruiseLock(0, 3), and FUN_062e91d0(NavHelperPtr24+0x18, Flag1c4 == 0).
+    // SetAvoidanceAllowed(0, 3), and FUN_062e91d0(SysMgr+0x18, bKillEngine == 0).
     void OnEngage() override;
 
-    // Slot 4, FUN_062c9380. Clears Watcher30 unless Flags28 bit 0x2; Commit() on SubObjectB
-    // and SubObjectC (afterburner off); then FUN_062d20f0 (Behavior::OnDisengage).
+    // Slot 4, FUN_062c9380. Clears Watcher30 unless Flags28 bit 0x2; Commit() on Face
+    // and Afterburner (afterburner off); then FUN_062d20f0 (Behavior::OnDisengage).
     void OnDisengage() override;
 
     // Slot 5, LAB_062c8c10 (RET 4, argument unread). Fast path: Flags28 bit 0x2,
@@ -95,7 +95,7 @@ public:
     // Slot 7: IBehaviorManager::UpdateBehaviorTick dispatches through vtable +0x1c.
     int OnUpdate() override { return Update(); }
 
-    // Slot 10, LAB_062c8b30. Reads Message->+0x44 into Flag1c4 and Message->+0xc (kind 1..4)
+    // Slot 10, LAB_062c8b30. Reads the DirectiveFaceOp's bKillEngine and Mode (kind 1..4)
     // into TargetKind2c: kind 1 re-points Watcher30 at FUN_062e74a0's result; kind 2 copies
     // a Vector from +0x14 into TargetPosition5c; kind 3 a Matrix from +0x20 into
     // OrientMatrix38; kind 4 only sets the flag. Reached cases set Flags28 bit 0x2 and return
@@ -131,28 +131,8 @@ public:
 
 public:
     // ------------------------------------------------------------------
-    // Fields, ascending offset; +0x04..+0x29 is Behavior's shared prefix. Retail size 0x1dc.
+    // Fields, ascending offset; +0x04..+0x29 is Behavior's. Retail size 0x1dc.
     // ------------------------------------------------------------------
-    int TypeId;                  // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
-    unsigned CachedHandle08;     // +0x08, the binder's Param1->get_id() (an object id)
-    int ModeSelector0xc;         // +0x0c, OnEvaluateReadiness's result.
-    int UpdateResult10;          // +0x10. Update()'s own tri-state result.
-    void* ThreatSourcePtr14;     // +0x14. Set by SetContext() (Param1).
-    IObjDB* ObjectDb;
-    float DeltaTime1c;            // +0x1c. Per-tick delta stored by the manager.
-    // +0x20, the binder's Param2. An IBehaviorManager: set_direction passes it as the
-    // receiver of FUN_062d4b20 (get_turn_sensitivity_factor, .text:062c9432), and
-    // .text:062c8c77 walks its +0x0c (Pathfind).
-    IBehaviorManager* BehaviorMgrPtr20;
-    // +0x24, the binder's Param3, the SystemManager. Update() reads its ExternalIface
-    // (+0x1580, .text:062c8e0a), passes its Thrust (+0x18) to FUN_062e92e0, refreshes its
-    // SelfTarget cache (+0x14fc+0xc/+0x18/+0x7e) and reads PersonalityData.EngineKillParams
-    // (+0x16d4..+0x16e4).
-    SystemManager* NavHelperPtr24;
-    unsigned char Flags28;       // +0x28. Bit 0x2 = "have a valid target" (set/cleared by
-                                  // ApplyTargetMessage(), tested by SetModeFromFlags()/Disengage()).
-    unsigned char Flag29;        // +0x29. Tested by SetModeFromFlags() (forces mode 3 either path).
-    unsigned char Pad2a[0x2c - 0x2a];
 
     int TargetKind2c;             // +0x2c. Zeroed by ctor. "Target kind" selector (1=watched-object
                                    // candidate, 2=fixed Vector, 3=fixed Matrix, 4=flag-only) --
@@ -165,11 +145,11 @@ public:
 
     // +0x68. Unlike the sibling behaviors, SetContext/OnDisengage never call it; only the
     // dtor clears its watcher (+0x7c).
-    MoveIdea SubObjectA;    // +0x68.
-    FaceIdea SubObjectB;    // +0xe0.
+    MoveIdea Move;    // +0x68.
+    FaceIdea Face;    // +0xe0.
     // +0x1a0 (ctor .text:062c8934). Slot 0 in SetContext (.text:062c8b08), slot 4 in
     // OnDisengage (062c93b5) and Update (062c8f16), slot 1 in Update (062c8ec5).
-    AfterburnerIdea SubObjectC;
+    AfterburnerIdea Afterburner;
     unsigned char Flag1b4;          // +0x1b4. Zeroed by ctor. Read/written directly by Update()
                                      // and set_direction() (1 on the set path, cleared by
                                      // OnEngage()/the clear path).
@@ -180,8 +160,8 @@ public:
                                       // writes -Offset.x (pre-clamp) on the set path.
     float FaceAxisZ;                  // +0x1c0. Zeroed by ctor/OnEngage(). set_direction()
                                       // writes Offset.z (unclamped, unnegated) on the set path.
-    unsigned char Flag1c4;           // +0x1c4. Set to 1 by ctor. OnApplyDirective() overwrites it
-                                      // from Message->+0x44; OnEngage() passes Flag1c4 == 0 to
+    unsigned char bKillEngine;           // +0x1c4. Set to 1 by ctor. OnApplyDirective() overwrites it
+                                      // from the op's bKillEngine; OnEngage() passes bKillEngine == 0 to
                                       // FUN_062e91d0.
     unsigned char Flag1c5;           // +0x1c5. Zeroed by ctor/OnEngage(). Update()'s "resolved
                                       // this tick" flag.
@@ -191,10 +171,10 @@ public:
     // EngineKillSearchTime / EngineKillFaceTime.
     float EngineKillStateElapsed;                  // +0x1c8. Zeroed by ctor/OnEngage().
     float Field1cc;                  // +0x1cc. Zeroed by ctor; SetContext() stores
-                                      // Behavior_InvokeManagerSlotF0(ThreatSourcePtr14, 0, 1.0f).
+                                      // Behavior_GetAngularSpeedXY(OwnerContext, 0, 1.0f).
     float Field1d0;                  // +0x1d0. Set to 0.9f by ctor. No other access found.
     unsigned char Flag1d4;            // +0x1d4. Zeroed by ctor. Update()'s entry guard checks and
-                                       // clears it (early-out -> UpdateResult10=2); set_throttle()
+                                       // clears it (early-out -> UpdateResult=2); set_throttle()
                                        // (slot 13) sets it.
     unsigned char Pad1d5[0x1d8 - 0x1d5];
     // +0x1d8: seconds spent turning toward the target while the bearing is still wide
@@ -202,27 +182,18 @@ public:
     float AfterburnerElapsed;                   // +0x1d8. Zeroed by ctor/OnEngage().
 };
 
-static_assert(offsetof(FaceBehavior, CachedHandle08) == 0x08, "FaceBehavior::CachedHandle08 offset");
-static_assert(offsetof(FaceBehavior, ModeSelector0xc) == 0x0c, "FaceBehavior::ModeSelector0xc offset");
-static_assert(offsetof(FaceBehavior, UpdateResult10) == 0x10, "FaceBehavior::UpdateResult10 offset");
-static_assert(offsetof(FaceBehavior, ThreatSourcePtr14) == 0x14, "FaceBehavior::ThreatSourcePtr14 offset");
-static_assert(offsetof(FaceBehavior, DeltaTime1c) == 0x1c, "FaceBehavior::DeltaTime1c offset");
-static_assert(offsetof(FaceBehavior, BehaviorMgrPtr20) == 0x20, "FaceBehavior::BehaviorMgrPtr20 offset");
-static_assert(offsetof(FaceBehavior, NavHelperPtr24) == 0x24, "FaceBehavior::NavHelperPtr24 offset");
-static_assert(offsetof(FaceBehavior, Flags28) == 0x28, "FaceBehavior::Flags28 offset");
-static_assert(offsetof(FaceBehavior, Flag29) == 0x29, "FaceBehavior::Flag29 offset");
 static_assert(offsetof(FaceBehavior, TargetKind2c) == 0x2c, "FaceBehavior::TargetKind2c offset");
 static_assert(offsetof(FaceBehavior, Watcher30) == 0x30, "FaceBehavior::Watcher30 offset");
 static_assert(offsetof(FaceBehavior, OrientMatrix38) == 0x38, "FaceBehavior::OrientMatrix38 offset");
 static_assert(offsetof(FaceBehavior, TargetPosition5c) == 0x5c, "FaceBehavior::TargetPosition5c offset");
-static_assert(offsetof(FaceBehavior, SubObjectA) == 0x68, "FaceBehavior::SubObjectA offset");
-static_assert(offsetof(FaceBehavior, SubObjectB) == 0xe0, "FaceBehavior::SubObjectB offset");
-static_assert(offsetof(FaceBehavior, SubObjectC) == 0x1a0, "FaceBehavior::SubObjectC offset");
+static_assert(offsetof(FaceBehavior, Move) == 0x68, "FaceBehavior::Move offset");
+static_assert(offsetof(FaceBehavior, Face) == 0xe0, "FaceBehavior::Face offset");
+static_assert(offsetof(FaceBehavior, Afterburner) == 0x1a0, "FaceBehavior::Afterburner offset");
 static_assert(offsetof(FaceBehavior, Flag1b4) == 0x1b4, "FaceBehavior::Flag1b4 offset");
 static_assert(offsetof(FaceBehavior, FaceAxisX) == 0x1b8, "FaceBehavior::FaceAxisX offset");
 static_assert(offsetof(FaceBehavior, FaceAxisY) == 0x1bc, "FaceBehavior::FaceAxisY offset");
 static_assert(offsetof(FaceBehavior, FaceAxisZ) == 0x1c0, "FaceBehavior::FaceAxisZ offset");
-static_assert(offsetof(FaceBehavior, Flag1c4) == 0x1c4, "FaceBehavior::Flag1c4 offset");
+static_assert(offsetof(FaceBehavior, bKillEngine) == 0x1c4, "FaceBehavior::bKillEngine offset");
 static_assert(offsetof(FaceBehavior, Flag1c5) == 0x1c5, "FaceBehavior::Flag1c5 offset");
 static_assert(offsetof(FaceBehavior, EngineKillStateElapsed) == 0x1c8, "FaceBehavior::EngineKillStateElapsed offset");
 static_assert(offsetof(FaceBehavior, Field1cc) == 0x1cc, "FaceBehavior::Field1cc offset");

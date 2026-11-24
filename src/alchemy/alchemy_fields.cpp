@@ -300,7 +300,7 @@ namespace AlchemyImpl
     }
 
     // LAB_06223dd0 (outer +0x14): node+0xa0 = Gravity * Dt.
-    GENRESULT DACOM_API FxGravityField::Pad5(float Dt)
+    GENRESULT DACOM_API FxGravityField::UpdateNode(float Dt)
     {
         TickLifetime(Dt);
         Gravity_ = static_cast<float>(
@@ -392,7 +392,7 @@ namespace AlchemyImpl
     }
 
     // LAB_062147b0 (outer +0x14): Blend (4.0 = DAT_0624ca50) is kept when <= 1 or unordered.
-    GENRESULT DACOM_API FxAirField::Pad5(float Dt)
+    GENRESULT DACOM_API FxAirField::UpdateNode(float Dt)
     {
         TickLifetime(Dt);
         FFxAirFieldPropertySet* const Set = AirProps();
@@ -500,7 +500,7 @@ namespace AlchemyImpl
     // before 1 / R. Retail stores the magnitude negated (FCHS); the port negates at its one
     // use in ApplyFieldToVel (exact). Retail also stores Dt at node+0xb0, which nothing
     // reads (not kept).
-    GENRESULT DACOM_API FxRadialField::Pad5(float Dt)
+    GENRESULT DACOM_API FxRadialField::UpdateNode(float Dt)
     {
         TickLifetime(Dt);
         FFxRadialFieldPropertySet* const Set = RadialProps(); // node+0x9c
@@ -621,7 +621,7 @@ namespace AlchemyImpl
 
     // LAB_0623dfa0 (outer +0x14): Blend (4.0 = DAT_0624ca50) is computed in double and
     // kept when <= 1 or unordered.
-    GENRESULT DACOM_API FxTurbulenceField::Pad5(float Dt)
+    GENRESULT DACOM_API FxTurbulenceField::UpdateNode(float Dt)
     {
         TickLifetime(Dt);
         FFxTurbulenceFieldPropertySet* const Set = TurbulenceProps();
@@ -749,7 +749,7 @@ namespace AlchemyImpl
     }
 
     // LAB_0621a780 (outer +0x14): node+0xa0 Reflect, node+0xa4 Dt.
-    GENRESULT DACOM_API FxCollideField::Pad5(float Dt)
+    GENRESULT DACOM_API FxCollideField::UpdateNode(float Dt)
     {
         TickLifetime(Dt);
         Reflect_ = static_cast<float>(CollideProps()->ReflectRamp->Eval(AppearanceOuterTime_, Age_));
@@ -934,7 +934,7 @@ namespace AlchemyImpl
 
     // LAB_06212c20: Dt (+0xd8) is stored before TickLifetime; R^2 (+0xa4) uses the
     // unrounded R.
-    GENRESULT DACOM_API FLDustField::Pad5(float Dt)
+    GENRESULT DACOM_API FLDustField::UpdateNode(float Dt)
     {
         UpdateDt_ = Dt;
         TickLifetime(Dt);

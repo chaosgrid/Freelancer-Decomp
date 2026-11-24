@@ -681,7 +681,7 @@ unsigned int RpcEncodeClientMissionResponse(FPacketBase& Packet, unsigned char**
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.PutDword(Wire->MissionId);
+    Stream.PutDword(Wire->OfferKind);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -712,7 +712,7 @@ unsigned int RpcDecodeClientMissionResponse(FPacketBase& Packet, const unsigned 
     if (!Stream.GetDword(ScratchDword)) {
         return Stream.GetError();
     }
-    Wire->MissionId = ScratchDword;
+    Wire->OfferKind = ScratchDword;
     if (!Stream.GetByte(ScratchByte)) {
         return Stream.GetError();
     }

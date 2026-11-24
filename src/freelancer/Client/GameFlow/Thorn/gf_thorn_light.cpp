@@ -19,8 +19,6 @@ namespace
 {
     char const* const GScriptLightFile = "E:\\FL\\Scratch\\Source\\Client\\GF\\ScriptLight.cpp";
 
-    GENRESULT const kThornReferenceMissing = static_cast<GENRESULT>(-1);
-
     // DAT_0066d27c -- this file's 3DMathEngine, acquired (FUN_005b73e0) on first use by each of
     // the three bodies that read it.
     I3DMathEngine* G_ThornLightMath = nullptr;

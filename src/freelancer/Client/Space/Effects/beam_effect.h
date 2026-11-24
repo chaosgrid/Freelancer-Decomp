@@ -71,12 +71,13 @@ struct FBeamEffect : FEffectBase
     ~FBeamEffect() override;
 
     FBeamEffectArch* Arch;         // +0x6C  from EffectArch.VisBeam
-    unsigned char Flags70;         // +0x70
+    unsigned char Flags70;         // +0x70  bit0 visible, bit1 hit, bit2 hit the player,
+                                   //        bit3 use look dir
     unsigned char Pad71[3];
-    float Float74;                 // +0x74  = 50.0
-    float Progress78;              // +0x78  = -1.0
-    float Float7C;                 // +0x7C  = -1.0
-    float ProgressDenom80;         // +0x80  = 0.1
+    float CullRadius;              // +0x74  = 50.0; slot +8 hands it out as the sphere radius
+    float Age;                     // +0x78  = -1.0; restarts at 0, then grows by dt per tick
+    float FadeTimeLeft;            // +0x7C  = -1.0 (none); the kill sets 0.3, intensity / 0.3
+    float ExtendTime;              // +0x80  = 0.1; the beam reaches full length at Age == this
 };
 
 static_assert(sizeof(FBeamEffect) == 0x84, "BeamEffect 0x84");
@@ -101,16 +102,16 @@ void BeamEffectDestroy(FBeamEffect* This, int FreeMemory);
 // LAB_004f9600 — vtable[0] start(EffectArch*): VisBeam → Arch, type=0x2c, EffectTypeListLink.
 unsigned char BeamEffectStart(FBeamEffect* This, FEffectArch* EffectArch);
 
-// LAB_004f97a0 — vtable[+0x04]: arm death / freeze + Float7C clamp to DAT_006129cc.
+// LAB_004f97a0 — vtable[+0x04]: arm death / freeze + FadeTimeLeft clamp to DAT_006129cc.
 void BeamEffectArmDeath(FBeamEffect* This);
 
-// LAB_004f9480 — vtable[+0x08]: world translation → Out; returns Float74.
+// LAB_004f9480 — vtable[+0x08]: world translation → Out; returns CullRadius.
 float BeamEffectGetWorldPos(FBeamEffect* This, FVector* Out);
 
 // LAB_004f9980 — vtable[+0x14]: frustum / pbubble visibility → Flags70 bit0.
 unsigned char BeamEffectUpdateVisibility(FBeamEffect* This, float Dt, FSpaceCamera* Cam);
 
-// LAB_004f9c20 — vtable[+0x18]: Progress78 / Float7C lifetime; 0 → death (Flags08 bit1).
+// LAB_004f9c20 — vtable[+0x18]: Age / FadeTimeLeft lifetime; 0 → death (Flags08 bit1).
 unsigned char BeamEffectTickDraw(FBeamEffect* This, float Dt, FSpaceCamera* Cam);
 
 // FUN_004f7d20 — attach Watchable (+8) + EngineIndex + local transform copy.
@@ -128,8 +129,8 @@ unsigned char BeamEffectBuildGeometry(FBeamEffect* This, FSpaceCamera* Cam);
 int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform, float T,
                                  float Intensity);
 
-// FUN_004fb1e0 — multi-segment builder (ESP+0x94 = B4 via a SUB ESP alias; UvU1-bits-as-index
-// is a retail bug, reproduced).
+// FUN_004fb1e0 — multi-segment builder. Retail reuses frame slots: B4 lands at ESP+0x94 through
+// a SUB ESP alias, and C3 over UvU1's slot once UvU1 is dead.
 int BeamEffectBuildMultiSegment(FBeamEffect* This, FTransform const* WorldXform, float T,
                                 float Intensity);
 

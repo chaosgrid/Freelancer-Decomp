@@ -15,7 +15,8 @@
 
 #include <cstddef>
 
-struct IObjDB; // common_cobjdb.h -- Behavior::SetObjectDb's argument (pointer-only use here)
+struct IObjDB; // common_cobjdb.h -- Behavior::ObjectDb (pointer-only use here)
+class SystemManager; // common_systemmanager.h -- Behavior::SysMgr (pointer-only use here)
 
 // Common.dll AI behavior family (Behavior and its subclasses), from the RTTI at each
 // vtable's [-4] slot:
@@ -49,7 +50,7 @@ struct IObjDB; // common_cobjdb.h -- Behavior::SetObjectDb's argument (pointer-o
 // FUN_062e5b70. Returns Obj->get_projected_throttle(Value, Type) (slot 0xd4), or
 // DAT_06399408 (0.0f) on null Obj. Retail pushes the ThrustEquipType as an integer (4 or 1).
 // Callers: FUN_062d5a20 and MatchThrottle2Idea::Update.
-float Behavior_InvokeManagerSlotD4(IObjInspect const* Obj, float Value, ThrustEquipType Type);
+float Behavior_GetProjectedThrottle(IObjInspect const* Obj, float Value, ThrustEquipType Type);
 
 // FUN_062d21c0: `Target->Flags28 = (Target->Flags28 & ~0x02) | 0x01`.
 //
@@ -57,16 +58,14 @@ float Behavior_InvokeManagerSlotD4(IObjInspect const* Obj, float Value, ThrustEq
 // ECX is a pointer field's value ([ESI+0x2f0] DockBehavior's NavPilotPtr at 062c393d /
 // 062c3d3f, [ESI+0x40] at 062c7695, [ESI+0x60] / [ESI+0x64] at 062cf4ff / 062cf513),
 // each preceded by that pointer's OnDisengage (vtable +0x10). So the target is a
-// Behavior-family object and +0x28 the Flags28 byte BaseFollowerBehavior_DefaultRequestFlag
+// Behavior-family object and +0x28 the Flags28 byte FormationBehavior::OnApplyDirective
 // (LAB_062cd630) sets bit 0x2 of.
-//
-// TODO: Flags28 is declared per derived class, not on Behavior, so the parameter stays
-// void*; hoist it onto Behavior and retype this.
-void Behavior_ReleaseDirectiveTarget(void* Target);
+class Behavior;
+void Behavior_ReleaseDirectiveTarget(Behavior* Target);
 
-// FUN_062e5af0. Same shape as Behavior_InvokeManagerSlotD4 on slot 0xd8,
+// FUN_062e5af0. Same shape as Behavior_GetProjectedThrottle on slot 0xd8,
 // IObjInspect::get_speed(float, ThrustEquipType).
-float Behavior_InvokeManagerSlotD8(IObjInspect const* Obj, float Value, ThrustEquipType Type);
+float Behavior_GetSpeed(IObjInspect const* Obj, float Value, ThrustEquipType Type);
 
 // FUN_062e5950, cdecl. Null Obj -> 0.0f;
 // MaxSpeed < 0 or == 0 -> 0.0f (`TEST AH,0x41; JP` lets only > and NaN through);
@@ -81,43 +80,47 @@ float Behavior_GetAngularDistanceTravelled(IObjInspect const* Obj, float From, f
 // on a tie or unordered compare. Slot 0x2c's second out-param is a 12-byte Vector.
 float Behavior_GetIfaceMaxScalarAttribute(IObjInspect const* Iface);
 
-// FUN_062e5850. Slot 0xcc, IObjInspect::get_time_to_accelerate(From, To, Dt, Type); the
-// parameter names are pre-identification guesses (Unused2 = From, Radius = To,
-// Falloff = Dt). Radius and Falloff are clamped to >= 0.0 (NaN clamps too); if Radius
-// and Unused2 are both exactly 0.0, returns 0.0f without the call. Otherwise Radius
-// below 0.001 (DAT_0639c9f0) snaps to 0.0 before the call. Type is pushed as an integer.
-float Behavior_QueryRadiusEffect(IObjInspect const* Obj, float Unused2, float Radius, float Falloff, ThrustEquipType Type);
+// FUN_062e5850. Slot 0xcc, IObjInspect::get_time_to_accelerate; the parameters are named after
+// CShip's implementation (FUN_062b37f0: Throttle, FromSpeed, ToSpeed). FromSpeed and ToSpeed
+// are clamped to >= 0.0 (NaN clamps too); if FromSpeed and Throttle are both exactly 0.0,
+// returns 0.0f without the call. Otherwise FromSpeed below 0.001 (DAT_0639c9f0) snaps to 0.0
+// before the call. Type is pushed as an integer.
+float Behavior_GetTimeToAccelerate(IObjInspect const* Obj, float Throttle, float FromSpeed, float ToSpeed,
+                                   ThrustEquipType Type);
 
-// FUN_062e58f0. Slot 0xd0, IObjInspect::get_distance_travelled(Speed, Dt, Accel, Type).
-// One gate only: Falloff < 0.0 or NaN returns 0.0f without the call (no clamp-and-continue).
-// Otherwise Radius below 0.001 snaps to 0.0 before the call. MatchThrottle2Idea chains
-// it after Behavior_QueryRadiusEffect, passing that result as Falloff.
-float Behavior_QueryFalloffEffect(IObjInspect const* Obj, float Unused2, float Radius, float Falloff, ThrustEquipType Type);
+// FUN_062e58f0. Slot 0xd0, IObjInspect::get_distance_travelled (CShip FUN_062b3900: Throttle,
+// FromSpeed, Time). One gate only: Time < 0.0 returns 0.0f without the call (no
+// clamp-and-continue; NaN continues). Otherwise FromSpeed below 0.001 snaps to 0.0 before the
+// call. MatchThrottle2Idea chains it after Behavior_GetTimeToAccelerate, passing that result
+// as Time.
+float Behavior_GetDistanceTravelled(IObjInspect const* Obj, float Throttle, float FromSpeed, float Time,
+                                    ThrustEquipType Type);
 
-// FUN_062e59b0. Chains Behavior_InvokeManagerSlotD8 with the QueryRadiusEffect /
-// QueryFalloffEffect pair (DAT_06399410 = 1.0, DAT_0639c430 = 0.0, DAT_0639c9f0 = 0.001).
+// FUN_062e59b0. Chains Behavior_GetSpeed with the GetTimeToAccelerate /
+// GetDistanceTravelled pair (DAT_06399410 = 1.0, DAT_0639c430 = 0.0, DAT_0639c9f0 = 0.001).
 // Ghidra's unaff_retaddr is the Radius parameter (entry ESP+8).
 float Behavior_QueryChainedRadiusEffect(void* Obj, float Radius, int Selector);
 
-// FUN_062e5ab0. Null-guards Obj, returns 0.0f if Radius < 0.001f (DAT_0639e6c8);
-// otherwise calls slot 0xd0 with Falloff = 1000.0f (DAT_063a0760) and Selector = 1.
-float Behavior_QueryFixedFalloffEffect(void* Obj, float Radius);
+// FUN_062e5ab0. Null-guards Obj, returns 0.0f if Speed < 0.001f (DAT_0639e6c8); otherwise
+// get_distance_travelled(0.0f, Speed, 1000.0f (DAT_063a0760), engine): the distance the ship
+// coasts from Speed (SplineMoveIdea's CoastDistance, PathfindManager's coast distances).
+float Behavior_GetCoastDistance(void* Obj, float Speed);
 
 // FUN_062e5bc0. Null-guards Obj, returns 0.0f if Value is exactly 0.0f, else
 // Obj->get_initial_speed_to_coast_distance(Value, true) (slot 0xdc).
-float Behavior_InvokeManagerSlotDC(IObjInspect const* Obj, float Value);
+float Behavior_GetInitialSpeedToCoastDistance(IObjInspect const* Obj, float Value);
 
 // FUN_062e5b20. Null Obj -> DAT_06399408 (0.0f), else
 // Obj->get_angular_speed_XY(Speed, MaxSpeed) (slot +0xf0).
-float Behavior_InvokeManagerSlotF0(IObjInspect const* Obj, float Speed, float MaxSpeed);
+float Behavior_GetAngularSpeedXY(IObjInspect const* Obj, float Speed, float MaxSpeed);
 
 // FUN_062e5b50: null Obj -> 0.0f, else Obj->get_angular_speed_Z(Speed) (slot +0xf4).
 // Sole caller FaceIdea::SetContext (.text:062d6881), which discards the result.
-float Behavior_InvokeManagerSlotF4(IObjInspect const* Obj, float Speed);
+float Behavior_GetAngularSpeedZ(IObjInspect const* Obj, float Speed);
 
 // FUN_062e5ba0: null Obj -> 0.0f, else Obj->get_projected_axis_throttle_XY(Value)
 // (slot +0xf8). Callers: FaceIdea's ctor / SetThrottleScale, ComputeFormationFollowerEnvelope.
-float Behavior_InvokeManagerSlotF8(IObjInspect const* Obj, float Value);
+float Behavior_GetProjectedAxisThrottleXY(IObjInspect const* Obj, float Value);
 
 // ============================================================================
 // FUN_062e89a0 / 062e8c20 / 062e8ce0 / 062e8e60 / 062e9030 / 062e9120 / 062e91d0 are
@@ -127,11 +130,11 @@ float Behavior_InvokeManagerSlotF8(IObjInspect const* Obj, float Value);
 
 // FUN_062e61f0. Tail-thunk `Node->get_transform()` (IObjInspect slot 0xc), no null test.
 // Sole caller ThrustManager::SetNudgeDirection (FUN_062e8ce0).
-Transform const* Behavior_InvokeNodeSlotC(void* Node);
+Transform const* Behavior_GetTransform(void* Node);
 
 // FUN_062ecb20 (FollowerDirectiveGateA), FUN_062ecc60 / FUN_062ecce0 (NotifyFormationLeader1 /
 // 2) and FUN_062ecc50 (SetFlagC3) are thiscall on the 0xC8-byte block at SystemManager+0x1364:
-// FGunConvergenceStateBlock members (common_systemmanager.h, common_gunconvergence.cpp).
+// FFormationLeaderState members (common_systemmanager.h, common_gunconvergence.cpp).
 // Notify callers: EvadeBehavior::OnUpdate (.text:062c7e80/062c7ebc, 062c7e98/062c7ed4) and
 // BuzzBehavior::Update (.text:062c64ec/062c67be, 062c6506/062c67d4); SetFlagC3's:
 // IBehaviorManager::QueueNotification cases 1 / 2 (.text:062d4949 / 062d496c).
@@ -168,8 +171,7 @@ bool TimerTableMissileWithinReaction08(SystemManagerTimerTable const* Self);   /
 // `Behavior::Behavior(int)`, which every derived behavior constructor calls first.
 //
 // FUN_062d2020 writes +0x04..+0x29, so all of that block belongs to Behavior itself (even
-// TrailBehavior, whose BaseClassArray is [TrailBehavior, Behavior], has it). The port still
-// declares it on each subclass; see the data-block note below.
+// TrailBehavior, whose BaseClassArray is [TrailBehavior, Behavior], has it).
 //
 // The table is 27 slots (.rdata:063a02c4..063a032c = 0x6c bytes). The next dword,
 // DAT_063a0330 = 0xBF19999A (-0.6f), is not a COL pointer; NullBehavior's table
@@ -236,15 +238,14 @@ public:
     // 2 +0x08. `MOV [ECX+0x18],EAX; RET 4` (0x0629afd0, ICF fold labelled
     // CEquip::ConnectServerEquip): setter for +0x18, the behavior's IObjDB. Sole caller
     // ConnectBehaviorManagerObjectDb (FUN_062d2830) hands every dispatch-table entry the
-    // manager's IObjDB. Stored by raw offset (see the data-block note below). No subclass
-    // overrides it.
+    // manager's IObjDB. No subclass overrides it.
     virtual void SetObjectDb(IObjDB* ObjectDb);
     // 3 +0x0c. FUN_062d20d0: `+0xc = 1; +0x10 = 1; +0x28 &= 0xfe; +0x1c = 0` (the ctor leaves
-    // +0xc = 2). Raw-offset stores. Derived slot-3 bodies that begin with `CALL FUN_062d20d0`
+    // +0xc = 2). Derived slot-3 bodies that begin with `CALL FUN_062d20d0`
     // call it as Behavior::OnEngage().
     virtual void OnEngage();
     // 4 +0x10. FUN_062d20f0: `P = [[this+0x20]+0xc]; if (P) [P+0x64] = 0; byte [this+0x29] = 0`
-    // -- this+0x20 is the IBehaviorManager, +0x0C its PathfindManager, whose Field_064 is
+    // -- this+0x20 is the IBehaviorManager, +0x0C its PathfindManager, whose AvoidExcludeId is
     // cleared. Derived slot-4 bodies that end in `CALL/JMP FUN_062d20f0` call it as
     // Behavior::OnDisengage().
     virtual void OnDisengage();
@@ -255,14 +256,12 @@ public:
     // 6 +0x18 -- ?external_player_evaluate@IBehaviorManager@@QAE?AW4EvaluateResult@@H@Z
     // tail-jumps here. Retail's base body is LAB_062cf5e0 `MOV EAX,2; RET 4` (EvalSkip == 2).
     virtual EvaluateResult evaluate(unsigned int Context) { (void)Context; return EvalSkip; }
-    // 7 +0x1c. _purecall in retail; every concrete subclass overrides it. Being pure also
-    // makes DockBehaviorFields, GotoBehaviorFields and InstantTradeLaneBehaviorFields abstract
-    // (their slot-7 bodies are on the derived classes); none is constructed on its own.
+    // 7 +0x1c. _purecall in retail; every concrete subclass overrides it.
     virtual int OnUpdate() = 0;
     // 8 +0x20. Bare `RET` -- a real, empty, zero-argument base implementation.
     virtual void PostUpdate() {}
     // 9 +0x24. `MOV EAX,[ECX+0x10]; RET` (ICF fold labelled IObjInspectImpl::cobject):
-    // getter for +0x10 (the subclasses' UpdateResult). Raw-offset read.
+    // getter for +0x10, UpdateResult.
     virtual int GetStatus();
     // 10 +0x28. `MOV AL,1; RET 4`. The base body ignores the argument, but callers pass a
     // directive op: IBehaviorManager::SetCurrentBehavior skips the call when it is null
@@ -278,12 +277,12 @@ public:
     virtual void set_cruise(bool bOn) { (void)bOn; }                        // 14 +0x38
     virtual void engage_engine(bool bOn) { (void)bOn; }                     // 15 +0x3C
     // 16 +0x40. FUN_062d2110. Driven by IBehaviorManager::update_current_behavior_set_afterburner.
-    // Queries IObjInspect::is_cruise_active (slot 0x5c) on the NavHelper's owner
-    // (`[this+0x24] + 0x8` -> list head - 8), then calls FUN_062e9120 on NavHelper+0x18.
+    // Queries IObjInspect::is_cruise_active (slot 0x5c) on the SysMgr's owner
+    // (`[this+0x24] + 0x8` -> list head - 8), then calls FUN_062e9120 on SysMgr+0x18.
     // See common_behavior.cpp.
     virtual void set_afterburner(bool bOn);                                 // 16 +0x40
     // 17 +0x44. FUN_062d21b0: `MOV ECX,[ECX+0x24]; ADD ECX,0x18; JMP FUN_062e9030` --
-    // forwards to the NavHelper's ThrustManager. The player's strafe burst reaches it via
+    // forwards to the SysMgr's ThrustManager. The player's strafe burst reaches it via
     // IBehaviorManager::update_current_behavior_slide_strafe_burst.
     virtual void slide_strafe_burst(StrafeDir Dir);                         // 17 +0x44
     virtual void brake_reverse(bool bOn) { (void)bOn; }                     // 18 +0x48
@@ -298,7 +297,7 @@ public:
     virtual void OnEvent(void* Arg) { (void)Arg; }
     // 23 +0x5C. LAB_062c2f50, `AND byte ptr [ECX+0x28],0xfd; RET` -- clears the +0x28 bit
     // slot 10's derived override sets. All 21 Behavior vtables point here; no subclass
-    // overrides it. Raw-offset store.
+    // overrides it.
     virtual void cancel_notify();
     virtual IObjRW const* get_target() { return nullptr; }                   // 24 +0x60
     // 25 +0x64. Retail body 0629ba10, `XOR AL,AL; RET 4`: returns false, pops one dword.
@@ -307,44 +306,63 @@ public:
     // typed after it).
     virtual void* GetDockTarget() { return nullptr; }
 
-    // ---- Behavior's own data block is +0x04..+0x29 ---------------------------------------
-    // FUN_062d2020 writes +0x04 = its argument, +0x08/+0x14/+0x24/+0x18/+0x1c = 0,
-    // +0x29 = 0, +0x28 &= 0xfc, the vptr (.rdata:063a02c4), +0x0c = 2, +0x10 = 1; the binder
-    // FUN_062d2090 writes +0x08, +0x14, +0x20, +0x24. So the whole block is Behavior's.
-    //
-    // Deviation: the port declares this block on each of the twenty-one subclasses instead
-    // (BuzzBehavior::DeltaTime, IdleBehavior::DeltaTime1c, BaseFollowerBehavior::DeltaTime,
-    // ...), each pinned by offsetof asserts that hold only while sizeof(Behavior) == 4.
-    // Hoisting it means retiring all twenty-one copies at once. TODO.
-    //
-    // Until then the base reaches the block by raw offset. IBehaviorManager::UpdateBehaviorTick
-    // stores its float accumulator (+0xd4) to the behavior's +0x1c right before OnUpdate
-    // (.text:062d335d); these accessors own that offset.
-    float GetTickDelta() const;
-    void SetTickDelta(float Delta);
+    // FUN_062d2020 (RET 4), `Behavior::Behavior(int)`, which every derived constructor calls
+    // first: the stores listed with the data block below, in retail order.
+    explicit Behavior(int InTypeId);
 
-    // +0x24, the NavHelper (SystemManager) pointer, by raw offset for the same reason.
-    void* GetNavHelper() const;
-
-    // FUN_062d2020, Behavior's constructor body (RET 4): the writes listed above. The port's
-    // derived constructors call this from their bodies, because the block is declared on
-    // them and cannot be initialised from Behavior's own constructor.
-    void ConstructBase(int TypeId);
+    Behavior(Behavior const&) = delete;
+    Behavior& operator=(Behavior const&) = delete;
 
     // FUN_062d2090, non-virtual, thiscall, RET 0xc, called by the slot-1 SetContext
-    // overrides: Owner && Sys required, else false; then +0x14 = Owner,
-    // +0x08 = Owner->get_id(), +0x24 = Sys, +0x20 = Manager, true. Raw-offset stores.
+    // overrides: Owner && Sys required, else false; then OwnerContext = Owner,
+    // OwnerId = Owner->get_id(), SysMgr = Sys, BehaviorMgr = Manager, true.
     bool BindContext(void* Owner, void* Manager, void* Sys);
 
     // FUN_062d21d0, non-virtual, thiscall: forwards both stack arguments to the manager's
-    // PathfindManager::SetCruiseLock (FUN_062dd3d0) via [[this+0x20]+0xc].
-    void SetCruiseLock(int Value, int Mask);
+    // PathfindManager::SetAvoidanceAllowed (FUN_062dd3d0) via [[this+0x20]+0xc]: Value (low byte)
+    // goes to the pathfinder's two obstacle-avoidance latches selected by Mask (bit 0
+    // bObstacleNudgeAllowed, bit 1 bAvoidPointAllowed). FreeFlightBehavior passes the thrust
+    // manager's bAutoAvoidance, GotoBehavior `bDisableAvoidance == 0`.
+    void SetAvoidanceAllowed(int Value, int Mask);
 
-    // +0x04 is the behavior type id. The twenty-one factory bodies (.text:062d16d0..062d1f90)
-    // pass the BehaviorTypeDesc's Id (+0x04) to each constructor, which forwards it to
-    // FUN_062d2020. Nothing in Common.dll reads it back; stored because retail stores it.
-    int GetTypeId() const;
+    // ---- Behavior's own data block, +0x04..+0x29 ------------------------------------------
+    // FUN_062d2020 writes +0x04 = its argument, +0x08/+0x14/+0x24/+0x18/+0x1c = 0,
+    // +0x29 = 0, +0x28 &= 0xfc, the vptr (.rdata:063a02c4), +0x0c = 2, +0x10 = 1; the binder
+    // FUN_062d2090 writes +0x08, +0x14, +0x20, +0x24.
+
+    // +0x04: the behavior type id. The twenty-one factory bodies (.text:062d16d0..062d1f90)
+    // pass the BehaviorTypeDesc's Id (+0x04) to each constructor, which forwards it here.
+    // Nothing in Common.dll reads it back.
+    int TypeId;                     // +0x04
+    unsigned OwnerId;               // +0x08, the binder's Owner->get_id()
+    // +0x0c: OnEvaluateReadiness's result, stored and returned by every slot-5 override;
+    // the ctor leaves 2, OnEngage 1.
+    int Readiness;                  // +0x0c
+    int UpdateResult;               // +0x10, OnUpdate's result; slot 9 (GetStatus) returns it
+    IObjRW* OwnerContext;           // +0x14, the owner (binder's first argument)
+    IObjDB* ObjectDb;               // +0x18, slot 2 (SetObjectDb)
+    // +0x1c: the per-tick delta. IBehaviorManager::UpdateBehaviorTick stores its float
+    // accumulator (+0xd4) here right before OnUpdate (.text:062d335d); OnEngage zeroes it.
+    float DeltaTime;                // +0x1c
+    IBehaviorManager* BehaviorMgr;  // +0x20, the owning manager (binder); not written by the ctor
+    SystemManager* SysMgr;          // +0x24, the owner's SystemManager (binder)
+    // +0x28: bit 0x1 is cleared by OnEngage and set by Behavior_ReleaseDirectiveTarget; bit 0x2
+    // is set by the slot-10 overrides that accept a directive and cleared by cancel_notify.
+    unsigned char Flags28;          // +0x28
+    unsigned char Flag29;           // +0x29, cleared by OnDisengage; slot 5 answers 3 while set
 };
+static_assert(offsetof(Behavior, TypeId) == 0x04, "Behavior::TypeId offset");
+static_assert(offsetof(Behavior, OwnerId) == 0x08, "Behavior::OwnerId offset");
+static_assert(offsetof(Behavior, Readiness) == 0x0c, "Behavior::Readiness offset");
+static_assert(offsetof(Behavior, UpdateResult) == 0x10, "Behavior::UpdateResult offset");
+static_assert(offsetof(Behavior, OwnerContext) == 0x14, "Behavior::OwnerContext offset");
+static_assert(offsetof(Behavior, ObjectDb) == 0x18, "Behavior::ObjectDb offset");
+static_assert(offsetof(Behavior, DeltaTime) == 0x1c, "Behavior::DeltaTime offset");
+static_assert(offsetof(Behavior, BehaviorMgr) == 0x20, "Behavior::BehaviorMgr offset");
+static_assert(offsetof(Behavior, SysMgr) == 0x24, "Behavior::SysMgr offset");
+static_assert(offsetof(Behavior, Flags28) == 0x28, "Behavior::Flags28 offset");
+static_assert(offsetof(Behavior, Flag29) == 0x29, "Behavior::Flag29 offset");
+static_assert(sizeof(Behavior) == 0x2c, "Behavior size (CruiseBehavior, which adds nothing, is 0x2c)");
 
 // ============================================================================
 // BaseFollowerBehavior -- RTTI ".?AVBaseFollowerBehavior@@" (TypeDescriptor .data:063ebf30),
@@ -379,8 +397,6 @@ public:
 //                 returned EAX to FUN_062c50c0, which copies three dwords out of it)
 // All four _purecall slots are `= 0` below; both subclasses override every one of them.
 // ============================================================================
-class SystemManager;
-
 class BaseFollowerBehavior : public Behavior
 {
 public:
@@ -430,20 +446,6 @@ protected:
     void UpdateTickPayload(float Delta);
 
 public:
-    // ---- Behavior's own +0x04..+0x2b block, still declared per class ----
-    int TypeId;                     // +0x04, FUN_062d2020's argument
-    unsigned CachedHandle08;        // +0x08, the binder's Owner->get_id()
-    int ModeSelector0xc;            // +0x0c, OnEvaluateReadiness's result
-    int UpdateResult;               // +0x10, OnUpdate's result
-    void* OwnerContext;             // +0x14, the owner IObjRW* (binder)
-    IObjDB* ObjectDb;
-    float DeltaTime;                // +0x1c, stored by the manager before OnUpdate
-    IBehaviorManager* BehaviorMgrPtr; // +0x20 (binder)
-    SystemManager* NavHelper;       // +0x24 (binder)
-    unsigned char Flags28;          // +0x28, bit 1 set/cleared by slot 10
-    unsigned char Flag29;           // +0x29
-    unsigned char Pad2a[0x2c - 0x2a];
-
     // ---- BaseFollowerBehavior's own block, built by FUN_062cb2b0 ----
     // +0x2c: the ship being followed. OnUpdate re-points it every tick from the SystemManager's
     // +0x1364 directive record (FUN_062ecaf0); FormationBehavior's slots 5/27 from
@@ -460,11 +462,13 @@ public:
     // to their +0x1c and dispatches slots 3/4/7/10, the manager's own protocol.
     Behavior* DockDelegate;         // +0x278
     Behavior* GotoDelegate;         // +0x27c
-    unsigned char Flag280;          // +0x280: OnEvent sets it when the owner left a trade lane
-    unsigned char Flag281;          // +0x281: a trade-lane order was handed to go_tradelane
-    unsigned char Flag282;          // +0x282: DockDelegate is running
-    unsigned char Flag283;          // +0x283: OnEngage latches the owner's is_player()
-    unsigned char Flag284;          // +0x284: GotoDelegate is running
+    unsigned char bLeftTradeLane;      // +0x280: OnEvent sets it when the owner left a trade lane
+    unsigned char bInTradeLane;        // +0x281: go_tradelane accepted the record's lane order (returned 0)
+    unsigned char bDockDelegateActive; // +0x282: DockDelegate is running
+    // +0x283: OnEngage sets it for a player owner; OnUpdate's one catch-up goto to a distant,
+    // slow leader runs while it is set and clears it.
+    unsigned char bPlayerCatchUp;
+    unsigned char bGotoDelegateActive; // +0x284: GotoDelegate is running
     unsigned char Flag285;          // +0x285: the record's +0xb0 order was consumed
     unsigned char Pad286[2];
     int Field288;                   // +0x288: OnEngage zeroes it; no reader found in this class
@@ -475,15 +479,6 @@ public:
     Vector Offset290;               // +0x290
     int Field29c;                   // +0x29c: OnDisengage zeroes it; no reader found in this class
 };
-static_assert(offsetof(BaseFollowerBehavior, TypeId) == 0x04, "BaseFollowerBehavior::TypeId offset");
-static_assert(offsetof(BaseFollowerBehavior, ModeSelector0xc) == 0x0c, "BaseFollowerBehavior::ModeSelector0xc offset");
-static_assert(offsetof(BaseFollowerBehavior, UpdateResult) == 0x10, "BaseFollowerBehavior::UpdateResult offset");
-static_assert(offsetof(BaseFollowerBehavior, OwnerContext) == 0x14, "BaseFollowerBehavior::OwnerContext offset");
-static_assert(offsetof(BaseFollowerBehavior, DeltaTime) == 0x1c, "BaseFollowerBehavior::DeltaTime offset");
-static_assert(offsetof(BaseFollowerBehavior, BehaviorMgrPtr) == 0x20, "BaseFollowerBehavior::BehaviorMgrPtr offset");
-static_assert(offsetof(BaseFollowerBehavior, NavHelper) == 0x24, "BaseFollowerBehavior::NavHelper offset");
-static_assert(offsetof(BaseFollowerBehavior, Flags28) == 0x28, "BaseFollowerBehavior::Flags28 offset");
-static_assert(offsetof(BaseFollowerBehavior, Flag29) == 0x29, "BaseFollowerBehavior::Flag29 offset");
 static_assert(offsetof(BaseFollowerBehavior, LeadWatcher) == 0x2c, "BaseFollowerBehavior::LeadWatcher offset");
 static_assert(offsetof(BaseFollowerBehavior, MatchThrottle) == 0x34, "BaseFollowerBehavior::MatchThrottle offset");
 static_assert(offsetof(BaseFollowerBehavior, Face) == 0x90, "BaseFollowerBehavior::Face offset");
@@ -492,7 +487,7 @@ static_assert(offsetof(BaseFollowerBehavior, BreakAway) == 0x1c8, "BaseFollowerB
 static_assert(offsetof(BaseFollowerBehavior, Afterburner) == 0x264, "BaseFollowerBehavior::Afterburner offset");
 static_assert(offsetof(BaseFollowerBehavior, DockDelegate) == 0x278, "BaseFollowerBehavior::DockDelegate offset");
 static_assert(offsetof(BaseFollowerBehavior, GotoDelegate) == 0x27c, "BaseFollowerBehavior::GotoDelegate offset");
-static_assert(offsetof(BaseFollowerBehavior, Flag280) == 0x280, "BaseFollowerBehavior::Flag280 offset");
+static_assert(offsetof(BaseFollowerBehavior, bLeftTradeLane) == 0x280, "BaseFollowerBehavior::bLeftTradeLane offset");
 static_assert(offsetof(BaseFollowerBehavior, Flag285) == 0x285, "BaseFollowerBehavior::Flag285 offset");
 static_assert(offsetof(BaseFollowerBehavior, Field288) == 0x288, "BaseFollowerBehavior::Field288 offset");
 static_assert(offsetof(BaseFollowerBehavior, Flag28c) == 0x28c, "BaseFollowerBehavior::Flag28c offset");
@@ -561,7 +556,7 @@ static_assert(sizeof(FormationBehavior) == 0x2b8, "FormationBehavior size == ret
 
 // ============================================================================
 // FUN_062ec520 ("is WantedId among the owner's 32 formation-follower ids") is
-// FGunConvergenceStateBlock::IsIdAmongOwnerFormationFollowers (common_systemmanager.h,
+// FFormationLeaderState::IsIdAmongOwnerFormationFollowers (common_systemmanager.h,
 // common_gunconvergence.cpp): both callers (GotoBehavior::Update, GuideBehavior::Update)
-// pass NavHelper+0x1364 as the receiver.
+// pass SysMgr+0x1364 as the receiver.
 // ============================================================================

@@ -10,21 +10,8 @@
 // FUN_062d2020 with the type id, and installs the vtable (063a0244) inline. This constructor
 // stands in for that sequence.
 NullBehavior::NullBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(2)
-    , UpdateResult10(1)
-    , OwnerContext(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime(0.0f)
-    , BehaviorMgrPtr(nullptr)
-    , NavHelper(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
+    : Behavior(InTypeId)
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
     // The initialiser values are FUN_062d2020's own: +0x0c = 2, +0x10 = 1, the rest zero.
 }
 

@@ -649,7 +649,7 @@ void FontStringConstruct(FFontString* Self)
     Self->Text = nullptr;
     Self->Capacity = 0;
     Self->MaxLines = 0x7fff;
-    Self->Field0C = static_cast<unsigned char>(reinterpret_cast<uintptr_t>(Self) >> 24);
+    Self->ChildAlloc = static_cast<unsigned char>(reinterpret_cast<uintptr_t>(Self) >> 24);
     Self->Pad0D[0] = 0;
     Self->Pad0D[1] = 0;
     Self->Pad0D[2] = 0;
@@ -813,14 +813,14 @@ void FontStringSetText(FFontString* Self, wchar_t const* Text)
     Self->LayoutGen = 0;
 }
 
-void FontStringSetScale(FFontString* Self, float Param1, float Param2)
+void FontStringSetScale(FFontString* Self, float WorldSize, float ViewDepth)
 {
     // FUN_004145d0. DAT_0067dc70 and DAT_0067dc9c are not font globals: they are the XScale
     // (+0x78) and ZNear (+0xa4) of the Win3D scene camera DAT_0067dbf8, read straight out of it.
     // Retail compares against double 0.001; no float lies in [0.001, 0.001f), so the float
     // compare is the same test.
     FSpaceCamera const* const Cam = GetWin3DSceneCamera();
-    float Depth = std::fabs(Param2);
+    float Depth = std::fabs(ViewDepth);
     if (Depth < 0.001f)
     {
         Depth = 1.0f;
@@ -828,7 +828,7 @@ void FontStringSetScale(FFontString* Self, float Param1, float Param2)
     double const Term =
         (static_cast<double>(Cam->XScale) / static_cast<double>(Cam->ZNear)) *
         (static_cast<double>(Cam->ZNear) / static_cast<double>(Depth)) *
-        static_cast<double>(Param1) +
+        static_cast<double>(WorldSize) +
         0.5;
     int const Key = static_cast<int>(std::floor(Term));
     if (Key != Self->ScaleKey)

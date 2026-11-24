@@ -131,7 +131,7 @@ UiScroll::UiScroll()
     , bHorizontal_(false)
 {
     // FUN_00595420.
-    memcpy(CustomColor_, &G_NnPaletteArgb_679b94, sizeof(CustomColor_));
+    memcpy(CustomColor_, &G_NnPaletteGrey, sizeof(CustomColor_));
     FScrollHitRect* const Rects[5] = { &TopArrow_, &BottomArrow_, &TrackBefore_, &TrackAfter_,
                                        &Thumb_ };
     for (int Index = 0; Index < 5; ++Index)
@@ -161,7 +161,7 @@ UiScroll::UiScroll()
         G_ScrollMidShape = ScrollShapeFind("HUD_slidertexmid");
     }
 
-    unsigned long const IdleColor = G_NnPaletteArgb_679bb0;
+    unsigned long const IdleColor = G_NnPaletteCyan;
     ArrowIdleColor_ = IdleColor;
     ArrowHotColor_ = IdleColor;
     BarIdleColor_ = IdleColor;
@@ -640,10 +640,10 @@ void UiScroll::Draw()
     }
     else
     {
-        ArrowIdleColor_ = G_NnPaletteArgb_679bb0;
-        ArrowHotColor_ = G_NnPaletteArgb_679bb0;
-        BarIdleColor_ = G_NnPaletteArgb_679bb0;
-        BarHotColor_ = G_NnPaletteArgb_679bb0;
+        ArrowIdleColor_ = G_NnPaletteCyan;
+        ArrowHotColor_ = G_NnPaletteCyan;
+        BarIdleColor_ = G_NnPaletteCyan;
+        BarHotColor_ = G_NnPaletteCyan;
     }
     BeginDraw();
 
@@ -845,7 +845,7 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
     // LAB_00596d30 (RET 4).
     if (!bActive_)
         return false;
-    if (Event->Field0 != -1)
+    if (Event->Button != kWin3DMouseLeft)
         return false;
 
     bool bHandled = false;
@@ -853,8 +853,8 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
     Win3DGetMouseRay(Ray);
     FVector const Local = RayToLocalViaHud(Ray);
     DragPart_ = -1;
-    int const Kind = Event->Field1;
-    bool const bPress = Kind == 2 || Kind == 3;
+    int const Kind = Event->Action;
+    bool const bPress = Kind == kWin3DMousePress || Kind == kWin3DMouseDoubleClick;
     if (!bPress && Parent != nullptr)
     {
         WinControl* const Owner = Parent->AsWinControl();
@@ -996,11 +996,11 @@ intptr_t UiScroll::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Page_ = DefaultPage_;
         if (static_cast<double>(Max - Min) < static_cast<double>(Page_))
         {
-            Flags = static_cast<unsigned char>(Flags & 0xfc);
+            Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         }
         else
         {
-            Flags = static_cast<unsigned char>(Flags | 3);
+            Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
             Max = static_cast<int>(static_cast<double>(Max) + 1.0);
         }
         RangeMin_ = static_cast<float>(Min);
@@ -1073,7 +1073,7 @@ bool UiCycle::MouseEvent(FWin3DMouseEvent const* Event)
     // auto-repeat; anything else inside is swallowed.
     if (!bActive_)
         return false;
-    if (Event->Field0 != -1)
+    if (Event->Button != kWin3DMouseLeft)
         return false;
     float Ray[3];
     Win3DGetMouseRay(Ray);
@@ -1081,7 +1081,7 @@ bool UiCycle::MouseEvent(FWin3DMouseEvent const* Event)
     DragPart_ = -1;
     if (!ScrollInsideBox(Local.X, Local.Y, Width_, Height_))
         return WinControl::MouseEvent(Event);
-    if (Event->Field1 != 2)
+    if (Event->Action != kWin3DMousePress)
         return true;
     if (ScrollRectContains(TopArrow_, Local.X, Local.Y))
     {

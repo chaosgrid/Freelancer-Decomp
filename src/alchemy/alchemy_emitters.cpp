@@ -468,7 +468,7 @@ namespace AlchemyImpl
             EmitNow = static_cast<long>(Room);
 
         // Begin fields (outer +0xB4), N emits (node slot 20), end fields (outer +0xC0).
-        Appearance->Pad45();
+        Appearance->BeginFields();
         if (EmitNow > 0)
         {
             do
@@ -481,7 +481,7 @@ namespace AlchemyImpl
                 --EmitNow;
             } while (EmitNow != 0);
         }
-        Appearance->Pad48();
+        Appearance->EndFields();
 
         LastEmitTime_ = Elapsed + LastEmitTime_;
         return GR_OK;
@@ -598,7 +598,7 @@ namespace AlchemyImpl
     }
 
     // LAB_0621b9d0: the shape values are sampled at Age + Dt (float), then FUN_06245bf0.
-    GENRESULT DACOM_API FxConeEmitter::Pad5(float Dt)
+    GENRESULT DACOM_API FxConeEmitter::UpdateNode(float Dt)
     {
         FFxConeEmitterPropertySet* const Set = ConeProps();
         const float Time = Dt + Age_;
@@ -687,7 +687,7 @@ namespace AlchemyImpl
     }
 
     // LAB_0621d360: as the cone's.
-    GENRESULT DACOM_API FxCubeEmitter::Pad5(float Dt)
+    GENRESULT DACOM_API FxCubeEmitter::UpdateNode(float Dt)
     {
         FFxCubeEmitterPropertySet* const Set = CubeProps();
         const float Time = Dt + Age_;
@@ -765,7 +765,7 @@ namespace AlchemyImpl
     }
 
     // LAB_0623bcf0: as the cone's.
-    GENRESULT DACOM_API FxSphereEmitter::Pad5(float Dt)
+    GENRESULT DACOM_API FxSphereEmitter::UpdateNode(float Dt)
     {
         FFxSphereEmitterPropertySet* const Set = SphereProps();
         const float Time = Dt + Age_;

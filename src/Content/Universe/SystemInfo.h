@@ -418,12 +418,12 @@ struct FSystemInfo : public CommReferrable
     // ship's placement).
     bool IsSeenByPlayerShip(Vector const* Point, float const* MaxDistance,
                             float const* ConeAngle);
-    // FUN_06f73130: some player's ship has a +0x120 pair (IsInTradeLane) and the space object
-    // of its +0x124 id is within *Radius of Point.
-    bool IsNearPlayerField124Object(Vector const* Point, float const* Radius);
-    // FUN_06f73210: some player's ship has a +0x120 pair and Point is within *Radius of the
-    // segment between the space objects of its +0x120 and +0x124 ids.
-    bool IsNearPlayerField120Segment(Vector const* Point, float const* Radius);
+    // FUN_06f73130: some player's ship is in a trade lane (IsInTradeLane) and the end ring of
+    // its lane run (TradeLaneEndRing, ship +0x124) is within *Radius of Point.
+    bool IsNearPlayerTradeLaneEndRing(Vector const* Point, float const* Radius);
+    // FUN_06f73210: some player's ship is in a trade lane and Point is within *Radius of the
+    // segment from its entry ring (+0x120) to its end ring (+0x124).
+    bool IsNearPlayerTradeLaneSegment(Vector const* Point, float const* Radius);
     // FUN_06f732e0: creates one NPC ship in this system from a copy of *Params
     // (System = this). Without a dock target: new FContentNpcShip, *OutShip = it (when
     // OutShip), appended to SpaceObjs, controller 0 gets message 0x1010 with the ship;
@@ -442,14 +442,14 @@ struct FSystemInfo : public CommReferrable
     // pub::SpaceObj::JumpIn(ship, GateId) (result ignored).
     void AddJumpingInSpaceObj(FContentSpaceObj* Object, unsigned int GateId);
 
-    // FUN_06f73bb0 (callers TU46 when the player ship's +0x11c changes): every object of
-    // SpaceObjs, taken as an NPC ship, gets SetCommMuted(!bClear).
-    void SetNpcShipsField1b1(bool bClear);
+    // FUN_06f73bb0 (callers TU46: true when the player's combat ends, false when it begins):
+    // every object of SpaceObjs, taken as an NPC ship, gets SetCommMuted(!bEnabled).
+    void SetNpcShipsCommEnabled(bool bEnabled);
     // FUN_06f73bf0 (x87 result): how fast Ship's remaining life (+0x1c8) runs down.
     // -1 when a player is close: a player ship within 2500, in single player one whose
-    // 70 degree view cone reaches it within 4000, or a player ship's +0x124 object within
-    // 4000 / +0x120..+0x124 segment within 2500 of it; also -1 when the ship itself has a
-    // +0x120 pair. Otherwise min(15, (distance to the nearest player ship - 2500) * 0.01 + 1),
+    // 70 degree view cone reaches it within 4000, or a lane-travelling player ship's end ring
+    // within 4000 / lane segment within 2500 of it; also -1 when the ship itself is in a
+    // trade lane. Otherwise min(15, (distance to the nearest player ship - 2500) * 0.01 + 1),
     // 15 when that distance is at most 2500 or no player has a ship.
     double GetNpcShipLifeRate(FContentNpcShip* Ship);
     // FUN_06f73dd0 (the argument is not read; caller SpaceSupport passes the tick
@@ -529,10 +529,10 @@ struct FSystemInfo : public CommReferrable
     // FUN_06f78ee0.
     std::vector<FContentPlayerState*>* GetPlayers();
 
-    // FUN_06f72930: one-line comm through SendSpaceComm (TextCount 1, mood 0,
+    // FUN_06f72930: one-line comm through SendSpaceComm (TextCount 1, PermutationIds 0,
     // interrupt). Returns pub::SpaceObj::SendComm's result.
     int SendComm(unsigned int SenderId, unsigned int TargetId, unsigned int TextId,
-                 unsigned int VoiceId, unsigned int CommType, Costume const* CommCostume,
+                 unsigned int VoiceId, unsigned int CaptionIds, Costume const* CommCostume,
                  float Duration);
 
     // FUN_06f73ac0 (callers the TU40 directives, TU21, TU27): the space object id a mission name
@@ -588,7 +588,7 @@ struct FSystemInfo : public CommReferrable
 // SpaceSupport calls this one too.
 int __cdecl SendSpaceComm(void const* Unused, unsigned int SenderId, unsigned int TargetId,
                           unsigned int* TextIds, int const* TextCount, unsigned int VoiceId,
-                          unsigned int CommType, Costume const* CommCostume, unsigned int Mood,
+                          unsigned int CaptionIds, Costume const* CommCostume, unsigned int PermutationIds,
                           float Duration, bool bInterrupt);
 
 // DAT_06fd3a5c: static init LAB_06f75ee0, atexit FUN_06f75f10.

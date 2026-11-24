@@ -205,7 +205,7 @@ namespace
             return;
 
         // The player's live mission controller (FUN_06f487c0).
-        if ((PlayerState->ValueD8 & 0x3fffffffu) != 0)
+        if ((PlayerState->LiveMissionId & 0x3fffffffu) != 0)
             return;
 
         switch (MissionNum)
@@ -343,7 +343,8 @@ namespace
         fprintf(File, "%s = %d\n", "debug", GStoryDebugFlag != 0 ? 1 : 0);
     }
 
-    // FUN_06ea6900.
+    // FUN_06ea6900. Retail: both strcpy's (MissionName, GenericMissionPath) are unbounded inline
+    // copies.
     void FStory::OnLoad(INI_Reader* Reader)
     {
         INI_Reader::State SavedState;

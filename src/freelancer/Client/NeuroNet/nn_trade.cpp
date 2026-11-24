@@ -24,6 +24,7 @@
 #include "Network/login_mgr.h"              // G_Server (DAT_0067ecd0)
 #include "NeuroNet/nn_button_control.h"
 #include "NeuroNet/nn_inventory.h"           // G_NanobotArchId (DAT_00674a8c), G_ShieldBatteryArchId (DAT_00674a88)
+#include "NeuroNet/nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
 #include "NeuroNet/nn_static_control.h"      // StaticControl +0x348 / +0x410 / +0x414
 #include "NeuroNet/nn_text_control.h"
 #include "Space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
@@ -154,14 +155,6 @@ namespace
             Range = 0;
         List->ScrollBar->SetProperty(0x37, 0, static_cast<uintptr_t>(Range));
         List->Refresh(-1);
-    }
-
-    // FUN_00489e80(Id, 0). HOLE: the call is only reported, although the voice queue is ported
-    // now (NnVoiceEnqueue, nn_messaging.h); this stub should forward to it.
-    void QueueTradeVoice(unsigned VoiceId)
-    {
-        FDUMP(0x100002, "NN_Trade: HOLE FUN_00489e80 (voice %u) -- voice queue not ported",
-              VoiceId);
     }
 
     // FUN_004bff30 (cdecl) -- blink a '|' caret at the end of Text every half second.
@@ -970,7 +963,7 @@ void NnTrade::SetMode(int NewMode)
     if (Previous == 4)
     {
         if (QuantityBar->Value > Most)
-            QueueTradeVoice(G_InsufficientCargoSpaceVoiceId); // FUN_00489e80(DAT_00672458, 0)
+            NnVoiceEnqueue(G_InsufficientCargoSpaceVoiceId, 0); // FUN_00489e80(DAT_00672458, 0)
     }
     else
     {
@@ -985,7 +978,7 @@ void NnTrade::SetMode(int NewMode)
     // Nothing fits: the voice line and back to browsing.
     if (Most >= 1)
         return;
-    QueueTradeVoice(G_InsufficientCargoSpaceVoiceId);
+    NnVoiceEnqueue(G_InsufficientCargoSpaceVoiceId, 0);
     CTradeEquipList* const Owner = SelectedLine->Owner;
     SetTradeMark(SelectedItem, 0);
     SelectedLine = nullptr;
@@ -1172,7 +1165,7 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
             PlayerCardTitle->SetProperty(0x1e, static_cast<uintptr_t>(IdsName), 0);
             RenderDisplayList Card;
             {
-                StyleNode Style(0xd801);
+                StyleNode Style(kTextStyleChatSystem);
                 RdlAppendNode(Card, Style.Clone());
             }
             LoadIdsIntoRdl(static_cast<unsigned>(IdsInfo), Card); // FUN_0057da40
@@ -1204,7 +1197,7 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
             TargetCardTitle->SetProperty(0x1e, static_cast<uintptr_t>(IdsName), 0);
             RenderDisplayList Card;
             {
-                StyleNode Style(0xd801);
+                StyleNode Style(kTextStyleChatSystem);
                 RdlAppendNode(Card, Style.Clone());
             }
             LoadIdsIntoRdl(static_cast<unsigned>(IdsInfo), Card);
@@ -1246,25 +1239,25 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (Control == Line->InfoCard)
             return 0;
         unsigned char const Bit2 =
-            static_cast<unsigned char>(static_cast<NnButtonControl*>(Control)->GetFlags330() & 0x04);
-        unsigned char Flags = Line->IconFrame->GetFlags330();
-        Line->IconFrame->SetFlags330(static_cast<unsigned char>(((Flags ^ Bit2) & 0x04) ^ Flags));
-        Flags = Line->InfoFrame->GetFlags330();
-        Line->InfoFrame->SetFlags330(static_cast<unsigned char>(((Flags ^ Bit2) & 0x04) ^ Flags));
+            static_cast<unsigned char>(static_cast<NnButtonControl*>(Control)->GetButtonBits() & 0x04);
+        unsigned char Flags = Line->IconFrame->GetButtonBits();
+        Line->IconFrame->SetButtonBits(static_cast<unsigned char>(((Flags ^ Bit2) & 0x04) ^ Flags));
+        Flags = Line->InfoFrame->GetButtonBits();
+        Line->InfoFrame->SetButtonBits(static_cast<unsigned char>(((Flags ^ Bit2) & 0x04) ^ Flags));
         unsigned Layer;
         if (Msg == 0x2c)
         {
-            Line->IconFrame->SetFlags330(static_cast<unsigned char>(Line->IconFrame->GetFlags330() | 1));
-            Line->InfoFrame->SetFlags330(static_cast<unsigned char>(Line->InfoFrame->GetFlags330() | 1));
+            Line->IconFrame->SetButtonBits(static_cast<unsigned char>(Line->IconFrame->GetButtonBits() | 1));
+            Line->InfoFrame->SetButtonBits(static_cast<unsigned char>(Line->InfoFrame->GetButtonBits() | 1));
             Layer = 1;
         }
         else
         {
-            Line->IconFrame->SetFlags330(static_cast<unsigned char>(Line->IconFrame->GetFlags330() & 0xfe));
-            Line->InfoFrame->SetFlags330(static_cast<unsigned char>(Line->InfoFrame->GetFlags330() & 0xfe));
+            Line->IconFrame->SetButtonBits(static_cast<unsigned char>(Line->IconFrame->GetButtonBits() & 0xfe));
+            Line->InfoFrame->SetButtonBits(static_cast<unsigned char>(Line->InfoFrame->GetButtonBits() & 0xfe));
             Layer = 0;
         }
-        if ((Line->IconFrame->GetFlags330() & 0x40) != 0)
+        if ((Line->IconFrame->GetButtonBits() & 0x40) != 0)
             Layer = 2;
         Line->IconFrame->DrawLayer = Layer;
         Line->IconMesh->DrawLayer = Layer;
@@ -1312,15 +1305,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         ChatPlaceMsgWinForTrade(0); // FUN_0046b450(0)
         Win3DReparent(this, nullptr); // FUN_0059dd00
-        Win3D* Child = ChildHead;
-        while (Child != nullptr)
-        {
-            Win3D* const Next = Child->NextSibling;
-            Win3DDeleteTree(Child); // FUN_0043d2a0
-            Child = Next;
-        }
-        Destroy(); // slot 10
-        delete this; // slot 0 (1)
+        Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
         return 0;
     }
 
@@ -1533,7 +1518,8 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     }
 
     // The "?" button, or any button of a list in select mode: the row's item goes onto the
-    // list's info card.
+    // list's info card. Retail: List is not tested on the "?" path (0x004c3519 jumps straight
+    // to 0x004c3540).
     if (List->SelectedItem != nullptr)
     {
         SetTradeMark(List->SelectedItem, 0);

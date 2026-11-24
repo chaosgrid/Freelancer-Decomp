@@ -142,14 +142,14 @@ struct FShadingPropertyRecord
     const char* Description;                // +0x08
     void* Callback;                         // +0x0C
     FShadingPropertyValue Current;          // +0x10
-    FShadingPropertyValue Default;          // +0x24
-    FShadingPropertyValue Saved;            // +0x38
+    FShadingPropertyValue Minimum;          // +0x24 lower bound of the range check
+    FShadingPropertyValue Maximum;          // +0x38 upper bound of the range check
 };
 
 static_assert(sizeof(FShadingPropertyValue) == 0x14, "retail typed property value stride");
 static_assert(offsetof(FShadingPropertyRecord, Current) == 0x10, "property current +0x10");
-static_assert(offsetof(FShadingPropertyRecord, Default) == 0x24, "property default +0x24");
-static_assert(offsetof(FShadingPropertyRecord, Saved) == 0x38, "property saved +0x38");
+static_assert(offsetof(FShadingPropertyRecord, Minimum) == 0x24, "property minimum +0x24");
+static_assert(offsetof(FShadingPropertyRecord, Maximum) == 0x38, "property maximum +0x38");
 static_assert(sizeof(FShadingPropertyRecord) == 0x4C, "retail property record stride");
 
 static const char kIidImaData[] = "IMAData";
@@ -241,10 +241,12 @@ struct ITextureLibrary2 : IDAComponent
 struct FMaDelta
 {
     float Duration; // +0 slot 5 tick
-    float Field4;
-    float Field8;
-    float FieldC;
-    float Field10;
+    // Per-second change of the matching FMaKey value (FillUvMatrix): A and B are
+    // offsets, C and D are scales less one.
+    float RateA; // +4
+    float RateB; // +8
+    float RateC; // +C
+    float RateD; // +10
 };
 
 static_assert(sizeof(FMaDelta) == 0x14, "FMaDelta 0x14");
@@ -381,7 +383,7 @@ struct IMaterialBatcher2 : IDAComponent
     virtual GENRESULT DACOM_API Submit(IMaterial* Material, void* Context,
                                        unsigned long PrimType, unsigned long Start,
                                        unsigned long Count, unsigned long IbStart,
-                                       unsigned long IndexSpan, void* Unused,
+                                       unsigned long IndexSpan, void* SortDepth,
                                        unsigned long Flags) = 0;
     // 12 +0x30 06ec9480: Clear both bin queues and synchronize frame value.
     virtual GENRESULT DACOM_API ClearBins() = 0;

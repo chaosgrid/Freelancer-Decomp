@@ -8,7 +8,7 @@
 
 #include "common_csys.h"           // Transform, Matrix, Acquire3DMathEngine
 #include "common_iface.h"          // IObjInspect, IObjRW, ObjRwFromWatchable, ObjInspectOf
-#include "common_systemmanager.h"  // SystemManager -- what NavHelper actually points at
+#include "common_systemmanager.h"  // SystemManager -- what SysMgr actually points at
 #include "common_misc.h"           // random_sphere_constrained_2
 #include "common_behavior.h"       // Behavior_GetIfaceMaxScalarAttribute and friends
 #include "common_aisteer.h"        // GetIfacePositionOrZero, GetObjectTypeOrZero, FAiTarget,
@@ -63,19 +63,7 @@ namespace
 // SetContext/OnEngage (+0x2c..+0x6c); every one is written there before a reader runs.
 // ----------------------------------------------------------------------------
 StrafeBehavior::StrafeBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , OwnerContext(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime(0.0f)
-    , BehaviorMgrPtr(nullptr)
-    , NavHelper(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
+    : Behavior(InTypeId)
     , TriggerRange2c(0.0f)
     , Opaque30{}
     , StrafeDistance34(0.0f)
@@ -90,11 +78,10 @@ StrafeBehavior::StrafeBehavior(int InTypeId)
     , Pad65{}
     , Field68(0)
     , Field6c(0)
-    , SubObjectA()
-    , SubObjectB()
-    , SubObjectC()
+    , Move()
+    , Face()
+    , Afterburner()
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
 }
 
 // FUN_062c95e0: the FaceIdea (+0xfc) and MoveIdea (+0x84) watcher releases are their member
@@ -111,9 +98,9 @@ bool StrafeBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     bool const bOk = BindContext(Owner, Manager, Sys);
     if (!bOk)
         return false;
-    SubObjectB.SetContext(Owner, Sys, Manager);
-    SubObjectA.SetContext(Owner, Sys, Manager);
-    SubObjectC.SetContext(Owner, Sys, Manager);
+    Face.SetContext(Owner, Sys, Manager);
+    Move.SetContext(Owner, Sys, Manager);
+    Afterburner.SetContext(Owner, Sys, Manager);
     Field60 = 2;
     StrafeMode48 = 2;
     Field64 = 0;
@@ -129,8 +116,8 @@ bool StrafeBehavior::OnApplyDirective(void* DirectiveOp)
 {
     if (DirectiveOp != nullptr)
     {
-        unsigned const* const OpTarget = (unsigned const*)(static_cast<char*>(DirectiveOp) + 0xc);
-        if (NavHelper->Timers.FindVerifiedObject(OpTarget) != nullptr)
+        unsigned const* const OpTarget = &static_cast<pub::AI::DirectiveStrafeOp const*>(DirectiveOp)->TargetId;
+        if (SysMgr->Timers.FindVerifiedObject(OpTarget) != nullptr)
         {
             Flags28 = static_cast<unsigned char>(Flags28 | 0x2);
             return true;
@@ -146,9 +133,9 @@ bool StrafeBehavior::OnApplyDirective(void* DirectiveOp)
 int StrafeBehavior::OnEvaluateReadiness(float Unused)
 {
     (void)Unused;
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
     int Result = 2;
-    if (!Sys->GunConvergenceStateBytes.FollowerDirectiveGateA())   // FUN_062ecb20
+    if (!Sys->FormationLeaders.FollowerDirectiveGateA())   // FUN_062ecb20
     {
         IObjRW* const Target = Sys->Targeting.GetTarget();         // FUN_062ed5a0
         if (Target != nullptr &&
@@ -172,10 +159,10 @@ int StrafeBehavior::OnEvaluateReadiness(float Unused)
     }
     if (Flag29 != 0)
     {
-        ModeSelector0xc = 3;
+        Readiness = 3;
         return 3;
     }
-    ModeSelector0xc = Result;
+    Readiness = Result;
     return Result;
 }
 
@@ -185,10 +172,10 @@ int StrafeBehavior::OnEvaluateReadiness(float Unused)
 void StrafeBehavior::OnEngage()
 {
     Behavior::OnEngage();
-    SetCruiseLock(1, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(1, 3);                                            // FUN_062d21d0
 
     IObjInspect const* const Owner = ObjInspectOf(OwnerContext);
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
 
     // Step starts at 0.1f and grows by 0.1f (DAT_0639d20c) after each call; the 10.0 bound
     // is tested before the result against pi/2.
@@ -207,7 +194,7 @@ void StrafeBehavior::OnEngage()
     }
 
     // FUN_062e5af0 (engine speed), times (Step + 1.0).
-    float const Speed = Behavior_InvokeManagerSlotD8(Owner, 1.0f, static_cast<ThrustEquipType>(1));
+    float const Speed = Behavior_GetSpeed(Owner, 1.0f, static_cast<ThrustEquipType>(1));
     TriggerRange2c = static_cast<float>(static_cast<double>(Speed) *
                                         (static_cast<double>(Step) + 1.0));
 
@@ -234,10 +221,10 @@ void StrafeBehavior::OnEngage()
 // ----------------------------------------------------------------------------
 void StrafeBehavior::OnDisengage()
 {
-    SubObjectA.PublishTargetId(0);                                  // FUN_062d4e50
-    SubObjectA.Commit();
-    SubObjectB.Commit();
-    SubObjectC.Commit();
+    Move.PublishTargetId(0);                                  // FUN_062d4e50
+    Move.Commit();
+    Face.Commit();
+    Afterburner.Commit();
     Behavior::OnDisengage();
 }
 
@@ -246,23 +233,23 @@ void StrafeBehavior::OnDisengage()
 // ----------------------------------------------------------------------------
 int StrafeBehavior::OnUpdate()
 {
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
 
     IObjRW* const Target = Sys->Targeting.GetTarget();
     if (Target == nullptr)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
 
-    SubObjectA.PublishTargetId(Target->get_id());
+    Move.PublishTargetId(Target->get_id());
 
     // Needs type bits 0x70000 clear on the target and set on the self record, and target
     // speed squared <= 400 (unordered continues); otherwise 3.
     if ((GetObjectTypeOrZero(Target) & 0x70000) != 0 ||
         (SelfRecord(Sys)->GetFlags() & 0x70000) == 0)
     {
-        UpdateResult10 = 3;
+        UpdateResult = 3;
         return 3;
     }
     {
@@ -272,7 +259,7 @@ int StrafeBehavior::OnUpdate()
             static_cast<double>(Velocity.z) * Velocity.z;
         if (SpeedSq > 400.0)
         {
-            UpdateResult10 = 3;
+            UpdateResult = 3;
             return 3;
         }
     }
@@ -288,9 +275,9 @@ int StrafeBehavior::OnUpdate()
         // unordered take the far value).
         double const Bearing = BearingAngleToIface(OwnerContext, Target);
         if (Bearing < 0.39269909262657166)
-            SubObjectA.SetScale40(ScaleNear58);
+            Move.SetScale40(ScaleNear58);
         else
-            SubObjectA.SetScale40(ScaleFar5c);
+            Move.SetScale40(ScaleFar5c);
 
         // Ahead = Transform * (0, 0, ForwardExtent44 * 1.2). Retail fetches the transform
         // through slot 4 (get_orientation), ICF-folded with slot 3 get_transform, and
@@ -370,19 +357,19 @@ int StrafeBehavior::OnUpdate()
         SelectStrafePoint(0, ObjInspectOf(Target));
     }
 
-    (void)SubObjectA.Update(DeltaTime);
-    (void)SubObjectB.Update(DeltaTime);
-    UpdateResult10 = Result;
+    (void)Move.Update(DeltaTime);
+    (void)Face.Update(DeltaTime);
+    UpdateResult = Result;
     return Result;
 }
 
 // ----------------------------------------------------------------------------
-// FUN_062c9810. Retail null-tests neither NavHelper, the watched object nor the sub-object
+// FUN_062c9810. Retail null-tests neither SysMgr, the watched object nor the sub-object
 // centre receiver.
 // ----------------------------------------------------------------------------
 void StrafeBehavior::SelectStrafePoint(int Mode, IObjInspect const* Target)
 {
-    SystemManager* const Sys = NavHelper;
+    SystemManager* const Sys = SysMgr;
 
     if (Mode == 1)
     {
@@ -430,8 +417,8 @@ void StrafeBehavior::SelectStrafePoint(int Mode, IObjInspect const* Target)
                                 SelfPos.y + StrafeDir38.y * StrafeDistance34,
                                 SelfPos.z + StrafeDir38.z * StrafeDistance34 };
 
-        SubObjectA.SetPosition(StrafePoint4c);   // FUN_062d5840
-        SubObjectB.SetPosition(StrafePoint4c);   // FUN_062d7560
+        Move.SetPosition(StrafePoint4c);   // FUN_062d5840
+        Face.SetPosition(StrafePoint4c);   // FUN_062d7560
 
         if (Sys->SelfTarget.bPosValid == 0)
         {
@@ -441,7 +428,7 @@ void StrafeBehavior::SelectStrafePoint(int Mode, IObjInspect const* Target)
         }
 
         // Radius times the double 5.0 (DAT_0639fa58).
-        SubObjectA.SetRange3c(static_cast<float>(static_cast<double>(Sys->SelfTarget.CachedRadius) * 5.0));
+        Move.SetRange3c(static_cast<float>(static_cast<double>(Sys->SelfTarget.CachedRadius) * 5.0));
 
         StrafeMode48 = Mode;
         return;
@@ -490,10 +477,10 @@ void StrafeBehavior::SelectStrafePoint(int Mode, IObjInspect const* Target)
             }
         }
 
-        SubObjectA.SetField44(2);                // FUN_062d88b0
-        SubObjectA.SetRange3c(1.0f);             // ICF fold 062a66b0
-        SubObjectA.SetPosition(StrafePoint4c);
-        SubObjectB.SetPosition(StrafePoint4c);
+        Move.SetField44(2);                // FUN_062d88b0
+        Move.SetRange3c(1.0f);             // ICF fold 062a66b0
+        Move.SetPosition(StrafePoint4c);
+        Face.SetPosition(StrafePoint4c);
     }
 
     StrafeMode48 = Mode;

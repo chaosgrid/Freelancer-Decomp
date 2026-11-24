@@ -61,7 +61,7 @@ bool BaseIdea::SetContext(void* InObject, void* InHandle, void* InContext)
 // FUN_062d4e50; no null tests.
 void BaseIdea::PublishTargetId(unsigned int Id)
 {
-    static_cast<IBehaviorManager*>(Context)->Pathfind->Field_064 = static_cast<int>(Id);
+    static_cast<IBehaviorManager*>(Context)->Pathfind->AvoidExcludeId = static_cast<int>(Id);
 }
 
 // ----------------------------------------------------------------------------

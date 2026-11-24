@@ -23,7 +23,7 @@
 #include "NeuroNet/nn_inventory.h"           // ReqPlayerSpendCashRetail, ReqPlayerHullStatusRetail,
                                     // ReqPlayerCollisionGroupsRetail, ReqPlayerEquipmentRetail
 #include "NeuroNet/nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
-#include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteArgb_679bac
+#include "NeuroNet/nn_ui_pulse.h"            // G_NnPaletteGreen
 #include "Interface/ship_view_control.h"      // ShipViewEquipmentHpClass (FUN_005835f0)
 #include "Interface/ui_scroll.h"
 #include "Interface/win3d.h"                  // Win3DReparent, Win3DFindByName, Win3DDeleteTree
@@ -59,11 +59,9 @@ namespace
     // (0x004b37b5).
     unsigned const G_NnVoiceRepairCompleteId = CreateID("repair_complete");
 
-    // LAB_004b2b70 / LAB_004b2b80 / LAB_004b2b90 -- three float statics of this translation unit
-    // (DAT_00672244 = DAT_00672240 = -0.6, DAT_0067223c = 0.6) that nothing reads.
-    float G_RepairStatic672244 = -0.6f;
-    float G_RepairStatic672240 = -0.6f;
-    float G_RepairStatic67223c = 0.6f;
+    // DAT_00672244 / DAT_00672240 / DAT_0067223c (-0.6f / -0.6f / 0.6f, static inits
+    // LAB_004b2b70 / LAB_004b2b80 / LAB_004b2b90) are this TU's copies of a header float
+    // constant that nothing reads; the port has no counterpart.
 
     uintptr_t PointerArg(void const* Pointer)
     {
@@ -109,19 +107,6 @@ NnRepair::NnRepair()
 NnRepair::~NnRepair()
 {
     // FUN_004b2c10.
-}
-
-void NnRepair::DeleteSelf()
-{
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child); // FUN_0043d2a0
-        Child = Next;
-    }
-    Destroy();   // slot 10
-    delete this; // slot 0 with 1
 }
 
 int NnRepair::SelectedTotal() const
@@ -239,8 +224,8 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
             float const Position[3] = {-0.176f, DamageY, 0.001f};
             float const Half[3] = {0.014f, 0.002f, 0.0f};
             ItemDamages[Index] = CreateCargoBarControl(Name, "", Position, nullptr, Half, 1, 0x43c,
-                                                       G_NnPaletteArgb_679bac,
-                                                       G_NnPaletteArgb_679bac);
+                                                       G_NnPaletteGreen,
+                                                       G_NnPaletteGreen);
             ItemDamages[Index]->SetProperty(0x19, 0x10000, 0);
         }
     }
@@ -325,7 +310,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // Closed from outside: no NavBar.
         Flags = static_cast<unsigned char>(Flags & 0xfc);
         Win3DReparent(this, nullptr); // FUN_0059dd00
-        DeleteSelf();
+        Win3DDeleteTree(this);
         return 0;
     }
     case 0x30:
@@ -384,7 +369,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Flags = static_cast<unsigned char>(Flags & 0xfc);
             Win3DReparent(this, nullptr); // FUN_0059dd00
             NavBarCloseService(false);    // FUN_004424f0(0)
-            DeleteSelf();
+            Win3DDeleteTree(this);
             return 0;
         }
         if (A == PointerArg(ToggleChecks))
@@ -457,8 +442,8 @@ void NnRepair::PopulateList()
         Items.push_back(Item); // FUN_004b49a0(end, &Item)
     }
 
-    // Every collision group whose health is not exactly 1.0, cost at least 1 (the group is not
-    // null-checked, as in retail).
+    // Every collision group whose health is not exactly 1.0, cost at least 1. Retail: the
+    // get_group_by_id result is not null-tested (0x004b39b0).
     std::list<CollisionGroupDesc> const& Groups = GetPlayerCollisionGroupListRetail();
     for (std::list<CollisionGroupDesc>::const_iterator It = Groups.begin(); It != Groups.end(); ++It)
     {
@@ -759,7 +744,7 @@ void NnRepair::Update()
     // `this` first).
     if (GetClientLocationCurrentBase() == 0)
     {
-        DeleteSelf();
+        Win3DDeleteTree(this);
         return;
     }
 
@@ -788,6 +773,6 @@ bool NnRepair::OnEvent(unsigned MsgId)
     Flags = static_cast<unsigned char>(Flags & 0xfc);
     Win3DReparent(this, nullptr); // FUN_0059dd00
     NavBarCloseService(false);    // FUN_004424f0(0)
-    DeleteSelf();
+    Win3DDeleteTree(this);
     return true;
 }

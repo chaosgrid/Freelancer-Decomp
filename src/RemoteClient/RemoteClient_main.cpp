@@ -440,7 +440,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
                     Desc.set_status(Record->Health);
                     Desc.set_id(Record->Id);
                     Desc.set_equipped(Record->bEquipped);
-                    // Native ignores the record's raw Field_0x0f byte here.
+                    // Native ignores the record's bMission byte here.
                     if (Record->HardpointSize != 0)
                     {
                         CacheString Hardpoint;
@@ -476,7 +476,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
                     Desc.set_status(Record->Health);
                     Desc.set_id(Record->Id);
                     Desc.set_equipped(Record->bEquipped);
-                    // Native ignores the record's raw Field_0x0f byte here.
+                    // Native ignores the record's bMission byte here.
                     if (Record->HardpointSize != 0)
                     {
                         CacheString Hardpoint;

@@ -490,8 +490,9 @@ private:
     static unsigned int const NameChars = 0x400;
     // Retail's join buffer is char[0x100] (+0x1464) and is filled with unbounded strcat:
     // a value whose joined parameters reach 0x100 chars overruns into bBini and past the
-    // object (undefined behaviour). The port keeps the bytes in a larger buffer and
-    // truncates only beyond it.
+    // object (undefined behaviour). Deviation: the port keeps the bytes in a larger buffer and
+    // truncates only beyond it, so bBini sits at +0x2464, not +0x1564. Every retail user of
+    // INI_Reader (content, server, freelancer, flserver) is rebuilt against this header.
     static unsigned int const JoinChars = 0x1000;
 
     // The BINI half at +0x1428. Retail calls FUN_0630fbd0 and FUN_0630ff40 with this

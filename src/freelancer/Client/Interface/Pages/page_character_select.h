@@ -101,10 +101,10 @@ public:
     int MotdVersion;                         // +0x2ec -- ChatGetServerMotdVersion at the last copy
     RenderDisplayList ColumnHeaders[5];      // +0x2f0 -- IDS table 0x005e25c8
     RenderDisplayList TitleText;             // +0x32c -- IDS 0x6004e, trailing paragraph cut
-    RenderDisplayList Text729;               // +0x338 -- IDS 0x729
+    RenderDisplayList ServerNameText;        // +0x338 -- IDS 0x729 "SERVER NAME"
     RenderDisplayList DetailsHeader;         // +0x344 -- IDS 0x744
     RenderDisplayList DetailsPassword;       // +0x350 -- IDS 0x750 (server +0x94 set)
-    RenderDisplayList DetailsField95;        // +0x35c -- IDS 0x74f (server +0x95 clear)
+    RenderDisplayList DetailsNoNewPlayers;   // +0x35c -- IDS 0x74f (server +0x95 clear)
     RenderDisplayList DetailsRestricted;     // +0x368 -- IDS 0x6007c, trailing paragraph cut
     RenderDisplayList MotdHeader;            // +0x374 -- IDS 0x60007, trailing paragraph cut
     // +0x380 (5 bytes): the constructor writes flags 0 and colour 0x52eaf5; nothing in the page

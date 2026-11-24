@@ -7,11 +7,8 @@
 #include "Core/ContentInternal.h"
 #include "Core/ContentMessageRouter.h"
 #include "Core/ContentPlayerState.h"
-#include "NPCs/PilotPersonalities.h"
-#include "Encounters/RandomEncounters.h"
 #include "RandomMissions/RandomMission.h"
 #include "RandomMissions/RandomMissionDB.h"
-#include "RandomMissions/RandomMissionGen.h"
 #include "Universe/SystemInfo.h"
 #include "common_id.h"
 #include "common_ini.h"
@@ -20,12 +17,10 @@
 #include "common_misc.h" // SinglePlayer
 #include "common_text.h"
 
-#include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <list>
 #include <map>
 #include <memory>
 #include <new>
@@ -302,10 +297,10 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
                 else if (Reader->is_value("vnpc"))
                 {
                     FVnpcRecord Record;
-                    Record.Values[1] = static_cast<unsigned int>(Reader->get_value_int(1));
-                    Record.Values[3] = static_cast<unsigned int>(Reader->get_value_int(3));
-                    Record.Values[2] = static_cast<unsigned int>(Reader->get_value_int(2));
-                    Record.Values[0] = static_cast<unsigned int>(Reader->get_value_int(0));
+                    Record.NpcId = static_cast<unsigned int>(Reader->get_value_int(1));
+                    Record.MissionState = static_cast<unsigned int>(Reader->get_value_int(3));
+                    Record.TalkCount = static_cast<unsigned int>(Reader->get_value_int(2));
+                    Record.BaseId = static_cast<unsigned int>(Reader->get_value_int(0));
                     State->Vnpcs.push_back(Record);
                 }
                 else if (Reader->is_value("can_dock"))
@@ -324,15 +319,15 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
                 else if (Reader->is_value("tlr_exception"))
                 {
                     FTlrException Record = {};
-                    Record.Values[0] = static_cast<unsigned int>(Reader->get_value_int(0));
-                    Record.Values[1] = static_cast<unsigned int>(Reader->get_value_int(1));
+                    Record.FirstRingId = static_cast<unsigned int>(Reader->get_value_int(0));
+                    Record.SecondRingId = static_cast<unsigned int>(Reader->get_value_int(1));
                     State->TradelaneExceptions.push_back(Record);
                 }
                 else if (Reader->is_value("rumor"))
                 {
                     FRumorRecord Record;
-                    Record.Values[1] = static_cast<unsigned int>(Reader->get_value_int(1));
-                    Record.Values[0] = static_cast<unsigned int>(Reader->get_value_int(0));
+                    Record.Count = static_cast<unsigned int>(Reader->get_value_int(1));
+                    Record.RumorId = static_cast<unsigned int>(Reader->get_value_int(0));
                     State->Rumors.push_back(Record);
                 }
                 else
@@ -362,7 +357,7 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
                 {
                     unsigned int ControllerId = pub::Controller::Create(
                         "content.dll", MissionType, Mission, pub::Controller::ABOVE_NORMAL);
-                    State->ValueD8 = ControllerId;
+                    State->LiveMissionId = ControllerId;
 
                     FRandomMissionAttachMessage AttachMessage;
                     AttachMessage.MissionControllerId = ControllerId;

@@ -56,14 +56,14 @@ public:
     // autoscale prelude and snapshots tmHeight into +0xd4. Always returns true.
     bool Init(FFontDesc const& Desc);
 
-    char const* Slot00() override;
+    char const* GetId() override;
     char const* GetName() override;
     float GetFixedHeight() override;
-    HFONT__* Slot03() override;
+    HFONT__* GetHFont() override;
     LOGFONTA const* GetLogFont() override;
     float GetGlyphAdvance(wchar_t Ch) override;
     int GetLineHeight() override;
-    int Slot07() override;
+    int GetInitLineHeight() override;
     void MeasureString(int* OutWH, wchar_t const* Text, int Len) override;
     int ProbeString(int MaxWidth, wchar_t const* Text, int Len) override;
     int GetCharWidths(wchar_t const* Text, int Len, int* OutWidths) override;
@@ -92,10 +92,10 @@ private:
     void RefreshScale(bool bRatioTarget);
 
     TString<64> Name;                 // +0x04 nickname (GetName)
-    TString<64> Id;                   // +0x48 "%s,%d" id (Slot00)
+    TString<64> Id;                   // +0x48 "%s,%d" id (GetId)
     TString<64> Face;                 // +0x8c GDI face name
     float FixedHeight;                // +0xd0
-    int InitLineHeight;               // +0xd4 tmHeight snapshot of FUN_00415a80 (Slot07)
+    int InitLineHeight;               // +0xd4 tmHeight snapshot of FUN_00415a80 (GetInitLineHeight)
     HDC Dc;                           // +0xd8 CreateCompatibleDC(0)
     LOGFONTA LogFont;                 // +0xdc
     HFONT Font;                       // +0x118

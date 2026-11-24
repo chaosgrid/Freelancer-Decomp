@@ -26,6 +26,8 @@
 #include "thorn_controls.h"
 #include "thorn_iface.h"
 
+#include <cstdint>
+
 struct FGfScript;
 struct ICamera;
 
@@ -34,6 +36,15 @@ static_assert(sizeof(void*) == 4, "the facet offsets of the QI table (0x005cca20
 // The "not implemented" answer of every default slot (LAB_00454190, LAB_0044fcc0..LAB_0044fcf0).
 // dacom.h has no name for it.
 static const GENRESULT kThornSlotNotImplemented = static_cast<GENRESULT>(0xFFFFFFF9);
+
+// The answer of a camera / light reference whose referenced entity is missing.
+static const GENRESULT kThornReferenceMissing = static_cast<GENRESULT>(-1);
+
+// An engine instance id (a long) as the void* the DALib interfaces take.
+inline void* InstancePointer(long Instance)
+{
+    return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+}
 
 struct FThornComponent : ICompoundControl,
                          ISoundControl,
@@ -160,7 +171,7 @@ struct FThornComponent : ICompoundControl,
     virtual void SetScene(void* Scene);
     // 20 (+0x50) -- RoomObject +0x10 / +0x11 / +0x12 / +0x14. Base: RET 0x10.
     virtual void SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,
-                          unsigned char bFlag14);
+                          unsigned char bRunningLights);
     // 21 (+0x54) -- re-apply the entity's sound state to what plays it. Only Thorn_Sound has a
     // body (LAB_00457630); the Gf fade tick (FUN_00456650) sends it to every spawned entity of
     // the playing scripts. Base: RET.

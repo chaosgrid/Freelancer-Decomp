@@ -159,7 +159,7 @@ namespace
         AddMultiple(&CentreWorld, OtherCore->PosWorldFCore, OtherCore->DeltaWorldFCore, DeltaTime);
 
         const float SearchRadius = (float)(
-            (double)(Object->field_94) + OtherCore->UpperLimitRadius + ScanRadius);
+            (double)(Object->extra_radius) + OtherCore->UpperLimitRadius + ScanRadius);
 
         // get_cache_object_no_lock (inlined), then FUN_06348470.
         IVP_NarrowPhaseCacheSlot* Cache = Object->get_cache_object_no_lock();

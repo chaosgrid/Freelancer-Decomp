@@ -122,7 +122,7 @@ public:
 // Comm sequences of an offer (VignetteParams.ini "comm_sequence", FRmCommSequence): one
 // conversation per sequence, one line per {speaker, text} pair. FUN_06f9e770 builds them into
 // the vignette offer's General component; the component (FUN_06f84f10) sends a clone in
-// message GRmMsgType06fd3b74 and the TU61 runtime machine hands it to the GCS conversation
+// message GRmMsgConversation and the TU61 runtime machine hands it to the GCS conversation
 // manager (FUN_06ee9140, which clones it once more through slot 5).
 // ---------------------------------------------------------------------------------------
 

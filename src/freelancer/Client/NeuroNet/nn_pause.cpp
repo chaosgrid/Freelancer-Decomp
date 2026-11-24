@@ -14,6 +14,7 @@
 #include "Space/HUD/hud_target.h"
 #include "Common/Fonts/ids_strings.h"           // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "Common/input_manager.h"         // MouseSetCursor, Get/SetClientMouseCursorDrawFlag
+#include "Interface/wire_controls.h"          // WireButtonControl::WireState2 (+0x35d)
 #include "Interface/menu_enter_state.h"      // MenuNavSetIntroModeRequest (FUN_00564b10, DAT_0067c200)
 #include "NeuroNet/nn_load_save.h"           // OpenNnLoadSave (FUN_00488970)
 #include "GameFlow/menu_universe_base.h"    // GetClientLocationCurrentBase (DAT_0066873c)
@@ -150,11 +151,11 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         float const BoxExtents[3] = {NnFloatBits(0x3e333333), NnFloatBits(0x3ce56042), 0.0f};
         ButtonBox[Index] = CreateWireButtonControl(Name, nullptr, BoxPosition, BoxExtents, 0, 0, 0,
                                                    0, 0);
-        // The last box gets +0x35d |= 1 (no null test).
+        // The last box flushes the line batchers after its Draw (+0x35d |= 1, no null test).
         if (Index == Count - 1)
         {
-            unsigned char* const Wire = reinterpret_cast<unsigned char*>(ButtonBox[Index]);
-            Wire[0x35d] = static_cast<unsigned char>(Wire[0x35d] | 1);
+            WireButtonControl* const Wire = static_cast<WireButtonControl*>(ButtonBox[Index]);
+            Wire->WireState2 = static_cast<unsigned char>(Wire->WireState2 | kWire2FlushBatchers);
         }
 
         // The 0.005 is DAT_005d3e44.
@@ -220,15 +221,7 @@ void NnPause::Update()
         SetClientMouseCursorDrawFlag(1);
     if (bClosePending == 0)
         return;
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child);
-        Child = Next;
-    }
-    Destroy();
-    delete this;
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
 }
 
 void NnPause::Draw()
@@ -299,15 +292,7 @@ void NnPause::ResumeAndDelete()
 {
     NnModalResumeGame(bCursorDrawFlag);
     ReleaseMouse();
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child);
-        Child = Next;
-    }
-    Destroy();
-    delete this;
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
 }
 
 void NnPause::DoAction(int Action)

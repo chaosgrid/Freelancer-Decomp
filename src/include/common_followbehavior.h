@@ -54,25 +54,25 @@ public:
 
 private:
     // Not a retail function: the engage toggle UpdateFollowerSteering inlines twice (062ccf83-062cd043 and
-    // 062cd0a3-062cd164) -- Enabled2a4 follows IsWithinInterceptRangeOfIface and each
+    // 062cd0a3-062cd164) -- bLeaderInRange follows IsWithinInterceptRangeOfIface and each
     // transition goes to IBehaviorManager::NotifyFollowEvent (FUN_062d29c0).
     void UpdateInterceptEngageState();
 
 public:
     // ---- FollowBehavior's own fields (+0x2a0..+0x2bc) ----
-    float SpeedParam2a0;        // +0x2a0. Ctor 150.0f; OnApplyDirective copies op+0x10.
-    unsigned char Enabled2a4;   // +0x2a4. Ctor 1; UpdateFollowerSteering toggles it on range transitions.
+    float FollowDistance;        // +0x2a0. Ctor 150.0f; OnApplyDirective copies the op's FollowDistance.
+    unsigned char bLeaderInRange;   // +0x2a4. Ctor 1; UpdateFollowerSteering toggles it on range transitions.
     unsigned char Pad2a5[3];
     float Distance2a8;          // +0x2a8. Not ctor-set; OnApplyDirective: |Offset290|.
     float Field2ac;             // +0x2ac. Ctor 150.0f.
     float LeadClearanceScale;             // +0x2b0. Ctor 2.0f; UpdateFollowerSteering's weight factor.
     float EngageRange;             // +0x2b4. Ctor 400.0f; OnEvaluateReadiness's range; OnApplyDirective's failure path
-                                // copies op+0x20.
+                                // copies the op's EngageRange.
     float FollowRangeBias;             // +0x2b8. Ctor 100.0f; UpdateFollowerSteering's range bias.
 };
 
-static_assert(offsetof(FollowBehavior, SpeedParam2a0) == 0x2a0, "FollowBehavior::SpeedParam2a0 offset");
-static_assert(offsetof(FollowBehavior, Enabled2a4) == 0x2a4, "FollowBehavior::Enabled2a4 offset");
+static_assert(offsetof(FollowBehavior, FollowDistance) == 0x2a0, "FollowBehavior::FollowDistance offset");
+static_assert(offsetof(FollowBehavior, bLeaderInRange) == 0x2a4, "FollowBehavior::bLeaderInRange offset");
 static_assert(offsetof(FollowBehavior, Distance2a8) == 0x2a8, "FollowBehavior::Distance2a8 offset");
 static_assert(offsetof(FollowBehavior, Field2ac) == 0x2ac, "FollowBehavior::Field2ac offset");
 static_assert(offsetof(FollowBehavior, LeadClearanceScale) == 0x2b0, "FollowBehavior::LeadClearanceScale offset");

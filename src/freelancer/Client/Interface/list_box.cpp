@@ -134,7 +134,8 @@ void ListBox::Update()
     int const Row = static_cast<int>((PointY - ScreenY) / LineHeight);
     if (Row < 0)
         return;
-    // Retail tests the visible row, not FirstVisible + Row, against the count.
+    // Retail: the visible row, not FirstVisible + Row, is tested against the count (005A233C
+    // `cmp eax,[edi+8A4h]`), so a scrolled list can hover past its end.
     if (Row >= ItemCount)
         return;
     HoverIndex = FirstVisible + Row;
@@ -168,7 +169,7 @@ void ListBox::Draw()
         unsigned long Color = 0;
         if (SelectedIndex == Index)
         {
-            Color = G_NnPaletteArgb_679ba4;
+            Color = G_NnPaletteAmber;
         }
         else if (HighlightIndex == Index)
         {
@@ -277,9 +278,9 @@ bool ListBox::MouseEvent(FWin3DMouseEvent const* Event)
     // tells the parent -- 0xf001 for kind 2, 0xf002 for kind 3 -- with the row's text and index.
     if (bSelectable == 0)
         return false;
-    if (Event->Field1 == 1)
+    if (Event->Action == kWin3DMouseRelease)
         return false;
-    if (Event->Field0 != -1)
+    if (Event->Button != kWin3DMouseLeft)
         return false;
 
     SelectedIndex = HoverIndex;
@@ -294,12 +295,12 @@ bool ListBox::MouseEvent(FWin3DMouseEvent const* Event)
         Text = Items[Selected]->Text_;
 
     unsigned const TextArg = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Text));
-    if (Event->Field1 == 2)
+    if (Event->Action == kWin3DMousePress)
     {
         Parent->ProcessMessage(0xf001, TextArg, static_cast<unsigned>(SelectedIndex));
         return true;
     }
-    if (Event->Field1 == 3)
+    if (Event->Action == kWin3DMouseDoubleClick)
     {
         Parent->ProcessMessage(0xf002, TextArg, static_cast<unsigned>(SelectedIndex));
         return true;

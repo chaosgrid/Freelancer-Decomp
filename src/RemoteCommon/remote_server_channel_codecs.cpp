@@ -6,11 +6,16 @@
 
 #include "rpc_server_channel_codec.h"
 #include "common_goods.h" // EquipDesc, EquipDescVector, StringAlloc (0x24/0x25)
+#include "common_text.h"
+#include "common_net.h" // IsMPServer (0x29 Encode)
+#include "server_createinfo.h" // CEqObjCreateInfo (fill / read)
+#include <cstdlib>
+#include <cwchar>
+#include <map>
+#include <new>
+#include <string>
 
 // ===== shared SERVER helpers =====
-#include "common_text.h"
-#include <new>
-
 // The 127-scale quantizer and its inverse (e.g. CREATEGUIDED 0x37, RC 06b5c4bf / RS 06bef98f).
 // The two doubles are RC 06b6c1e0 / 06b6c1e8, RS 06c0df40 / 06c0df48.
 static const double GRpcServerScale127 = 127.0;
@@ -48,9 +53,6 @@ void RpcServerExpand127(unsigned char Encoded, float* Value) {
 // --- create-object block: 0x04 CREATESHIP and 0x42 CREATESOLAR ---
 // Addresses are RS unless marked; the RC encoder 06b50e50 is identical to RS 06c08640, the RC
 // decoder 06b51750 differs only where the #if branches say.
-#include "server_createinfo.h" // CEqObjCreateInfo (fill / read)
-#include <map>
-#include <string>
 
 // The two doubles behind the 255-scale health bytes: RS 06c0e270 (255.0) and
 // 06c0e660 (1/255).
@@ -199,7 +201,7 @@ FRpcServerCreateObjectFields::FRpcServerCreateObjectFields()
 // The per-record flag byte, built at 06c08ac6..06c08b2d and taken apart at
 // 06c09399..06c0961c.
 static const unsigned char kRpcServerEquipEquipped = 0x01;
-static const unsigned char kRpcServerEquipField0f = 0x02;
+static const unsigned char kRpcServerEquipMission = 0x02;
 static const unsigned char kRpcServerEquipWideCount = 0x04;
 static const unsigned char kRpcServerEquipWideId = 0x08;
 static const unsigned char kRpcServerEquipHardpointText = 0x10;
@@ -212,7 +214,7 @@ static bool RpcServerEncodeCreateObjectEquip(FRpcWireStream& Stream,
     const FRpcServerEquipRecord* Record) {
     unsigned char Flags = 0;
     if (Record->bEquipped != 0) Flags = kRpcServerEquipEquipped;
-    if (Record->bMission != 0) Flags |= kRpcServerEquipField0f;
+    if (Record->bMission != 0) Flags |= kRpcServerEquipMission;
     if (Record->Count > 0xff) Flags |= kRpcServerEquipWideCount;             // signed
     if (Record->Id > 0xffu) Flags |= kRpcServerEquipWideId;                  // unsigned
     unsigned char Code = 0;
@@ -659,159 +661,15 @@ void RpcServerCreateObjectRead(const FRpcServerCreateObjectFields* Fields,
 #endif
 // ===== end shared SERVER helpers =====
 
+#if defined(REMOTECLIENT_EXPORTS) || defined(REMOTESERVER_EXPORTS)
+
+// RC 06b49675 / RS 06be4135: the same table in both images. Native registration order;
+// every RegisterType result is ignored.
 #if defined(REMOTECLIENT_EXPORTS)
-
 int RpcRegisterRemoteClientServerPackets(FPacketSerializer* Serializer) {
-    // RC 06b49675. Native registration order; every RegisterType result is ignored.
-    if (Serializer == nullptr) {
-        return 4;
-    }
-    Serializer->RegisterType(0x20001, "FLPACKET_SERVER_CONNECTRESPONSE", &FRpcConnectResponsePacket::Factory);
-    Serializer->RegisterType(0x20002, "FLPACKET_SERVER_LOGINRESPONSE", &FRpcLoginResponsePacket::Factory);
-    Serializer->RegisterType(0x20005u, "FLPACKET_SERVER_DAMAGEOBJECT",
-        &FRpcServerDamageObjectPacket::Factory);
-    Serializer->RegisterType(0x20006u, "FLPACKET_SERVER_DESTROYOBJECT",
-        &FRpcServerDestroyObjectPacket::Factory);
-    Serializer->RegisterType(0x20004u, "FLPACKET_SERVER_CREATESHIP", &FRpcServerCreateShipPacket::Factory);
-    Serializer->RegisterType(0x20044u, "FLPACKET_SERVER_REQUEST_RETURNED",
-        &FRpcServerRequestReturnedPacket::Factory);
-    Serializer->RegisterType(0x20003u, "FLPACKET_SERVER_CHARACTERINFO",
-        &FRpcServerCharacterInfoPacket::Factory);
-    Serializer->RegisterType(0x20007u, "FLPACKET_SERVER_LAUNCH", &FRpcServerLaunchPacket::Factory);
-    Serializer->RegisterType(0x20008u, "FLPACKET_SERVER_CHARSELECTVERIFIED",
-        &FRpcServerCharSelectVerifiedPacket::Factory);
-    Serializer->RegisterType(0x2000au, "FLPACKET_SERVER_ACTIVATEOBJECT",
-        &FRpcServerActivateObjectPacket::Factory);
-    Serializer->RegisterType(0x2000bu, "FLPACKET_SERVER_LAND", &FRpcServerLandPacket::Factory);
-    Serializer->RegisterType(0x2000eu, "FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST",
-        &FRpcServerGfCompleteNewsBroadcastListPacket::Factory);
-    Serializer->RegisterType(0x20010u, "FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST",
-        &FRpcServerGfCompleteMissionComputerListPacket::Factory);
-    Serializer->RegisterType(0x2000fu, "FLPACKET_SERVER_GFCOMPLETECHARLIST",
-        &FRpcServerGfCompleteCharListPacket::Factory);
-    Serializer->RegisterType(0x20011u, "FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST",
-        &FRpcServerGfCompleteScriptBehaviorListPacket::Factory);
-    Serializer->RegisterType(0x20013u, "FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST",
-        &FRpcServerGfCompleteAmbientScriptListPacket::Factory);
-    Serializer->RegisterType(0x20021u, "FLPACKET_SERVER_SYSTEM_SWITCH_OUT",
-        &FRpcServerSystemSwitchOutPacket::Factory);
-    Serializer->RegisterType(0x20022u, "FLPACKET_SERVER_SYSTEM_SWITCH_IN",
-        &FRpcServerSystemSwitchInPacket::Factory);
-    Serializer->RegisterType(0x20023u, "FLPACKET_SERVER_SETSHIPARCH", &FRpcSetShipArchPacket::Factory);
-    Serializer->RegisterType(0x20024u, "FLPACKET_SERVER_SETEQUIPMENT",
-        &FRpcServerSetEquipmentPacket::Factory);
-    Serializer->RegisterType(0x20025u, "FLPACKET_SERVER_SETCARGO", &FRpcServerSetCargoPacket::Factory);
-    Serializer->RegisterType(0x20027u, "FLPACKET_SERVER_REQUESTCREATESHIPRESP",
-        &FRpcServerRequestCreateShipRespPacket::Factory);
-    Serializer->RegisterType(0x2000du, "FLPACKET_SERVER_SETSTARTROOM",
-        &FRpcServerSetStartRoomPacket::Factory);
-    Serializer->RegisterType(0x20015u, "FLPACKET_SERVER_GFDESTROYCHARACTER",
-        &FRpcServerGfDestroyCharacterPacket::Factory);
-    Serializer->RegisterType(0x20014u, "FLPACKET_SERVER_GFDESTROYNEWSBROADCAST",
-        &FRpcServerGfDestroyNewsBroadcastPacket::Factory);
-    Serializer->RegisterType(0x20016u, "FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER",
-        &FRpcServerGfDestroyMissionComputerPacket::Factory);
-    Serializer->RegisterType(0x20017u, "FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR",
-        &FRpcServerGfDestroyScriptBehaviorPacket::Factory);
-    Serializer->RegisterType(0x20019u, "FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT",
-        &FRpcServerGfDestroyAmbientScriptPacket::Factory);
-    Serializer->RegisterType(0x2001au, "FLPACKET_SERVER_GFSCRIPTBEHAVIOR",
-        &FRpcServerGfScriptBehaviorPacket::Factory);
-    Serializer->RegisterType(0x2001fu, "FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT",
-        &FRpcServerGfUpdateAmbientScriptPacket::Factory);
-    Serializer->RegisterType(0x2005bu, "FLPACKET_SERVER_MISSIONSAVEA",
-        &FRpcServerMissionSaveAPacket::Factory);
-    Serializer->RegisterType(0x2001du, "FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER",
-        &FRpcServerGfUpdateMissionComputerPacket::Factory);
-    Serializer->RegisterType(0x2001eu, "FLPACKET_SERVER_GFUPDATENEWSBROADCAST",
-        &FRpcServerGfUpdateNewsBroadcastPacket::Factory);
-    Serializer->RegisterType(0x20020u, "FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE",
-        &FRpcServerGfMissionVendorAcceptancePacket::Factory);
-    Serializer->RegisterType(0x2005au, "FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY",
-        &FRpcServerGfMissionVendorWhyEmptyPacket::Factory);
-    Serializer->RegisterType(0x20026u, "FLPACKET_SERVER_GFUPDATECHAR",
-        &FRpcServerGfUpdateCharPacket::Factory);
-    Serializer->RegisterType(0x20028u, "FLPACKET_SERVER_CREATELOOT", &FRpcServerCreateLootPacket::Factory);
-    Serializer->RegisterType(0x20029u, "FLPACKET_SERVER_SETREPUTATION",
-        &FRpcServerSetReputationPacket::Factory);
-    Serializer->RegisterType(0x2002au, "FLPACKET_SERVER_ADJUSTATTITUDE",
-        &FRpcServerAdjustAttitudePacket::Factory);
-    Serializer->RegisterType(0x2002bu, "FLPACKET_SERVER_SETGROUPFEELINGS",
-        &FRpcServerSetGroupFeelingsPacket::Factory);
-    Serializer->RegisterType(0x2002cu, "FLPACKET_SERVER_CREATEMINE", &FRpcServerCreateMinePacket::Factory);
-    Serializer->RegisterType(0x2002du, "FLPACKET_SERVER_CREATECOUNTER",
-        &FRpcServerCreateCounterPacket::Factory);
-    Serializer->RegisterType(0x20031u, "FLPACKET_SERVER_EXPLODEASTEROIDMINE",
-        &FRpcServerExplodeAsteroidMinePacket::Factory);
-    Serializer->RegisterType(0x2004du, "FLPACKET_SERVER_LOADHINT", &FRpcServerLoadHintPacket::Factory);
-    Serializer->RegisterType(0x2004eu, "FLPACKET_SERVER_SETDIRECTIVE",
-        &FRpcServerSetDirectivePacket::Factory);
-    Serializer->RegisterType(0x20037u, "FLPACKET_SERVER_CREATEGUIDED",
-        &FRpcServerCreateGuidedPacket::Factory);
-    Serializer->RegisterType(0x20038u, "FLPACKET_SERVER_ITEMTRACTORED",
-        &FRpcServerItemTractoredPacket::Factory);
-    Serializer->RegisterType(0x2002fu, "FLPACKET_SERVER_SETREMOVEITEM",
-        &FRpcServerSetRemoveItemPacket::Factory);
-    Serializer->RegisterType(0x2002eu, "FLPACKET_SERVER_SETADDITEM", &FRpcServerSetAddItemPacket::Factory);
-    Serializer->RegisterType(0x20030u, "FLPACKET_SERVER_SETCASH", &FRpcServerSetCashPacket::Factory);
-    Serializer->RegisterType(0x20032u, "FLPACKET_SERVER_REQUESTSPACESCRIPT",
-        &FRpcServerRequestSpaceScriptPacket::Factory);
-    Serializer->RegisterType(0x20033u, "FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE",
-        &FRpcServerSetMissionObjectiveStatePacket::Factory);
-    Serializer->RegisterType(0x20047u, "FLPACKET_SERVER_CFGINTERFACENOTIFICATION",
-        &FRpcServerCfgInterfaceNotificationPacket::Factory);
-    Serializer->RegisterType(0x20046u, "FLPACKET_SERVER_MARKOBJ", &FRpcServerMarkObjPacket::Factory);
-    Serializer->RegisterType(0x20035u, "FLPACKET_SERVER_SETMISSIONOBJECTIVES",
-        &FRpcServerSetMissionObjectivesPacket::Factory);
-    Serializer->RegisterType(0x20034u, "FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE",
-        &FRpcServerReplaceMissionObjectivePacket::Factory);
-    Serializer->RegisterType(0x20043u, "FLPACKET_SERVER_SET_STORY_CUE",
-        &FRpcServerSetStoryCuePacket::Factory);
-    Serializer->RegisterType(0x2004bu, "FLPACKET_SERVER_SET_CAMERA", &FRpcServerSetCameraPacket::Factory);
-    Serializer->RegisterType(0x2004cu, "FLPACKET_SERVER_REVERT_CAMERA",
-        &FRpcServerRevertCameraPacket::Factory);
-    Serializer->RegisterType(0x20045u, "FLPACKET_SERVER_SET_MISSION_MESSAGE",
-        &FRpcServerSetMissionMessagePacket::Factory);
-    Serializer->RegisterType(0x2003cu, "FLPACKET_SERVER_REPAIROBJECT",
-        &FRpcServerRepairObjectPacket::Factory);
-    Serializer->RegisterType(0x2003eu, "FLPACKET_SERVER_SETNUMKILLS", &FRpcServerSetNumKillsPacket::Factory);
-    Serializer->RegisterType(0x2003fu, "FLPACKET_SERVER_SETMISSIONSUCCESSES",
-        &FRpcServerSetMissionSuccessesPacket::Factory);
-    Serializer->RegisterType(0x20040u, "FLPACKET_SERVER_SETMISSIONFAILURES",
-        &FRpcServerSetMissionFailuresPacket::Factory);
-    Serializer->RegisterType(0x20041u, "FLPACKET_SERVER_BURNFUSE", &FRpcServerBurnFusePacket::Factory);
-    Serializer->RegisterType(0x20042u, "FLPACKET_SERVER_CREATESOLAR", &FRpcServerCreateSolarPacket::Factory);
-    Serializer->RegisterType(0x20048u, "FLPACKET_SERVER_SETCOLLISIONGROUPS",
-        &FRpcServerSetCollisionGroupsPacket::Factory);
-    Serializer->RegisterType(0x20049u, "FLPACKET_SERVER_SETHULLSTATUS", &FRpcSetHullStatusPacket::Factory);
-    Serializer->RegisterType(0x2004au, "FLPACKET_SERVER_SETGUIDEDTARGET",
-        &FRpcServerSetGuidedTargetPacket::Factory);
-    Serializer->RegisterType(0x2004fu, "FLPACKET_SERVER_SENDCOMM", &FRpcServerSendCommPacket::Factory);
-    Serializer->RegisterType(0x20051u, "FLPACKET_SERVER_USE_ITEM", &FRpcServerUseItemPacket::Factory);
-    Serializer->RegisterType(0x20039u, "FLPACKET_SERVER_SCANNOTIFY", &FRpcServerScanNotifyPacket::Factory);
-    Serializer->RegisterType(0x20052u, "FLPACKET_SERVER_PLAYERLIST", &FRpcServerPlayerListPacket::Factory);
-    Serializer->RegisterType(0x2003du, "FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE",
-        &FRpcServerRemoteObjectCargoUpdatePacket::Factory);
-    Serializer->RegisterType(0x20054u, "FLPACKET_SERVER_MISCOBJUPDATE",
-        &FRpcServerMiscObjUpdatePacket::Factory);
-    Serializer->RegisterType(0x20053u, "FLPACKET_SERVER_FORMATION_UPDATE",
-        &FRpcServerFormationUpdatePacket::Factory);
-    Serializer->RegisterType(0x20055u, "FLPACKET_SERVER_OBJECTCARGOUPDATE",
-        &FRpcServerObjectCargoUpdatePacket::Factory);
-    Serializer->RegisterType(0x20056u, "FLPACKET_SERVER_SENDNNMESSAGE",
-        &FRpcServerSendNNMessagePacket::Factory);
-    Serializer->RegisterType(0x20057u, "FLPACKET_SERVER_SET_MUSIC", &FRpcServerSetMusicPacket::Factory);
-    Serializer->RegisterType(0x20058u, "FLPACKET_SERVER_CANCEL_MUSIC", &FRpcServerCancelMusicPacket::Factory);
-    Serializer->RegisterType(0x20059u, "FLPACKET_SERVER_PLAY_SOUND_EFFECT",
-        &FRpcServerPlaySoundEffectPacket::Factory);
-    return 0;
-}
-
-
-#elif defined(REMOTESERVER_EXPORTS)
-
+#else
 int RpcRegisterRemoteServerServerPackets(FPacketSerializer* Serializer) {
-    // RS 06be4135. Native registration order; every RegisterType result is ignored.
+#endif
     if (Serializer == nullptr) {
         return 4;
     }
@@ -2288,7 +2146,6 @@ void RpcServerRelationListAppendCopy(std::list< ::Reputation::Relation*>& Dest,
 }
 
 // --- 0x29 SETREPUTATION ---
-#include "common_net.h" // IsMPServer (0x29 Encode)
 
 // RC 06b4af30 / RS 06be5a50.
 FRpcServerSetReputationPacket::FRpcServerSetReputationPacket() : FPacketBase(0x20029u) {
@@ -3020,7 +2877,7 @@ FRpcServerSetDirectivePacket::FRpcServerSetDirectivePacket() : FPacketBase(0x200
     Directive.FollowOffset.x = 0.0f;
     Directive.FollowOffset.y = 0.0f;
     Directive.FollowOffset.z = 0.0f;
-    Directive.Field_0x3c = 0.0f;
+    Directive.FollowEngageRange = 0.0f;
     Directive.GotoMode = 3;
     Directive.GotoDestination.x = 0.0f;
     Directive.GotoDestination.y = 0.0f;
@@ -3032,11 +2889,11 @@ FRpcServerSetDirectivePacket::FRpcServerSetDirectivePacket() : FPacketBase(0x200
     Directive.SplineP3 = FRpcDirectiveBlock{0u, 0u, 0u};
     Directive.GotoRange = 0.0f;
     Directive.GotoSpeed = 0.0f;
-    Directive.Field_0x8c = 0;
+    Directive.bGotoFlyThrough = 0;
     Directive.Field_0x8d = 0;
     Directive.bGotoCruise = 0;
     Directive.bGotoNoCruise = 0;
-    Directive.bGotoAllowCruise = 0;
+    Directive.bGotoDisableAvoidance = 0;
 }
 
 // The copy inlined in the sender RC 06b35f40 (Source -> packet +0x20).
@@ -3069,8 +2926,6 @@ unsigned int FRpcServerSetDirectivePacket::Decode(const unsigned char* Buffer,
 }
 
 // --- 0x52 PLAYERLIST ---
-#include <cstdlib>
-#include <cwchar>
 
 // RC 06b466a0 / RS 06bf9f40.
 FRpcServerPlayerListPacket::~FRpcServerPlayerListPacket() {
@@ -3243,12 +3098,12 @@ unsigned int FRpcServerSendCommPacket::Encode(unsigned char** BufferHolder,
             if (!Stream.Put(&Ids[Index], 4u)) return 0x16u;
         }
     }
-    if (!Stream.Put(&CommType, 4u)) return 0x16u;
+    if (!Stream.Put(&CaptionIds, 4u)) return 0x16u;
     if (!Stream.Put(&TextCount, 1u)) return 0x16u;
     for (int Index = 0; Index < static_cast<int>(TextCount); ++Index) {
         if (!Stream.Put(&TextIds[Index], 4u)) return 0x16u;
     }
-    const unsigned short LowWord = static_cast<unsigned short>(Mood);
+    const unsigned short LowWord = static_cast<unsigned short>(PermutationIds);
     if (!Stream.Put(&LowWord, 2u)) return 0x16u;
     const unsigned char Quantized = RpcServerSendCommQuantize(&Duration);
     if (!Stream.Put(&Quantized, 1u)) return 0x16u;
@@ -3287,7 +3142,7 @@ unsigned int FRpcServerSendCommPacket::Decode(const unsigned char* Buffer,
         Body.PartIds[3] = 0;
         Body.AccessoryCount = 0;
     }
-    if (!Stream.Get(&CommType, 4u)) return MarshalError;
+    if (!Stream.Get(&CaptionIds, 4u)) return MarshalError;
     if (!Stream.Get(&TextCount, 1u)) return MarshalError;
     const unsigned int ExtraBytes = static_cast<unsigned int>(static_cast<int>(TextCount)) * 4u;
 #if defined(REMOTECLIENT_EXPORTS)
@@ -3304,7 +3159,7 @@ unsigned int FRpcServerSendCommPacket::Decode(const unsigned char* Buffer,
     }
     unsigned short LowWord = 0;
     if (!Stream.Get(&LowWord, 2u)) return MarshalError;
-    Mood = LowWord;
+    PermutationIds = LowWord;
     unsigned char Quantized = 0;
     if (!Stream.Get(&Quantized, 1u)) return MarshalError;
     RpcServerSendCommExpand(Quantized, &Duration);
@@ -3320,34 +3175,34 @@ FRpcServerMiscObjUpdatePacket::FRpcServerMiscObjUpdatePacket()
       Affiliation(0xffffffffu), IdCount(0) {}
 
 // RC 06b45830.
-void FRpcServerMiscObjUpdatePacket::SetField0x28(unsigned int Value) {
+void FRpcServerMiscObjUpdatePacket::SetObjectId(unsigned int Value) {
     Flags |= 0x08u;
     ObjectId = Value;
 }
 
 // RC 06b45840.
-void FRpcServerMiscObjUpdatePacket::SetField0x24(unsigned int Value) {
+void FRpcServerMiscObjUpdatePacket::SetPlayerId(unsigned int Value) {
     Flags |= 0x04u;
     PlayerId = Value;
 }
 
 // RC 06b45850.
-void FRpcServerMiscObjUpdatePacket::SetField0x54(unsigned int Value) {
+void FRpcServerMiscObjUpdatePacket::SetAffiliation(unsigned int Value) {
     Flags |= 0x20u;
     Affiliation = Value;
 }
 
 // RC 06b45860.
-void FRpcServerMiscObjUpdatePacket::SetField0x34(unsigned int Value) {
+void FRpcServerMiscObjUpdatePacket::SetGroupId(unsigned int Value) {
     Flags |= 0x01u;
     GroupId = Value;
 }
 
 // RC 06b45870.
-void FRpcServerMiscObjUpdatePacket::SetFields0x38(unsigned int Value0x38, unsigned int Value0x3c) {
+void FRpcServerMiscObjUpdatePacket::SetMission(unsigned int InMissionId, unsigned int InMissionSetBy) {
     Flags |= 0x02u;
-    MissionId = Value0x38;
-    MissionSetBy = Value0x3c;
+    MissionId = InMissionId;
+    MissionSetBy = InMissionSetBy;
 }
 
 // RC 06b45890 (VC6 basic_string<unsigned short>::assign).
@@ -3357,13 +3212,13 @@ void FRpcServerMiscObjUpdatePacket::SetText(const std::wstring& Source) {
 }
 
 // RC 06b45a40.
-void FRpcServerMiscObjUpdatePacket::SetField0x30(unsigned int Value) {
+void FRpcServerMiscObjUpdatePacket::SetSystemId(unsigned int Value) {
     Flags |= 0x80u;
     SystemId = Value;
 }
 
 // RC 06b45a50.
-void FRpcServerMiscObjUpdatePacket::SetField0x2c(unsigned short Value) {
+void FRpcServerMiscObjUpdatePacket::SetRank(unsigned short Value) {
     Flags |= 0x40u;
     Rank = Value;
 }

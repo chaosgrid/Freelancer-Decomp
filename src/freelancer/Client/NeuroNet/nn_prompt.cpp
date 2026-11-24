@@ -20,6 +20,7 @@
 #include "Interface/win3d_renderables.h"  // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include <wchar.h>
 #include <windows.h>
@@ -103,7 +104,7 @@ bool NnPrompt::Create(Win3D* NewParent, void* Data)
         // Retail's clone-into-list idiom (FUN_0046c800 clones again; the first clone is
         // deleted), onto the +0x4fc fixed-style list.
         {
-            StyleNode const Style(0x9ca4);
+            StyleNode const Style(kTextStyleBody);
             RDLNode* const Temp = Style.Clone();
             RdlAppendNode(PromptEdit->FixedStyle, Temp->Clone());
             delete Temp;
@@ -206,15 +207,7 @@ void NnPrompt::CopyEditText()
 void NnPrompt::Close()
 {
     ReleaseMouse(); // slot 33 (+0x84)
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child); // FUN_0043d2a0
-        Child = Next;
-    }
-    Destroy();   // slot 10 (+0x28)
-    delete this; // slot 0 (1)
+    Win3DDeleteTree(this); // FUN_0043d2a0, inlined in retail
 }
 
 bool NnPrompt::OnEvent(unsigned MsgId)
@@ -297,7 +290,7 @@ intptr_t NnPrompt::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    // Unlike Close, retail deletes the tree only (FUN_0043d2a0(this)).
+    // Close's steps; here retail calls FUN_0043d2a0(this) rather than inlining it.
     ReleaseMouse();
     Win3DDeleteTree(this);
     return 0;
@@ -346,7 +339,7 @@ void NnPrompt::SetButtonRdl(int Which, RenderDisplayList const* Caption)
 
     RichTextWin* const CaptionWin = *Button->TextWinRef;
     CaptionWin->ClearContent();                   // FUN_0057b370
-    StyleNode Style(0x828b);
+    StyleNode Style(kTextStyleButton);
     CaptionWin->AppendNode(Style);                // FUN_0057b470
     JustifyNode Justify(TextJustifyCenter);       // JustifyNode(1)
     CaptionWin->AppendNode(Justify);              // FUN_0057b470

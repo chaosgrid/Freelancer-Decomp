@@ -347,7 +347,7 @@ namespace AlchemyImpl
     {
         FAleChunk Chunk;
         Chunk.Filesys = Filesys;
-        Chunk.DeleteNode(kNodeLibName);
+        Chunk.CreateNode(kNodeLibName);
         Chunk.OpenNode(kNodeLibName);
         Chunk.OpenChunk(Filesys, kNodeLibName, 1);
         const unsigned long VersionBits = kAleVersion11Bits;

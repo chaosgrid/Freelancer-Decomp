@@ -29,30 +29,7 @@ static const char* const G_EyeMaterialPattern = "^eye*";
 static const char* const G_FileSystemName = "FileSystem";
 static const char* const G_Name3DMathEngine = "3DMathEngine";
 
-// ReadFile UTF header (0x38). Deformable2 walks IFileSystem nodes, not this dword.
-static const unsigned long G_UtfMagic = 0x20465455u; // "UTF "
-static const unsigned long G_UtfVersion = 0x101u;
 static const int G_MaxBoneCount = 150;
-
-struct FUtfHeader
-{
-    unsigned long Magic;       // +0x00 "UTF "
-    unsigned long Version;     // +0x04 0x101
-    unsigned long TreeOffset;  // +0x08
-    unsigned long Pad0C;
-    unsigned long Pad10;
-    unsigned long NodeSize;    // +0x14 0x0C or 0x2C
-    unsigned long StringOff;   // +0x18
-    unsigned long Pad1C;
-    unsigned long Pad20;
-    unsigned long DataOffset;  // +0x24
-    unsigned long Pad28;
-    unsigned long Pad2C;
-    unsigned long Pad30;
-    unsigned long Pad34;
-};
-
-static_assert(sizeof(FUtfHeader) == 0x38, "UTF header must be 0x38");
 
 // The 0x34 FileSystem AGGDESC (FUN_065f3e80 / FUN_065f36c0) and IFileSystem come from
 // readfile.h.
@@ -124,7 +101,7 @@ static_assert(sizeof(FSkinVertex) == 8, "skin vertex must be 8");
 // FUN_065f89e0 / FUN_065f96b0: per-bone std::vector<ushort> of vertex indices.
 struct FBoneVertexList
 {
-    unsigned char Pad00;
+    unsigned char Allocator;    // +0x00 the STL allocator byte
     unsigned char Pad01[3];
     unsigned short* Start;
     unsigned short* Finish;
@@ -206,12 +183,14 @@ struct FMeshArchetype : FDeformMesh
     unsigned long* UvIndices;            // +0x54  UV0_indices
     int UvDeformCount;          // +0x58 FUN_065f8480 rows
     FUvDeformRecord* UvDeform;  // +0x5C count * 0x24
-    unsigned char NameHint;     // +0x60 vector pad
+    // +0x60 the allocator byte of the remap vector; the ctor stores the low byte of Name in it.
+    unsigned char RemapAllocator;
     unsigned char Pad61[3];
     FVertexRemapList* RemapStart;    // +0x64 FUN_065f75f0
     FVertexRemapList* RemapFinish;   // +0x68
     FVertexRemapList* RemapCapacity; // +0x6C
-    unsigned char Flag70;       // +0x70
+    // +0x70 LodIndex < FDeformPartDesc::LodLimit: bones are skinned; else they stay identity.
+    unsigned char bSkinned;
     unsigned char SphereReady;  // +0x71 LAB_065f8d00 cache
     unsigned char Pad72[2];
     float SphereCenter[3];      // +0x74
@@ -458,13 +437,13 @@ struct FIkListNode
     unsigned char Active; // +0 = 0 anim (FUN_065f41d0); 1 IK (FUN_065f5400)
     unsigned char Pad01[3];
     struct FIkEvent* Event; // +4 handle or FIkEvent*
-    unsigned long Extra8;   // +8 FUN_065f41d0 local
+    unsigned long StartHeight; // +8 float bits: the root height FUN_065f41d0 played at
     FIkListNode* Prev; // +0xC
     FIkListNode* Next; // +0x10
 };
 
 static_assert(sizeof(FIkListNode) == 0x14, "IK list node must be 0x14");
-static_assert(offsetof(FIkListNode, Extra8) == 0x08, "list node extra +8");
+static_assert(offsetof(FIkListNode, StartHeight) == 0x08, "list node start height +8");
 
 // IK event owns its typed channels and serves as their owner callback.
 struct FIkEvent : IChannelOwner
@@ -487,21 +466,23 @@ struct FIkEvent : IChannelOwner
     float* Quats;            // +0x1C count * 0x10
     void* TargetA;           // +0x20 desc+0x10
     void* TargetB;           // +0x24 desc+0x14
-    unsigned long Flags28;   // +0x28 desc+0x0C
+    // +0x28 desc+0x0C: bit 0 TargetA is a point (else a direction), 0x20 / 0x40 position /
+    // orientation target, 0x80 no rest pull and no joint-limit clamp.
+    unsigned long AimFlags;
     unsigned char* LockBytes;// +0x2C
-    int Extra30;             // +0x30 desc+0x1C
-    unsigned char Flags34;   // +0x34 ctor &= ~1
+    int LockCount;           // +0x30 desc+0x1C, locked joint ids at desc+0x20
+    unsigned char StateFlags; // +0x34 bit 0 stopped (FUN_065f5950), bit 1 sphere axis (DLS alt)
     unsigned char Pad35[3];
-    float Damp38;            // +0x38 desc+0x18
-    int Tick3C;              // +0x3C
+    float Damping;           // +0x38 desc+0x18, the DLS damping factor
+    int ApplyTick;           // +0x3C Apply calls this round; solves on 0, wraps at JointCount
     int JointCount;          // +0x40 FUN_065fb030
 };
 
 static_assert(sizeof(FIkEvent) == 0x44, "IK event must be 0x44");
 static_assert(offsetof(FIkEvent, JointIds) == 0x08, "IK joints +8");
-static_assert(offsetof(FIkEvent, Flags28) == 0x28, "IK flags +28");
-static_assert(offsetof(FIkEvent, Flags34) == 0x34, "IK flags34 +34");
-static_assert(offsetof(FIkEvent, Damp38) == 0x38, "IK damp +38");
+static_assert(offsetof(FIkEvent, AimFlags) == 0x28, "IK aim flags +28");
+static_assert(offsetof(FIkEvent, StateFlags) == 0x34, "IK state flags +34");
+static_assert(offsetof(FIkEvent, Damping) == 0x38, "IK damping +38");
 static_assert(offsetof(FIkEvent, JointCount) == 0x40, "IK joint count +40");
 
 // LAB_065fb540 arg4: +0 skip DLS; +0xC joint for +0xC4/+0xD4.
@@ -509,10 +490,10 @@ struct FIkApplyGate
 {
     int SkipFlag;
     unsigned char Pad04[8];
-    int JointAt0C;
+    int Joint;    // +0x0C
 };
 
-static_assert(offsetof(FIkApplyGate, JointAt0C) == 0x0C, "IK apply gate +C");
+static_assert(offsetof(FIkApplyGate, Joint) == 0x0C, "IK apply gate +C");
 
 struct FIkMathDesc
 {
@@ -574,10 +555,10 @@ struct FDeformInstance : IChannelSink
     FIkListNode* ListHead;          // +0x0C
     FIkListNode* ListTail;          // +0x10
     int ListCount;           // +0x14
-    IChannelSink* UserAt18;  // +0x18 Create arg3 (FUN_065f36c0 param_2)
-    void* UserAt1C;          // +0x1C Create arg4 (FUN_065f36c0 param_3)
-    float Offset20;          // +0x20 FUN_065f50b0 set; pose Y add
-    float Offset24;          // +0x24 FUN_065f4de0: bone+0x34 − Offset20
+    IChannelSink* ForwardSink;  // +0x18 Create arg3: the sink the notifications go on to
+    void* DefaultScript;        // +0x1C Create arg4: the script of a Play without one
+    float BaseHeight;           // +0x20 SetHeight (FUN_065f50b0); added to the pose Y
+    float RootHeightOffset;     // +0x24 FUN_065f4de0: root bone Y (bone+0x34) - BaseHeight
     float RateCookie;        // +0x28 DAT_0660314c / rand phase
 
     void DACOM_API OnKeys(unsigned long ChannelKey, void* Context,
@@ -613,5 +594,5 @@ static_assert(offsetof(FDeformPart, Flags) == 0x30, "part flags +30");
 static_assert(sizeof(FDeformInstance) == 0x2C, "create instance must be 0x2C");
 static_assert(offsetof(FDeformInstance, ListHead) == 0x0C, "instance list head +0c");
 static_assert(offsetof(FDeformInstance, ListTail) == 0x10, "instance list tail +10");
-static_assert(offsetof(FDeformInstance, Offset20) == 0x20, "instance offset +20");
-static_assert(offsetof(FDeformInstance, Offset24) == 0x24, "instance offset +24");
+static_assert(offsetof(FDeformInstance, BaseHeight) == 0x20, "instance base height +20");
+static_assert(offsetof(FDeformInstance, RootHeightOffset) == 0x24, "instance root height offset +24");

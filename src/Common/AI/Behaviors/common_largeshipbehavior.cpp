@@ -13,37 +13,24 @@
 
 #include <cmath>  // sqrtf, for the two places retail uses a real FSQRT rather than the bit-hack
 
-// FUN_062cfe20. SubObjectA is a MoveIdea (FUN_062d4e60), SubObjectB a FaceIdea (FUN_062d6750).
+// FUN_062cfe20. Move is a MoveIdea (FUN_062d4e60), Face a FaceIdea (FUN_062d6750).
 LargeShipBehavior::LargeShipBehavior(int InTypeId)
-    : Behavior()
-    , TypeId(InTypeId)
-    , CachedHandle08(0)
-    , ModeSelector0xc(0)
-    , UpdateResult10(0)
-    , ThreatSourcePtr14(nullptr)
-    , ObjectDb(nullptr)
-    , DeltaTime1c(0.0f)
-    , BehaviorMgrPtr20(nullptr)
-    , NavHelperPtr24(nullptr)
-    , Flags28(0)
-    , Flag29(0)
-    , Pad2a{}
-    , Field2c(1500.0f)
-    , SubObjectA()
-    , SubObjectB()
+    : Behavior(InTypeId)
+    , AverageGunRange(1500.0f)
+    , Move()
+    , Face()
     , AvoidanceScanCooldown(0.0f)
     , ThreatCooldown(0.0f)
     , AvoidanceGoalPos{}
 {
-    ConstructBase(InTypeId);   // FUN_062d2020
 }
 
-// FUN_062cfec0 (scalar deleting FUN_062cfea0): SubObjectB's watcher (+0xbc) is cleared before
-// SubObjectA's (+0x44); ~Behavior (FUN_062d2080) chains after.
+// FUN_062cfec0 (scalar deleting FUN_062cfea0): Face's watcher (+0xbc) is cleared before
+// Move's (+0x44); ~Behavior (FUN_062d2080) chains after.
 LargeShipBehavior::~LargeShipBehavior()
 {
-    SubObjectB.Watcher.set(nullptr);
-    SubObjectA.Watcher.set(nullptr);
+    Face.Watcher.set(nullptr);
+    Move.Watcher.set(nullptr);
 }
 
 // Slot 1, LAB_062cff40. Retail does not test the BindContext result before binding the ideas
@@ -52,12 +39,12 @@ bool LargeShipBehavior::SetContext(void* Owner, void* Manager, void* Sys)
 {
     bool const bBound = BindContext(Owner, Manager, Sys);
 
-    SubObjectA.SetContext(ThreatSourcePtr14, NavHelperPtr24, Manager);
+    Move.SetContext(OwnerContext, SysMgr, Manager);
 
     // FUN_062d5a10, called non-virtually like all MoveIdea setters.
-    SubObjectA.SetEnabled(true);
+    Move.SetEnabled(true);
 
-    SubObjectB.SetContext(ThreatSourcePtr14, NavHelperPtr24, Manager);
+    Face.SetContext(OwnerContext, SysMgr, Manager);
 
     return bBound;
 }
@@ -69,22 +56,22 @@ void LargeShipBehavior::OnEngage()
 
     // Retail calls the ICF fold named TextRenderContext::set_origin_h with pi (0x40490fdb),
     // restoring MoveIdea's ctor default.
-    SubObjectA.SetAngle38(3.14159274f);
+    Move.SetAngle38(3.14159274f);
 
-    SetCruiseLock(0, 3);                                            // FUN_062d21d0
+    SetAvoidanceAllowed(0, 3);                                            // FUN_062d21d0
 
-    // FUN_062eb5a0. Field2c takes the average, not the max.
+    // FUN_062eb5a0 (ComputeGunRangeStats): the average, not the max.
     float OutAverage = 0.0f;
     float OutMax = 0.0f;
-    if (NavHelperPtr24->GunGroups.ComputeGunRangeStats(&OutAverage, &OutMax))
-        Field2c = OutAverage;
+    if (SysMgr->GunGroups.ComputeGunRangeStats(&OutAverage, &OutMax))
+        AverageGunRange = OutAverage;
 }
 
-// Slot 4, FUN_062d09e0. SubObjectB commits before SubObjectA.
+// Slot 4, FUN_062d09e0. Face commits before Move.
 void LargeShipBehavior::OnDisengage()
 {
-    SubObjectB.Commit();
-    SubObjectA.Commit();
+    Face.Commit();
+    Move.Commit();
 
     Behavior::OnDisengage();
 }
@@ -97,19 +84,19 @@ int LargeShipBehavior::OnEvaluateReadiness(float Value)
 
     // The mask is tested on the out-parameter; get_type's return value is discarded.
     unsigned ObjectType = 0;
-    ObjInspectOf(ThreatSourcePtr14)->get_type(ObjectType);
+    ObjInspectOf(OwnerContext)->get_type(ObjectType);
     if ((ObjectType & 0x80000) != 0)
     {
-        if (NavHelperPtr24->Targeting.GetTarget() != nullptr)      // FUN_062ed5a0
+        if (SysMgr->Targeting.GetTarget() != nullptr)      // FUN_062ed5a0
             Mode = 1;
     }
 
     if (Flag29 != 0)
     {
-        ModeSelector0xc = 3;
+        Readiness = 3;
         return 3;
     }
-    ModeSelector0xc = Mode;
+    Readiness = Mode;
     return Mode;
 }
 
@@ -158,14 +145,14 @@ static double FastLengthFromSquared(double LengthSq)
 // The byte the ThreatCooldown clamp writes ([ESP+0x27], read at 062d0274 as [ESP+0x2b] after
 // a PUSH) gates the second half of the avoidance scan: while ThreatCooldown has not run down
 // this tick, retail averages the hostile-contact positions and stops, committing both ideas
-// instead of steering (bField16cExpired below).
+// instead of steering (bThreatCooldownExpired below).
 // ----------------------------------------------------------------------------
 int LargeShipBehavior::Update()
 {
-    IObjRW* const Handle = NavHelperPtr24->Targeting.GetTarget();
+    IObjRW* const Handle = SysMgr->Targeting.GetTarget();
     if (Handle == nullptr)
     {
-        UpdateResult10 = 2;
+        UpdateResult = 2;
         return 2;
     }
 
@@ -173,15 +160,15 @@ int LargeShipBehavior::Update()
     // Deviation: zero-initialised where retail leaves the unused slices indeterminate; every
     // field read below is set by Init or one of the lazy refreshes.
     FAiTarget Scratch = {};
-    Scratch.Init(ObjInspectOf(ThreatSourcePtr14), ObjInspectOf(Handle));
+    Scratch.Init(ObjInspectOf(OwnerContext), ObjInspectOf(Handle));
 
     // Clamped at zero (DAT_0639c430 = 0.0 double).
-    bool bField16cExpired = false;
-    ThreatCooldown -= DeltaTime1c;
+    bool bThreatCooldownExpired = false;
+    ThreatCooldown -= DeltaTime;
     if (ThreatCooldown <= 0.0f)
     {
         ThreatCooldown = 0.0f;
-        bField16cExpired = true;
+        bThreatCooldownExpired = true;
     }
 
     RefreshAiTargetFlags(Scratch);
@@ -191,24 +178,24 @@ int LargeShipBehavior::Update()
         Scratch.RefreshPos();
         Vector const ThreatPos = Scratch.CachedPos;
 
-        SubObjectA.SetRange3c(500.0f);  // DAT_0639f55c
-        SubObjectA.SetMode(0);
-        SubObjectA.SetScale40(0.6f);    // DAT_0639f554
-        SubObjectB.SetPosition(ThreatPos);
-        SubObjectA.SetPosition(ThreatPos);
+        Move.SetRange3c(500.0f);  // DAT_0639f55c
+        Move.SetMode(0);
+        Move.SetScale40(0.6f);    // DAT_0639f554
+        Face.SetPosition(ThreatPos);
+        Move.SetPosition(ThreatPos);
 
         ThreatCooldown = 30.0f;  // DAT_0639f550
-        UpdateResult10 = 1;
+        UpdateResult = 1;
         return 1;  // early return: this path skips the shared tail's tick calls
     }
 
     // A separate cooldown gates the avoidance scan (DAT_06399408 = 0.0f).
-    AvoidanceScanCooldown -= DeltaTime1c;
+    AvoidanceScanCooldown -= DeltaTime;
     if (AvoidanceScanCooldown < 0.0f)
     {
         AvoidanceScanCooldown = 5.0f;  // DAT_0639f54c
 
-        SystemManager* const Sys = NavHelperPtr24;
+        SystemManager* const Sys = SysMgr;
 
         // The owning ship's own world position; no null test, as retail.
         Vector const SelfPos = OwnerObjInspectOf(Sys)->get_position();
@@ -249,7 +236,7 @@ int LargeShipBehavior::Update()
             HostileCentre.y = static_cast<float>(HostileCentre.y * InvCount);
             HostileCentre.z = static_cast<float>(HostileCentre.z * InvCount);
 
-            if (bField16cExpired)
+            if (bThreatCooldownExpired)
             {
                 // ---- Pass 2: average the positions of every nearby candidate of one of
                 // ---- three exact types.
@@ -360,9 +347,9 @@ int LargeShipBehavior::Update()
                                       + static_cast<double>(ToGoal.y) * ToGoal.y;
                 if (FastLengthFromSquared(ToGoalSq) < 100.0)  // DAT_0639fb58
                 {
-                    SubObjectB.Update(DeltaTime1c);
-                    SubObjectA.Update(DeltaTime1c);
-                    UpdateResult10 = 1;
+                    Face.Update(DeltaTime);
+                    Move.Update(DeltaTime);
+                    UpdateResult = 1;
                     return 1;
                 }
 
@@ -451,37 +438,37 @@ int LargeShipBehavior::Update()
                 // directly when the candidate list is empty.
                 if (!bBlocked)
                 {
-                    SubObjectA.SetRange3c(250.0f);  // DAT_0639f558
-                    SubObjectA.SetMode(0);
-                    SubObjectA.SetScale40(0.6f);    // DAT_0639f554
-                    SubObjectB.SetPosition(AvoidanceGoalPos);
-                    SubObjectA.SetPosition(AvoidanceGoalPos);
+                    Move.SetRange3c(250.0f);  // DAT_0639f558
+                    Move.SetMode(0);
+                    Move.SetScale40(0.6f);    // DAT_0639f554
+                    Face.SetPosition(AvoidanceGoalPos);
+                    Move.SetPosition(AvoidanceGoalPos);
                     ThreatCooldown = 30.0f;               // DAT_0639f550
                 }
 
                 if (bBlocked)
                 {
-                    SubObjectA.Commit();
-                    SubObjectB.Commit();
+                    Move.Commit();
+                    Face.Commit();
                 }
             }
             else
             {
-                SubObjectA.Commit();
-                SubObjectB.Commit();
+                Move.Commit();
+                Face.Commit();
             }
         }
         else
         {
-            SubObjectA.Commit();
-            SubObjectB.Commit();
+            Move.Commit();
+            Face.Commit();
         }
     }
 
     // LAB_062d0972, the shared tail. Both results are discarded.
-    SubObjectB.Update(DeltaTime1c);
-    SubObjectA.Update(DeltaTime1c);
+    Face.Update(DeltaTime);
+    Move.Update(DeltaTime);
 
-    UpdateResult10 = 1;
+    UpdateResult = 1;
     return 1;
 }

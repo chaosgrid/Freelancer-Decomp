@@ -43,7 +43,7 @@
 #include "Common/Audio/menu_sound_arch.h"  // GetClientSoundListenerObject (FUN_0040f130)
 #include "NeuroNet/nn_montage_draw.h"  // FindButtonMontageTile (FUN_0055a360)
 #include "NeuroNet/nn_text_control.h"  // NnTextControl (+0x334 Font::String, FUN_0058a5d0 / FUN_0058a5e0)
-#include "NeuroNet/nn_ui_pulse.h"      // G_NnPaletteArgb_679ba8
+#include "NeuroNet/nn_ui_pulse.h"      // G_NnPaletteRed
 #include "Space/player_behavior.h"  // GetPlayerObjRW, IsMouseFlightHoldThresholdReached, IsMouseFlightLocked
 #include "Space/player_spawn.h"     // GetPlayerWaypointCountRetail / GetPlayerWaypointRetail
 #include "Space/Cameras/space_camera.h"     // FSpaceCamera, AsCamera
@@ -108,7 +108,7 @@ namespace
         float const HalfExtents[3] = {0.018f, 0.018f, 0.0f};
         WinControl* const Alert = Parent->CreateStaticControl(
             Name, MeshPath, Position, nullptr, HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
-        uintptr_t const Red = reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba8);
+        uintptr_t const Red = reinterpret_cast<uintptr_t>(&G_NnPaletteRed);
         Alert->SetProperty(0x18, Red, Red);
         if (Ids != 0)
             Alert->SetProperty(3, Ids, 0);
@@ -153,7 +153,7 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     HUDItem::Name = "Targetable_Objects";
     SetPosition(Position);
     if (Win3D::Create(nullptr, nullptr))
-        RegisterEvent(6);
+        RegisterEvent(USER_BUTTON0);
     Win3D::SetName("Targetable_Objects");
     ClassName = "Targetable_Objects";
 
@@ -294,8 +294,8 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     FontStringSetText(&BestPathLabel, Caption);
 
     NameCacheSimpleId = 0;
-    NameCacheKey848 = -1;
-    NameCacheKey84c = -1;
+    NameCacheLootUnits = -1;
+    NameCacheVisited = -1;
     TargetInfoKey = -1;
     NameCacheTimer = 0.0f;
     AimPoint.z = 0.0f;
@@ -379,7 +379,7 @@ void HudTargetableObjects::SetTarget(IObjRW* Target)
     {
         CObject* const Object = Base->cobject();
         if (Object != nullptr &&
-            (static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u)
+            (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
         {
             Ship = static_cast<CShip*>(Object);
         }
@@ -397,7 +397,7 @@ bool HudTargetableObjects::Create(Win3D* NewParent, void* Data)
     SetPosition(Position);
     if (!Win3D::Create(NewParent, Data))   // FUN_004b5060
         return false;
-    RegisterEvent(6);        // FUN_005760d0
+    RegisterEvent(USER_BUTTON0);        // FUN_005760d0
     return true;
 }
 
@@ -408,18 +408,18 @@ bool HudTargetableObjects::OnEvent(unsigned MsgId)
         return false;
     if (Win3DGetHover() != nullptr)   // FUN_0059daa0
         return false;
-    if (MsgId != 6)
+    if (MsgId != USER_BUTTON0)
         return false;
     if (IsMouseFlightHoldThresholdReached() && !IsMouseFlightLocked())
         return false;
 
     // A key-down record re-picks quietly and remembers the result.
-    if (HudCommandRecord()->Byte18 != 0)
+    if (HudCommandRecord()->bKeyDown != 0)
     {
         bPickPending = PickUnderCursor(true) ? 1 : 0;
         return false;
     }
-    if (HudCommandRecord()->Byte1A != 0)
+    if (HudCommandRecord()->bDoubleClick != 0)
         return false;
 
     if (PickId == 0 && bPickPending == 0)
@@ -431,7 +431,7 @@ bool HudTargetableObjects::OnEvent(unsigned MsgId)
         return false;
     FSpaceCommand Command;
     std::memset(&Command, 0, sizeof(Command));
-    Command.Id = 0x1c;
+    Command.Id = USER_SET_TARGET;
     Command.ObjectId = PickId;
     Command.SubObjectId = PickSubObjId;
     Command.Byte26 = 1;
@@ -554,7 +554,7 @@ void HudTargetableObjects::RebuildContacts()
     if (Player != nullptr)
     {
         CObject* const Object = CObjectOfObjRW(Player);
-        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u)
+        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             PlayerShip = static_cast<CShip*>(Object);
     }
 
@@ -664,7 +664,7 @@ void HudTargetableObjects::RebuildContacts()
         if (Object->get_type(Type) != 0)
             continue;
         CObject const* const Target = Object->cobject();
-        if (Target != nullptr && (static_cast<unsigned>(Target->ObjectClass) & 0x503u) == 0x503u &&
+        if (Target != nullptr && (static_cast<unsigned>(Target->ObjectClass) & CObject::ClassShip) == CObject::ClassShip &&
             static_cast<CShip const*>(Target)->bIsPlayer != 0)
         {
             Record.bPlayerShip = 1;
@@ -779,7 +779,7 @@ void HudTargetableObjects::RebuildContacts()
 
     // A solar with a parent picks the parent, when the parent's client object is known; a known
     // parent that is not a solar ends the pick.
-    if ((static_cast<unsigned>(RayTarget->ObjectClass) & 0x303u) == 0x303u)
+    if ((static_cast<unsigned>(RayTarget->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
     {
         ID_String const& Parent = static_cast<CSolar*>(RayTarget)->GetParentNickname();
         if (!Parent.IsEmpty())
@@ -790,7 +790,7 @@ void HudTargetableObjects::RebuildContacts()
                 CObject* const ParentObject = CObjectOfGameobj(Gameobj);
                 if (ParentObject == nullptr)
                     return;
-                if ((static_cast<unsigned>(ParentObject->ObjectClass) & 0x303u) != 0x303u)
+                if ((static_cast<unsigned>(ParentObject->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
                     return;
                 Pick = static_cast<CSimple*>(ParentObject);
             }
@@ -850,7 +850,7 @@ namespace
 }
 
 FCameraRayHit* CameraRayPickTo(FCameraRayHit* Out, ICamera* Camera, Vector const* To,
-                               CObject const* Ignore, bool bSkipFireBlocked)
+                               CObject const* Ignore, bool bSkipCloaked)
 {
     // FUN_0051ddd0.
     FCameraRayHit Result;
@@ -867,7 +867,7 @@ FCameraRayHit* CameraRayPickTo(FCameraRayHit* Out, ICamera* Camera, Vector const
     int const HitCount = PhySys::FindRayCollisions(SystemId, *From, *To, Hits, 8);
 
     // The first hit that is not Ignore (itself or through its root), not a shield part, and --
-    // with bSkipFireBlocked -- not on a ship whose CloakPercent is at least 1.0 (DAT_005c75dc;
+    // with bSkipCloaked -- not on a ship whose CloakPercent is at least 1.0 (DAT_005c75dc;
     // NaN keeps the hit).
     for (int Index = 0; Index < HitCount; ++Index)
     {
@@ -879,8 +879,8 @@ FCameraRayHit* CameraRayPickTo(FCameraRayHit* Out, ICamera* Camera, Vector const
             continue;
         if (Hit.Object->is_shield_part(Hit.PartId))
             continue;
-        if (bSkipFireBlocked && HitRoot != nullptr &&
-            (static_cast<unsigned>(HitRoot->ObjectClass) & 0x503u) == 0x503u &&
+        if (bSkipCloaked && HitRoot != nullptr &&
+            (static_cast<unsigned>(HitRoot->ObjectClass) & CObject::ClassShip) == CObject::ClassShip &&
             static_cast<CEqObj const*>(HitRoot)->CloakPercent >= 1.0f)
         {
             continue;
@@ -908,7 +908,7 @@ FCameraRayHit* CameraRayPickTo(FCameraRayHit* Out, ICamera* Camera, Vector const
 }
 
 FCameraRayHit* CameraRayPick(FCameraRayHit* Out, ICamera* Camera, float ScreenX, float ScreenY,
-                             CObject const* Ignore, bool bSkipFireBlocked)
+                             CObject const* Ignore, bool bSkipCloaked)
 {
     // FUN_0051dd20.
     Vector Direction;
@@ -928,7 +928,7 @@ FCameraRayHit* CameraRayPick(FCameraRayHit* Out, ICamera* Camera, float ScreenX,
     To.x = Direction.x + From[0];
     To.y = Direction.y + From[1];
     To.z = Direction.z + From[2];
-    CameraRayPickTo(Out, Camera, &To, Ignore, bSkipFireBlocked);
+    CameraRayPickTo(Out, Camera, &To, Ignore, bSkipCloaked);
     return Out;
 }
 
@@ -944,7 +944,7 @@ bool HudTargetableObjects::PickUnderCursor(bool bQuiet)
     CObject* const PlayerShip = CObjectOfObjRW(Player);
     if (PlayerShip == nullptr)
         return false;
-    if ((static_cast<unsigned>(PlayerShip->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(PlayerShip->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return false;
 
     if (G_HudPickOverrideId != 0)
@@ -1025,7 +1025,7 @@ bool HudTargetableObjects::PickUnderCursor(bool bQuiet)
             PickSubObjId = SUBOBJ_ID_NONE;
             CObject const* const HotObject = Hot->cobject();
             if (HotObject != nullptr &&
-                (static_cast<unsigned>(HotObject->ObjectClass) & 0x303u) == 0x303u)
+                (static_cast<unsigned>(HotObject->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             {
                 CSolar const* const Solar = static_cast<CSolar const*>(HotObject);
                 if (!Solar->GetParentNickname().IsEmpty())
@@ -1109,7 +1109,7 @@ void HudTargetableObjects::PickRayTarget(FCameraRayHit const* Hit, unsigned* Out
     CObject* const PlayerShip = CObjectOfObjRW(Player);
     if (PlayerShip == nullptr)
         return;
-    if ((static_cast<unsigned>(PlayerShip->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(PlayerShip->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
 
     CObject* const Object = Hit->Object;
@@ -1175,13 +1175,13 @@ void HudTargetableObjects::PickRayTarget(FCameraRayHit const* Hit, unsigned* Out
     CObject* const Equipped = Hit->Object;
     if (Equipped == nullptr)
         return;
-    if ((static_cast<unsigned>(Equipped->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(Equipped->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         return;
     if (bOutOfRange)
         return;
 
     // A solar with a known parent picks the parent, whole.
-    if ((static_cast<unsigned>(Equipped->ObjectClass) & 0x303u) == 0x303u)
+    if ((static_cast<unsigned>(Equipped->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
     {
         CSolar const* const Solar = static_cast<CSolar const*>(Equipped);
         if (!Solar->GetParentNickname().IsEmpty())
@@ -1425,7 +1425,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
     CollectLeadMarkers();
 
     // The lead markers only for a player ship neither in a trade lane nor in cruise.
-    CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, 0x503u));
+    CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
     if (PlayerShip != nullptr && !PlayerShip->is_using_tradelane() &&
         !PlayerShip->is_cruise_active())
     {
@@ -1510,10 +1510,10 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
                     bNoAttitude = true;
             }
             // A fully cloaked equipped object (>= 1.0, ordered) shows no attitude.
-            bool const bBlocked =
-                (static_cast<unsigned>(Ray->ObjectClass) & 0x103u) == 0x103u &&
+            bool const bFullyCloaked =
+                (static_cast<unsigned>(Ray->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj &&
                 static_cast<CEqObj const*>(static_cast<CObject const*>(Ray))->CloakPercent >= 1.0f;
-            if (!bBlocked && !bNoAttitude)
+            if (!bFullyCloaked && !bNoAttitude)
                 bUseAttitude = true;
         }
     }
@@ -1526,7 +1526,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
         {
             CObject const* const ContactObject = Contact->cobject();
             if (ContactObject != nullptr &&
-                (static_cast<unsigned>(ContactObject->ObjectClass) & 0x303u) == 0x303u)
+                (static_cast<unsigned>(ContactObject->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             {
                 CSolar const* const Solar = static_cast<CSolar const*>(ContactObject);
                 if (!Solar->GetParentNickname().IsEmpty())
@@ -1542,10 +1542,10 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
                 (static_cast<FClientGameobj*>(Player)->ManagerKind == 1) ? Player : nullptr;
             Attitude = GetAttitudeClass(PlayerOrNull, Contact);   // FUN_0045a490
             CObject const* const Target = Contact->cobject();
-            bool const bBlocked =
-                Target != nullptr && (static_cast<unsigned>(Target->ObjectClass) & 0x103u) == 0x103u &&
+            bool const bFullyCloaked =
+                Target != nullptr && (static_cast<unsigned>(Target->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj &&
                 static_cast<CEqObj const*>(Target)->CloakPercent >= 1.0f;
-            if (!bBlocked)
+            if (!bFullyCloaked)
                 bUseAttitude = true;
         }
     }
@@ -1639,10 +1639,10 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
             }
             if (bShow)
             {
-                bool const bBlocked =
-                    (static_cast<unsigned>(Ray->ObjectClass) & 0x103u) == 0x103u &&
+                bool const bFullyCloaked =
+                    (static_cast<unsigned>(Ray->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj &&
                     static_cast<CEqObj const*>(static_cast<CObject const*>(Ray))->CloakPercent >= 1.0f;
-                if (!bBlocked)
+                if (!bFullyCloaked)
                     FeedObjectToolTip(&Info, Ray, static_cast<int>(~Ray->Id));
             }
         }
@@ -1655,7 +1655,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
             ObjRwFromWatchable(const_cast<Watchable*>(ScanEntries->Entries[HotIndex].target()));
         CObject const* Target = (Contact != nullptr) ? Contact->cobject() : nullptr;
         bool bShow = Target != nullptr && (static_cast<unsigned>(Target->ObjectClass) & 3u) == 3u;
-        if (bShow && (static_cast<unsigned>(Target->ObjectClass) & 0x303u) == 0x303u)
+        if (bShow && (static_cast<unsigned>(Target->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
         {
             CSolar const* const Solar = static_cast<CSolar const*>(Target);
             if (!Solar->GetParentNickname().IsEmpty())
@@ -1666,7 +1666,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
                 {
                     CObject* const ParentObject = CObjectOfGameobj(Parent);
                     if (ParentObject == nullptr ||
-                        (static_cast<unsigned>(ParentObject->ObjectClass) & 0x303u) != 0x303u)
+                        (static_cast<unsigned>(ParentObject->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
                     {
                         bShow = false;
                     }
@@ -1679,10 +1679,10 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
         }
         if (bShow)
         {
-            bool const bBlocked =
-                (static_cast<unsigned>(Target->ObjectClass) & 0x103u) == 0x103u &&
+            bool const bFullyCloaked =
+                (static_cast<unsigned>(Target->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj &&
                 static_cast<CEqObj const*>(Target)->CloakPercent >= 1.0f;
-            if (!bBlocked)
+            if (!bFullyCloaked)
             {
                 CSimple const* const Simple = static_cast<CSimple const*>(Target);
                 FeedObjectToolTip(&Info, Simple, static_cast<int>(Simple->Id));
@@ -1892,7 +1892,7 @@ void HudTargetableObjects::DrawContactMarkers()
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
     if (Scanner == nullptr || Player == nullptr)
         return;
-    CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, 0x503u));
+    CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
     if (PlayerShip == nullptr)
         return;
 
@@ -1934,7 +1934,7 @@ void HudTargetableObjects::DrawContactMarkers()
 
         // The idle cyan; with the player in ObjDB bucket 1 its reputation colour (FUN_0045a4e0)
         // and whether the contact is hostile (FUN_0045a490 == -1).
-        unsigned long Color = G_NnPaletteArgb_679bb0;
+        unsigned long Color = G_NnPaletteCyan;
         bool bHostile = false;
         if (static_cast<FClientGameobj*>(Player)->ManagerKind == 1)
         {
@@ -1966,7 +1966,7 @@ void HudTargetableObjects::DrawContactMarkers()
         {
             // One of HUD_Comm's watched objects is amber.
             if (HudCommIsWatchedObjectId(Contact->get_id()))   // FUN_004cc880
-                Color = G_NnPaletteArgb_679ba4;
+                Color = G_NnPaletteAmber;
 
             // The alpha fades with distance (DAT_005c9804, DAT_005d954c), halved for type
             // 0x10000000 (DAT_005c75e0), clamped to [0, 1] with NaN left as is, and the alpha
@@ -2117,7 +2117,7 @@ void HudTargetableObjects::DrawTargetReticle()
         ReticleRangeText->SetProperty(1, 1, 0);
         return;
     }
-    CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, 0x503u));
+    CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
     if (PlayerShip == nullptr)
         return;
 
@@ -2160,7 +2160,7 @@ void HudTargetableObjects::DrawTargetReticle()
     {
         if (WaypointRecord.bOnScreen != 0)
         {
-            DrawWaypointMarker(&WaypointRecord, &G_NnPaletteArgb_679b80, 0);
+            DrawWaypointMarker(&WaypointRecord, &G_NnPaletteViolet, 0);
             double const LabelY = static_cast<double>(WaypointRecord.Screen.y) -
                                   static_cast<double>(WaypointRecord.ScreenRadius) * 1.1;   // DAT_005d9618
             Vector const Point =
@@ -2178,7 +2178,7 @@ void HudTargetableObjects::DrawTargetReticle()
     {
         if (BestPathRecord.bOnScreen != 0)
         {
-            DrawWaypointMarker(&BestPathRecord, &G_NnPaletteArgb_679b80, 1);
+            DrawWaypointMarker(&BestPathRecord, &G_NnPaletteViolet, 1);
             double const LabelY = static_cast<double>(BestPathRecord.Screen.y) -
                                   static_cast<double>(BestPathRecord.ScreenRadius) * 1.1;
             Vector const Point =
@@ -2229,7 +2229,7 @@ void HudTargetableObjects::DrawTargetReticle()
                               static_cast<double>(2.0f);   // DAT_005d55b4
         Vector const Point = ReticleLabelPoint(static_cast<double>(Record.Screen.x), LabelY);
         CObject const* const Object = Contact->cobject();
-        if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 0x503u) != 0x503u)
+        if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
             continue;
         CShip const* const Ship = static_cast<CShip const*>(Object);
 
@@ -2305,7 +2305,7 @@ void HudTargetableObjects::DrawTargetReticle()
     }
     CObject const* const TargetObject = ShipTarget->cobject();
     if (TargetObject != nullptr &&
-        (static_cast<unsigned>(TargetObject->ObjectClass) & 0x503u) == 0x503u &&
+        (static_cast<unsigned>(TargetObject->ObjectClass) & CObject::ClassShip) == CObject::ClassShip &&
         static_cast<CShip const*>(TargetObject)->bIsPlayer != 0)
     {
         TargetRecord.bPlayerShip = 1;
@@ -2419,7 +2419,7 @@ void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
     if (WaypointArrow != nullptr && WaypointArrowBackground != nullptr)
     {
         unsigned char const BackgroundRgba[4] = {0x0c, 0x3e, 0x7a, 0xff};
-        unsigned long const ArrowRgba = G_NnPaletteArgb_679b80;
+        unsigned long const ArrowRgba = G_NnPaletteViolet;
         NnMontageDrawTileAt(WaypointArrowBackground, &ArrowPos.x, BackgroundRgba, 0.06f, 0, 0.0f);
         NnMontageDrawTileAt(WaypointArrow, &ArrowPos.x,
                             reinterpret_cast<unsigned char const*>(&ArrowRgba), 0.06f, 0, 0.0f);
@@ -2540,7 +2540,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         CObject const* const ShipObject = Object->cobject();
         if (ShipObject == nullptr)
             return;
-        if ((static_cast<unsigned>(ShipObject->ObjectClass) & 0x503u) != 0x503u)
+        if ((static_cast<unsigned>(ShipObject->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
             return;
         int const Vibe = static_cast<int>(static_cast<CEqObj const*>(ShipObject)->VibeId);
         unsigned Affiliation = 0;
@@ -2622,7 +2622,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     unsigned long Color;
     if (bWaypoint || Record->bIsBestPath != 0)
     {
-        Color = G_NnPaletteArgb_679b80;
+        Color = G_NnPaletteViolet;
     }
     else
     {
@@ -2630,7 +2630,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         Color = *HudTargetMarkerColor(&Marker, Object);
     }
     if (bWatched)
-        Color = G_NnPaletteArgb_679ba4;
+        Color = G_NnPaletteAmber;
     unsigned char const* const ColorRgba = reinterpret_cast<unsigned char const*>(&Color);
 
     if (!bWaypoint)
@@ -2691,7 +2691,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     {
         unsigned const Class = static_cast<unsigned>(BarObject->ObjectClass);
         bool bIndestructible = false;
-        if ((Class & 0x303u) == 0x303u && BarObject->Archetype != nullptr &&
+        if ((Class & CObject::ClassSolar) == CObject::ClassSolar && BarObject->Archetype != nullptr &&
             !static_cast<Archetype::Solar const*>(BarObject->Archetype)->bDestructible)
         {
             bIndestructible = true;
@@ -2711,7 +2711,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     if (Simple != nullptr)
     {
         Health = Simple->get_relative_health();
-        if ((static_cast<unsigned>(Simple->ObjectClass) & 0x103u) == 0x103u)
+        if ((static_cast<unsigned>(Simple->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
         {
             float ShieldMax = 0.0f;
             float ShieldCur = 0.0f;
@@ -2753,12 +2753,12 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     // The fills, health red and shield blue, each only above 0 (ordered).
     if (bHealthBar && Health > 0.0f)
     {
-        SetReticleBarColor(G_NnPaletteArgb_679ba8, false);
+        SetReticleBarColor(G_NnPaletteRed, false);
         EmitReticleBarQuad(ReticleHealthRect, Health, true);
     }
     if (bShieldActive && ShieldFraction > 0.0f)
     {
-        SetReticleBarColor(G_NnPaletteArgb_679b98, false);
+        SetReticleBarColor(G_NnPaletteBlue, false);
         EmitReticleBarQuad(ReticleShieldsRect, ShieldFraction, true);
     }
     Win3DEnd();   // FUN_00421690
@@ -2767,14 +2767,14 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     if (bHealthBar)
     {
         Win3DBegin(kWin3DLineLoop);
-        SetReticleBarColor(G_NnPaletteArgb_679ba8, true);
+        SetReticleBarColor(G_NnPaletteRed, true);
         EmitReticleBarQuad(ReticleHealthRect, 0.0f, false);
         Win3DEnd();
     }
     if (bShieldActive)
     {
         Win3DBegin(kWin3DLineLoop);
-        SetReticleBarColor(G_NnPaletteArgb_679b98, true);
+        SetReticleBarColor(G_NnPaletteBlue, true);
         EmitReticleBarQuad(ReticleShieldsRect, 0.0f, false);
         Win3DEnd();
     }
@@ -2818,7 +2818,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     // The ship behind the object and whether a player owns it.
     CObject const* const ShipObject = Object->cobject();
     CShip const* Ship = nullptr;
-    if (ShipObject != nullptr && (static_cast<unsigned>(ShipObject->ObjectClass) & 0x503u) == 0x503u)
+    if (ShipObject != nullptr && (static_cast<unsigned>(ShipObject->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
         Ship = static_cast<CShip const*>(ShipObject);
     FHudWideText Caption;   // retail frees the buffer on the way out under SEH
     Caption.Text = nullptr;
@@ -2832,7 +2832,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         // The cache keys -- loot units (1 unless CLoot), visited (0 for an unvisited solar,
         // FUN_004d4c70).
         int LootUnits = 1;
-        if ((static_cast<unsigned>(Simple->ObjectClass) & 0x803u) == 0x803u)
+        if ((static_cast<unsigned>(Simple->ObjectClass) & CObject::ClassLoot) == CObject::ClassLoot)
             LootUnits = static_cast<int>(static_cast<CLoot const*>(Simple)->Units);
         int Visited = 1;
         if (HudIsUnvisitedSolar(Simple))
@@ -2841,12 +2841,12 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         bool const bType40 = (Simple->TypeBits & 0x40u) != 0;
 
         // Rebuild the caption unless the cache matches.
-        if (!(NameCacheSimpleId == Simple->Id && NameCacheKey848 == LootUnits &&
-              NameCacheKey84c == Visited))
+        if (!(NameCacheSimpleId == Simple->Id && NameCacheLootUnits == LootUnits &&
+              NameCacheVisited == Visited))
         {
             // Mode 1 (with the location line) for a ship, a docked CEqObj, or TypeBits 0x80 /
             // 0x40; FUN_004e8100 without the short name.
-            bool const bDocked = (static_cast<unsigned>(Simple->ObjectClass) & 0x103u) == 0x103u &&
+            bool const bDocked = (static_cast<unsigned>(Simple->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj &&
                                  static_cast<CEqObj const*>(Simple)->DockingBaseId != 0;
             int const Mode = (Ship != nullptr || bDocked || bType80 || bType40) ? 1 : 0;
             if (HudBuildObjectCaption(Simple, &Caption, Mode, false))
@@ -2895,9 +2895,9 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
 
                 // The PlayerName font for a player-owned ship, else HudSmall; scale 0.171
                 // (DAT_005d8f0c).
-                NameCacheKey84c = Visited;
+                NameCacheVisited = Visited;
                 NameCacheSimpleId = Simple->Id;
-                NameCacheKey848 = LootUnits;
+                NameCacheLootUnits = LootUnits;
                 NameCacheTimer = 0.0f;
                 FontStringSetFont(CaptionText, bPlayerOwned ? PlayerNameFont : SmallFont);
                 FontStringSetScale(CaptionText, 0.171f, -1.0f);
@@ -2906,8 +2906,8 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
             else
             {
                 // No caption -- the keys invalidated, the string emptied.
-                NameCacheKey848 = -1;
-                NameCacheKey84c = -1;
+                NameCacheLootUnits = -1;
+                NameCacheVisited = -1;
                 NameCacheSimpleId = 0;
                 NameCacheTimer = 0.0f;
                 FontStringClearContents(CaptionText);
@@ -2988,7 +2988,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     // retail. Retail projects into an uninitialised stack vector; the port starts it at zero.
     if ((RecordType & 0xfdffu) == 0)
     {
-        CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, 0x503u));
+        CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
         Vector Lead;
         if (PlayerShip->get_tgt_lead_fire_pos(Object, Lead))
         {
@@ -3010,13 +3010,13 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
 unsigned long* HudTargetMarkerColor(unsigned long* OutArgb, IObjRW* Object)
 {
     // FUN_004eeea0.
-    unsigned long Color = G_NnPaletteArgb_679bb0;
+    unsigned long Color = G_NnPaletteCyan;
     unsigned Type = 0;
     if (Object->get_type(Type) == 0)   // a failure keeps the cyan
     {
         if ((Type & 0x200u) != 0)
         {
-            Color = G_NnPaletteArgb_679b80;
+            Color = G_NnPaletteViolet;
         }
         else if ((Type & 0x10000000u) != 0)
         {
@@ -3024,7 +3024,7 @@ unsigned long* HudTargetMarkerColor(unsigned long* OutArgb, IObjRW* Object)
         }
         else if ((Type & 0x5000000u) != 0)
         {
-            Color = G_NnPaletteArgb_679ba8;
+            Color = G_NnPaletteRed;
         }
         else
         {
@@ -3144,7 +3144,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         CObject const* const ShipObject = Object->cobject();
         if (ShipObject == nullptr)
             return;
-        if ((static_cast<unsigned>(ShipObject->ObjectClass) & 0x503u) != 0x503u)
+        if ((static_cast<unsigned>(ShipObject->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
             return;
         int const Vibe = static_cast<int>(static_cast<CEqObj const*>(ShipObject)->VibeId);
         if (Reputation::Vibe::GetAffiliation(Vibe, Affiliation, false) != 0)
@@ -3217,7 +3217,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
     unsigned long Color;
     if (bWaypoint)
     {
-        Color = G_NnPaletteArgb_679b80;
+        Color = G_NnPaletteViolet;
     }
     else
     {
@@ -3225,7 +3225,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         Color = *HudTargetMarkerColor(&Marker, Object);
     }
     if (bWatched)
-        Color = G_NnPaletteArgb_679ba4;
+        Color = G_NnPaletteAmber;
     reinterpret_cast<unsigned char*>(&Color)[3] = static_cast<unsigned char>(Alpha);
     unsigned char const* const ColorRgba = reinterpret_cast<unsigned char const*>(&Color);
 
@@ -3398,7 +3398,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         {
             unsigned const Class = static_cast<unsigned>(BarObject->ObjectClass);
             bool bIndestructible = false;
-            if ((Class & 0x303u) == 0x303u && BarObject->Archetype != nullptr &&
+            if ((Class & CObject::ClassSolar) == CObject::ClassSolar && BarObject->Archetype != nullptr &&
                 !static_cast<Archetype::Solar const*>(BarObject->Archetype)->bDestructible)
             {
                 bIndestructible = true;
@@ -3421,7 +3421,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         if (HealthObject != nullptr)
         {
             Health = static_cast<CSimple const*>(HealthObject)->get_relative_health();
-            if ((static_cast<unsigned>(HealthObject->ObjectClass) & 0x103u) == 0x103u)
+            if ((static_cast<unsigned>(HealthObject->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             {
                 float ShieldMax = 0.0f;
                 float ShieldCur = 0.0f;
@@ -3456,14 +3456,14 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         if (bHealthBar && Health > 0.0f)
         {
             unsigned char const* const Red =
-                reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679ba8);
+                reinterpret_cast<unsigned char const*>(&G_NnPaletteRed);
             Win3DColor3ub(Red[0], Red[1], Red[2]);
             EmitBarQuad(HealthBarRect, Health, true);
         }
         if (bShieldActive && ShieldFraction > 0.0f)
         {
             unsigned char const* const Blue =
-                reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679b98);
+                reinterpret_cast<unsigned char const*>(&G_NnPaletteBlue);
             Win3DColor3ub(Blue[0], Blue[1], Blue[2]);
             EmitBarQuad(ShieldBarRect, ShieldFraction, true);
         }
@@ -3473,14 +3473,14 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         if (bHealthBar)
         {
             Win3DBegin(kWin3DLineLoop);
-            SetDimmedPaletteColor(G_NnPaletteArgb_679ba8);
+            SetDimmedPaletteColor(G_NnPaletteRed);
             EmitBarQuad(HealthBarRect, 0.0f, false);
             Win3DEnd();
         }
         if (bShieldActive)
         {
             Win3DBegin(kWin3DLineLoop);
-            SetDimmedPaletteColor(G_NnPaletteArgb_679b98);
+            SetDimmedPaletteColor(G_NnPaletteBlue);
             EmitBarQuad(ShieldBarRect, 0.0f, false);
             Win3DEnd();
         }
@@ -3564,7 +3564,7 @@ void HudTargetableObjects::CollectLeadMarkers()
             continue;
 
         // No null test on the player's ship, as retail.
-        CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, 0x503u));
+        CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
         Vector Lead;
         if (!PlayerShip->get_tgt_lead_fire_pos(Object_, Lead))
             continue;
@@ -3593,7 +3593,7 @@ void HudTargetableObjects::DrawLeadMarkers()
 
     // The red of DAT_00679ba8 as A:R:G:B, once with its alpha and once with alpha 0 for the
     // edges.
-    unsigned char const* const Red = reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679ba8);
+    unsigned char const* const Red = reinterpret_cast<unsigned char const*>(&G_NnPaletteRed);
     unsigned long const EdgeColor = (static_cast<unsigned long>(Red[0]) << 16) |
                                     (static_cast<unsigned long>(Red[1]) << 8) |
                                     static_cast<unsigned long>(Red[2]);
@@ -3782,7 +3782,7 @@ void HudTargetableObjects::UpdateAimPoint()
     Direction.y = static_cast<float>(Direction.y * InvLength);
     Direction.z = static_cast<float>(Direction.z * InvLength);
     float GunRange = 0.0f;
-    CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, 0x503u));
+    CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
     if (!PlayerShip->get_farthest_active_gun_range(GunRange))
         GunRange = 1.0e10f;
 
@@ -3908,7 +3908,7 @@ void HudTargetableObjects::UpdateTrailAlert()
     // closest trailing ship is nearer than 500 (DAT_005d8ef8; ordered <) and the phase is off.
     uintptr_t bHide = 1;
     CEqObj* const PlayerShip =
-        static_cast<CEqObj*>(PlayerObjectOfClass(static_cast<IObjRW*>(GetPlayerObjRW()), 0x503u));
+        static_cast<CEqObj*>(PlayerObjectOfClass(static_cast<IObjRW*>(GetPlayerObjRW()), CObject::ClassShip));
     if (PlayerShip != nullptr)
     {
         IBehaviorManager* const Behavior = PlayerShip->get_behavior_interface();
@@ -3939,12 +3939,12 @@ void HudTargetableObjects::UpdateLagAlert()
     if (CDPClient::GetPingDelay() > 0x4b0)
     {
         bLagBlinkOn = (bLagBlinkOn == 0) ? 1 : 0;
-        uintptr_t const Red = reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba8);
+        uintptr_t const Red = reinterpret_cast<uintptr_t>(&G_NnPaletteRed);
         LagAlert->SetProperty(0x18, Red, Red);
     }
     else
     {
-        uintptr_t const Amber = reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba4);
+        uintptr_t const Amber = reinterpret_cast<uintptr_t>(&G_NnPaletteAmber);
         bLagBlinkOn = 0;
         LagAlert->SetProperty(0x18, Amber, Amber);
     }
@@ -4028,7 +4028,7 @@ void FHudHazardWarning::Update(float DeltaSeconds)
     // The ship's scanner, used as the CEScanner it is with no cast check. Any scanned object of
     // type 0x800 closer than 2000 m (DAT_005d97f8) counts; the first new such id is announced.
     bool bMineInRange = false;
-    CShip* const ShipForScan = static_cast<CShip*>(HazardObjectOfClass(Player, 0x503));
+    CShip* const ShipForScan = static_cast<CShip*>(HazardObjectOfClass(Player, CObject::ClassShip));
     CEScanner const* const Scanner = static_cast<CEScanner const*>(
         ShipForScan->EquipManager.FindFirst(EquipTypeScanner));
     if (Scanner != nullptr)
@@ -4067,7 +4067,7 @@ void FHudHazardWarning::Update(float DeltaSeconds)
         MineId = 0;
 
     // Nothing more while the ship rides a trade lane (no reset either).
-    CShip* const Ship = static_cast<CShip*>(HazardObjectOfClass(Player, 0x503));
+    CShip* const Ship = static_cast<CShip*>(HazardObjectOfClass(Player, CObject::ClassShip));
     if (Ship->is_using_tradelane())
         return;
 

@@ -60,7 +60,8 @@ public:
     // FUN_06f33d20 (called by the sdd 06f572f0).
     ~FContentShipBase() override;
 
-    // Slot 1 (06ea1480; TU43 overrides with 06ea1460 = true). The name is a guess.
+    // Slot 1 (06ea1480; TU43 overrides with 06ea1460 = true): only FContentNpcShip answers
+    // true, and the callers cast to it on that answer.
     virtual bool IsNpcShip();
     // Slot 2 (06f33cf0): byte +0x11c.
     virtual bool IsInCombat();
@@ -70,7 +71,7 @@ public:
     virtual void ReleaseActiveDirective();
 
     // DirectiveCallback slot 0 (06f57820): if the directive list is not empty, advance it.
-    void OnDirectiveComplete(int ResultWord11c, int ResultWord118) override;
+    void OnDirectiveComplete(int CompletedBehavior, int DirectiveResult) override;
 
     // FUN_06f33e40 (in TU43's range): the reputation rank, truncated (ftol).
     int GetReputationRank() const;

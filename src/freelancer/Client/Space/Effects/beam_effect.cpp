@@ -93,10 +93,10 @@ FBeamEffect::FBeamEffect(unsigned TypeId) : FEffectBase(TypeId)
     Arch = nullptr;
     Flags70 = 0;
     std::memset(Pad71, 0, sizeof(Pad71));
-    Float74 = 50.0f;
-    Progress78 = -1.0f;
-    Float7C = -1.0f;
-    ProgressDenom80 = 0.1f;
+    CullRadius = 50.0f;
+    Age = -1.0f;
+    FadeTimeLeft = -1.0f;
+    ExtendTime = 0.1f;
     G_BeamEffectLiveCount = G_BeamEffectLiveCount + 1;
 }
 
@@ -153,7 +153,7 @@ unsigned char FBeamEffect::Start(FEffectArch* EffectArch)
     This->EffectTypeId = kBeamEffectTypeId;
     FEffectTypeInfo* TypeInfo = EffectTypeInfoByIndex(static_cast<int>(kBeamEffectTypeId));
     if (TypeInfo != nullptr)
-        This->Priority0C = TypeInfo->Priority;
+        This->Priority = TypeInfo->Priority;
 
     This->Flags08 = static_cast<unsigned char>(This->Flags08 & 0xfdu);
     // Inlined FUN_004f7af0.
@@ -199,7 +199,7 @@ float FBeamEffect::GetWorldPos(FVector* Out)
     Out->X = World.Translation.X;
     Out->Y = World.Translation.Y;
     Out->Z = World.Translation.Z;
-    return This->Float74;
+    return This->CullRadius;
 }
 
 float BeamEffectGetWorldPos(FBeamEffect* This, FVector* Out)
@@ -239,8 +239,8 @@ void FBeamEffect::Kill()
 
     // Below 0.0 or above the cap (DAT_006129cc) becomes the cap; exactly 0.0 and NaN are left
     // alone.
-    if (This->Float7C < 0.0f || This->Float7C > kLifetimeIntensityCap)
-        This->Float7C = kLifetimeIntensityCap;
+    if (This->FadeTimeLeft < 0.0f || This->FadeTimeLeft > kLifetimeIntensityCap)
+        This->FadeTimeLeft = kLifetimeIntensityCap;
 }
 
 void BeamEffectArmDeath(FBeamEffect* This)
@@ -258,7 +258,7 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
 
     // Below the perf level (or unordered) the beam is killed (FUN_004f7bd0 inlined).
     float const Perf = GetPerfGenericEffectPerf();
-    if (!(This->Priority0C >= Perf))
+    if (!(This->Priority >= Perf))
     {
         EffectKill(AsEffect(This));
         return static_cast<unsigned char>(This->Flags70 & 1u);
@@ -320,18 +320,18 @@ unsigned char FBeamEffect::TickDraw(float Dt, FSpaceCamera* Cam)
         return 1;
 
     // Below zero (or NaN) restarts at 0, else accumulates.
-    if (!(This->Progress78 >= 0.0f))
-        This->Progress78 = 0.0f;
+    if (!(This->Age >= 0.0f))
+        This->Age = 0.0f;
     else
-        This->Progress78 = This->Progress78 + Dt;
+        This->Age = This->Age + Dt;
 
     // No lifetime (<= 0 or NaN): keep drawing.
-    if (!(This->Float7C > 0.0f))
+    if (!(This->FadeTimeLeft > 0.0f))
         return 1;
 
     // Still above zero (or NaN) after the tick: keep drawing.
-    This->Float7C = This->Float7C - Dt;
-    if (!(This->Float7C <= 0.0f))
+    This->FadeTimeLeft = This->FadeTimeLeft - Dt;
+    if (!(This->FadeTimeLeft <= 0.0f))
         return 1;
 
     // FUN_004f7bd0 inlined, then the dead bit retail sets again (already set by the kill).
@@ -371,15 +371,15 @@ unsigned char FBeamEffect::BuildGeometry(FSpaceCamera* Cam)
 
     // T = +0x78 / +0x80 only when strictly below (ordered), else 1.
     float T = 1.0f;
-    if (This->Progress78 < This->ProgressDenom80)
-        T = This->Progress78 / This->ProgressDenom80;
+    if (This->Age < This->ExtendTime)
+        T = This->Age / This->ExtendTime;
 
     // With +0x7c above 0, intensity = +0x7c / 0.3f; the unrounded quotient at or below 0
     // returns 0.
     float Intensity = 1.0f;
-    if (This->Float7C > 0.0f)
+    if (This->FadeTimeLeft > 0.0f)
     {
-        double const Quotient = static_cast<double>(This->Float7C) / 0.3f;
+        double const Quotient = static_cast<double>(This->FadeTimeLeft) / 0.3f;
         Intensity = static_cast<float>(Quotient);
         if (Quotient <= 0.0)
             return 0;
@@ -597,8 +597,9 @@ int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform
     EffectVertexBatchPushTriangle(Batch, A0, A1, A6);
     EffectVertexBatchPushTriangle(Batch, A0, A2, A3);
     EffectVertexBatchPushTriangle(Batch, A0, A2, A4);
-    // 0x004fb1ae reads frame +0x3c, which held A0 until 0x004fb16d stored the MOVZX'd A5 over
-    // it (MOV [ESP+0x48],EAX with three arguments pushed); A0 itself stays in ESI.
+    // Third index A5, as retail: 0x004fb1ae reads frame +0x3c, A0's slot until 0x004fb16d
+    // stored the MOVZX'd A5 over it (MOV [ESP+0x48],EAX with three arguments pushed); A0
+    // itself stays in ESI.
     EffectVertexBatchPushTriangle(Batch, A0, A2, A5);
     EffectVertexBatchPushTriangle(Batch, A0, A2, A6);
     return 1;

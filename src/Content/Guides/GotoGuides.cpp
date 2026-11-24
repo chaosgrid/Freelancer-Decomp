@@ -8,7 +8,7 @@
 // dock_guide (type 6). See GuidesInternal.h.
 
 #include "Guides/GuidesInternal.h"
-#include "Core/ContentPlayerState.h"   // FindContentPlayerStateByShip, GetValueE4 / GetValueE8
+#include "Core/ContentPlayerState.h"   // FindContentPlayerStateByShip, GetManeuverBehaviorId / GetManeuverTargetId
 #include "Comms/Gcs.h"                  // PickVoiceLine
 #include "Missions/MissionObject.h"        // FNnPathLeg, FMissionDirectiveList
 #include "Missions/MissionObjList.h"       // the directive setters
@@ -25,13 +25,6 @@ extern unsigned int GGuideLargeShipsClass;   // Guides.cpp, DAT_06fd0644
 
 namespace
 {
-    Vector GetShipPosition(FContentNpcShip* Ship)
-    {
-        Vector Position;
-        Ship->GetPosition(&Position);                                   // FUN_06eb70f0
-        return Position;
-    }
-
     // (z*z + y*y) + x*x of A - B, the order of most TU37 distance checks.
     double DistanceSquaredZyx(Vector const& A, Vector const& B)
     {
@@ -111,8 +104,8 @@ FGotoGuide::FGotoGuide(FMbGotoGuide const* Desc)
     , FirstPosition(Desc->FirstPosition)
     , Destination(Desc->Destination)
     , Range(Desc->Range)
-    , bCruise(Desc->Field_0x174)
-    , bNoCruise(Desc->Field_0x175)
+    , bCruise(Desc->bCruise)
+    , bNoCruise(Desc->bNoCruise)
     , bStartFollowing(Desc->bStartFollowing)
     , Priority(Desc->Priority)
     , Path(Desc->Legs)
@@ -205,10 +198,10 @@ void FGotoGuide::Reset()
 }
 
 // 06ea1490 (RET 8): nothing.
-void FGotoGuide::OnDirectivesDone(int ResultWord11c, int ResultWord118)
+void FGotoGuide::OnDirectivesDone(int CompletedBehavior, int DirectiveResult)
 {
-    (void)ResultWord11c;
-    (void)ResultWord118;
+    (void)CompletedBehavior;
+    (void)DirectiveResult;
 }
 
 // LAB_06f07de0.
@@ -587,7 +580,7 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
             FContentPlayerState* Player = FindContentPlayerStateByShip(&TargetId);   // FUN_06f49bc0
             if (Player == nullptr)
                 break;
-            if (IsTargetOnPath(static_cast<int>(Player->GetValueE4()), Player->GetValueE8()))
+            if (IsTargetOnPath(static_cast<int>(Player->GetManeuverBehaviorId()), Player->GetManeuverTargetId()))
             {
                 SetState(7);
                 break;
@@ -644,7 +637,7 @@ void FGotoGuide::HandleTimer(float DeltaSeconds, FNnPathLeg const& Leg, double A
             break;
         }
         if (Player != nullptr &&
-            IsTargetOnPath(static_cast<int>(Player->GetValueE4()), Player->GetValueE8()))
+            IsTargetOnPath(static_cast<int>(Player->GetManeuverBehaviorId()), Player->GetManeuverTargetId()))
         {
             SetState(7);
             break;
@@ -734,7 +727,7 @@ void FGotoGuide::Start()
     case 2:
     {
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(8, &New.Pointer);
+        CreateObjListDirective(OBJLIST_GUIDE, &New.Pointer);
         FObjListGuide* Guide = static_cast<FObjListGuide*>(New.Pointer);
         Guide->SetGuide(&TargetId, &FirstPosition, &Leg.PointA, 500.0f, bNoCruise != 0,
                         bCruise != 0, bStartFollowing != 0, false);         // FUN_06f26770
@@ -748,7 +741,7 @@ void FGotoGuide::Start()
     case 5:
     {
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(8, &New.Pointer);
+        CreateObjListDirective(OBJLIST_GUIDE, &New.Pointer);
         FObjListGuide* Guide = static_cast<FObjListGuide*>(New.Pointer);
         Guide->SetGuide(&TargetId, &FirstPosition, &Waypoint, 500.0f, bNoCruise != 0,
                         bCruise != 0, bStartFollowing != 0, false);
@@ -758,7 +751,7 @@ void FGotoGuide::Start()
     case 6:
     {
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(8, &New.Pointer);
+        CreateObjListDirective(OBJLIST_GUIDE, &New.Pointer);
         FObjListGuide* Guide = static_cast<FObjListGuide*>(New.Pointer);
         Guide->SetGuide(&TargetId, &FirstPosition, &Leg.PointB, 500.0f, bNoCruise != 0,
                         bCruise != 0, bStartFollowing != 0, true);
@@ -777,7 +770,7 @@ void FGotoGuide::Start()
         FTradeLaneRing Entry;
         FindEntryRing(&Entry, &ShipPosition, &Rings, nullptr);
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(0x13, &New.Pointer);
+        CreateObjListDirective(OBJLIST_DOCK, &New.Pointer);
         static_cast<FObjListDock*>(New.Pointer)->SetTarget(&Entry.ObjectId, &Leg.ObjectB);   // FUN_06f276f0
         KeepAndQueue(this, New, &Directives);
         break;
@@ -794,7 +787,7 @@ void FGotoGuide::Start()
     case 10:
     {
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(8, &New.Pointer);
+        CreateObjListDirective(OBJLIST_GUIDE, &New.Pointer);
         FObjListGuide* Guide = static_cast<FObjListGuide*>(New.Pointer);
         Guide->SetGuide(&TargetId, &FirstPosition, &Destination, Range, bNoCruise != 0,
                         bCruise != 0, bStartFollowing != 0, false);
@@ -981,7 +974,7 @@ void FDockGuide::Start()
     {
         FMissionDirectiveList Directives;                               // FUN_06f93790 head
         TRefHandle<FObjListDirective> New;
-        CreateObjListDirective(0x13, &New.Pointer);
+        CreateObjListDirective(OBJLIST_DOCK, &New.Pointer);
         unsigned int const Zero = 0;
         static_cast<FObjListDock*>(New.Pointer)->SetTarget(&DockTargetId, &Zero);
         KeepAndQueue(this, New, &Directives);

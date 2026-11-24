@@ -4,62 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "common_physys.h"
-
-#include "common_archetype.h"
-#include "common_cobject.h"
-#include "common_cobjdb.h"
-#include "common_id.h"
-#include "common_universe.h"
-#include "common_net.h"
-#include "common_phyarch.h"
-#include "common_misc.h"
-#include "common_server.h"
-
-#include "dacom.h"
-#include "DALib.h"
-#include "x86math.h"
-#include "ivp_collision/ivp_collision.h"
-#include "ivp_physics/ivp_core.h"
-#include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_environment.h"
-#include "ivp_physics/ivp_controller.h"
-#include "ivp_physics/ivp_material.h"
-#include "ivp_physics/ivp_listener.h"
-#include "ivp_physics/ivp_mindist_settings.h"
-#include "ivp_physics/ivp_mindist.h" // IVP_Synapse_Real (CalcClosestPointOnSynapse)
-#include "common_csys.h"
-// CalcClosestPointOnSynapse walks retail's compact half-edge mesh directly.
-#include "ivp_compact_builder/ivp_compact_ledge.h"
-#include "ivp_compact_builder/ivp_surface_builder_pointsoup.h" // the box phantom's hull
-#include "ivp_compact_builder/ivp_surface_builder_ledge_soup.h" // the box phantom's surface
-#include "ivp_physics/ivp_surman_polygon.h"
-#include "ivp_collision/ivp_ray_solver.h"
-#include "ivp_collision/ivp_sphere_query.h"
-#include "ivp_utility/ivp_core_trap.h"      // IVP_CoreTrap -- retail's `MOV [0],0`
-
-#include <assert.h>
-#include <float.h>   // FLT_MAX (GetClosestPhantomIntruderPos)
-#include <math.h>
-#include <new>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <map>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <mmsystem.h>
-
-// Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
-#ifdef GetCurrentTime
-#undef GetCurrentTime
-#endif
-
 #include "Physics/common_physys_internal.h"
+#include "ivp_utility/ivp_core_trap.h"      // IVP_CoreTrap -- retail's `MOV [0],0`
 
 using namespace CmnPhySys;
 
@@ -164,7 +110,7 @@ namespace
         if (Listener != nullptr)
         {
             NewPhantom->Listener = Listener;
-            ((IVP_Controller_Phantom*)NewPhantom->Body->first_child)->set_of_objects->listeners.Add(NewPhantom);
+            ((IVP_Controller_Phantom*)NewPhantom->Body->controller_phantom)->set_of_objects->listeners.Add(NewPhantom);
         }
     }
 }
@@ -209,7 +155,7 @@ int __cdecl PhySys::CreatePhantom(PhantomParms const& Parms, Vector const& HalfE
 {
     IVP_RealObjectConstructionTemplate Template;
     Template.set_short_name(Parms.Name);
-    Template.FlagsHi = Parms.Flag04;
+    Template.FlagsHi = Parms.bPhysicalUnmoveable;
 
     // The lookup is not tested: a miss builds into the map head node's unconstructed storage
     // (retail quirk, see PhySys_FindSystem).
@@ -274,7 +220,7 @@ int __cdecl PhySys::CreatePhantom(PhantomParms const& Parms, float Radius, void*
 {
     IVP_RealObjectConstructionTemplate Template;
     Template.set_short_name(Parms.Name);
-    Template.FlagsHi = Parms.Flag04;
+    Template.FlagsHi = Parms.bPhysicalUnmoveable;
 
     // A miss is not tested (retail quirk, see PhySys_FindSystem).
     PhysicalSystem& System = PhySys_FindSystem(Parms.SystemId);
@@ -309,7 +255,7 @@ int __cdecl PhySys::CreatePhantom(PhantomParms const& Parms, PhyArch::Part const
 
     IVP_RealObjectConstructionTemplate Template;
     Template.set_short_name(Parms.Name);
-    Template.FlagsHi = Parms.Flag04;
+    Template.FlagsHi = Parms.bPhysicalUnmoveable;
 
     // A miss is not tested (retail quirk, see PhySys_FindSystem).
     PhysicalSystem& System = PhySys_FindSystem(Parms.SystemId);
@@ -346,7 +292,7 @@ void __cdecl PhySys::DestroyPhantom(void* Handle)
     // Retail quirk kept (inside RemoveElement): a phantom created without a listener is not in
     // the vector, so the search gives -1 and the vector is corrupted. Retail's callers always
     // pass a listener.
-    ((IVP_Controller_Phantom*)OldPhantom->Body->first_child)->set_of_objects->listeners.RemoveElement(OldPhantom);
+    ((IVP_Controller_Phantom*)OldPhantom->Body->controller_phantom)->set_of_objects->listeners.RemoveElement(OldPhantom);
 
     // The owner's phantom list loses the node directly, not through DetachPhantom (no IVP
     // split). Unlike DetachPhantom this path checks for "not found".
@@ -804,7 +750,7 @@ bool __cdecl PhySys::GetClosestPhantomIntruderPos(void* Handle, unsigned FilterA
         unsigned HashIndex;
         IVP_Mindist_Base* Elem;
     };
-    IVP_Controller_Phantom* const Controller = (IVP_Controller_Phantom*)Body->first_child;
+    IVP_Controller_Phantom* const Controller = (IVP_Controller_Phantom*)Body->controller_phantom;
     float BestDistSq = FLT_MAX;
     for (int Slot = Controller->mindist_set.SizeMm; Slot >= 0; --Slot)
     {
@@ -819,7 +765,7 @@ bool __cdecl PhySys::GetClosestPhantomIntruderPos(void* Handle, unsigned FilterA
 
         // An intruder that is itself a phantom is skipped.
         IVP_Real_Object* const Intruder = Synapse->l_obj;
-        if (Intruder->first_child != nullptr)
+        if (Intruder->controller_phantom != nullptr)
             continue;
 
         // The root of its client must exist, have class bits 3 (a CSimple), share a type bit

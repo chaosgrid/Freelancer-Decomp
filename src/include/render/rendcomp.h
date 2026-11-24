@@ -150,7 +150,7 @@ struct FVmeshDataHeader
     unsigned char Flags;        // +0x00 bit0 set = facegroup-relative indices (FUN_06c2d5a0);
                                 //        clear = "mesh in old format" (FUN_06c2dd20 refuses it)
     unsigned char Unread01[3];  // +0x01..+0x03 unread
-    unsigned long PrimitiveType; // +0x04 IMaterial::Submit PrimType (LAB_06c319e0), IMesh Slot13
+    unsigned long PrimitiveType; // +0x04 IMaterial::Submit PrimType (LAB_06c319e0), IMesh GetFaceGroupPrimitiveType
     unsigned short FaceGroups;  // +0x08
     unsigned short Indices;     // +0x0A
     unsigned short Fvf;         // +0x0C
@@ -165,18 +165,18 @@ struct FVmeshRef
     unsigned short VertexStart; // +0x08 FUN_06c31500 / FUN_06c31950
     unsigned short VertexCount; // +0x0A
     unsigned short IndexStart;  // +0x0C FUN_06c31950 / LAB_06c319e0
-    unsigned short IndexCount;  // +0x0E IRenderableMesh Slot5/Slot6 (LAB_06c30f70 / LAB_06c30f10)
+    unsigned short IndexCount;  // +0x0E IRenderableMesh GetIndexCount / CopyIndices (LAB_06c30f70 / LAB_06c30f10)
     unsigned short FacegroupStart; // +0x10
     unsigned short FacegroupCount; // +0x12
-    unsigned long Box14[6];     // +0x14 copied out whole by FUN_06c310a0 (IRC Slot13)
-    float Extra2C[3];           // +0x2C center (FUN_06c310c0 / FUN_06c310f0)
-    float Extra38;              // +0x38 radius (FUN_06c310c0 / SetInstanceExtent)
+    unsigned long Bounds[6];    // +0x14 bounding box, copied out whole by FUN_06c310a0 (IRenderComponent GetBounds)
+    float Center[3];            // +0x2C (FUN_06c310c0 / FUN_06c310f0)
+    float Radius;               // +0x38 (FUN_06c310c0 / SetInstanceExtent)
 };
 
 // Facegroup 0xC (header +0x10 + 12 * index).
 struct FVmeshFacegroup
 {
-    unsigned long MaterialCrc;  // +0x00 IMaterialLibrary Slot16 key (LAB_06c317b0)
+    unsigned long MaterialCrc;  // +0x00 IMaterialLibrary FindMaterialByCrc key (LAB_06c317b0)
     unsigned short VertexBegin; // +0x04 added onto each index (FUN_06c2d5a0), Submit Start
     unsigned short VertexEnd;   // +0x06 Submit Count = End - Begin + 1 (LAB_06c319e0)
     unsigned short IndexCount;  // +0x08

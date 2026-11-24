@@ -27,6 +27,7 @@ class IVP_Cluster_Manager;         // ivp_cluster_manager.h
 class IVP_Universe_Manager;        // ivp_cluster_manager.h
 class IVP_Sim_Units_Manager;       // ivp_simulation_unit.h
 class IVP_Environment;
+class IVP_Collision_Delegator_Root;  // ivp_collision.h
 
 // The IVP SDK's IVP_Controller_Manager: 4 bytes holding only the environment
 // (operator new(4) in the environment ctor). Its methods are the free
@@ -75,13 +76,6 @@ public:
     void set_time(float Time); // FUN_063605a0
 };
 static_assert(sizeof(void*) != 4 || sizeof(IVP_Env_Interval_Gate) == 0x20, "retail operator new(0x20), :0634c397");
-
-struct IVP_U_Vector_Base
-{
-    uint16_t mem_size;     // Capacity
-    uint16_t n_elems;      // Count
-    void**   elems;        // Data buffer
-};
 
 #include "ivp_core.h"
 #include "ivp_controller.h" // IVP_Controller_Independent (IVP_Standard_Gravity_Controller's base)
@@ -178,7 +172,7 @@ public:
     void env_set_current_time(IVP_Environment* Environment, float TimeHi, float TimeLo);
 
     // FUN_06360a40: clamp DeltaTime into [0.005, 0.1] and hand it to
-    // EventManager slot 1 together with PsiEvent.
+    // EventManager slot 1 together with PsiEvent, under 64-bit x87 precision.
     void simulate_variable_time_step(IVP_Environment* Environment, float DeltaTime);
 
     // FUN_06360a10: remove the minimum-key entry and return its payload; null
@@ -189,7 +183,7 @@ public:
     // Does not free the manager itself.
     void DestroyContents();
 };
-static_assert(sizeof(IVP_Sim_Unit_Manager) == 0x1c, "IVP_Sim_Unit_Manager size must be 0x1c -- retail's own 7-dword REP STOSD at Common.dll.txt:063608bc");
+static_assert(sizeof(IVP_Sim_Unit_Manager) == 0x1c, "IVP_Sim_Unit_Manager is 0x1c bytes (FUN_063608a0 zeroes 7 dwords)");
 static_assert(offsetof(IVP_Sim_Unit_Manager, EventManager) == 0x04, "IVP_Sim_Unit_Manager+0x04");
 static_assert(offsetof(IVP_Sim_Unit_Manager, EventPool) == 0x08, "IVP_Sim_Unit_Manager+0x08");
 static_assert(offsetof(IVP_Sim_Unit_Manager, PsiEvent) == 0x0c, "IVP_Sim_Unit_Manager+0x0c");
@@ -231,7 +225,7 @@ public:
 
     IVP_U_Point grav_vec; // +0x04 (x, y, z; hesse at +0x10 never written)
 };
-static_assert(sizeof(IVP_Standard_Gravity_Controller) == 0x14, "operator_new(0x14) at .text:0634c1e8");
+static_assert(sizeof(IVP_Standard_Gravity_Controller) == 0x14, "retail operator new(0x14), FUN_0634bf50");
 
 // ============================================================================
 // IVP_Range_Manager: IVP_Environment+0x1c, 0x34 bytes (library name). Built by
@@ -275,7 +269,7 @@ public:
     float            look_ahead_max_distance_world;   // +0x2c  default 15.0f
     float            look_ahead_min_seconds_world;    // +0x30  default 0.1f
 };
-static_assert(sizeof(IVP_Range_Manager) == 0x34, "operator_new(0x34) at .text:0634c3e0");
+static_assert(sizeof(IVP_Range_Manager) == 0x34, "retail operator new(0x34), FUN_0634bf50");
 
 // ============================================================================
 // IVP_PerformanceCounter_Simple: the default IVP_Environment+0x28 object,
@@ -316,7 +310,7 @@ public:
     FCounter Counters[17];     // +0x18..+0x9f
     IVP_Time TimeOfLastReset;  // +0xa0: reset_and_print_performance_counters's argument
 };
-static_assert(sizeof(IVP_PerformanceCounter_Simple) == 0xa8, "operator_new(0xa8) at .text:0634c41a");
+static_assert(sizeof(IVP_PerformanceCounter_Simple) == 0xa8, "retail operator new(0xa8), FUN_0634bf50");
 
 // A node of IVP_Environment::buffer_node_list (+0x13C). Only the members the
 // teardown reads are known. No code in Common.dll allocates or links a node, so
@@ -383,27 +377,16 @@ public:
     IVP_Real_Object*      static_object;         // +0x30. A 0xa8-byte IVP_Ball
                                                   // built via FUN_0634cdf0 ->
                                                   // FUN_06362570.
-    // +0x34..+0x87: mostly opaque. The counter_* dwords are only ever
-    // incremented (no reader in Common.dll): width and increment sites are
-    // known, meaning is not.
+    // +0x34..+0x87: statistics, zero-filled by FUN_063505f0. The *_count
+    // dwords are only ever incremented (no reader in Common.dll); each is named
+    // after its one increment site.
     char                  manager_context_34[0x18]; // +0x34..+0x4B
-    int32_t               counter_4c;            // +0x4C: ++ once per
-                                                  // IVP_Impact_Solver::DoImpactSystem
-                                                  // entry (06357918).
-    int32_t               counter_50;            // +0x50: += (candidate count + 1)
-                                                  // after the ambiguous-winner search
-                                                  // loop (06359067).
+    int32_t               impact_solver_count;   // +0x4C: ++ per IVP_Impact_Solver::DoImpactSystem (06357918)
+    int32_t               impact_loop_count;     // +0x50: += the impacts one impact system ran (Count + 1, 06359067)
     char                  manager_context_54[0x08]; // +0x54..+0x5B
-    int32_t               counter_5c;            // +0x5C: ++ on
-                                                  // IVP_Impact_Solver::FinalizeImpact's
-                                                  // deferred-commit path only
-                                                  // (06358204).
-    int32_t               counter_60;            // +0x60: ++ per pair whose owner
-                                                  // state byte (+0x54) != 1 in
-                                                  // 063591a0 (0635921f).
-    int32_t               counter_64;            // +0x64: ++ in DoImpactSystem's
-                                                  // post-finalize "a core got
-                                                  // flagged" tail (06357f14).
+    int32_t               impact_deferred_commit_count; // +0x5C: ++ on FinalizeImpact's deferred-commit path (06358204)
+    int32_t               impact_priority_calc_count;   // +0x60: ++ per contact whose priority test_loop_all_pairs recomputes (0635921f)
+    int32_t               impact_flagged_core_count;    // +0x64: ++ when DoImpactSystem leaves a core with MovementState bits 8-15 set (06357f14)
     char                  manager_context_68[0x04]; // +0x68..+0x6B (float accumulator, see ivp_listmanager_topology.cpp)
     // +0x6c/+0x70/+0x74: the library's mindist statistics. The IVP_Mindist
     // ctor (FUN_0634dd10) increments +0x6c/+0x70; its dtor (FUN_0634dd60)
@@ -412,19 +395,13 @@ public:
     int32_t               mindists_generated;    // +0x70
     int32_t               mindists_deleted;      // +0x74
     int32_t               range_intra_exceeded;  // +0x78: ++ in 06369a10 / 06362d90 before get_coll_range_intra_objects
-    int32_t               counter_7c;            // +0x7C: ++ once per
-                                                  // IVP_Mindist_Manager::
-                                                  // RecheckOvElement entry, after
-                                                  // the element leaves the OV tree
-                                                  // (0634ec49).
-    int32_t               counter_80;            // +0x80: ++ once per
-                                                  // FUN_0635a1e0 (the contact-
-                                                  // frame dispatcher) entry, after
-                                                  // it allocates the pair's
-                                                  // IVP_Impact_Solver_Long_Term
-                                                  // (0635a220).
+    int32_t               ov_element_recheck_count; // +0x7C: ++ per IVP_Mindist_Manager::RecheckOvElement, after the element leaves the OV tree (0634ec49)
+    int32_t               long_term_solver_count;   // +0x80: ++ per IVP_Impact_Solver_Long_Term FUN_0635a1e0 allocates (0635a220)
     char                  manager_context_84[0x04]; // +0x84..+0x87
-    float                 default_friction;      // +0x88 (0.3f)
+    // +0x88: the library's freeze manager (one float, ctor FUN_0634bf30 ->
+    // FUN_0634bf40). IVP_Core::classify_motion_state (FUN_063478f0) compares
+    // the time since a core last moved against it (063479af).
+    float                 freeze_check_dtime;    // +0x88 (0.3f)
     IVP_Env_Interval_Gate* interval_gate;        // +0x8C: new(0x20) + 063605e0
     // +0x90: the IVP SDK's IVP_Controller_Manager (4 bytes holding only the
     // environment); the `this` of 06349040 / 06348fe0 (PhySys 06285ce6).
@@ -437,13 +414,13 @@ public:
     // +0x9C: vtable 063a551c, ctor FUN_0634bd80, size 8 (ivp_material.h).
     // Adopted from Parms->0xc if non-null.
     IVP_Material_Manager* l_material_manager;
-    // +0xA0/+0xA4: the names are misleading: these are two IVP_U_Memory arenas
-    // over the halves of the caller's Parms->MemoryBlock (see ivp_u_memory.h),
-    // nothing to do with cores or vectors.
-    IVP_U_Memory*         vector_cores_active;   // +0xA0. Arena over the first
-                                                  // half. Ctor FUN_06344120.
-    IVP_U_Memory*         vector_cores_frozen;   // +0xA4. Arena over the second
-                                                  // half. Same type and ctor.
+    // +0xA0/+0xA4: two IVP_U_Memory arenas over the halves of the caller's
+    // Parms->MemoryBlock (see ivp_u_memory.h), ctor FUN_06344120. +0xA0 is the
+    // per-PSI scratch of the friction solver and IVP_MergeRedundantContacts;
+    // +0xA4 holds the cores' sync records and the sim-unit / mindist
+    // transactions (State++ ... reset_chunks).
+    IVP_U_Memory*         short_term_mem;        // +0xA0: first half
+    IVP_U_Memory*         sim_unit_mem;          // +0xA4: second half
     float                 field_a8;              // +0xA8
     float                 delta_time;            // +0xAC. delta_PSI_time,
                                                   // default 1/66 s; set with
@@ -453,18 +430,16 @@ public:
     float                 inv_delta_time;        // +0xB0. 1.0f / delta_time.
     // +0xB4..+0xBC: the gravity vector; default {0, 9.83f, 0} (0x411d47ae,
     // not 9.81f).
-    float                 field_b4;              // +0xB4. Gravity vector X (0).
-    float                 field_b8;              // +0xB8. Gravity vector Y
-                                                  // (9.83f).
-    float                 field_bc;              // +0xBC. Gravity vector Z (0).
+    float                 gravity_x;             // +0xB4 (0)
+    float                 gravity_y;             // +0xB8 (9.83f)
+    float                 gravity_z;             // +0xBC (0)
     float                 field_c0;              // +0xC0
-    float                 field_c4;              // +0xC4. length(gravity
-                                                  // vector), set by
+    float                 gravity_length;        // +0xC4: |gravity|, set by
                                                   // FUN_0634cb20.
-    IVP_U_Vector_Base     vector_listeners_c8;   // +0xC8 (8 bytes)
-    IVP_U_Vector_Base     vector_listeners_d0;   // +0xD0 (8 bytes)
-    IVP_U_Vector_Base     event_queue;           // +0xD8 (8 bytes: Time event queue)
-    IVP_U_Vector_Base     vector_e0;             // +0xE0 (8 bytes)
+    IVP_U_Vector<IVP_Listener_Collision> collision_listeners; // +0xC8
+    IVP_U_Vector<IVP_Listener_PSI> psi_listeners;             // +0xD0
+    IVP_U_Vector<IVP_Core> event_queue;                       // +0xD8 cores queued for revival
+    IVP_U_Vector<void>    vector_e0;                          // +0xE0 constructed and cleared only
     char*                 environment_name;      // +0xE8. strdup of the name
                                                   // (FUN_06356920), or null.
     void*                 client_data;           // +0xEC. Plain copy of the
@@ -489,23 +464,24 @@ public:
     // solver stamps it into IVP_Core::TimeOfLastPsi (06351c6b).
     IVP_Time              time_of_last_psi;      // +0x108 (8 bytes: +0x108 / +0x10C)
     int32_t               sim_step_count;        // +0x110
-    int32_t               field_114;             // +0x114: an int counter, incremented at
-                                                  // 06358d1a; copied raw into IVP_Core+0x1b8
-                                                  // (06347be7) and at 063461d5. Meaning unknown.
+    // +0x114: incremented once per do_impact (06358d1a); copied into
+    // IVP_Core::MindistEventStamp (06347be7, 063461d5), which
+    // recheck_mindists_of_other_cores compares between the two cores.
+    int32_t               mindist_event_stamp;   // +0x114
     // +0x118: countdown, in sim-unit PSI steps, to the next movement check.
     // The ctor seeds 10; every unit step decrements it and on 0 reseeds
     // 15 - ftol(rand * -5.0f) and runs the motion/sleep check FUN_063495e0.
     int16_t               next_movement_check;   // +0x118
     int16_t               field_11a;             // +0x11A
     int32_t               sim_substate;          // +0x11C
-    float                 field_120;             // +0x120
-    IVP_U_Vector_Base     object_listeners;      // +0x124 (8 bytes)
-    IVP_U_Vector_Base     vector_12c;            // +0x12C (8 bytes).
-                                                  // IVP_Collision_Delegator_Root*
-                                                  // elements; the ctor appends
-                                                  // Parms->Vector12cElement or a
-                                                  // new IVP_Collision_Delegator_Root_Mindist
-                                                  // (FUN_06360df0).
+    // +0x120: pow(0.9f, delta_time), set by the ctor; each tick scales every
+    // core pair's IntegratedAntiEnergy by it (FUN_06355cc0).
+    float                 integrated_energy_damp; // +0x120
+    IVP_U_Vector<IVP_Listener_Object> object_listeners;       // +0x124
+    // +0x12C: IVP_Collision_Delegator_Root* elements; the ctor appends
+    // Parms->CollisionDelegatorRoot or a new IVP_Collision_Delegator_Root_Mindist
+    // (FUN_06360df0).
+    IVP_U_Vector<IVP_Collision_Delegator_Root> collision_delegator_roots; // +0x12C
     float                 field_134;             // +0x134
     float                 field_138;             // +0x138
     // +0x13C: singly-linked list freed by the destructor (FUN_0634cd20).
@@ -522,12 +498,12 @@ static_assert(offsetof(IVP_Environment, ov_tree_manager) == 0x14, "IVP_Environme
 static_assert(offsetof(IVP_Environment, anomaly_manager) == 0x20, "IVP_Environment+0x20");
 static_assert(offsetof(IVP_Environment, anomaly_limits) == 0x24, "IVP_Environment+0x24");
 static_assert(offsetof(IVP_Environment, manager_context_34) == 0x34, "IVP_Environment+0x34");
-static_assert(offsetof(IVP_Environment, counter_4c) == 0x4C, "IVP_Environment+0x4C");
-static_assert(offsetof(IVP_Environment, counter_5c) == 0x5C, "IVP_Environment+0x5C");
-static_assert(offsetof(IVP_Environment, counter_64) == 0x64, "IVP_Environment+0x64");
-static_assert(offsetof(IVP_Environment, counter_7c) == 0x7C, "IVP_Environment+0x7C");
-static_assert(offsetof(IVP_Environment, counter_80) == 0x80, "IVP_Environment+0x80");
-static_assert(offsetof(IVP_Environment, default_friction) == 0x88, "IVP_Environment+0x88");
+static_assert(offsetof(IVP_Environment, impact_solver_count) == 0x4C, "IVP_Environment+0x4C");
+static_assert(offsetof(IVP_Environment, impact_deferred_commit_count) == 0x5C, "IVP_Environment+0x5C");
+static_assert(offsetof(IVP_Environment, impact_flagged_core_count) == 0x64, "IVP_Environment+0x64");
+static_assert(offsetof(IVP_Environment, ov_element_recheck_count) == 0x7C, "IVP_Environment+0x7C");
+static_assert(offsetof(IVP_Environment, long_term_solver_count) == 0x80, "IVP_Environment+0x80");
+static_assert(offsetof(IVP_Environment, freeze_check_dtime) == 0x88, "IVP_Environment+0x88");
 static_assert(offsetof(IVP_Environment, inv_delta_time) == 0xB0, "IVP_Environment+0xB0");
 
 // FUN_0634bbe0: drains the whole wake/event queue (ivp_environment.cpp).
@@ -550,9 +526,9 @@ void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core);
 // 062923f4 / 06292580 (common_physys.cpp).
 void IVP_Controller_Manager_Ensure_Core_To_Be_In_Simulation(IVP_Core* core);
 
-// FUN_0634cf60: event_pre_collision to every vector_listeners_c8 entry whose
+// FUN_0634cf60: event_pre_collision to every collision_listeners entry whose
 // enabled_callbacks bit 0 is set. Caller: FUN_06358680 (06358aa7).
-void IVP_Environment_Notify_Listeners_C8(IVP_Environment* env, void* arg);
+void IVP_Environment_Fire_Event_Pre_Collision(IVP_Environment* env, void* arg);
 
 // {Environment*, IVP_Real_Object*} record that FUN_0634b480 builds on its stack
 // for the object-listener notifications.
@@ -564,14 +540,14 @@ struct IVP_Environment_Object_Notify_Event
 
 // FUN_0634cf30: object_listeners slot 2 (event_object_revived), backward, no
 // gate; the argument is forwarded untouched.
-void IVP_Environment_Notify_Object_Listeners(IVP_Environment* env, void* event_data);
+void IVP_Environment_Fire_Event_Object_Revived(IVP_Environment* env, void* event_data);
 
 // FUN_0634c6f0: ~IVP_Environment().
 void IVP_Environment_Destructor(IVP_Environment* env);
 
-// FUN_0634caf0: vector_12c slot 4 (object_is_removed_from_collision_detection),
-// backward. The destructor's own vector_12c loop calls slot 6 instead.
-void IVP_Environment_Notify_Vector12c_Slot4(IVP_Environment* env, void* arg);
+// FUN_0634caf0: collision_delegator_roots slot 4 (object_is_removed_from_collision_detection),
+// backward. The destructor's own collision_delegator_roots loop calls slot 6 instead.
+void IVP_Environment_Notify_Object_Removed_From_Collision_Detection(IVP_Environment* env, void* arg);
 
 // FUN_0634cd20: frees each node's buffer inline, deletes the node, then nulls
 // the head. Called from the destructor.
@@ -582,36 +558,25 @@ void IVP_Environment_Append_Object_Listener(IVP_Environment* env, void* listener
 
 // FUN_0634ced0 / FUN_0634cf00: object_listeners slot 0 (event_object_deleted)
 // / slot 3 (event_object_frozen), backward, no gate.
-void IVP_Environment_Notify_Object_Listeners_Slot0(IVP_Environment* env, void* arg);
-void IVP_Environment_Notify_Object_Listeners_Slot3(IVP_Environment* env, void* arg);
+void IVP_Environment_Fire_Event_Object_Deleted(IVP_Environment* env, void* arg);
+void IVP_Environment_Fire_Event_Object_Frozen(IVP_Environment* env, void* arg);
 
 // FUN_0634cea0: object_listeners slot 1 (event_object_created), no null test.
 // Called by the IVP_Polygon and IVP_Ball constructors.
-void IVP_Environment_Notify_Object_Listeners_Slot1(IVP_Environment* env, void* arg);
+void IVP_Environment_Fire_Event_Object_Created(IVP_Environment* env, void* arg);
 
-// FUN_0634cfa0 / FUN_0634cfe0: vector_listeners_c8 slots 2 / 3, gated on
-// enabled_callbacks bit 2 (&4, not the &1 of Notify_Listeners_C8).
+// FUN_0634cfa0 / FUN_0634cfe0: collision_listeners slots 2 / 3, gated on
+// enabled_callbacks bit 2 (&4, not the &1 of Fire_Event_Pre_Collision).
 void IVP_Environment_Notify_Friction_Created(IVP_Environment* env, void* arg);
 void IVP_Environment_Notify_Friction_Deleted(IVP_Environment* env, void* arg);
 
-// FUN_0634d050: append onto vector_listeners_c8.
-void IVP_Environment_Append_Listener_C8(IVP_Environment* env, void* listener);
+// FUN_0634d050: append onto collision_listeners.
+void IVP_Environment_Add_Listener_Collision(IVP_Environment* env, void* listener);
 
 
 // ============================================================================
 // IVP_Environment construction
 // ============================================================================
-
-// FUN_063441a0: growable-vector realloc (capacity 2n+1) for the raw
-// IVP_U_Vector_Base header. The same retail function as
-// IVP_U_Vector<T>::Realloc (ivp_u_vector.h); the two types share one layout but
-// spell the capacity field differently and the template's Realloc is
-// protected. The inline buffer right after the header is never freed.
-void IVP_U_Vector_Base_Realloc(IVP_U_Vector_Base* v);
-
-// The append idiom retail open-codes around the realloc: grow when
-// n_elems >= mem_size (unsigned), then store and bump.
-void IVP_U_Vector_Base_Append(IVP_U_Vector_Base* v, void* elem);
 
 // ----------------------------------------------------------------------------
 // IVP_Environment_Create_Parms: port-local name for the 0x30-byte read-only
@@ -629,7 +594,7 @@ struct IVP_Environment_Create_Parms
     IVP_PerformanceCounter* PerformanceCounter; // +0x18 -> +0x28, else new IVP_PerformanceCounter_Simple.
     void*    AnomalyManager;     // +0x1C -> +0x20, else FUN_06360eb0.
     void*    AnomalyLimits;      // +0x20 -> +0x24, else FUN_06360e30.
-    void*    Vector12cElement;   // +0x24 -> appended to vector_12c, else FUN_06360df0.
+    void*    CollisionDelegatorRoot;   // +0x24 -> appended to collision_delegator_roots, else FUN_06360df0.
     IVP_U_Active_Value_Manager* ActiveValueManager; // +0x28 -> +0x98, else new IVP_U_Active_Value_Manager(1).
     IVP_Range_Manager* RangeManager; // +0x2C -> +0x1C, else new IVP_Range_Manager(env, 1).
 
@@ -649,11 +614,11 @@ static_assert(offsetof(IVP_Environment_Create_Parms, RangeManager) == 0x2C, "Cre
 // Runs as a member ctor before the constructor body wipes the same bytes.
 void* IVP_Environment_Init_Block34(void* block34);
 
-// FUN_0634bf40: default_friction (+0x88) = 0.3f.
-void IVP_Environment_Init_DefaultFriction(void* block88);
+// FUN_0634bf40: the freeze manager's init, freeze_check_dtime (+0x88) = 0.3f.
+void IVP_Freeze_Manager_Init(void* FreezeManager);
 
 // FUN_0634bf30: the +0x88 sub-object ctor; returns `this`.
-void* IVP_Environment_Init_Block88(void* block88);
+void* IVP_Freeze_Manager_Construct(void* FreezeManager);
 
 // FUN_0634c6d0: IVP_Environment::set_delta_PSI_time. Callers: the env ctor
 // and FUN_0628c900 (PhySys).

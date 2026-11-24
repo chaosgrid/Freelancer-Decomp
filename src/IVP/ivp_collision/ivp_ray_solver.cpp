@@ -219,7 +219,7 @@ void IVP_Ray_Solver::check_ray_against_ball(IVP_Real_Object* Ball)
     const float Cy = Cache->WorldTransform.vv.k[1];
     const float Cz = Cache->WorldTransform.vv.k[2];
 
-    const double Radius = Ball->field_94;
+    const double Radius = Ball->extra_radius;
     const double RadiusSq = Radius * Radius;
 
     // A ray starting inside the ball (or unordered) reports no hit.
@@ -277,7 +277,7 @@ void IVP_Ray_Solver::check_ray_against_object(IVP_Real_Object* Object)
     if (Object != nullptr)
     {
         const int32_t Flags = ray_flags;
-        if ((Flags & 0x1) != 0 && Object->first_child != nullptr)
+        if ((Flags & 0x1) != 0 && Object->controller_phantom != nullptr)
             return;
         if ((Flags & 0x2) != 0 && (Object->flags & 0x10) == 0)
             return;

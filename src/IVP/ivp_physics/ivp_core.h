@@ -62,19 +62,37 @@ static_assert(offsetof(IVP_Core_AxisLock, ContactImpulse) == 0x58, "IVP_Core_Axi
 static_assert(offsetof(IVP_Core_AxisLock, LastUpdateTime) == 0x5c, "IVP_Core_AxisLock+0x5c");
 static_assert(offsetof(IVP_Core_AxisLock, Field_0x64) == 0x64, "IVP_Core_AxisLock+0x64");
 
+// IVP_Core::Flags: Ipion's five 2-bit IVP_BOOL bitfields, in declaration order
+// (fast_piling_allowed_flag, physical_unmoveable, is_in_wakeup_vec,
+// rot_inertias_are_equal, pinned). The uses that fix the middle three:
+// ctor step 5 and the static-core ObjectHashMap (0xC), add_revive_core's queue
+// state (0x30), RecomputeInverseInertia's isotropy bit (0xC0). Impacts and
+// friction treat a pinned core like an unmoveable one; calc_effective_mass_*
+// gives it unit mass.
+enum : uint32_t
+{
+    IVP_CORE_FAST_PILING_ALLOWED      = 0x003u, // ctor step 9 (FlagsLo)
+    IVP_CORE_PHYSICAL_UNMOVEABLE      = 0x00Cu, // ctor step 5 (FlagsHi); nonzero: static / kinematic
+    IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE = 0x004u, // the field == 1: ObjectHashMap is a hash
+    IVP_CORE_IS_IN_WAKEUP_VEC         = 0x030u,
+    IVP_CORE_ROT_INERTIAS_ARE_EQUAL   = 0x0C0u,
+    IVP_CORE_PINNED                   = 0x300u,
+};
+
 // Complete full retail IVP_Core structure (0x1BC = 444 bytes)
 class IVP_Core
 {
 public:
     // +0x00
     unsigned int Flags;                       // +0x00: Bitfield status & movement flags
-    // +0x04: IVP's upper_limit_radius, the radius of the sphere bounding this core
-    // (distinct from BoundingRadius at +0x14C). The OV-tree insertion adds it to a
-    // collision range and subtracts it back out (0634ec97 / 0634eceb);
-    // DAngularLimitFactor = 0.5f / it. SetSpeedLimits() writes it with SpeedLimit.
-    // TODO: no port code writes it except SetSpeedLimits.
+    // +0x04: IVP's upper_limit_radius, the radius of the sphere bounding this core.
+    // The OV-tree insertion adds it to a collision range and subtracts it back out
+    // (0634ec97 / 0634eceb); DAngularLimitFactor = 0.5f / it. Written by SetRadius()
+    // (from IVP_InitCoreRestStateAndDamping) and grown when objects join a core.
     float UpperLimitRadius;                   // +0x04
-    float SpeedLimit;                        // +0x08: Speed limit
+    // +0x08: IVP's max_surface_deviation, the largest distance from the centre to the
+    // surface: MaxSurfaceRotSpeed = AbsOmega * it (FUN_06351a50).
+    float MaxSurfaceDeviation;                // +0x08
     IVP_Environment* Environment;             // +0x0C: Simulation environment
 
     // +0x10: see IVP_Core_AxisLock. The owning object is Objects[0] (+0x58).
@@ -142,11 +160,13 @@ public:
     IVP_U_Matrix MWorldFCore;                // +0xF4: 4x4 Transformation matrix to world space (64 bytes)
 
     // +0x134
-    Vector RotAxisOS;                        // +0x134: Rotation axis in object space (1.0, 0.0, 0.0)
+    // +0x134..+0x14C: IVP's rotation_axis_world_space, current_speed, abs_omega and
+    // max_surface_rot_speed, written per PSI by IVP_Calc_Next_PSI_Solver.
+    Vector RotAxisWS;                        // +0x134: rotation axis in world space ((1, 0, 0) when not rotating)
     float Pad140;                            // +0x140: Padding
-    float Margin;                            // +0x144: Collision margin
-    float MaxSurfaceDeviation;               // +0x148: Surface deviation limit
-    float BoundingRadius;                    // +0x14C: Bounding radius
+    float CurrentSpeed;                      // +0x144: |Speed|
+    float AbsOmega;                          // +0x148: absolute angular speed
+    float MaxSurfaceRotSpeed;                // +0x14C: AbsOmega * MaxSurfaceDeviation
 
     // +0x150: one inline slot (the destructor's sentinel test compares elems with +0x158).
     IVP_U_Vector_Fixed<IVP_Controller, 1> Controllers; // +0x150 (12 bytes)
@@ -171,11 +191,14 @@ public:
     IVP_Core* MergedCoreWhichReplacedIt;
 
     // +0x1B4
-    void* FastSimUnitData;                   // +0x1B4: Temp simulation buffer pointer
-    // +0x1B8: identity unknown (not the sim unit; that is +0x15C).
-    // notify_objects_and_cache_env_field() (FUN_06347be0) stores
-    // Environment->field_114 here.
-    void* Unconfirmed_0x1B8;                 // +0x1B8
+    // +0x1B4: Ipion's old_sync_info, the IVP_Old_Sync_Rot_Z record (arena memory)
+    // recalc_interpolated_frame() saves and restore_fast_sim_snapshot() reads back.
+    void* OldSyncInfo;                       // +0x1B4
+    // +0x1B8: a stamp of Environment->mindist_event_stamp, the counter do_impact increments
+    // (06358d1a). notify_objects_and_cache_env_field() (FUN_06347be0) stores it;
+    // recheck_mindists_of_other_cores (FUN_06344f50) re-solves only mindists whose
+    // two cores carry different stamps. An int held in a pointer-sized slot.
+    void* MindistEventStamp;                 // +0x1B8
 
     // Not a retail function: the port's PhySys (common_physys.cpp,
     // BuildIVP_Real/BuildIVP_Sphere) builds cores with `new IVP_Core()` and fills
@@ -199,14 +222,14 @@ public:
     //   7. PosWorldFCore = *InitialPosition, DeltaWorldFCore = 0,
     //      QWorldFCore.set_matrix(&MWorldFCore) (rotation block only),
     //      MWorldFCore.vv = *InitialPosition.
-    //   8. SetSpeedLimits(1000.0f, 1000.0f).
+    //   8. SetRadius(1000.0f, 1000.0f).
     //   9. Flags = (Flags & ~0x3) | (FlagsLo & 0x3).
     IVP_Core(IVP_Real_Object* Owner, const IVP_U_Quat* InitialOrientation,
              const IVP_U_Point* InitialPosition, uint32_t FlagsHi, uint32_t FlagsLo);
 
-    // FUN_06346870: UpperLimitRadius (+4) and SpeedLimit (+8). Callers: the
+    // FUN_06346870: UpperLimitRadius (+4) and MaxSurfaceDeviation (+8). Callers: the
     // constructor (1000.0f, 1000.0f) and FUN_06345b20.
-    void SetSpeedLimits(float NewUpperLimitRadius, float NewSpeedLimit);
+    void SetRadius(float NewUpperLimitRadius, float NewMaxSurfaceDeviation);
 
     // Core methods
     void ensure_in_simulation();
@@ -253,7 +276,7 @@ public:
     void update_time_of_last_motion();
 
     // FUN_06346e70: IDeltaTime (+0x70) = InvDeltaTime, QWorldFCoreNext = QWorldFCore,
-    // Speed / DeltaWorldFCore / the three speed bounds zeroed, RotAxisOS = (1, 0, 0).
+    // Speed / DeltaWorldFCore / the three speed bounds zeroed, RotAxisWS = (1, 0, 0).
     // DeltaTime is never read (kept for the call sites). Callers pass the environment's {delta_time,
     // inv_delta_time} or revive_pass()'s {Alpha, 1/Alpha} (falling back to the
     // environment pair when Alpha is within 1e-10f of 0).
@@ -316,7 +339,7 @@ public:
     double calc_conservative_effective_mass(const Vector* LeverArm) const; // returned in ST0 unrounded
 
     // FUN_06347240, Ipion synchronize_with_rot_z: saves RotSpeed/QWorldFCoreNext into an
-    // IVP_Old_Sync_Rot_Z record from the frozen-core arena (FastSimUnitData),
+    // IVP_Old_Sync_Rot_Z record from the frozen-core arena (OldSyncInfo),
     // moves QWorldFCoreNext/MWorldFCore to the current time and -- gated on
     // `(Flags & 0xC0) == 0` -- refreshes RotSpeed from the PRE-interpolation
     // delta quaternion via asin. Full trace in ivp_core.cpp. Callers:
@@ -413,8 +436,8 @@ public:
     void clear_speed_change();
 
     // FUN_063473b0: restores RotSpeed and QWorldFCoreNext from the IVP_Old_Sync_Rot_Z
-    // record FastSimUnitData (+0x1B4) points at, then clears
-    // FastSimUnitData to null WITHOUT freeing it (frozen-core arena memory,
+    // record OldSyncInfo (+0x1B4) points at, then clears
+    // OldSyncInfo to null WITHOUT freeing it (frozen-core arena memory,
     // written by recalc_interpolated_frame()).
     void restore_fast_sim_snapshot();
 
@@ -430,7 +453,7 @@ public:
     // ivp_core.cpp).
     int classify_motion_state(float CurrentTimeBase, float CurrentTimeOffset);
 
-    // FUN_06347be0: Unconfirmed_0x1B8 = Environment->field_114, then FUN_06344f50
+    // FUN_06347be0: MindistEventStamp = Environment->mindist_event_stamp, then FUN_06344f50
     // on every attached object.
     void notify_objects_and_cache_env_field();
 
@@ -461,11 +484,11 @@ static_assert(offsetof(IVP_Core, DeltaWorldFCore) == 0xC4, "IVP_Core+0xC4");
 static_assert(offsetof(IVP_Core, QWorldFCore) == 0xD4, "IVP_Core+0xD4");
 static_assert(offsetof(IVP_Core, QWorldFCoreNext) == 0xE4, "IVP_Core+0xE4");
 static_assert(offsetof(IVP_Core, MWorldFCore) == 0xF4, "IVP_Core+0xF4");
-static_assert(offsetof(IVP_Core, Margin) == 0x144, "IVP_Core+0x144");
-static_assert(offsetof(IVP_Core, BoundingRadius) == 0x14C, "IVP_Core+0x14C");
+static_assert(offsetof(IVP_Core, CurrentSpeed) == 0x144, "IVP_Core+0x144");
+static_assert(offsetof(IVP_Core, MaxSurfaceRotSpeed) == 0x14C, "IVP_Core+0x14C");
 static_assert(offsetof(IVP_Core, Controllers) == 0x150, "IVP_Core+0x150");
 static_assert(offsetof(IVP_Core, OwningSimUnit) == 0x15C, "IVP_Core+0x15C");
-static_assert(offsetof(IVP_Core, Unconfirmed_0x1B8) == 0x1B8, "IVP_Core+0x1B8");
+static_assert(offsetof(IVP_Core, MindistEventStamp) == 0x1B8, "IVP_Core+0x1B8");
 
 // IVP_Core_UnionFindGetFather: IVP_Core::get_master_core() (defined in
 // ivp_core.cpp; also used by ivp_simulation_unit.cpp).

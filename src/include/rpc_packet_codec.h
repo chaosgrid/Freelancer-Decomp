@@ -765,7 +765,7 @@ public:
     unsigned int Field_0x10;
     Vector Field_0x14;
     Vector Field_0x20;
-    Quaternion Field_0x2c;
+    Quaternion Orientation;
     unsigned int Field_0x3c;
     wchar_t* WideData;
     unsigned int WideCount;

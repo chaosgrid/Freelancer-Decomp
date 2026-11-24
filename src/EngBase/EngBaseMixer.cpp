@@ -434,7 +434,7 @@ float* FMixerOverlay::SampleDisplacement(float* Out, float Dt)
     return Out;
 }
 
-// FUN_06612b20 (this = Left). Kind and Instance compare signed, Extra unsigned.
+// FUN_06612b20 (this = Left). Kind and Instance compare signed, Sink unsigned.
 bool FAnimBindLess::operator()(const FAnimBindOut& Left, const FAnimBindOut& Right) const
 {
     if (Left.Kind != Right.Kind)
@@ -442,7 +442,7 @@ bool FAnimBindLess::operator()(const FAnimBindOut& Left, const FAnimBindOut& Rig
     if (Left.Kind == 0 || Left.Kind == 1)
         return (ptrdiff_t)(Left.Instance) < (ptrdiff_t)(Right.Instance);
     if (Left.Kind == 2)
-        return (size_t)(Left.Extra) < (size_t)(Right.Extra);
+        return (size_t)(Left.Sink) < (size_t)(Right.Sink);
     return false;
 }
 
@@ -553,6 +553,8 @@ void MixerDestroyAll(FAnimationObject* Animation)
     Animation->Mixers = nullptr;
 }
 
+// FUN_066152d0: snapshot one bind key's node list, then tick every node and finish the blends
+// that complete. Retail: the 0x140-slot stack snapshot has no bound test (066152f0).
 void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FMixerList* List,
                        float Dt)
 {

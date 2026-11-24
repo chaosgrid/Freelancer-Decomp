@@ -108,13 +108,13 @@ COMMON_API int __cdecl PackMissionLogData(int Type, FmtStr const* Fmt, unsigned 
 
 class TextRenderContext;
 class RenderDisplayList;
-// 0x06326600 -- the RDLX layout / line-breaking pass: walks Rdl's node list (a flat-walk
-// simplification of retail's single-use recursion deque), measuring, splitting, wrapping,
-// justifying and positioning each line into OutRdl, with a single-line "truncate with an
-// ellipsis" mode gated by Param7. The edge-case trim when the ellipsis itself does not fit and
-// the meaning of the return value are judgment calls (see common_renderdisplaylist.cpp).
-COMMON_API bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl, int Param3, RenderDisplayList& OutRdl, int Param5, int Param6, bool Param7, int* Param8, bool Param9);
-COMMON_API int __cdecl lex_compare(RenderDisplayList const& A, RenderDisplayList const& B, bool Param3);
+// 0x06326600 -- the RDLX layout / line-breaking pass: walks Rdl's node list (a deque of list
+// frames, as retail), measuring, splitting, wrapping, justifying and positioning each line into
+// OutRdl, with a single-line "truncate with an ellipsis" mode gated by bSingleLine. The edge-case
+// trim when the ellipsis itself does not fit and the meaning of the return value are judgment
+// calls (see common_renderdisplaylist.cpp).
+COMMON_API bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl, int MaxWidth, RenderDisplayList& OutRdl, int OriginH, int OriginV, bool bSingleLine, int* OutHeight, bool bWordWrap);
+COMMON_API int __cdecl lex_compare(RenderDisplayList const& A, RenderDisplayList const& B, bool bCaseSensitive);
 
 // ============================================================================
 // FmtStr — formatted string with embedded values (linked-list of Val nodes).
@@ -187,8 +187,7 @@ struct FmtStr
     };
 
     // Which counter each append_* uses; the value is the byte offset minus 0x08. Only
-    // KindUnused0D (+0x0D) is never stamped by an exported append_*; KindUnused13 (+0x13) is
-    // used by append_fmt_str.
+    // KindUnused0D (+0x0D) is never stamped by an exported append_*.
     enum ValueKind
     {
         KindNavMarker = 0,      // +0x08
@@ -202,7 +201,8 @@ struct FmtStr
         KindRepGroup = 8,       // +0x10
         KindZoneId = 9,         // +0x11
         KindSpaceObjId = 10,    // +0x12
-        KindUnused13 = 11,      // +0x13
+        KindFmtStr = 11,        // +0x13  append_fmt_str
+
         KindInstallation = 12,  // +0x14
         KindLoot = 13,          // +0x15
         KindCount = 14
@@ -381,7 +381,7 @@ public:
     virtual void get_font_metrics(int& Ascent, int& Descent) const = 0;              // +0x10
     virtual void get_text_fit(const wchar_t* Text, int MaxWidth, int& FitCount,
                               int* Widths, VisualSize& Size, int Len) const = 0;     // +0x14
-    virtual void execute_text(const wchar_t* Text, bool bHighlight, int Len) = 0;    // +0x18
+    virtual void execute_text(const wchar_t* Text, bool bDraw, int Len) = 0;         // +0x18
     // ImageNode::Execute (0x06329620) passes its image and its own bool through.
     virtual void execute_image(const Image* Img, bool bDraw) = 0;                    // +0x1C
     virtual void set_clip_rect(const RECT& ClipRect) = 0;                            // +0x20
@@ -393,8 +393,9 @@ private:
     // State save/restore. Private in retail; besides the class only LayoutRichText calls them,
     // so it is a friend.
     friend COMMON_API bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl,
-                                                  int Param3, RenderDisplayList& OutRdl, int Param5,
-                                                  int Param6, bool Param7, int* Param8, bool Param9);
+                                                  int MaxWidth, RenderDisplayList& OutRdl,
+                                                  int OriginH, int OriginV, bool bSingleLine,
+                                                  int* OutHeight, bool bWordWrap);
     void get_state(State& OutState);
     void set_state(const State& InState);
 
@@ -488,7 +489,7 @@ public:
     virtual void get_font_metrics(int& Ascent, int& Descent) const override;
     virtual void get_text_fit(const wchar_t* Text, int MaxWidth, int& FitCount,
                               int* Widths, VisualSize& Size, int Len) const override;
-    virtual void execute_text(const wchar_t* Text, bool bHighlight, int Len) override;
+    virtual void execute_text(const wchar_t* Text, bool bDraw, int Len) override;
     virtual void execute_image(const Image* Img, bool bDraw) override;
     virtual void set_clip_rect(const RECT& NewClip) override;
     virtual void get_clip_rect(RECT& OutRect) override;
@@ -552,7 +553,7 @@ public:
 
     // Virtual interface (slots from vtable analysis)
     virtual RDLNode* Clone() const = 0;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) = 0;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) = 0;
     // Pure in RDLNode. Every concrete node exports its own override; all but RDLRefNode's
     // (0x06329b70, forwards to its referenced list) are the ICF-folded `RET 4` at 0x062ed730.
     virtual void Update(float Dt) = 0;
@@ -610,7 +611,7 @@ public:
     NullNode(const NullNode& Other);
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -642,7 +643,7 @@ public:
     void set_default_mask(unsigned int InMask);   // 0x06332f50  MOV [ECX+0x10],arg
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -685,7 +686,7 @@ public:
     const std::wstring& get_text() const;
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -714,7 +715,7 @@ public:
     int get_text_length() const;
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -751,7 +752,7 @@ public:
     void set_operation(Op op);
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -782,7 +783,7 @@ public:
     void set_image(TextRenderContext::Image const* InImg); // 0x06309b30  MOV [ECX+0x4],arg
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -819,7 +820,7 @@ public:
     void set_rel_v(bool bRel);
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -849,7 +850,7 @@ public:
     ParagraphNode(const ParagraphNode& Other);
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -877,7 +878,7 @@ public:
     void set_justify(TextJustify Mode);
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -909,7 +910,7 @@ public:
     const tagRECT& get_rect();
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -941,7 +942,7 @@ public:
     void set_style_id(unsigned short Id);
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void Update(float Dt) override; // 0x062ed730 (ICF-folded empty `RET 4`)
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
@@ -971,7 +972,7 @@ public:
     virtual void Update(float Dt) override;
 
     virtual RDLNode* Clone() const override;
-    virtual void Execute(TextRenderContext& Ctx, bool bHighlight) override;
+    virtual void Execute(TextRenderContext& Ctx, bool bDraw) override;
     virtual void GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const override;
     virtual void GetElementSize(int& OutSize) const override;
     virtual void GetElementPos(int Index, TextRenderContext& Ctx, int& OutPos) const override;
@@ -1009,7 +1010,7 @@ public:
 
     RenderDisplayList& operator=(const RenderDisplayList& Other);
 
-    void execute(TextRenderContext& Ctx, bool bHighlight);
+    void execute(TextRenderContext& Ctx, bool bDraw);
     void update(float Dt);
     void get_dimensions(TextRenderContext& Ctx, float& OutWidth, float& OutHeight, float& OutDepth);
     int get_element_count() const;

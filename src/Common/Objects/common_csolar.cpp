@@ -6,7 +6,7 @@
 
 // CSolar (retail CSolar.cpp).
 #include "common_cobject.h"
-#include "Objects/common_cobject_internal.h" // CmnCobject::GetObjectDbCollisionGroup
+#include "Objects/common_cobject_internal.h" // CmnCobject::GetObjectDbSystemId
 
 #include "common_goods.h"
 #include "common_id.h"
@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-using CmnCobject::GetObjectDbCollisionGroup;
+using CmnCobject::GetObjectDbSystemId;
 
 ID_String const& CSolar::get_loadout() const
 {
@@ -125,14 +125,14 @@ void CSolar::init(CreateParms const& Parms)
         }
     }
 
-    DockingBaseId = Parms.DockingCount;                            // +0x160
+    DockingBaseId = Parms.DockingBaseId;                           // +0x160
 
-    unsigned const RawTypeBits = Parms.DockWithBaseId;
-    DockingPointBaseId = RawTypeBits;                              // +0x164
+    unsigned const DockWithBaseId = Parms.DockWithBaseId;
+    DockingPointBaseId = DockWithBaseId;                           // +0x164
 
     // Diagnostic only.
     if ((TypeBits & 0x600d60) != 0 && (TypeBits & 2) == 0 &&
-        (RawTypeBits & 0x3fffffff) == 0 && (DestSystem & 0x3fffffff) == 0)
+        (DockWithBaseId & 0x3fffffff) == 0 && (DestSystem & 0x3fffffff) == 0)
     {
         FDUMP(0x100001,
               "%s(%d) : *** ERROR: %s is dockable, but doesn't have a valid base or system to go to ",
@@ -143,7 +143,7 @@ void CSolar::init(CreateParms const& Parms)
     if ((TypeBits & 0x84) != 0)
         VisitValue = 1;
 
-    init_docking_points(RawTypeBits);
+    init_docking_points(DockWithBaseId);
 
     // Parms +0xe4 list.
     for (std::list<char const*>::const_iterator It = Parms.ContinualAnims.begin();
@@ -254,7 +254,7 @@ bool CSolar::is_planetary() const
 
 bool CSolar::is_system_gate() const
 {
-    // FUN_0629a800
+    // FUN_0629a800. Retail: true for any subset of 0xc40, TypeBits == 0 included.
     return TypeBits == (TypeBits & 0xc40);
 }
 
@@ -354,7 +354,7 @@ void CSolar::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
         (double)AngularVelocity.z * AngularVelocity.z;
     if (!(SpinSq > 0.0))
     {
-        Phy.bFlag1c = 1;
+        Phy.bPhysicalUnmoveable = 1;
         Phy.LinearDamping = 1.0e6f;
         Phy.AngularDamping[0] = 1.0e6f;
         Phy.AngularDamping[1] = 1.0e6f;
@@ -362,7 +362,7 @@ void CSolar::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     }
     else
     {
-        Phy.bFlag1c = 0;
+        Phy.bPhysicalUnmoveable = 0;
         Phy.LinearDamping = 1.0e12f;
         Phy.AngularDamping[0] = 0.0f;
         Phy.AngularDamping[1] = 0.0f;
@@ -372,8 +372,8 @@ void CSolar::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     // No null test on the archetype.
     Archetype::Solar const* const SolarArch = (Archetype::Solar const*)Archetype;
     Phy.Mass = Archetype->Mass;
-    Phy.Type = 1;
-    Phy.CollisionGroupId = GetObjectDbCollisionGroup(ObjectDb);
+    Phy.Type = PhySys::ANIM_TECHNIQUE_GOLEM;
+    Phy.SystemId = GetObjectDbSystemId(ObjectDb);
 
     // A .sph DaArchetype (+0x0c) gets a sphere of SolarRadius (+0x98) when that is positive.
     char Ext[256];
@@ -389,7 +389,7 @@ void CSolar::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
         PhySys::BuildIVP_Real(this, Phy);
     }
 
-    if (Phy.bFlag1c == 0)
+    if (Phy.bPhysicalUnmoveable == 0)
         PhySys::AddToAngularVelocityOS(this, AngularVelocity);
 }
 
@@ -689,7 +689,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
         {
             char const* BaseName = Reader.get_value_string();
             unsigned const BaseId = Universe::get_base_id(BaseName);
-            Parms.DockingCount = BaseId;                               // retail +0x5c
+            Parms.DockingBaseId = BaseId;                               // retail +0x5c
             if (BaseId == 0)
             {
                 FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find base %s for solar object.",

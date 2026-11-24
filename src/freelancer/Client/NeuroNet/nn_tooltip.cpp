@@ -253,7 +253,7 @@ void NnToolTipControl::Draw()
     Height = static_cast<float>(static_cast<unsigned>(Extent[1]));
 
     FProjectedPoint const Screen = ProjectUiPoint(Position);
-    if (FlagE1 != 0)
+    if (bDrawBackground != 0)
     {
         float const PadW = Width + 3.0f;
         float const PadH = Height + 2.0f;
@@ -266,10 +266,10 @@ void NnToolTipControl::Draw()
         Win3DSetOrtho2D();
 
         unsigned char FillRgba[4] = {
-            static_cast<unsigned char>(ColorD8 & 0xff),
-            static_cast<unsigned char>((ColorD8 >> 8) & 0xff),
-            static_cast<unsigned char>((ColorD8 >> 16) & 0xff),
-            static_cast<unsigned char>((ColorD8 >> 24) & 0xff)};
+            static_cast<unsigned char>(BackgroundColor & 0xff),
+            static_cast<unsigned char>((BackgroundColor >> 8) & 0xff),
+            static_cast<unsigned char>((BackgroundColor >> 16) & 0xff),
+            static_cast<unsigned char>((BackgroundColor >> 24) & 0xff)};
         Win3DColor4ubv(FillRgba);
         Win3DDisable(kWin3DTexture2D);
         Win3DBegin(kWin3DQuads);
@@ -322,12 +322,12 @@ void NnToolTipControl::ApplyHover(FToolTipHoverInfo const* Info)
 
     // 0x004bd8dc..0x004bd949: three byte-built colour dwords into +0xd8 / +0xd4 / +0xcc, the
     // two flag bytes +0xe1 / +0xe0 = 1 and the text scale +0xb0.
-    ColorD8 = 0xFF706143u; // bytes 43 61 70 ff
+    BackgroundColor = 0xFF706143u; // bytes 43 61 70 ff
     ColorD4 = 0x19e0c387u; // bytes 87 c3 e0 19
     ColorIdle = 0xFFFFF7B9u; // bytes b9 f7 ff ff
     TextScale = 0.0011f;
     FlagE0 = 1;
-    FlagE1 = 1;
+    bDrawBackground = 1;
 
     wchar_t Scratch[0x100];
     wchar_t Resolved[0x800];

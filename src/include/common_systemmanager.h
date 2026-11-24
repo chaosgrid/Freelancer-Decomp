@@ -88,13 +88,13 @@ static_assert(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 // allocates operator new(0x195C) and stores it at IBehaviorManager+0x08 (Sys). Sub-objects in
 // construction order (sizes from the ctor's LEA sequence):
 //
-//   +0x00           int    Unknown0        -- never written by the ctor
+//   +0x00           int    OwnerObjectId  -- never written by the ctor
 //   +0x04  IBehaviorManager* Owner         -- zeroed at the end of the ctor; set by
 //                     InitSystemManager (FUN_062e6490). ThrustManager::CheckSteeringGate
 //                     reads it through ThrustManager::Owner.
 //   +0x08  (0x08)   BaseWatcher Watcher    -- zeroed
 //   +0x10           IObjDB* ObjectDb       -- zeroed at the end
-//   +0x14           byte   Unknown14 (+pad)-- zeroed at the end
+//   +0x14           byte   bLeaderParamsBorrowed (+pad) -- zeroed at the end
 //   +0x18  (0x1C)   ThrustManager Thrust   -- the ctor zeroes only its first dword;
 //                     InitSystemManager initialises the rest (see ThrustManager below).
 //   +0x34  (0xF8)   SystemManagerTimerTable Timers -- ctor FUN_062e6af0; embeds 11x
@@ -102,13 +102,13 @@ static_assert(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 //   +0x12C (0x1238) SystemManagerGunGroupManager GunGroups -- ctor FUN_062e9330. Two
 //                     0x40-slot, 0x20-stride gun-group arrays plus LauncherFireCacheSlot[16]
 //                     at GunGroups+0x1098.
-//   +0x1364 (0xC8)  GunConvergenceState -- ctor FUN_062ebbc0.
+//   +0x1364 (0xC8)  FFormationLeaderState FormationLeaders -- ctor FUN_062ebbc0.
 //   +0x142C (0x6C)  TargetManager Targeting (common_iface.h) -- ctor FUN_062ed570; vftable
 //                     .rdata:063a0888 (base IObjInspect::SubtargetEnumerator).
-//   +0x1498         4 bytes, not written by the ctor: the loot sub-object's first dword
-//                     (InitSystemManager stores the SystemManager into it). Owner1498 below.
-//   +0x149C (0x08)  BaseWatcher Watcher149C -- zeroed
-//   +0x14A4         short  Unknown14A4 (+pad) -- SUBOBJ_ID_NONE (0)
+//   +0x1498         SystemManager* TractorOwner -- not written by the ctor; the loot tractor
+//                     record's first dword (InitSystemManager stores the SystemManager into it).
+//   +0x149C (0x08)  BaseWatcher TractorTargetWatcher -- zeroed
+//   +0x14A4         short  TractorEquipId (+pad) -- SUBOBJ_ID_NONE (0)
 //   +0x14A8 (0x54)  RepairManager Repair -- ctor inline in FUN_062e6260; its +0x50
 //                     CheckTimer (absolute +0x14F8) is not written by the ctor.
 //   +0x14FC (0x88)  FAiTarget SelfTarget -- the own ship's AI-target record (every
@@ -318,7 +318,7 @@ struct SystemManagerTimerTable
     unsigned char Pad_0x1E[2];
 
     // +0x20: per-tick multiplier for Level's passive decay (UpdateSystemManagerTimerTable:
-    // `Level -= DecayRate * UnknownScale_0xD8 * DeltaTime`).
+    // `Level -= DecayRate * DecayScale * DeltaTime`).
     float DecayRate;
 
     // +0x24: shared "signal level" compared against every SustainedThresholdTimer's
@@ -346,7 +346,7 @@ struct SystemManagerTimerTable
     };
     SustainedThresholdTimer Timers[TimerChannelCount];
 
-    float UnknownScale_0xD8;       // +0xD8 = 0.5f, role not identified
+    float DecayScale;              // +0xD8 = 0.5f, the second factor of Level's decay
     unsigned char Reserved0xDC;    // +0xDC uninitialized-in-retail artifact byte (Ghidra's `local_11`)
     unsigned char Pad0xDD[3];
     void* ListHeadNode;            // +0xE0: heap-allocated (operator_new(0x10)) empty
@@ -462,7 +462,7 @@ struct FGunGroupSlot
     {
         KindPlain = 0,              // munition without a seeker
         KindSeeker = 1,             // munition with a seeker
-        KindHpType10 = 2,           // munition HpType 0xa
+        KindTorpedo = 2,            // munition of HpType 0xa (HpTypeTorpedo)
         KindMineDropper = 3,
         KindCruiseDisruptor = 4,
         KindUnclassified = 5,
@@ -820,9 +820,9 @@ static_assert(offsetof(RepairManager, CheckTimer) == 0x50, "RepairManager+0x50 C
 // FUN_062ecfb0, thiscall on the RepairManager. Re-seeds both helpers'
 // PreUseDelay / PostUseDelay / UseAtRatio from a pub::AI::Personality's RepairParams --
 // normally the owning SystemManager's own, but, when the owner is not player-controlled, its
-// FormationParams.bLeaderMakesMeTougher byte is set, GunConvergenceStateBytes[0xC5] is clear and the
-// watched object at GunConvergenceStateBytes+0x0C resolves to a CEqObj with a behavior
-// manager, that object's SystemManager instead (and the owner's Unknown14 latch is set).
+// FormationParams.bLeaderMakesMeTougher byte is set, FormationLeaders.bLeaderSuppressed is clear and the
+// FormationLeaderWatcher's object resolves to a CEqObj with a behavior
+// manager, that object's SystemManager instead (and the owner's bLeaderParamsBorrowed latch is set).
 // Always returns true.
 bool RefreshRepairManagerFromPersonality(RepairManager* Self);
 
@@ -837,7 +837,7 @@ bool RefreshRepairManagerFromPersonality(RepairManager* Self);
 // ---------------------------------------------------------------------------
 struct FormationFollowerEnvelope; // common_gotobehavior.h
 
-struct FGunConvergenceStateBlock
+struct FFormationLeaderState
 {
     // +0x00: += Dt every Update while bForceAttackFormation; zeroed once the unrounded sum
     // exceeds FormationParams.ForceAttackFormationActiveTime + ...UnactiveTime. Gate A
@@ -879,8 +879,8 @@ struct FGunConvergenceStateBlock
     unsigned char Pad_0xC7;
 
     // FUN_062ebbc0.
-    FGunConvergenceStateBlock();
-    ~FGunConvergenceStateBlock();
+    FFormationLeaderState();
+    ~FFormationLeaderState();
 
     // FUN_062ebcb0; called from UpdateSystemManager.
     void Update(float Dt);
@@ -953,17 +953,17 @@ struct FGunConvergenceStateBlock
     // owner has no watched object or no followers. Definition: common_gotobehavior.cpp.
     bool ComputeFormationFollowerEnvelope(FormationFollowerEnvelope* Out);
 };
-static_assert(sizeof(FGunConvergenceStateBlock) == 0xC8, "FGunConvergenceStateBlock sizeof 0xC8");
-static_assert(offsetof(FGunConvergenceStateBlock, Owner) == 0x08, "FGunConvergenceStateBlock+0x08 Owner");
-static_assert(offsetof(FGunConvergenceStateBlock, FormationLeaderWatcher) == 0x0C, "FGunConvergenceStateBlock+0x0C");
-static_assert(offsetof(FGunConvergenceStateBlock, FollowLeaderWatcher) == 0x14, "FGunConvergenceStateBlock+0x14");
-static_assert(offsetof(FGunConvergenceStateBlock, FollowerScratch) == 0x1C, "FGunConvergenceStateBlock+0x1C");
-static_assert(offsetof(FGunConvergenceStateBlock, FormationNarrowAngle) == 0x9C, "FGunConvergenceStateBlock+0x9C");
-static_assert(offsetof(FGunConvergenceStateBlock, OrderObjectId) == 0xA8, "FGunConvergenceStateBlock+0xA8");
-static_assert(offsetof(FGunConvergenceStateBlock, OrderLaneParam) == 0xB8, "FGunConvergenceStateBlock+0xB8");
-static_assert(offsetof(FGunConvergenceStateBlock, bOrderPending) == 0xBD, "FGunConvergenceStateBlock+0xBD");
-static_assert(offsetof(FGunConvergenceStateBlock, bForceAttackFormation) == 0xC3, "FGunConvergenceStateBlock+0xC3");
-static_assert(offsetof(FGunConvergenceStateBlock, bReleaseRequested) == 0xC6, "FGunConvergenceStateBlock+0xC6");
+static_assert(sizeof(FFormationLeaderState) == 0xC8, "FFormationLeaderState sizeof 0xC8");
+static_assert(offsetof(FFormationLeaderState, Owner) == 0x08, "FFormationLeaderState+0x08 Owner");
+static_assert(offsetof(FFormationLeaderState, FormationLeaderWatcher) == 0x0C, "FFormationLeaderState+0x0C");
+static_assert(offsetof(FFormationLeaderState, FollowLeaderWatcher) == 0x14, "FFormationLeaderState+0x14");
+static_assert(offsetof(FFormationLeaderState, FollowerScratch) == 0x1C, "FFormationLeaderState+0x1C");
+static_assert(offsetof(FFormationLeaderState, FormationNarrowAngle) == 0x9C, "FFormationLeaderState+0x9C");
+static_assert(offsetof(FFormationLeaderState, OrderObjectId) == 0xA8, "FFormationLeaderState+0xA8");
+static_assert(offsetof(FFormationLeaderState, OrderLaneParam) == 0xB8, "FFormationLeaderState+0xB8");
+static_assert(offsetof(FFormationLeaderState, bOrderPending) == 0xBD, "FFormationLeaderState+0xBD");
+static_assert(offsetof(FFormationLeaderState, bForceAttackFormation) == 0xC3, "FFormationLeaderState+0xC3");
+static_assert(offsetof(FFormationLeaderState, bReleaseRequested) == 0xC6, "FFormationLeaderState+0xC6");
 
 // ---------------------------------------------------------------------------
 // SystemManager itself.
@@ -974,7 +974,7 @@ public:
     SystemManager();
     ~SystemManager();
 
-    int Unknown0;                                    // +0x00 never written by the ctor
+    int OwnerObjectId;                                 // +0x00 the owner's get_id, cached by InitSystemManager
     // +0x04: back-pointer to the owning IBehaviorManager; zeroed by the ctor, set by
     // InitSystemManager (FUN_062e6490).
     IBehaviorManager* Owner;                           // +0x04
@@ -983,7 +983,10 @@ public:
     // SetSystemManagerSharedListHead (FUN_062e68e0). TargetManager::GetScanResponse calls its
     // FindById.
     IObjDB* ObjectDb;                                  // +0x10
-    unsigned char Unknown14;                           // +0x14
+    // +0x14: set when RefreshRepairManagerFromPersonality / RefreshWeaponFireControlConfig took
+    // the formation leader's parameters; UpdateSystemManager clears it (and re-reads the own
+    // personality) once no live leader is left.
+    unsigned char bLeaderParamsBorrowed;               // +0x14
     unsigned char Pad15[3];
     // +0x18: the embedded ThrustManager. `Thrust.Owner != nullptr` is retail's "has this
     // ThrustManager been initialised yet" test.
@@ -991,16 +994,17 @@ public:
 
     SystemManagerTimerTable Timers;                    // +0x34
     SystemManagerGunGroupManager GunGroups;            // +0x12C
-    FGunConvergenceStateBlock GunConvergenceStateBytes; // +0x1364 (ctor FUN_062ebbc0)
+    FFormationLeaderState FormationLeaders;            // +0x1364 (ctor FUN_062ebbc0)
     TargetManager Targeting;                           // +0x142C (FUN_062ed570, common_iface.h)
-    // +0x1498..+0x14A7: a small sub-object LootBehavior hands to FUN_062ece40 as
-    // Sys+0x1498. Its first dword is a SystemManager back-pointer written only by
-    // InitSystemManager; +0x149C is a BaseWatcher (zeroed by the ctor, cleared first by the
-    // owning IBehaviorManager's dtor); +0x14A4 is an equipment id, SUBOBJ_ID_NONE from the
-    // ctor and filled by InitSystemManager through find_equipment(&Id, 1, 0x100000).
-    SystemManager* Owner1498;                          // +0x1498 not written by the ctor
-    BaseWatcher Watcher149C;                           // +0x149C
-    unsigned short Unknown14A4;                        // +0x14A4
+    // +0x1498..+0x14A7: the loot tractor record LootBehavior hands to FUN_062ecd90 /
+    // FUN_062ece40 as Sys+0x1498. TractorOwner is a SystemManager back-pointer written only by
+    // InitSystemManager; TractorTargetWatcher (zeroed by the ctor, cleared first by the owning
+    // IBehaviorManager's dtor) watches the object being tractored; TractorEquipId is
+    // SUBOBJ_ID_NONE from the ctor and filled by InitSystemManager through
+    // find_equipment(&Id, 1, 0x100000).
+    SystemManager* TractorOwner;                       // +0x1498 not written by the ctor
+    BaseWatcher TractorTargetWatcher;                  // +0x149C
+    unsigned short TractorEquipId;                     // +0x14A4
     unsigned char Pad14A6[2];
 
     // +0x14A8..+0x14FB: RepairManager (see above); its CheckTimer is SystemManager+0x14F8.
@@ -1022,11 +1026,11 @@ static_assert(offsetof(SystemManager, ObjectDb) == 0x10, "SystemManager+0x10 Obj
 static_assert(offsetof(SystemManager, Thrust) == 0x18, "SystemManager+0x18 ThrustManager");
 static_assert(offsetof(SystemManager, Timers) == 0x34, "SystemManager+0x34 Timers");
 static_assert(offsetof(SystemManager, GunGroups) == 0x12C, "SystemManager+0x12C GunGroups");
-static_assert(offsetof(SystemManager, GunConvergenceStateBytes) == 0x1364, "SystemManager+0x1364 GunConvergenceStateBytes");
+static_assert(offsetof(SystemManager, FormationLeaders) == 0x1364, "SystemManager+0x1364 FormationLeaders");
 static_assert(offsetof(SystemManager, Targeting) == 0x142C, "SystemManager+0x142C Targeting");
-static_assert(offsetof(SystemManager, Owner1498) == 0x1498, "SystemManager+0x1498 Owner1498");
-static_assert(offsetof(SystemManager, Watcher149C) == 0x149C, "SystemManager+0x149C Watcher149C");
-static_assert(offsetof(SystemManager, Unknown14A4) == 0x14A4, "SystemManager+0x14A4 Unknown14A4");
+static_assert(offsetof(SystemManager, TractorOwner) == 0x1498, "SystemManager+0x1498 TractorOwner");
+static_assert(offsetof(SystemManager, TractorTargetWatcher) == 0x149C, "SystemManager+0x149C TractorTargetWatcher");
+static_assert(offsetof(SystemManager, TractorEquipId) == 0x14A4, "SystemManager+0x14A4 TractorEquipId");
 static_assert(offsetof(SystemManager, Repair) == 0x14A8, "SystemManager+0x14A8 RepairManager");
 static_assert(offsetof(SystemManager, SelfTarget) == 0x14FC, "SystemManager+0x14FC SelfTarget");
 static_assert(offsetof(SystemManager, PersonalityData) == 0x1584, "SystemManager+0x1584 PersonalityData");
@@ -1039,9 +1043,9 @@ static_assert(offsetof(SystemManager, PersonalityData) == 0x1584, "SystemManager
 // non-null, also empties the cached AI target list (bBuilt = 0, End = Begin).
 void SetSystemManagerSharedListHead(SystemManager* Self, void* NewHead);
 
-// FUN_062e6990. Clears either of GunConvergenceStateBytes' two BaseWatchers
+// FUN_062e6990. Clears either of FormationLeaders' two BaseWatchers
 // (SystemManager+0x1370 / +0x1378) if its watched target's id matches TargetId.
-void ClearGunConvergenceStateWatcherIfTarget(SystemManager* Self, int TargetId);
+void ClearFormationLeaderWatcherIfTarget(SystemManager* Self, int TargetId);
 
 // FUN_062e92d0 / FUN_062e92e0 are ThrustManager::SetSteeringFallbackFlag /
 // CheckSteeringGate (declared on the struct above).
@@ -1054,7 +1058,7 @@ bool RefreshSystemManagerTimerThresholdsFromPersonality(SystemManagerTimerTable*
 // FUN_062e6950. The "personality changed" notification
 // IBehaviorManager::set_personality fires: refresh the weapon fire-control
 // config, rebuild the timer thresholds above, refresh the RepairManager's
-// thresholds (RefreshRepairManagerFromPersonality), then mirror one status byte off the gun-convergence
+// thresholds (RefreshRepairManagerFromPersonality), then mirror one status byte off the formation-leader
 // state's watched object.
 void NotifySystemManagerPersonalityChanged(SystemManager* Self);
 
@@ -1070,14 +1074,14 @@ void UpdateSystemManagerCandidateScan(SystemManagerTimerTable* Self, float Unuse
 
 // FUN_062e7010, thiscall on &Timers. Runs the candidate scan above,
 // advances all eleven SustainedThresholdTimer slots against Timers::Level, then
-// decays Level by DecayRate * UnknownScale_0xD8 * DeltaTime, clamped at zero.
+// decays Level by DecayRate * DecayScale * DeltaTime, clamped at zero.
 void UpdateSystemManagerTimerTable(SystemManagerTimerTable* Self, float DeltaTime);
 
 // FUN_062e6490, thiscall on the SystemManager, called once from IBehaviorManager's ctor
 // right after SystemManager::SystemManager. Binds Watcher to Object, stores Manager in
-// Owner, caches the object's id in Unknown0, arms the timer table and -- only when Watcher
+// Owner, caches the object's id in OwnerObjectId, arms the timer table and -- only when Watcher
 // then holds a live object -- initialises the ThrustManager, the gun groups, the
-// gun-convergence state, the +0x1498 block (owner + the first equipment id of type mask
+// formation-leader state, the +0x1498 tractor record (owner + the first equipment id of type mask
 // 0x100000) and the RepairManager, and binds the
 // hardpoint-id watcher at +0x1344. TargetManager::Attach runs unconditionally. Returns
 // true (the caller ignores it).

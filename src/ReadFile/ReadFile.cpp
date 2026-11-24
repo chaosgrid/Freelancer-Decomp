@@ -272,8 +272,9 @@ namespace
     const unsigned long kUtfNode12 = 0x0C;
     const unsigned long kUtfNode2C = 0x2C;
 
-    // On-disk UTF header (FUN_06b71190 / FUN_06b714f0 / LAB_06b71f50). The Unk fields are
-    // unidentified.
+    // On-disk UTF header (FUN_06b71190 / FUN_06b714f0 / LAB_06b71f50). Retail ReadFile reads
+    // only Magic, Version, TreeOffset, NodeSize, StringOffset and DataOffset; the Unk fields are
+    // never touched.
     struct FUtfHeader
     {
         unsigned long Magic;          // +0x00  0x20465455
@@ -1114,7 +1115,7 @@ namespace
             return 0;
         }
         // DOS LAB_06b75e90 / UTF LAB_06b73d40: LastError=5, return 0.
-        int DACOM_API RejectOperation1C(unsigned long, unsigned long, unsigned long, unsigned long) override
+        int DACOM_API GetOverlappedResult(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
@@ -1190,13 +1191,13 @@ namespace
                 CopyNestedLastError();
             return Result;
         }
-        int DACOM_API ReturnOne2C(unsigned long, unsigned long, unsigned long, unsigned long,
+        int DACOM_API LockFileRegion(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             LastError = 5;
             return 1;
         }
-        int DACOM_API ReturnOne30(unsigned long, unsigned long, unsigned long, unsigned long,
+        int DACOM_API UnlockFileRegion(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             LastError = 5;
@@ -1218,7 +1219,7 @@ namespace
             return Result;
         }
         // DOS LAB_06b75e90 / UTF LAB_06b73d40: LastError=5, return 0.
-        int DACOM_API RejectOperation38(unsigned long, unsigned long, unsigned long, unsigned long) override
+        int DACOM_API SetFileTimes(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
@@ -1316,13 +1317,13 @@ namespace
             return 0;
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
-        int DACOM_API RejectOperation54(const char*, unsigned long) override
+        int DACOM_API CreateNode(const char*, unsigned long) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75e50 / UTF LAB_06b73d10: LastError=5, return 0.
-        int DACOM_API RejectOperation58(unsigned long) override
+        int DACOM_API RemoveNode(unsigned long) override
         {
             LastError = 5;
             return 0;
@@ -1378,19 +1379,19 @@ namespace
         }
 
         // DOS LAB_06b75e50 / UTF LAB_06b73d10: LastError=5, return 0.
-        int DACOM_API RejectOperation64(unsigned long) override
+        int DACOM_API RemoveFile(unsigned long) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75ed0 / UTF LAB_06b73d30: LastError=5, return 0.
-        int DACOM_API RejectOperation68(unsigned long, unsigned long, unsigned long) override
+        int DACOM_API CopyFileTo(unsigned long, unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
-        int DACOM_API RejectOperation6C(unsigned long, unsigned long) override
+        int DACOM_API MoveFileTo(unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
@@ -1415,7 +1416,7 @@ namespace
             return (int)(Attr);
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
-        int DACOM_API RejectOperation74(unsigned long, unsigned long) override
+        int DACOM_API SetPathAttributes(unsigned long, unsigned long) override
         {
             LastError = 5;
             return 0;
@@ -1786,12 +1787,14 @@ namespace
             FDosFileSystem* Child = new (std::nothrow) FDosFileSystem();
             *Created = (Child != nullptr) ? (IFileSystem*)(Child) : nullptr;
 
+            // Retail: Child is used without a null test after new.
             if (FsDesc->Parent != nullptr)
             {
                 Child->AttachNestedChild((IFileSystem*)(FsDesc->Parent));
                 Child->FileHandle = (HANDLE)(FsDesc->Extra);
                 Child->bFileInstance = 1;
                 Child->AccessFlags = FsDesc->Access;
+                // Retail: the path lands on the singleton, not on Child (06B748A8 lea [ebx+0Dh]).
                 std::strncpy(RootPath, FsDesc->Path, 0x108);
                 PathPrefix = 0;
                 return GR_OK;
@@ -1882,6 +1885,9 @@ namespace
                 return -1;
             }
             char Resolved[0x105] = {};
+            // Retail: the test is inverted (06B753AD test eax / je), so every pattern that
+            // joins fails with 0xA1, and FindFirstFileA failure is tested against 0, not
+            // INVALID_HANDLE_VALUE.
             if (JoinRoot(RootPath, Pattern, Resolved, 0x104) != 0)
             {
                 LastError = 0xa1;
@@ -2815,20 +2821,21 @@ namespace
             MappedView = nullptr;
         }
 
-        // MEM LAB_06b775b0: +0x10 / +0x44 / +0x50 / +0x58 / +0x60 /
-        // +0x64 / +0x70 return 0 and leave LastError alone (+0x50 comes from the base).
+        // MEM (table 06b792f0) LAB_06b775b0: +0x10 / +0x44 / +0x50 / +0x58 / +0x60 /
+        // +0x64 / +0x70, and LAB_06b775d0: +0x54 / +0x5C / +0x6C / +0x74, return 0 and leave
+        // LastError alone (+0x50 comes from the base).
         int DACOM_API CloseFile(unsigned long) override { return 0; }
         int DACOM_API UnmapFileView(unsigned long) override { return 0; }
-        int DACOM_API RejectOperation58(unsigned long) override { return 0; }
+        int DACOM_API RemoveNode(unsigned long) override { return 0; }
 
         int DACOM_API OpenNode(const char*) override { return 0; }
-        int DACOM_API RejectOperation64(unsigned long) override { return 0; }
+        int DACOM_API RemoveFile(unsigned long) override { return 0; }
         int DACOM_API GetPathAttributes(const char*) override { return 0; }
-        int DACOM_API RejectOperation54(const char*, unsigned long) override { return 0; }
+        int DACOM_API CreateNode(const char*, unsigned long) override { return 0; }
 
         int DACOM_API GetCurrentPath(unsigned long, char*) override { return 0; }
-        int DACOM_API RejectOperation6C(unsigned long, unsigned long) override { return 0; }
-        int DACOM_API RejectOperation74(unsigned long, unsigned long) override { return 0; }
+        int DACOM_API MoveFileTo(unsigned long, unsigned long) override { return 0; }
+        int DACOM_API SetPathAttributes(unsigned long, unsigned long) override { return 0; }
         int DACOM_API GetFileSystemError() override { return 0; }
 
         int DACOM_API OpenByDesc(FFileSystemDesc*) override { return -1; }
@@ -2978,16 +2985,16 @@ namespace
             LogicalSize = MappedPos;
             return 1;
         }
-        int DACOM_API RejectOperation1C(unsigned long, unsigned long, unsigned long, unsigned long) override
+        int DACOM_API GetOverlappedResult(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
             return 0;
         }
-        int DACOM_API ReturnOne2C(unsigned long, unsigned long, unsigned long, unsigned long,
+        int DACOM_API LockFileRegion(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             return 1;
         }
-        int DACOM_API ReturnOne30(unsigned long, unsigned long, unsigned long, unsigned long,
+        int DACOM_API UnlockFileRegion(unsigned long, unsigned long, unsigned long, unsigned long,
                              unsigned long) override
         {
             return 1;
@@ -2996,7 +3003,7 @@ namespace
         {
             return 0;
         }
-        int DACOM_API RejectOperation38(unsigned long, unsigned long, unsigned long, unsigned long) override
+        int DACOM_API SetFileTimes(unsigned long, unsigned long, unsigned long, unsigned long) override
         {
             return 0;
         }
@@ -3010,7 +3017,7 @@ namespace
         {
             return 0;
         }
-        int DACOM_API RejectOperation68(unsigned long, unsigned long, unsigned long) override
+        int DACOM_API CopyFileTo(unsigned long, unsigned long, unsigned long) override
         {
             return 0;
         }

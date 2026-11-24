@@ -179,6 +179,7 @@ Rect __cdecl ViewRect_to_Rect(ViewRect const& In)
 
 tagRECT __cdecl Rect_to_RECT(Rect const& In)
 {
+    // 0631e580. Retail: -2, not the -1 of Rect_to_ViewRect.
     tagRECT Out;
     Out.left = In.Left;
     Out.top = In.Top;
@@ -189,6 +190,7 @@ tagRECT __cdecl Rect_to_RECT(Rect const& In)
 
 Rect __cdecl RECT_to_Rect(tagRECT const& In)
 {
+    // 0631e5b0. Retail: +2, the inverse of Rect_to_RECT.
     Rect Out;
     Out.Left = In.left;
     Out.Top = In.top;

@@ -9,12 +9,9 @@
 // the two TU61 trigger classes it builds (vtables 06fbca40 / 06fbca84). Declarations in
 // RandomMissionMachine.h.
 //
-// FUN_06f8c460 is one function in retail; the port splits it by state (Handle*). The
-// objective keys the machine uses (the generator's
-// FRmObjectiveMap keys): 1 the target ship marker, 2 the main battle marker, 3 the target
-// component's "going to main" marker (shown as key 2), 4 / 5 the big / other solars, 6 / 7 the
-// defensive / big ships, 8 the friendly group, 9 the "return to the combat area" countdown,
-// 0xa / 0xb the critical loot, 0xc the dock of the offer base.
+// FUN_06f8c460 is one function in retail; the port splits it by state (Handle*,
+// ERmMachineState). The objective keys are the generator's FRmObjectiveMap keys
+// (ERmObjectiveKey, RandomMissionRuntime.h).
 
 #include "RandomMissions/RandomMissionMachine.h"
 
@@ -282,8 +279,8 @@ int FRmShipHealthTrigger::GetLowestHealth()
 // their flags are cleared.
 void FRmVignetteMachine::ClearShipTargets()
 {
-    RemoveObjective(6);
-    RemoveObjective(7);
+    RemoveObjective(RmObjKillShips);
+    RemoveObjective(RmObjKillBigShips);
     FRmRecordList Flagged = Ships->Query(0, 2, 2);
     for (std::list<FRmSpawnRecord*>::iterator It = Flagged.Records.begin();
          It != Flagged.Records.end(); ++It)
@@ -300,8 +297,8 @@ void FRmVignetteMachine::ClearShipTargets()
 // FUN_06f8bd90.
 void FRmVignetteMachine::ClearSolarTargets()
 {
-    RemoveObjective(4);
-    RemoveObjective(5);
+    RemoveObjective(RmObjKillBigSolar);
+    RemoveObjective(RmObjKillOtherSolars);
     FRmRecordList Flagged = Solars->Query(-1, 2, 2);
     for (std::list<FRmSpawnRecord*>::iterator It = Flagged.Records.begin();
          It != Flagged.Records.end(); ++It)
@@ -403,26 +400,26 @@ void FRmVignetteMachine::OnFlaggedShipsLost(unsigned int ObjectId)
     {
         FRmRecordList Left = Ships->Query(2, 2, 2);
         if (Left.Records.size() == 0)
-            RemoveObjective(7);
+            RemoveObjective(RmObjKillBigShips);
     }
     else if (Kind == 1)
     {
         FRmRecordList Left = Ships->Query(1, 2, 2);
         if (Left.Records.size() == 0)
-            RemoveObjective(6);
+            RemoveObjective(RmObjKillShips);
     }
 }
 
 // FUN_06f8c330.
 bool FRmVignetteMachine::HasTargetObjectives()
 {
-    if (FindObjective(7) != ActiveObjectives.end())
+    if (FindObjective(RmObjKillBigShips) != ActiveObjectives.end())
         return true;
-    if (FindObjective(4) != ActiveObjectives.end())
+    if (FindObjective(RmObjKillBigSolar) != ActiveObjectives.end())
         return true;
-    if (FindObjective(6) != ActiveObjectives.end())
+    if (FindObjective(RmObjKillShips) != ActiveObjectives.end())
         return true;
-    if (FindObjective(5) != ActiveObjectives.end())
+    if (FindObjective(RmObjKillOtherSolars) != ActiveObjectives.end())
         return true;
     return false;
 }
@@ -463,7 +460,7 @@ void FRmVignetteMachine::MarkGroupTargets(FRmRecordList* Members, FRmObjectiveMa
     if (Flagged != nullptr)
     {
         // Defensive ships 6, any other kind 7.
-        int const Key = (Flagged->Kind != 1 ? 1 : 0) + 6;
+        int const Key = (Flagged->Kind != 1 ? 1 : 0) + RmObjKillShips;
         std::vector<FRmObjective*>::iterator Active = FindObjective(Key);
         unsigned int const SystemId = Offer->System->SystemId;
         if (Active == ActiveObjectives.end())
@@ -481,7 +478,7 @@ void FRmVignetteMachine::MarkGroupTargets(FRmRecordList* Members, FRmObjectiveMa
                 ->SetTargetRecords(&SameKind, GetMissionPlayers(), 2, SystemId, Position);
             RebuildObjective((*Active)->Key);
         }
-        RemoveObjective(8);
+        RemoveObjective(RmObjDontKillShips);
         bMarked = true;
     }
 
@@ -490,17 +487,18 @@ void FRmVignetteMachine::MarkGroupTargets(FRmRecordList* Members, FRmObjectiveMa
     FRmSpawnRecord* const First = Members->Records.front();
     if (!(First->Attitude < 0.0f))
         return;
-    if (Map->Objectives.find(8) == Map->Objectives.end())
+    if (Map->Objectives.find(RmObjDontKillShips) == Map->Objectives.end())
         return;
     if (bMarked)
         return;
-    if (FindObjective(8) != ActiveObjectives.end())
+    if (FindObjective(RmObjDontKillShips) != ActiveObjectives.end())
         return;
-    if (FindObjective(6) != ActiveObjectives.end())
+    if (FindObjective(RmObjKillShips) != ActiveObjectives.end())
         return;
-    if (FindObjective(7) != ActiveObjectives.end())
+    if (FindObjective(RmObjKillBigShips) != ActiveObjectives.end())
         return;
-    AddObjective(8, static_cast<FRmObjective*>(Map->Objectives[8]));
+    AddObjective(RmObjDontKillShips,
+                 static_cast<FRmObjective*>(Map->Objectives[RmObjDontKillShips]));
 }
 
 // =======================================================================================
@@ -515,38 +513,38 @@ bool FRmVignetteMachine::OnStateEvent(SMEventData const* Event, int const& State
         return HandleAnyState(Event);
 
     // States 0..2 are the base's slots 13..15, their result dropped.
-    if (State == 0)
+    if (State == RmStateIdle)
     {
         OnState0(Event, State);
         return false;
     }
-    if (State == 1)
+    if (State == RmStateWaitStart)
     {
         OnState1(Event, State);
         return false;
     }
-    if (State == 2)
+    if (State == RmStateStarted)
     {
         OnState2(Event, State);
         return false;
     }
-    if (State == 3)
+    if (State == RmStateStart)
         return HandleStart(Event);
-    if (State == 8)
+    if (State == RmStatePreBattle)
         return HandlePreBattle(Event);
-    if (State == 9)
+    if (State == RmStateTargetBattle)
         return HandleTargetBattle(Event);
-    if (State == 10)
+    if (State == RmStateApproachMain)
         return HandleApproachMain(Event);
-    if (State == 11)
+    if (State == RmStateMainBattle)
         return HandleMainBattle(Event);
-    if (State == 12)
+    if (State == RmStateCriticalLoot)
         return HandleCriticalLoot(Event);
-    if (State == 5)
+    if (State == RmStateSucceeded)
         return HandleSucceeded(Event);
-    if (State == 6)
+    if (State == RmStateFailed)
         return HandleFailed(Event);
-    if (State == 7)
+    if (State == RmStateDone)
         return HandleDone(Event);
     return false;
 }
@@ -565,7 +563,7 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
 
     // A comm sequence conversation (DAT_06fd3b74) goes to the GCS manager (DAT_06fcf1b0)
     // when valid.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b74))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgConversation))
     {
         FRmConversationBase* const Conversation =
             static_cast<FRmConversationMessage const*>(Message)->Conversation;
@@ -641,13 +639,13 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
         if (PlayerMap->find(Player->PlayerId) == PlayerMap->end())
             return true;
         FailReason = 13;
-        set_state(6);
+        set_state(RmStateFailed);
         return true;
     }
 
     // The critical loot was spawned (DAT_06fd3b98): the loot's objective (0xa or 0xb by its
     // mode) marks it -- the active one rebuilt, else the offer's added. Record not null-tested.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b98))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgCriticalLootSpawned))
     {
         unsigned int const LootId = static_cast<FRmLootMessage const*>(Message)->ObjectId;
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(LootId));
@@ -655,12 +653,12 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
             return true;
         ClearShipTargets();
         ClearSolarTargets();
-        set_state(12);
+        set_state(RmStateCriticalLoot);
         int Key = 0;
         if (Record->CriticalLootMode == 1)
-            Key = 0xa;
+            Key = RmObjDestroyLoot;
         else if (Record->CriticalLootMode == 2 || Record->CriticalLootMode == 3)
-            Key = 0xb;
+            Key = RmObjTractorLoot;
         else
             return true;
 
@@ -711,7 +709,7 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
             return true;
         VignetteOffer->General.SendConversations(RmCommGlobalFailOther, this, It->second);
         FailReason = pub::SinglePlayer() ? 2 : 3;
-        set_state(6);
+        set_state(RmStateFailed);
         return true;
     }
 
@@ -726,16 +724,17 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
             RmCommLeftCombatArea, this, FindContentPlayerStateByShip(&Fired->Activator));
         FRmObjectiveType4* Countdown = new FRmObjectiveType4();
         Countdown->ObjectiveType = 0xda;
-        Countdown->StrId = RmComponentObjective(&VignetteOffer->General, 9)->StrId;
+        Countdown->StrId =
+            RmComponentObjective(&VignetteOffer->General, RmObjReturnToBattle)->StrId;
         unsigned int const SystemId = VignetteOffer->System->SystemId;
         Countdown->SetCountdown(static_cast<int>(GRmMultiplayerDelay), SystemId, 0x44d,
                                 Position);
-        InsertObjective(9, Countdown, ActiveObjectives.begin());
+        InsertObjective(RmObjReturnToBattle, Countdown, ActiveObjectives.begin());
         AddMachine(new FRmProximityTrigger(Cookies.ReenterArea, get_id(),
                                            VignetteOffer->System->SystemId, &Position,
                                            AreaRadius - 250.0f, GetMissionPlayers()));
         AddMachine(new FRmTimerTrigger(Cookies.Countdown, get_id(), GRmMultiplayerDelay));
-        StateMachineMessage Tick(GRmMsgType06fd3b7c);
+        StateMachineMessage Tick(GRmMsgCountdownTick);
         send_delayed_message_to_me(&Tick, 5.0f, SMMS_Broadcast, 0);
         return true;
     }
@@ -748,11 +747,11 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
         VignetteOffer->General.SendConversations(
             RmCommReenteredCombatArea, this, FindContentPlayerStateByShip(&Fired->Activator));
         SendPlaceholderObjectives();
-        std::vector<FRmObjective*>::iterator Active = FindObjective(9);
+        std::vector<FRmObjective*>::iterator Active = FindObjective(RmObjReturnToBattle);
         if (Active != ActiveObjectives.end())
         {
             FRmObjective* const Countdown = *Active;
-            RemoveObjective(9);
+            RemoveObjective(RmObjReturnToBattle);
             if (Countdown != nullptr)
                 delete Countdown;
         }
@@ -780,7 +779,7 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
         VignetteOffer->General.SendConversations(
             RmCommGlobalFailCombatRange, this, FindContentPlayerStateByShip(&Fired->Activator));
         FailReason = pub::SinglePlayer() ? 0xb : 0xc;
-        set_state(6);
+        set_state(RmStateFailed);
         LeftAreaTime = -1.0f;
         return true;
     }
@@ -788,15 +787,15 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
     // The 5 s tick (DAT_06fd3b7c): the countdown objective is taken out and, while time is
     // left (unordered stops), put back at the front with the remaining seconds. Retail reads
     // the objective without an end test: the tick only runs while it is active.
-    if (RmMessageOf(this, Event, GRmMsgType06fd3b7c) != nullptr)
+    if (RmMessageOf(this, Event, GRmMsgCountdownTick) != nullptr)
     {
         if (LeftAreaTime == -1.0f)
             return true;
         double const Now = GetContentGameTime();
         double const Left = LeftAreaTime;
         int const Elapsed = static_cast<int>(GetContentTimeDistance(&Left, &Now));
-        FRmObjective* const Countdown = *FindObjective(9);
-        RemoveObjective(9);
+        FRmObjective* const Countdown = *FindObjective(RmObjReturnToBattle);
+        RemoveObjective(RmObjReturnToBattle);
         double const Remaining = static_cast<double>(GRmMultiplayerDelay) -
                                  static_cast<double>(Elapsed);
         if (!(Remaining > 0.0))
@@ -804,14 +803,14 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
         unsigned int const SystemId = VignetteOffer->System->SystemId;
         static_cast<FRmObjectiveType4*>(Countdown)
             ->SetCountdown(static_cast<int>(Remaining), SystemId, 0x44d, Position);
-        InsertObjective(9, Countdown, ActiveObjectives.begin());
-        StateMachineMessage Tick(GRmMsgType06fd3b7c);
+        InsertObjective(RmObjReturnToBattle, Countdown, ActiveObjectives.begin());
+        StateMachineMessage Tick(GRmMsgCountdownTick);
         send_delayed_message_to_me(&Tick, 5.0f, SMMS_Broadcast, 0);
         return true;
     }
 
     // A ship destroyed (DAT_06fd3ba8): its loot.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3ba8))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgShipDestroyed))
     {
         unsigned int const ObjectId = static_cast<FRmShipMessage const*>(Message)->ObjectId;
         SpawnRecordLoot(Ships->Records.FindById(ObjectId));
@@ -833,19 +832,21 @@ bool FRmVignetteMachine::HandleStart(SMEventData const* Event)
     if (Vignette->TargetShips.bActive)
     {
         unsigned int const SystemId = Vignette->System->SystemId;
-        static_cast<FRmObjectiveType2*>(RmComponentObjective(&Vignette->General, 1))
-            ->SetMarker(SystemId, 0x44d, Vignette->TargetShips.Position);
-        AddObjective(1, static_cast<FRmObjective*>(RmComponentObjective(&Vignette->General, 1)));
-        set_state(8);
+        FRmParamText* const Guide = RmComponentObjective(&Vignette->General, RmObjGuideToPreBattle);
+        static_cast<FRmObjectiveType2*>(Guide)->SetMarker(SystemId, 0x44d,
+                                                          Vignette->TargetShips.Position);
+        AddObjective(RmObjGuideToPreBattle, static_cast<FRmObjective*>(Guide));
+        set_state(RmStatePreBattle);
     }
     else
     {
         Vector const* Center = RmMainBattleCenter(Vignette);
         unsigned int const SystemId = Vignette->System->SystemId;
-        static_cast<FRmObjectiveType2*>(RmComponentObjective(&Vignette->General, 2))
-            ->SetMarker(SystemId, 0x44d, *Center);
-        AddObjective(2, static_cast<FRmObjective*>(RmComponentObjective(&Vignette->General, 2)));
-        set_state(10);
+        FRmParamText* const Guide =
+            RmComponentObjective(&Vignette->General, RmObjGuideToMainBattle);
+        static_cast<FRmObjectiveType2*>(Guide)->SetMarker(SystemId, 0x44d, *Center);
+        AddObjective(RmObjGuideToMainBattle, static_cast<FRmObjective*>(Guide));
+        set_state(RmStateApproachMain);
     }
     AreaRadius = 3500.0f;
     std::vector<FContentPlayerState*>* Players = Mission->GetPlayerStates();
@@ -898,8 +899,8 @@ bool FRmVignetteMachine::HandlePreBattle(SMEventData const* Event)
             RemoveMachine(Fired->Sender);
         VignetteOffer->General.SendConversations(
             RmCommPreBattleSpawnRange, this, FindContentPlayerStateByShip(&Fired->Activator));
-        RemoveObjective(1);
-        set_state(9);
+        RemoveObjective(RmObjGuideToPreBattle);
+        set_state(RmStateTargetBattle);
         return true;
     }
     return false;
@@ -975,7 +976,7 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
         {
             if (!RmHasUnspawnedGroup(&VignetteOffer->Ships.Groups))
             {
-                set_state(5);
+                set_state(RmStateSucceeded);
                 return true;
             }
             VignetteOffer->General.SendConversations(RmCommKilledAllGoingToMain, this, nullptr);
@@ -987,13 +988,12 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
         }
         Vector const* Center = RmMainBattleCenter(VignetteOffer.Get());
         unsigned int const SystemId = VignetteOffer->System->SystemId;
-        static_cast<FRmObjectiveType2*>(RmComponentObjective(&VignetteOffer->TargetShips, 3))
-            ->SetMarker(SystemId, 0x44d, *Center);
-        InsertObjective(2,
-                        static_cast<FRmObjective*>(
-                            RmComponentObjective(&VignetteOffer->TargetShips, 3)),
+        FRmParamText* const Guide =
+            RmComponentObjective(&VignetteOffer->TargetShips, RmObjGuideToMainFromPre);
+        static_cast<FRmObjectiveType2*>(Guide)->SetMarker(SystemId, 0x44d, *Center);
+        InsertObjective(RmObjGuideToMainBattle, static_cast<FRmObjective*>(Guide),
                         ActiveObjectives.begin());
-        set_state(10);
+        set_state(RmStateApproachMain);
         return true;
     }
 
@@ -1004,10 +1004,10 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
             RemoveMachine(Fired->Sender);
         if (!RmHasUnspawnedGroup(&VignetteOffer->TargetShips.Groups))
         {
-            if (FindObjective(7) == ActiveObjectives.end() &&
-                FindObjective(4) == ActiveObjectives.end() &&
-                FindObjective(6) == ActiveObjectives.end() &&
-                FindObjective(5) == ActiveObjectives.end())
+            if (FindObjective(RmObjKillBigShips) == ActiveObjectives.end() &&
+                FindObjective(RmObjKillBigSolar) == ActiveObjectives.end() &&
+                FindObjective(RmObjKillShips) == ActiveObjectives.end() &&
+                FindObjective(RmObjKillOtherSolars) == ActiveObjectives.end())
                 return true;
         }
         SpawnGroupWithTriggers(Fired->Activator, &VignetteOffer->TargetShips, CookieNextGroup);
@@ -1015,7 +1015,7 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
     }
 
     // A delayed target group (DAT_06fd3b78).
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b78))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgSpawnGroup))
     {
         SpawnGroupWithTriggers(static_cast<FRmCookieMessage const*>(Message)->Cookie,
                                &VignetteOffer->TargetShips, CookieNextGroup);
@@ -1023,12 +1023,12 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
     }
 
     // A whole group destroyed (DAT_06fd3ba4) is taken.
-    if (RmMessageOf(this, Event, GRmMsgType06fd3ba4) != nullptr)
+    if (RmMessageOf(this, Event, GRmMsgGroupDestroyed) != nullptr)
         return true;
 
     // The flagged ships of a group died (DAT_06fd3ba0): once every target group spawned and
     // at most the countdown is active, the main battle starts (or state 5 with no main ships).
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3ba0))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgGroupTargetsDestroyed))
     {
         OnFlaggedShipsLost(static_cast<FRmShipMessage const*>(Message)->ObjectId);
         if (RmHasUnspawnedGroup(&VignetteOffer->TargetShips.Groups))
@@ -1037,23 +1037,24 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
         {
             if (ActiveObjectives.size() != 1)
                 return true;
-            if (FindObjective(9) == ActiveObjectives.end())
+            if (FindObjective(RmObjReturnToBattle) == ActiveObjectives.end())
                 return true;
         }
         if (ActiveObjectives.size() == 1)
         {
-            RemoveObjective(9);
+            RemoveObjective(RmObjReturnToBattle);
             LeftAreaTime = -1.0f;
         }
         if (!RmHasUnspawnedGroup(&VignetteOffer->Ships.Groups))
         {
-            set_state(5);
+            set_state(RmStateSucceeded);
             return true;
         }
         VignetteOffer->General.SendConversations(RmCommKilledAllGoingToMain, this, nullptr);
-        AddObjective(2, static_cast<FRmObjective*>(
-                            RmComponentObjective(&VignetteOffer->TargetShips, 3)));
-        set_state(10);
+        AddObjective(RmObjGuideToMainBattle,
+                     static_cast<FRmObjective*>(RmComponentObjective(&VignetteOffer->TargetShips,
+                                                                     RmObjGuideToMainFromPre)));
+        set_state(RmStateApproachMain);
         return true;
     }
 
@@ -1061,15 +1062,15 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
     // (2000 is DAT_06fbc2cc).
     if (Event->get_event_type() < 4 && Event->get_event_type() == 2)
     {
-        if (PendingState != 10)
+        if (PendingState != RmStateApproachMain)
             return true;
         AreaRadius = GRmVignetteOuterRadius;
         TRefHandle<FObjListDirective> StayInRange;
-        CreateObjListDirective(0xd, &StayInRange.Pointer);
+        CreateObjListDirective(OBJLIST_STAY_IN_RANGE, &StayInRange.Pointer);
         static_cast<FObjListStayInRange*>(StayInRange.Pointer)
             ->SetSphere(RmMainBattleCenter(VignetteOffer.Get()), 2000.0f);
         TRefHandle<FObjListDirective> GotoCenter;
-        CreateObjListDirective(5, &GotoCenter.Pointer);
+        CreateObjListDirective(OBJLIST_GOTO_VEC, &GotoCenter.Pointer);
         static_cast<FObjListGotoVec*>(GotoCenter.Pointer)
             ->SetDestination(RmMainBattleCenter(VignetteOffer.Get()), 750.0f, -1.0f, 0, false, true);
         FRmRecordList Alive = Ships->Query(0, 2, 0);
@@ -1140,29 +1141,29 @@ bool FRmVignetteMachine::HandleApproachMain(SMEventData const* Event)
 
     // The flagged ships of a group died (DAT_06fd3ba0): with every main group spawned and no
     // target, loot or dock objective left, state 5.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3ba0))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgGroupTargetsDestroyed))
     {
         OnFlaggedShipsLost(static_cast<FRmShipMessage const*>(Message)->ObjectId);
         if (RmHasUnspawnedGroup(&VignetteOffer->Ships.Groups))
             return true;
-        if (FindObjective(7) != ActiveObjectives.end() ||
-            FindObjective(4) != ActiveObjectives.end() ||
-            FindObjective(6) != ActiveObjectives.end() ||
-            FindObjective(5) != ActiveObjectives.end())
+        if (FindObjective(RmObjKillBigShips) != ActiveObjectives.end() ||
+            FindObjective(RmObjKillBigSolar) != ActiveObjectives.end() ||
+            FindObjective(RmObjKillShips) != ActiveObjectives.end() ||
+            FindObjective(RmObjKillOtherSolars) != ActiveObjectives.end())
             return true;
-        if (FindObjective(0xa) != ActiveObjectives.end() ||
-            FindObjective(0xb) != ActiveObjectives.end() ||
-            FindObjective(0xc) != ActiveObjectives.end() ||
-            FindObjective(0xd) != ActiveObjectives.end())
+        if (FindObjective(RmObjDestroyLoot) != ActiveObjectives.end() ||
+            FindObjective(RmObjTractorLoot) != ActiveObjectives.end() ||
+            FindObjective(RmObjReturnLoot) != ActiveObjectives.end() ||
+            FindObjective(RmObjJettisonLoot) != ActiveObjectives.end())
             return true;
-        set_state(5);
+        set_state(RmStateSucceeded);
         return true;
     }
 
     // A solar destroyed (DAT_06fd3b9c): the last flagged solar of its type takes objective 4
     // (type 0) or 5 (type 1); with no flagged solar left the lone objective 8 goes; once
     // nothing else is left, state 5. Record not null-tested.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b9c))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgSolarDestroyed))
     {
         unsigned int const SolarId = static_cast<FRmSolarMessage const*>(Message)->ObjectId;
         FRmSolarRecord* Record = static_cast<FRmSolarRecord*>(Solars->Records.FindById(SolarId));
@@ -1174,9 +1175,9 @@ bool FRmVignetteMachine::HandleApproachMain(SMEventData const* Event)
         if (TypeLeft != 0)
             return true;
         if (Record->SolarType == 0)
-            RemoveObjective(4);
+            RemoveObjective(RmObjKillBigSolar);
         else if (Record->SolarType == 1)
-            RemoveObjective(5);
+            RemoveObjective(RmObjKillOtherSolars);
         size_t AnyLeft = 0;
         {
             FRmRecordList Left = Solars->Query(-1, 2, 2);
@@ -1184,14 +1185,15 @@ bool FRmVignetteMachine::HandleApproachMain(SMEventData const* Event)
         }
         if (AnyLeft != 0)
             return true;
-        if (ActiveObjectives.size() == 1 && FindObjective(8) != ActiveObjectives.end())
-            RemoveObjective(8);
+        if (ActiveObjectives.size() == 1 &&
+            FindObjective(RmObjDontKillShips) != ActiveObjectives.end())
+            RemoveObjective(RmObjDontKillShips);
         if (RmHasUnspawnedGroup(&VignetteOffer->Ships.Groups))
             return true;
-        if (FindObjective(0xa) != ActiveObjectives.end() ||
-            FindObjective(0xb) != ActiveObjectives.end() ||
-            FindObjective(0xc) != ActiveObjectives.end() ||
-            FindObjective(0xd) != ActiveObjectives.end())
+        if (FindObjective(RmObjDestroyLoot) != ActiveObjectives.end() ||
+            FindObjective(RmObjTractorLoot) != ActiveObjectives.end() ||
+            FindObjective(RmObjReturnLoot) != ActiveObjectives.end() ||
+            FindObjective(RmObjJettisonLoot) != ActiveObjectives.end())
             return true;
         // Retail searches key 7 through the FUN_06f90a40 getter here.
         std::vector<FRmObjective*>::iterator Big = ActiveObjectives.begin();
@@ -1199,16 +1201,16 @@ bool FRmVignetteMachine::HandleApproachMain(SMEventData const* Event)
             ++Big;
         if (Big != ActiveObjectives.end())
             return true;
-        if (FindObjective(4) != ActiveObjectives.end() ||
-            FindObjective(6) != ActiveObjectives.end() ||
-            FindObjective(5) != ActiveObjectives.end())
+        if (FindObjective(RmObjKillBigSolar) != ActiveObjectives.end() ||
+            FindObjective(RmObjKillShips) != ActiveObjectives.end() ||
+            FindObjective(RmObjKillOtherSolars) != ActiveObjectives.end())
             return true;
-        if (FindObjective(9) != ActiveObjectives.end())
+        if (FindObjective(RmObjReturnToBattle) != ActiveObjectives.end())
         {
-            RemoveObjective(9);
+            RemoveObjective(RmObjReturnToBattle);
             LeftAreaTime = -1.0f;
         }
-        set_state(5);
+        set_state(RmStateSucceeded);
         return true;
     }
 
@@ -1245,14 +1247,14 @@ bool FRmVignetteMachine::HandleApproachMain(SMEventData const* Event)
             RemoveMachine(Fired->Sender);
         VignetteOffer->General.SendConversations(RmCommMainBattleShipSpawnRange, this,
                                                  FindContentPlayerStateByShip(&Fired->Activator));
-        set_state(11);
+        set_state(RmStateMainBattle);
         return true;
     }
 
     // The exit drops the main battle marker (key 2).
     if (Event->is_sm_event() && Event->get_event_type() == 2)
     {
-        RemoveObjective(2);
+        RemoveObjective(RmObjGuideToMainBattle);
         return true;
     }
     return false;
@@ -1272,20 +1274,20 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
         FRmRecordList Others = Solars->Query(1, 2, 2);
         if (Others.Records.size() != 0)
         {
-            static_cast<FRmObjectiveType3*>(RmComponentObjective(&VignetteOffer->Solars, 5))
-                ->SetTargetRecords(&Others, GetMissionPlayers(), 2,
-                                   VignetteOffer->System->SystemId, Position);
-            AddObjective(5, static_cast<FRmObjective*>(
-                                RmComponentObjective(&VignetteOffer->Solars, 5)));
+            FRmParamText* const Kill =
+                RmComponentObjective(&VignetteOffer->Solars, RmObjKillOtherSolars);
+            static_cast<FRmObjectiveType3*>(Kill)->SetTargetRecords(
+                &Others, GetMissionPlayers(), 2, VignetteOffer->System->SystemId, Position);
+            AddObjective(RmObjKillOtherSolars, static_cast<FRmObjective*>(Kill));
         }
         FRmRecordList Big = Solars->Query(0, 2, 2);
         if (Big.Records.size() != 0)
         {
-            static_cast<FRmObjectiveType3*>(RmComponentObjective(&VignetteOffer->Solars, 4))
-                ->SetTargetRecords(&Big, GetMissionPlayers(), 2,
-                                   VignetteOffer->System->SystemId, Position);
-            AddObjective(4, static_cast<FRmObjective*>(
-                                RmComponentObjective(&VignetteOffer->Solars, 4)));
+            FRmParamText* const Kill =
+                RmComponentObjective(&VignetteOffer->Solars, RmObjKillBigSolar);
+            static_cast<FRmObjectiveType3*>(Kill)->SetTargetRecords(
+                &Big, GetMissionPlayers(), 2, VignetteOffer->System->SystemId, Position);
+            AddObjective(RmObjKillBigSolar, static_cast<FRmObjective*>(Kill));
         }
         if (!VignetteOffer->Ships.Groups.empty())
         {
@@ -1320,7 +1322,7 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
     }
 
     // A delayed main group (DAT_06fd3b78).
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b78))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgSpawnGroup))
     {
         SpawnGroupWithTriggers(static_cast<FRmCookieMessage const*>(Message)->Cookie,
                                &VignetteOffer->Ships, CookieNextGroup);
@@ -1337,21 +1339,21 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
             {
                 if (Machine->ActiveObjectives.size() != 1)
                     return true;
-                if (Machine->FindObjective(9) == Machine->ActiveObjectives.end())
+                if (Machine->FindObjective(RmObjReturnToBattle) == Machine->ActiveObjectives.end())
                     return true;
             }
             if (Machine->ActiveObjectives.size() == 1)
             {
-                Machine->RemoveObjective(9);
+                Machine->RemoveObjective(RmObjReturnToBattle);
                 Machine->LeftAreaTime = -1.0f;
             }
-            Machine->set_state(5);
+            Machine->set_state(RmStateSucceeded);
             return true;
         }
     };
 
     // The flagged ships of a group died (DAT_06fd3ba0).
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3ba0))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgGroupTargetsDestroyed))
     {
         OnFlaggedShipsLost(static_cast<FRmShipMessage const*>(Message)->ObjectId);
         if (RmHasUnspawnedGroup(&VignetteOffer->Ships.Groups))
@@ -1360,7 +1362,7 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
     }
 
     // A solar destroyed (DAT_06fd3b9c).
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b9c))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgSolarDestroyed))
     {
         unsigned int const SolarId = static_cast<FRmSolarMessage const*>(Message)->ObjectId;
         FRmSolarRecord* Record = static_cast<FRmSolarRecord*>(Solars->Records.FindById(SolarId));
@@ -1372,11 +1374,12 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
         if (!bTypeGone)
             return true;
         if (Record->SolarType == 0)
-            RemoveObjective(4);
+            RemoveObjective(RmObjKillBigSolar);
         else if (Record->SolarType == 1)
-            RemoveObjective(5);
-        if (ActiveObjectives.size() == 1 && FindObjective(8) != ActiveObjectives.end())
-            RemoveObjective(8);
+            RemoveObjective(RmObjKillOtherSolars);
+        if (ActiveObjectives.size() == 1 &&
+            FindObjective(RmObjDontKillShips) != ActiveObjectives.end())
+            RemoveObjective(RmObjDontKillShips);
         if (RmHasUnspawnedGroup(&VignetteOffer->Ships.Groups))
             return true;
         return FTail::Run(this);
@@ -1411,7 +1414,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
             FRmLootRecord* const Record = static_cast<FRmLootRecord*>(Held.Records.front());
             FindContentPlayerState(Record->HolderId);
             unsigned int const ShipId = FindContentPlayerState(Record->HolderId)->GetShipId();
-            FRmLootMessage Drop(GRmMsgType06fd3b6c, Record->ObjectId, ShipId);
+            FRmLootMessage Drop(GRmMsgDropLoot, Record->ObjectId, ShipId);
             send_immediate_message(&Drop, static_cast<MessageHandler*>(Loot)->get_id());
         }
         return false;
@@ -1423,7 +1426,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         static void Send(FRmVignetteMachine* Machine, FRmLootRecord* Record)
         {
             unsigned int const ShipId = FindContentPlayerState(Record->HolderId)->GetShipId();
-            FRmLootMessage Drop(GRmMsgType06fd3b6c, Record->ObjectId, ShipId);
+            FRmLootMessage Drop(GRmMsgDropLoot, Record->ObjectId, ShipId);
             Machine->send_immediate_message(&Drop,
                                             static_cast<MessageHandler*>(Machine->Loot)->get_id());
         }
@@ -1433,7 +1436,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
     // Mode 2: a mission player has it -> objective 0xb goes, state 5. Mode 3: a mission player
     // has it -> objective 0xb goes, the dock of the offer base becomes objective 0xc. A
     // non-mission picker gets it dropped again.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b90))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgLootPickedUp))
     {
         FRmLootMessage const* Picked = static_cast<FRmLootMessage const*>(Message);
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(Picked->ObjectId));
@@ -1452,10 +1455,10 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
             FDrop::Send(this, Record);
             return true;
         }
-        RemoveObjective(0xb);
+        RemoveObjective(RmObjTractorLoot);
         if (Mode == 2)
         {
-            set_state(5);
+            set_state(RmStateSucceeded);
             return true;
         }
 
@@ -1470,25 +1473,25 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         pub::SpaceObj::GetLocation(DockId, Where, Orientation);
         std::vector<unsigned int> Dock;
         Dock.push_back(DockId);
-        static_cast<FRmObjectiveType3*>(RmComponentObjective(&VignetteOffer->General, 0xc))
-            ->SetTargets(&Dock, GetMissionPlayers(), Base->GetSystemInfo()->SystemId, Where);
-        AddObjective(0xc, static_cast<FRmObjective*>(
-                              RmComponentObjective(&VignetteOffer->General, 0xc)));
+        FRmParamText* const Return = RmComponentObjective(&VignetteOffer->General, RmObjReturnLoot);
+        static_cast<FRmObjectiveType3*>(Return)->SetTargets(
+            &Dock, GetMissionPlayers(), Base->GetSystemInfo()->SystemId, Where);
+        AddObjective(RmObjReturnLoot, static_cast<FRmObjective*>(Return));
         return true;
     }
 
     // The loot created again (DAT_06fd3b84): mode 3 -> the offer's objective 0xb marks the
     // loot; modes 1 / 2 -> the active objective 0xa / 0xb marks every alive critical loot of
     // the mode (no end test on the find, as retail).
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b84))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgLootDropped))
     {
         unsigned int const LootId = static_cast<FRmLootMessage const*>(Message)->ObjectId;
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(LootId));
         int const Mode = Record->CriticalLootMode;
         if (Mode == 3)
         {
-            RemoveObjective(0xc);
-            RemoveObjective(0xb);
+            RemoveObjective(RmObjReturnLoot);
+            RemoveObjective(RmObjTractorLoot);
             Vector Where;
             Matrix Orientation;
             pub::SpaceObj::GetLocation(Record->ObjectId, Where, Orientation);
@@ -1496,10 +1499,11 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
             pub::SpaceObj::GetSystem(Record->ObjectId, SystemId);
             FRmRecordList Single;
             Single.Records.push_back(Record);
-            static_cast<FRmObjectiveType3*>(RmComponentObjective(&VignetteOffer->General, 0xb))
-                ->SetTargetRecords(&Single, GetMissionPlayers(), 2, SystemId, Where);
-            AddObjective(0xb, static_cast<FRmObjective*>(
-                                  RmComponentObjective(&VignetteOffer->General, 0xb)));
+            FRmParamText* const Tractor =
+                RmComponentObjective(&VignetteOffer->General, RmObjTractorLoot);
+            static_cast<FRmObjectiveType3*>(Tractor)->SetTargetRecords(
+                &Single, GetMissionPlayers(), 2, SystemId, Where);
+            AddObjective(RmObjTractorLoot, static_cast<FRmObjective*>(Tractor));
             return true;
         }
         if (Mode != 1 && Mode != 2)
@@ -1509,7 +1513,8 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         pub::SpaceObj::GetLocation(Record->ObjectId, Where, Orientation);
         unsigned int SystemId = 0;
         pub::SpaceObj::GetSystem(Record->ObjectId, SystemId);
-        std::vector<FRmObjective*>::iterator Active = FindObjective(Mode == 1 ? 0xa : 0xb);
+        std::vector<FRmObjective*>::iterator Active =
+            FindObjective(Mode == 1 ? RmObjDestroyLoot : RmObjTractorLoot);
         FRmRecordList Critical = Loot->Query(Record->CriticalLootMode, 2, 0, 2, 0);
         FRmObjective* const Objective = *Active;
         static_cast<FRmObjectiveType3*>(Objective)
@@ -1520,7 +1525,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
 
     // The loot destroyed by a player (DAT_06fd3b94 {loot, ship}): mode 1 succeeds, modes 2 / 3
     // fail.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b94))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgLootDestroyed))
     {
         FRmLootMessage const* Destroyed = static_cast<FRmLootMessage const*>(Message);
         FRmLootRecord* Record =
@@ -1528,22 +1533,22 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         int const Mode = Record->CriticalLootMode;
         if (Mode == 1)
         {
-            RemoveObjective(0xa);
-            set_state(5);
+            RemoveObjective(RmObjDestroyLoot);
+            set_state(RmStateSucceeded);
             return true;
         }
         if (Mode != 2 && Mode != 3)
             return true;
-        RemoveObjective(0xb);
+        RemoveObjective(RmObjTractorLoot);
         VignetteOffer->General.SendConversations(RmCommGlobalFailDestroyedCriticalLoot, this,
                                                  FindContentPlayerStateByShip(&Destroyed->Value));
         FailReason = Mode == 2 ? 4 : 5;
-        set_state(6);
+        set_state(RmStateFailed);
         return true;
     }
 
     // The loot destroyed otherwise (DAT_06fd3b80); the reason is unchanged for another mode.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b80))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgLootLost))
     {
         unsigned int const LootId = static_cast<FRmLootMessage const*>(Message)->ObjectId;
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(LootId));
@@ -1554,7 +1559,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
             FailReason = 7;
         else if (Mode == 3)
             FailReason = 8;
-        set_state(6);
+        set_state(RmStateFailed);
         return true;
     }
 
@@ -1572,14 +1577,14 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         if (First->State == 4 && First->HolderId == Parms[3])
         {
             FailReason = 9;
-            set_state(6);
+            set_state(RmStateFailed);
         }
         return false;
     }
 
     // The holder docked (DAT_06fd3b88 {loot, ship, base}): mode 3 at the offer base succeeds,
     // elsewhere fails.
-    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgType06fd3b88))
+    if (StateMachineMessage const* Message = RmMessageOf(this, Event, GRmMsgLootHolderDocked))
     {
         FRmLootPlayerMessage const* Docked = static_cast<FRmLootPlayerMessage const*>(Message);
         FRmLootRecord* Record =
@@ -1588,12 +1593,12 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
             return true;
         if (Docked->Value1 == VignetteOffer->OfferBase)
         {
-            RemoveObjective(0xc);
-            set_state(5);
+            RemoveObjective(RmObjReturnLoot);
+            set_state(RmStateSucceeded);
             return true;
         }
         FailReason = 10;
-        set_state(6);
+        set_state(RmStateFailed);
         return true;
     }
     return false;
@@ -1615,7 +1620,7 @@ bool FRmVignetteMachine::HandleSucceeded(SMEventData const* Event)
         OnSucceeded();
         StateMachineMessage Done(GRmMsgMachineSucceeded);
         send_delayed_message(&Done, 0.001f, static_cast<MessageHandler*>(Mission)->get_id());
-        set_state(7);
+        set_state(RmStateDone);
         return true;
     }
     if (FRmTriggerFiredMessage const* Fired = RmFiredTriggerOf(this, Event, Cookies.ReenterArea))
@@ -1641,7 +1646,7 @@ bool FRmVignetteMachine::HandleFailed(SMEventData const* Event)
     {
         FRmMachineFailedMessage Failed(FailReason);
         send_delayed_message(&Failed, 0.001f, static_cast<MessageHandler*>(Mission)->get_id());
-        set_state(7);
+        set_state(RmStateDone);
         return true;
     }
     if (FRmTriggerFiredMessage const* Fired = RmFiredTriggerOf(this, Event, Cookies.ReenterArea))

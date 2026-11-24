@@ -35,6 +35,7 @@
 #include "Interface/win3d_renderables.h"      // ButtonMontageEnsure (FUN_00559c10)
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "DALib.h"
 #include "common_goods.h"           // NewsBroadcastProperties, GoodList::find_by_id
@@ -87,12 +88,9 @@ namespace
     // The tooltip of an unknown category (0x004a535f / 0x004a57ee).
     int const kNewsDefaultIconIds = 0x42b;
 
-    // LAB_004a3f90 / LAB_004a3fa0 / LAB_004a3fb0 -- three float statics of this translation unit
-    // (DAT_00672100 = DAT_006720fc = -0.6, DAT_006720f8 = 0.6). Each has one XREF, its
-    // initializer's write; nothing reads them.
-    float G_NewsStatic672100 = -0.6f;
-    float G_NewsStatic6720fc = -0.6f;
-    float G_NewsStatic6720f8 = 0.6f;
+    // DAT_00672100 / DAT_006720fc / DAT_006720f8 (-0.6f / -0.6f / 0.6f, static inits
+    // LAB_004a3f90 / LAB_004a3fa0 / LAB_004a3fb0) are this TU's copies of a header float
+    // constant that nothing reads; the port has no counterpart.
 
     uintptr_t PointerArg(void const* Pointer)
     {
@@ -173,26 +171,13 @@ uintptr_t NnNews::RowDword(size_t ArrayOffset, int Index) const
     return Value;
 }
 
-void NnNews::DeleteSelf()
-{
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child); // FUN_0043d2a0
-        Child = Next;
-    }
-    Destroy();   // slot 10
-    delete this; // slot 0 with 1
-}
-
 void NnNews::RevealSelected()
 {
     // Inlined at 0x004a4ca6 and 0x004a4f54. Retail does not test Selected first (a click below
     // the last item reveals past the array).
     NewsBroadcastProperties const& Item = News[Selected];
-    KnowledgeMapRevealFmtStr(&Item.Body); // +0x28, FUN_00459950
-    KnowledgeMapRevealFmtStr(&Item.Logo); // +0x40
+    KnowledgeMapRevealFmtStr(&Item.Headline); // +0x28, FUN_00459950
+    KnowledgeMapRevealFmtStr(&Item.Text);     // +0x40
 }
 
 bool NnNews::Create(Win3D* NewParent, void* Data)
@@ -394,9 +379,9 @@ void NnNews::LoadNews()
             bool bTake = false;
             switch (Pass)
             {
-            case 0: bTake = Item.bFlag2; break;           // byte +9
-            case 1: bTake = (Item.Category == 1); break;  // dword +0xc
-            case 2: bTake = Item.bFlag1; break;           // byte +8
+            case 0: bTake = Item.bAutoselect; break;      // byte +9
+            case 1: bTake = (Item.Icon == 1); break;      // dword +0xc
+            case 2: bTake = Item.bBreaking; break;        // byte +8
             default: bTake = true; break;
             }
             if (!bTake)
@@ -432,11 +417,11 @@ void NnNews::RefreshRows()
 
         char const* Path = nullptr;
         int Ids = 0;
-        NewsIconFor(*this, Item.Category, &Path, &Ids);
+        NewsIconFor(*this, Item.Icon, &Path, &Ids);
         HeadlineIcons[Row]->SetProperty(4, PointerArg(Path), 0);
         IconFrames[Row]->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
 
-        FmtStrSprintf(&Item.Body, Buffer, 0x400); // +0x28
+        FmtStrSprintf(&Item.Headline, Buffer, 0x400); // +0x28
         Headlines[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
 
         // A headline of fewer than two lines (unsigned) moves 0.016 down. For each of Create's
@@ -482,15 +467,15 @@ void NnNews::ShowSelected()
 
     wchar_t Buffer[0x1000];
     NewsBroadcastProperties const& Item = News[Selected];
-    FmtStrSprintf(&Item.Body, Buffer, 0x1000); // +0x28
+    FmtStrSprintf(&Item.Headline, Buffer, 0x1000); // +0x28
     StoryHeadline->SetProperty(0x1d, PointerArg(Buffer), 0);
 
     // +0x40 as the story.
-    FmtStrSprintf(&Item.Logo, Buffer, 0x1000);
+    FmtStrSprintf(&Item.Text, Buffer, 0x1000);
     {
         RenderDisplayList Text;
         {
-            StyleNode Style(0x9ca4);
+            StyleNode Style(kTextStyleBody);
             RdlAppendNode(Text, Style.Clone());
         }
         AppendTextMaybeXmlRdl(Buffer, static_cast<unsigned>(wcslen(Buffer)), Text, false);
@@ -515,7 +500,7 @@ void NnNews::ShowSelected()
         // Not shown or hidden here.
         char const* Path = nullptr;
         int Ids = 0;
-        NewsIconFor(*this, Item.Category, &Path, &Ids);
+        NewsIconFor(*this, Item.Icon, &Path, &Ids);
         StoryIcon->SetProperty(4, PointerArg(Path), 0);
         StoryIcon->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
     }
@@ -543,9 +528,9 @@ void NnNews::BuildTicker()
         for (int Index = 0; Index < NewsCount; ++Index)
         {
             NewsBroadcastProperties const& Item = News[Index];
-            if (!Item.bFlag1)
+            if (!Item.bBreaking)
                 continue;
-            FmtStrSprintf(&Item.Body, Part, 0x100);
+            FmtStrSprintf(&Item.Headline, Part, 0x100);
             wcscpy(Space, L" --- ");
             int const Length = static_cast<int>(wcslen(Space)) + static_cast<int>(wcslen(Part)) + Total;
             if (Length >= 0x400)
@@ -556,7 +541,7 @@ void NnNews::BuildTicker()
         }
 
         // Every commodity the base trades (TransactionType 2 or 0) with a positive price and a
-        // name: "NAME price --- ", when it still fits. Good is not null-tested.
+        // name: "NAME price --- ", when it still fits. Retail: Good is not null-tested.
         for (std::list<FClientMarketGood const*>::const_iterator It = Goods.begin();
              It != Goods.end(); ++It)
         {
@@ -727,7 +712,7 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x4e:
     {
         // Closed from outside: no callback, no NavBar. (Retail tests `this` first.)
-        DeleteSelf();
+        Win3DDeleteTree(this);
         return 0;
     }
     case 0x3e:
@@ -778,7 +763,7 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (ResultCallback != nullptr)
                 ResultCallback(ResultContext);
             NavBarCloseService(false); // FUN_004424f0(0)
-            DeleteSelf();
+            Win3DDeleteTree(this);
             return 0;
         }
 
@@ -814,6 +799,6 @@ bool NnNews::OnEvent(unsigned MsgId)
     if (ResultCallback != nullptr)
         ResultCallback(ResultContext);
     NavBarCloseService(false); // FUN_004424f0(0)
-    DeleteSelf();
+    Win3DDeleteTree(this);
     return true;
 }

@@ -6,7 +6,7 @@
 
 // CShip (retail CShip.cpp), FAnimScriptRef and the CShip-only helpers.
 #include "common_cobject.h"
-#include "Objects/common_cobject_internal.h" // CmnCobject::RotateWorldToObjectSpace, GetObjectDbCollisionGroup
+#include "Objects/common_cobject_internal.h" // CmnCobject::RotateWorldToObjectSpace, GetObjectDbSystemId
 #include "x86math.h"
 #include "x87_trig.h"   // retail's inline FSIN / FCOS (CShip::generate_follow_offset)
 
@@ -27,13 +27,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-using CmnCobject::GetObjectDbCollisionGroup;
+using CmnCobject::GetObjectDbSystemId;
 using CmnCobject::RotateWorldToObjectSpace;
 
 namespace
 {
     const char kCShipSource[] = "E:\\FL\\Scratch\\Source\\Common\\CShip.cpp";
+
+    // 0x1ff0000: CInternalEquip's family (EquipTypeCargo..EquipTypeArmor).
+    const int kInternalEquipMask = EquipTypeCargo | EquipTypeEngine | EquipTypePower |
+                                   EquipTypeScanner | EquipTypeTractor | EquipTypeRepairDroid |
+                                   EquipTypeInternalFX | EquipTypeTradeLane | EquipTypeArmor;
+    static_assert(kInternalEquipMask == 0x1ff0000, "the 0x1ff0000 traverser mask");
 }
+
 
 CShip::CShip()
     : CEqObj(ClassShip)
@@ -61,7 +68,7 @@ CShip::CShip()
     ThrustPower = 0.0f;
     MaxThrustPower = 0.0f;
     BayDoorCounter = 0;
-    BayState = 0;
+    BayState = BayClosed;
     TradelaneSpeed = 0.0f;
     bUsingTradelane = 0;
     bIsPlayer = 0;
@@ -155,10 +162,10 @@ void CShip::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     Phy.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
     Phy.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
     Phy.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-    Phy.Type = 2;
+    Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     _itoa((int)Id, Phy.Name, 0x18);
     Phy.Mass = Archetype->Mass;
-    Phy.CollisionGroupId = GetObjectDbCollisionGroup(ObjectDb);
+    Phy.SystemId = GetObjectDbSystemId(ObjectDb);
     Phy.bEnableCollisions = 0;
     if (Archetype->bHasRotationInertia)
     {
@@ -237,8 +244,8 @@ void CShip::init(CreateParms const& Parms)
     NudgeEngine.Activate(true);
 
     // +0x160 = Parms +0x5c.
-    DockingBaseId = Parms.DockingCount;
-    init_docking_points(Parms.DockingCount);
+    DockingBaseId = Parms.DockingBaseId;
+    init_docking_points(Parms.DockingBaseId);
 
     Reputation::Vibe::SetRank(VibeId, Parms.Rank);                    // Parms +0xf0
 
@@ -432,7 +439,7 @@ double CShip::get_cargo_hold_remaining() const
     // per add. HoldSize (+0x100, no null test); over-full or unordered gives 0, otherwise the
     // remainder unrounded in ST0.
     float Used = 0.0f;
-    CEquipTraverser Walk(0x1ff0000);
+    CEquipTraverser Walk(kInternalEquipMask);
     for (CEquip* Equip = const_cast<CEquipManager&>(EquipManager).Traverse(Walk); Equip != nullptr;
          Equip = const_cast<CEquipManager&>(EquipManager).Traverse(Walk))
     {
@@ -543,7 +550,7 @@ int CShip::get_space_for_cargo_type(Archetype::Equipment const* CargoArch) const
     {
         // As get_cargo_hold_remaining, inlined.
         float Used = 0.0f;
-        CEquipTraverser Walk(0x1ff0000);
+        CEquipTraverser Walk(kInternalEquipMask);
         for (CEquip* Equip = const_cast<CEquipManager&>(EquipManager).Traverse(Walk); Equip != nullptr;
              Equip = const_cast<CEquipManager&>(EquipManager).Traverse(Walk))
         {
@@ -850,15 +857,16 @@ unsigned CShip::get_tradelane_entrance_ring()
 
 unsigned CShip::get_tradelane_exit_ring()
 {
-    // FUN_062b1840, tail jump to FUN_062c2330. Retail bug kept: it reads LaneAction +0x28
-    // (EntranceRingXform.Ring), not ExitRing (+0x24), so it returns the entrance ring's id.
+    // FUN_062b1840, tail jump to FUN_062c2330: LaneAction +0x28 (LegStartXform.Ring), the ring
+    // the current leg starts at, not ExitRing (+0x24). Retail: once under way this is the last
+    // ring passed; before the first hop it is the entrance ring.
     IAction* const Action = Actions.find("LaneAction");
     if (Action == nullptr || Action == (IAction*)0x10)
         return 0;
     LaneAction const* const Lane = static_cast<LaneAction const*>(Action);
-    if (Lane->EntranceRingXform.Ring == nullptr)
+    if (Lane->LegStartXform.Ring == nullptr)
         return 0;
-    return Lane->EntranceRingXform.Ring->get_id();
+    return Lane->LegStartXform.Ring->get_id();
 }
 
 float CShip::get_tradelane_speed()
@@ -905,15 +913,15 @@ float CShip::close_bay()
         return DALib::Anim->GetStoredDuration(BayAnim.Index);
     }
 
-    if (BayState != 3 && BayState != 2)
+    if (BayState != BayOpening && BayState != BayOpen)
         return 0.0f;
     if (BayAnim.Index == -1)
     {
-        BayState = 0;
+        BayState = BayClosed;
         return 0.0f;
     }
 
-    BayState = 1;
+    BayState = BayClosing;
     DALib::Anim->EvalPlayback(BayAnim.Index, 1, -2.0f, 1.0f, nullptr, AsOpaqueDword(1.0f),
                               AsOpaqueDword(1.0f), nullptr);   // slot 0x2c
     AnimDB::Add(BayAnim.Index);
@@ -925,8 +933,8 @@ float CShip::close_bay()
         notify(INotify::BayStateChanged, &bOpen);
     }
 
-    // Shields (mask 0x100) come back on when the bay closes.
-    CEquipTraverser Walk(0x100);
+    // Shields come back on when the bay closes.
+    CEquipTraverser Walk(EquipTypeShield);
     for (CEquip* Equip = EquipManager.Traverse(Walk); Equip != nullptr;
          Equip = EquipManager.Traverse(Walk))
     {
@@ -935,10 +943,11 @@ float CShip::close_bay()
     return Result;
 }
 
-void CShip::jump_in(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Speed)
+void CShip::jump_in(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Duration)
 {
     // FUN_062b2d40. operator_new(0x68) with the JumpInAction ctor inlined; no null test.
-    Actions.add(new JumpInAction(JumpObj, Pos, Orient, Speed));
+    Actions.add(new JumpInAction(JumpObj, Pos, Orient, Duration));
+
 }
 
 void CShip::collect_force_components(float ThrottleVal, ThrustEquipType ThrustType,
@@ -951,7 +960,7 @@ void CShip::collect_force_components(float ThrottleVal, ThrustEquipType ThrustTy
 
     if (ThrustType == ThrustEquipEngine)
     {
-        CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(0x20000)));
+        CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeEngine)));
         if (Engine != nullptr)
         {
             OutForceX = (float)((double)(Engine->GetThrust(ThrottleVal)) + OutForceX);
@@ -961,14 +970,14 @@ void CShip::collect_force_components(float ThrottleVal, ThrustEquipType ThrustTy
     else if (ThrustType == ThrustEquipThruster)
     {
         // The thruster walk stops at the first entry CEThruster::cast rejects.
-        CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(0x20000)));
+        CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeEngine)));
         if (Engine != nullptr)
         {
             OutForceX = (float)((double)(Engine->GetThrust(ThrottleVal)) + OutForceX);
             OutForceY = (float)((double)(Engine->GetLinearDrag()) + OutForceY);
         }
 
-        CEquipTraverser Trav(0x400);
+        CEquipTraverser Trav(EquipTypeThruster);
         for (CEThruster* Thruster = CEThruster::cast(const_cast<CEquipManager&>(EquipManager).Traverse(Trav));
              Thruster != nullptr;
              Thruster = CEThruster::cast(const_cast<CEquipManager&>(EquipManager).Traverse(Trav)))
@@ -978,7 +987,7 @@ void CShip::collect_force_components(float ThrottleVal, ThrustEquipType ThrustTy
     }
     else if (ThrustType == ThrustEquipCruise)
     {
-        CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(0x20000)));
+        CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeEngine)));
         if (Engine != nullptr)
         {
             OutForceX = (float)((double)(Engine->GetCruiseThrust(ThrottleVal)) + OutForceX);
@@ -989,16 +998,16 @@ void CShip::collect_force_components(float ThrottleVal, ThrustEquipType ThrustTy
     {
         // NudgeForce +0x120.
         OutForceX = (float)((double)(ThrottleVal) * ShipArch->NudgeForce + OutForceX);
-        CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(0x20000)));
+        CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeEngine)));
         if (Engine != nullptr)
             OutForceY = (float)((double)(Engine->GetLinearDrag()) + OutForceY);
     }
 
-    // LinearDrag +0x104; zone (+0xa4) slot +0x58 times ScannerInterference (+0xa8).
+    // LinearDrag +0x104; zone (+0xa4) slot +0x58 times ZoneImmersion (+0xa8).
     OutForceY = (float)((double)(ShipArch->LinearDrag) + OutForceY);
     float const BaseDrag = OutForceY;
-    if (ZoneAtA4 != nullptr)
-        OutForceY = (float)((double)(ZoneAtA4->GetDragModifier()) * ScannerInterference * BaseDrag +
+    if (CurrentZone != nullptr)
+        OutForceY = (float)((double)(CurrentZone->GetDragModifier()) * ZoneImmersion * BaseDrag +
                                        OutForceY);   // ZONE 0633ad70
 }
 
@@ -1027,7 +1036,7 @@ double CShip::get_linear_drag() const
     Archetype::Ship const* const ShipArch = shiparch();
     float TotalDrag = ShipArch->LinearDrag;
 
-    CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(0x20000)));
+    CEEngine* const Engine = CEEngine::cast(const_cast<CEquip*>(EquipManager.FindFirst(EquipTypeEngine)));
     if (Engine != nullptr && Engine->IsActive())
     {
         if (Engine->bCruiseActive != 0)
@@ -1036,8 +1045,8 @@ double CShip::get_linear_drag() const
             TotalDrag = (float)((double)(Engine->GetLinearDrag()) + TotalDrag);
     }
 
-    if (ZoneAtA4 != nullptr)
-        return (double)ZoneAtA4->GetDragModifier() * TotalDrag;   // ZONE 0633ad70
+    if (CurrentZone != nullptr)
+        return (double)CurrentZone->GetDragModifier() * TotalDrag;   // ZONE 0633ad70
 
     return TotalDrag;
 }
@@ -1645,8 +1654,8 @@ int CShip::update(float Dt, unsigned Flags)
         }
 
         // IZone slot +0x58.
-        if (ZoneAtA4 != nullptr)
-            Drag = (float)((double)(ZoneAtA4->GetDragModifier()) * Drag);
+        if (CurrentZone != nullptr)
+            Drag = (float)((double)(CurrentZone->GetDragModifier()) * Drag);
 
         // No zero test on the mass.
         float const LinearDamping = (float)((double)(Drag) / get_mass());
@@ -1668,19 +1677,19 @@ int CShip::update(float Dt, unsigned Flags)
     // Bay door animation (slots 0x14 / 0x40): opening becomes open when the stored duration
     // reaches the script's (unordered keeps opening); closing becomes closed at <= 0. No null
     // test on Anim.
-    if (BayState == 3)
+    if (BayState == BayOpening)
     {
         float const ScriptDuration =
             DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
         float const StoredDuration = DALib::Anim->GetStoredDuration(BayAnim.Index);
         if (StoredDuration >= ScriptDuration)
-            BayState = 2;
+            BayState = BayOpen;
     }
-    else if (BayState == 1)
+    else if (BayState == BayClosing)
     {
         float const StoredDuration = DALib::Anim->GetStoredDuration(BayAnim.Index);
         if (StoredDuration <= 0.0f)
-            BayState = 0;
+            BayState = BayClosed;
     }
 
     // The atmosphere the ship is inside: IObjDB slot 0x0c bucket 0xfdff, QuerySphere (slot
@@ -1752,15 +1761,15 @@ double CShip::open_bay()
         return (double)Script - Stored;
     }
 
-    if (BayState != 1 && BayState != 0)
+    if (BayState != BayClosing && BayState != BayClosed)
         return 0.0f;
     if (BayAnim.Index == -1)
     {
-        BayState = 2;
+        BayState = BayOpen;
         return 0.0f;
     }
 
-    BayState = 3;
+    BayState = BayOpening;
     DALib::Anim->EvalPlayback(BayAnim.Index, 0, -2.0f, 1.0f, nullptr, AsOpaqueDword(1.0f),
                               AsOpaqueDword(1.0f), nullptr);   // slot 0x2c
     AnimDB::Add(BayAnim.Index);
@@ -1774,8 +1783,8 @@ double CShip::open_bay()
         notify(INotify::BayStateChanged, &bOpen);
     }
 
-    // Shields (mask 0x100) go down while the bay is open.
-    CEquipTraverser Walk(0x100);
+    // Shields go down while the bay is open.
+    CEquipTraverser Walk(EquipTypeShield);
     for (CEquip* Equip = EquipManager.Traverse(Walk); Equip != nullptr;
          Equip = EquipManager.Traverse(Walk))
     {
@@ -1826,10 +1835,10 @@ void CShip::notify_set_target(CShip* TargetShip, bool bIsTarget)
 // CShip::launch
 // ============================================================================
 
-void CShip::launch(IObjRW* DockObj, CEqObj* BaseObj, int LaunchType)
+void CShip::launch(IObjRW* DockObj, CEqObj* BaseObj, int DockPortIndex)
 {
     // FUN_062b2a20. operator_new(0x78). The bay fields are not touched here.
-    LaunchAction* Action = new LaunchAction(DockObj, BaseObj, LaunchType);
+    LaunchAction* Action = new LaunchAction(DockObj, BaseObj, DockPortIndex);
     Actions.add(Action);
     // FUN_062aff80, called unconditionally (also with a null allocation in retail).
     Action->Start();
@@ -2265,9 +2274,11 @@ IObjRW* CShip::next_target(bool bReverse)
     return nullptr;
 }
 
-bool CShip::leaving_system_update(unsigned& SystemId)
+bool CShip::leaving_system_update(unsigned& LeavingObjId)
 {
-    // FUN_062b4b10. SystemId names the object that leaves; every watcher slot on it is cleared.
+    // FUN_062b4b10. LeavingObjId is the object that leaves the system; every watcher slot on it
+    // is cleared.
+
     bool bFound = false;
 
     // get_id is IObjInspect slot 0x20.
@@ -2275,7 +2286,7 @@ bool CShip::leaving_system_update(unsigned& SystemId)
          It != FormationFollowers.end(); ++It)
     {
         IObjRW* const Follower = It->get();
-        if (Follower != nullptr && Follower->get_id() == SystemId)
+        if (Follower != nullptr && Follower->get_id() == LeavingObjId)
         {
             bFound = true;
             It->set(nullptr);
@@ -2286,7 +2297,7 @@ bool CShip::leaving_system_update(unsigned& SystemId)
          It != FollowFollowers.end(); ++It)
     {
         IObjRW* const Follower = It->get();
-        if (Follower != nullptr && Follower->get_id() == SystemId)
+        if (Follower != nullptr && Follower->get_id() == LeavingObjId)
         {
             It->set(nullptr);
             bFound = true;
@@ -2297,7 +2308,7 @@ bool CShip::leaving_system_update(unsigned& SystemId)
     for (std::vector<FSimpleWatcher>::iterator It = Targeters.begin(); It != Targeters.end(); ++It)
     {
         CSimple* const Targeter = It->get();
-        if (Targeter != nullptr && Targeter->Id == SystemId)
+        if (Targeter != nullptr && Targeter->Id == LeavingObjId)
         {
             It->set(nullptr);
             bFound = true;

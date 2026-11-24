@@ -56,13 +56,13 @@ namespace
     }
 }
 
-// FUN_062afda0. DockObjWatcher +0x1c, BaseObj +0x24, LaunchType +0x2c. LaunchFlags is BaseObj's
-// TypeBits (no null test); bit 0x20 forces LaunchType 1. The pad bytes +0x4e/+0x4f are not
-// written.
-LaunchAction::LaunchAction(IObjRW* DockObj, CEqObj* InBaseObj, int InLaunchType)
+// FUN_062afda0. DockObjWatcher +0x1c, BaseObj +0x24, DockPortIndex +0x2c. LaunchFlags is
+// BaseObj's TypeBits (no null test); bit 0x20 forces DockPortIndex 1. The pad bytes +0x4e/+0x4f
+// are not written.
+LaunchAction::LaunchAction(IObjRW* DockObj, CEqObj* InBaseObj, int InDockPortIndex)
     : BaseObj(InBaseObj)
     , LaunchFlags(0)
-    , LaunchType(InLaunchType)
+    , DockPortIndex(InDockPortIndex)
     , CoastElapsed(0.0f)
     , bNoDockingCamera(false)
     , bUpdateComplete(false)
@@ -82,7 +82,7 @@ LaunchAction::LaunchAction(IObjRW* DockObj, CEqObj* InBaseObj, int InLaunchType)
     LaunchFlags = BaseObj->TypeBits;
     if ((LaunchFlags & 0x20) != 0)
     {
-        LaunchType = 1;
+        DockPortIndex = 1;
     }
 }
 
@@ -107,11 +107,11 @@ LaunchAction::~LaunchAction()
 // FUN_062b01f0, LaunchAction's DirectiveCallback slot 0 (vtable 0639e57c). Retail addresses the
 // fields relative to the DirectiveCallback sub-object at +0x18; the compiler's thunk does that
 // here.
-void LaunchAction::OnDirectiveComplete(int ResultWord11c, int ResultWord118)
+void LaunchAction::OnDirectiveComplete(int CompletedBehavior, int DirectiveResult)
 {
     // RET 0x8 fixes two arguments, but retail never reads them.
-    (void)ResultWord11c;
-    (void)ResultWord118;
+    (void)CompletedBehavior;
+    (void)DirectiveResult;
 
     IObjRW* Dock = ObjRwFromWatchable(WatchedTarget(DockObjWatcher));
 
@@ -126,7 +126,7 @@ void LaunchAction::OnDirectiveComplete(int ResultWord11c, int ResultWord118)
     EqObjOrNull(Docked)->set_control_exclusion(0);
 
     {
-        ObjAffectOf(Dock)->slot_70(BaseObj->Id);
+        ObjAffectOf(Dock)->launch_complete(BaseObj->Id);
     }
 
     bUpdateComplete = true;
@@ -147,8 +147,8 @@ void LaunchAction::Start()
         {
             pub::AI::DirectiveLaunchOp Op;
             Op.LaunchObjectId = BaseObj->Id; // CSimple::Id, +0xb0
-            Op.Field_10 = LaunchType;
-            Op.Field_14 = 1;
+            Op.DockPortIndex = DockPortIndex;
+            Op.TerminalType = 1;
 
             IBehaviorManager* BM = GetBehaviorManager(Dock);
             if (BM != nullptr)
@@ -177,7 +177,7 @@ void LaunchAction::Start()
     // IObjAffect slot 0 (IObjRW+4).
     ObjAffectOf(Dock)->set_throttle(0.0f);
 
-    BaseObj->launch_pos(LaunchPos, LaunchOrient, LaunchType);
+    BaseObj->launch_pos(LaunchPos, LaunchOrient, DockPortIndex);
 
     // Push the launch point 150 along the forward axis, then correct by the docked ship's
     // origin-to-"hpmount" offset (ported from the listing).
@@ -307,7 +307,7 @@ bool LaunchAction::update(float /*Dt*/)
 
     {
         // IObjAffect slot 28 (+0x70).
-        ObjAffectOf(Dock)->slot_70(BaseObj->Id);
+        ObjAffectOf(Dock)->launch_complete(BaseObj->Id);
     }
 
     {
@@ -381,9 +381,9 @@ void LaunchAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
 
 // Inlined in CShip::jump_in (FUN_062b2d40). JumpObjWatcher is +0x18, bJumpComplete +0x64; the
 // pad bytes +0x65..+0x67 are not written.
-JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Speed)
+JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Duration)
     : JumpElapsed(0.0f)
-    , JumpSpeed(0.0f)
+    , JumpDuration(0.0f)
     , JumpApproachBudget(0.0f)
     , JumpOrient(1.0f, 0.0f, 0.0f,
                  0.0f, 1.0f, 0.0f,
@@ -408,8 +408,8 @@ JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Ori
 
     JumpPos = Pos;
     JumpOrient = Orient;
-    JumpSpeed = Speed;
-    JumpApproachBudget = Speed * 2000.0f;
+    JumpDuration = Duration;
+    JumpApproachBudget = Duration * 2000.0f;
 
     // Written but never read by JumpInAction.
     Field5c = 1500.0f;
@@ -459,10 +459,11 @@ bool JumpInAction::update(float /*Dt*/)
     return !bJumpComplete;
 }
 
-// LAB_062afbe0, JumpInAction's PhySys::Controller slot 4 (from the listing). JumpSpeed is used
-// as a duration in seconds: until it elapses the ship eases toward JumpPos along JumpOrient's
-// forward column by ((JumpSpeed - t) / JumpSpeed)^2 * JumpApproachBudget; then it is placed
-// exactly, its engine re-activated and the arrival system id reported (IObjAffect slot_74).
+// LAB_062afbe0, JumpInAction's PhySys::Controller slot 4 (from the listing). Until JumpDuration
+// seconds have elapsed the ship eases toward JumpPos along JumpOrient's forward column by
+// ((JumpDuration - t) / JumpDuration)^2 * JumpApproachBudget; then it is placed
+// exactly, its engine re-activated and the arrival system id reported (IObjAffect
+// jump_in_complete).
 // Retail quirk kept: no null test on the resolved ship (a non-ship faults).
 void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList)
 {
@@ -484,10 +485,10 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
     JumpElapsed = (float)Elapsed;
 
     // Unordered eases.
-    if (!(Elapsed >= JumpSpeed))
+    if (!(Elapsed >= JumpDuration))
     {
         // Clamped to [0, 1] (NaN passes), all unrounded.
-        double Blend = ((double)JumpSpeed - Elapsed) / JumpSpeed;
+        double Blend = ((double)JumpDuration - Elapsed) / JumpDuration;
         Blend = Blend * Blend;
         if (Blend > 1.0)
             Blend = 1.0;
@@ -513,8 +514,8 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
     if (EngineEquip != nullptr && !EngineEquip->IsActive())
         EngineEquip->Activate(true);
 
-    // IObjAffect slot_74 (+0x74; ship gameobjects send JumpInComplete with it) gets the id of
-    // the ship's system.
+    // IObjAffect jump_in_complete (+0x74; ship gameobjects send JumpInComplete with it) gets
+    // the id of the ship's system.
     IObjDB* ObjDb = TargetShip->ObjectDb;   // +0xac
     if (ObjDb == nullptr)
         return;
@@ -522,5 +523,5 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
     if (System == nullptr)
         return;
     unsigned const SystemId = System->GetId();
-    ObjAffectOf(Watched)->slot_74(SystemId);
+    ObjAffectOf(Watched)->jump_in_complete(SystemId);
 }

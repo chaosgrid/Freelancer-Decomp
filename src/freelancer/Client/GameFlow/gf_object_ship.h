@@ -48,7 +48,7 @@ struct FObjectShipDesc
     char* LaunchScript;                // +0x34 malloc_strcpy'd; FUN_004487f0: the pad's
                                        //       ShipPlaceInfo::LaunchingScript
     unsigned char bShadow;             // +0x38 FUN_004487f0: 1
-    float Float1C;                     // +0x3c RoomObject slot 3; FUN_004487f0: the pad's y
+    float FloorHeight;                 // +0x3c RoomObject slot 3; FUN_004487f0: the pad's y
     EquipDescList const* Equipment;    // +0x40 copied into the ship's own list
 
 private:
@@ -156,10 +156,10 @@ public:
     void MountEquipment(int bCombined, unsigned ArchId, unsigned short Id,
                         CacheString const* Hardpoint, int Count, float Health);
     // FUN_00447850 -- unmount a removed item. Cargo bay -> nothing; missing hardpoint -> FDUMP
-    // (ObjectShip.cpp 0x295); RemoveResult 0 (the item erased) -> detached. Arg2, Arg3 and
-    // Arg5 are not read.
-    void UnmountEquipment(int RemoveResult, unsigned Arg2, unsigned Arg3,
-                          CacheString const* Hardpoint, unsigned Arg5);
+    // (ObjectShip.cpp 0x295); RemoveResult 0 (the item erased) -> detached. ArchId, Id and
+    // Count (what the player-equipment callers pass) are not read.
+    void UnmountEquipment(int RemoveResult, unsigned ArchId, unsigned Id,
+                          CacheString const* Hardpoint, unsigned Count);
 
     // FUN_00447cd0 -- with a launch script (+0x64): a Gf sequence playing it, +0xac = 1, then
     // FUN_00558c00; without one FUN_00558a30.

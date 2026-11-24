@@ -14,8 +14,8 @@
 // FAlchemy: the IAlchemy / IFxNodeLibrary component.
 namespace AlchemyImpl
 {
-    // FUN_0623f450: the fixed particle-draw render-state block and two-stream
-    // vertex declaration, applied to G_RenderPipeline (DAT_06257bc0). Retail
+    // FUN_0623f450: the fixed particle-draw render-state and texture-stage
+    // block, applied to G_RenderPipeline (DAT_06257bc0). Retail
     // callers: FAlchemy::BeginDraw (0x06201b5e) and the two material Bind slots
     // in alchemy_material.cpp (LAB_06203300 / LAB_06203320).
     void ApplyParticleDrawRenderState();
@@ -31,12 +31,12 @@ namespace AlchemyImpl
             : Inner_(this), Controller_(&Inner_), Attaches_(nullptr), AttachCount_(0),
               AttachCapacity_(0), InitNode_(nullptr)
         {
-            SavedRsAlphaTest_ = 0;
+            SavedRsCullMode_ = 0;
             SavedRsAlphaBlend_ = 0;
             SavedRsSrcBlend_ = 0;
             SavedRsDestBlend_ = 0;
-            SavedRsColorWrite_ = 0;
-            SavedRsCull_ = 0;
+            SavedRsLighting_ = 0;
+            SavedRsZWriteEnable_ = 0;
         }
 
         ~FAlchemy() noexcept(false);
@@ -81,7 +81,7 @@ namespace AlchemyImpl
         {
             return static_cast<GENRESULT>(G_DrawCookie);
         }
-        GENRESULT DACOM_API Slot19(const char* Name, void* Unused) override;
+        GENRESULT DACOM_API CreateNamedNode(const char* Name, void* Unused) override;
         GENRESULT DACOM_API AttachNode(void* ParentRaw, void* ChildRaw) override;
         GENRESULT DACOM_API AttachNodeFiltered(void* A, void* B) override;
         GENRESULT DACOM_API DetachNode(void* Node) override;
@@ -157,12 +157,12 @@ namespace AlchemyImpl
         unsigned long AttachCount_;
         unsigned long AttachCapacity_;
         IDAComponent* InitNode_;
-        int SavedRsAlphaTest_;
+        int SavedRsCullMode_;
         int SavedRsAlphaBlend_;
         int SavedRsSrcBlend_;
         int SavedRsDestBlend_;
-        int SavedRsColorWrite_;
-        int SavedRsCull_;
+        int SavedRsLighting_;
+        int SavedRsZWriteEnable_;
     };
 
 } // namespace AlchemyImpl

@@ -52,38 +52,41 @@ namespace
     unsigned G_PlayerMissionSuccesses = 0;
     unsigned G_PlayerMissionFailures = 0;
 
-    // DAT_00673360 — scratch scalar (FUN_004c4650/4660); meaning TBD, spawn copies it.
-    unsigned G_PlayerSpawnScratchScalar = 0;
+    // DAT_00673360 -- the character's voice (CharacterInfo +0x26c, FUN_004c4660); the ship
+    // spawn reads it into CreateParms::VoiceId (FUN_004c4650).
+    unsigned G_PlayerVoiceId = 0;
 
     // DAT_0067338c — the player's rank level (FUN_004c55d0 / FUN_004c55e0); -1 while a
     // RequestRankLevel answer is pending (FUN_004c55f0).
     int G_PlayerRankLevel = 0;
 
-    // DAT_0061226c — spawn system id written by FUN_004c4680 / read by FUN_004c4670.
-    int G_PlayerSpawnSystemId = -1;
+    // DAT_0061226c -- the player's reputation vibe, from the character-select response
+    // (FUN_004c4680); read through FUN_004c4670 into CreateParms::VibeId and the reputation
+    // lookups.
+    int G_PlayerRepVibe = -1;
 
     // DAT_00673354 / DAT_00673358 — star system / base (FUN_004c4840/4910).
     unsigned G_PlayerStarSystemId = 0;
     unsigned G_PlayerBaseId = 0;
 
-    // DAT_0067335c — faction / slot scratch (FUN_004c4a10).
-    unsigned G_PlayerFactionScratch = 0;
+    // DAT_0067335c -- the location (CharacterInfo +0x268) the character stands in
+    // (FUN_004c4a10 / FUN_004c4a00).
+    unsigned G_PlayerLocationId = 0;
 
     // DAT_006732e4..ec / DAT_006732c0..e0 -- the player ship's last position and orientation,
     // written by the space frame through FUN_004c4a30 / FUN_004c4a60.
     float G_PlayerLastPosition[3] = {};
     float G_PlayerLastOrientation[9] = {};
 
-    // DAT_006728e4 cluster — 4-dword header + count @ +0x30 + up to 8 rank dwords.
-    // Sibling DAT_00672918 cluster (FUN_004c3d20) for the other rank buffer.
-    static const int kMaxRepScratchTail = 8;
-    unsigned G_RepVibeHeader[4] = {};
-    int G_RepVibeCount = 0;
-    unsigned G_RepVibeTail[kMaxRepScratchTail] = {};
-
-    unsigned G_RepRankHeader[4] = {};
-    int G_RepRankCount = 0;
-    unsigned G_RepRankTail[kMaxRepScratchTail] = {};
+    // DAT_006728e4 / DAT_00672918 -- the selected character's comm and base Costume
+    // (FUN_004c3d80 / FUN_004c3d20), back to back as in retail.
+    struct FPlayerCostumes
+    {
+        Costume Com;  // DAT_006728e4
+        Costume Base; // DAT_00672918
+    };
+    static_assert(sizeof(Costume) == 0x34, "Costume 0x34");
+    FPlayerCostumes G_PlayerCostumes = {};
 
     // DAT_00673384 / DAT_00673388 — generation counters bumped by equip/collision sync.
     unsigned G_EquipListGeneration = 0;
@@ -98,20 +101,23 @@ namespace
     // its atexit entry LAB_004c3a00; a namespace-scope std::map has the same lifetime.
     std::map<unsigned, unsigned char> G_PlayerVisitMap;
 
-    // The body FUN_004c3d20 and FUN_004c3d80 share: the costume's four part dwords, its
-    // accessory count (src+0x30, stored as it is), then that many accessory dwords from
-    // src+0x10, the loop bound re-read from the stored count on every pass. No clamp, no null
-    // test, and the rest of the tail keeps its old values.
-    void CopyRepBuffer(unsigned* OutHeader4, int* OutCount, unsigned* OutTail,
-                       unsigned const* SourceHeader4, int Count, unsigned const* TailDwords)
+    // The body FUN_004c3d20 and FUN_004c3d80 share: the four part dwords, the accessory count
+    // (+0x30) stored as it is, then that many accessory dwords from +0x10, the signed loop bound
+    // re-read from the stored count on every pass. No null test, and the accessories past the
+    // count keep their old values. Retail: no clamp to the eight accessory slots; a ninth copies
+    // the count over itself and later ones run on past the costume (from the comm costume into
+    // the base one).
+    void CopyCostume(Costume& Out, Costume const& Source)
     {
-        OutHeader4[0] = SourceHeader4[0];
-        OutHeader4[1] = SourceHeader4[1];
-        OutHeader4[2] = SourceHeader4[2];
-        OutHeader4[3] = SourceHeader4[3];
-        *OutCount = Count;
-        for (int Index = 0; Index < *OutCount; ++Index)
-            OutTail[Index] = TailDwords[Index];
+        Out.PartIds[0] = Source.PartIds[0];
+        Out.PartIds[1] = Source.PartIds[1];
+        Out.PartIds[2] = Source.PartIds[2];
+        Out.PartIds[3] = Source.PartIds[3];
+        Out.AccessoryCount = Source.AccessoryCount;
+        unsigned* const OutWords = Out.AccessoryIds;
+        unsigned const* const SourceWords = Source.AccessoryIds;
+        for (int Index = 0; Index < static_cast<int>(Out.AccessoryCount); ++Index)
+            OutWords[Index] = SourceWords[Index];
     }
 
     // The three members FUN_005aa9c0 writes live on the connect context itself,
@@ -239,29 +245,30 @@ std::list<CollisionGroupDesc>& GetPlayerCollisionGroupListRetail()
     return G_PlayerCollisionGroups;
 }
 
-unsigned const* GetPlayerRepVibeScratchRetail()
+unsigned const* GetPlayerComCostumePartsRetail()
 {
-    return G_RepVibeHeader;
+    // FUN_004c3de0 hands out &DAT_006728e4 itself.
+    return G_PlayerCostumes.Com.PartIds;
 }
 
-int GetPlayerRepVibeScratchCountRetail()
+int GetPlayerComCostumeAccessoryCountRetail()
 {
-    return G_RepVibeCount;
+    return static_cast<int>(G_PlayerCostumes.Com.AccessoryCount);
 }
 
-unsigned const* GetPlayerRepVibeScratchTailRetail()
+unsigned const* GetPlayerComCostumeAccessoriesRetail()
 {
-    return G_RepVibeTail;
+    return G_PlayerCostumes.Com.AccessoryIds;
 }
 
-unsigned GetPlayerSpawnScratchScalarRetail()
+unsigned GetPlayerVoiceIdRetail()
 {
-    return G_PlayerSpawnScratchScalar;
+    return G_PlayerVoiceId;
 }
 
-int GetPlayerSpawnSystemIdRetail()
+int GetPlayerRepVibeRetail()
 {
-    return G_PlayerSpawnSystemId;
+    return G_PlayerRepVibe;
 }
 
 float GetPlayerHealthScaleRetail()
@@ -296,9 +303,9 @@ unsigned GetPlayerBaseIdRetail()
     return G_PlayerBaseId;
 }
 
-unsigned GetPlayerFactionScratchRetail()
+unsigned GetPlayerLocationIdRetail()
 {
-    return G_PlayerFactionScratch;
+    return G_PlayerLocationId;
 }
 
 void SetPlayerShipArchetypeIdRetail(unsigned ShipArchId)
@@ -357,28 +364,26 @@ void SyncPlayerCollisionGroupListRetail(std::list<CollisionGroupDesc> const& Sou
         Ship->RebuildModel();
 }
 
-void SetPlayerRepRankBufferRetail(unsigned const* SourceHeader4, int Count,
-                                  unsigned const* TailDwords)
+void SetPlayerBaseCostumeRetail(Costume const& Source)
 {
-    // FUN_004c3d20
-    CopyRepBuffer(G_RepRankHeader, &G_RepRankCount, G_RepRankTail, SourceHeader4, Count, TailDwords);
+    // FUN_004c3d20.
+    CopyCostume(G_PlayerCostumes.Base, Source);
 }
 
-void SetPlayerRepVibeScratchRetail(unsigned const* SourceHeader4, int Count,
-                                   unsigned const* TailDwords)
+void SetPlayerComCostumeRetail(Costume const& Source)
 {
-    // FUN_004c3d80
-    CopyRepBuffer(G_RepVibeHeader, &G_RepVibeCount, G_RepVibeTail, SourceHeader4, Count, TailDwords);
+    // FUN_004c3d80.
+    CopyCostume(G_PlayerCostumes.Com, Source);
 }
 
-void SetPlayerSpawnScratchScalarRetail(unsigned Value)
+void SetPlayerVoiceIdRetail(unsigned VoiceId)
 {
-    G_PlayerSpawnScratchScalar = Value;
+    G_PlayerVoiceId = VoiceId;
 }
 
-void SetPlayerSpawnSystemIdRetail(int SystemId)
+void SetPlayerRepVibeRetail(int Vibe)
 {
-    G_PlayerSpawnSystemId = SystemId;
+    G_PlayerRepVibe = Vibe;
 }
 
 void SetPlayerHealthScaleRetail(float Scale)
@@ -518,9 +523,9 @@ void SetPlayerCollisionGroupHealthRetail(unsigned short Id, float Health)
     ++G_CollisionListGeneration;
 }
 
-void SetPlayerFactionScratchRetail(unsigned Value)
+void SetPlayerLocationIdRetail(unsigned LocationId)
 {
-    G_PlayerFactionScratch = Value;
+    G_PlayerLocationId = LocationId;
 }
 
 float const* GetPlayerLastPositionRetail()
@@ -571,7 +576,7 @@ bool ApplyCharacterSelectEquipFields(CCharacterSet::CharacterInfo const* CharInf
     if (CharInfo == nullptr)
         return false;
 
-    SetPlayerSpawnScratchScalarRetail(CharInfo->VoiceId);          // +0x26c FUN_004c4660
+    SetPlayerVoiceIdRetail(CharInfo->VoiceId);                     // +0x26c FUN_004c4660
     SetPlayerHealthScaleRetail(CharInfo->HullStatus);              // +0x244 FUN_004c4f80
     SetPlayerShipArchetypeIdRetail(CharInfo->ShipArchetype);       // +0x230 FUN_004c3e20
 
@@ -582,14 +587,8 @@ bool ApplyCharacterSelectEquipFields(CCharacterSet::CharacterInfo const* CharInf
 
     SetPlayerCreditsRetail(static_cast<unsigned>(CharInfo->Money), 1);    // +0x234 FUN_004c4cf0
 
-    // +0x2a8 FUN_004c3d20 and +0x274 FUN_004c3d80: the base and the comm Costume
-    // (four parts, the accessory count at +0x30, the accessory ids).
-    Costume const& BaseCostume = CharInfo->BaseCostume;
-    SetPlayerRepRankBufferRetail(BaseCostume.PartIds, static_cast<int>(BaseCostume.AccessoryCount),
-                                 BaseCostume.AccessoryIds);
-    Costume const& ComCostume = CharInfo->ComCostume;
-    SetPlayerRepVibeScratchRetail(ComCostume.PartIds, static_cast<int>(ComCostume.AccessoryCount),
-                                  ComCostume.AccessoryIds);
+    SetPlayerBaseCostumeRetail(CharInfo->BaseCostume);             // +0x2a8 FUN_004c3d20
+    SetPlayerComCostumeRetail(CharInfo->ComCostume);               // +0x274 FUN_004c3d80
 
     unsigned BaseId = CharInfo->BaseId;                            // +0x264
     if ((BaseId & 0x3fffffffU) != 0)
@@ -603,7 +602,7 @@ bool ApplyCharacterSelectEquipFields(CCharacterSet::CharacterInfo const* CharInf
         SetPlayerStarSystemIdRetail(CharInfo->SystemId);           // +0x260
     }
 
-    SetPlayerFactionScratchRetail(CharInfo->LocationId);           // +0x268 FUN_004c4a10
+    SetPlayerLocationIdRetail(CharInfo->LocationId);               // +0x268 FUN_004c4a10
 
     // An empty name is the _Nullstr, i.e. L"". Unbounded, as retail (the buffer is 24 wchars).
     wcscpy(G_PlayerCharacterName, CharInfo->Name.c_str());
@@ -667,7 +666,7 @@ void NotifyCharacterSelectComplete(unsigned const Response4[4])
 {
     // FUN_005ab380 after its first store (CLoginMgr+0x21c = 1, done by
     // CLoginMgr::OnCharacterSelectResponse). The response is read without a null test.
-    SetPlayerSpawnSystemIdRetail(static_cast<int>(Response4[0])); // FUN_004c4680
+    SetPlayerRepVibeRetail(static_cast<int>(Response4[0])); // FUN_004c4680
 
     if (!SinglePlayer())
     {

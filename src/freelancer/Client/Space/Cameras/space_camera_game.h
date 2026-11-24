@@ -54,17 +54,17 @@
 //          in GameCamera and the cameras built on it (.rdata 0x005dbfd8, 0x005dc1e0, 0x005dc350)
 enum EGameCameraSlot
 {
-    kGameCamSlotUnk50        = 0x50,
+    kGameCamSlotScaleEnvFx   = 0x50,
     kGameCamSlotGetName      = 0x54,
     kGameCamSlotAttach       = 0x58,
-    kGameCamSlotUnk5c        = 0x5c,
+    kGameCamSlotApplyViewport = 0x5c,
     kGameCamSlotHasNoTarget  = 0x60,
-    kGameCamSlotUnk64        = 0x64,
-    kGameCamSlotUnk68        = 0x68,
-    kGameCamSlotUnk6c        = 0x6c,
-    kGameCamSlotUnk70        = 0x70,
-    kGameCamSlotUnk74        = 0x74,
-    kGameCamSlotUnk78        = 0x78,
+    kGameCamSlotActivate     = 0x64,
+    kGameCamSlotDeactivate   = 0x68,
+    kGameCamSlotUpdate       = 0x6c,
+    kGameCamSlotCommand70    = 0x70,
+    kGameCamSlotCommand74    = 0x74,
+    kGameCamSlotDrawScene    = 0x78,
     kGameCamSlotSoundMode    = 0x7c,
     kGameCamSlotCount        = 32          // the vtable is 32 slots, 0x80 bytes (HUDCamera's
                                            // 0x005dc08c..0x005dc108, the name string at 0x005dc10c)
@@ -93,17 +93,19 @@ struct FGameCamera : FSpaceCamera
     BaseWatcher    Watched;          // +0x0c0  Common.dll BaseWatcher (sizeof 8)
     float          BaseHalfFovXDeg;  // +0x0c8  35.0f; re-cached whenever fovx/fovy is set
     unsigned char  Pad0CC[4];        // +0x0cc  the ctor never touches this
-    float          VectorD0[3];      // +0x0d0  zeroed by the ctor
+    float          LastPosition[3];  // +0x0d0  zeroed; the position as of the last update
     float          Velocity[3];      // +0x0dc  zeroed; slot 0x48 hands this out
     unsigned char  Flags;            // +0x0e8  the ctor clears its low two bits; bit 0 = clear the
                                      //         colour buffer, bit 1 = clear depth (FUN_0051b500)
     unsigned char  ClearColor[3];    // +0x0e9  R, G, B bytes (written at 0x0051c303, 0x0051c881,
                                      //         0x00549cfe; read by FUN_0051b500)
-    unsigned       FieldEC;          // +0x0ec  zeroed
-    unsigned       FieldF0;          // +0x0f0  zeroed
-    unsigned char  bFlagF4;          // +0x0f4  zeroed
-    unsigned char  bFlagF5;          // +0x0f5  zeroed
-    unsigned char  bFlagF6;          // +0x0f6  zeroed
+    // +0xec..+0xf6: zeroed by the ctor; no access in the camera code (0x00516f00..0x0051e200)
+    // but the ctor's stores.
+    unsigned       FieldEC;          // +0x0ec
+    unsigned       FieldF0;          // +0x0f0
+    unsigned char  bFlagF4;          // +0x0f4
+    unsigned char  bFlagF5;          // +0x0f5
+    unsigned char  bFlagF6;          // +0x0f6
     unsigned char  Pad0F7;
 };
 
@@ -111,7 +113,7 @@ struct FGameCamera : FSpaceCamera
 static_assert(sizeof(FGameCamera) == 0x0f8, "FGameCamera must be 0xf8");
 static_assert(offsetof(FGameCamera, Watched) == 0x0c0, "GC +0x0c0");
 static_assert(offsetof(FGameCamera, BaseHalfFovXDeg) == 0x0c8, "GC +0x0c8");
-static_assert(offsetof(FGameCamera, VectorD0) == 0x0d0, "GC +0x0d0");
+static_assert(offsetof(FGameCamera, LastPosition) == 0x0d0, "GC +0x0d0");
 static_assert(offsetof(FGameCamera, Velocity) == 0x0dc, "GC +0x0dc");
 static_assert(offsetof(FGameCamera, Flags) == 0x0e8, "GC +0x0e8");
 static_assert(offsetof(FGameCamera, FieldEC) == 0x0ec, "GC +0x0ec");
@@ -277,3 +279,12 @@ void CameraOrientFromForwardAndUp(float* Out, const float* M, const float* Up);
 // The IObjRW the watcher currently holds, or null. Retail spells this `watched - 8` inline at
 // every use site.
 void* GameCameraGetTarget(const FGameCamera* Cam);
+
+struct CEqObj;
+struct IObjRW;
+
+// The object's CEqObj when its class has ship mask 0x503, else null. Retail inlines the chain
+// at every use: the CBase sub-object (IObjRW + 0x0c, null-tested), then CBase::Object (+0x10).
+CEqObj* GameCameraShipOf(IObjRW* Object);
+// GameCameraShipOf on the watched object.
+CEqObj* GameCameraWatchedShip(const FGameCamera* Cam);

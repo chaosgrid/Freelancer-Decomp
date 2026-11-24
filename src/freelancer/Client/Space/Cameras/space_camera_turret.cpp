@@ -104,19 +104,8 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
     FHudCamera* const Hud = (FHudCamera*)Cam;
 
     // Not a watched ship (CObject mask 0x503) -> true.
-    {
-        const unsigned char* const Held =
-            reinterpret_cast<const unsigned char*>(Hud->Watched.target());
-        if (Held == nullptr || Held - 8 == nullptr)
-            return true;
-        const unsigned char* const Plus0c = Held - 8 + 0xc;
-        if (Plus0c == nullptr)
-            return true;
-        CEqObj* const EqObj = *reinterpret_cast<CEqObj* const*>(Plus0c + 4);
-        if (EqObj == nullptr ||
-            (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) != 0x503u)
-            return true;
-    }
+    if (GameCameraWatchedShip(Hud) == nullptr)
+        return true;
 
     IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
     const float* const ShipRot = &Object->get_transform().Rotation.E[0][0];
@@ -298,7 +287,7 @@ bool TurretCameraOnEvent(FTurretCamera* Cam, unsigned MsgId)
         return true;
 
     // The record's key-down byte decides between +/-KeyRotateRate and 0.
-    const bool bDown = HudCommandRecord()->Byte18 != 0;
+    const bool bDown = HudCommandRecord()->bKeyDown != 0;
     switch (MsgId)
     {
     case 0x32:

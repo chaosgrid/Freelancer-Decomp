@@ -324,10 +324,10 @@ RDLNode* TextNode::Clone() const
     return new (std::nothrow) TextNode(*this);
 }
 
-void TextNode::Execute(TextRenderContext& Ctx, bool bHighlight)
+void TextNode::Execute(TextRenderContext& Ctx, bool bDraw)
 {
     // .text:06328e10
-    Ctx.execute_text(Text.c_str(), bHighlight, (int)Text.size());
+    Ctx.execute_text(Text.c_str(), bDraw, (int)Text.size());
 }
 
 void TextNode::GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const
@@ -473,10 +473,10 @@ RDLNode* TextPtrNode::Clone() const
     return new (std::nothrow) TextPtrNode(TextPtr, TextLen);
 }
 
-void TextPtrNode::Execute(TextRenderContext& Ctx, bool bHighlight)
+void TextPtrNode::Execute(TextRenderContext& Ctx, bool bDraw)
 {
     // RVA 0xC9390
-    Ctx.execute_text(TextPtr, bHighlight, TextLen);
+    Ctx.execute_text(TextPtr, bDraw, TextLen);
 }
 
 void TextPtrNode::GetVisualSize(const TextRenderContext& Ctx, VisualSize& Size) const
@@ -603,10 +603,10 @@ ImageNode& ImageNode::operator=(const ImageNode& Other)
 
 RDLNode* ImageNode::Clone() const { return new (std::nothrow) ImageNode(*this); } // .text:063296c0
 
-void ImageNode::Execute(TextRenderContext& Ctx, bool bHighlight)
+void ImageNode::Execute(TextRenderContext& Ctx, bool bDraw)
 {
     // .text:06329620. No null check of Img.
-    Ctx.execute_image(Img, bHighlight);
+    Ctx.execute_image(Img, bDraw);
 }
 
 TextRenderContext::Image const* ImageNode::get_image() { return Img; }         // 0x062d1ad0
@@ -614,7 +614,7 @@ void ImageNode::set_image(TextRenderContext::Image const* InImg) { Img = InImg; 
 
 void ImageNode::GetVisualSize(const TextRenderContext&, VisualSize& Size) const
 {
-    // .text:06329640. Retail scales BOTH axes by ScaleY (DAT_063ed66c).
+    // .text:06329640. Both axes are scaled by the one image scale (DAT_063ed66c).
     if (Img == nullptr)
     {
         Size.Height = 0;
@@ -623,8 +623,8 @@ void ImageNode::GetVisualSize(const TextRenderContext&, VisualSize& Size) const
         Size.Descent = 0;
         return;
     }
-    Size.Width = (int)((double)GRichTextScaleY * (double)Img->Width);
-    const int ScaledHeight = (int)((double)GRichTextScaleY * (double)Img->Height);
+    Size.Width = (int)((double)GRichTextImageScale * (double)Img->Width);
+    const int ScaledHeight = (int)((double)GRichTextImageScale * (double)Img->Height);
     Size.Descent = 0;
     Size.Ascent = ScaledHeight;
     Size.Height = ScaledHeight;
@@ -910,10 +910,10 @@ void StyleNode::set_style_id(unsigned short Id) { StyleId = Id; }
 
 RDLNode* StyleNode::Clone() const { return new (std::nothrow) StyleNode(*this); } // .text:06329b10
 
-void StyleNode::Execute(TextRenderContext& Ctx, bool bHighlight)
+void StyleNode::Execute(TextRenderContext& Ctx, bool bDraw)
 {
     // RVA 0xC9A50
-    StyleCollection::get_style(StyleId).execute(Ctx, bHighlight);
+    StyleCollection::get_style(StyleId).execute(Ctx, bDraw);
 }
 
 void StyleNode::GetVisualSize(const TextRenderContext&, VisualSize& Size) const
@@ -957,10 +957,10 @@ void RDLRefNode::Update(float Dt)
 
 RDLNode* RDLRefNode::Clone() const { return new (std::nothrow) RDLRefNode(*this); } // .text:06329c40
 
-void RDLRefNode::Execute(TextRenderContext& Ctx, bool bHighlight)
+void RDLRefNode::Execute(TextRenderContext& Ctx, bool bDraw)
 {
     // .text:06329b40: the referenced list's execute inlined.
-    List.execute(Ctx, bHighlight);
+    List.execute(Ctx, bDraw);
 }
 
 void RDLRefNode::GetVisualSize(const TextRenderContext&, VisualSize&) const

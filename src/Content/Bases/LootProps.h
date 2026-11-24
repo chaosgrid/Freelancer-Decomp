@@ -21,9 +21,15 @@ struct FLootProps
 {
     ID_String Nickname;                                       // +0x00 CreateID(nickname)
     float DropChance;                                        // +0x04 drop_properties[0] * 0.01
-    // +0x08..+0x18: drop_properties[1..5] as read. TODO: meaning of each value (readers
-    // around FUN_06f5d14f, TU53).
-    int DropProperties[5];
+    // +0x08..+0x18: drop_properties values 1..5, named after SpaceSupport::PrepareLoot
+    // (FUN_06f5cfa0): the item count that may drop is (worth - MinWorth) / WorthPerUnit
+    // (capped at the count; the count itself for a 0 divisor) + BonusCount, at most
+    // MaxCandidates and the count; each candidate drops with DropChance, at most MaxDrops.
+    int MinWorth;                                             // +0x08 below it nothing drops
+    int WorthPerUnit;                                         // +0x0c
+    int BonusCount;                                           // +0x10
+    int MaxCandidates;                                        // +0x14
+    int MaxDrops;                                             // +0x18
 };
 static_assert(sizeof(FLootProps) == 0x1c, "retail mLootProps record is 0x1c bytes");
 

@@ -107,6 +107,18 @@ bool TimerTableMissileWithinReaction08(SystemManagerTimerTable const* Self)
     return Best <= Self->Owner->PersonalityData.MissileReaction.EvadeAfterburnMissileReactionTime;   // +0x17bc
 }
 
+namespace
+{
+    // Doubly-linked circular list node: {next, prev, embedded BaseWatcher}, 0x10 bytes (the
+    // size of both retail operator new calls, sentinel and node).
+    struct SystemManagerTimerListNode
+    {
+        SystemManagerTimerListNode* Next;  // +0x00
+        SystemManagerTimerListNode* Prev;  // +0x04
+        unsigned char Watcher[8];          // +0x08, BaseWatcher-sized payload
+    };
+}
+
 // ============================================================================
 // SystemManagerTimerTable -- FUN_062e6af0.
 // ============================================================================
@@ -123,12 +135,13 @@ void ConstructSystemManagerTimerTable(SystemManagerTimerTable* Self)
         Timers[i].Accumulator = 0.0f;
     }
 
-    Self->UnknownScale_0xD8 = 0.5f;
+    Self->DecayScale = 0.5f;
 
     // An empty, self-referential circular-list sentinel head (operator new(0x10)).
-    void** Node = static_cast<void**>(::operator new(0x10));
-    Node[0] = Node;
-    Node[1] = Node;
+    SystemManagerTimerListNode* const Node =
+        static_cast<SystemManagerTimerListNode*>(::operator new(0x10));
+    Node->Next = Node;
+    Node->Prev = Node;
     Self->ListHeadNode = Node;
     Self->ListCount = 0;
 
@@ -141,15 +154,16 @@ namespace
     // is {Next, Prev, BaseWatcher}.
     void DestroySystemManagerTimerList(SystemManagerTimerTable* Self)
     {
-        void** const Head = static_cast<void**>(Self->ListHeadNode);
-        void** Node = static_cast<void**>(Head[0]);
+        SystemManagerTimerListNode* const Head =
+            static_cast<SystemManagerTimerListNode*>(Self->ListHeadNode);
+        SystemManagerTimerListNode* Node = Head->Next;
         while (Node != Head)
         {
-            void** const Next = static_cast<void**>(Node[0]);
-            void** const Prev = static_cast<void**>(Node[1]);
-            Prev[0] = Next;
-            Next[1] = Prev;
-            reinterpret_cast<BaseWatcher*>(Node + 2)->~BaseWatcher();
+            SystemManagerTimerListNode* const Next = Node->Next;
+            SystemManagerTimerListNode* const Prev = Node->Prev;
+            Prev->Next = Next;
+            Next->Prev = Prev;
+            reinterpret_cast<BaseWatcher*>(Node->Watcher)->~BaseWatcher();
             ::operator delete(Node);
             --Self->ListCount;
             Node = Next;
@@ -169,18 +183,6 @@ SystemManagerTimerTable::~SystemManagerTimerTable()
     Targets.Begin = nullptr;
     Targets.End = nullptr;
     Targets.Cap = nullptr;
-}
-
-namespace
-{
-    // Doubly-linked circular list node: {next, prev, embedded BaseWatcher}, 0x10 bytes (the
-    // size of both retail operator new calls, sentinel and node).
-    struct SystemManagerTimerListNode
-    {
-        SystemManagerTimerListNode* Next;  // +0x00
-        SystemManagerTimerListNode* Prev;  // +0x04
-        unsigned char Watcher[8];          // +0x08, BaseWatcher-sized payload
-    };
 }
 
 // FUN_062e8720, thiscall (this = SystemManager+0x34), RET 4. Sole caller: IBehaviorManager::
@@ -530,7 +532,7 @@ void UpdateSystemManagerTimerTable(SystemManagerTimerTable* Self, float DeltaTim
     if (Self->Level > 0.0f)
     {
         double const NewLevel = Self->Level -
-            (double)Self->UnknownScale_0xD8 * Self->DecayRate * DeltaTime;
+            (double)Self->DecayScale * Self->DecayRate * DeltaTime;
         Self->Level = (float)NewLevel;
         if (NewLevel < 0.0)
             Self->Level = 0.0f;

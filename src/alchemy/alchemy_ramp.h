@@ -19,6 +19,22 @@ namespace AlchemyImpl
     // has no key objects to create.
     static const GENRESULT kRampNoKeyFactory = static_cast<GENRESULT>(0xFFFFFFF9);
 
+    // The ramp interpolation mode (SetMode / GetMode, and FFxAnimatedSingle::ComputeSlopes):
+    // the weight between two keys is U (linear), U*U (ease-in), 1-(1-U)^2 (ease-out) or
+    // U*U*(3-2U) (ease-in-out); modes 5 / 6 pick ease-in when the value falls / rises
+    // across the segment and ease-out otherwise. The nested ramps blend any other mode
+    // linearly.
+    enum ERampMode : unsigned long
+    {
+        RampModeStep = 0,
+        RampModeLinear = 1,
+        RampModeEaseIn = 2,
+        RampModeEaseOut = 3,
+        RampModeEaseInOut = 4,
+        RampModeEaseInWhenFalling = 5,
+        RampModeEaseInWhenRising = 6,
+    };
+
     // The key container every ramp embeds at +8: {vptr, Data (+4), ?, LastIndex (+0xC,
     // count - 1, -1 when empty), Capacity (+0x10)} over 8-byte {float Time; TValue} keys.
     // Value moves only; children are AddRef'd / Released by the owning ramp.

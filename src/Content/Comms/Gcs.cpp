@@ -205,13 +205,13 @@ TString<0x40> __cdecl MakeObjectReferenceName(int Kind, FContentSpaceObj* Object
         char const* Name = nullptr;
         switch (static_cast<FContentNpcShip*>(Object)->GetGuideType())
         {
-        case 2:
+        case GUIDE_TYPE_TRADE:
             Name = HasFormationWingmen(Object) ? "gcs_dhail_mbid_traders"
                                                : "gcs_dhail_mbid_trader";
             break;
-        case 3:
-        case 4:
-        case 7:
+        case GUIDE_TYPE_PATROL_PATH:
+        case GUIDE_TYPE_WANDER:
+        case GUIDE_TYPE_PATROL_GUIDE:
             Name = HasFormationWingmen(Object) ? "gcs_dhail_mbid_patrollers"
                                                : "gcs_dhail_mbid_patrol";
             break;
@@ -524,7 +524,7 @@ void FGcsLine::BuildSingleVoiceLine(unsigned int Roles, char const* Name)
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName(MakeTString64(Name).Data, "-", VoiceId).Data);
 }
@@ -687,13 +687,13 @@ FGcsLineLaunchClearance::FGcsLineLaunchClearance(FSystemInfo* InSystem, unsigned
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed9330. Role 0x40 (dockrequest_dock).
-    if (!HasVoiceRoles(0x40))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCK))
         return;
     // The listener's ship is not null-tested; rand() / 32768 is always 0 (15-bit CRT rand).
     FContentSpaceObj* const Ship = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a41;
+    PermutationIds = IDS_COMM_ORDER_9;
     TextIds.reserve(9);
 
     PushText(MakeShortFactionName(Ship).Data);
@@ -734,11 +734,11 @@ FGcsLineAck::FGcsLineAck(FSystemInfo* InSystem, unsigned int InSpeaker,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edf7a0: role 0x200 (misc_chatter).
-    if (!HasVoiceRoles(0x200))
+    if (!HasVoiceRoles(VOICE_ROLE_MISC_CHATTER))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
 }
@@ -748,14 +748,14 @@ FGcsLineDockRequest::FGcsLineDockRequest(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed6dd0: role 0x80 (dockrequest_docker).
-    if (!HasVoiceRoles(0x80))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCKER))
         return;
     // The speaker's own ship (not null-tested); the dock's lookup (FUN_06f73a40) is unused.
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     System->FindShipOrSolar(Listener);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a42;
+    PermutationIds = IDS_COMM_ORDER_10;
     TextIds.reserve(10);
 
     PushText("gcs_misc_thisis+");
@@ -776,11 +776,11 @@ FGcsLineDockHostile::FGcsLineDockHostile(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed72e0: role 0x40.
-    if (!HasVoiceRoles(0x40))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCK))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName("gcs_dockrequest_responsehostile", "-", VoiceId).Data);
 }
@@ -791,13 +791,13 @@ FGcsLineDockGranted::FGcsLineDockGranted(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed74d0: role 0x40; the ship's lookup (FUN_06f73930) is unused. No rand() test.
-    if (!HasVoiceRoles(0x40))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCK))
         return;
     System->FindShip(Listener);
     if (DockType == 6)
     {
         // Landing.
-        PermutationIds = 0x4a3e;
+        PermutationIds = IDS_COMM_ORDER_6;
         TextIds.reserve(6);
         PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
         PushText("gcs_dockrequest_yourrequest+");
@@ -810,7 +810,7 @@ FGcsLineDockGranted::FGcsLineDockGranted(FSystemInfo* InSystem, unsigned int InS
     if (DockIndex <= 0x14)
     {
         // A terminal up to 20, its number (DockIndex + 1) at the end.
-        PermutationIds = 0x4a3f;
+        PermutationIds = IDS_COMM_ORDER_7;
         TextIds.reserve(7);
         PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
         PushText("gcs_dockrequest_yourrequest+");
@@ -826,7 +826,7 @@ FGcsLineDockGranted::FGcsLineDockGranted(FSystemInfo* InSystem, unsigned int InS
         return;
     }
     // A terminal above 20, its number digit by digit (two digits).
-    PermutationIds = 0x4a40;
+    PermutationIds = IDS_COMM_ORDER_8;
     TextIds.reserve(8);
     PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
     PushText("gcs_dockrequest_yourrequest+");
@@ -847,11 +847,11 @@ FGcsLineDockStandby::FGcsLineDockStandby(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed7dc0: role 0x40.
-    if (!HasVoiceRoles(0x40))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCK))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3c;
+    PermutationIds = IDS_COMM_ORDER_4;
     TextIds.reserve(4);
     PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
     PushText(MakeVoiceLineName("gcs_dockrequest_standby", "-", VoiceId).Data);
@@ -864,11 +864,11 @@ FGcsLineDockDenied::FGcsLineDockDenied(FSystemInfo* InSystem, unsigned int InSpe
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed80d0: role 0x40.
-    if (!HasVoiceRoles(0x40))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCK))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3d;
+    PermutationIds = IDS_COMM_ORDER_5;
     TextIds.reserve(5);
     PushText(MakeVoiceLineName("gcs_misc_ack", "-", VoiceId).Data);
     PushText("gcs_dockrequest_yourrequest+");
@@ -882,12 +882,12 @@ FGcsLineDockNowCleared::FGcsLineDockNowCleared(FSystemInfo* InSystem, unsigned i
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed8450: role 0x40; the ship is not null-tested.
-    if (!HasVoiceRoles(0x40))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCK))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3f;
+    PermutationIds = IDS_COMM_ORDER_7;
     TextIds.reserve(7);
     PushText(MakeShortFactionName(Ship).Data);
     PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
@@ -903,11 +903,11 @@ FGcsLineJumpGateOpen::FGcsLineJumpGateOpen(FSystemInfo* InSystem, unsigned int I
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed8810: role 0x80.
-    if (!HasVoiceRoles(0x80))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCKER))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3b;
+    PermutationIds = IDS_COMM_ORDER_3;
     TextIds.reserve(3);
     PushText(MakeVoiceLineName("gcs_dockrequest_jumpgateopen", "-", VoiceId).Data);
     PushText(MakeVoiceLineName("gcs_dockrequest_goingto", "+", VoiceId).Data);
@@ -920,11 +920,11 @@ FGcsLineJumpGateDelayed::FGcsLineJumpGateDelayed(FSystemInfo* InSystem, unsigned
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed8ac0: role 0x80.
-    if (!HasVoiceRoles(0x80))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCKER))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName("gcs_dockrequest_jumpgatedelayed", "-", VoiceId).Data);
     PushText(MakeSystemPrefixName(TargetSystem).Data);
@@ -936,7 +936,7 @@ FGcsLineJumpGateOpenAfterDelay::FGcsLineJumpGateOpenAfterDelay(FSystemInfo* InSy
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed8d20.
-    BuildSingleVoiceLine(0x80, "gcs_dockrequest_jumpgateopenafterdelay");
+    BuildSingleVoiceLine(VOICE_ROLE_DOCKREQUEST_DOCKER, "gcs_dockrequest_jumpgateopenafterdelay");
 }
 
 FGcsLineTradeLaneStart::FGcsLineTradeLaneStart(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -944,7 +944,7 @@ FGcsLineTradeLaneStart::FGcsLineTradeLaneStart(FSystemInfo* InSystem, unsigned i
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed8f10.
-    BuildSingleVoiceLine(0x80, "gcs_dockrequest_tradelanestart");
+    BuildSingleVoiceLine(VOICE_ROLE_DOCKREQUEST_DOCKER, "gcs_dockrequest_tradelanestart");
 }
 
 FGcsLineThisOurStop::FGcsLineThisOurStop(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -952,11 +952,11 @@ FGcsLineThisOurStop::FGcsLineThisOurStop(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed9100: role 0x80.
-    if (!HasVoiceRoles(0x80))
+    if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCKER))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName("gcs_dockrequest_thisourstop", "-", VoiceId).Data);
     PushText(MakeVoiceLineName("gcs_dockrequest_thankshelp", "-", VoiceId).Data);
@@ -967,14 +967,14 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed97e0: role 0x20 (hail_dock); the ship is not null-tested.
-    if (!HasVoiceRoles(0x20))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_DOCK))
         return;
     FContentShipBase* const Ship = static_cast<FContentShipBase*>(System->FindShip(Listener));
 
     // DAT_06fb6214 (-0.6f): at or below, or unordered, refuses; no rand() test on that side.
     if (!(Attitude > -0.6f))
     {
-        PermutationIds = 0x4a3c;
+        PermutationIds = IDS_COMM_ORDER_4;
         TextIds.reserve(4);                                         // FUN_06eec150
         PushText("gcs_dockhail_dock_incoming+");
         TString<0x40> ShipPrefix;
@@ -990,7 +990,7 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
     int const Pick = (rand() * 2) / 32768;
     if (Pick == 1)
     {
-        PermutationIds = 0x4a3f;
+        PermutationIds = IDS_COMM_ORDER_7;
         TextIds.reserve(7);
         PushText("gcs_dockhail_dock_incoming+");
         TString<0x40> ShipPrefix;
@@ -1007,7 +1007,7 @@ FGcsLineDockHail::FGcsLineDockHail(FSystemInfo* InSystem, unsigned int InSpeaker
     }
     if (Pick != 0)
         return;
-    PermutationIds = 0x4a3e;
+    PermutationIds = IDS_COMM_ORDER_6;
     TextIds.reserve(6);
     PushText("gcs_misc_thisis+");
     PushText(MakeObjectLocationName(Speaker).Data);                 // FUN_06eeb730 inlined
@@ -1026,10 +1026,10 @@ FGcsLineDockHailReceived::FGcsLineDockHailReceived(FSystemInfo* InSystem, unsign
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ed9f70: role 0x20; the ship (not null-tested); no rand() test.
-    if (!HasVoiceRoles(0x20))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_DOCK))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Listener);
-    PermutationIds = 0x4a3d;
+    PermutationIds = IDS_COMM_ORDER_5;
     TextIds.reserve(5);
     PushText(MakeVoiceLineName("gcs_dockhail_dock_transreceived", "+", VoiceId).Data);
     PushText(MakeShortFactionName(Ship).Data);
@@ -1043,12 +1043,12 @@ FGcsLineHaileeDataSubmit::FGcsLineHaileeDataSubmit(FSystemInfo* InSystem, unsign
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06eda290: role 0x10 (hail_hailee); the speaker's own ship.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3d;
+    PermutationIds = IDS_COMM_ORDER_5;
     TextIds.reserve(5);
     PushText("gcs_misc_thisis+");
     // Retail calls GetFactionProps directly here; same outcome as FUN_06eeb190.
@@ -1063,7 +1063,7 @@ FGcsLineHaileeAngry::FGcsLineHaileeAngry(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06eda5a0.
-    BuildSingleVoiceLine(0x10, "gcs_dhail_angry_response");
+    BuildSingleVoiceLine(VOICE_ROLE_HAIL_HAILEE, "gcs_dhail_angry_response");
 }
 
 FGcsLineGoingTo::FGcsLineGoingTo(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1071,12 +1071,12 @@ FGcsLineGoingTo::FGcsLineGoingTo(FSystemInfo* InSystem, unsigned int InSpeaker,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06eda790: role 0x10; the speaker's ship.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeFormationVoiceLineName(Ship, "gcs_misc_goingto", "+", VoiceId).Data);
     // The guide's second target (slot +0x34), its place.
@@ -1093,12 +1093,12 @@ FGcsLinePatrolIdHome::FGcsLinePatrolIdHome(FSystemInfo* InSystem, unsigned int I
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edab00: role 0x10; the speaker's ship.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeFormationVoiceLineName(Ship, "gcs_patrol_idhome", "+", VoiceId).Data);
     // The guide's first target (slot +0x34), its place.
@@ -1115,7 +1115,7 @@ FGcsLinePatrolStatus::FGcsLinePatrolStatus(FSystemInfo* InSystem, unsigned int I
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edae70: role 0x10.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     // The ship is not null-tested; callers only get here for guide type 3. Slot +0x4c is
     // LAB_06f0b2d0. No rand() test in either branch.
@@ -1123,12 +1123,12 @@ FGcsLinePatrolStatus::FGcsLinePatrolStatus(FSystemInfo* InSystem, unsigned int I
     int const PointsToGo = static_cast<FPatrolGuide*>(GetShipGuide(Ship))->GetPathPointsToGo();
     if (PointsToGo == 0)
     {
-        PermutationIds = 0x4a39;
+        PermutationIds = IDS_COMM_ORDER_1;
         TextIds.reserve(1);
         PushText(MakeFormationVoiceLineName(Ship, "gcs_patrol_finished", "-", VoiceId).Data);
         return;
     }
-    PermutationIds = 0x4a3b;
+    PermutationIds = IDS_COMM_ORDER_3;
     TextIds.reserve(3);
     char const* Have = nullptr;
     if (HasFormationWingmen(Ship))
@@ -1149,12 +1149,12 @@ FGcsLineTradeStatus::FGcsLineTradeStatus(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edb260: role 0x10; the speaker's ship.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3c;
+    PermutationIds = IDS_COMM_ORDER_4;
     TextIds.reserve(4);
 
     // The trade guide's slot +0x4c (trade good), else slot +0x50 (return good).
@@ -1202,12 +1202,12 @@ FGcsLineTradeIdHome::FGcsLineTradeIdHome(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edb720: role 0x10; the speaker's ship.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeFormationVoiceLineName(Ship, "gcs_trade_idhome", "+", VoiceId).Data);
     // The guide's first target (slot +0x34), its place.
@@ -1225,11 +1225,11 @@ FGcsLinePlayerHailBlowOff::FGcsLinePlayerHailBlowOff(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee11c0: role 0x10.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName(MakeTString64("gcs_phail_blowoff").Data, "-", VoiceId).Data);
 }
@@ -1240,11 +1240,11 @@ FGcsLinePlayerHailCombatBlowOff::FGcsLinePlayerHailCombatBlowOff(FSystemInfo* In
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee13b0: FUN_06ee11c0 with its own name.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName(MakeTString64("gcs_phail_combatblowoff").Data, "-", VoiceId).Data);
 }
@@ -1255,12 +1255,12 @@ FGcsLinePlayerHailIdentify::FGcsLinePlayerHailIdentify(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee15a0: role 0x10; the ship is not null-tested.
-    if (!HasVoiceRoles(0x10))
+    if (!HasVoiceRoles(VOICE_ROLE_HAIL_HAILEE))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3c;
+    PermutationIds = IDS_COMM_ORDER_4;
     TextIds.reserve(4);
     PushText("gcs_misc_thisis+");
     // Retail calls GetFactionProps directly here; same outcome.
@@ -1284,7 +1284,8 @@ namespace
         FVoiceProperties* const Voice = FindVoiceProperties(&Line->VoiceId);
         unsigned int Type = 0;
         pub::SpaceObj::GetType(Line->Speaker, Type);
-        unsigned int const Roles = (Type & 0x7f0000) != 0 ? 0x4000 : 0x800;
+        unsigned int const Roles = (Type & 0x7f0000) != 0 ? VOICE_ROLE_COMBAT_LEV_1
+                                                             : VOICE_ROLE_COMBAT_DOCK;
         if (Voice == nullptr || !Voice->SupportsRoles(Roles))
         {
             Line->System = nullptr;
@@ -1301,7 +1302,7 @@ FGcsLineCombatDeathSympathy::FGcsLineCombatDeathSympathy(FSystemInfo* InSystem,
 {
     // FUN_06edba90: +0x08 = 0 (the third argument is never read).
     (void)Unused;
-    BuildSingleVoiceLine(0x4000, "gcs_combat_deathsympathy");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_deathsympathy");
 }
 
 FGcsLineCombatTakingLead::FGcsLineCombatTakingLead(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1311,12 +1312,12 @@ FGcsLineCombatTakingLead::FGcsLineCombatTakingLead(FSystemInfo* InSystem, unsign
     // FUN_06edbc80: +0x08 = 0 (the third argument is never read); role 0x4; the ship is not
     // null-tested.
     (void)Unused;
-    if (!HasVoiceRoles(0x4))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_2))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3e;
+    PermutationIds = IDS_COMM_ORDER_6;
     TextIds.reserve(6);
     PushText("gcs_misc_thisis+");
     PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
@@ -1335,7 +1336,7 @@ FGcsLineCombatScream::FGcsLineCombatScream(FSystemInfo* InSystem, unsigned int I
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_scream").Data, "-", VoiceId).Data);
 }
@@ -1345,7 +1346,7 @@ FGcsLineCombatBrag::FGcsLineCombatBrag(FSystemInfo* InSystem, unsigned int InSpe
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edc180.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_brag");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_brag");
 }
 
 FGcsLineCombatTakingDamage::FGcsLineCombatTakingDamage(FSystemInfo* InSystem,
@@ -1358,7 +1359,7 @@ FGcsLineCombatTakingDamage::FGcsLineCombatTakingDamage(FSystemInfo* InSystem,
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     // Double DAT_06fb6aa0 (0.49); unordered is not "below".
     char const* const Name = static_cast<double>(Health) < 0.49
@@ -1374,11 +1375,11 @@ FGcsLineCombatInflictingDamage::FGcsLineCombatInflictingDamage(FSystemInfo* InSy
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edc5d0: role 0x4000.
-    if (!HasVoiceRoles(0x4000))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_1))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     // Double DAT_06fb6b00 (0.33); unordered is not "below".
     char const* const Name = static_cast<double>(Health) < 0.33
@@ -1392,7 +1393,7 @@ FGcsLineCombatInSights::FGcsLineCombatInSights(FSystemInfo* InSystem, unsigned i
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edc800.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_insights");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_insights");
 }
 
 FGcsLineCombatHasInSights::FGcsLineCombatHasInSights(FSystemInfo* InSystem,
@@ -1401,7 +1402,7 @@ FGcsLineCombatHasInSights::FGcsLineCombatHasInSights(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edc9f0.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_hasinsights");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_hasinsights");
 }
 
 FGcsLineCombatRejoiningForm::FGcsLineCombatRejoiningForm(FSystemInfo* InSystem,
@@ -1410,7 +1411,7 @@ FGcsLineCombatRejoiningForm::FGcsLineCombatRejoiningForm(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edcbe0.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_rejoiningform");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_rejoiningform");
 }
 
 FGcsLineCombatOrderDisengage::FGcsLineCombatOrderDisengage(FSystemInfo* InSystem,
@@ -1419,11 +1420,11 @@ FGcsLineCombatOrderDisengage::FGcsLineCombatOrderDisengage(FSystemInfo* InSystem
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edcdd0: role 0x4000.
-    if (!HasVoiceRoles(0x4000))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_1))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_order_disengage").Data, "-",
                                VoiceId).Data);
@@ -1436,7 +1437,7 @@ FGcsLineCombatAllClear::FGcsLineCombatAllClear(FSystemInfo* InSystem, unsigned i
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edd000.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_announce_allclear");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_announce_allclear");
 }
 
 FGcsLineCombatResumeTrade::FGcsLineCombatResumeTrade(FSystemInfo* InSystem,
@@ -1445,12 +1446,12 @@ FGcsLineCombatResumeTrade::FGcsLineCombatResumeTrade(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edd1f0: role 0xc004; the ship is not null-tested.
-    if (!HasVoiceRoles(0xc004))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_3))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3b;
+    PermutationIds = IDS_COMM_ORDER_3;
     TextIds.reserve(3);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_resume_trade").Data, "+",
                                VoiceId).Data);
@@ -1470,7 +1471,7 @@ FGcsLineCombatResumePatrol::FGcsLineCombatResumePatrol(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edd500.
-    BuildSingleVoiceLine(0x4, "gcs_combat_resume_patrol");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_2, "gcs_combat_resume_patrol");
 }
 
 FGcsLineCombatEngaging::FGcsLineCombatEngaging(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1480,7 +1481,7 @@ FGcsLineCombatEngaging::FGcsLineCombatEngaging(FSystemInfo* InSystem, unsigned i
     // FUN_06edd6f0: the listener is 0, NOT the target -- SendComm goes to receiver 0 and the
     // client plays it as chatter on channel B (no talking head, HUD_Comm 004ce26c). InTarget
     // is read only for the target's ship. Role 0x4.
-    if (!HasVoiceRoles(0x4))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_2))
         return;
     // The speaker's ship lookup is unused.
     System->FindShip(Speaker);
@@ -1492,7 +1493,7 @@ FGcsLineCombatEngaging::FGcsLineCombatEngaging(FSystemInfo* InSystem, unsigned i
     }
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3c;
+    PermutationIds = IDS_COMM_ORDER_4;
     TextIds.reserve(4);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_engaging").Data, "+", VoiceId).Data);
     PushText(MakeShortFactionName(Target).Data);
@@ -1518,11 +1519,11 @@ FGcsLineCombatNoEngaging::FGcsLineCombatNoEngaging(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edda20: role 0x4.
-    if (!HasVoiceRoles(0x4))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_2))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_noengaging").Data, "+", VoiceId).Data);
     PushText(Reason == 2 ? "gcs_combat_noengagereason_tootough_01-"
@@ -1534,7 +1535,7 @@ FGcsLineCombatAskEngage::FGcsLineCombatAskEngage(FSystemInfo* InSystem, unsigned
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06eddc10.
-    BuildSingleVoiceLine(0x4, "gcs_combat_askengage");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_2, "gcs_combat_askengage");
 }
 
 FGcsLineCombatOrderEngage::FGcsLineCombatOrderEngage(FSystemInfo* InSystem,
@@ -1543,7 +1544,7 @@ FGcsLineCombatOrderEngage::FGcsLineCombatOrderEngage(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edde00.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_order_engage");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_order_engage");
 }
 
 FGcsLineCombatOrderNoEngage::FGcsLineCombatOrderNoEngage(FSystemInfo* InSystem,
@@ -1552,11 +1553,11 @@ FGcsLineCombatOrderNoEngage::FGcsLineCombatOrderNoEngage(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06eddff0: FUN_06edda20 with "gcs_combat_order_noengage" and "-".
-    if (!HasVoiceRoles(0x4))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_2))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_order_noengage").Data, "-",
                                VoiceId).Data);
@@ -1570,7 +1571,7 @@ FGcsLineCombatEnemySighted::FGcsLineCombatEnemySighted(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ede1e0.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_announce_enemysighted");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_announce_enemysighted");
 }
 
 FGcsLineCombatAskForHelp::FGcsLineCombatAskForHelp(FSystemInfo* InSystem,
@@ -1579,12 +1580,12 @@ FGcsLineCombatAskForHelp::FGcsLineCombatAskForHelp(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ede3d0: role 0x4; the listener's ship is not null-tested.
-    if (!HasVoiceRoles(0x4))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_2))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3c;
+    PermutationIds = IDS_COMM_ORDER_4;
     TextIds.reserve(4);
     // Retail calls GetFactionProps directly here; same outcome.
     PushText(MakeShortFactionName(Ship).Data);
@@ -1598,12 +1599,12 @@ FGcsLineCombatComingIn::FGcsLineCombatComingIn(FSystemInfo* InSystem, unsigned i
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ede6c0: role 0x4; the ship is not null-tested.
-    if (!HasVoiceRoles(0x4))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_2))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName(MakeTString64("gcs_misc_ack").Data, "-", VoiceId).Data);
     PushText(MakeFormationVoiceLineName(Ship, "gcs_combat_comingin", "-", VoiceId).Data);
@@ -1614,13 +1615,13 @@ FGcsLineCombatOfferHelp::FGcsLineCombatOfferHelp(FSystemInfo* InSystem, unsigned
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ede9b0: role 0x4; neither ship is null-tested.
-    if (!HasVoiceRoles(0x4))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_2))
         return;
     FContentSpaceObj* const SpeakerShip = System->FindShip(Speaker);
     FContentSpaceObj* const ListenerShip = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a41;
+    PermutationIds = IDS_COMM_ORDER_9;
     TextIds.reserve(9);
     PushText("gcs_misc_thisis+");
     PushText(MakeShortFactionName(SpeakerShip).Data);
@@ -1639,12 +1640,12 @@ FGcsLineCombatRetreatTowards::FGcsLineCombatRetreatTowards(FSystemInfo* InSystem
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ededd0: role 0xc004; the ship is not null-tested.
-    if (!HasVoiceRoles(0xc004))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_3))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3c;
+    PermutationIds = IDS_COMM_ORDER_4;
     TextIds.reserve(4);
     PushText(MakeVoiceLineName(MakeTString64("gcs_misc_attentionallwingmen").Data, "+",
                                VoiceId).Data);
@@ -1666,11 +1667,11 @@ FGcsLineCombatAnnounceFlee::FGcsLineCombatAnnounceFlee(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edf160: role 0x4.
-    if (!HasVoiceRoles(0x4))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_LEV_2))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3a;
+    PermutationIds = IDS_COMM_ORDER_2;
     TextIds.reserve(2);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_announce_flee").Data, "-",
                                VoiceId).Data);
@@ -1684,7 +1685,7 @@ FGcsLineCombatFriendlyFire::FGcsLineCombatFriendlyFire(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edf3c0.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_announce_ff");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_announce_ff");
 }
 
 FGcsLineCombatDrift::FGcsLineCombatDrift(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1692,7 +1693,7 @@ FGcsLineCombatDrift::FGcsLineCombatDrift(FSystemInfo* InSystem, unsigned int InS
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edf5b0.
-    BuildSingleVoiceLine(0x4000, "gcs_combat_announce_combatdrift");
+    BuildSingleVoiceLine(VOICE_ROLE_COMBAT_LEV_1, "gcs_combat_announce_combatdrift");
 }
 
 FGcsLineStationAllClear::FGcsLineStationAllClear(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1700,11 +1701,11 @@ FGcsLineStationAllClear::FGcsLineStationAllClear(FSystemInfo* InSystem, unsigned
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee1830: role 0x800.
-    if (!HasVoiceRoles(0x800))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_DOCK))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3c;
+    PermutationIds = IDS_COMM_ORDER_4;
     TextIds.reserve(4);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_attentionallunits").Data, "-",
                                VoiceId).Data);
@@ -1719,7 +1720,7 @@ FGcsLineStationEngage::FGcsLineStationEngage(FSystemInfo* InSystem, unsigned int
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee1b50: role 0x800.
-    if (!HasVoiceRoles(0x800))
+    if (!HasVoiceRoles(VOICE_ROLE_COMBAT_DOCK))
         return;
     // An empty place ends the ctor with System kept and no text.
     TString<0x40> const Place = MakeObjectLocationName(Speaker);
@@ -1728,7 +1729,7 @@ FGcsLineStationEngage::FGcsLineStationEngage(FSystemInfo* InSystem, unsigned int
     int const Pick = (rand() * 2) / 32768;
     if (Pick == 1)
     {
-        PermutationIds = 0x4a3c;
+        PermutationIds = IDS_COMM_ORDER_4;
         TextIds.reserve(4);
         PushText(MakeVoiceLineName(MakeTString64("gcs_combat_attentionallunits").Data, "-",
                                    VoiceId).Data);
@@ -1740,7 +1741,7 @@ FGcsLineStationEngage::FGcsLineStationEngage(FSystemInfo* InSystem, unsigned int
     }
     if (Pick != 0)
         return;
-    PermutationIds = 0x4a39;
+    PermutationIds = IDS_COMM_ORDER_1;
     TextIds.reserve(1);
     PushText(MakeVoiceLineName(MakeTString64("gcs_combat_manturrets").Data, "-", VoiceId).Data);
 }
@@ -1754,13 +1755,13 @@ FGcsLineScanAnnounce::FGcsLineScanAnnounce(FSystemInfo* InSystem, unsigned int I
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee5c20: role 0x8; neither ship is null-tested.
-    if (!HasVoiceRoles(0x8))
+    if (!HasVoiceRoles(VOICE_ROLE_SCAN))
         return;
     FContentSpaceObj* const SpeakerShip = System->FindShip(Speaker);
     FContentSpaceObj* const ListenerShip = System->FindShip(Listener);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a43;
+    PermutationIds = IDS_COMM_ORDER_11;
     TextIds.reserve(11);
     PushText("gcs_misc_thisis+");
     PushText(MakeShortFactionName(SpeakerShip).Data);
@@ -1781,7 +1782,7 @@ FGcsLineScanNothingFound::FGcsLineScanNothingFound(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee6090.
-    BuildSingleVoiceLine(0x8, "gcs_scan_nothingfound");
+    BuildSingleVoiceLine(VOICE_ROLE_SCAN, "gcs_scan_nothingfound");
 }
 
 FGcsLineScanOrderDrop::FGcsLineScanOrderDrop(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1789,7 +1790,7 @@ FGcsLineScanOrderDrop::FGcsLineScanOrderDrop(FSystemInfo* InSystem, unsigned int
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee6280.
-    BuildSingleVoiceLine(0x8, "gcs_scan_orderdrop");
+    BuildSingleVoiceLine(VOICE_ROLE_SCAN, "gcs_scan_orderdrop");
 }
 
 FGcsLineScanRefuse::FGcsLineScanRefuse(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1797,7 +1798,7 @@ FGcsLineScanRefuse::FGcsLineScanRefuse(FSystemInfo* InSystem, unsigned int InSpe
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee6470.
-    BuildSingleVoiceLine(0x8, "gcs_scan_refuse");
+    BuildSingleVoiceLine(VOICE_ROLE_SCAN, "gcs_scan_refuse");
 }
 
 FGcsLineScanComply::FGcsLineScanComply(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1805,7 +1806,7 @@ FGcsLineScanComply::FGcsLineScanComply(FSystemInfo* InSystem, unsigned int InSpe
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee6660.
-    BuildSingleVoiceLine(0x8, "gcs_scan_comply");
+    BuildSingleVoiceLine(VOICE_ROLE_SCAN, "gcs_scan_comply");
 }
 
 FGcsLineScanAngry::FGcsLineScanAngry(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1813,7 +1814,7 @@ FGcsLineScanAngry::FGcsLineScanAngry(FSystemInfo* InSystem, unsigned int InSpeak
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee6850.
-    BuildSingleVoiceLine(0x8, "gcs_scan_angry");
+    BuildSingleVoiceLine(VOICE_ROLE_SCAN, "gcs_scan_angry");
 }
 
 FGcsLineScanHappy::FGcsLineScanHappy(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1821,7 +1822,7 @@ FGcsLineScanHappy::FGcsLineScanHappy(FSystemInfo* InSystem, unsigned int InSpeak
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee6a40.
-    BuildSingleVoiceLine(0x8, "gcs_scan_happy");
+    BuildSingleVoiceLine(VOICE_ROLE_SCAN, "gcs_scan_happy");
 }
 
 FGcsLineScanLootDestroyed::FGcsLineScanLootDestroyed(FSystemInfo* InSystem,
@@ -1830,7 +1831,7 @@ FGcsLineScanLootDestroyed::FGcsLineScanLootDestroyed(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee6c30.
-    BuildSingleVoiceLine(0x8, "gcs_scan_lootdestroyed");
+    BuildSingleVoiceLine(VOICE_ROLE_SCAN, "gcs_scan_lootdestroyed");
 }
 
 // ---------------------------------------------------------------------------------------
@@ -1842,7 +1843,7 @@ FGcsLineFidgetTradeRumor::FGcsLineFidgetTradeRumor(FSystemInfo* InSystem, unsign
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edf950.
-    BuildSingleVoiceLine(0x400, "gcs_fidget_traderumor");
+    BuildSingleVoiceLine(VOICE_ROLE_FIDGET, "gcs_fidget_traderumor");
 }
 
 FGcsLineFidgetTradeIHear::FGcsLineFidgetTradeIHear(FSystemInfo* InSystem, unsigned int InSpeaker,
@@ -1850,11 +1851,11 @@ FGcsLineFidgetTradeIHear::FGcsLineFidgetTradeIHear(FSystemInfo* InSystem, unsign
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edfb40: role 0x400.
-    if (!HasVoiceRoles(0x400))
+    if (!HasVoiceRoles(VOICE_ROLE_FIDGET))
         return;
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3b;
+    PermutationIds = IDS_COMM_ORDER_3;
     TextIds.reserve(3);
     PushText(MakeVoiceLineName(MakeTString64("gcs_fidget_trade_ihear").Data, "+", VoiceId).Data);
     // The prefix status is ignored.
@@ -1872,7 +1873,7 @@ FGcsLineFidgetTradeSimple::FGcsLineFidgetTradeSimple(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edfde0.
-    BuildSingleVoiceLine(0x400, "gcs_fidget_trade_simple");
+    BuildSingleVoiceLine(VOICE_ROLE_FIDGET, "gcs_fidget_trade_simple");
 }
 
 FGcsLineFidgetStatusQuery::FGcsLineFidgetStatusQuery(FSystemInfo* InSystem,
@@ -1881,12 +1882,12 @@ FGcsLineFidgetStatusQuery::FGcsLineFidgetStatusQuery(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06edffd0: role 0x400; the ship is not null-tested.
-    if (!HasVoiceRoles(0x400))
+    if (!HasVoiceRoles(VOICE_ROLE_FIDGET))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a40;
+    PermutationIds = IDS_COMM_ORDER_8;
     TextIds.reserve(8);
     PushText(MakeVoiceLineName(MakeTString64("gcs_misc_attentionallwingmen").Data, "+", VoiceId)
                  .Data);
@@ -1905,12 +1906,12 @@ FGcsLineFidgetStatusReport::FGcsLineFidgetStatusReport(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee0390: role 0x400; the ship is not null-tested.
-    if (!HasVoiceRoles(0x400))
+    if (!HasVoiceRoles(VOICE_ROLE_FIDGET))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3e;
+    PermutationIds = IDS_COMM_ORDER_6;
     TextIds.reserve(6);
     PushText("gcs_misc_thisis+");
     PushText(MakeObjectReferenceName(1, Ship, nullptr).Data);
@@ -1942,7 +1943,7 @@ FGcsLineFidgetPatrolRumor::FGcsLineFidgetPatrolRumor(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee06d0.
-    BuildSingleVoiceLine(0x400, "gcs_fidget_patrolrumor");
+    BuildSingleVoiceLine(VOICE_ROLE_FIDGET, "gcs_fidget_patrolrumor");
 }
 
 FGcsLineFidgetPatrolSimple::FGcsLineFidgetPatrolSimple(FSystemInfo* InSystem,
@@ -1951,7 +1952,7 @@ FGcsLineFidgetPatrolSimple::FGcsLineFidgetPatrolSimple(FSystemInfo* InSystem,
     : FGcsLine(InSystem, InSpeaker, InListener)
 {
     // FUN_06ee08c0.
-    BuildSingleVoiceLine(0x400, "gcs_fidget_patrolsimple");
+    BuildSingleVoiceLine(VOICE_ROLE_FIDGET, "gcs_fidget_patrolsimple");
 }
 
 FGcsLineFidgetWaypointQuery::FGcsLineFidgetWaypointQuery(FSystemInfo* InSystem,
@@ -1961,12 +1962,12 @@ FGcsLineFidgetWaypointQuery::FGcsLineFidgetWaypointQuery(FSystemInfo* InSystem,
 {
     // FUN_06ee0ab0: role 0x400. Retail looks the ship up (not null-tested) between GetVoiceID
     // and the voice record; both are plain lookups, so the port asks after the voice test.
-    if (!HasVoiceRoles(0x400))
+    if (!HasVoiceRoles(VOICE_ROLE_FIDGET))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3f;
+    PermutationIds = IDS_COMM_ORDER_7;
     TextIds.reserve(7);
     PushText("gcs_misc_thisis+");
     PushText(MakeShortFactionName(Ship).Data);
@@ -1986,21 +1987,21 @@ FGcsLineFidgetPatrolStatus::FGcsLineFidgetPatrolStatus(FSystemInfo* InSystem,
 {
     // FUN_06ee0e10: role 0x400; the ship lookup is moved after the voice test as in
     // FUN_06ee0ab0. Slot +0x4c is LAB_06f0b2d0.
-    if (!HasVoiceRoles(0x400))
+    if (!HasVoiceRoles(VOICE_ROLE_FIDGET))
         return;
     FContentSpaceObj* const Ship = System->FindShip(Speaker);
     int const PointsToGo = static_cast<FPatrolGuide*>(GetShipGuide(Ship))->GetPathPointsToGo();
     if (PointsToGo == 0)
     {
         // No rand() test on this branch.
-        PermutationIds = 0x4a39;
+        PermutationIds = IDS_COMM_ORDER_1;
         TextIds.reserve(1);
         PushText(MakeFormationVoiceLineName(Ship, "gcs_patrol_finished", "-", VoiceId).Data);
         return;
     }
     if (rand() / 32768 != 0)
         return;
-    PermutationIds = 0x4a3b;
+    PermutationIds = IDS_COMM_ORDER_3;
     TextIds.reserve(3);
     PushText(PointsToGo == 1 ? "gcs_patrol_wehaveonly+" : "gcs_patrol_wehave+");
     TString<0x40> Number;
@@ -2163,7 +2164,7 @@ FGcsPlayerHailConversation::FGcsPlayerHailConversation(FGcsPlayerObjectEvent con
             unsigned int const PlayerShip = Player->ShipObject->SpaceObjId;
             switch (Ship->GetGuideType())
             {
-            case 2:
+            case GUIDE_TYPE_TRADE:
             {
                 // Trade home, then what it trades; failing that (deleted, System kept) where
                 // it is going.
@@ -2183,7 +2184,7 @@ FGcsPlayerHailConversation::FGcsPlayerHailConversation(FGcsPlayerObjectEvent con
                 Line = new FGcsLineGoingTo(System, Leader->SpaceObjId, PlayerShip);
                 break;
             }
-            case 3:
+            case GUIDE_TYPE_PATROL_PATH:
                 if (!AddLine(new FGcsLinePatrolIdHome(System, Leader->SpaceObjId, PlayerShip)) ||
                     !AddLine(new FGcsLineGoingTo(System, Leader->SpaceObjId, PlayerShip)))
                 {
@@ -2192,7 +2193,7 @@ FGcsPlayerHailConversation::FGcsPlayerHailConversation(FGcsPlayerObjectEvent con
                 }
                 Line = new FGcsLinePatrolStatus(System, Leader->SpaceObjId, PlayerShip);
                 break;
-            case 4:
+            case GUIDE_TYPE_WANDER:
                 // Wander: home only.
                 Line = new FGcsLinePatrolIdHome(System, Leader->SpaceObjId, PlayerShip);
                 break;
@@ -2237,7 +2238,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
     unsigned int const ObjectB = Event->ObjectB;
     switch (Event->GetType())
     {
-    case 6:
+    case GCS_EVENT_DAMAGED:
     {
         // Both types, 0 when GetType fails (B first).
         float const Health = static_cast<FGcsCombatDamageEvent const*>(Event)->Health;
@@ -2270,7 +2271,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         AddLineOrClear(Line);
         return;
     }
-    case 7:
+    case GCS_EVENT_KILLED:
     {
         // The killer's and the victim's ships.
         FContentSpaceObj* const ShipA = System->FindShip(ObjectA);
@@ -2321,7 +2322,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         AddLineOrClear(Line);
         return;
     }
-    case 8:
+    case GCS_EVENT_IN_SIGHTS:
     {
         // Who is in whose sights.
         FContentSpaceObj* const ObjA = System->FindSpaceObj(ObjectA);
@@ -2338,7 +2339,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         AddLineOrClear(Line);
         return;
     }
-    case 9:
+    case GCS_EVENT_ENGAGE:
     {
         // A ship engages ObjectB.
         FContentSpaceObj* const Object = System->FindSpaceObj(ObjectA);
@@ -2381,7 +2382,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         AddFormationAcks(Ship);
         return;
     }
-    case 0xa:
+    case GCS_EVENT_COMBAT_OVER:
     {
         // The fight is over.
         FContentSpaceObj* const Object = System->FindSpaceObj(ObjectA);
@@ -2425,12 +2426,12 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
             return;
         // Guide type 2 resumes trade, 3 and 4 patrol, the rest nothing.
         int const GuideType = static_cast<FContentNpcShip*>(Object)->GetGuideType();
-        if (GuideType == 2)
+        if (GuideType == GUIDE_TYPE_TRADE)
         {
             if (!AddLineOrClear(new FGcsLineCombatResumeTrade(System, Ship->SpaceObjId, 0)))
                 return;
         }
-        else if (GuideType > 2 && GuideType <= 4)
+        else if (GuideType > GUIDE_TYPE_TRADE && GuideType <= GUIDE_TYPE_WANDER)
         {
             if (!AddLineOrClear(new FGcsLineCombatResumePatrol(System, Ship->SpaceObjId, 0)))
                 return;
@@ -2440,7 +2441,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         AddFormationAcks(Ship);
         return;
     }
-    case 0xb:
+    case GCS_EVENT_NO_ENGAGE:
     {
         // A ship does not engage.
         FContentSpaceObj* const Object = System->FindSpaceObj(ObjectA);
@@ -2480,7 +2481,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         AddFormationAcks(Ship);
         return;
     }
-    case 0xc:
+    case GCS_EVENT_HELP:
     {
         // Two NPC ships, A no wingman.
         FContentSpaceObj* const ObjA = System->FindSpaceObj(ObjectA);
@@ -2503,10 +2504,10 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         AddLineOrClear(new FGcsLineCombatComingIn(System, ObjectA, ObjectB));
         return;
     }
-    case 0xd:
+    case GCS_EVENT_DRIFT:
         AddLineOrClear(new FGcsLineCombatDrift(System, ObjectA, 0));
         return;
-    case 0xe:
+    case GCS_EVENT_FLEE:
     {
         // A ship flees (the object is not null-tested).
         FContentShipBase* const Ship =
@@ -2542,13 +2543,13 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         AddFormationAcks(Ship);
         return;
     }
-    case 0xf:
+    case GCS_EVENT_FRIENDLY_FIRE:
         // Friendly fire: B speaks to A.
         if (System->FindSpaceObj(ObjectB) == nullptr)
             return;
         AddLineOrClear(new FGcsLineCombatFriendlyFire(System, ObjectB, ObjectA));
         return;
-    case 0x10:
+    case GCS_EVENT_LEADER_CHANGED:
         AddLineOrClear(new FGcsLineCombatTakingLead(System, ObjectA, 0));
         return;
     default:
@@ -2627,16 +2628,16 @@ FGcsScanConversation::FGcsScanConversation(FGcsScanEvent const* Event)
     FGcsLine* Line = nullptr;
     switch (Event->GetType())
     {
-    case 0x11:
+    case GCS_EVENT_SCAN_ANNOUNCE:
         Line = new FGcsLineScanAnnounce(System, Speaker, Listener);
         break;
-    case 0x12:
+    case GCS_EVENT_SCAN_NOTHING_FOUND:
         Line = new FGcsLineScanNothingFound(System, Speaker, Listener);
         break;
-    case 0x13:
+    case GCS_EVENT_SCAN_CONTRABAND:
         Line = new FGcsLineScanOrderDrop(System, Speaker, Listener);
         break;
-    case 0x14:
+    case GCS_EVENT_SCAN_JETTISONED:
     {
         // A player's ship gets the happy line only.
         if (FindContentPlayerStateByShip(&Listener) != nullptr)
@@ -2653,17 +2654,17 @@ FGcsScanConversation::FGcsScanConversation(FGcsScanEvent const* Event)
         Line = new FGcsLineScanHappy(System, Speaker, Listener);
         break;
     }
-    case 0x15:
+    case GCS_EVENT_SCAN_RESPONSE:
         // Only a scanned NPC refuses (speaker and listener swapped); a player one reaches the
         // tail with no line.
         if (FindContentPlayerStateByShip(&Listener) != nullptr)
             break;
         Line = new FGcsLineScanRefuse(System, Listener, Speaker);
         break;
-    case 0x16:
+    case GCS_EVENT_SCAN_HOSTILE:
         Line = new FGcsLineScanAngry(System, Speaker, Listener);
         break;
-    case 0x18:
+    case GCS_EVENT_SCAN_LOOT_TAKEN:
         // The listener argument is the loot taker.
         Line = new FGcsLineScanLootDestroyed(System, Speaker, Event->LootTakerId);
         break;
@@ -2736,7 +2737,7 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
     int const GuideType = GetShipGuide(Ship)->GetType();
     unsigned int const ShipId = Ship->SpaceObjId;
     FGcsLine* Line = nullptr;
-    if (GuideType == 2)
+    if (GuideType == GUIDE_TYPE_TRADE)
     {
         // Trade.
         switch (Kind)
@@ -2772,7 +2773,7 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
             return;
         }
     }
-    else if (GuideType == 3)
+    else if (GuideType == GUIDE_TYPE_PATROL_PATH)
     {
         // Patrol.
         switch (Kind)
@@ -2812,7 +2813,7 @@ FGcsFidgetConversation::FGcsFidgetConversation(FGcsFidgetEvent const* Event)
             return;
         }
     }
-    else if (GuideType == 4)
+    else if (GuideType == GUIDE_TYPE_WANDER)
     {
         // Wander.
         switch (Kind)
@@ -3046,7 +3047,7 @@ FGcsDockHailConversation::FGcsDockHailConversation(FGcsObjectEvent const* Event)
 
     switch (Ship->GetGuideType())
     {
-    case 2:
+    case GUIDE_TYPE_TRADE:
     {
         // Trade: home, then what it trades (failing that, where it is going).
         if (!AddLine(new FGcsLineTradeIdHome(System, Listener, Speaker)))
@@ -3065,7 +3066,7 @@ FGcsDockHailConversation::FGcsDockHailConversation(FGcsObjectEvent const* Event)
             System = nullptr;
         return;
     }
-    case 3:
+    case GUIDE_TYPE_PATROL_PATH:
         // Patrol: home, where it is going, its progress.
         if (!AddLine(new FGcsLinePatrolIdHome(System, Listener, Speaker)) ||
             !AddLine(new FGcsLineGoingTo(System, Listener, Speaker)) ||
@@ -3074,7 +3075,7 @@ FGcsDockHailConversation::FGcsDockHailConversation(FGcsObjectEvent const* Event)
             System = nullptr;
         }
         return;
-    case 4:
+    case GUIDE_TYPE_WANDER:
         // Wander: home, where it is going.
         if (!AddLine(new FGcsLinePatrolIdHome(System, Listener, Speaker)) ||
             !AddLine(new FGcsLineGoingTo(System, Listener, Speaker)))
@@ -3108,13 +3109,13 @@ bool FGcsDockConversation::IsValid()
 int FGcsDockHailEvent::GetType() const
 {
     // LAB_06ee9e10.
-    return 1;
+    return GCS_EVENT_DOCK_HAIL;
 }
 
 int FGcsPlayerObjectEvent::GetType() const
 {
     // LAB_06ee99a0.
-    return 5;
+    return GCS_EVENT_PLAYER_HAIL;
 }
 
 int FGcsCombatEvent::GetType() const
@@ -3132,7 +3133,7 @@ int FGcsScanEvent::GetType() const
 int FGcsFidgetEvent::GetType() const
 {
     // LAB_06eea870.
-    return 0x19;
+    return GCS_EVENT_FIDGET;
 }
 
 // =======================================================================================
@@ -3264,9 +3265,9 @@ float FGcsConversationManager::QueueConversation(FGcsEvent const* Event)
     FGcsConversation* Conversation = nullptr;
     switch (Type)
     {
-    case 1:
-    case 2:
-    case 3:
+    case GCS_EVENT_DOCK_HAIL:
+    case GCS_EVENT_DOCK_GRANTED:
+    case GCS_EVENT_LAUNCH:
     {
         // Type 2 records both objects, types 1 and 3 the speaker only.
         FGcsObjectEvent const* ObjectEvent = static_cast<FGcsObjectEvent const*>(Event);
@@ -3274,13 +3275,13 @@ float FGcsConversationManager::QueueConversation(FGcsEvent const* Event)
                               ObjectEvent->Listener))
             return 0.0f;
         RecordGcsComm(Type, ObjectEvent->System, ObjectEvent->Speaker,
-                      Type == 2 ? ObjectEvent->Listener : 0);
-        if (Type == 3)
+                      Type == GCS_EVENT_DOCK_GRANTED ? ObjectEvent->Listener : 0);
+        if (Type == GCS_EVENT_LAUNCH)
         {
             Conversation =
                 new FGcsLaunchConversation(static_cast<FGcsLaunchEvent const*>(Event));
         }
-        else if (Type == 2)
+        else if (Type == GCS_EVENT_DOCK_GRANTED)
         {
             Conversation =
                 new FGcsDockConversation(static_cast<FGcsDockGrantedEvent const*>(Event));
@@ -3291,37 +3292,37 @@ float FGcsConversationManager::QueueConversation(FGcsEvent const* Event)
         }
         break;
     }
-    case 5:
+    case GCS_EVENT_PLAYER_HAIL:
         // No admission test.
         Conversation = new FGcsPlayerHailConversation(
             static_cast<FGcsPlayerObjectEvent const*>(Event));
         break;
-    case 6:
-    case 7:
-    case 8:
-    case 9:
-    case 0xa:
-    case 0xb:
-    case 0xc:
-    case 0xd:
-    case 0xe:
-    case 0xf:
-    case 0x10:
-        // No admission test here (FGcsHandler1 tests and records before queueing).
+    case GCS_EVENT_DAMAGED:
+    case GCS_EVENT_KILLED:
+    case GCS_EVENT_IN_SIGHTS:
+    case GCS_EVENT_ENGAGE:
+    case GCS_EVENT_COMBAT_OVER:
+    case GCS_EVENT_NO_ENGAGE:
+    case GCS_EVENT_HELP:
+    case GCS_EVENT_DRIFT:
+    case GCS_EVENT_FLEE:
+    case GCS_EVENT_FRIENDLY_FIRE:
+    case GCS_EVENT_LEADER_CHANGED:
+        // No admission test here (FGcsCombatHandler tests and records before queueing).
         Conversation =
             new FGcsCombatConversation(static_cast<FGcsCombatEvent const*>(Event));
         break;
-    case 0x11:
-    case 0x12:
-    case 0x13:
-    case 0x14:
-    case 0x15:
-    case 0x16:
-    case 0x17:
-    case 0x18:
+    case GCS_EVENT_SCAN_ANNOUNCE:
+    case GCS_EVENT_SCAN_NOTHING_FOUND:
+    case GCS_EVENT_SCAN_CONTRABAND:
+    case GCS_EVENT_SCAN_JETTISONED:
+    case GCS_EVENT_SCAN_RESPONSE:
+    case GCS_EVENT_SCAN_HOSTILE:
+    case GCS_EVENT_SCAN_UNUSED_17:
+    case GCS_EVENT_SCAN_LOOT_TAKEN:
         Conversation = new FGcsScanConversation(static_cast<FGcsScanEvent const*>(Event));
         break;
-    case 0x19:
+    case GCS_EVENT_FIDGET:
         Conversation = new FGcsFidgetConversation(static_cast<FGcsFidgetEvent const*>(Event));
         break;
     default:
@@ -3368,9 +3369,9 @@ FGcsHandler* __cdecl GetGcsHandler(int const* Type)
 
     FGcsHandler* Handler = nullptr;
     if (*Type == 2)
-        Handler = new FGcsHandler2();
+        Handler = new FGcsFidgetHandler();
     else if (*Type == 1)
-        Handler = new FGcsHandler1();
+        Handler = new FGcsCombatHandler();
     else
         Handler = new FGcsDockHailHandler();
     GGcsHandlerMap.insert(std::make_pair(*Type, static_cast<FGcsHandler*>(nullptr)))
@@ -3592,7 +3593,7 @@ void FGcsDockHailHandler::OnSystemUnloaded(unsigned int const* SystemId)
 // Handlers 1 and 2
 // ---------------------------------------------------------------------------------------
 
-void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const* Parms)
+void FGcsCombatHandler::HandleMessage(pub::Controller::EMessage MessageId, void const* Parms)
 {
     using pub::Controller::EMessage;
     // LAB_06eea160. Every other message id does nothing.
@@ -3610,16 +3611,16 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
         FSystemInfo* const System = FindSystemInfo(&Words[0]);
         if (System->FindShip(Words[1]) == nullptr)
             return;
-        if (!IsGcsCommAllowed(7, System, 0, Words[1]))
+        if (!IsGcsCommAllowed(GCS_EVENT_KILLED, System, 0, Words[1]))
             return;
         FGcsCombatEvent Event;
         Event.System = System;
         Event.ObjectA = 0;
         Event.ObjectB = Words[1];
-        Event.Type = 7;
+        Event.Type = GCS_EVENT_KILLED;
         float const Duration = GGcsConversations.QueueConversation(&Event);
         *reinterpret_cast<float*>(const_cast<unsigned int*>(&Words[3])) = Duration;
-        RecordGcsComm(7, System, 0, Words[1]);
+        RecordGcsComm(GCS_EVENT_KILLED, System, 0, Words[1]);
         return;
     }
     case EMessage::ObjectDamaged:
@@ -3635,7 +3636,7 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
         unsigned int VictimType = 0;
         if (pub::SpaceObj::GetType(Words[0], VictimType) != 0)
             return;
-        if (!IsGcsCommAllowed(6, System, Words[2], Words[0]))
+        if (!IsGcsCommAllowed(GCS_EVENT_DAMAGED, System, Words[2], Words[0]))
             return;
         // Relative health (status not tested) below DAT_06fb5810 (1.0); unordered fails.
         float Health = 0.0f;
@@ -3643,12 +3644,12 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
         pub::SpaceObj::GetRelativeHealth(Words[0], Health);
         if (!(Health < 1.0f))
             return;
-        RecordGcsComm(6, System, Words[2], Words[0]);
+        RecordGcsComm(GCS_EVENT_DAMAGED, System, Words[2], Words[0]);
         FGcsCombatDamageEvent Event;
         Event.System = System;
         Event.ObjectA = Words[2];
         Event.ObjectB = Words[0];
-        Event.Type = 6;
+        Event.Type = GCS_EVENT_DAMAGED;
         Event.Health = Health;
         GGcsConversations.QueueConversation(&Event);
         return;
@@ -3680,15 +3681,15 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
                     return;
             }
         }
-        if (!IsGcsCommAllowed(7, System, Words[1], Words[0]))
+        if (!IsGcsCommAllowed(GCS_EVENT_KILLED, System, Words[1], Words[0]))
             return;
         FGcsCombatEvent Event;
         Event.System = System;
         Event.ObjectA = Words[1];
         Event.ObjectB = 0;
-        Event.Type = 7;
+        Event.Type = GCS_EVENT_KILLED;
         GGcsConversations.QueueConversation(&Event);
-        RecordGcsComm(7, System, Words[1], Words[0]);
+        RecordGcsComm(GCS_EVENT_KILLED, System, Words[1], Words[0]);
         return;
     }
     case EMessage::CombatState:
@@ -3700,14 +3701,14 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
         {
         case 0:
         {
-            if (!IsGcsCommAllowed(9, System, Words[1], Words[2]))
+            if (!IsGcsCommAllowed(GCS_EVENT_ENGAGE, System, Words[1], Words[2]))
                 return;
-            RecordGcsComm(9, System, Words[1], Words[2]);
+            RecordGcsComm(GCS_EVENT_ENGAGE, System, Words[1], Words[2]);
             FGcsCombatEvent Event;
             Event.System = System;
             Event.ObjectA = Words[1];
             Event.ObjectB = Words[2];
-            Event.Type = 9;
+            Event.Type = GCS_EVENT_ENGAGE;
             GGcsConversations.QueueConversation(&Event);
             return;
         }
@@ -3715,18 +3716,18 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
         case 2:
         {
             // Only a ship (type & 0x7f0000; GetType's status not tested).
-            if (!IsGcsCommAllowed(0xb, System, Words[1], Words[2]))
+            if (!IsGcsCommAllowed(GCS_EVENT_NO_ENGAGE, System, Words[1], Words[2]))
                 return;
             unsigned int Type = ParmsBits;
             pub::SpaceObj::GetType(Words[1], Type);
             if ((Type & 0x7f0000) == 0)
                 return;
-            RecordGcsComm(0xb, System, Words[1], Words[2]);
+            RecordGcsComm(GCS_EVENT_NO_ENGAGE, System, Words[1], Words[2]);
             FGcsCombatNoEngageEvent Event;
             Event.System = System;
             Event.ObjectA = Words[1];
             Event.ObjectB = Words[2];
-            Event.Type = 0xb;
+            Event.Type = GCS_EVENT_NO_ENGAGE;
             Event.Reason = static_cast<int>(Words[0]);
             GGcsConversations.QueueConversation(&Event);
             return;
@@ -3734,14 +3735,14 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
         case 3:
         case 4:
         {
-            if (!IsGcsCommAllowed(0xa, System, Words[1], Words[2]))
+            if (!IsGcsCommAllowed(GCS_EVENT_COMBAT_OVER, System, Words[1], Words[2]))
                 return;
-            RecordGcsComm(0xa, System, Words[1], Words[2]);
+            RecordGcsComm(GCS_EVENT_COMBAT_OVER, System, Words[1], Words[2]);
             FGcsCombatOverEvent Event;
             Event.System = System;
             Event.ObjectA = Words[1];
             Event.ObjectB = Words[2];
-            Event.Type = 0xa;
+            Event.Type = GCS_EVENT_COMBAT_OVER;
             Event.Reason = static_cast<int>(Words[0]);
             GGcsConversations.QueueConversation(&Event);
             return;
@@ -3754,14 +3755,14 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
     {
         // {ship, system}: combat drift (0xd).
         FSystemInfo* const System = FindSystemInfo(&Words[1]);
-        if (!IsGcsCommAllowed(0xd, System, Words[0], 0))
+        if (!IsGcsCommAllowed(GCS_EVENT_DRIFT, System, Words[0], 0))
             return;
-        RecordGcsComm(0xd, System, Words[0], 0);
+        RecordGcsComm(GCS_EVENT_DRIFT, System, Words[0], 0);
         FGcsCombatEvent Event;
         Event.System = System;
         Event.ObjectA = Words[0];
         Event.ObjectB = 0;
-        Event.Type = 0xd;
+        Event.Type = GCS_EVENT_DRIFT;
         GGcsConversations.QueueConversation(&Event);
         return;
     }
@@ -3770,7 +3771,8 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
     {
         // {A, B, system}: 0x1003 help (0xc, sender FUN_06f70580) / 0x100e in sights (8,
         // ship_in_sights_event 06f34000).
-        int const Type = MessageId == EMessage::NpcTurnedHostile ? 0xc : 8;
+        int const Type =
+            MessageId == EMessage::NpcTurnedHostile ? GCS_EVENT_HELP : GCS_EVENT_IN_SIGHTS;
         FSystemInfo* const System = FindSystemInfo(&Words[2]);
         if (!IsGcsCommAllowed(Type, System, Words[0], Words[1]))
             return;
@@ -3787,14 +3789,14 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
     {
         // {ship, reason, system}: flight (0xe), sender request_flee_destination 06f34ce0.
         FSystemInfo* const System = FindSystemInfo(&Words[2]);
-        if (!IsGcsCommAllowed(0xe, System, Words[0], 0))
+        if (!IsGcsCommAllowed(GCS_EVENT_FLEE, System, Words[0], 0))
             return;
-        RecordGcsComm(0xe, System, Words[0], 0);
+        RecordGcsComm(GCS_EVENT_FLEE, System, Words[0], 0);
         FGcsCombatFleeEvent Event;
         Event.System = System;
         Event.ObjectA = Words[0];
         Event.ObjectB = 0;
-        Event.Type = 0xe;
+        Event.Type = GCS_EVENT_FLEE;
         Event.Reason = static_cast<int>(Words[1]);
         GGcsConversations.QueueConversation(&Event);
         return;
@@ -3806,14 +3808,14 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
         if (Words[0] != 0)
             return;
         FSystemInfo* const System = FindSystemInfo(&Words[3]);
-        if (!IsGcsCommAllowed(0xf, System, Words[1], Words[2]))
+        if (!IsGcsCommAllowed(GCS_EVENT_FRIENDLY_FIRE, System, Words[1], Words[2]))
             return;
-        RecordGcsComm(0xf, System, Words[1], Words[2]);
+        RecordGcsComm(GCS_EVENT_FRIENDLY_FIRE, System, Words[1], Words[2]);
         FGcsCombatEvent Event;
         Event.System = System;
         Event.ObjectA = Words[1];
         Event.ObjectB = Words[2];
-        Event.Type = 0xf;
+        Event.Type = GCS_EVENT_FRIENDLY_FIRE;
         GGcsConversations.QueueConversation(&Event);
         return;
     }
@@ -3827,14 +3829,14 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
             return;
         if (!HasFormationWingmen(Ships[0]))
             return;
-        if (!IsGcsCommAllowed(0x10, System, Ships[0]->SpaceObjId, Ships[1]->SpaceObjId))
+        if (!IsGcsCommAllowed(GCS_EVENT_LEADER_CHANGED, System, Ships[0]->SpaceObjId, Ships[1]->SpaceObjId))
             return;
-        RecordGcsComm(0x10, System, Ships[0]->SpaceObjId, Ships[1]->SpaceObjId);
+        RecordGcsComm(GCS_EVENT_LEADER_CHANGED, System, Ships[0]->SpaceObjId, Ships[1]->SpaceObjId);
         FGcsCombatEvent Event;
         Event.System = System;
         Event.ObjectA = Ships[0]->SpaceObjId;
         Event.ObjectB = Ships[1]->SpaceObjId;
-        Event.Type = 0x10;
+        Event.Type = GCS_EVENT_LEADER_CHANGED;
         GGcsConversations.QueueConversation(&Event);
         return;
     }
@@ -3843,7 +3845,7 @@ void FGcsHandler1::HandleMessage(pub::Controller::EMessage MessageId, void const
     }
 }
 
-int FGcsHandler1::GetType() const
+int FGcsCombatHandler::GetType() const
 {
     // LAB_06ee9e10.
     return 1;
@@ -3871,7 +3873,7 @@ namespace
 // DAT_06fcf0dc (static initializer 06eea880: 0x4abebc20).
 float GGcsFidgetRangeSquared = 6250000.0f;
 
-void FGcsHandler2::HandleMessage(pub::Controller::EMessage MessageId, void const* Parms)
+void FGcsFidgetHandler::HandleMessage(pub::Controller::EMessage MessageId, void const* Parms)
 {
     // LAB_06eea890. Parms is never read.
     (void)Parms;
@@ -3894,7 +3896,7 @@ void FGcsHandler2::HandleMessage(pub::Controller::EMessage MessageId, void const
         if (!IsRandBelow(0.0083333338f)) // DAT_06fb6230 (1/120)
             continue;
         FContentPlayerShip* const PlayerShip = Player->ShipObject;
-        if (!IsGcsCommAllowed(0x19, PlayerShip->GetSystem(), 0, PlayerShip->SpaceObjId))
+        if (!IsGcsCommAllowed(GCS_EVENT_FIDGET, PlayerShip->GetSystem(), 0, PlayerShip->SpaceObjId))
             continue;
 
         // A local copy of the system's space objects.
@@ -3987,7 +3989,7 @@ void FGcsHandler2::HandleMessage(pub::Controller::EMessage MessageId, void const
         if (Speaker == nullptr)
             continue;
 
-        RecordGcsComm(0x19, PlayerShip->GetSystem(), Speaker->SpaceObjId, PlayerShip->SpaceObjId);
+        RecordGcsComm(GCS_EVENT_FIDGET, PlayerShip->GetSystem(), Speaker->SpaceObjId, PlayerShip->SpaceObjId);
         // Kind 2 below DAT_06fb6234 (1/30), else 1 below DAT_06fb6238 (0.2) of a second roll,
         // else 0. The result is dropped.
         FGcsFidgetEvent Event;
@@ -4008,7 +4010,7 @@ void FGcsHandler2::HandleMessage(pub::Controller::EMessage MessageId, void const
     }
 }
 
-int FGcsHandler2::GetType() const
+int FGcsFidgetHandler::GetType() const
 {
     // LAB_06ee9660.
     return 2;

@@ -75,7 +75,8 @@ public:
     SCreateCharacterInfo* Selection;     // +0xb8 -- &DAT_0067bcf8
     int* SelectionFactionIndex;          // +0xbc -- &DAT_0067bd38; no reader in CharCreate.cpp
     RenderDisplayList BackText;          // +0xc0 -- IDS 0x60029, Back's text
-    RenderDisplayList Text60028;         // +0xcc -- IDS 0x60028; loaded, never referenced
+    // +0xcc -- IDS 0x60028 "Select Another Account"; loaded, never referenced
+    RenderDisplayList SelectAnotherAccountText;
     double SlideT;                       // +0xd8 -- Create -1.0, 0..2 in; Leave 0, down to -0.9
     unsigned char bLeaving;              // +0xe0
     int LeaveDirection;                  // +0xe4 -- -1 back, 1 created, 2 failed (0 = none)
@@ -93,7 +94,7 @@ public:
     RenderDisplayList NameLabelText;     // +0x12c -- IDS 0x6006c
     RenderDisplayList BaseLabelText;     // +0x138 -- IDS 0x6006b
     RenderDisplayList ShipLabelText;     // +0x144 -- IDS 0x6006e
-    RenderDisplayList Text6006a;         // +0x150 -- IDS 0x6006a; loaded, never referenced
+    RenderDisplayList LoadoutLabelText;  // +0x150 -- IDS 0x6006a "LOADOUT:"; never referenced
     RenderDisplayList MoneyLabelText;    // +0x15c -- IDS 0x60063
     RenderDisplayList PackageDescText;   // +0x168 -- the package's strid_desc
     RenderDisplayList TitleText;         // +0x174 -- IDS 0x60034

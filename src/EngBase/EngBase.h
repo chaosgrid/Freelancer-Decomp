@@ -459,11 +459,25 @@ protected:
 // Bind descriptor: kind, sink, context token and target instance.
 struct FAnimBindOut
 {
-    unsigned long Kind;
-    void* Extra;
-    void* Typed;
+    unsigned long Kind;         // 0 joint, 1 object, 2 root (event channels only)
+    void* Sink;                 // IChannelSink*: PlayScript's sink, typed +0x0C
+    void* SinkContext;          // PlayScript's sink context, typed +0x10
     FEngineInstance* Instance;
 };
+
+// The seven-dword play header FUN_066126e0 / FUN_066127e0 build and the typed channel's slot 1
+// (BindHeader) takes; IChannel::Play passes the caller's own.
+struct FPlayHeader
+{
+    float StartTime;            // [0] FUN_0661af70 accepts -1, 0, -2 or a time in range
+    unsigned long LoopFlags;    // [1] typed +0x20
+    float Rate;                 // [2] signed playback rate, typed +0x28
+    float BlendDuration;        // [3] the mixer blend time (MixerBlendAttach)
+    float Scale;                // [4] typed +0x2C
+    float TranslationScale;     // [5] typed +0x30
+    const float* Transform;     // [6] type 6 only: 3x3 orientation + translation, or null
+};
+static_assert(sizeof(FPlayHeader) == 7 * 4, "play header is seven dwords");
 
 // Constructors leave unspecified members uninitialized; release the archetype before freeing.
 struct FTypedChannel
@@ -472,7 +486,7 @@ struct FTypedChannel
     explicit FTypedChannel(struct FChannelArchetypeObject* NewArchetype);    // FUN_0661acf0
 
     virtual unsigned long Interpolate(float* Out, const float* Left, const float* Right, double Alpha);
-    virtual unsigned long BindHeader(unsigned long* Header);
+    virtual unsigned long BindHeader(const FPlayHeader* Header);
     virtual unsigned long Apply(const float* Left, const float* Right, double Alpha);
     virtual unsigned long InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha);
     virtual unsigned long SetTime(float Time);
@@ -483,7 +497,7 @@ struct FTypedChannel
     virtual unsigned long SetOverlayExtra(const float* Extra);
     virtual unsigned long AddOverlayPos(const float* Delta);
     virtual float* GetSampled();
-    virtual unsigned long TouchMapped(void* ArgA, void* ArgB);
+    virtual unsigned long TouchMapped(void* OutPos, void* OutSampledPos);
     virtual unsigned long UpdateDeltaRate(float Dt);
     virtual unsigned long Step(float* Out, float Dt);
 
@@ -497,10 +511,12 @@ struct FTypedChannel
     // Retail +0x20: header[1] as FUN_0661af30 stores it; bit 1 loop, bit 2 ping-pong.
     unsigned long LoopFlags;                         // +0x20
     struct FChannelArchetypeObject* Archetype;       // +0x24
-    float Weight;                                    // +0x28 (header[2])
+    // Signed playback rate: Time advances by Dt * Rate, < 0 plays backwards, ping-pong negates it.
+    float Rate;                                      // +0x28 (header[2])
     float Scale;                                     // +0x2C (header[4])
-    // TODO: name this play-header position factor when its purpose is known.
-    float TranslationScale;                          // +0x30
+    // Multiplies every sampled translation (with Scale for the position kinds). TODO: what the
+    // callers' header[5] stands for.
+    float TranslationScale;                          // +0x30 (header[5])
     unsigned long PlayFlags;                         // +0x34
     // Retail +0x38, a byte: bit 0 is set from FUN_0661ad90's result by IChannel::Play, tested by
     // IChannel::StopGraph and the standalone pass of LAB_066157f0, cleared by FUN_06611f90.
@@ -563,7 +579,7 @@ struct FPosQuatTypedChannel : FTypedChannel
     explicit FPosQuatTypedChannel(struct FChannelArchetypeObject* NewArchetype);
 
     unsigned long Interpolate(float* Out, const float* Left, const float* Right, double Alpha) override;
-    unsigned long BindHeader(unsigned long* Header) override;
+    unsigned long BindHeader(const FPlayHeader* Header) override;
     unsigned long Apply(const float* Left, const float* Right, double Alpha) override;
     unsigned long InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override;
     unsigned long GetType() override;
@@ -572,7 +588,7 @@ struct FPosQuatTypedChannel : FTypedChannel
     unsigned long SetOverlayExtra(const float* Extra) override;
     unsigned long AddOverlayPos(const float* Delta) override;
     float* GetSampled() override;
-    unsigned long TouchMapped(void* ArgA, void* ArgB) override;
+    unsigned long TouchMapped(void* OutPos, void* OutSampledPos) override;
     unsigned long UpdateDeltaRate(float Dt) override;
     unsigned long Step(float* Out, float Dt) override;
 
@@ -775,11 +791,12 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     GENRESULT DACOM_API EnumScriptNames(void* Callback, void* Script, void* Context) override;
     GENRESULT DACOM_API FindScriptName(void* Callback, void* Script, const char* Name,
                                         void* Context) override;
-    unsigned long DACOM_API PlayScript(void* Script, void* Root, const char* Name, void* ArgD,
-                                         void* ArgE) override;
+    unsigned long DACOM_API PlayScript(void* Script, void* Root, const char* Name, void* Sink,
+                                         void* SinkContext) override;
     GENRESULT DACOM_API DestroyScript(void* Script) override;
     unsigned long DACOM_API EvalPlayback(unsigned long PlaybackId, unsigned long Flags, float Time,
-                                         float Scale, void* A, void* B, void* C, void* D) override;
+                                         float Speed, void* BlendDuration, void* Scale,
+                                         void* TranslationScale, void* Transform) override;
     unsigned long DACOM_API EvalStored(unsigned long PlaybackId) override;
     unsigned long DACOM_API ApplyChannels(unsigned long PlaybackId) override;
     unsigned long DACOM_API StopPlayback(unsigned long PlaybackId) override;
@@ -810,9 +827,9 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     // IAggregateComponent @ +4, slot 3 (LAB_06616d40).
     GENRESULT DACOM_API Initialize() override;
     // IRootData @ +0xC, slot 3 (LAB_06614b30).
-    unsigned char DACOM_API Eval(unsigned long PlaybackId, void* TouchArg, unsigned long Flags,
-                                 float Time, float Scale, void* Arg6, void* Arg7,
-                                 float Arg8) override;
+    unsigned char DACOM_API Eval(unsigned long PlaybackId, void* OutSampledPos, unsigned long Flags,
+                                 float Time, float Speed, void* BlendDuration, void* Scale,
+                                 float TranslationScale) override;
 };
 
 // Hardpoint and EngineComponent facets share a cache and nondelegating inner unknown.
@@ -841,15 +858,15 @@ struct FHardpointObject : IHardpoint, IEngineComponent
                                               FHardpointKey const* KeyB) override;
     char const* DACOM_API FindHardpoint(void* Handle, unsigned long const* Crc) override;
     int DACOM_API Initialize() override;
-    int DACOM_API CreateArchetype(void* Arg1, void* Arg2) override;
-    int DACOM_API DuplicateArchetype(void* Arg1, void* Arg2) override;
-    int DACOM_API DestroyArchetype(void* Arg1) override;
-    int DACOM_API QueryArchetype(void* Arg1, const char* Iid, void** Out) override;
-    int DACOM_API CreateInstance(void* Arg1, void* Arg2) override;
-    int DACOM_API DestroyInstance(void* Arg1) override;
-    int DACOM_API UpdateInstance(void* Arg1, void* Arg2) override;
-    int DACOM_API QueryInstance(void* Arg1, const char* Iid, void** Out) override;
-    int DACOM_API Notify(void* Arg1) override;
+    int DACOM_API CreateArchetype(void* Archetype, void* FileSystem) override;
+    int DACOM_API DuplicateArchetype(void* NewArchetype, void* OldArchetype) override;
+    int DACOM_API DestroyArchetype(void* Archetype) override;
+    int DACOM_API QueryArchetype(void* Archetype, const char* Iid, void** Out) override;
+    int DACOM_API CreateInstance(void* Instance, void* Archetype) override;
+    int DACOM_API DestroyInstance(void* Instance) override;
+    int DACOM_API UpdateInstance(void* Instance, void* Arg) override;
+    int DACOM_API QueryInstance(void* Instance, const char* Iid, void** Out) override;
+    int DACOM_API Notify(void* Arg) override;
 };
 
 // ChannelArchetype, operator_new(0x20). LAB_0661d8d0 loads a 0xC-byte Header plus a Frames blob.

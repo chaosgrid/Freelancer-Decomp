@@ -237,9 +237,9 @@ namespace
         }
         // The nine-entry table on the stack: -1, -2, ... -9.
         Event->Record.Key = static_cast<unsigned>(-1 - static_cast<int>(ButtonIndex));
-        Event->Record.Byte18 = bDown ? 1 : 0;
-        Event->Record.Byte19 = 0;
-        Event->Record.Byte1A = bDouble ? 1 : 0;
+        Event->Record.bKeyDown = bDown ? 1 : 0;
+        Event->Record.bRepeat = 0;
+        Event->Record.bDoubleClick = bDouble ? 1 : 0;
     }
 
     // FUN_0041f8a0 (thiscall, RET 0xc): build and queue a button / wheel event.
@@ -1028,7 +1028,7 @@ void MouseDispatchEvents()
             continue;
         // An unclaimed left press goes to FUN_0045a270(WM_LBUTTONDOWN, 0, 0).
         if (!KeyMapRouteMouseEvent(&Event.Record) && Event.ButtonIndex == 0 &&
-            Event.Record.Byte18 != 0)
+            Event.Record.bKeyDown != 0)
         {
             NnMainButtonOnUnclaimedMouse(0x201, 0, 0);
         }

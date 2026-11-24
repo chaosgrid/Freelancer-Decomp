@@ -108,7 +108,7 @@ bool CETractor::Update(float Dt, unsigned Flags)
         for (std::vector<TractorArm>::iterator It = Arms.begin(); It != Arms.end(); ++It)
         {
             It->Update(Dt);
-            if (It->GetMode() != TractorArm::MODE_0)
+            if (It->GetMode() != TractorArm::MODE_OFF)
                 ++ActiveCount;
         }
         if (ActiveCount == 0)
@@ -128,26 +128,26 @@ int CETractor::CountActiveArms() const
     // FUN_0629e240
     int Count = 0;
     for (std::vector<TractorArm>::const_iterator It = Arms.begin(); It != Arms.end(); ++It)
-        if (It->GetMode() != TractorArm::MODE_0)
+        if (It->GetMode() != TractorArm::MODE_OFF)
             ++Count;
     return Count;
 }
 
 TractorFailureCode CETractor::AddTarget(CLoot* Target)
 {
-    // FUN_0629e270. On a verify failure Notify(Event_0x14) gets the address of the failure code
-    // (retail reuses the dead param_1 slot for it), not the CLoot.
+    // FUN_0629e270. On a verify failure Notify(TractorTargetRejected) gets the address of the
+    // failure code (retail reuses the dead param_1 slot for it), not the CLoot.
     TractorFailureCode Code = VerifyTarget(Target);
     if (Code != TractorOk)
     {
-        Notify(INotify::Event_0x14, &Code);
+        Notify(INotify::TractorTargetRejected, &Code);
         return Code;
     }
 
     TractorArm* Slot = nullptr;
     for (std::vector<TractorArm>::iterator It = Arms.begin(); It != Arms.end(); ++It)
     {
-        if (It->GetMode() == TractorArm::MODE_0)
+        if (It->GetMode() == TractorArm::MODE_OFF)
         {
             Slot = &*It;
             break;
@@ -175,7 +175,7 @@ void CETractor::RemoveTarget(unsigned TargetId)
     int RemainingActive = 0;
     for (std::vector<TractorArm>::iterator It = Arms.begin(); It != Arms.end(); ++It)
     {
-        if (It->GetMode() == TractorArm::MODE_0)
+        if (It->GetMode() == TractorArm::MODE_OFF)
             continue;
         CLoot* Target = It->GetTarget();
         if (Target == nullptr || Target->get_id() != TargetId)

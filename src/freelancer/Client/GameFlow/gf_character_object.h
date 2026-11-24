@@ -14,7 +14,7 @@
 // behaviour script a click starts.
 //
 // Retail slots over RoomObject (0x005e14a4): 0 FUN_004440a0 (deleting dtor), 3 LAB_004449a0
-// (SetFloat1C), 5 LAB_004449d0 (Update), 6 LAB_00444970 (GetEngineInstance), 7 LAB_00445150
+// (SetFloorHeight), 5 LAB_004449d0 (Update), 6 LAB_00444970 (GetEngineInstance), 7 LAB_00445150
 // (DrawOpaque), 10..12 FUN_00445a90 / FUN_00445be0 / FUN_00445c10 (hotspot events).
 //
 // Built by the room (RoomControl FUN_00449e60 -> FUN_00435960 -> FUN_00435b80) for every
@@ -97,7 +97,7 @@ struct FCharacterObject : FRoomObject
     // FUN_004440c0 (FUN_004440a0 is the scalar deleting destructor).
     ~FCharacterObject() override;
 
-    void SetFloat1C(float Value) override;          // 3  LAB_004449a0
+    void SetFloorHeight(float Value) override;      // 3  LAB_004449a0
     void Update(double DeltaSeconds) override;      // 5  LAB_004449d0
     void* GetEngineInstance() override;             // 6  LAB_00444970
     void DrawOpaque(ICamera* Camera) override;      // 7  LAB_00445150

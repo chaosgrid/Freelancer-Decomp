@@ -63,7 +63,7 @@ namespace AlchemyImpl
         GENRESULT DACOM_API GetBoundComponent(void** Out) override;
         // FUN_06220d70 thiscall (this, flag): Release +0x1c; flag&1 → delete.
         // Port: unbind only. Lifetime stays on Release (factory fail path).
-        GENRESULT DACOM_API Slot17() override;
+        GENRESULT DACOM_API DestructorSlot() override;
 
         GENRESULT DACOM_API Initialize(AGGDESC* Desc) override;
 

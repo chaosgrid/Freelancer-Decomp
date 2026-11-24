@@ -59,15 +59,6 @@ namespace
     // DAT_005cfb78 -- u"  "
     wchar_t const kChatGap[] = L"  ";
 
-    // The clone-into-list idiom (FUN_0046c800 with a fresh clone, first clone deleted; the inline
-    // FUN_0042a7e0 + FUN_0046ea00 insertion is the same thing).
-    void AppendNodeClone(RenderDisplayList& List, RDLNode const& Node)
-    {
-        RDLNode* const Temp = Node.Clone();
-        RdlAppendNode(List, Temp->Clone());
-        delete Temp;
-    }
-
     // DAT_0067ed80 (guard DAT_0067ed78 bit 0, atexit IDPMsgHandler::OnDisconnect -- an empty
     // body): the zero record both lists fall back to when a name has no player info.
     FChatPlayerInfo* ChatZeroPlayerInfo()
@@ -252,17 +243,17 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
 
     {
         StyleNode Style(0xfaa9);
-        AppendNodeClone(BroadcastTitleText, Style);
+        ChatAppendNodeClone(BroadcastTitleText, Style);
     }
     LoadIdsTextIntoRdl(0x6002cu, BroadcastTitleText, L"DEBUG - Broadcast Channels");
     {
         StyleNode Style(0xfaa9);
-        AppendNodeClone(HistoryTitleText, Style);
+        ChatAppendNodeClone(HistoryTitleText, Style);
     }
     LoadIdsTextIntoRdl(0x60032u, HistoryTitleText, L"DEBUG - Chat History");
     {
         StyleNode Style(0xfaa9);
-        AppendNodeClone(PrivateTitleText, Style);
+        ChatAppendNodeClone(PrivateTitleText, Style);
     }
     LoadIdsTextIntoRdl(0x60033u, PrivateTitleText, L"DEBUG - Private Channels");
     LoadIdsTextIntoRdl(0x60054u, NoneText, L"DEBUG - None");
@@ -490,36 +481,36 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
                 RdlClear(Text);
                 {
                     JustifyNode Justify(TextJustifyLeft);
-                    AppendNodeClone(Text, Justify);
+                    ChatAppendNodeClone(Text, Justify);
                 }
 
                 unsigned TipIds = 0;
                 if (Entry.Key == Current.Id)
                 {
-                    StyleNode Style(0x3343);
-                    AppendNodeClone(Text, Style);
+                    StyleNode Style(kTextStyleRowSelected);
+                    ChatAppendNodeClone(Text, Style);
                 }
                 else
                 {
                     {
-                        StyleNode Style(0x8283);
-                        AppendNodeClone(Text, Style);
+                        StyleNode Style(kTextStyleChatPlayer);
+                        ChatAppendNodeClone(Text, Style);
                     }
                     if (Entry.Key == G_ChatIdChannel1.Id)
                     {
-                        StyleNode Style(0xd801);
-                        AppendNodeClone(Text, Style);
+                        StyleNode Style(kTextStyleChatSystem);
+                        ChatAppendNodeClone(Text, Style);
                     }
                     else if (Entry.Key == G_ChatIdChannel2.Id)
                     {
-                        StyleNode Style(0x1d9d);
-                        AppendNodeClone(Text, Style);
+                        StyleNode Style(kTextStyleChatLocal);
+                        ChatAppendNodeClone(Text, Style);
                     }
                     else if (Entry.Key == G_ChatIdChannel3.Id)
                     {
                         {
-                            StyleNode Style(0xd801);
-                            AppendNodeClone(Text, Style);
+                            StyleNode Style(kTextStyleChatSystem);
+                            ChatAppendNodeClone(Text, Style);
                         }
                         // The group channel is live only with group members.
                         if (G_ChatGroupControl != nullptr)
@@ -527,18 +518,18 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
                     }
                     else if (Entry.Key == G_ChatIdNone.Id)
                     {
-                        StyleNode Style(0x73f7);
-                        AppendNodeClone(Text, Style);
+                        StyleNode Style(kTextStyleChatConsole);
+                        ChatAppendNodeClone(Text, Style);
                     }
                     else if (Entry.Key == G_ChatIdChannel0.Id)
                     {
-                        StyleNode Style(0xd681);
-                        AppendNodeClone(Text, Style);
+                        StyleNode Style(kTextStyleChatUniverse);
+                        ChatAppendNodeClone(Text, Style);
                     }
                     else
                     {
-                        StyleNode Style(0x8283);
-                        AppendNodeClone(Text, Style);
+                        StyleNode Style(kTextStyleChatPlayer);
+                        ChatAppendNodeClone(Text, Style);
                     }
                 }
 
@@ -556,34 +547,34 @@ void ChatControl::FillBroadcast(int FirstItem, unsigned VisibleRows)
 
                 if (!bEnabled)
                 {
-                    StyleNode Style(0xbb80);
-                    AppendNodeClone(Text, Style);
+                    StyleNode Style(kTextStyleDisabled);
+                    ChatAppendNodeClone(Text, Style);
                 }
                 {
                     TextNode Gap(kChatGap, -1);
-                    AppendNodeClone(Text, Gap);
+                    ChatAppendNodeClone(Text, Gap);
                 }
                 if (bEnabled)
                 {
                     if (Entry.Key == G_ChatIdChannel1.Id)
                     {
                         ImageNode Image(SystemColorImage);
-                        AppendNodeClone(Text, Image);
+                        ChatAppendNodeClone(Text, Image);
                     }
                     else if (Entry.Key == G_ChatIdChannel3.Id)
                     {
                         ImageNode Image(GroupColorImage);
-                        AppendNodeClone(Text, Image);
+                        ChatAppendNodeClone(Text, Image);
                     }
                 }
                 else
                 {
                     ImageNode Image(InactiveColorImage);
-                    AppendNodeClone(Text, Image);
+                    ChatAppendNodeClone(Text, Image);
                 }
                 {
                     TextNode Gap(kChatGap, -1);
-                    AppendNodeClone(Text, Gap);
+                    ChatAppendNodeClone(Text, Gap);
                 }
                 ChatAppendRdlCopy(Text, *Entry.Name);
 
@@ -625,16 +616,16 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         RdlClear(Text);
         {
             JustifyNode Justify(TextJustifyLeft);
-            AppendNodeClone(Text, Justify);
+            ChatAppendNodeClone(Text, Justify);
         }
         {
-            StyleNode Style(static_cast<unsigned short>(Entry->Key == Current.Id ? 0x3343 : 0x69f5));
-            AppendNodeClone(Text, Style);
+            StyleNode Style(static_cast<unsigned short>(Entry->Key == Current.Id ? kTextStyleRowSelected : kTextStyleRow));
+            ChatAppendNodeClone(Text, Style);
         }
         if (!bEnabled)
         {
-            StyleNode Style(0xbb80);
-            AppendNodeClone(Text, Style);
+            StyleNode Style(kTextStyleDisabled);
+            ChatAppendNodeClone(Text, Style);
         }
         ChatAppendRdlCopy(Text, *Entry->Name);
         PrivateList->SetCellSpanToEnd(Row, 0, true);
@@ -664,7 +655,8 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         return;
 
     unsigned short const DetailStyle =
-        static_cast<unsigned short>(Entry->Key == Current.Id ? 0x3dbc : 0x5203);
+        static_cast<unsigned short>(Entry->Key == Current.Id ? kTextStyleRowDetailSelected
+                                                             : kTextStyleRowDetail);
     wchar_t Buffer[64];
 
     // Column 1 -- GroupId, or the "None" text when zero.
@@ -674,22 +666,22 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         RdlClear(Text);
         {
             JustifyNode Justify(TextJustifyCenter);
-            AppendNodeClone(Text, Justify);
+            ChatAppendNodeClone(Text, Justify);
         }
         {
             StyleNode Style(DetailStyle);
-            AppendNodeClone(Text, Style);
+            ChatAppendNodeClone(Text, Style);
         }
         if (Entry->Info->GroupId != 0)
         {
             swprintf(Buffer, sizeof(Buffer) / sizeof(Buffer[0]), L"%u", Entry->Info->GroupId);   // DAT_005cfb80
             TextNode Value(Buffer, -1);
-            AppendNodeClone(Text, Value);
+            ChatAppendNodeClone(Text, Value);
         }
         else
         {
             RDLRefNode None(NoneText);
-            AppendNodeClone(Text, None);
+            ChatAppendNodeClone(Text, None);
         }
         PrivateList->SetCellSpanToEnd(Detail, 1, false);
         PrivateList->InvalidateCell(Detail, 1);
@@ -701,16 +693,16 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         RdlClear(Text);
         {
             JustifyNode Justify(TextJustifyCenter);
-            AppendNodeClone(Text, Justify);
+            ChatAppendNodeClone(Text, Justify);
         }
         {
             StyleNode Style(DetailStyle);
-            AppendNodeClone(Text, Style);
+            ChatAppendNodeClone(Text, Style);
         }
         swprintf(Buffer, sizeof(Buffer) / sizeof(Buffer[0]), L"%u", Entry->Info->Rank);
         {
             TextNode Value(Buffer, -1);
-            AppendNodeClone(Text, Value);
+            ChatAppendNodeClone(Text, Value);
         }
         PrivateList->SetCellSpanToEnd(Detail, 2, false);
         PrivateList->InvalidateCell(Detail, 2);
@@ -723,16 +715,16 @@ void ChatControl::RenderPrivateRow(unsigned Row, FChatControlEntry const* Entry,
         RdlClear(Text);
         {
             JustifyNode Justify(TextJustifyCenter);
-            AppendNodeClone(Text, Justify);
+            ChatAppendNodeClone(Text, Justify);
         }
         {
             StyleNode Style(DetailStyle);
-            AppendNodeClone(Text, Style);
+            ChatAppendNodeClone(Text, Style);
         }
-        if (G_ChatNameCache70 != nullptr)
+        if (G_ChatSystemNameCache != nullptr)
         {
             RDLRefNode System(*ChatGetSystemName(Entry->Info->SystemId));
-            AppendNodeClone(Text, System);
+            ChatAppendNodeClone(Text, System);
         }
         PrivateList->SetCellSpanToEnd(Detail, 3, false);
         PrivateList->InvalidateCell(Detail, 3);
@@ -817,21 +809,21 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
         RdlClear(Text);
         {
             JustifyNode Justify(TextJustifyCenter);
-            AppendNodeClone(Text, Justify);
+            ChatAppendNodeClone(Text, Justify);
         }
         bool const bSorted = Column == SortColumn;
         {
             StyleNode Style(static_cast<unsigned short>(bSorted ? 0xda80 : 0x3df7));
-            AppendNodeClone(Text, Style);
+            ChatAppendNodeClone(Text, Style);
         }
         {
             RDLRefNode Header(Headers[Column]);
-            AppendNodeClone(Text, Header);
+            ChatAppendNodeClone(Text, Header);
         }
         if (bSorted)
         {
             ImageNode Pip(SortAscending[Column] != 0 ? DownPipImage : UpPipImage);
-            AppendNodeClone(Text, Pip);
+            ChatAppendNodeClone(Text, Pip);
         }
     }
 

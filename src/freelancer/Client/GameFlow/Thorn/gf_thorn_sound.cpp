@@ -58,18 +58,18 @@ FThornSound::FThornSound(Csys const& ScriptFrame, FGfScript* InOwner, FThornEnti
       bSpatial(0),
       bAmbient(0),
       bMusic(0),
-      Field_0x78(0),
+      bHoldScript(0),
       Arch(nullptr),
       Handle(nullptr),
       bUseScriptFade(0),
       Attenuation(0.0f),
       Pan(0.0f),
-      Field_0x90(1e9f),
-      Field_0x94(1e9f),
-      Field_0x98(0x168),
-      Field_0x9c(0x168),
-      Field_0xa0(0.0f),
-      Field_0xa4(0.0f)
+      MinDistance(1e9f),
+      MaxDistance(1e9f),
+      ConeInsideAngle(0x168),
+      ConeOutsideAngle(0x168),
+      ConeOutsideAttenuation(0.0f),
+      ReverbMix(0.0f)
 {
     Pad79[0] = 0;
     Pad79[1] = 0;
@@ -147,7 +147,7 @@ void FThornSound::SetSpatial(unsigned char bInSpatial)
 // FUN_00457380. ISoundSource slot 29 (+0x74).
 bool FThornSound::IsHoldingScript() const
 {
-    if (Handle == nullptr || Field_0x78 == 0)
+    if (Handle == nullptr || bHoldScript == 0)
         return false;
     return Handle->IsFinished() != 0;
 }
@@ -172,13 +172,13 @@ void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
         _stricmp(Template, "$BGCS_My_Faction_FM") == 0)
     {
         MessageName = Talker->ResolveBgcsContextToken(Template);
-        Field_0x78 = 0;
+        bHoldScript = 0;
     }
     if (_stricmp(Template, "$BGCS_Faction_Rebuff_ML") == 0 ||
         _stricmp(Template, "$BGCS_Faction_Rebuff_FM") == 0)
     {
         MessageName = Talker->ResolveBgcsContextToken(Template);
-        Field_0x78 = 1;
+        bHoldScript = 1;
     }
 
     // The local is 0x100 bytes; the copy is unbounded, as retail's.
@@ -192,7 +192,7 @@ void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
         int const Pick = (Product + ((Product >> 31) & 0x7fff)) >> 15;
         _ltoa(Pick, Underscore, 10);
         MessageName = Scratch + 2;
-        Field_0x78 = 0;
+        bHoldScript = 0;
     }
 
     unsigned int const MessageId = CreateID(MessageName);
@@ -336,17 +336,17 @@ GENRESULT DACOM_API FThornSound::SetAudioProps(float const* Props8, int Mask)
     if ((Mask & 0x2) != 0)
         CopyDword(&Pan, &Props8[1]);
     if ((Mask & 0x4) != 0)
-        CopyDword(&Field_0x90, &Props8[2]);
+        CopyDword(&MinDistance, &Props8[2]);
     if ((Mask & 0x8) != 0)
-        CopyDword(&Field_0x94, &Props8[3]);
+        CopyDword(&MaxDistance, &Props8[3]);
     if ((Mask & 0x10) != 0)
-        CopyDword(&Field_0x98, &Props8[4]);
+        CopyDword(&ConeInsideAngle, &Props8[4]);
     if ((Mask & 0x20) != 0)
-        CopyDword(&Field_0x9c, &Props8[5]);
+        CopyDword(&ConeOutsideAngle, &Props8[5]);
     if ((Mask & 0x40) != 0)
-        CopyDword(&Field_0xa0, &Props8[6]);
+        CopyDword(&ConeOutsideAttenuation, &Props8[6]);
     if ((Mask & 0x80) != 0)
-        CopyDword(&Field_0xa4, &Props8[7]);
+        CopyDword(&ReverbMix, &Props8[7]);
     RefreshSound();
     return GR_OK;
 }
@@ -359,17 +359,17 @@ GENRESULT DACOM_API FThornSound::GetAudioProps(float* Props8, int Mask)
     if ((Mask & 0x2) != 0)
         CopyDword(&Props8[1], &Pan);
     if ((Mask & 0x4) != 0)
-        CopyDword(&Props8[2], &Field_0x90);
+        CopyDword(&Props8[2], &MinDistance);
     if ((Mask & 0x8) != 0)
-        CopyDword(&Props8[3], &Field_0x94);
+        CopyDword(&Props8[3], &MaxDistance);
     if ((Mask & 0x10) != 0)
-        CopyDword(&Props8[4], &Field_0x98);
+        CopyDword(&Props8[4], &ConeInsideAngle);
     if ((Mask & 0x20) != 0)
-        CopyDword(&Props8[5], &Field_0x9c);
+        CopyDword(&Props8[5], &ConeOutsideAngle);
     if ((Mask & 0x40) != 0)
-        CopyDword(&Props8[6], &Field_0xa0);
+        CopyDword(&Props8[6], &ConeOutsideAttenuation);
     if ((Mask & 0x80) != 0)
-        CopyDword(&Props8[7], &Field_0xa4);
+        CopyDword(&Props8[7], &ReverbMix);
     return GR_OK;
 }
 

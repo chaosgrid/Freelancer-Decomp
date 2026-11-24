@@ -1008,7 +1008,7 @@ void NeuroNetNavMap::Draw()
             WinControl* const SystemText = BaseSystemTexts[Index];
             if (SystemText == nullptr || !IsShown(SystemText))
                 continue;
-            unsigned long Colour = G_NnPaletteArgb_679bb0;
+            unsigned long Colour = G_NnPaletteCyan;
             if (BaseText->HitTest(Ray) || SystemText->HitTest(Ray))
             {
                 unsigned long Pulsed = 0;
@@ -1030,10 +1030,10 @@ void NeuroNetNavMap::Draw()
         // 1: bases), the other pulsed under the ray.
         if (BaseTitleText != nullptr && IsShown(BaseTitleText))
         {
-            unsigned long Colour = G_NnPaletteArgb_679bb0;
+            unsigned long Colour = G_NnPaletteCyan;
             if (bBaseListByBase != 0)
             {
-                Colour = G_NnPaletteArgb_679ba4;
+                Colour = G_NnPaletteAmber;
             }
             else if (BaseTitleText->HitTest(Ray))
             {
@@ -1046,10 +1046,10 @@ void NeuroNetNavMap::Draw()
         }
         if (SystemTitleText != nullptr && IsShown(SystemTitleText))
         {
-            unsigned long Colour = G_NnPaletteArgb_679bb0;
+            unsigned long Colour = G_NnPaletteCyan;
             if (bBaseListByBase == 0)
             {
-                Colour = G_NnPaletteArgb_679ba4;
+                Colour = G_NnPaletteAmber;
             }
             else if (SystemTitleText->HitTest(Ray))
             {
@@ -1076,7 +1076,7 @@ void NeuroNetNavMap::Draw()
     }
 
     // Slot 39, WinControl's no-op tail.
-    Slot39();
+    PostDraw();
 }
 
 // ----------------------------------------------------------------------------------------
@@ -1110,9 +1110,9 @@ void NeuroNetNavMap::DrawJumpLinks()
             // A route link in the palette colour DAT_00679b80, its
             // alpha byte cleared for the edges.
             unsigned char Edge[4];
-            memcpy(Edge, &G_NnPaletteArgb_679b80, sizeof(Edge));
+            memcpy(Edge, &G_NnPaletteViolet, sizeof(Edge));
             Edge[3] = 0;
-            NavMapDrawBand(From, To, reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679b80),
+            NavMapDrawBand(From, To, reinterpret_cast<unsigned char const*>(&G_NnPaletteViolet),
                            Edge, kNavMapLinkWidth);
         }
     }
@@ -1167,10 +1167,10 @@ void NeuroNetNavMap::DrawRouteLines()
         memcpy(FromPos, ClientMeshHolderGetPosition(&From->Mesh), sizeof(FromPos));
         float ToPos[3];
         memcpy(ToPos, ClientMeshHolderGetPosition(&To->Mesh), sizeof(ToPos));
-        memcpy(Edge, &G_NnPaletteArgb_679b80, sizeof(Edge));
+        memcpy(Edge, &G_NnPaletteViolet, sizeof(Edge));
         Edge[3] = 0;
         NavMapDrawTexturedBand(FromPos, ToPos,
-                               reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679b80),
+                               reinterpret_cast<unsigned char const*>(&G_NnPaletteViolet),
                                Edge, kNavMapRouteWidth); // FUN_00498730
     }
 
@@ -1203,10 +1203,10 @@ void NeuroNetNavMap::DrawRouteLines()
         memcpy(FromPos, ClientMeshHolderGetPosition(&From->Mesh), sizeof(FromPos));
         float ToPos[3];
         memcpy(ToPos, ClientMeshHolderGetPosition(&To->Mesh), sizeof(ToPos));
-        memcpy(Edge, &G_NnPaletteArgb_679b80, sizeof(Edge));
+        memcpy(Edge, &G_NnPaletteViolet, sizeof(Edge));
         Edge[3] = 0;
         NavMapDrawTexturedBand(FromPos, ToPos,
-                               reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679b80),
+                               reinterpret_cast<unsigned char const*>(&G_NnPaletteViolet),
                                Edge, kNavMapLinkWidth);
     }
 
@@ -1257,7 +1257,7 @@ void NeuroNetNavMap::DrawLabels()
     // The idle colour; while a transition runs into this view (or into
     // the universe view) its alpha byte fades out with the ease.
     unsigned char Colour[4];
-    memcpy(Colour, &G_NnPaletteArgb_679bb0, sizeof(Colour));
+    memcpy(Colour, &G_NnPaletteCyan, sizeof(Colour));
     if (bTransition != 0 && (TransitionView == 0 || ViewMode == TransitionView))
     {
         double const Fade = (kNavMapOne - static_cast<double>(TransitionEase)) * kNavMapByteMax;
@@ -1617,7 +1617,7 @@ void NeuroNetNavMap::DrawGroupMarkers()
     if (GroupMarkerMesh.EngineInstance == reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
     {
         ClientMeshLoadFromPath(&GroupMarkerMesh, kNavMapGroupMarkerMesh, 0, false); // FUN_0059ec80
-        unsigned char const* const Tint = reinterpret_cast<unsigned char const*>(&G_NnPaletteArgb_679bac);
+        unsigned char const* const Tint = reinterpret_cast<unsigned char const*>(&G_NnPaletteGreen);
         GroupMarkerMesh.UserFloats[0] = static_cast<float>(static_cast<double>(Tint[0]) * static_cast<double>(kNavMapInv255));
         GroupMarkerMesh.UserFloats[1] = static_cast<float>(static_cast<double>(Tint[1]) * static_cast<double>(kNavMapInv255));
         GroupMarkerMesh.UserFloats[2] = static_cast<float>(static_cast<double>(Tint[2]) * static_cast<double>(kNavMapInv255));
@@ -1812,7 +1812,7 @@ bool NeuroNetNavMap::BuildZoneShading()
     ShadeVertexCount = 0;
     ShadeIndexCount = 0;
     FNavMapFrame const Frame = MakeZoneFrame(this);
-    int const PlayerVibe = GetPlayerSpawnSystemIdRetail(); // FUN_004c4670 (DAT_0061226c)
+    int const PlayerVibe = GetPlayerRepVibeRetail(); // FUN_004c4670 (DAT_0061226c)
 
     for (std::list<Universe::FSystemZone>::const_iterator It = Zones->begin(); It != Zones->end(); ++It)
     {
@@ -1883,7 +1883,7 @@ bool NeuroNetNavMap::BuildZoneShading()
         unsigned long ColourDword = 0;
         NnReputationColorArgb(&ColourDword, Feel); // FUN_0045a650
         if (Mode == 5)
-            ColourDword = G_NnPaletteArgb_679ba4;
+            ColourDword = G_NnPaletteAmber;
         unsigned char Rgba[4];
         memcpy(Rgba, &ColourDword, sizeof(Rgba));
         if (Mode != 2 && Mode != 1)
@@ -2523,7 +2523,7 @@ void NeuroNetNavMap::DrawZoneOutlines()
 {
     // FUN_0049aa30: nothing unless bDrawZoneOutlines (+0x898), whose only writer in the exe is
     // the constructor's zero. The remaining body (every zone's outline as line strips by
-    // shape, limited to terrain zones by the +0xb48 byte -- also only ever zeroed) is
+    // shape, limited to terrain zones by bOutlineTerrainZonesOnly -- also only ever zeroed) is
     // therefore unreachable in retail and NOT ported.
     if (bDrawZoneOutlines == 0)
         return;

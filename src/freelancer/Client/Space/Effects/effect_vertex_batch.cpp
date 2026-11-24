@@ -141,7 +141,7 @@ void EffectVertexBatchStaticInit()
     G_EffectVertexBatch.Pipeline = nullptr;
     G_EffectVertexBatch.VertCapacity = 0;
     G_EffectVertexBatch.IndexCapacity = 0;
-    G_EffectVertexBatch.Flag28 = 0;
+    G_EffectVertexBatch.bCloseLoop = 0;
     G_EffectVertexBatch.bStripMode = 0;
     G_EffectVertexBatch.StripCounter = 0;
     G_EffectVertexBatch.Type = 1;
@@ -220,7 +220,7 @@ void EffectVertexBatchReset(FEffectVertexBatch* Batch)
 {
     Batch->VertCount = 0;
     Batch->bStripMode = 0;
-    Batch->Flag28 = 0;
+    Batch->bCloseLoop = 0;
     Batch->StripCounter = 0;
     Batch->IndexCount = 0;
     EffectVertexBatchGrowVertices(Batch);

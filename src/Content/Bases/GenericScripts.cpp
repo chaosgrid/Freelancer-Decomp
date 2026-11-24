@@ -40,24 +40,29 @@ namespace
 
     // .data 06fce380: 0x42 {value, name} pairs read only by FUN_06f01d70; every value
     // equals its index.
-    FGenericScriptSegment const GGenericScriptSegments[0x42] = {
-        {0x00, "FIDGET"}, {0x01, "A01aG"},  {0x02, "A02aG"},  {0x03, "A02cG"},
-        {0x04, "A02dG"},  {0x05, "A02eB"},  {0x06, "A03aG"},  {0x07, "A04aG"},
-        {0x08, "C01aR"},  {0x09, "D01aN"},  {0x0a, "D01bG"},  {0x0b, "D01cG"},
-        {0x0c, "D01dG"},  {0x0d, "D01fG"},  {0x0e, "D01fGm"}, {0x0f, "D01hG"},
-        {0x10, "D01kG"},  {0x11, "D01kGm"}, {0x12, "D02aP"},  {0x13, "D02aPm"},
-        {0x14, "D02bP"},  {0x15, "D02dP"},  {0x16, "D02eP"},  {0x17, "D03aN"},
-        {0x18, "D04aG"},  {0x19, "D04bB"},  {0x1a, "D05aP"},  {0x1b, "D05bP"},
-        {0x1c, "D06aG"},  {0x1d, "D07aG"},  {0x1e, "D07bG"},  {0x1f, "F01aB"},
-        {0x20, "F01bB"},  {0x21, "F01dG"},  {0x22, "F01eG"},  {0x23, "F01fG"},
-        {0x24, "F01jG"},  {0x25, "F02aP"},  {0x26, "F03aR"},  {0x27, "F03bR"},
-        {0x28, "F03cR"},  {0x29, "F03dR"},  {0x2a, "F04aG"},  {0x2b, "F04dG"},
-        {0x2c, "F04fG"},  {0x2d, "F04gP"},  {0x2e, "F05aG"},  {0x2f, "F05bG"},
-        {0x30, "F05cG"},  {0x31, "F06aP"},  {0x32, "F07aP"},  {0x33, "F07bP"},
-        {0x34, "F07cP"},  {0x35, "F08dR"},  {0x36, "F08bR"},  {0x37, "F08cR"},
-        {0x38, "F09bP"},  {0x39, "F10aR"},  {0x3a, "F10bR"},  {0x3b, "F10bRm"},
-        {0x3c, "W01cG"},  {0x3d, "W01bB"},  {0x3e, "W02aF"},  {0x3f, "W03bB"},
-        {0x40, "W04bP"},  {0x41, "W04cP"},
+    FGenericScriptSegment const GGenericScriptSegments[GSEG_COUNT] = {
+        {GSEG_FIDGET, "FIDGET"}, {GSEG_A01aG, "A01aG"}, {GSEG_A02aG, "A02aG"},
+        {GSEG_A02cG, "A02cG"}, {GSEG_A02dG, "A02dG"}, {GSEG_A02eB, "A02eB"},
+        {GSEG_A03aG, "A03aG"}, {GSEG_A04aG, "A04aG"}, {GSEG_C01aR, "C01aR"},
+        {GSEG_D01aN, "D01aN"}, {GSEG_D01bG, "D01bG"}, {GSEG_D01cG, "D01cG"},
+        {GSEG_D01dG, "D01dG"}, {GSEG_D01fG, "D01fG"}, {GSEG_D01fGm, "D01fGm"},
+        {GSEG_D01hG, "D01hG"}, {GSEG_D01kG, "D01kG"}, {GSEG_D01kGm, "D01kGm"},
+        {GSEG_D02aP, "D02aP"}, {GSEG_D02aPm, "D02aPm"}, {GSEG_D02bP, "D02bP"},
+        {GSEG_D02dP, "D02dP"}, {GSEG_D02eP, "D02eP"}, {GSEG_D03aN, "D03aN"},
+        {GSEG_D04aG, "D04aG"}, {GSEG_D04bB, "D04bB"}, {GSEG_D05aP, "D05aP"},
+        {GSEG_D05bP, "D05bP"}, {GSEG_D06aG, "D06aG"}, {GSEG_D07aG, "D07aG"},
+        {GSEG_D07bG, "D07bG"}, {GSEG_F01aB, "F01aB"}, {GSEG_F01bB, "F01bB"},
+        {GSEG_F01dG, "F01dG"}, {GSEG_F01eG, "F01eG"}, {GSEG_F01fG, "F01fG"},
+        {GSEG_F01jG, "F01jG"}, {GSEG_F02aP, "F02aP"}, {GSEG_F03aR, "F03aR"},
+        {GSEG_F03bR, "F03bR"}, {GSEG_F03cR, "F03cR"}, {GSEG_F03dR, "F03dR"},
+        {GSEG_F04aG, "F04aG"}, {GSEG_F04dG, "F04dG"}, {GSEG_F04fG, "F04fG"},
+        {GSEG_F04gP, "F04gP"}, {GSEG_F05aG, "F05aG"}, {GSEG_F05bG, "F05bG"},
+        {GSEG_F05cG, "F05cG"}, {GSEG_F06aP, "F06aP"}, {GSEG_F07aP, "F07aP"},
+        {GSEG_F07bP, "F07bP"}, {GSEG_F07cP, "F07cP"}, {GSEG_F08dR, "F08dR"},
+        {GSEG_F08bR, "F08bR"}, {GSEG_F08cR, "F08cR"}, {GSEG_F09bP, "F09bP"},
+        {GSEG_F10aR, "F10aR"}, {GSEG_F10bR, "F10bR"}, {GSEG_F10bRm, "F10bRm"},
+        {GSEG_W01cG, "W01cG"}, {GSEG_W01bB, "W01bB"}, {GSEG_W02aF, "W02aF"},
+        {GSEG_W03bB, "W03bB"}, {GSEG_W04bP, "W04bP"}, {GSEG_W04cP, "W04cP"},
     };
 
     // FUN_06f02aa0 (06f02aa0-06f02b08) with Pos 0 and Count = Left.size(): _memicmp over
@@ -98,7 +103,7 @@ void __cdecl LoadGenericScripts(char const* Path)
         // Fresh defaults per section.
         int Gender = 2;
         int Posture = 2;
-        int Segment = 0x42;
+        int Segment = GSEG_COUNT;
         while (Reader.read_value())
         {
             if (Reader.is_value("set_gender"))
@@ -112,8 +117,8 @@ void __cdecl LoadGenericScripts(char const* Path)
             else if (Reader.is_value("set_segment"))
             {
                 char const* Name = Reader.get_value_string();
-                Segment = 0x42;
-                for (int Index = 0; Index < 0x42; ++Index)
+                Segment = GSEG_COUNT;
+                for (int Index = 0; Index < GSEG_COUNT; ++Index)
                 {
                     if (_stricmp(GGenericScriptSegments[Index].Name, Name) == 0)
                     {
@@ -201,7 +206,7 @@ char const* __cdecl PickGenericScript(int Segment, int Gender, int Posture, unsi
 // FUN_06f020a0 (06f020a0-06f020b6).
 char const* __cdecl PickFidgetScript(int Gender, int Posture)
 {
-    return PickGenericScript(0, Gender, Posture, 0);
+    return PickGenericScript(GSEG_FIDGET, Gender, Posture, 0);
 }
 
 // FUN_06f01ab0 (06f01ab0-06f01ae1).
@@ -324,11 +329,11 @@ namespace
                                   FContentPlayerState* State)
     {
         Behavior->DialogType = 3;
-        AppendGenericScript(Behavior, 0x24, Character, Posture, 0);
+        AppendGenericScript(Behavior, GSEG_F01jG, Character, Posture, 0);
         // A player already on a mission.
         if ((State->GetLiveMission() & 0x3fffffff) != 0)
         {
-            AppendGenericScript(Behavior, 0x2c, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_F04fG, Character, Posture, 0);
             return;
         }
 
@@ -340,105 +345,106 @@ namespace
         if (!Offer->Data.Loader->CanAccept(Offer->Data.Mission, &Reason, &Code))
         {
             if (Code == 1)
-                AppendGenericScript(Behavior, 0x2b, Character, Posture, 0);
+                AppendGenericScript(Behavior, GSEG_F04dG, Character, Posture, 0);
             else if (Code == 2)
-                AppendGenericScript(Behavior, 0x2a, Character, Posture, 0);
+                AppendGenericScript(Behavior, GSEG_F04aG, Character, Posture, 0);
             return;
         }
 
         if (!pub::SinglePlayer())
         {
-            AppendGenericScript(Behavior, 0x31, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_F06aP, Character, Posture, 0);
         }
         else
         {
-            AppendGenericScript(Behavior, 0x2d, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_F04gP, Character, Posture, 0);
             // FUN_06f4b050 of the mission's difficulty (+0x4c).
             int const Fit = CompareRmOfferDifficulty(State, Offer->Data.Mission->Difficulty);
-            int const Segment = (Fit < 0) ? 0x2e : ((Fit == 0) ? 0x2f : 0x30);
+            int const Segment = (Fit < 0) ? GSEG_F05aG : ((Fit == 0) ? GSEG_F05bG : GSEG_F05cG);
             AppendGenericScript(Behavior, Segment, Character, Posture, 0);
         }
-        AppendGenericScript(Behavior, 8, Character, Posture, 1);
-        AppendGenericScript(Behavior, 0x32, Character, Posture, 2);
-        AppendGenericScript(Behavior, 0x39, Character, Posture, 2);
-        AppendGenericScript(Behavior, 0x34, Character, Posture, 3);
-        AppendGenericScript(Behavior, pub::SinglePlayer() ? 0x3a : 0x3b, Character, Posture, 3);
-        AppendGenericScript(Behavior, 0x2c, Character, Posture, 6);
+        AppendGenericScript(Behavior, GSEG_C01aR, Character, Posture, 1);
+        AppendGenericScript(Behavior, GSEG_F07aP, Character, Posture, 2);
+        AppendGenericScript(Behavior, GSEG_F10aR, Character, Posture, 2);
+        AppendGenericScript(Behavior, GSEG_F07cP, Character, Posture, 3);
+        AppendGenericScript(Behavior, pub::SinglePlayer() ? GSEG_F10bR : GSEG_F10bRm, Character, Posture, 3);
+        AppendGenericScript(Behavior, GSEG_F04fG, Character, Posture, 6);
         // The mission's description (+0x24).
         Behavior->NameFmtStr = Offer->Data.Mission->Description;
     }
 
-    // FUN_06f01420 (06f01420-06f015dd, cdecl): the bartender's scripts. Vnpc is compared
-    // unsigned.
+    // FUN_06f01420 (06f01420-06f015dd, cdecl): the bartender's scripts. VnpcTalkCount is
+    // compared unsigned.
     void BuildBartenderScripts(CharacterBehaviorDescription* Behavior,
-                               FBarCharacter const* Character, int Posture, unsigned int Vnpc)
+                               FBarCharacter const* Character, int Posture,
+                               unsigned int VnpcTalkCount)
     {
         if (Character->TalkCount != 0)
         {
-            AppendGenericScript(Behavior, pub::SinglePlayer() ? 0xd : 0xe, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x15, Character, Posture, 0);
+            AppendGenericScript(Behavior, pub::SinglePlayer() ? GSEG_D01fG : GSEG_D01fGm, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D02dP, Character, Posture, 0);
             return;
         }
         if (!pub::SinglePlayer())
         {
-            AppendGenericScript(Behavior, 0x11, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x1b, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D01kGm, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D05bP, Character, Posture, 0);
             return;
         }
-        if (Vnpc > 1)
+        if (VnpcTalkCount > 1)
         {
-            AppendGenericScript(Behavior, 0x10, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D01kG, Character, Posture, 0);
         }
         else
         {
-            AppendGenericScript(Behavior, 0xf, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x16, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x17, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D01hG, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D02eP, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D03aN, Character, Posture, 0);
         }
-        AppendGenericScript(Behavior, 0x1b, Character, Posture, 0);
+        AppendGenericScript(Behavior, GSEG_D05bP, Character, Posture, 0);
     }
 
     // FUN_06f011f0 (06f011f0-06f0141b, cdecl): the scripts of a character with a vnpc record.
-    // false only for vnpc value 1, which ends the builder without offer scripts.
+    // false only while its mission is active, which ends the builder without offer scripts.
     bool BuildVnpcScripts(CharacterBehaviorDescription* Behavior, FBarCharacter const* Character,
-                          int Posture, unsigned int Vnpc)
+                          int Posture, unsigned int VnpcTalkCount)
     {
         bool const bResult = true;
         if (IsShopRole(Character))
             return bResult;
         if (IsBartenderRole(Character))
         {
-            BuildBartenderScripts(Behavior, Character, Posture, Vnpc);
+            BuildBartenderScripts(Behavior, Character, Posture, VnpcTalkCount);
             return bResult;
         }
 
-        // FUN_06f48770; not found -> 0.
+        // FUN_06f48770; not found -> NONE.
         FContentPlayerState* State = FindContentPlayerState(Character->PlayerId);
-        unsigned int Value = 0;
-        if (!State->FindVnpcValue3(State->GetBaseRecord()->BaseId, &Character->Nickname.Id,
-                                   &Value))
-            Value = 0;
-        if (Value == 0)
+        unsigned int MissionState = VNPC_MISSION_NONE;
+        if (!State->FindVnpcMissionState(State->GetBaseRecord()->BaseId, &Character->Nickname.Id,
+                                         &MissionState))
+            MissionState = VNPC_MISSION_NONE;
+        if (MissionState == VNPC_MISSION_NONE)
         {
-            BuildBartenderScripts(Behavior, Character, Posture, Vnpc);
+            BuildBartenderScripts(Behavior, Character, Posture, VnpcTalkCount);
             return bResult;
         }
-        if (Value == 1)
+        if (MissionState == VNPC_MISSION_ACTIVE)
         {
-            AppendGenericScript(Behavior, 0xc, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D01dG, Character, Posture, 0);
             return false;
         }
         if (!pub::SinglePlayer())
             return bResult;
-        if (Value == 2)
+        if (MissionState == VNPC_MISSION_SUCCEEDED)
         {
-            AppendGenericScript(Behavior, 0xb, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x1b, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D01cG, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D05bP, Character, Posture, 0);
         }
         else
         {
-            AppendGenericScript(Behavior, 0xa, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x14, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D01bG, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_D02bP, Character, Posture, 0);
         }
         return bResult;
     }
@@ -456,19 +462,19 @@ namespace
 
         case BAR_OFFER_BRIBE:
         {
-            AppendGenericScript(Behavior, 0x23, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x25, Character, Posture, 0);
-            AppendGenericScript(Behavior, 8, Character, Posture, 1);
-            AppendGenericScript(Behavior, 0x32, Character, Posture, 2);
-            AppendGenericScript(Behavior, 0x34, Character, Posture, 3);
+            AppendGenericScript(Behavior, GSEG_F01fG, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_F02aP, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_C01aR, Character, Posture, 1);
+            AppendGenericScript(Behavior, GSEG_F07aP, Character, Posture, 2);
+            AppendGenericScript(Behavior, GSEG_F07cP, Character, Posture, 3);
             FBarBribeOffer const* Bribe = static_cast<FBarBribeOffer const*>(Character->Offer.Object);
             // Retail reads the cash into the Posture argument slot.
             int Cash = Posture;
             pub::Player::InspectCash(Character->PlayerId, Cash);
             AppendGenericScript(Behavior,
-                                (static_cast<unsigned int>(Cash) < static_cast<unsigned int>(Bribe->Price)) ? 0x35 : 0x39,
+                                (static_cast<unsigned int>(Cash) < static_cast<unsigned int>(Bribe->Price)) ? GSEG_F08dR : GSEG_F10aR,
                                 Character, Posture, 2);
-            AppendGenericScript(Behavior, pub::SinglePlayer() ? 0x3a : 0x3b, Character, Posture, 3);
+            AppendGenericScript(Behavior, pub::SinglePlayer() ? GSEG_F10bR : GSEG_F10bRm, Character, Posture, 3);
             FormatBribeOfferText(&Behavior->NameFmtStr, Bribe);
             Behavior->DialogType = 1;
             return;
@@ -476,41 +482,41 @@ namespace
 
         case BAR_OFFER_KNOW:
         {
-            AppendGenericScript(Behavior, IsBartenderRole(Character) ? 0x20 : 0x22, Character,
+            AppendGenericScript(Behavior, IsBartenderRole(Character) ? GSEG_F01bB : GSEG_F01eG, Character,
                                 Posture, 0);
-            AppendGenericScript(Behavior, 0x25, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_F02aP, Character, Posture, 0);
             FBaseNpcKnow const* Know = Character->Offer.Know;
             switch (Know->RepLevel)
             {
             case 0:
             case 1:
-                AppendGenericScript(Behavior, 0x26, Character, Posture, 0);
+                AppendGenericScript(Behavior, GSEG_F03aR, Character, Posture, 0);
                 break;
             case 2:
-                AppendGenericScript(Behavior, 0x27, Character, Posture, 0);
+                AppendGenericScript(Behavior, GSEG_F03bR, Character, Posture, 0);
                 break;
             case 3:
-                AppendGenericScript(Behavior, 0x28, Character, Posture, 0);
+                AppendGenericScript(Behavior, GSEG_F03cR, Character, Posture, 0);
                 break;
             default:
                 break;
             }
-            AppendGenericScript(Behavior, 8, Character, Posture, 1);
+            AppendGenericScript(Behavior, GSEG_C01aR, Character, Posture, 1);
             // Retail reads the cash into the Character argument slot.
             int Cash = static_cast<int>(reinterpret_cast<intptr_t>(Character));
             pub::Player::InspectCash(Character->PlayerId, Cash);
             if (static_cast<unsigned int>(Cash) < static_cast<unsigned int>(Know->Price))
             {
-                AppendGenericScript(Behavior, 0x35, Character, Posture, 2);
+                AppendGenericScript(Behavior, GSEG_F08dR, Character, Posture, 2);
             }
             else
             {
-                AppendGenericScript(Behavior, 8, Character, Posture, 4);
-                AppendGenericScript(Behavior, 0x38, Character, Posture, 2);
-                AppendGenericScript(Behavior, 0x39, Character, Posture, 2);
+                AppendGenericScript(Behavior, GSEG_C01aR, Character, Posture, 4);
+                AppendGenericScript(Behavior, GSEG_F09bP, Character, Posture, 2);
+                AppendGenericScript(Behavior, GSEG_F10aR, Character, Posture, 2);
             }
-            AppendGenericScript(Behavior, 0x33, Character, Posture, 3);
-            AppendGenericScript(Behavior, pub::SinglePlayer() ? 0x3a : 0x3b, Character, Posture, 3);
+            AppendGenericScript(Behavior, GSEG_F07bP, Character, Posture, 3);
+            AppendGenericScript(Behavior, pub::SinglePlayer() ? GSEG_F10bR : GSEG_F10bRm, Character, Posture, 3);
             FormatKnowOfferText(Behavior, Know);
             Behavior->DialogType = 4;
             return;
@@ -518,13 +524,13 @@ namespace
 
         case BAR_OFFER_RUMOR:
         {
-            AppendGenericScript(Behavior, IsBartenderRole(Character) ? 0x1f : 0x21, Character,
+            AppendGenericScript(Behavior, IsBartenderRole(Character) ? GSEG_F01aB : GSEG_F01dG, Character,
                                 Posture, 0);
-            AppendGenericScript(Behavior, 0x25, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x36, Character, Posture, 0);
-            AppendGenericScript(Behavior, 8, Character, Posture, 1);
-            AppendGenericScript(Behavior, 0x38, Character, Posture, 0);
-            AppendGenericScript(Behavior, 0x39, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_F02aP, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_F08bR, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_C01aR, Character, Posture, 1);
+            AppendGenericScript(Behavior, GSEG_F09bP, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_F10aR, Character, Posture, 0);
             // No bound on the eight slots, as in retail (the data never fills them).
             FBaseNpcRumor const* Rumor = Character->Offer.Rumor;
             Behavior->DescFmtStr.begin_mad_lib(static_cast<unsigned int>(Rumor->Ids[0]));
@@ -538,14 +544,14 @@ namespace
         default:
             if (IsBartenderRole(Character))
             {
-                AppendGenericScript(Behavior, 5, Character, Posture, 0);
+                AppendGenericScript(Behavior, GSEG_A02eB, Character, Posture, 0);
                 return;
             }
             if (IsShopRole(Character))
                 return;
             if (!bVnpc)
-                AppendGenericScript(Behavior, 1, Character, Posture, 0);
-            AppendGenericScript(Behavior, 2, Character, Posture, 0);
+                AppendGenericScript(Behavior, GSEG_A01aG, Character, Posture, 0);
+            AppendGenericScript(Behavior, GSEG_A02aG, Character, Posture, 0);
             return;
         }
     }
@@ -581,9 +587,9 @@ namespace
         Behavior.RelocateLocationId = 0;
         Behavior.StartRoomLocationId = 0;
         bool const bShop = IsShopRole(Character);
-        Behavior.OfferMissionId = 1;
+        Behavior.OfferKind = pub::Controller::MissionOfferBarCharacter;
         Behavior.DialogType = bShop ? 2 : 0;
-        Behavior.OfferArg = Character->CharacterId;
+        Behavior.OfferId = Character->CharacterId;
         Behavior.Filter = Character->PlayerId;
 
         FContentPlayerState* State = FindContentPlayerState(Character->PlayerId);
@@ -592,8 +598,8 @@ namespace
         pub::GF::GetCharacterPlacementPosture(Character->RoomId, Character->Placement,
                                               PostureValue);
         int const Posture = static_cast<int>(PostureValue);
-        unsigned int const Vnpc =
-            State->GetVnpcValue2(State->GetBaseRecord()->BaseId, Character->Nickname.Id);
+        unsigned int const VnpcTalkCount =
+            State->GetVnpcTalkCount(State->GetBaseRecord()->BaseId, Character->Nickname.Id);
         // Status ignored; the attitude slot is unset in retail when it fails. 0.0 is
         // DAT_06fb444c; an unordered attitude counts as friendly.
         int const Reputation = State->GetReputation();
@@ -603,86 +609,86 @@ namespace
         bool const bFriendly = Attitude >= 0.0f;
         int const OfferKind = Character->Offer.Kind;
 
-        if (Vnpc == 0)
+        if (VnpcTalkCount == 0)
         {
             if (IsBartenderRole(Character))
             {
-                AppendGenericScript(&Behavior, 0x3d, Character, Posture, 0);
-                AppendGenericScript(&Behavior, 0x3f, Character, Posture, 0);
-                AppendGenericScript(&Behavior, 0x40, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_W01bB, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_W03bB, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_W04bP, Character, Posture, 0);
                 bool const bChance = static_cast<unsigned int>(RollPercent()) < 0x19;
                 if (pub::SinglePlayer() && bChance)
                 {
-                    AppendGenericScript(&Behavior, 9, Character, Posture, 0);
-                    AppendGenericScript(&Behavior, 0x12, Character, Posture, 0);
-                    AppendGenericScript(&Behavior, 0x19, Character, Posture, 0);
-                    AppendGenericScript(&Behavior, 0x1a, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D01aN, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D02aP, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D04bB, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D05aP, Character, Posture, 0);
                 }
                 else
                 {
-                    AppendGenericScript(&Behavior, 9, Character, Posture, 0);
-                    AppendGenericScript(&Behavior, 0x13, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D01aN, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D02aPm, Character, Posture, 0);
                 }
                 if (static_cast<unsigned int>(RollPercent()) < 0x14)
-                    AppendGenericScript(&Behavior, 0x3e, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_W02aF, Character, Posture, 0);
             }
             else if (!IsShopRole(Character))
             {
-                AppendGenericScript(&Behavior, 0x3c, Character, Posture, 0);
-                AppendGenericScript(&Behavior, 0x41, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_W01cG, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_W04cP, Character, Posture, 0);
                 bool const bChance = static_cast<unsigned int>(RollPercent()) < 0x19;
                 if (pub::SinglePlayer() && bChance)
                 {
-                    AppendGenericScript(&Behavior, 9, Character, Posture, 0);
-                    AppendGenericScript(&Behavior, 0x12, Character, Posture, 0);
-                    AppendGenericScript(&Behavior, 0x18, Character, Posture, 0);
-                    AppendGenericScript(&Behavior, 0x1a, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D01aN, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D02aP, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D04aG, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D05aP, Character, Posture, 0);
                 }
                 else
                 {
-                    AppendGenericScript(&Behavior, 9, Character, Posture, 0);
-                    AppendGenericScript(&Behavior, 0x13, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D01aN, Character, Posture, 0);
+                    AppendGenericScript(&Behavior, GSEG_D02aPm, Character, Posture, 0);
                 }
-                AppendGenericScript(&Behavior, 0x1c, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_D06aG, Character, Posture, 0);
                 // Retail looks the player state up again here.
                 FContentBase const* Base =
                     FindContentPlayerState(Character->PlayerId)->GetBaseRecord();
                 AppendGenericScript(&Behavior,
-                                    (Base->LocalFaction == Character->Affiliation) ? 0x1d : 0x1e,
+                                    (Base->LocalFaction == Character->Affiliation) ? GSEG_D07aG : GSEG_D07bG,
                                     Character, Posture, 0);
             }
         }
 
         if (bFriendly)
         {
-            if (Vnpc != 0)
+            if (VnpcTalkCount != 0)
             {
-                if (!BuildVnpcScripts(&Behavior, Character, Posture, Vnpc))
+                if (!BuildVnpcScripts(&Behavior, Character, Posture, VnpcTalkCount))
                     return CreateBarBehavior(Character, &Behavior);
             }
             else if (OfferKind != 0 && static_cast<unsigned int>(RollPercent()) < 0x14 &&
                      !IsShopRole(Character) && !IsBartenderRole(Character))
             {
-                AppendGenericScript(&Behavior, 1, Character, Posture, 0);
-                AppendGenericScript(&Behavior, 4, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_A01aG, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_A02dG, Character, Posture, 0);
             }
-            BuildOfferScripts(Character, &Behavior, Posture, State, Vnpc != 0, OfferKind);
+            BuildOfferScripts(Character, &Behavior, Posture, State, VnpcTalkCount != 0, OfferKind);
         }
         else if (IsShopRole(Character) || IsBartenderRole(Character))
         {
-            if (Vnpc != 0 && !BuildVnpcScripts(&Behavior, Character, Posture, Vnpc))
+            if (VnpcTalkCount != 0 && !BuildVnpcScripts(&Behavior, Character, Posture, VnpcTalkCount))
                 return CreateBarBehavior(Character, &Behavior);
-            BuildOfferScripts(Character, &Behavior, Posture, State, Vnpc != 0, OfferKind);
+            BuildOfferScripts(Character, &Behavior, Posture, State, VnpcTalkCount != 0, OfferKind);
         }
         else
         {
-            if (Vnpc == 0)
-                AppendGenericScript(&Behavior, 1, Character, Posture, 0);
-            AppendGenericScript(&Behavior, 3, Character, Posture, 0);
-            if (Vnpc != 0)
+            if (VnpcTalkCount == 0)
+                AppendGenericScript(&Behavior, GSEG_A01aG, Character, Posture, 0);
+            AppendGenericScript(&Behavior, GSEG_A02cG, Character, Posture, 0);
+            if (VnpcTalkCount != 0)
             {
-                AppendGenericScript(&Behavior, 6, Character, Posture, 0);
-                AppendGenericScript(&Behavior, 7, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_A03aG, Character, Posture, 0);
+                AppendGenericScript(&Behavior, GSEG_A04aG, Character, Posture, 0);
             }
         }
         return CreateBarBehavior(Character, &Behavior);

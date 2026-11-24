@@ -113,27 +113,27 @@ public:
         return !bObstructed;
     }
 
-    // FUN_062dd3d0, not exported, thiscall, `RET 8`, 108 instructions. Reached only through Behavior::SetCruiseLock
+    // FUN_062dd3d0, not exported, thiscall, `RET 8`, 108 instructions. Reached only through Behavior::SetAvoidanceAllowed
     // (FUN_062d21d0, 20 call sites across the Behavior family), which tail-jumps here with
     // this = Behavior+0x20 (IBehaviorManager) -> +0x0C. Only the low byte of Value is read
-    // (`MOV CL,byte ptr [ESP+param_1]`). Mask bit 1 latches it into Field_254, bit 0 into
-    // Field_24C; a zero Value then resets the +0x214..+0x243 record (after notifying the
-    // ThrustManager with a zero vector when bit 0 was given and Field_214 bit 0 was set).
+    // (`MOV CL,byte ptr [ESP+param_1]`). Mask bit 1 latches it into bAvoidPointAllowed, bit 0 into
+    // bObstacleNudgeAllowed; a zero Value then resets the +0x214..+0x243 record (after notifying the
+    // ThrustManager with a zero vector when bit 0 was given and AvoidRecordKind bit 0 was set).
     // Retail name unknown; the port name follows the Behavior-side callers.
-    void SetCruiseLock(int Value, unsigned int Mask);
+    void SetAvoidanceAllowed(int Value, unsigned int Mask);
 
     // FUN_062dd760, not exported, __thiscall, RET 4. The per-tick update; its one caller is
     // IBehaviorManager::UpdateBehaviorTick (.text:062d2d00) with the tick's Dt. Only for an
-    // owner type in 0x7f0000: a 1 s zone-property probe (Field_000 / Field_004), a reset
+    // owner type in 0x7f0000: a 1 s zone-property probe (ZoneStatusFlags / ZoneProperties), a reset
     // of the obstacle state while behaviour 6 / 8 / 0x13 / -1 runs, the 0.1 s
-    // RefreshAvoidance and the nudge hand-off to the ThrustManager, then (with Flag245 and
-    // Field_254 set) UpdateShipHeadingBlend and the ObstacleAvoidance tick on its own period.
+    // RefreshAvoidance and the nudge hand-off to the ThrustManager, then (with bObstacleAvoidanceEnabled and
+    // bAvoidPointAllowed set) UpdateShipHeadingBlend and the ObstacleAvoidance tick on its own period.
     void Update(float Dt);
 
     // FUN_062dd580, not exported, __thiscall, RET 0. Rebuilds the +0x214 record: a point
-    // from SelectAvoidancePoint (Field_214 = 2), else for owner types in 0x130000 a nudge
-    // direction from SelectObstacleDirection (Field_214 = 1, the obstacle watched in
-    // Watcher218), else nothing (Field_214 = 0).
+    // from SelectAvoidancePoint (AvoidRecordKind = 2), else for owner types in 0x130000 a nudge
+    // direction from SelectObstacleDirection (AvoidRecordKind = 1, the obstacle watched in
+    // AvoidObstacleWatcher), else nothing (AvoidRecordKind = 0).
     void RefreshAvoidance();
 
     // FUN_062dda10, not exported, __thiscall, RET 0xc. 0 with *OutPoint / *OutScale /
@@ -142,7 +142,7 @@ public:
     int SelectAvoidancePoint(Vector* OutPoint, float* OutScale, int* OutKind);
 
     // FUN_062de050, not exported, __thiscall, RET 0xc. 0 with a nudge direction and the
-    // obstacle it avoids (Field_255 = 1, Field_258 = its id), 2 otherwise.
+    // obstacle it avoids (bNudgeObstacleFound = 1, NudgeObstacleId = its id), 2 otherwise.
     int SelectObstacleDirection(Vector* OutDirection, IObjRW** OutObstacle, unsigned ExcludeId);
 
     // FUN_062db830, not exported, __thiscall, RET 8 (the second stack argument is a float*
@@ -156,7 +156,7 @@ public:
     int GetUserZoneApproachDirection(Vector* OutDir);
 
     // FUN_062dc840, not exported, __thiscall. Resets Reaction, then picks the obstacle whose deflection capsule
-    // (padded by 750 / 250 and Field_1FC) holds the ship and lies closest to the target from
+    // (padded by 750 / 250 and CoastDistanceFrom300) holds the ship and lies closest to the target from
     // the own scan list and a 20000-radius spatial query; commits a State 1 escape or asks
     // NudgeObstaclePathPoint for a deflection point (State 0). 4 = nothing reacts, 0 = a commit,
     // otherwise NudgeObstaclePathPoint's non-zero result. Definition: common_obstacleavoidance.cpp.
@@ -190,12 +190,17 @@ public:
         ObstacleAvoidance::Slot ActiveSlot;    // +0x18  (+0x184) never written by the ctor
     };
 
-    int Field_000;                             // +0x000 ctor: 0 (.text:062db54c)
-    int Field_004;                             // +0x004 ctor: 0 (.text:062db644)
+    // +0x000: rebuilt by Update's zone probe: 1 when the probe sphere's zone properties have a
+    // bit of 0x7000, | 8 while Avoidance has a contact. ctor: 0 (.text:062db54c).
+    int ZoneStatusFlags;                       // +0x000
+    int ZoneProperties;                        // +0x004 Update's GetSphereProperties result; ctor: 0 (.text:062db644)
     bool bUserZoneActive;                      // +0x008 submit_user_zone sets, clear_user_zone clears
     unsigned char Pad009[3];
     UserZone Zone;                             // +0x00C
-    int Field_064;                             // +0x064 ctor: 0 (.text:062db519)
+    // +0x064: an object id the avoidance ignores (SelectAvoidancePoint skips an avoidance
+    // contact with this id; RefreshAvoidance passes it to SelectObstacleDirection). Written by
+    // BaseIdea::PublishTargetId, cleared by Behavior::OnDisengage. ctor: 0 (.text:062db519).
+    int AvoidExcludeId;                        // +0x064
     unsigned int NextDeflectionSlot;           // +0x068 round-robin cursor into DeflectionSlots
     unsigned int RecentObstacleIds[8];         // +0x06C ctor: REP STOSD 8 x 0 (.text:062db3f4)
     // Built with `eh vector constructor iterator(this+0x8c, 0x1c, 8, 0x06261260)`: the
@@ -212,40 +217,54 @@ public:
     BaseWatcher Watcher1C8;                    // +0x1C8 destroyed by FUN_062d2530 (.text:062d259b)
     Vector Field_1D0;                          // +0x1D0 ctor: 0 (stored z, y, x)
     int Field_1DC;                             // +0x1DC ctor: 0
-    float Timer1E0;                            // +0x1E0 ctor: rand() / 32768 * Period1E4
-    float Period1E4;                           // +0x1E4 ctor: 1.0f
-    float Timer1E8;                            // +0x1E8 ctor: rand() / 32768 * Period1EC
-    float Period1EC;                           // +0x1EC ctor: 0.5f
+    // Three phase-offset clocks of Update (each ctor-seeded to rand() / 32768 * its period):
+    // the zone probe (1 s), the ObstacleAvoidance tick (0.5 s, 0.1 s while it is active or has
+    // a contact) and the RefreshAvoidance rebuild of the +0x214 record (0.1 s).
+    float ZoneProbeTimer;                      // +0x1E0
+    float ZoneProbePeriod;                     // +0x1E4 1.0f
+    float AvoidanceTickTimer;                  // +0x1E8
+    float AvoidanceTickPeriod;                 // +0x1EC 0.5f / 0.1f
     int Field_1F0;                             // +0x1F0 ctor: 0
     float MaxEngineSpeed;                      // +0x1F4 Owner get_speed(1.0f, Engine) (seeded 80.0f first)
-    float Field_1F8;                           // +0x1F8 get_distance_travelled(0, MaxEngineSpeed, 1000, Engine) or 0
-    float Field_1FC;                           // +0x1FC get_distance_travelled(0, 300, 1000, Engine) or 0
+    // get_distance_travelled(throttle 0, from speed, 1000, Engine): the coasting distance from
+    // MaxEngineSpeed and from 300. 0 when get_speed answered -1. ClassifyObstaclePhase pads
+    // its capsules by half of CoastDistanceFrom300.
+    float MaxSpeedCoastDistance;               // +0x1F8
+    float CoastDistanceFrom300;                // +0x1FC
     Vector CachedTargetPosition;               // +0x200 ctor: 0; ClassifyShipObstaclePhase reads it
-    float Timer20C;                            // +0x20C ctor: rand() / 32768 * Period210
-    float Period210;                           // +0x210 ctor: 0.1f
-    int Field_214;                             // +0x214 ctor: 0
-    BaseWatcher Watcher218;                    // +0x218 ctor FUN_062de190(nullptr); destroyed by FUN_062d2530 (.text:062d2580)
-    Vector Field_220;                          // +0x220 ctor: 0 (stored z, y, x)
-    Vector Field_22C;                          // +0x22C ctor: 0 (stored z, y, x)
-    unsigned char Field_238;                   // +0x238 ctor: 0; RefreshAvoidance copies Avoidance.HasContact's raw byte
+    float AvoidRecordTimer;                    // +0x20C
+    float AvoidRecordPeriod;                   // +0x210 0.1f
+    // +0x214..+0x243: the avoidance record RefreshAvoidance rebuilds and the Ideas read.
+    // Kind: 0 none, 1 a nudge direction (AvoidNudgeDirection, handed to the ThrustManager),
+    // 2 a point to steer at (AvoidTargetPoint / AvoidPointScale; DodgeIdea and FaceIdea).
+    int AvoidRecordKind;                       // +0x214 ctor: 0
+    BaseWatcher AvoidObstacleWatcher;          // +0x218 the nudged-around obstacle; ctor FUN_062de190(nullptr); destroyed by FUN_062d2530 (.text:062d2580)
+    Vector AvoidNudgeDirection;                // +0x220 ctor: 0 (stored z, y, x)
+    Vector AvoidTargetPoint;                   // +0x22C ctor: 0 (stored z, y, x)
+    unsigned char AvoidPointContact;           // +0x238 ctor: 0; RefreshAvoidance copies Avoidance.HasContact's raw byte
     unsigned char Pad239[3];
-    float Field_23C;                           // +0x23C ctor: 1.0f
-    int Field_240;                             // +0x240 ctor: 0
-    bool Field_244;                            // +0x244 ctor: 0
+    float AvoidPointScale;                     // +0x23C ctor: 1.0f
+    // +0x240: where the record came from: SelectAvoidancePoint's kind (1 avoidance point,
+    // 2 user-zone exit, 3 obstacle reaction) or 4 for a nudge. ctor: 0.
+    int AvoidRecordSource;                     // +0x240
+    bool bBlendAvoidNudge;                     // +0x244 nudge blended in by Update (else set once directly); ctor: 0
     // +0x245: pub::AI::SubmitState's SetFlagParams FlagId 0 stores the raw uint8_t there
     // (Server .text:06d5c93c); Common tests it as a byte (TEST AL,AL at .text:062dd937,
-    // 062dda17, 062de058). ctor: 1.
-    unsigned char Flag245;                     // +0x245
+    // 062dda17, 062de058). Clear, it stops the avoidance point, the obstacle nudge, the
+    // heading blend and the ObstacleAvoidance tick. ctor: 1.
+    unsigned char bObstacleAvoidanceEnabled;   // +0x245
     unsigned char Pad246[2];
-    int Field_248;                             // +0x248 ctor: -1
-    unsigned char Field_24C;                   // +0x24C ctor: 1; SetCruiseLock stores a raw byte
+    int NudgeObstacleTypeMask;                 // +0x248 FindClosestObstacleToAvoid's type mask; ctor: -1
+    // SetAvoidanceAllowed's two latches (raw bytes, ctor: 1): mask bit 0 gates
+    // SelectObstacleDirection, bit 1 SelectAvoidancePoint and Update's heading blend / avoidance tick.
+    unsigned char bObstacleNudgeAllowed;       // +0x24C
     unsigned char Pad24D[3];
     int Field_250;                             // +0x250 ctor: 0x7f0000
-    unsigned char Field_254;                   // +0x254 ctor: 1; SetCruiseLock stores a raw byte
-    bool Field_255;                            // +0x255 ctor: 0
+    unsigned char bAvoidPointAllowed;          // +0x254
+    bool bNudgeObstacleFound;                  // +0x255 SelectObstacleDirection found one; ctor: 0
     unsigned char Pad256[2];
-    int Field_258;                             // +0x258 ctor: 0
-    int Field_25C;                             // +0x25C ctor: 0
+    int NudgeObstacleId;                       // +0x258 its id; ctor: 0
+    int LastAvoidPointKind;                    // +0x25C SelectAvoidancePoint's last *OutKind; ctor: 0
     unsigned int CachedObstacleId;             // +0x260 ctor: 0
     bool bHasCachedObstacle;                   // +0x264 ctor: 0
     unsigned char Pad265[3];
@@ -268,7 +287,7 @@ static_assert(sizeof(PathfindManager::ObstacleReaction) == 0x34, "ObstacleReacti
 
 static_assert(offsetof(PathfindManager, bUserZoneActive) == 0x008, "PathfindManager+0x008 bUserZoneActive");
 static_assert(offsetof(PathfindManager, Zone) == 0x00C, "PathfindManager+0x00C Zone");
-static_assert(offsetof(PathfindManager, Field_064) == 0x064, "PathfindManager+0x064");
+static_assert(offsetof(PathfindManager, AvoidExcludeId) == 0x064, "PathfindManager+0x064");
 static_assert(offsetof(PathfindManager, NextDeflectionSlot) == 0x068, "PathfindManager+0x068");
 static_assert(offsetof(PathfindManager, RecentObstacleIds) == 0x06C, "PathfindManager+0x06C");
 static_assert(offsetof(PathfindManager, DeflectionSlots) == 0x08C, "PathfindManager+0x08C");
@@ -281,18 +300,18 @@ static_assert(offsetof(PathfindManager, Owner) == 0x1C0, "PathfindManager+0x1C0 
 static_assert(offsetof(PathfindManager, OwnerType) == 0x1C4, "PathfindManager+0x1C4");
 static_assert(offsetof(PathfindManager, Watcher1C8) == 0x1C8, "PathfindManager+0x1C8");
 static_assert(offsetof(PathfindManager, Field_1D0) == 0x1D0, "PathfindManager+0x1D0");
-static_assert(offsetof(PathfindManager, Timer1E0) == 0x1E0, "PathfindManager+0x1E0");
+static_assert(offsetof(PathfindManager, ZoneProbeTimer) == 0x1E0, "PathfindManager+0x1E0");
 static_assert(offsetof(PathfindManager, MaxEngineSpeed) == 0x1F4, "PathfindManager+0x1F4");
 static_assert(offsetof(PathfindManager, CachedTargetPosition) == 0x200, "PathfindManager+0x200");
-static_assert(offsetof(PathfindManager, Timer20C) == 0x20C, "PathfindManager+0x20C");
-static_assert(offsetof(PathfindManager, Field_214) == 0x214, "PathfindManager+0x214");
-static_assert(offsetof(PathfindManager, Watcher218) == 0x218, "PathfindManager+0x218");
-static_assert(offsetof(PathfindManager, Field_238) == 0x238, "PathfindManager+0x238");
-static_assert(offsetof(PathfindManager, Field_244) == 0x244, "PathfindManager+0x244");
-static_assert(offsetof(PathfindManager, Flag245) == 0x245, "PathfindManager+0x245");
-static_assert(offsetof(PathfindManager, Field_248) == 0x248, "PathfindManager+0x248");
+static_assert(offsetof(PathfindManager, AvoidRecordTimer) == 0x20C, "PathfindManager+0x20C");
+static_assert(offsetof(PathfindManager, AvoidRecordKind) == 0x214, "PathfindManager+0x214");
+static_assert(offsetof(PathfindManager, AvoidObstacleWatcher) == 0x218, "PathfindManager+0x218");
+static_assert(offsetof(PathfindManager, AvoidPointContact) == 0x238, "PathfindManager+0x238");
+static_assert(offsetof(PathfindManager, bBlendAvoidNudge) == 0x244, "PathfindManager+0x244");
+static_assert(offsetof(PathfindManager, bObstacleAvoidanceEnabled) == 0x245, "PathfindManager+0x245");
+static_assert(offsetof(PathfindManager, NudgeObstacleTypeMask) == 0x248, "PathfindManager+0x248");
 static_assert(offsetof(PathfindManager, Field_250) == 0x250, "PathfindManager+0x250");
-static_assert(offsetof(PathfindManager, Field_255) == 0x255, "PathfindManager+0x255");
+static_assert(offsetof(PathfindManager, bNudgeObstacleFound) == 0x255, "PathfindManager+0x255");
 static_assert(offsetof(PathfindManager, CachedObstacleId) == 0x260, "PathfindManager+0x260");
 static_assert(offsetof(PathfindManager, bHasCachedObstacle) == 0x264, "PathfindManager+0x264");
 static_assert(offsetof(PathfindManager, Avoidance) == 0x268, "PathfindManager+0x268 Avoidance");

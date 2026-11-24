@@ -26,7 +26,7 @@ CAsteroid::CAsteroid()
     CubeId = 0;
     bMine = false;
     bInstantKill = false;
-    CollisionGroupId = 0;
+    SystemId = 0;
     OwnerField = nullptr;
 }
 
@@ -39,7 +39,7 @@ CAsteroid::CAsteroid(CAsteroid const& Other)
     CubeId = Other.CubeId;
     bMine = Other.bMine;
     bInstantKill = Other.bInstantKill;
-    CollisionGroupId = Other.CollisionGroupId;
+    SystemId = Other.SystemId;
     OwnerField = Other.OwnerField;
 }
 
@@ -71,9 +71,9 @@ void CAsteroid::init_physics(Vector const& Velocity, Vector const& AngularVeloci
     Phy.AngularDamping[0] = 1000000.0f;
     Phy.AngularDamping[1] = 1000000.0f;
     Phy.AngularDamping[2] = 1000000.0f;
-    Phy.CollisionGroupId = CollisionGroupId;
-    Phy.Type = 2;
-    Phy.bFlag1c = 1;
+    Phy.SystemId = SystemId;
+    Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
+    Phy.bPhysicalUnmoveable = 1;
     Phy.bEnableCollisions = 1;
     // Retail's sprintf of "Asteroid" into the 8-byte Name writes its NUL into bHasInertia
     // (+0x26), which is zeroed next anyway; 8 raw bytes give the same content without UB.
@@ -131,11 +131,12 @@ CmnAsteroid::CAsteroidField const* CAsteroid::get_owner_field()
     return OwnerField;
 }
 
-void CAsteroid::set_system(unsigned int SystemId)
+void CAsteroid::set_system(unsigned int InSystemId)
 {
     // FUN_0629d4d0 (+0xf4)
-    CollisionGroupId = SystemId;
+    SystemId = InSystemId;
 }
+
 
 // ============================================================================
 // CDynamicAsteroid implementation
@@ -163,10 +164,10 @@ void CDynamicAsteroid::init(CreateParms const& Parms)
 {
     // FUN_062a2a70. Forwards straight to the virtual init_physics (vtable +0x80, the last
     // slot); CDynamicAsteroid is not a CSimple.
-    init_physics(Parms.Velocity, Parms.AngularVelocity, Parms.CollisionGroupId);
+    init_physics(Parms.Velocity, Parms.AngularVelocity, Parms.SystemId);
 }
 
-void CDynamicAsteroid::init_physics(Vector const& Velocity, Vector const& AngularVelocity, unsigned CollisionGroupId)
+void CDynamicAsteroid::init_physics(Vector const& Velocity, Vector const& AngularVelocity, unsigned SystemId)
 {
     // FUN_062a2a90. As CAsteroid::init_physics: dead first pass skipped, velocities never applied.
     PhySys::CreateParms Phy;
@@ -176,9 +177,9 @@ void CDynamicAsteroid::init_physics(Vector const& Velocity, Vector const& Angula
     Phy.AngularDamping[0] = 0.0f;
     Phy.AngularDamping[1] = 0.0f;
     Phy.AngularDamping[2] = 0.0f;
-    Phy.CollisionGroupId = CollisionGroupId;
-    Phy.Type = 2;
-    Phy.bFlag1c = 0;
+    Phy.SystemId = SystemId;
+    Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
+    Phy.bPhysicalUnmoveable = 0;
     Phy.bEnableCollisions = 1;
     strcpy(Phy.Name, "DynAst");
     Phy.bHasInertia = 0;

@@ -9,6 +9,7 @@
 // prompt, the known-bases list). See nn_navmap.h. Retail Client\Interface\NeuroNet\NavMap.cpp.
 
 #include "NeuroNet/NavMap/nn_navmap.h"
+#include "NeuroNet/Chat/chat_init.h"                 // kTextStyleBody / kTextStyleCardTitle
 #include "NeuroNet/Economy/best_path.h"               // G_BestPaths (DAT_00672950), BestPathGetFirst / HasText
 #include "Interface/Pages/character_select_equip.h"  // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
 #include "NeuroNet/Economy/commodity_by_base.h"       // IsCommodityByBaseListedName (FUN_004a2310)
@@ -607,7 +608,7 @@ intptr_t NeuroNetNavMap::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // LAB_00497d30 (RET 4). Only the -1 / -2 button records (FUN_0059d140).
-    if (Event->Field0 != -1 && Event->Field0 != -2)
+    if (Event->Button != kWin3DMouseLeft && Event->Button != kWin3DMouseRight)
         return false;
     NnToolTipHideGlobal(); // FUN_004be390
 
@@ -629,7 +630,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
         return true;
 
     // A press while zoomed in arms a drag (Update moves the pan).
-    if (Event->Field1 == 2 && ViewMode == 2)
+    if (Event->Action == kWin3DMousePress && ViewMode == 2)
     {
         bMouseDown = 1;
         bDragging = 0;
@@ -637,7 +638,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
         DragMouseY = MouseY;
     }
 
-    if (Event->Field1 == 3)
+    if (Event->Action == kWin3DMouseDoubleClick)
     {
         // The info card of the star under the cursor, else of the
         // zone at the LAST CLICK (retail reads ClickMapPos here, not the cursor's point).
@@ -655,7 +656,7 @@ bool NeuroNetNavMap::MouseEvent(FWin3DMouseEvent const* Event)
         ShowZoneInfoCard(*this);
         return true;
     }
-    if (Event->Field1 != 1)
+    if (Event->Action != kWin3DMouseRelease)
         return true;
 
     // LAB_00497fa7: a release, unless it ended a drag.
@@ -988,7 +989,7 @@ void NeuroNetNavMap::ShowInfoCard(int IdsName, int IdsInfo, unsigned char Visit,
     // 0x9ca4 for the body.
     RenderDisplayList Card;
     {
-        StyleNode Style(0xf64);
+        StyleNode Style(kTextStyleCardTitle);
         RdlAppendNode(Card, Style.Clone());
     }
     if (IdsName != 0)
@@ -1001,7 +1002,7 @@ void NeuroNetNavMap::ShowInfoCard(int IdsName, int IdsInfo, unsigned char Visit,
                               Card, false);
     }
     {
-        StyleNode Style(0x9ca4);
+        StyleNode Style(kTextStyleBody);
         RdlAppendNode(Card, Style.Clone());
     }
     G_NnTextScratchB[0] = 0;
@@ -1070,7 +1071,7 @@ void NeuroNetNavMap::AskAbortMission()
 
     RenderDisplayList Text;
     {
-        StyleNode Style(0x9ca4);
+        StyleNode Style(kTextStyleBody);
         RdlAppendNode(Text, Style.Clone());
     }
     AppendTextMaybeXmlRdl(G_NnTextScratchB, static_cast<unsigned>(wcslen(G_NnTextScratchB)),
@@ -1097,7 +1098,7 @@ void NeuroNetNavMap::ConfirmAbortMission()
 
     RenderDisplayList Text;
     {
-        StyleNode Style(0x9ca4);
+        StyleNode Style(kTextStyleBody);
         RdlAppendNode(Text, Style.Clone());
     }
     AppendTextMaybeXmlRdl(G_NnTextScratchB, static_cast<unsigned>(wcslen(G_NnTextScratchB)),

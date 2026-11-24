@@ -123,7 +123,7 @@ void HUD_CruiseProgress::Draw()
     {
         return;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
     {
         return;
     }
@@ -160,7 +160,7 @@ void HUD_CruiseProgress::Draw()
         // The countdown before the charge starts.
         bCharging = 0;
         Text->SetCachedDraw(0, 0);                                      // FUN_0058ad70
-        Text->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679ba8), 1);
+        Text->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), 1);
         int const Seconds = static_cast<int>(ceil(-static_cast<double>(Elapsed))); // ftol
         // Retail's format is u"%s - %d%" (0x005d7fdc). VC6 msvcrt's _woutput leaves its format
         // loop at the terminator right after the lone trailing '%' and prints nothing for it;
@@ -178,7 +178,7 @@ void HUD_CruiseProgress::Draw()
         // The charge percentage.
         Text->SetCachedDraw(1, static_cast<unsigned char>(bCharging == 0));
         bCharging = 1;
-        Text->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteArgb_679bb0), 1);
+        Text->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteCyan), 1);
         // 100.0f (0x005ca230), 0.5 (double 0x005c75e8), ftol.
         int const Percent = static_cast<int>(static_cast<double>(Ratio) * 100.0 + 0.5);
         swprintf(Line, 0x3c, L"%s - %d%%", ChargingCaption, Percent);   // u"%s - %d%%" 0x005d7fc8

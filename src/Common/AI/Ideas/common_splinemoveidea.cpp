@@ -31,7 +31,7 @@ using namespace CmnAiSteer;
 // ----------------------------------------------------------------------------
 
 // FUN_062d9bf0. See common_idea.h for the RTTI walk and field citations. Retail
-// leaves Spline/LookaheadScale/SpeedNorm/PersistedT untouched; zeroed here as a
+// leaves Spline/CoastDistance/SplineLength/PersistedT untouched; zeroed here as a
 // port-only safety init.
 SplineMoveIdea::SplineMoveIdea()
     : BaseIdea()
@@ -43,8 +43,8 @@ SplineMoveIdea::SplineMoveIdea()
     , BankBlendCap(1.0f)
     , StopStyle(0)
     , MaxSpeed15c(0.0f)
-    , LookaheadScale(0.0f)
-    , SpeedNorm(0.0f)
+    , CoastDistance(0.0f)
+    , SplineLength(0.0f)
     , StepNumerator(10.0f)
     , ExtrapolateBase(50.0f)
     , PersistedT(0.0f)
@@ -102,7 +102,7 @@ void SplineMoveIdea::SetBankBlendCap(float Value)
 // FUN_062da4e0. No Mode ladder: the thrust type is always ThrustEquipEngine.
 void SplineMoveIdea::SetThrottleScale(float Value)
 {
-    BankBlendCap = Behavior_InvokeManagerSlotD4(ObjInspectOf(Object), Value, ThrustEquipEngine);
+    BankBlendCap = Behavior_GetProjectedThrottle(ObjInspectOf(Object), Value, ThrustEquipEngine);
 }
 
 // FUN_062da400 -- `MOV [ECX+0x158],EAX; RET 4`. See the declaration for the
@@ -130,13 +130,13 @@ void SplineMoveIdea::SetSpline(ICRSplineSegment* NewSpline)
     Move.bKillEngineOffBearing = 0;
 
     // FUN_062e5af0: get_speed at full engine throttle.
-    MaxSpeed15c = Behavior_InvokeManagerSlotD8(ObjInspectOf(Object), 1.0f, ThrustEquipEngine);
+    MaxSpeed15c = Behavior_GetSpeed(ObjInspectOf(Object), 1.0f, ThrustEquipEngine);
 
     // FUN_062e5ab0 consumes the rounded result above.
-    LookaheadScale = Behavior_QueryFixedFalloffEffect(Object, MaxSpeed15c);
+    CoastDistance = Behavior_GetCoastDistance(Object, MaxSpeed15c);
 
     // No null test on the spline, as retail.
-    SpeedNorm = Spline->get_spline_length();
+    SplineLength = Spline->get_spline_length();
 }
 
 // Own vtable slot 1 -- LAB_062d9d00, RET 4. Returns 3 when not attached / no spline
@@ -158,7 +158,7 @@ int SplineMoveIdea::Update(float Dt)
     Envelope.Throttle = 0.0f;
     Envelope.AngularSpeed = 0.0f;
     Envelope.AngularThrottle = 0.0f;
-    if (Handle->GunConvergenceStateBytes.ComputeFormationFollowerEnvelope(&Envelope))
+    if (Handle->FormationLeaders.ComputeFormationFollowerEnvelope(&Envelope))
         Move.Throttle = Envelope.Throttle;
 
     FAiTarget* const Elem = &Handle->SelfTarget;
@@ -168,7 +168,7 @@ int SplineMoveIdea::Update(float Dt)
     // The centre is copied once; both get_t_from_point and the look-ahead use the copy.
     Vector const ElemPos = Elem->CachedPos;
 
-    float const T1 = Spline->get_t_from_point(ElemPos, PersistedT, StepNumerator / SpeedNorm);
+    float const T1 = Spline->get_t_from_point(ElemPos, PersistedT, StepNumerator / SplineLength);
     PersistedT = T1;
     // Retail samples at T1 and never reads the result.
     (void)Spline->calculate_spline_vector(T1);
@@ -191,20 +191,20 @@ int SplineMoveIdea::Update(float Dt)
         DirA.z = -Column2.z;
     }
 
-    // LookaheadPoint = ElemPos + DirA * LookaheadScale (the element position, not the
+    // LookaheadPoint = ElemPos + DirA * CoastDistance (the element position, not the
     // spline sample); the scaled vector rounds before the add.
-    Vector const ScaledDirA{ DirA.x * LookaheadScale, DirA.y * LookaheadScale, DirA.z * LookaheadScale };
+    Vector const ScaledDirA{ DirA.x * CoastDistance, DirA.y * CoastDistance, DirA.z * CoastDistance };
     Vector const LookaheadPoint{ ElemPos.x + ScaledDirA.x, ElemPos.y + ScaledDirA.y, ElemPos.z + ScaledDirA.z };
-    float const T2 = Spline->get_t_from_point(LookaheadPoint, T1, StepNumerator / SpeedNorm);
+    float const T2 = Spline->get_t_from_point(LookaheadPoint, T1, StepNumerator / SplineLength);
 
     bool const bWide = WideMode != 0;
     double BankBlend = 1.0f;
 
     // Both arms refresh the cached radius again and sample the far point at
-    // T3 = ((Radius + bonus) / SpeedNorm) + T2, rounded once.
+    // T3 = ((Radius + bonus) / SplineLength) + T2, rounded once.
     Elem->RefreshPos();
     float const LookaheadRadiusBonus = bWide ? 200.0f : 50.0f; // DAT_0639b22c / DAT_0639e6d4
-    float const T3 = (float)(((double)Elem->CachedRadius + LookaheadRadiusBonus) / SpeedNorm + T2);
+    float const T3 = (float)(((double)Elem->CachedRadius + LookaheadRadiusBonus) / SplineLength + T2);
     Vector const FarPoint = Spline->calculate_spline_vector(T3);
 
     if (!bWide)
@@ -226,8 +226,8 @@ int SplineMoveIdea::Update(float Dt)
 
         // FUN_062e5bc0 then FUN_062e5b70(Object, that, Engine).
         IObjInspect const* const Inspect = ObjInspectOf(Object);
-        float const SlotDCResult = Behavior_InvokeManagerSlotDC(Inspect, (float)(BankFactor * LookaheadScale));
-        BankBlend = Behavior_InvokeManagerSlotD4(Inspect, SlotDCResult, ThrustEquipEngine);
+        float const SlotDCResult = Behavior_GetInitialSpeedToCoastDistance(Inspect, (float)(BankFactor * CoastDistance));
+        BankBlend = Behavior_GetProjectedThrottle(Inspect, SlotDCResult, ThrustEquipEngine);
     }
     else
     {
@@ -256,7 +256,7 @@ int SplineMoveIdea::Update(float Dt)
     Move.Position = Spline->P2;
     ((IBehaviorManager*)Move.Context)->Pathfind->CachedTargetPosition = Move.Position;
 
-    ((IBehaviorManager*)Move.Context)->Pathfind->Field_248 = 0x30038010;
+    ((IBehaviorManager*)Move.Context)->Pathfind->NudgeObstacleTypeMask = 0x30038010;
 
     int const MoveResult = Move.Update(Dt);
 

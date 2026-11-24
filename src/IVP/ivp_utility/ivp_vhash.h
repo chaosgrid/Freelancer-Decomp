@@ -142,4 +142,4 @@ private:
     // FUN_06352650: regrow to NewSize entries and re-insert every occupied one.
     void Rehash(int NewSize);
 };
-static_assert(sizeof(IVP_VHash_Store) == 0x14, "IVP_VHash_Store is 0x14 bytes (operator new(0x14), 06344710 :063447c1)");
+static_assert(sizeof(IVP_VHash_Store) == 0x14, "IVP_VHash_Store is 0x14 bytes (operator new(0x14), FUN_06344710)");

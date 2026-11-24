@@ -95,9 +95,9 @@ struct FCliAsteroidCube
 // +0x0c, size at +0x18. The port constructs a std::map in the same 0x14 bytes.
 typedef std::map<unsigned long, FCliAsteroidCube> FCliAsteroidCubeMap;
 
-// The map in FCliAsteroid::MapAt08.
+// The map in FCliAsteroid::CubeMapStorage.
 FCliAsteroidCubeMap& CliAsteroidCubeMap(FCliAsteroid* Field);
-// FUN_005274a0, inlined in the field constructor -- placement construction into MapAt08.
+// FUN_005274a0, inlined in the field constructor -- placement construction into CubeMapStorage.
 void CliAsteroidCubeMapConstruct(FCliAsteroid* Field);
 // The field destructor's FUN_00527310 and inline head free -- erase every cube (each value's
 // destructor runs), then the map's own destructor. FUN_00520500 is the EH-unwind copy of the

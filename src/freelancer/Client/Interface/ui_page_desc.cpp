@@ -180,8 +180,8 @@ FUiWidgetEntry* FUiPageDesc::ParseScrollCycleLine(char const* Line, char* Type, 
 
 bool FUiPageDesc::LoadFromFile(char const* FullPath)
 {
-    // Retail keeps setlocale's RETURN VALUE (the new locale name, not the old one) and "restores"
-    // it at the end, so the net effect leaves LC_NUMERIC at "C".
+    // FUN_00592230. Retail: setlocale(LC_NUMERIC, "C")'s RETURN VALUE (the new locale name, not
+    // the old one) is kept and "restored" at the end, so LC_NUMERIC stays "C" for the process.
     std::string SavedLocale(setlocale(LC_NUMERIC, "C"));
     bool bOk = false;
 

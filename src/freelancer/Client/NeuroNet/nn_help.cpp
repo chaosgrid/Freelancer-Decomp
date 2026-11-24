@@ -6,6 +6,7 @@
 
 #include "NeuroNet/nn_help.h"
 
+#include "NeuroNet/Chat/chat_init.h"                // kTextStyleBody / kTextStyleCardTitle
 #include "NeuroNet/Economy/best_path.h"              // BestPathGetWaypoint (FUN_004c4ff0), FBestPathWaypoint
 #include "Interface/Pages/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830),
                                     // GetPlayerBaseIdRetail (*FUN_004c4900),
@@ -106,11 +107,11 @@ namespace
     // and style 0x9ca4.
     void AppendSectionTitle(RenderDisplayList& Card, unsigned TitleIds)
     {
-        AppendStyle(Card, 0xf64);
+        AppendStyle(Card, kTextStyleCardTitle);
         AppendText(Card, kLineBreak);
         LoadIdsIntoRdl(TitleIds, Card);
         AppendText(Card, kTitleTail);
-        AppendStyle(Card, 0x9ca4);
+        AppendStyle(Card, kTextStyleBody);
     }
 
     // Not a retail function: one priced line (inlined twice) -- the name, then " " + the grouped price (ids 0x2140 prefix) + the item tail.
@@ -206,7 +207,7 @@ void NnHelpAppendBaseGoods(RenderDisplayList* Card, unsigned BaseId, unsigned ch
     if (bCommodities == 0 && bEquipment == 0 && bShips == 0)
         return;
 
-    AppendStyle(*Card, 0x9ca4);
+    AppendStyle(*Card, kTextStyleBody);
 
     // A market of the base's goods, priced with its variance (the
     // BaseData is used untested, as in retail).
@@ -384,7 +385,7 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
             SystemName = System->GetStridName();
 
         RenderDisplayList Card; // [ESP+0x18]
-        AppendStyle(Card, 0x9ca4);
+        AppendStyle(Card, kTextStyleBody);
 
         if (IsPlayerDockedRetail())
         {
@@ -591,7 +592,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
     unsigned const TypeBits = Simple->TypeBits; // +0xe0
     unsigned InfoIds = 0;
     RenderDisplayList Card;
-    AppendStyle(Card, 0x9ca4);
+    AppendStyle(Card, kTextStyleBody);
 
     unsigned char const Visit = HudObjectVisitFlags(Target); // [ESP+0x17]
     G_NnTextScratchB[0] = L'\0';

@@ -740,37 +740,37 @@ char FRmObjectiveText::Parse(INI_Reader* Reader, unsigned int Index)
     char const* Name = Reader->get_value_string(Index);
     int Objective = 0;
     if (_stricmp(Name, "guide_to_main_battle") == 0)
-        Objective = 2;
+        Objective = RmObjGuideToMainBattle;
     else if (_stricmp(Name, "guide_to_pre_battle") == 0)
-        Objective = 1;
+        Objective = RmObjGuideToPreBattle;
     else if (_stricmp(Name, "guide_to_main_from_pre") == 0)
-        Objective = 3;
+        Objective = RmObjGuideToMainFromPre;
     else if (_stricmp(Name, "kill_big_solar") == 0)
-        Objective = 4;
+        Objective = RmObjKillBigSolar;
     else if (_stricmp(Name, "kill_other_solars") == 0)
-        Objective = 5;
+        Objective = RmObjKillOtherSolars;
     else if (_stricmp(Name, "pb_kill_ships") == 0)
-        Objective = 0x13;
+        Objective = RmObjPbKillShips;
     else if (_stricmp(Name, "pb_kill_big_ships") == 0)
-        Objective = 0x14;
+        Objective = RmObjPbKillBigShips;
     else if (_stricmp(Name, "pb_dont_kill_ships") == 0)
-        Objective = 0x15;
+        Objective = RmObjPbDontKillShips;
     else if (_stricmp(Name, "mb_kill_ships") == 0)
-        Objective = 0x16;
+        Objective = RmObjMbKillShips;
     else if (_stricmp(Name, "mb_kill_big_ships") == 0)
-        Objective = 0x17;
+        Objective = RmObjMbKillBigShips;
     else if (_stricmp(Name, "mb_dont_kill_ships") == 0)
-        Objective = 0x18;
+        Objective = RmObjMbDontKillShips;
     else if (_stricmp(Name, "return_to_battle") == 0)
-        Objective = 9;
+        Objective = RmObjReturnToBattle;
     else if (_stricmp(Name, "destroy_loot") == 0)
-        Objective = 0xa;
+        Objective = RmObjDestroyLoot;
     else if (_stricmp(Name, "tractor_loot") == 0)
-        Objective = 0xb;
+        Objective = RmObjTractorLoot;
     else if (_stricmp(Name, "return_loot") == 0)
-        Objective = 0xc;
+        Objective = RmObjReturnLoot;
     else if (_stricmp(Name, "jettison_loot") == 0)
-        Objective = 0xd;
+        Objective = RmObjJettisonLoot;
     else
         Objective = static_cast<int>(reinterpret_cast<intptr_t>(this));
 
@@ -1316,7 +1316,7 @@ bool FRmLootItemFilter::ApplyNode(FRmVignetteNode const* /*Node*/, char /*Bit*/)
 }
 
 // Node names of LAB_06f9b3f0 in flag order (+0x0c..+0x26).
-char const* const GRmAssassinateNodeNames[27] = {
+char const* const GRmAssassinateNodeNames[RmAsnNodeCount] = {
     "assassinate_ship", "assassinate_solar", "target_drops_critical_loot", "bring_back_loot",
     "tractor_in_loot", "destroy_loot", "target_spawns_with_wave", "pre_battle",
     "target_spawns_at_pre_battle", "pre_battle_non_target_wave", "pre_battle_wave_runs",
@@ -1331,14 +1331,14 @@ char const* const GRmAssassinateNodeNames[27] = {
 // FUN_06f9b390.
 FRmAssassinateFilter::FRmAssassinateFilter()
 {
-    for (int Index = 0; Index < 27; ++Index)
+    for (int Index = 0; Index < RmAsnNodeCount; ++Index)
         Flags[Index] = false;
 }
 
-// LAB_06f9a400: Flags[0] is assassinate_ship.
+// LAB_06f9a400.
 int FRmAssassinateFilter::Slot00() const
 {
-    return Flags[0] ? 2 : 3;
+    return Flags[RmAsnAssassinateShip] ? 2 : 3;
 }
 
 // FUN_06ea1480.
@@ -1353,7 +1353,7 @@ bool FRmAssassinateFilter::ApplyNode(FRmVignetteNode const* Node, char Bit)
     if (Bit == 0)
         return false;
     ID_String const& Nickname = Node->Nickname;
-    for (int Index = 0; Index < 27; ++Index)
+    for (int Index = 0; Index < RmAsnNodeCount; ++Index)
     {
         if (Nickname.Id == CreateID(GRmAssassinateNodeNames[Index]))
         {
@@ -1373,8 +1373,7 @@ FRmPathFilter* FRmAssassinateFilter::Specialize() const
     return nullptr;
 }
 
-// FUN_06f9ba50 (byte table 06f9bac4). Flags[7] pre_battle, [8] target_spawns_at_pre_battle,
-// [15] target_spawns_at_main_battle, [16] main_battle_non_target_wave.
+// FUN_06f9ba50 (byte table 06f9bac4).
 bool FRmAssassinateFilter::SupportsTextParam(int Param) const
 {
     switch (Param)
@@ -1382,18 +1381,18 @@ bool FRmAssassinateFilter::SupportsTextParam(int Param) const
     case 1:
     case 3:
     case 19:
-        return Flags[7];
+        return Flags[RmAsnPreBattle];
     case 20:
-        return Flags[8];
+        return Flags[RmAsnTargetSpawnsAtPreBattle];
     case 4:
     case 5:
     case 21:
     case 24:
         return false;
     case 22:
-        return Flags[15] && Flags[16];
+        return Flags[RmAsnTargetSpawnsAtMainBattle] && Flags[RmAsnMainBattleNonTargetWave];
     case 23:
-        return Flags[15];
+        return Flags[RmAsnTargetSpawnsAtMainBattle];
     default:
         return FRmPathFilter::SupportsTextParam(Param);
     }
@@ -1545,8 +1544,8 @@ FRmTreePath* FRandomMissionGenerator::PickTreePath(std::vector<FRmTreePath>* Pat
     float const Total = static_cast<float>(Sum);
     if (Sum == 0.0)
     {
-        // Retail returns the dword after the last entry (undefined), which its caller then
-        // dereferences.
+        // Deviation: retail returns the dword at Weighted.end() (06f9d28b, heap garbage), which
+        // ChooseTreePath then dereferences; the port returns null and so faults there.
         return nullptr;
     }
 
@@ -2338,22 +2337,22 @@ void FRmDestroySolarsFilter::SpawnSolars(
     }
 }
 
-// FUN_06f9b790. 0.9 is DAT_06fbd3e4. Flags indices follow GRmAssassinateNodeNames.
+// FUN_06f9b790. 0.9 is DAT_06fbd3e4.
 bool FRmAssassinateFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** OutOffer)
 {
-    FRmVignetteOffer* const NewOffer = new FRmVignetteOffer(Flags[0] ? 2 : 3);
+    FRmVignetteOffer* const NewOffer = new FRmVignetteOffer(Flags[RmAsnAssassinateShip] ? 2 : 3);
     TRmRef<FRmVignetteOffer> Holder(NewOffer);
     NewOffer->Release();
     FRmVignetteOffer* const Offer = Holder.Get();
 
     Offer->General.bActive = true;
-    if (Flags[0])
+    if (Flags[RmAsnAssassinateShip])
     {
-        if (Flags[3])
+        if (Flags[RmAsnBringBackLoot])
             Offer->Type = 4;
-        else if (Flags[4])
+        else if (Flags[RmAsnTractorInLoot])
             Offer->Type = 5;
-        else if (Flags[5])
+        else if (Flags[RmAsnDestroyLoot])
             Offer->Type = 3;
         else
             Offer->Type = 2;
@@ -2364,10 +2363,10 @@ bool FRmAssassinateFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** Ou
     }
 
     FRmOfferQuery Scaled = *Query;
-    if (Flags[2] && Flags[3])
+    if (Flags[RmAsnTargetDropsCriticalLoot] && Flags[RmAsnBringBackLoot])
         Scaled.Difficulty = Scaled.Difficulty * 0.9f;
 
-    if (Flags[0])
+    if (Flags[RmAsnAssassinateShip])
     {
         FFactionNames* const Names = GetFactionNames(&Scaled.EnemyGroup);
         if (Names->MaleFirstNames.IsEmpty())
@@ -2379,13 +2378,19 @@ bool FRmAssassinateFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** Ou
     }
 
     int Count = 0;
-    if (Flags[7])
-        Count = Flags[19] ? static_cast<int>(Flags[21]) + 1
-                          : static_cast<int>(Flags[9]) + static_cast<int>(Flags[8]);
+    if (Flags[RmAsnPreBattle])
+        Count = Flags[RmAsnPkAllShips]
+                    ? static_cast<int>(Flags[RmAsnPreBattleWave2]) + 1
+                    : static_cast<int>(Flags[RmAsnPreBattleNonTargetWave]) +
+                          static_cast<int>(Flags[RmAsnTargetSpawnsAtPreBattle]);
     int const MainBattle =
-        Flags[19] ? static_cast<int>(Flags[18]) + static_cast<int>(Flags[23]) * 2
-                  : static_cast<int>(Flags[17]) + static_cast<int>(Flags[18]) +
-                        static_cast<int>(Flags[16]) + static_cast<int>(Flags[15]);
+        Flags[RmAsnPkAllShips]
+            ? static_cast<int>(Flags[RmAsnContinuousReenforcements]) +
+                  static_cast<int>(Flags[RmAsnMainBattleWave2]) * 2
+            : static_cast<int>(Flags[RmAsnWaveJustAfterMainBattleStarts]) +
+                  static_cast<int>(Flags[RmAsnContinuousReenforcements]) +
+                  static_cast<int>(Flags[RmAsnMainBattleNonTargetWave]) +
+                  static_cast<int>(Flags[RmAsnTargetSpawnsAtMainBattle]);
     Count = Count + MainBattle;
     float Share = 0.0f;
     if (Count != 0)
@@ -2394,7 +2399,7 @@ bool FRmAssassinateFilter::CreateOffer(FRmOfferQuery const* Query, FRmOffer** Ou
 
     // The target ships replace the success byte; the ship groups are ANDed.
     bool bSuccess = true;
-    if (Flags[7])
+    if (Flags[RmAsnPreBattle])
         bSuccess = FillTargetShips(&Scaled, &Offer->TargetShips, Share, &Offer->TargetName);
     bool const bShips =
         FillShipGroups(&Scaled, &Offer->Ships, Share, &Offer->Solars, &Offer->TargetName);
@@ -2450,18 +2455,16 @@ namespace
     // else destroy_loot 1, else 0.
     int GetRmCriticalLootKind(bool const* Flags)
     {
-        if (Flags[3])
+        if (Flags[RmAsnBringBackLoot])
             return 3;
-        if (Flags[4])
+        if (Flags[RmAsnTractorInLoot])
             return 2;
-        return Flags[5] ? 1 : 0;
+        return Flags[RmAsnDestroyLoot] ? 1 : 0;
     }
 }
 
 // FUN_06f9c100. Ring radii 6000.0 / 5500.0 are DAT_06fbcbcc / DAT_06fbd3e8, 1.5 is
-// DAT_06fb6058. Flags[19] pk_all_ships, [10] pre_battle_wave_runs, [21] pre_battle_wave_2,
-// [9] pre_battle_non_target_wave, [8] target_spawns_at_pre_battle, [2]
-// target_drops_critical_loot. The end trigger (component +0x50 / +0x54) is stored last.
+// DAT_06fb6058. The end trigger (component +0x50 / +0x54) is stored last.
 bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
                                            FRmTargetShipComponent* TargetShips, float Share,
                                            FNpcNameParams* TargetName) const
@@ -2478,9 +2481,9 @@ bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
     TargetShips->Position = Position;
 
     FRmShipBlock Block;
-    if (Flags[19])
+    if (Flags[RmAsnPkAllShips])
     {
-        if (Flags[10])
+        if (Flags[RmAsnPreBattleWaveRuns])
         {
             Field50 = 2;
             Field54 = 1;
@@ -2488,7 +2491,7 @@ bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
         ResetRmShipBlock(&Block, 1, 0, 1, 0, 0, 0, -1);
         PickRmShipFormationSize(&Block.Size, Share, Query->EnemyGroup);
         bSuccess = BuildRmShipGroup(Query, TargetShips, &Block, &Position, false, nullptr);
-        if (Flags[21])
+        if (Flags[RmAsnPreBattleWave2])
         {
             Block.SpawnTriggerMode = 3;
             Block.SpawnTriggerParam = 1;
@@ -2500,12 +2503,12 @@ bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
     }
     else
     {
-        if (Flags[9])
+        if (Flags[RmAsnPreBattleNonTargetWave])
         {
             ResetRmShipBlock(&Block, 1, 0, 1, 0, 0, 0, -1);
-            if (!Flags[8])
+            if (!Flags[RmAsnTargetSpawnsAtPreBattle])
             {
-                if (Flags[10])
+                if (Flags[RmAsnPreBattleWaveRuns])
                 {
                     Field50 = 2;
                     Field54 = 1;
@@ -2518,12 +2521,13 @@ bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
             PickRmShipFormationSize(&Block.Size, Share, Query->EnemyGroup);
             bSuccess = BuildRmShipGroup(Query, TargetShips, &Block, &Position, false, nullptr);
         }
-        if (Flags[8])
+        if (Flags[RmAsnTargetSpawnsAtPreBattle])
         {
-            ResetRmShipBlock(&Block, 1, 1, 0, 1, Flags[2] ? 1 : 0, 0, -1);
-            if (Flags[2])
+            ResetRmShipBlock(&Block, 1, 1, 0, 1, Flags[RmAsnTargetDropsCriticalLoot] ? 1 : 0, 0,
+                             -1);
+            if (Flags[RmAsnTargetDropsCriticalLoot])
                 Block.CriticalLootMode = GetRmCriticalLootKind(Flags);
-            if (Flags[9])
+            if (Flags[RmAsnPreBattleNonTargetWave])
             {
                 std::vector<FRmShipSpawn> const& Ships = TargetShips->Groups.back().Ships;
                 if (Ships.size() > 1)
@@ -2555,20 +2559,15 @@ bool FRmAssassinateFilter::FillTargetShips(FRmOfferQuery const* Query,
     return bSuccess;
 }
 
-// FUN_06f9c410. 0.5 is DAT_06fb605c, 1.3 DAT_06fbd3ec. Flags[14]
-// defensive_solars_at_main_battle, [19] pk_all_ships, [22] / [23] main_battle_wave_1 / _2,
-// [24] friendly_ships_at_main_battle, [25] friendly_ships_after_30_s, [18]
-// continuous_reenforcements, [26] friendly_ships_come_in_to_whoop_up, [16]
-// main_battle_non_target_wave, [15] target_spawns_at_main_battle, [17]
-// wave_just_after_main_battle_starts. The size picks reuse each block, so a failed pick
-// keeps the previous level.
+// FUN_06f9c410. 0.5 is DAT_06fb605c, 1.3 DAT_06fbd3ec. The size picks reuse each block, so a
+// failed pick keeps the previous level.
 bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipComponent* Ships,
                                           float Share, FRmSolarComponent* Solars,
                                           FNpcNameParams* TargetName) const
 {
     Vector const Position = Query->ObjectivePos;
     bool bSuccess = true;
-    if (Flags[14])
+    if (Flags[RmAsnDefensiveSolarsAtMainBattle])
         bSuccess = FillDefensiveSolars(Query, Solars);
     Ships->Position = Query->ObjectivePos;
     float FriendlyShare = Share * 0.5f;
@@ -2576,27 +2575,27 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
 
     FRmShipBlock Hostile;
     FRmShipBlock Friendly;
-    if (Flags[19])
+    if (Flags[RmAsnPkAllShips])
     {
         ResetRmShipBlock(&Hostile, 1, 0, 1, 0, 0, 0, -1);
         ResetRmShipBlock(&Friendly, 0, 0, 0, 0, 0, 2, 1);
-        if (Flags[22])
+        if (Flags[RmAsnMainBattleWave1])
         {
             PickRmShipFormationSize(&Hostile.Size, Share, Query->EnemyGroup);
             bool const bBuilt =
                 BuildRmShipGroup(Query, Ships, &Hostile, &Position, false, nullptr);
             bSuccess = bSuccess && bBuilt;
         }
-        if (Flags[24])
+        if (Flags[RmAsnFriendlyShipsAtMainBattle])
         {
             PickRmShipFormationSize(&Friendly.Size, FriendlyShare, OfferGroup);
             FRmShipBlock const Copy = CopyFriendlyRmShipBlock(&Friendly);
             bool const bBuilt = BuildRmShipGroup(Query, Ships, &Copy, &Position, true, nullptr);
             bSuccess = bSuccess && bBuilt;
         }
-        if (Flags[23])
+        if (Flags[RmAsnMainBattleWave2])
         {
-            if (Flags[22])
+            if (Flags[RmAsnMainBattleWave1])
             {
                 Hostile.SpawnTriggerMode = 3;
                 Hostile.SpawnTriggerParam = 1;
@@ -2611,7 +2610,7 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
                 BuildRmShipGroup(Query, Ships, &Hostile, &Position, false, nullptr);
             bSuccess = bSuccess && bBuilt;
         }
-        if (Flags[25])
+        if (Flags[RmAsnFriendlyShipsAfter30S])
         {
             Friendly.SpawnTriggerMode = 1;
             Friendly.SpawnTriggerParam = 0x3c;
@@ -2620,7 +2619,7 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
             bool const bBuilt = BuildRmShipGroup(Query, Ships, &Copy, &Position, true, nullptr);
             bSuccess = bSuccess && bBuilt;
         }
-        if (Flags[18])
+        if (Flags[RmAsnContinuousReenforcements])
         {
             Hostile.bRequired = 0;
             Hostile.bKillAllShips = 1;
@@ -2631,7 +2630,7 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
                 BuildRmShipGroup(Query, Ships, &Hostile, &Position, false, nullptr);
             return bSuccess && bBuilt;
         }
-        if (Flags[26])
+        if (Flags[RmAsnFriendlyShipsComeInToWhoopUp])
         {
             Friendly.SpawnTriggerMode = 2;
             Friendly.SpawnTriggerParam = 9;
@@ -2649,18 +2648,18 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
         return bSuccess;
     }
 
-    if (Flags[16])
+    if (Flags[RmAsnMainBattleNonTargetWave])
     {
-        unsigned char const bTarget = Flags[15] ? 1 : 0;
+        unsigned char const bTarget = Flags[RmAsnTargetSpawnsAtMainBattle] ? 1 : 0;
         ResetRmShipBlock(&Hostile, bTarget, 0, bTarget, 0, 0, 0, -1);
         PickRmShipFormationSize(&Hostile.Size, Share, Query->EnemyGroup);
         bool const bBuilt = BuildRmShipGroup(Query, Ships, &Hostile, &Position, false, nullptr);
         bSuccess = bSuccess && bBuilt;
     }
-    if (Flags[15])
+    if (Flags[RmAsnTargetSpawnsAtMainBattle])
     {
         ResetRmShipBlock(&Hostile, 1, 1, 0, 1, 0, 0, -1);
-        if (Flags[16])
+        if (Flags[RmAsnMainBattleNonTargetWave])
         {
             Hostile.SpawnTriggerMode = 2;
             Hostile.SpawnTriggerParam = 0x2d;
@@ -2669,25 +2668,25 @@ bool FRmAssassinateFilter::FillShipGroups(FRmOfferQuery const* Query, FRmShipCom
         {
             Hostile.SpawnTriggerMode = 0;
         }
-        Hostile.bDropsCriticalLoot = Flags[2] ? 1 : 0;
-        if (Flags[2])
+        Hostile.bDropsCriticalLoot = Flags[RmAsnTargetDropsCriticalLoot] ? 1 : 0;
+        if (Flags[RmAsnTargetDropsCriticalLoot])
             Hostile.CriticalLootMode = GetRmCriticalLootKind(Flags);
         FriendlyShare = Share * 1.5f;
-        if (!Flags[16])
+        if (!Flags[RmAsnMainBattleNonTargetWave])
             FriendlyShare = FriendlyShare * 1.3f;
         PickRmShipFormationSize(&Hostile.Size, FriendlyShare, Query->EnemyGroup);
         bool const bBuilt =
             BuildRmShipGroup(Query, Ships, &Hostile, &Position, false, TargetName);
         bSuccess = bSuccess && bBuilt;
     }
-    if (Flags[17])
+    if (Flags[RmAsnWaveJustAfterMainBattleStarts])
     {
         ResetRmShipBlock(&Hostile, 0, 0, 0, 0, 0, 2, 0xf0);
         PickRmShipFormationSize(&Hostile.Size, Share, Query->EnemyGroup);
         bool const bBuilt = BuildRmShipGroup(Query, Ships, &Hostile, &Position, false, nullptr);
         bSuccess = bSuccess && bBuilt;
     }
-    if (Flags[18])
+    if (Flags[RmAsnContinuousReenforcements])
     {
         ResetRmShipBlock(&Hostile, 0, 0, 0, 0, 0, 2, 0x78);
         PickRmShipFormationSize(&Hostile.Size, Share, Query->EnemyGroup);
@@ -2998,7 +2997,8 @@ void FRandomMissionGenerator::BuildObjectives(FRmOfferQuery const* Query, FRmOff
     {
         int Key = It->first;
         FRmParamText* Objective = nullptr;
-        if (Key == 2 || Key == 1 || Key == 3)
+        if (Key == RmObjGuideToMainBattle || Key == RmObjGuideToPreBattle ||
+            Key == RmObjGuideToMainFromPre)
         {
             FRmObjectiveType2* const Guide = new FRmObjectiveType2(&It->second);
             Guide->SetMarker(Query->DestSys, 0x44d, Query->ObjectivePos);
@@ -3012,28 +3012,28 @@ void FRandomMissionGenerator::BuildObjectives(FRmOfferQuery const* Query, FRmOff
         FRmObjectiveMap* Map = nullptr;
         switch (Key)
         {
-        case 1:
-        case 2:
-        case 9:
-        case 10:
-        case 11:
-        case 12:
-        case 13:
+        case RmObjGuideToPreBattle:
+        case RmObjGuideToMainBattle:
+        case RmObjReturnToBattle:
+        case RmObjDestroyLoot:
+        case RmObjTractorLoot:
+        case RmObjReturnLoot:
+        case RmObjJettisonLoot:
             Map = GeneralMap;
             break;
-        case 4:
-        case 5:
+        case RmObjKillBigSolar:
+        case RmObjKillOtherSolars:
             Map = SolarMap;
             break;
-        case 3:
-        case 19:
-        case 20:
-        case 21:
+        case RmObjGuideToMainFromPre:
+        case RmObjPbKillShips:
+        case RmObjPbKillBigShips:
+        case RmObjPbDontKillShips:
             Map = TargetMap;
             break;
-        case 22:
-        case 23:
-        case 24:
+        case RmObjMbKillShips:
+        case RmObjMbKillBigShips:
+        case RmObjMbDontKillShips:
             Map = ShipMap;
             break;
         default:
@@ -3042,17 +3042,17 @@ void FRandomMissionGenerator::BuildObjectives(FRmOfferQuery const* Query, FRmOff
 
         switch (Key)
         {
-        case 19:
-        case 22:
-            Key = 6;
+        case RmObjPbKillShips:
+        case RmObjMbKillShips:
+            Key = RmObjKillShips;
             break;
-        case 20:
-        case 23:
-            Key = 7;
+        case RmObjPbKillBigShips:
+        case RmObjMbKillBigShips:
+            Key = RmObjKillBigShips;
             break;
-        case 21:
-        case 24:
-            Key = 8;
+        case RmObjPbDontKillShips:
+        case RmObjMbDontKillShips:
+            Key = RmObjDontKillShips;
             break;
         default:
             break;

@@ -208,7 +208,7 @@ namespace CmnAsteroid
     // CmnAsteroid::CAsteroidCube: one grid cell of a CAsteroidField (the map node holds it
     // at node+0x10). Retail layout: StateTimer +0x00, Owner +0x04, CubeId +0x08, Orient +0x0c,
     // Pos +0x30, Size +0x3c, State +0x40 (a full dword), Asteroids list head +0x48 / count
-    // +0x4c, SystemId +0x50 (also the CollisionGroupId of every CAsteroid spawned here),
+    // +0x4c, SystemId +0x50 (also the SystemId of every CAsteroid spawned here),
     // bEmpty +0x54. The byte at +0x44 is written with stale register data by the
     // CAsteroidField*-taking ctor and never read; not modeled. ~CAsteroidCube (0x062a6190)
     // releases each asteroid then clears the list. The port's member order is not retail's.
@@ -384,7 +384,7 @@ namespace CmnAsteroid
         // Retail field+0x30: owned, destroyed by ~CAsteroidField (0x062a47a0).
         Exclusion::AsteroidExclusionZoneMgr* ExclusionMgr;
         // Retail field+0x40: populate_asteroids_internal stamps it onto each new cube's
-        // SystemId (every spawned CAsteroid's CollisionGroupId).
+        // SystemId (every spawned CAsteroid's SystemId).
         unsigned SystemId;
         // Retail field+0x50: passed as init()'s Rot argument.
         AxisRotations Rotations;

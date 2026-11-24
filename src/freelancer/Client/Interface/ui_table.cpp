@@ -201,8 +201,9 @@ void UiTable::Layout(unsigned RowStart, unsigned RowCount, unsigned ColStart, un
                                     : RowEdges[Row] + Height;
         for (unsigned Col = ColStart; Col < ColEnd; ++Col)
         {
-            // The element address, or 0 when either index or the flat index is out of range --
-            // and the element is then read through that address without a test, as retail does.
+            // The element address, or 0 when either index or the flat index is out of range.
+            // Retail: the element is then read through that address without a test (0059837b
+            // `xor esi,esi`, 0059837d `cmp [esi],0`).
             BaseRichTextWin** Cell = nullptr;
             if (Row < RowEdges.size() && Col < ColumnEdges.size())
             {
@@ -424,9 +425,9 @@ void UiTable::Draw()
 bool UiTable::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // LAB_00599090
-    if (Event->Field0 == -1)
+    if (Event->Button == kWin3DMouseLeft)
     {
-        if (Event->Field1 == 2)
+        if (Event->Action == kWin3DMousePress)
         {
             if (bHovered != 0)
             {

@@ -296,7 +296,7 @@ namespace UIPage
             delete PageObject;
             PageObject = nullptr;
         }
-        Flags = static_cast<unsigned char>(Flags & 0xfc);
+        Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
             Child->Destroy();
         Win3DUnregister(this);

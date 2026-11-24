@@ -525,7 +525,7 @@ namespace Archetype
         : Projectile(InCompanion)
         , HullDamage(0.0f)
         , EnergyDamage(0.0f)
-        , Seeker(0)
+        , Seeker(SeekerNone)
         , TimeToLock(0.0f)
         , SeekerRange(0.0f)
         , SeekerFovCos(1.0f)
@@ -576,13 +576,13 @@ namespace Archetype
             // DACOM.DLL stricmp.
             char const* Kind = Reader.get_value_string();
             if (CallDacomStricmp("dumb", Kind) == 0)
-                Seeker = 1;
+                Seeker = SeekerDumb;
             else if (CallDacomStricmp("lock", Kind) == 0)
-                Seeker = 2;
+                Seeker = SeekerLock;
             else
-                Seeker = 0;
+                Seeker = SeekerNone;
 
-            if (Seeker != 0)
+            if (Seeker != SeekerNone)
                 ObjectType = 0x1000000;
             else
                 ObjectType = 0x2000000;

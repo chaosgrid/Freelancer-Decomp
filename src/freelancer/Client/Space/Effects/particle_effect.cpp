@@ -102,7 +102,6 @@ unsigned char FParticleTunnel::TickDraw(float Dt, FSpaceCamera* Cam)
     // transform; then the particle's own tick, whose answer is returned.
     FTransform World;
     EffectGetWorldTransform(reinterpret_cast<FEffectBase const*>(Self), &World);
-    typedef float const*(__stdcall * FCamGetPosFn)(FSpaceCamera* CameraSelf);
     float const* const CamPos = AsCamera(Cam)->GetPosition();
     FTransform Local;
     Local.Rotation = World.Rotation;
@@ -255,7 +254,7 @@ unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
     FEffectTypeInfo const* const FirstInfo =
         EffectTypeInfoByIndex(static_cast<int>(This->EffectTypeId));
     if (FirstInfo != nullptr)
-        This->Priority0C = FirstInfo->Priority;
+        This->Priority = FirstInfo->Priority;
 
     FEffectTypeInfo const* const TypeInfo =
         EffectTypeInfoByIndex(static_cast<int>(This->EffectTypeId));
@@ -276,12 +275,12 @@ unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
         EffectArch->VisGeneric == nullptr)
     {
         This->Vis = EffectArch->VisEffect;                 // +0x08
-        This->Priority0C = TypeInfo->Priority;
+        This->Priority = TypeInfo->Priority;
     }
     else
     {
         This->Vis = EffectArch->VisGeneric;                // +0x10
-        This->Priority0C = TypeInfo->GenericPriority;
+        This->Priority = TypeInfo->GenericPriority;
     }
 
     if (This->Vis == nullptr)
@@ -433,7 +432,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     }
 
     // Below the perf level (or unordered) returns the visibility bit untouched.
-    if (!(This->Priority0C >= GetPerfGenericEffectPerf()))
+    if (!(This->Priority >= GetPerfGenericEffectPerf()))
         return static_cast<unsigned char>(This->Flags7C & 1u);
 
     FVector WorldPos;
@@ -796,7 +795,6 @@ unsigned char FCameraParticles::Start(FEffectArch* Arch)
     Self->Camera = Camera;
     if (Camera != nullptr)
     {
-        typedef float const*(__stdcall * FCamGetPosFn)(void* CameraSelf);
         float const* const CamPos =
             ((ICamera*)Camera)->GetPosition();
         float const Dx = CamPos[0] - World.Translation.X;
@@ -987,7 +985,7 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
     }
     if (Sound != nullptr)
     {
-        Sound->SetLooping(static_cast<unsigned char>(EffectArch->Flags50 & 1u));
+        Sound->SetLooping(static_cast<unsigned char>(EffectArch->Flags & 1u));
         if (EffectArch->SndEffect == nullptr ||
             Sound->Start(EffectArch->SndEffect, 0) == 0)
         {
@@ -1120,10 +1118,10 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
     // Pos3 is the particle's frozen velocity (+0x4c).
     if (Particle != nullptr)
     {
-        float* const Pad = reinterpret_cast<float*>(Particle->Pad4C);
-        Pad[0] = Pos3[0];
-        Pad[1] = Pos3[1];
-        Pad[2] = Pos3[2];
+        float* const Velocity = reinterpret_cast<float*>(Particle->FrozenVelocity);
+        Velocity[0] = Pos3[0];
+        Velocity[1] = Pos3[1];
+        Velocity[2] = Pos3[2];
     }
 
     // The factory's class decides (CameraParticles for DAT_00674c5c).
@@ -1137,7 +1135,7 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
     }
     if (Sound != nullptr)
     {
-        Sound->SetLooping(static_cast<unsigned char>(EffectArch->Flags50 & 1u));
+        Sound->SetLooping(static_cast<unsigned char>(EffectArch->Flags & 1u));
         if (EffectArch->SndEffect == nullptr ||
             Sound->Start(EffectArch->SndEffect, 0) == 0)
         {

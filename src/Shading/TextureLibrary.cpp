@@ -330,6 +330,7 @@ namespace
                                 unsigned long Alpha)
     {
         // FUN_06ed0bc0: nine physical descriptors, independent of profile remaps.
+        // Retail compares Blue with the red channel's bit count (06ed0c0c).
         for (int Index = 0; Index < 9; ++Index)
         {
             const FTextureFormatDescriptor* Descriptor = TextureFormatDescriptor(Index);
@@ -2214,6 +2215,7 @@ GENRESULT DACOM_API FTextureLibrary::SetSubTexture(void* Record, int Index, int 
         std::sprintf(AnonymousName, "anon%i", TextureId);
         if (!CreateTextureRecord(Handle, AnonymousName, &Child, false))
             return GR_GENERIC;
+        // Retail: the new record is stored in its own child list; Record is left alone.
         if (Child->Children.size() < RequiredCount)
             Child->Children.resize(RequiredCount, nullptr);
         Child->Children[ChildIndex] = Child;

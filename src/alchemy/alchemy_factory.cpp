@@ -221,6 +221,19 @@ namespace AlchemyImpl
                 return InitResult;
             }
         }
+        else if (Spec_.Kind == KindFxEffectArchetype || Spec_.Kind == KindFxEffectLibrary)
+        {
+            // 06222180 / 062224e0: the new archetype's +0x50 or library's +0x38 Initialize
+            // with the descriptor; a non-zero result destroys the object.
+            const GENRESULT InitResult = Spec_.Kind == KindFxEffectArchetype
+                ? static_cast<IFxEffectArchetype*>(static_cast<FFxEffectArchetype*>(Object))->Initialize(Desc)
+                : static_cast<IFxEffectLibrary*>(static_cast<FFxEffectLibrary*>(Object))->Initialize(Desc);
+            if (InitResult != GR_OK)
+            {
+                Object->Release();
+                return InitResult;
+            }
+        }
         else if (Spec_.Kind == KindFxEffect)
         {
             FFxEffectObject* Effect = static_cast<FFxEffectObject*>(Object);
@@ -304,8 +317,8 @@ namespace AlchemyImpl
             // initialization contract; Alchemy/Runtime inner outputs are
             // handled before Initialize above.
             FAggDesc14* Extended = reinterpret_cast<FAggDesc14*>(Desc);
-            if (Extended->WritebackAtC != nullptr)
-                *Extended->WritebackAtC = Object;
+            if (Extended->InnerUnknown != nullptr)
+                *Extended->InnerUnknown = Object;
         }
 
         *Instance = Object;

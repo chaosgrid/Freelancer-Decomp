@@ -28,6 +28,7 @@
 #include "Interface/win3d.h"                  // Win3DFindByName, Win3DDeleteTree, Win3DGetMouseRay
 #include "Interface/win_factory.h"
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_archetype.h"
 #include "common_goods.h"
@@ -76,7 +77,7 @@ namespace
     void BuildInfoText(RenderDisplayList& Text, int Ids)
     {
         {
-            StyleNode Style(0x9ca4);
+            StyleNode Style(kTextStyleBody);
             RdlAppendNode(Text, Style.Clone());
         }
         LoadIdsIntoRdl(static_cast<unsigned>(Ids), Text); // result not read
@@ -99,20 +100,6 @@ int NnShipTrader::RowDword(size_t ArrayOffset, int Index) const
     unsigned char const* const Bytes = reinterpret_cast<unsigned char const*>(this);
     memcpy(&Value, Bytes + ArrayOffset + static_cast<ptrdiff_t>(Index) * 4, sizeof(Value));
     return Value;
-}
-
-void NnShipTrader::Close()
-{
-    // Port-only helper for the close retail inlines (e.g. 0x004b8883).
-    Win3D* Child = ChildHead;
-    while (Child != nullptr)
-    {
-        Win3D* const Next = Child->NextSibling;
-        Win3DDeleteTree(Child);
-        Child = Next;
-    }
-    Destroy();
-    delete this;
 }
 
 bool NnShipTrader::Create(Win3D* NewParent, void* Data)
@@ -626,7 +613,7 @@ bool NnShipTrader::KeyEvent(unsigned Key, unsigned char* Modifiers)
     {
         NavBarCloseService(false); // FUN_004424f0(0)
         NavBarShowDealerTab();     // FUN_00442850
-        Close();
+        Win3DDeleteTree(this);
     }
     return false;
 }
@@ -645,14 +632,14 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         {
             NavBarCloseService(false);
             NavBarShowDealerTab();
-            Close();
+            Win3DDeleteTree(this);
             return 1;
         }
         if (Sender == BuyButton)
         {
             // The window closes and the NavBar opens the dealer with the selected row's order.
             int const Index = RowIndices[Selected];
-            Close();
+            Win3DDeleteTree(this);
             NavBarOpenDealer(Index); // FUN_004421a0
             return 1;
         }
@@ -689,7 +676,7 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         int const Index = RowIndices[Row];
         NavBarCloseService(false);
         NavBarShowDealerTab();
-        Close();
+        Win3DDeleteTree(this);
         NavBarOpenDealer(Index);
         return 1;
     }
@@ -726,7 +713,7 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // caseD_4e: close. Retail tests `this` first.
         NavBarCloseService(false);
         NavBarShowDealerTab();
-        Close();
+        Win3DDeleteTree(this);
         return 0;
     default:
         return 0;
@@ -740,7 +727,7 @@ bool NnShipTrader::OnEvent(unsigned MsgId)
         return false;
     NavBarCloseService(false);
     NavBarShowDealerTab();
-    Close();
+    Win3DDeleteTree(this);
     return true;
 }
 

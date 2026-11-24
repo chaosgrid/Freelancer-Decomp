@@ -35,7 +35,7 @@
 #include "NeuroNet/nn_modal.h"                 // NnMainButtonOnModalOpen (FUN_0045a460)
 #include "NeuroNet/nn_story_star.h"            // StoryStarOnMissionMessage (FUN_004b9c60, slot 70)
 #include "NeuroNet/nn_trade.h"                 // G_NnTrade (DAT_006724b4)
-#include "Space/player_behavior.h"          // SetUnknownFloat673568 / 67356c (FUN_004c83a0/b0)
+#include "Space/player_behavior.h"          // SetTarget/StatusWindowNotification (FUN_004c83a0/b0)
 #include "Space/player_spawn.h"             // player ids (DAT_00673344 / DAT_00673378)
 #include "rpc_iclient_args.h"         // FServerSetReputationInfo (slot 66)
 #include "Network/server_connect.h"           // GetLocalServerInterface (DAT_0067ecd0)
@@ -390,7 +390,7 @@ void IClientImpl::SendServerSetReputation(unsigned int /*ClientId*/, const FServ
 // own +0x00, hence the int view of that unsigned field.
 void IClientImpl::SendServerAdjustAttitude(unsigned int /*ClientId*/, const FPayloadServerAdjustAttitude& Info)
 {
-    int const PlayerVibe = GetPlayerSpawnSystemIdRetail(); // FUN_004c4670 -> DAT_0061226c
+    int const PlayerVibe = GetPlayerRepVibeRetail(); // FUN_004c4670 -> DAT_0061226c
     Reputation::Vibe::AdjustAttitude(*reinterpret_cast<int const*>(&Info.VibeHandle), PlayerVibe,
                                      Info.Attitude);
 }
@@ -453,12 +453,12 @@ void IClientImpl::SendServerCfgInterfaceNotification(const unsigned int& /*Clien
     unsigned int const StatusWindow = MakeId("status_window");
     if (Info.NotifType == TargetWindow)
     {
-        SetUnknownFloat673568(DwordAsFloat(Info.Param));
+        SetTargetWindowNotification(DwordAsFloat(Info.Param));
         return;
     }
     if (Info.NotifType == StatusWindow)
     {
-        SetUnknownFloat67356c(DwordAsFloat(Info.Param));
+        SetStatusWindowNotification(DwordAsFloat(Info.Param));
     }
 }
 

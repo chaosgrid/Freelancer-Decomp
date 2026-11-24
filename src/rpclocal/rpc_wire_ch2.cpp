@@ -464,16 +464,16 @@ unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** B
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
     const unsigned short Flags = Wire->Flags;
     Stream.PutWord(Flags);
-    if ((Flags & kMiscObjUpdateFlagField_0x08) != 0) {         // 06d98daf TEST ...,0x8
+    if ((Flags & kMiscObjUpdateFlagObjectId) != 0) {         // 06d98daf TEST ...,0x8
         Stream.PutDword(Wire->ObjectId);
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x04) != 0) {         // 06d98de4
+    if ((Flags & kMiscObjUpdateFlagPlayerId) != 0) {         // 06d98de4
         Stream.PutDword(Wire->PlayerId);
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x14) != 0) {         // 06d98e19
+    if ((Flags & kMiscObjUpdateFlagGroupId) != 0) {         // 06d98e19
         Stream.PutDword(Wire->GroupId);
     }
-    if ((Flags & kMiscObjUpdateFlagPair) != 0) {               // 06d98e4e
+    if ((Flags & kMiscObjUpdateFlagMission) != 0) {               // 06d98e4e
         Stream.PutDword(Wire->MissionId);
         Stream.PutDword(Wire->MissionSetBy);
     }
@@ -485,13 +485,13 @@ unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** B
         // Retail's buffer pointer, or _Nullstr when never allocated: c_str().
         Stream.PutBytes(Wire->Text.c_str(), (unsigned int)Chars * 2u);
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x34) != 0) {         // 06d98f45
+    if ((Flags & kMiscObjUpdateFlagAffiliation) != 0) {         // 06d98f45
         Stream.PutDword(Wire->Affiliation);
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x0c) != 0) {         // 06d98f7c
+    if ((Flags & kMiscObjUpdateFlagRank) != 0) {         // 06d98f7c
         Stream.PutWord(Wire->Rank);
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x10) != 0) {         // 06d98fb5 TEST AL,AL / JNS
+    if ((Flags & kMiscObjUpdateFlagSystemId) != 0) {         // 06d98fb5 TEST AL,AL / JNS
         Stream.PutDword(Wire->SystemId);
     }
     if ((Flags & kMiscObjUpdateFlagIds) != 0) {                // 06d98fed TEST [+0x21],1
@@ -524,19 +524,19 @@ unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned ch
     }
     Wire->Flags = Flags;
     unsigned int Scratch = 0;
-    if ((Flags & kMiscObjUpdateFlagField_0x08) != 0) {         // 06d99149 TEST AL,0x8
+    if ((Flags & kMiscObjUpdateFlagObjectId) != 0) {         // 06d99149 TEST AL,0x8
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
         Wire->ObjectId = Scratch;
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x04) != 0) {         // 06d9917b
+    if ((Flags & kMiscObjUpdateFlagPlayerId) != 0) {         // 06d9917b
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
         Wire->PlayerId = Scratch;
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x14) != 0) {         // 06d991ab
+    if ((Flags & kMiscObjUpdateFlagGroupId) != 0) {         // 06d991ab
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
         Wire->GroupId = Scratch;
     }
-    if ((Flags & kMiscObjUpdateFlagPair) != 0) {               // 06d991db
+    if ((Flags & kMiscObjUpdateFlagMission) != 0) {               // 06d991db
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
         Wire->MissionId = Scratch;
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
@@ -564,16 +564,16 @@ unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned ch
         Wire->Text.assign(Temp, (size_t)Chars);
         free(Temp);
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x34) != 0) {         // 06d9932e
+    if ((Flags & kMiscObjUpdateFlagAffiliation) != 0) {         // 06d9932e
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
         Wire->Affiliation = Scratch;
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x0c) != 0) {         // 06d99362
+    if ((Flags & kMiscObjUpdateFlagRank) != 0) {         // 06d99362
         unsigned short Word = 0;
         if (!Stream.GetWord(Word)) { return Stream.GetError(); }
         Wire->Rank = Word;
     }
-    if ((Flags & kMiscObjUpdateFlagField_0x10) != 0) {         // 06d99398 TEST AL,AL / JNS
+    if ((Flags & kMiscObjUpdateFlagSystemId) != 0) {         // 06d99398 TEST AL,AL / JNS
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
         Wire->SystemId = Scratch;
     }
@@ -683,7 +683,7 @@ unsigned int RpcEncodeServerSendComm(FPacketBase& Packet, unsigned char** Buffer
             Stream.PutDword(IdSlots[Index]);
         }
     }
-    Stream.PutDword(Wire->CommType);
+    Stream.PutDword(Wire->CaptionIds);
     Stream.PutByte(Wire->BufferCount);
     // The loop bound is the byte, signed.
     const int SignedBufferCount = (int)(signed char)Wire->BufferCount;
@@ -694,7 +694,7 @@ unsigned int RpcEncodeServerSendComm(FPacketBase& Packet, unsigned char** Buffer
         }
     }
     // The dword's low half only.
-    Stream.PutWord((unsigned short)(Wire->Mood & 0xffffu));
+    Stream.PutWord((unsigned short)(Wire->PermutationIds & 0xffffu));
     float Scaled = 0.0f;
     RpcSendCommMoveFloatBits(&Scaled, &Wire->DurationBits);
     Stream.PutQuantizedTwoStage(Scaled, FRpcMarshalStream::kTenthScale,
@@ -754,7 +754,7 @@ unsigned int RpcDecodeServerSendComm(FPacketBase& Packet, const unsigned char* B
         Wire->Body.Count = 0;
     }
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->CommType = Scratch;
+    Wire->CaptionIds = Scratch;
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
     Wire->BufferCount = Small8;
 
@@ -776,7 +776,7 @@ unsigned int RpcDecodeServerSendComm(FPacketBase& Packet, const unsigned char* B
     }
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
     // Zero-extended into the dword.
-    Wire->Mood = (unsigned int)Small16;
+    Wire->PermutationIds = (unsigned int)Small16;
     float Scaled = 0.0f;
     if (!Stream.GetQuantizedUnsigned(Scaled, FRpcMarshalStream::kTenthInvScale)) {
         return Stream.GetError();

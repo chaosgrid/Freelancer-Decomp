@@ -46,7 +46,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
     Options->data_path.Length = CopyBoundedString(Options->data_path.Text, 0x104, "..\\Data");
 
     // In retail's store order.
-    Options->field_878 = 0;
+    Options->present_when_inactive = 0;
     Options->quick_flag = 0;
     Options->color_bpp = -1;
     Options->depth_bpp = -1;

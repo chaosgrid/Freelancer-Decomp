@@ -44,7 +44,7 @@ namespace
 
     FThornEntitySnap const* EntitySnap(IScriptEngine* Engine, int Index)
     {
-        return static_cast<FThornEntitySnap const*>(Engine->Slot9Entity(Index));
+        return static_cast<FThornEntitySnap const*>(Engine->GetEntityDesc(Index));
     }
 
     // The geo facet (+0x0c) slots 3 / 4 take non-const pointers; retail hands them the
@@ -62,7 +62,7 @@ namespace
 // for a reference entity.
 void FGfScript::Spawn()
 {
-    int const Count = static_cast<int>(Engine->Slot6EntityCount());
+    int const Count = static_cast<int>(Engine->GetEntityCount());
     Spawned = new FThornComponent*[Count];
     SpawnedCount = Count;
     int Index = 0;
@@ -171,7 +171,7 @@ void FGfScript::Spawn()
     {
         if (Spawned[Index] == nullptr)
             continue;
-        Engine->Slot12Attach(Index, static_cast<ICompoundControl*>(Spawned[Index]));
+        Engine->AttachEntity(Index, static_cast<ICompoundControl*>(Spawned[Index]));
         Spawned[Index]->EntityIndex = Index;
     }
 
@@ -263,7 +263,7 @@ void FGfScript::ApplySpecialMarker(FThornEntitySnap const* Snap, FThornComponent
         return;
     FCharacterObject* const Player = RoomControlPlayerCharacter(Room);
     if (Player != nullptr)
-        Player->SetFloat1C(Local.Pos.y);
+        Player->SetFloorHeight(Local.Pos.y);
 }
 
 // FUN_0044d810. Thorn_Marker is operator new(0x9c), Thorn_MarkerReference 0x70. A reference
@@ -463,7 +463,7 @@ FThornComponent* FGfScript::SpawnDeformable(int Index, FThornEntitySnap const* S
         bPlayerActor = 1;
         PlayerCharacter = Character;
         PlayerCsys = Deformable->GetCharacterCsys();
-        PlayerField94 = Character->GetFloat1C();
+        PlayerFloorHeight = Character->GetFloorHeight();
         PlayerDeformInstance = Deformable->GetDeformInstance();
     }
     free(Actor);
@@ -624,7 +624,7 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
 // FUN_0044e870. The player is FUN_00449cd0, a room role FUN_00449d50. Otherwise BindMode picks
 // the sequence's characters (0), the mirror's first (1) or the mirror's of that actor (2); a
 // miss falls to the sequence's, and still none creates one (FUN_00435b80). Every character found
-// or made gets FUN_004454e0 with Field_0x55.
+// or made gets FUN_004454e0 with bOwnScript.
 FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char const* Actor)
 {
     FCharacterObject* Character = nullptr;
@@ -650,7 +650,7 @@ FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char
                   "Player hardpoint is missing, so script cannot connect to the player.\n");
             return nullptr;
         }
-        Character->TakeOverForScript(Field_0x55);
+        Character->TakeOverForScript(bOwnScript);
         return Character;
     }
     if (bRole)
@@ -658,7 +658,7 @@ FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char
         Character = RoomControlFindCharacterByName(Room, Actor);
         if (Character == nullptr)
             return nullptr;
-        Character->TakeOverForScript(Field_0x55);
+        Character->TakeOverForScript(bOwnScript);
         return Character;
     }
 
@@ -691,6 +691,6 @@ FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char
         Character = CreateCharacterObject(Props, nullptr, -1, Room, 1, CharacterFrame);
         Sequence->AddCharacter(Character, Actor);
     }
-    Character->TakeOverForScript(Field_0x55);
+    Character->TakeOverForScript(bOwnScript);
     return Character;
 }

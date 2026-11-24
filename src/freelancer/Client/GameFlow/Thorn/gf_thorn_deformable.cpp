@@ -14,8 +14,18 @@
 #include "GameFlow/gf_character_object.h"
 #include "GameFlow/Thorn/gf_script_object.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
+
+// Retail's layout: the index -1 slot accesses below land on the same members as retail's.
+static_assert(sizeof(FThornDeformable::FMotionSlot) == 0x10, "Thorn_Deformable motion stride 0x10");
+static_assert(sizeof(FThornDeformable::FAimSlot) == 0x3c, "Thorn_Deformable aim stride 0x3c");
+static_assert(offsetof(FThornDeformable, bReference) == 0x68, "Thorn_Component +0x68");
+static_assert(offsetof(FThornDeformable, Character) == 0x6c, "Thorn_Deformable +0x6c");
+static_assert(offsetof(FThornDeformable, FloorHeight) == 0x74, "Thorn_Deformable +0x74");
+static_assert(offsetof(FThornDeformable, Motions) == 0x78, "Thorn_Deformable +0x78");
+static_assert(offsetof(FThornDeformable, Aims) == 0x278, "Thorn_Deformable +0x278");
 
 namespace
 {
@@ -24,11 +34,6 @@ namespace
 
     void* const kDeformNoScript = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
     void* const kDeformNoInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-
-    void* InstancePointer(long Instance)
-    {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
-    }
 
     Vector InstancePosition(void* Instance)
     {
@@ -73,8 +78,8 @@ FThornDeformable::~FThornDeformable()
 
 // LAB_00452240. AcquireScript is CharacterInfo FUN_00434d10, AddMotionHandle FUN_004456e0. With a
 // locked bone the IAnimation2 slot 36 answer is returned, otherwise IDeformable slot 7's.
-// RETAIL DEFECT KEPT: with all 32 slots busy the index stays -1 and slot 7 still gets
-// &Motions[-1].Handle -- in retail's layout this + 0x68, the reference byte and its padding.
+// Retail: with all 32 slots busy the index stays -1 and slot 7 still gets &Motions[-1].Handle,
+// this + 0x68: the reference byte and its padding.
 GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
 {
     FThornMotionEventDesc const* Desc = static_cast<FThornMotionEventDesc const*>(DescArg);
@@ -129,8 +134,10 @@ GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
     return static_cast<GENRESULT>(BlockResult);
 }
 
-// LAB_004523a0. With no matching slot the index stays -1 (Motions[-1] is read, as retail). The
-// character forgets the slot's handle (FUN_004456f0) either way. Always 0.
+// LAB_004523a0. The character forgets the slot's handle (FUN_004456f0) either way. Always 0.
+// Retail: with no matching slot the index stays -1 and Motions[-1] is this + 0x68: Handle the
+// reference byte and padding, ScriptId Character, EventId ActorName, bActive FloorHeight's low
+// byte; when that byte is set the reset writes null into Character and -1 into ActorName.
 GENRESULT DACOM_API FThornDeformable::StopMotion(void* DescArg)
 {
     FThornMotionEventDesc const* Desc = static_cast<FThornMotionEventDesc const*>(DescArg);
@@ -175,7 +182,7 @@ GENRESULT DACOM_API FThornDeformable::SetFloorHeight(float Height)
     Point.y = Height;
     Point.z = 0.0f;
     Vector const World = Frame.trans_from_frame(Point);
-    Character->SetFloat1C(World.y);
+    Character->SetFloorHeight(World.y);
     return GR_OK;
 }
 
@@ -363,8 +370,9 @@ GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, fl
     return GR_GENERIC;
 }
 
-// FUN_00452a30. With no matching slot the index stays -1 (Aims[-1] is read, as retail).
-// RemoveAimHandle is FUN_00445710.
+// FUN_00452a30. RemoveAimHandle is FUN_00445710. Retail: with no matching slot the index stays
+// -1 and Aims[-1] is this + 0x23c: Handle Motions[28].ScriptId, bActive Motions[31].bActive,
+// bStarted the padding byte after it.
 GENRESULT DACOM_API FThornDeformable::StopIk(void* DescArg)
 {
     FThornStartIkDesc const* Desc = static_cast<FThornStartIkDesc const*>(DescArg);
@@ -391,7 +399,8 @@ GENRESULT DACOM_API FThornDeformable::StopIk(void* DescArg)
     return Result;
 }
 
-// LAB_00452680. With no matching slot the index stays -1 (Aims[-1] is read, as retail).
+// LAB_00452680. Retail: with no matching slot the index stays -1 and Aims[-1] (this + 0x23c,
+// see StopIk) is read and written.
 GENRESULT DACOM_API FThornDeformable::UpdateIk(void* DescArg, float* Position, float* Orientation)
 {
     FThornStartIkDesc const* Desc = static_cast<FThornStartIkDesc const*>(DescArg);
@@ -479,7 +488,7 @@ void FThornDeformable::Stop()
         Character->Layer = 0;
         Character->RenderMode = 0;
     }
-    Character->ResetScriptState(Owner->Field_0x55);
+    Character->ResetScriptState(Owner->bOwnScript);
 }
 
 // LAB_00452df0. Hands out the character's +0x1b4 (voice id) and the character itself.
@@ -508,12 +517,12 @@ void FThornDeformable::SetScene(void* Scene)
 
 // LAB_00452ed0 -- no null check.
 void FThornDeformable::SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,
-                                unsigned char bFlag14)
+                                unsigned char bRunningLights)
 {
     Character->bVisible = bVisible;
     Character->bLit = bLit;
     Character->bFog = bFog;
-    Character->Flag14 = bFlag14;
+    Character->bRunningLights = bRunningLights;
 }
 
 // FUN_00452e40.

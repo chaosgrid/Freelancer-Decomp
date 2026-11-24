@@ -20,12 +20,6 @@ static_assert(SWP_NOZORDER == 4, "SetWindowPos flags");
 static_assert(WM_CREATE == 1 && WM_SIZE == 5 && WM_PAINT == 0x0F && WM_ERASEBKGND == 0x14, "window messages");
 static_assert(GWL_USERDATA == -21, "SetWindowLong index");
 
-// FUN_06acf3d0. movie.dll operator delete: forwards to free (FUN_06ad07b3).
-void __cdecl MovieOperatorDelete(void* Block);
-
-// 0x06acf3db. movie.dll operator new: __nh_malloc(size, 1). Returns the pointer; does not throw itself.
-void* __cdecl MovieOperatorNew(unsigned int Size);
-
 // FUN_06ad970e. Throws the "string too long" C++ exception. No return on the retail path.
 void __cdecl MovieThrowStringTooLong();
 

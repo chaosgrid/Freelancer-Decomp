@@ -309,10 +309,11 @@ struct FNpcNameParams;
 // TU63 FUN_06f97580 (cdecl): Size.Count ships of GroupId into Group->Ships, at most one per
 // slot of the faction's "fighters" formation -- a class_fighter / "D<level>" npc_ship arch,
 // named "Vignette_ship_%X". The first ship gets Loot (when given) and the First* values, the
-// others the Other* values. bMatchLevel rejects a level 0 or an arch more than one level off.
+// others the Other* values (FRmShipSpawn::TargetFlags +0xd8 / ShipKind +0xdc). bMatchLevel
+// rejects a level 0 or an arch more than one level off.
 bool __cdecl BuildRmShips(FRmShipGroup* Group, unsigned int GroupId, FRmShipSize Size,
-                          int FirstField_0xd8, int OtherField_0xd8, int FirstField_0xdc,
-                          int OtherField_0xdc, FRmLootSpawn const* Loot, FNpcNameParams* TargetName,
+                          int FirstTargetFlags, int OtherTargetFlags, int FirstShipKind,
+                          int OtherShipKind, FRmLootSpawn const* Loot, FNpcNameParams* TargetName,
                           bool bMatchLevel);
 
 // TU63 FUN_06f979b0 (cdecl): a new ship group of the block's size in Component (the offer
@@ -398,15 +399,49 @@ struct FRmCavalryFilter : FRmDestroySolarsFilter
     bool ApplyNode(FRmVignetteNode const* Node, char Bit) override;   // FUN_06f9a6f0
 };
 
+// Indices of FRmAssassinateFilter::Flags, named after the path node that sets each one
+// (GRmAssassinateNodeNames, the same order).
+enum ERmAssassinateNode
+{
+    RmAsnAssassinateShip = 0,               // "assassinate_ship"
+    RmAsnAssassinateSolar,                  // "assassinate_solar"
+    RmAsnTargetDropsCriticalLoot,           // "target_drops_critical_loot"
+    RmAsnBringBackLoot,                     // "bring_back_loot"
+    RmAsnTractorInLoot,                     // "tractor_in_loot"
+    RmAsnDestroyLoot,                       // "destroy_loot"
+    RmAsnTargetSpawnsWithWave,              // "target_spawns_with_wave"
+    RmAsnPreBattle,                         // "pre_battle"
+    RmAsnTargetSpawnsAtPreBattle,           // "target_spawns_at_pre_battle"
+    RmAsnPreBattleNonTargetWave,            // "pre_battle_non_target_wave"
+    RmAsnPreBattleWaveRuns,                 // "pre_battle_wave_runs"
+    RmAsnPkPreBattleWave,                   // "pk_pre_battle_wave"
+    RmAsnTargetRunsToMainBattle,            // "target_runs_to_main_battle"
+    RmAsnMainBattle,                        // "main_battle"
+    RmAsnDefensiveSolarsAtMainBattle,       // "defensive_solars_at_main_battle"
+    RmAsnTargetSpawnsAtMainBattle,          // "target_spawns_at_main_battle"
+    RmAsnMainBattleNonTargetWave,           // "main_battle_non_target_wave"
+    RmAsnWaveJustAfterMainBattleStarts,     // "wave_just_after_main_battle_starts"
+    RmAsnContinuousReenforcements,          // "continuous_reenforcements"
+    RmAsnPkAllShips,                        // "pk_all_ships"
+    RmAsnPreBattleWave1,                    // "pre_battle_wave_1"
+    RmAsnPreBattleWave2,                    // "pre_battle_wave_2"
+    RmAsnMainBattleWave1,                   // "main_battle_wave_1"
+    RmAsnMainBattleWave2,                   // "main_battle_wave_2"
+    RmAsnFriendlyShipsAtMainBattle,         // "friendly_ships_at_main_battle"
+    RmAsnFriendlyShipsAfter30S,             // "friendly_ships_after_30_s"
+    RmAsnFriendlyShipsComeInToWhoopUp,      // "friendly_ships_come_in_to_whoop_up"
+    RmAsnNodeCount                          // 27
+};
+
 // Assassinate filter (retail 0x28, vtable 06fbd01c; built by FUN_06f9a270 with the base
 // flags copied, ctor FUN_06f9b390 clears +0x0c..+0x26). Flags[i] is set by the path node
-// named GRmAssassinateNodeNames[i] (LAB_06f9b3f0).
+// named GRmAssassinateNodeNames[i] (LAB_06f9b3f0); i is an ERmAssassinateNode.
 struct FRmAssassinateFilter : FRmPathFilter
 {
-    bool Flags[27];                             // +0x0c..+0x26
+    bool Flags[RmAsnNodeCount];                 // +0x0c..+0x26
 
     FRmAssassinateFilter();                     // FUN_06f9b390
-    int Slot00() const override;                // LAB_06f9a400: Flags[0] ? 2 : 3
+    int Slot00() const override;                // LAB_06f9a400: assassinate_ship ? 2 : 3
     bool HasMissionType() const override;       // FUN_06ea1480
     bool ApplyNode(FRmVignetteNode const* Node, char Bit) override;   // FUN_06f9b3f0
     FRmPathFilter* Specialize() const override; // FUN_06ea1450: null
@@ -433,7 +468,7 @@ struct FRmAssassinateFilter : FRmPathFilter
                      std::list<FRmSolarSpawn>* OutSolars) const;
 };
 
-extern char const* const GRmAssassinateNodeNames[27];
+extern char const* const GRmAssassinateNodeNames[RmAsnNodeCount];
 
 // Destroy-ships filter (retail 0x0c, vtable 06fbd004) and loot-item filter (retail 0x0c,
 // vtable 06fbcfec): both built by FUN_06f9a270 with every flag cleared. Slots 1 and 2 are

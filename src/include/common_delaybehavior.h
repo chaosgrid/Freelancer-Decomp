@@ -27,7 +27,7 @@ class DelayBehavior : public Behavior
 {
 public:
     // Retail's ctor argument is the behavior type id (20, "Delay"), pushed by the factory out of
-    // the descriptor's +0x04 -- see Behavior::GetTypeId() in common_behavior.h.
+    // the descriptor's +0x04 -- see Behavior::TypeId in common_behavior.h.
     explicit DelayBehavior(int InTypeId);
     ~DelayBehavior() override;
 
@@ -45,7 +45,7 @@ public:
     // ------------------------------------------------------------------
 
     // Slot 1, LAB_062d0a70. The binder FUN_062d2090; on success
-    // Watcher2c.SetContext(OwnerContextPtr14, NavHelperPtr24, Param2), then zeroes
+    // Watcher2c.SetContext(OwnerContext, SysMgr, Param2), then zeroes
     // DelayDuration and DelayElapsed.
     bool SetContext(void* Param1, void* Param2, void* Param3);
 
@@ -56,18 +56,18 @@ public:
     // FUN_062d20f0 (Behavior::OnDisengage).
     void Disengage();
 
-    // Slot 5, LAB_062ce3c0 (shared): `ModeSelector0xc = Flag29 ? 3 : 1`, returned. RET 4.
+    // Slot 5, LAB_062ce3c0 (shared): `Readiness = Flag29 ? 3 : 1`, returned. RET 4.
     int SetModeFromFlags();
 
     // Slot 7, FUN_062d0ae0.
-    //   if (OwnerContextPtr14 == nullptr) { UpdateResult10 = 3; return 3; }
-    //   Watcher2c.Update(DeltaTime1c);
-    //   DelayElapsed += DeltaTime1c;     // compared unrounded, strictly greater
+    //   if (OwnerContext == nullptr) { UpdateResult = 3; return 3; }
+    //   Watcher2c.Update(DeltaTime);
+    //   DelayElapsed += DeltaTime;     // compared unrounded, strictly greater
     //   if (DelayElapsed > DelayDuration) {
     //       DelayElapsed = <float bit-pattern 0xccbebc20>;
-    //       BehaviorMgrPtr20->FUN_062d29a0(0x14, 0);   // writes manager +0x118/+0x11c
+    //       BehaviorMgr->FUN_062d29a0(0x14, 0);   // writes manager +0x118/+0x11c
     //   }
-    //   UpdateResult10 = 1;
+    //   UpdateResult = 1;
     //   return 1;
     int Update();
 
@@ -87,28 +87,8 @@ public:
 
 public:
     // ------------------------------------------------------------------
-    // Fields: Behavior's shared +0x04..+0x29 prefix, an IdleIdea, two floats. Retail size 0x48.
+    // Fields: Behavior's +0x04..+0x29, an IdleIdea, two floats. Retail size 0x48.
     // ------------------------------------------------------------------
-    int TypeId;                // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
-    unsigned CachedHandle08;   // +0x08, the binder's Param1->get_id() (an object id)
-    int ModeSelector0xc;       // +0x0c. Written by ResetTickState() (=1) and
-                               // SetModeFromFlags() (1 or 3).
-    int UpdateResult10;        // +0x10. Update()'s own tri-state result (1=active/3=idle)
-                               // and ResetTickState()'s own write (=1).
-    void* OwnerContextPtr14;   // +0x14. Set by SetContext() (Param1); null-checked by Update().
-    IObjDB* ObjectDb;
-    float DeltaTime1c;         // +0x1c. Passed to Watcher2c's Evaluate(dt) call and
-                               // accumulated into DelayElapsed by Update().
-    // +0x20, the binder's Param2. An IBehaviorManager: Update() (.text:062d0b14) passes it as
-    // the thiscall receiver of FUN_062d29a0, which writes +0x118/+0x11c as IBehaviorManager
-    // does on its own `this` (.text:062d2ea9), and sits among the named IBehaviorManager
-    // methods (between set_state_graph @062d28b0 and get_scan_response @062d2b00).
-    IBehaviorManager* BehaviorMgrPtr20;
-    SystemManager* NavHelperPtr24; // +0x24. Set by SetContext() (Param3).
-    unsigned char Flags28;     // +0x28. Bit 0x1 cleared by ResetTickState(); bit 0x2 set by
-                               // ApplyDirective().
-    unsigned char Flag29;      // +0x29. Read by SetModeFromFlags(); cleared by FUN_062d20f0.
-    unsigned char Pad2a[0x2c - 0x2a];
 
     IdleIdea Watcher2c;        // +0x2c, 0x14 bytes (ctor FUN_062d9b10 at .text:062d0a42)
     float DelayDuration;             // +0x40. Zeroed by SetContext(); set to Param->Field_0c by
@@ -119,15 +99,6 @@ public:
                                // DelayDuration.
 };
 
-static_assert(offsetof(DelayBehavior, CachedHandle08) == 0x08, "DelayBehavior::CachedHandle08 offset");
-static_assert(offsetof(DelayBehavior, ModeSelector0xc) == 0x0c, "DelayBehavior::ModeSelector0xc offset");
-static_assert(offsetof(DelayBehavior, UpdateResult10) == 0x10, "DelayBehavior::UpdateResult10 offset");
-static_assert(offsetof(DelayBehavior, OwnerContextPtr14) == 0x14, "DelayBehavior::OwnerContextPtr14 offset");
-static_assert(offsetof(DelayBehavior, DeltaTime1c) == 0x1c, "DelayBehavior::DeltaTime1c offset");
-static_assert(offsetof(DelayBehavior, BehaviorMgrPtr20) == 0x20, "DelayBehavior::BehaviorMgrPtr20 offset");
-static_assert(offsetof(DelayBehavior, NavHelperPtr24) == 0x24, "DelayBehavior::NavHelperPtr24 offset");
-static_assert(offsetof(DelayBehavior, Flags28) == 0x28, "DelayBehavior::Flags28 offset");
-static_assert(offsetof(DelayBehavior, Flag29) == 0x29, "DelayBehavior::Flag29 offset");
 static_assert(offsetof(DelayBehavior, Watcher2c) == 0x2c, "DelayBehavior::Watcher2c offset");
 static_assert(offsetof(DelayBehavior, DelayDuration) == 0x40, "DelayBehavior::DelayDuration offset");
 static_assert(offsetof(DelayBehavior, DelayElapsed) == 0x44, "DelayBehavior::DelayElapsed offset");

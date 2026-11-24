@@ -35,10 +35,9 @@ struct FNewsItem
     int ToStage;                                           // +0x14 "rank"[1], default 0x2a
     CacheString Audio;                                     // +0x18 "audio" (StringAlloc)
     CacheString Logo;                                      // +0x1c "logo" (StringAlloc)
-    // +0x20. Common's field names do not follow the ini keys: "category" goes to
-    // Desc.Headline (+0x2c), "headline" to Desc.Text (+0x44), "text" to Desc.Audio
-    // (+0x5c); "breaking" -> bFlag1, "autoselect" -> bFlag2, "icon" -> Category,
-    // "logo" -> LogoTexture (+0x74), "audio" -> AudioName (+0x78).
+    // +0x20. "category" goes to Desc.CategoryName (+0x2c), "headline" to Desc.Headline
+    // (+0x44), "text" to Desc.Text (+0x5c); "breaking" -> bBreaking, "autoselect" ->
+    // bAutoselect, "icon" -> Icon, "logo" -> LogoTexture (+0x74), "audio" -> AudioName (+0x78).
     NewsBroadcastDescription Desc;
 };
 
@@ -53,8 +52,8 @@ void __cdecl LoadNewsItems(INI_Reader* Reader);
 // new mission controller (06eb51dc).
 struct FMissionOfferAcceptMsg
 {
-    unsigned int OfferId;           // +0x00 vendor offer id / bar character id / controller
-    unsigned int Kind;              // +0x04 2 vendor offer, 1 bar character
+    unsigned int OfferId;           // +0x00 controller id / bar character id / vendor offer id
+    unsigned int Kind;              // +0x04 pub::Controller::EMissionOfferKind
     unsigned char bAccepted;        // +0x08 raw message byte, forwarded unchanged
     unsigned int PlayerId;          // +0x0c
 };

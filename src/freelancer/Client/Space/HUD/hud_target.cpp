@@ -556,7 +556,7 @@ CShip* HudShipOfObjRw(IObjRW* ObjRw)
     {
         return nullptr;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
     {
         return nullptr;
     }
@@ -581,13 +581,10 @@ namespace
         return Base->cobject();
     }
 
-    // CShip +0x1b4 -- CShip::GroupId, the multiplayer group id (common_basefollowerbehavior.cpp
-    // compares the same field between two player ships), read by offset from a CObject.
+    // CShip::GroupId (+0x1b4), the multiplayer group id, read from a CObject with no class test.
     unsigned HudShipGroupId(CObject const* Ship)
     {
-        unsigned Value = 0;
-        memcpy(&Value, reinterpret_cast<unsigned char const*>(Ship) + 0x1b4, sizeof(Value));
-        return Value;
+        return static_cast<CShip const*>(Ship)->GroupId;
     }
 }
 
@@ -602,7 +599,7 @@ bool HudIsUnvisitedSolar(CSimple const* Object)
         if ((Type & 0x107ffdffu) != 0 && Gameobj->bWatchListed != 0)
             return false;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x303u) != 0x303u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
         return false;
     // The solar's own visit byte OR the visit-map flags (zero when the id has no entry:
     // FUN_004c4da0 leaves the pre-cleared byte alone); bit 0 means visited.
@@ -617,7 +614,7 @@ unsigned char HudObjectVisitFlags(CObject const* Object)
     // FUN_004d4d00.
     if (Object == nullptr)
         return 1;
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x303u) != 0x303u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
         return 1;
     CSolar const* const Solar = static_cast<CSolar const*>(Object);
     unsigned char const OwnVisit = Solar->GetVisitValue();
@@ -694,7 +691,7 @@ namespace
     // " (%d)" (u" (%d)" 0x005cfb88) for a loot object ((class & 0x803) == 0x803) of more than one unit (CLoot +0xf0).
     void HudCaptionAppendLootCount(CSimple const* Object)
     {
-        if ((static_cast<unsigned>(Object->ObjectClass) & 0x803u) != 0x803u)
+        if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassLoot) != CObject::ClassLoot)
         {
             return;
         }
@@ -753,7 +750,7 @@ unsigned GetObjectIdsName(CObject const* Object)
     {
         return 0;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
     {
         // No null test on Archetype, as retail.
         return static_cast<unsigned>(Object->Archetype->IdsName);
@@ -766,7 +763,7 @@ unsigned GetShipPilotName(CObject const* Object, FHudWideText* Out)
     // FUN_005472d0. Out = "" (DAT_005c8ce0) first.
     wchar_t const* const Empty = L"";
     HudWideTextAssign(Out, Empty, wcslen(Empty));
-    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u)
+    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
     {
         wchar_t const* const Pilot = static_cast<CShip const*>(Object)->get_pilot_name();
         if (Pilot != nullptr)
@@ -874,7 +871,7 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
 {
     // FUN_004e8d30.
     CSolar const* Ring = nullptr;
-    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x303u) == 0x303u)
+    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
     {
         Ring = static_cast<CSolar const*>(Object);
     }
@@ -919,7 +916,7 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
     while (Head->PrevRing != 0)
     {
         CObject* const Next = HudCObjectOf(ClientObjDb_FindObject(Head->PrevRing, 0));
-        if (Next == nullptr || (static_cast<unsigned>(Next->ObjectClass) & 0x303u) != 0x303u)
+        if (Next == nullptr || (static_cast<unsigned>(Next->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
         {
             return false;
         }
@@ -932,7 +929,7 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
     while (Tail->NextRing != 0)
     {
         CObject* const Next = HudCObjectOf(ClientObjDb_FindObject(Tail->NextRing, 0));
-        if (Next == nullptr || (static_cast<unsigned>(Next->ObjectClass) & 0x303u) != 0x303u)
+        if (Next == nullptr || (static_cast<unsigned>(Next->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
         {
             return false;
         }
@@ -997,7 +994,7 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
     }
 
     // Anything but a CEqObj.
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         if (Name == 0)
         {
@@ -1211,7 +1208,7 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
     // FUN_0045a4e0.
     if (Other == nullptr || Player == nullptr)
     {
-        *OutArgb = G_NnPaletteArgb_679b84;
+        *OutArgb = G_NnPaletteWhite;
         return;
     }
 
@@ -1222,14 +1219,14 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
         // freelancer.exe sets bit 2 (the other writers touch bits 0, 1 and 3 only).
         if ((static_cast<FClientShipGameobj*>(Gameobj)->ShipFlags & 4) != 0)
         {
-            *OutArgb = G_NnPaletteArgb_679b9c;
+            *OutArgb = G_NnPalettePurple;
             return;
         }
         // A player ship with a non-zero group id that the player's ship shares.
         if (Gameobj->is_player())
         {
             CObject* const Object = HudCObjectOf(Gameobj);
-            if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u &&
+            if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip &&
                 HudShipGroupId(Object) != 0)
             {
                 IObjRW* const PlayerRw = static_cast<IObjRW*>(GetPlayerObjRW());
@@ -1240,13 +1237,13 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
                     // that read unguarded, as retail does.
                     CObject* PlayerShip = HudCObjectOf(static_cast<IObjInspectImpl*>(PlayerRw));
                     if (PlayerShip != nullptr &&
-                        (static_cast<unsigned>(PlayerShip->ObjectClass) & 0x503u) != 0x503u)
+                        (static_cast<unsigned>(PlayerShip->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
                     {
                         PlayerShip = nullptr;
                     }
                     if (HudShipGroupId(PlayerShip) == HudShipGroupId(Object))
                     {
-                        *OutArgb = G_NnPaletteArgb_679b88;
+                        *OutArgb = G_NnPalettePink;
                         return;
                     }
                 }
@@ -1258,26 +1255,26 @@ void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
     float Attitude = 0.0f;
     if (Other->get_attitude_towards(Attitude, Player) != 0)
     {
-        *OutArgb = G_NnPaletteArgb_679b84;
+        *OutArgb = G_NnPaletteWhite;
         return;
     }
     if (Attitude <= -0.6f)
     {
-        *OutArgb = G_NnPaletteArgb_679ba8;
+        *OutArgb = G_NnPaletteRed;
         return;
     }
     // -0.2f is DAT_005ce7f0. NaN ends white; both white exits are kept as retail spells them.
     if (Attitude <= -0.2f)
     {
-        *OutArgb = G_NnPaletteArgb_679b84;
+        *OutArgb = G_NnPaletteWhite;
         return;
     }
     if (!(Attitude >= 0.6f))
     {
-        *OutArgb = G_NnPaletteArgb_679b84;
+        *OutArgb = G_NnPaletteWhite;
         return;
     }
-    *OutArgb = G_NnPaletteArgb_679bac;
+    *OutArgb = G_NnPaletteGreen;
 }
 
 int HudReputationBand(float Attitude)
@@ -1438,7 +1435,7 @@ void HudTargetBase::HideGroupAndEquipParts()
     {
         return;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         return;
     }
@@ -1551,7 +1548,7 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
         // The HUDItem target (+0x28) when it is a ship, else null -- which retail does not test:
         // GetDirectionMatrix is handed null + 8 (EngineObject::get_transform inlined).
         CObject* Ship = CObjectOfWatcher(HUDItem::Target);
-        if (Ship != nullptr && (static_cast<unsigned>(Ship->ObjectClass) & 0x503u) != 0x503u)
+        if (Ship != nullptr && (static_cast<unsigned>(Ship->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         {
             Ship = nullptr;
         }
@@ -1570,7 +1567,7 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
         // Loot (class & 0x803) stands four times as far (DAT_005cfc9c).
         CObject* const ViewedObject = GetViewCObject();
         if (ViewedObject != nullptr &&
-            (static_cast<unsigned>(ViewedObject->ObjectClass) & 0x803u) == 0x803u)
+            (static_cast<unsigned>(ViewedObject->ObjectClass) & CObject::ClassLoot) == CObject::ClassLoot)
         {
             Offset[0] = Offset[0] * 4.0f;
             Offset[1] = Offset[1] * 4.0f;
@@ -1643,7 +1640,7 @@ void HudTargetBase::ColourGroupParts()
     {
         return;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         return;
     }
@@ -1695,7 +1692,7 @@ void HudTargetBase::ColourEquipParts()
     {
         return;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         return;
     }
@@ -1708,7 +1705,7 @@ void HudTargetBase::ColourEquipParts()
     CEquip* Equip = EqObj->EquipManager.Traverse(EquipWalk);
     while (Equip != nullptr)
     {
-        unsigned long Colour = G_NnPaletteArgb_679b98;
+        unsigned long Colour = G_NnPaletteBlue;
         float const Damage = 1.0f - Equip->GetRelativeHealth();
         if (Damage > 0.0f)
         {
@@ -1726,7 +1723,7 @@ void HudTargetBase::ColourEquipParts()
                 Archetype::Gun const* const Arch = Gun->GunArch();
                 if (Arch != nullptr && !Arch->bAutoTurret)
                 {
-                    Colour = Equip->IsActive() ? G_NnPaletteArgb_679ba4 : ChromeColourArgb();
+                    Colour = Equip->IsActive() ? G_NnPaletteAmber : ChromeColourArgb();
                 }
             }
         }
@@ -1843,7 +1840,7 @@ unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, in
     {
         return 0;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
     {
         return 0;
     }
@@ -2011,7 +2008,7 @@ void HudTargetBase::Draw()
         }
     }
     // Tail jump through the WinControl face's slot 39 (+0x9c).
-    Slot39();
+    PostDraw();
 }
 
 intptr_t HudTargetBase::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
@@ -2047,7 +2044,7 @@ CEquip* HudTargetBase::FindTargetEquip(unsigned short SubId)
     {
         return nullptr;
     }
-    if ((static_cast<unsigned>(Object->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
     {
         return nullptr;
     }

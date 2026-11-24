@@ -24,13 +24,8 @@ class IVP_Hull_Manager;
 // IVP_Core field names used below are the port's (ivp_core.h); where they
 // differ from the SDK roles these functions establish, the SDK role is given
 // in the comment at the access:
-//   +0x08 SpeedLimit          = max_surface_deviation
 //   +0x10 AxisLock            = car_wheel
 //   +0x4c SpinClipping        = spin_clipping (per-axis |rot_speed| bound)
-//   +0x134 RotAxisOS          = rotation_axis_world_space
-//   +0x144 Margin             = current_speed
-//   +0x148 MaxSurfaceDeviation = abs_omega
-//   +0x14c BoundingRadius     = max_surface_rot_speed
 // ============================================================================
 class IVP_Calc_Next_PSI_Solver
 {

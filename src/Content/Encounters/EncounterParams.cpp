@@ -285,49 +285,49 @@ void FEncounterFormation::ParseArrival(INI_Reader* Reader)
         // DACOM stricmp.
         if (_stricmp(Name, "all") == 0)
         {
-            Arrival[1] = bSet;
-            Arrival[2] = bSet;
-            Arrival[5] = bSet;
-            Arrival[3] = bSet;
-            Arrival[4] = bSet;
-            Arrival[6] = bSet;
-            Arrival[7] = bSet;
-            Arrival[8] = bSet;
+            Arrival[ARRIVAL_TRADELANE] = bSet;
+            Arrival[ARRIVAL_UNNAMED_2] = bSet;
+            Arrival[ARRIVAL_OBJECT_STATION] = bSet;
+            Arrival[ARRIVAL_OBJECT_DOCKING_RING] = bSet;
+            Arrival[ARRIVAL_OBJECT_JUMP_GATE] = bSet;
+            Arrival[ARRIVAL_OBJECT_CAPITAL] = bSet;
+            Arrival[ARRIVAL_CRUISE] = bSet;
+            Arrival[ARRIVAL_BUZZ] = bSet;
         }
         else if (_stricmp(Name, "tradelane") == 0)
         {
-            Arrival[1] = bSet;
+            Arrival[ARRIVAL_TRADELANE] = bSet;
         }
         else if (_stricmp(Name, "object_all") == 0)
         {
-            Arrival[5] = bSet;
-            Arrival[3] = bSet;
-            Arrival[4] = bSet;
-            Arrival[6] = bSet;
+            Arrival[ARRIVAL_OBJECT_STATION] = bSet;
+            Arrival[ARRIVAL_OBJECT_DOCKING_RING] = bSet;
+            Arrival[ARRIVAL_OBJECT_JUMP_GATE] = bSet;
+            Arrival[ARRIVAL_OBJECT_CAPITAL] = bSet;
         }
         else if (_stricmp(Name, "object_docking_ring") == 0)
         {
-            Arrival[3] = bSet;
+            Arrival[ARRIVAL_OBJECT_DOCKING_RING] = bSet;
         }
         else if (_stricmp(Name, "object_capital") == 0)
         {
-            Arrival[6] = bSet;
+            Arrival[ARRIVAL_OBJECT_CAPITAL] = bSet;
         }
         else if (_stricmp(Name, "object_jump_gate") == 0)
         {
-            Arrival[4] = bSet;
+            Arrival[ARRIVAL_OBJECT_JUMP_GATE] = bSet;
         }
         else if (_stricmp(Name, "object_station") == 0)
         {
-            Arrival[5] = bSet;
+            Arrival[ARRIVAL_OBJECT_STATION] = bSet;
         }
         else if (_stricmp(Name, "cruise") == 0)
         {
-            Arrival[7] = bSet;
+            Arrival[ARRIVAL_CRUISE] = bSet;
         }
         else if (_stricmp(Name, "buzz") == 0)
         {
-            Arrival[8] = bSet;
+            Arrival[ARRIVAL_BUZZ] = bSet;
         }
     } while (!Reader->is_value_empty(Index));
 }
@@ -759,13 +759,13 @@ int FEncounterParameters::Spawn(FSpawnRequest const* Request, bool const* bStarr
         // clamp flag.
         if (pub::SinglePlayer() && Standing <= -0.6f && SpacePopGetHostileClamp() == 0)
             continue;
-        // The player's flags: bit 0 refuses hostile factions, bit 1 refuses the others
+        // The player's flags refuse hostile factions or the others
         // (both tests are skipped for a NaN standing).
         unsigned int const ShipId = PlayerShip->SpaceObjId;
         unsigned int const Flags = FindContentPlayerStateByShip(&ShipId)->GetFlags();   // FUN_06f49bc0
-        if ((Flags & 1) != 0 && Standing <= -0.6f)
+        if ((Flags & PLAYER_FLAG_NO_HOSTILE_ENCOUNTERS) != 0 && Standing <= -0.6f)
             continue;
-        if ((Flags & 2) != 0 && Standing > -0.6f)
+        if ((Flags & PLAYER_FLAG_NO_FRIENDLY_ENCOUNTERS) != 0 && Standing > -0.6f)
             continue;
 
         // A ship in combat (slot 2, +0x11c) takes new ships only below the zone's
@@ -840,7 +840,7 @@ int FEncounterParameters::Spawn(FSpawnRequest const* Request, bool const* bStarr
             {
                 FSystemInfo* System = FindSystemInfo(&SystemId);
                 System->FindZone(ZoneId);                                   // result unused
-                if (Plan.Kind == 2)
+                if (Plan.Kind == SPAWN_PLAN_DOCK)
                 {
                     System->CreateNpcShips(&Blocks, Plan.DockTarget, &Ships);   // FUN_06f73810
                 }
@@ -946,7 +946,7 @@ void FEncounterParameters::SpawnFormation(FSpawnRequest const* Request, FSpawnPl
     if (Desc != nullptr)
     {
         CopyPlanToGuideDesc(Plan, Desc);
-        if (Desc->Type == 2)
+        if (Desc->Type == GUIDE_TYPE_TRADE)
         {
             // A trade guide -- the leader's cargo pick, one unit fitted to each freighter /
             // transport of the formation BEHIND the leader. GenerateCargo has already appended

@@ -534,12 +534,12 @@ void AsteroidExclusionZoneMgr::set_max_dynamicasteroid_exclusion_distance(float 
     MaxDynDist = Dist * Dist;
 }
 
-bool AsteroidExclusionZoneMgr::is_cliasteroid_excluded(const Vector& Pos, float* OutDist)
+bool AsteroidExclusionZoneMgr::is_cliasteroid_excluded(const Vector& Pos, float* OutFrequency)
 {
     // .text:062bc200. No null tests. The zones are sorted by distance, so the scan stops at the
     // first one beyond MaxCliDist. A negative or unordered EmptyCubeFrequency excludes
     // outright; otherwise the last containing zone's value is reported.
-    *OutDist = -1.0f;
+    *OutFrequency = -1.0f;
     for (AsteroidExclusionZone** It = Begin; It != End; ++It)
     {
         AsteroidExclusionZone* const Zone = *It;
@@ -549,16 +549,16 @@ bool AsteroidExclusionZoneMgr::is_cliasteroid_excluded(const Vector& Pos, float*
         {
             if (!(Zone->EmptyCubeFrequency >= 0.0f))
                 return true;
-            *OutDist = Zone->EmptyCubeFrequency;
+            *OutFrequency = Zone->EmptyCubeFrequency;
         }
     }
     return false;
 }
 
-bool AsteroidExclusionZoneMgr::is_cmnasteroid_excluded(const Vector& Pos, float* OutDist)
+bool AsteroidExclusionZoneMgr::is_cmnasteroid_excluded(const Vector& Pos, float* OutFrequency)
 {
     // .text:062bc270. As is_cliasteroid_excluded without the distance cut-off.
-    *OutDist = -1.0f;
+    *OutFrequency = -1.0f;
     for (AsteroidExclusionZone** It = Begin; It != End; ++It)
     {
         AsteroidExclusionZone* const Zone = *It;
@@ -566,16 +566,16 @@ bool AsteroidExclusionZoneMgr::is_cmnasteroid_excluded(const Vector& Pos, float*
         {
             if (!(Zone->EmptyCubeFrequency >= 0.0f))
                 return true;
-            *OutDist = Zone->EmptyCubeFrequency;
+            *OutFrequency = Zone->EmptyCubeFrequency;
         }
     }
     return false;
 }
 
-bool AsteroidExclusionZoneMgr::is_billboard_excluded(const Vector& Pos, float* OutDist)
+bool AsteroidExclusionZoneMgr::is_billboard_excluded(const Vector& Pos, float* OutDensity)
 {
     // .text:062bc2d0. The end of the scan returns false in every case; the found flag only
-    // stops further writes to *OutDist.
+    // stops further writes to *OutDensity.
     bool bFound = false;
     for (AsteroidExclusionZone** It = Begin; It != End; ++It)
     {
@@ -592,7 +592,7 @@ bool AsteroidExclusionZoneMgr::is_billboard_excluded(const Vector& Pos, float* O
         if (Zone->ZonePtr->GetImmersion(Pos) != 0.0f)
         {
             bFound = true;
-            *OutDist = Density;
+            *OutDensity = Density;
         }
     }
     return false;
@@ -716,23 +716,23 @@ NebulaExclusionZone* NebulaExclusionZoneMgr::back()
 
 bool NebulaExclusionZoneMgr::is_in_exclusion_zone(const Vector& Pos,
                                                 NebulaExclusionZone** OutZone,
-                                                float* OutDist, bool Flag)
+                                                float* OutImmersion, bool bNearOnly)
 {
-    // .text:062bcb40. No null tests. With Flag the scan stops at the first zone beyond 10.0f
+    // .text:062bcb40. No null tests. With bNearOnly the scan stops at the first zone beyond 10.0f
     // (float 0639e884); the threshold 1e-5f is float 0639b984.
     *OutZone = nullptr;
-    *OutDist = 0.0f;
+    *OutImmersion = 0.0f;
     for (NebulaExclusionZone** It = Begin; It != End; ++It)
     {
         NebulaExclusionZone* const Zone = *It;
-        if (Flag && Zone->MaxDistSq > 10.0f)
+        if (bNearOnly && Zone->MaxDistSq > 10.0f)
             return false;
         // Compared unrounded.
         double const Inside = Zone->ZonePtr->GetImmersion(Pos);
         if (Inside > 9.99999975e-06f)
         {
             *OutZone = Zone;
-            *OutDist = (float)Inside;
+            *OutImmersion = (float)Inside;
             return true;
         }
     }

@@ -110,9 +110,6 @@ public:
     float HealthScale;                   // +0x490 FUN_004c4f70 when the list was built
 
 private:
-    // Port-only helper for the tail every close shares (e.g. 0x004b362b): delete the children,
-    // Destroy, delete this.
-    void DeleteSelf();
     // FUN_004b39b0 -- the list rebuilt from the player's hull, collision groups and equipment,
     // and the scroll range.
     void PopulateList();

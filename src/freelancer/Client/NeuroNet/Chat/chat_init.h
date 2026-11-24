@@ -51,6 +51,34 @@ extern const CHAT_ID G_ChatIdGroupInvite;   // DAT_0066da34 {4, 1} -- the group 
 // Called once from InitializeEngine (0x005b1ca0).
 void ChatRegisterTextStyles();
 
+// StyleCollection ids ChatRegisterTextStyles registers, named after the text that uses them.
+// The ids without a name here (0xd5ec, 0xe784, 0x66b7, 0x2b34, 0x66ac, 0x867f, 0x686c, 0x76ec)
+// have no settled use.
+enum EChatTextStyle : unsigned short
+{
+    kTextStyleChatSystem = 0xd801,      // the system channel (also the group channel's list row)
+    kTextStyleChatLocal = 0x1d9d,       // the local channel
+    kTextStyleChatGroup = 0xba28,       // the group channel (the input prefix)
+    kTextStyleChatUniverse = 0xd681,    // the universe channel
+    kTextStyleChatConsole = 0x73f7,     // the console target
+    kTextStyleChatPlayer = 0x8283,      // a player target / name
+    kTextStyleNotice = 0x3ea8,          // the system-notice prefix (group and chat notices)
+    kTextStyleBody = 0x9ca4,            // info-card / panel body text (HUD chrome colour)
+    kTextStyleBodyHighlight = 0x3d0a,   // the body attributes in the pulse amber
+    kTextStyleCardTitle = 0xf64,        // an info card's title line (HUD chrome colour)
+    kTextStyleScreenTitle = 0x1df5,     // a front-end page title
+    kTextStyleScreenSubtitle = 0x43e0,  // a front-end page subtitle
+    kTextStyleButton = 0x828b,          // a button caption
+    kTextStyleColumnHeader = 0xd824,    // a table column header
+    kTextStyleColumnHeaderSorted = 0xd190, // the sorted column's header
+    kTextStyleRow = 0x69f5,             // a list row
+    kTextStyleRowSelected = 0x3343,     // the selected list row
+    kTextStyleRowDetail = 0x5203,       // a chat private-list detail row
+    kTextStyleRowDetailSelected = 0x3dbc, // the selected entry's detail row
+    kTextStyleDisabled = 0xbb80,        // a disabled row (grey)
+    kTextStyleList = 0x4433,            // {TRANode, JustifyNode(1)}
+};
+
 // DAT_0066d8e4 -- "Interface\NeuroNet\Chat\" (ChatInit assigns it).
 extern std::string G_ChatImageRoot;
 
@@ -184,9 +212,9 @@ private:
 extern FChatMessageStore* G_ChatMessageStore;                 // DAT_0066da60
 extern FChatDisplaySnapshot* G_ChatAllMessages;               // DAT_0066da64
 extern FChatDisplaySnapshot* G_ChatRecentMessages;            // DAT_0066da68
-extern std::map<unsigned, RenderDisplayList*>* G_ChatNameCache70; // DAT_0066da70
-extern std::map<unsigned, RenderDisplayList*>* G_ChatNameCache74; // DAT_0066da74
-extern std::map<unsigned, RenderDisplayList*>* G_ChatNameCache78; // DAT_0066da78
+extern std::map<unsigned, RenderDisplayList*>* G_ChatSystemNameCache; // DAT_0066da70
+extern std::map<unsigned, RenderDisplayList*>* G_ChatShipArchNameCache; // DAT_0066da74
+extern std::map<unsigned, RenderDisplayList*>* G_ChatBaseNameCache; // DAT_0066da78
 extern FChatChannelTable* G_ChatChannelTable;                 // DAT_0066da7c
 extern MsgWin* G_ChatMsgWin;                                  // DAT_0066da80 (chat_msg_win.h)
 extern NnGroupControl* G_ChatGroupControl;                    // DAT_0066da84
@@ -213,6 +241,10 @@ void ChatCommitEntries();
 
 // Appends a clone of every node of Source to Dst (the FUN_0046c800 copy loop the posters inline).
 void ChatAppendRdlCopy(RenderDisplayList& Dst, RenderDisplayList const& Source);
+
+// The clone-into-list idiom (FUN_0046c800 with a fresh clone, first clone deleted; the inline
+// FUN_0042a7e0 + FUN_0046ea00 insertion is the same thing).
+void ChatAppendNodeClone(RenderDisplayList& List, RDLNode const& Node);
 
 // ---------------------------------------------------------------------------------------------
 // FUN_004690c0 -- build everything above (called once from the pre-init tail).

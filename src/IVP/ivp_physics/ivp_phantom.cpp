@@ -146,7 +146,7 @@ IVP_Controller_Phantom::~IVP_Controller_Phantom()
         listeners.elems[I]->phantom_is_going_to_be_deleted_event(this);
     }
 
-    object->first_child = nullptr;
+    object->controller_phantom = nullptr;
 
     // In this order: +0x30, +0x2c (FUN_06352620 + operator delete), +0x28,
     // +0x34 (slot 1). Each pointer is nulled after its test.

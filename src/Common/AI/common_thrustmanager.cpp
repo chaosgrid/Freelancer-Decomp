@@ -7,8 +7,8 @@
 // Common.dll -- ThrustManager (SystemManager+0x18).
 
 #include "common_systemmanager.h"
-#include "common_aisteer.h"   // SustainedThresholdTimer, ConstructGunConvergenceState, RefreshWeaponFireControlConfig
-#include "common_behavior.h"  // Behavior_InvokeNodeSlotC (FUN_062e61f0)
+#include "common_aisteer.h"   // SustainedThresholdTimer, RefreshWeaponFireControlConfig
+#include "common_behavior.h"  // Behavior_GetTransform (FUN_062e61f0)
 #include "common_csys.h"      // Transform, Acquire3DMathEngine
 #include "x86math.h"          // I3DMathEngine::TransposeTransform / TransformMatrix, FVector, FMatrix
 #include "common_misc.h"      // SUBOBJ_ID_NONE
@@ -301,7 +301,7 @@ void ThrustManager::SetNudgeDirection(Vector const& WorldDir)
 
     // Local into ship space (FUN_062e61f0 for the frame; DAT_063fca58 is this function's
     // engine cache) -- the nudge vector to apply.
-    Transform const* const Frame = Behavior_InvokeNodeSlotC(OwnerShip());
+    Transform const* const Frame = Behavior_GetTransform(OwnerShip());
     Vector Nudge;
     Acquire3DMathEngine()->TransposeTransform(reinterpret_cast<FVector&>(Nudge),
                                               reinterpret_cast<FMatrix const&>(Frame->Rotation),

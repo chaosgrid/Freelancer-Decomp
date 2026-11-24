@@ -43,8 +43,8 @@ struct FThornSound : FThornComponent
     void SetSpeaker(char const* InSpeaker);
     // FUN_004572d0 (thiscall, RET 4) -- +0x75.
     void SetSpatial(unsigned char bInSpatial);
-    // FUN_00457380 (thiscall) -- true for a playing voice line with +0x78 set whose handle's
-    // slot 29 answers true. Caller: FGfScript::GetSoundTailMs (FUN_0044f500).
+    // FUN_00457380 (thiscall) -- true for a playing voice line with bHoldScript set whose
+    // handle's slot 29 answers true. Caller: FGfScript::GetSoundTailMs (FUN_0044f500).
     bool IsHoldingScript() const;
 
     // ICompoundControl (0x005ce290 / 0x005ce294)
@@ -79,9 +79,10 @@ struct FThornSound : FThornComponent
     unsigned char bSpatial;        // +0x75 the entity's Flags bit 1
     unsigned char bAmbient;        // +0x76 "BackgroundAmbient"
     unsigned char bMusic;          // +0x77 "BackgroundMusic"
-    unsigned char Field_0x78;      // +0x78 TODO: meaning not recovered; FUN_004570a0 writes 0 for
-                                   //       the base / faction tokens and "$BGCS_Trent_", 1 for
-                                   //       "$BGCS_Faction_Rebuff_*"; FUN_00457380 reads it
+    unsigned char bHoldScript;     // +0x78 the line's remaining time holds the script
+                                   //       (IsHoldingScript); FUN_004570a0 writes 0 for the base /
+                                   //       faction tokens and "$BGCS_Trent_", 1 for
+                                   //       "$BGCS_Faction_Rebuff_*"
     unsigned char Pad79[3];
     void* Arch;                    // +0x7c Archetype::ISound (or VoiceMsg) to play, or null
     ISoundSource* Handle;          // +0x80 the playing source, or null
@@ -89,12 +90,14 @@ struct FThornSound : FThornComponent
     unsigned char Pad85[3];
     float Attenuation;             // +0x88 audio prop 0 (dB)
     float Pan;                     // +0x8c audio prop 1
-    float Field_0x90;              // +0x90 audio prop 2, 1e9 -- TODO: meaning not recovered
-    float Field_0x94;              // +0x94 audio prop 3, 1e9 -- TODO: meaning not recovered
-    unsigned int Field_0x98;       // +0x98 audio prop 4, integer 360 -- TODO: meaning not recovered
-    unsigned int Field_0x9c;       // +0x9c audio prop 5, integer 360 -- TODO: meaning not recovered
-    float Field_0xa0;              // +0xa0 audio prop 6, 0 -- TODO: meaning not recovered
-    float Field_0xa4;              // +0xa4 audio prop 7, 0 -- TODO: meaning not recovered
+    // Audio props 2..7, FThornAudio8's dmin / dmax / ain / aout / atout / rmix (the Thorn
+    // script keys). Stored and handed back only; nothing here applies them to the handle.
+    float MinDistance;             // +0x90 dmin, 1e9
+    float MaxDistance;             // +0x94 dmax, 1e9
+    unsigned int ConeInsideAngle;  // +0x98 ain, integer 360
+    unsigned int ConeOutsideAngle; // +0x9c aout, integer 360
+    float ConeOutsideAttenuation;  // +0xa0 atout, 0
+    float ReverbMix;               // +0xa4 rmix, 0
     Csys Local;                    // +0xa8 position 0, orientation identity; the handle takes
                                    //       the position (ISoundSource slot 35)
 

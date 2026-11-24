@@ -76,26 +76,3 @@ struct JumpShipEffectDesc
             Ids[Index].clear();
     }
 };
-
-// The rest of this range is the sun / star-sphere code (star_sphere.h/.cpp). The three empty
-// structs below are unused placeholders; the real descriptors live there.
-//
-// "[spines]" descriptor -- FUN_0050fba0 (star_sphere.cpp). Fields as offsets in the target:
-struct NebulaSpineDesc
-{
-    // +0x10 CacheString Shape;  // "shape=" (FUN_00417c50 = shape-id hash; zeroed when the key's value is empty)
-    // +0x38 float MinRadius;    // "min_radius="
-    // +0x3c float MaxRadius;    // "max_radius="
-    // "radius_scale=" (default 1.0) and "spine=" (5 floats/entry) are also parsed.
-};
-
-// "[star_glow]" descriptor -- FUN_0050c950; see FStarGlowDesc (star_sphere.h).
-struct StarGlowDesc
-{
-};
-
-// "[lens_glow]" descriptor -- FUN_0050d420, embedded in FSunEffectBody (+0x288..+0x2f4); see
-// LensGlowLoadFromIni (star_sphere.cpp).
-struct LensGlowDesc
-{
-};

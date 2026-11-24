@@ -146,7 +146,7 @@ void ShipTransposeRotate(FVector& Out, FMatrix const& M, FVector const& V)
 // ---------------------------------------------------------------------------------------
 
 FObjectShipDesc::FObjectShipDesc()
-    : Ship(nullptr), LaunchScript(nullptr), bShadow(0), Float1C(0.0f), Equipment(nullptr)
+    : Ship(nullptr), LaunchScript(nullptr), bShadow(0), FloorHeight(0.0f), Equipment(nullptr)
 {
     // FUN_00446bf0.
     Pos.x = 0.0f;
@@ -349,7 +349,7 @@ void FObjectShip::Load(FObjectShipDesc const& Desc)
     Orient = Desc.Orient;
     malloc_strcpy(&LaunchScript, Desc.LaunchScript);
     bShadow = Desc.bShadow;
-    SetFloat1C(Desc.Float1C);
+    SetFloorHeight(Desc.FloorHeight);
     Equipment = new EquipDescList();
     Equipment->Items = Desc.Equipment->Items;
     ScriptState = 0;
@@ -357,7 +357,7 @@ void FObjectShip::Load(FObjectShipDesc const& Desc)
     RenderMode = 0;
     LightGroup = 3;
     Layer = 0;
-    Flag14 = 0;
+    bRunningLights = 0;
 }
 
 void FObjectShip::RebuildModel()
@@ -457,7 +457,7 @@ void FObjectShip::Update(double DeltaSeconds)
 
     DALib::Anim->MixerWalk(static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)), Delta);
     DALib::Engine->UpdateInstance(Instance, 0, AsOpaqueDword(Delta));
-    if (Flag14 != 0)
+    if (bRunningLights != 0)
         Visuals.UpdateFlashLights(Delta);
 }
 
@@ -482,7 +482,7 @@ void FObjectShip::DrawOpaque(ICamera* Camera)
         return;
     if (bShadow != 0)
     {
-        float const Height = GetFloat1C();
+        float const Height = GetFloorHeight();
         unsigned long HeightBits = 0;
         memcpy(&HeightBits, &Height, sizeof(HeightBits));
         RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
@@ -498,7 +498,7 @@ void FObjectShip::DrawTranslucent(ICamera* Camera)
         return;
     if (GetGameOption(kGameOptShips) == 0)
         return;
-    if (Flag14 == 0)
+    if (bRunningLights == 0)
         return;
     Visuals.DrawFlashLights(Camera);
 }
@@ -682,8 +682,8 @@ void FObjectShip::MountEquipment(int bCombined, unsigned ArchId, unsigned short 
         Visuals.Attach(Index, Archetype::GetEquipment(ArchId));
 }
 
-void FObjectShip::UnmountEquipment(int RemoveResult, unsigned /*Arg2*/, unsigned /*Arg3*/,
-                                   CacheString const* Hardpoint, unsigned /*Arg5*/)
+void FObjectShip::UnmountEquipment(int RemoveResult, unsigned /*ArchId*/, unsigned /*Id*/,
+                                   CacheString const* Hardpoint, unsigned /*Count*/)
 {
     // FUN_00447850.
     if (Hardpoint->Value == EquipDesc::CARGO_BAY_HP_NAME.Value)
@@ -807,7 +807,7 @@ void FDealerShipObject::Load(FDealerShipDesc const& Desc)
     // FUN_00443920.
     bShadow = Desc.bShadow;
     // 1.6f is the float DAT_005cb908.
-    SetFloat1C(static_cast<float>(static_cast<double>(Desc.Height) - static_cast<double>(1.6f)));
+    SetFloorHeight(static_cast<float>(static_cast<double>(Desc.Height) - static_cast<double>(1.6f)));
 
     // The material entries go into RoomObject +0x20.
     Archetype::ICliObj* const Companion = Desc.Ship->Companion;
@@ -850,7 +850,7 @@ void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
     // FUN_00443a30. No option, model or camera test.
     if (bShadow != 0)
     {
-        float const Height = GetFloat1C();
+        float const Height = GetFloorHeight();
         unsigned long HeightBits = 0;
         memcpy(&HeightBits, &Height, sizeof(HeightBits));
         RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
@@ -889,6 +889,7 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
             if (Name == nullptr)
                 Name = "";
             Archetype::CollisionGroup const* const Group = Ship->get_group_by_id(It->Id);
+            // Retail re-tests the name after forcing it to "".
             if (Name == nullptr || Group == nullptr)
                 continue;
             if (_stricmp(Name, Group->ObjName) != 0) // DACOM stricmp
@@ -906,6 +907,7 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
     {
         if (!(It->Health == 0.0f))
             continue;
+        // Retail: no null test on the group here, unlike the loop above.
         Archetype::CollisionGroup const* const Group = Ship->get_group_by_id(It->Id);
         std::vector<Archetype::DamageObjInfo>::const_iterator Dmg = Group->DmgObjs.Items->begin();
         for (; Dmg != Group->DmgObjs.Items->end(); ++Dmg)

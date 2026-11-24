@@ -232,7 +232,7 @@ static_assert(sizeof(Heap) == 0x10, "Heap sizeof 0x10");
 // ICF-folded with EquipDesc::set_status and others, and its six Common.dll call sites all
 // belong to those; get_cause (.text:06263a70) is a folded one-liner. Server.dll writes 0x19
 // into +0x10 of a stack DamageList at .text:06cf61d2 / 06d07f8a.
-// DamageCause values from Server.dll, Common.dll, FLSDK and FLHook across Server.dll, Common.dll, FLSDK, and FLHook:
+// DamageCause values, from Server.dll, Common.dll, FLSDK and FLHook:
 //   0    = Unknown (default)
 //   1    = Collision (StarSystem::collision_damage 0x06d0d730 & non-bullet/non-guided fallback)
 //   2    = Gun (ObjectType 0x2000000 BULLET munition hit, 0x06d0d604)

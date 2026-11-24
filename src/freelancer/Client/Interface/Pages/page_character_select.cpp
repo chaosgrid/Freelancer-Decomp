@@ -332,10 +332,10 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
     }
 
     // In retail's order.
-    LoadIds(Text729, 0x729);
+    LoadIds(ServerNameText, 0x729);
     LoadIds(DetailsHeader, 0x744);
     LoadIds(DetailsPassword, 0x750);
-    LoadIds(DetailsField95, 0x74f);
+    LoadIds(DetailsNoNewPlayers, 0x74f);
     LoadIdsCut(TitleText, 0x6004e);
     LoadIdsCut(MotdHeader, 0x60007);
     LoadIdsCut(DetailsRestricted, 0x6007c);
@@ -390,7 +390,7 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
     CharacterTable->SetEdges(&Edges);
 
     Title->ClearContent();
-    AppendStyle(Title, 0x1df5);
+    AppendStyle(Title, kTextStyleScreenTitle);
     AppendRef(Title, TitleText);
 
     SelectedCharacter = G_NoCharacterId;
@@ -409,8 +409,8 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
         FServerInfo const Server = G_LoginMgr.GetCurrentServer();
         ServerDetails->ClearContent();
         AppendJustify(ServerDetails, TextJustifyCenter);
-        AppendStyle(ServerDetails, 0x4433);
-        AppendRef(ServerDetails, Text729);
+        AppendStyle(ServerDetails, kTextStyleList);
+        AppendRef(ServerDetails, ServerNameText);
         AppendParagraph(ServerDetails);
         AppendJustify(ServerDetails, TextJustifyLeft);
         AppendStyle(ServerDetails, 0x76ec);
@@ -420,7 +420,7 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
         }
         AppendParagraph(ServerDetails);
         AppendJustify(ServerDetails, TextJustifyCenter);
-        AppendStyle(ServerDetails, 0x4433);
+        AppendStyle(ServerDetails, kTextStyleList);
         AppendRef(ServerDetails, DetailsHeader);
         AppendParagraph(ServerDetails);
         AppendJustify(ServerDetails, TextJustifyLeft);
@@ -435,14 +435,14 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
         if (Server.bAllowNewPlayers == 0 || Server.bPassword != 0)
         {
             AppendJustify(ServerDetails, TextJustifyCenter);
-            AppendStyle(ServerDetails, 0x4433);
+            AppendStyle(ServerDetails, kTextStyleList);
             AppendRef(ServerDetails, DetailsRestricted);
             AppendParagraph(ServerDetails);
             AppendStyle(ServerDetails, 0x76ec);
             AppendJustify(ServerDetails, TextJustifyLeft);
             if (Server.bAllowNewPlayers == 0)
             {
-                AppendRef(ServerDetails, DetailsField95);
+                AppendRef(ServerDetails, DetailsNoNewPlayers);
                 AppendParagraph(ServerDetails);
             }
             if (Server.bPassword != 0)
@@ -458,9 +458,12 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
         RebuildTable();
 
     // Retail inlines UpdateButtons' body here.
-    NewCharacter->Flags = static_cast<unsigned char>(NewCharacter->Flags | 3);
-    LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags | 3);
-    DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags | 3);
+    NewCharacter->Flags =
+        static_cast<unsigned char>(NewCharacter->Flags | kWin3DActive | kWin3DVisible);
+    LoadCharacter->Flags =
+        static_cast<unsigned char>(LoadCharacter->Flags | kWin3DActive | kWin3DVisible);
+    DeleteCharacter->Flags =
+        static_cast<unsigned char>(DeleteCharacter->Flags | kWin3DActive | kWin3DVisible);
     UpdateButtons();
 
     SlideT = -1.0;
@@ -501,13 +504,13 @@ void PageCharacterSelect::SetCell(unsigned Row, unsigned Column, RenderDisplayLi
     {
         if (Column == SortColumn)
         {
-            StyleNode const Style(0xd190);
+            StyleNode const Style(kTextStyleColumnHeaderSorted);
             AppendNodeClone(Cell->Source, Style);
             bSortArrow = true;
         }
         else
         {
-            StyleNode const Style(0xd824);
+            StyleNode const Style(kTextStyleColumnHeader);
             AppendNodeClone(Cell->Source, Style);
         }
         JustifyNode const Justify(TextJustifyCenter);
@@ -516,9 +519,9 @@ void PageCharacterSelect::SetCell(unsigned Row, unsigned Column, RenderDisplayLi
     else
     {
         unsigned short const StyleId =
-            !bEnabled ? static_cast<unsigned short>(0xbb80)
-                      : (bSelected ? static_cast<unsigned short>(0x3343)
-                                   : static_cast<unsigned short>(0x69f5));
+            !bEnabled ? kTextStyleDisabled
+                      : (bSelected ? kTextStyleRowSelected
+                                   : kTextStyleRow);
         {
             StyleNode const Style(StyleId);
             AppendNodeClone(Cell->Source, Style);
@@ -1136,7 +1139,7 @@ void PageCharacterSelect::RefreshMotd()
     MotdVersion = Version;
     Motd->ClearContent();
     AppendJustify(Motd, TextJustifyCenter);
-    AppendStyle(Motd, 0x4433);
+    AppendStyle(Motd, kTextStyleList);
     AppendRef(Motd, MotdHeader);
     AppendParagraph(Motd);
     AppendJustify(Motd, TextJustifyLeft);

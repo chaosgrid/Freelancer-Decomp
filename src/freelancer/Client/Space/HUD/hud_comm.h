@@ -61,8 +61,8 @@ struct ISoundSource;
 // Radio inbox (radio.h)
 // ============================================================================================
 
-// One comm message (0x98 bytes). Field names follow what reads them; the server calls +0x40 the
-// comm type and +0x88 the mood.
+// One comm message (0x98 bytes). Field names follow what reads them (pub::SpaceObj::SendComm's
+// caption_ids / permutation_ids are +0x40 / +0x88).
 struct FCommMessage
 {
     // FUN_004cdc30 -- the four costume parts and the accessory count 0, TextCount 1, +0x88 and

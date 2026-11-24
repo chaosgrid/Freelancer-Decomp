@@ -276,7 +276,7 @@ unsigned int FRpcRequestCollisionGroupsPacket::Decode(const unsigned char* Buffe
 
 FRpcDebugCreateShipPacket::FRpcDebugCreateShipPacket()
     : FPacketBase(0x30022u), Field_0x14{0.0f, 0.0f, 0.0f},
-      Field_0x20{0.0f, 0.0f, 0.0f}, Field_0x2c{1.0f, 0.0f, 0.0f, 0.0f},
+      Field_0x20{0.0f, 0.0f, 0.0f}, Orientation{1.0f, 0.0f, 0.0f, 0.0f},
       Field_0x3c(0), WideData(nullptr), WideCount(0), DataA(nullptr), DataSizeA(0),
       DataB(nullptr), DataSizeB(0), Field_0x50(0), Field_0x54(0), Field_0x58(0),
       Field_0x5c(0), ArrayCount(0), ArrayData(nullptr) {}
@@ -303,10 +303,10 @@ unsigned int FRpcDebugCreateShipPacket::Encode(unsigned char** BufferHolder,
     if (!Stream.Reserve(16u, 0x16u)) return 0x16u;
     // W/X/Y/Z as integer DWORDs (06b39ec0).
     unsigned int QuaternionBits[4];
-    std::memcpy(&QuaternionBits[0], &Field_0x2c.w, 4u);
-    std::memcpy(&QuaternionBits[1], &Field_0x2c.x, 4u);
-    std::memcpy(&QuaternionBits[2], &Field_0x2c.y, 4u);
-    std::memcpy(&QuaternionBits[3], &Field_0x2c.z, 4u);
+    std::memcpy(&QuaternionBits[0], &Orientation.w, 4u);
+    std::memcpy(&QuaternionBits[1], &Orientation.x, 4u);
+    std::memcpy(&QuaternionBits[2], &Orientation.y, 4u);
+    std::memcpy(&QuaternionBits[3], &Orientation.z, 4u);
     Stream.PutReserved(QuaternionBits, 16u);
     if (!Stream.Put(&Field_0x3c, 4u)) return 0x16u;
     if (!Stream.Put(&WideCount, 4u)) return 0x16u;
@@ -348,10 +348,10 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
     if (!RpcWireGetVector(*this, Stream, Field_0x14)) return MarshalError;
     if (!RpcWireGetVector(*this, Stream, Field_0x20)) return MarshalError;
     if (!Stream.Reserve(16u, 0x17u)) return MarshalError;
-    std::memcpy(&Field_0x2c.w, reinterpret_cast<const void*>(MarshalPtr), 4u);
-    std::memcpy(&Field_0x2c.x, reinterpret_cast<const void*>(MarshalPtr + 4u), 4u);
-    std::memcpy(&Field_0x2c.y, reinterpret_cast<const void*>(MarshalPtr + 8u), 4u);
-    std::memcpy(&Field_0x2c.z, reinterpret_cast<const void*>(MarshalPtr + 12u), 4u);
+    std::memcpy(&Orientation.w, reinterpret_cast<const void*>(MarshalPtr), 4u);
+    std::memcpy(&Orientation.x, reinterpret_cast<const void*>(MarshalPtr + 4u), 4u);
+    std::memcpy(&Orientation.y, reinterpret_cast<const void*>(MarshalPtr + 8u), 4u);
+    std::memcpy(&Orientation.z, reinterpret_cast<const void*>(MarshalPtr + 12u), 4u);
     Stream.CommitReadPointer(16u);
     if (!RpcWireGetThenStore(Stream, Field_0x3c)) return MarshalError;
     if (!RpcWireGetThenStore(Stream, WideCount)) return MarshalError;

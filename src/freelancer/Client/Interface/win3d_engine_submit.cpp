@@ -32,8 +32,7 @@ namespace
 {
     constexpr float kOne = 1.0f;
 
-    // RS 0x0e / 0x17. The "Cull" / "Lighting" local and parameter names below are older
-    // misreadings of these two states.
+    // RS 0x0e / 0x17.
     constexpr D3DRENDERSTATETYPE kRsZWriteEnable = D3DRS_ZWRITEENABLE;
     constexpr D3DRENDERSTATETYPE kRsDepthFunction = D3DRS_ZFUNC;
 
@@ -70,10 +69,10 @@ namespace
                      Scale);
     }
 
-    void ApplyCullAndLighting(IRenderPipeline* Pipe, unsigned char bNonZeroCullByte)
+    void ApplyDepthStates(IRenderPipeline* Pipe, unsigned char bDepthTested)
     {
-        // Non-zero: depth func 4, no z write; else depth func 8 (always), z write on.
-        if (bNonZeroCullByte != 0)
+        // Non-zero: D3DCMP_LESSEQUAL (4), no z write; else D3DCMP_ALWAYS (8), z write on.
+        if (bDepthTested != 0)
         {
             Pipe->SetRenderState(kRsDepthFunction, 4);
             Pipe->SetRenderState(kRsZWriteEnable, 0);
@@ -146,12 +145,12 @@ void Win3DUnprojectScreenRayDir(FSpaceCamera* Cam, float ScreenX, float ScreenY,
     OutDir[2] = Wz;
 }
 
-void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor, unsigned char bFrontCull,
-                               float Scale, unsigned long Flags)
+void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
+                               unsigned char bDepthTested, float Scale, unsigned long Flags)
 {
     // FUN_0059efa0 (thiscall on the holder, RET 0x10). No test of the holder, its instance, the
     // renderer or the pipeline; the depth states are not restored.
-    ApplyCullAndLighting(GetPipe(), bFrontCull);
+    ApplyDepthStates(GetPipe(), bDepthTested);
 
     // Scale != 1 passes a scaled identity with Flags | 0x30; else no matrix.
     void* Matrix = nullptr;
@@ -171,7 +170,7 @@ void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor, unsi
 void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
                                      unsigned char MaterialSelector, unsigned long Flags,
                                      unsigned char const ColorRgba[4],
-                                     unsigned char bCullLightingByte, float Scale)
+                                     unsigned char bDepthTested, float Scale)
 {
     // FUN_00434310 (cdecl, 7 args).
     if (GetGameOption(kGameOptShipWires) == 0)
@@ -181,11 +180,11 @@ void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
 
     // The two depth states saved, then set; restored at the end.
     IRenderPipeline* const Pipe = GetPipe();
-    int SavedCull = 0;
-    int SavedLighting = 0;
-    Pipe->GetRenderState(kRsDepthFunction, &SavedCull);
-    Pipe->GetRenderState(kRsZWriteEnable, &SavedLighting);
-    ApplyCullAndLighting(Pipe, bCullLightingByte);
+    int SavedDepthFunc = 0;
+    int SavedZWrite = 0;
+    Pipe->GetRenderState(kRsDepthFunction, &SavedDepthFunc);
+    Pipe->GetRenderState(kRsZWriteEnable, &SavedZWrite);
+    ApplyDepthStates(Pipe, bDepthTested);
 
     // Neither GetOverrideMaterial's result nor the material is tested, as retail.
     IMaterial* Material = nullptr;
@@ -225,14 +224,14 @@ void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
     }
 
     DALib::Renderer->RenderInstance(ArchAnchor, EngineInstance, 1.0f, SlotFlags, Matrix, Material);
-    Pipe->SetRenderState(kRsDepthFunction, SavedCull);
-    Pipe->SetRenderState(kRsZWriteEnable, SavedLighting);
+    Pipe->SetRenderState(kRsDepthFunction, SavedDepthFunc);
+    Pipe->SetRenderState(kRsZWriteEnable, SavedZWrite);
 }
 
 void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, void* EngineInstance,
                                             unsigned char bFrontCull,
                                             unsigned char const ColorRgba[4],
-                                            unsigned char bCullLightingByte, float Scale,
+                                            unsigned char bDepthTested, float Scale,
                                             unsigned long Flags)
 {
     // FUN_00434630.
@@ -241,12 +240,12 @@ void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, void* EngineInstan
         OrFlags |= 0x2000u;
     // The material selector is the constant 1, not the depth byte.
     SubmitWin3DTintedEngineInstance(ArchAnchor, EngineInstance, 1, OrFlags, ColorRgba,
-                                    bCullLightingByte, Scale);
+                                    bDepthTested, Scale);
 }
 
 int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsigned char bFrontCull,
                                       unsigned char const ColorRgba[4],
-                                      unsigned char bCullLightingByte, float Scale,
+                                      unsigned char bDepthTested, float Scale,
                                       unsigned char bParam10, unsigned long Flags)
 {
     // FUN_00433f40
@@ -254,11 +253,11 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsign
         return 1;
 
     IRenderPipeline* const Pipe = DALib::Pipeline;
-    int SavedCull = 0;
-    int SavedLighting = 0;
-    Pipe->GetRenderState(kRsDepthFunction, &SavedCull);
-    Pipe->GetRenderState(kRsZWriteEnable, &SavedLighting);
-    ApplyCullAndLighting(Pipe, bCullLightingByte);
+    int SavedDepthFunc = 0;
+    int SavedZWrite = 0;
+    Pipe->GetRenderState(kRsDepthFunction, &SavedDepthFunc);
+    Pipe->GetRenderState(kRsZWriteEnable, &SavedZWrite);
+    ApplyDepthStates(Pipe, bDepthTested);
 
     // Retail does not test the material before using it.
     IMaterial* Material = nullptr;
@@ -306,8 +305,8 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsign
     int const Result =
         DALib::Renderer->RenderInstance(Camera, EngineInstance, 1.0f, SlotFlags, Matrix, Material);
 
-    Pipe->SetRenderState(kRsDepthFunction, SavedCull);
-    Pipe->SetRenderState(kRsZWriteEnable, SavedLighting);
+    Pipe->SetRenderState(kRsDepthFunction, SavedDepthFunc);
+    Pipe->SetRenderState(kRsZWriteEnable, SavedZWrite);
     return Result;
 }
 

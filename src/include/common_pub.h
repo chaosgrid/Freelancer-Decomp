@@ -143,13 +143,15 @@ static_assert(sizeof(GSplinePath) == 0x30, "GSplinePath size (operator= copies 0
 class COMMON_API Personality
 {
 public:
-    // Nested in retail: get_toughness_ratio takes `W4TOUGHNESS_TYPE@123@`.
+    // Nested in retail: get_toughness_ratio takes `W4TOUGHNESS_TYPE@123@`. Named after the
+    // EASIEST..HARDEST tokens Content's [JobBlock] loader maps to 0..4.
     enum TOUGHNESS_TYPE
     {
-        ToughnessDefault = 0,
-        ToughnessHull = 1,
-        ToughnessShield = 2,
-        ToughnessMax = 3,
+        ToughnessEasiest = 0,
+        ToughnessEasy = 1,
+        ToughnessEqual = 2,
+        ToughnessHard = 3,
+        ToughnessHardest = 4,
     };
 
     // Field names of the *UseStruct / *ReactionStruct members are the [<Name>Block] keys
@@ -530,7 +532,10 @@ public:
                                             //             [JobBlock] key writes it (TODO: meaning)
         int32_t  SceneToughnessThreshold;   // +0x004  2
         int32_t  TargetToughnessPreference; // +0x008  2
-        float    Field_0C;                  // +0x00C  10000.0  no [JobBlock] key writes it (TODO)
+        // +0x00C: TargetManager fires combat_drift_event once the owner is this far from its
+        // attack anchor. Content recognises "combat_drift_distance" in [JobBlock] but never
+        // stores it, so the ctor default always applies.
+        float    CombatDriftDistance;       // +0x00C  10000.0
         // +0x010: 12 records plus the terminator record. The ctor writes record 0 =
         // {11, 5000.0, 0xF} and record 1's class = 12 only; the port zeroes the rest.
         FAttackPreference AttackPreferences[13]; // +0x010
@@ -655,7 +660,15 @@ static_assert(sizeof(BaseOp) == 0x0C, "BaseOp size");
 //
 // Layouts from each op's default ctor (Common.dll.c 0x7AE20-0x7B2A0), copy ctor
 // (0x48A60-0x48EE0) and validate() (0x7AE60-0x7B360); the comment column is the ctor
-// default. Unnamed fields are Field_XX by offset.
+// default. Unnamed fields are Field_XX by offset. Names come from the consumers
+// (GotoBehavior / DockBehavior / GuideBehavior / ... OnApplyDirective), Content's [ObjList]
+// parsers and Server's SubmitDirective.
+//
+// "Tether" fields: an optional object the ship keeps company with. Its id is watched by the
+// behaviour's 0x1c-byte proximity watcher (ProxWatcherInit, FUN_062c29f0), which caps the
+// speed by the near / far ranges and reports zone changes through
+// ContentCallback::tether_object_event (Content's Cnd_TetherBroke). The cruise ratio is a
+// float stored in an integer field (0 = derive it from the two ships' speeds).
 //
 // Retail exports per op: default ctor, copy ctor, vftable and the virtual validate(). The
 // Directive* ops are classes, the three Set*Params structs. No operator= or destructor is
@@ -664,32 +677,42 @@ static_assert(sizeof(BaseOp) == 0x0C, "BaseOp size");
 class COMMON_API DirectiveGotoOp : public BaseOp
 {
 public:
-    int32_t Field_0C;              // +0x0C  3
+    // +0x0C: 0 = fly to TargetId, 1 = to Destination, 2 = along the spline (Content's
+    // GotoShip / GotoVec / GotoSpline); GotoBehavior::OnApplyDirective fails any other value.
+    int32_t GotoKind;              // +0x0C  3
     Vector  Destination;           // +0x10  0,0,0 (validate rejects NaN components)
-    int32_t Field_1C;              // +0x1C  0     gates the NaN check in validate()
-    uint32_t Field_20;             // +0x20  0
-    uint32_t Field_24;             // +0x24  0
-    uint32_t Field_28;             // +0x28  0
-    uint32_t Field_2C;             // +0x2C  0
-    uint32_t Field_30;             // +0x30  0
-    uint32_t Field_34;             // +0x34  0
-    uint32_t Field_38;             // +0x38  0
-    uint32_t Field_3C;             // +0x3C  0
-    uint32_t Field_40;             // +0x40  0
-    uint32_t Field_44;             // +0x44  0
-    uint32_t Field_48;             // +0x48  0
-    uint32_t Field_4C;             // +0x4C  0
-    float   Field_50;              // +0x50  500.0  (validate: must be >= 0)
-    float   Field_54;              // +0x54  -1.0
-    uint8_t Field_58;              // +0x58  0
-    uint8_t Field_59;              // +0x59  1
-    uint8_t Field_5A;              // +0x5A  0
-    uint8_t Field_5B;              // +0x5B  0
-    uint32_t Field_5C;             // +0x5C  0
-    float   Field_60;              // +0x60  200.0
-    float   Field_64;              // +0x64  500.0  (validate: Field_64 must be >= Field_60)
-    uint32_t Field_68;             // +0x68  0
-    uint8_t Field_6C;              // +0x6C  0
+    int32_t TargetId;              // +0x1C  0     object to fly to (validate: no Destination with it)
+    // +0x20..+0x4C: the spline's four control points as float bits, in memory order P1, P2,
+    // P0, P3 (GotoBehavior builds the ICRSplineSegment from +0x38 / +0x20 / +0x2c / +0x44).
+    uint32_t SplineP1X;            // +0x20  0
+    uint32_t SplineP1Y;            // +0x24  0
+    uint32_t SplineP1Z;            // +0x28  0
+    uint32_t SplineP2X;            // +0x2C  0
+    uint32_t SplineP2Y;            // +0x30  0
+    uint32_t SplineP2Z;            // +0x34  0
+    uint32_t SplineP0X;            // +0x38  0
+    uint32_t SplineP0Y;            // +0x3C  0
+    uint32_t SplineP0Z;            // +0x40  0
+    uint32_t SplineP3X;            // +0x44  0
+    uint32_t SplineP3Y;            // +0x48  0
+    uint32_t SplineP3Z;            // +0x4C  0
+    float   ArrivalRange;          // +0x50  500.0  (validate: must be >= 0)
+    // +0x54: speed limit; above 1e-5 GotoBehavior turns it into its MaxThrottle through
+    // get_projected_throttle, otherwise full throttle.
+    float   MaxSpeed;              // +0x54  -1.0
+    // +0x58: set = no stop at the destination (the Move / SplineMove Ideas get StopStyle 2,
+    // "no slow-down"); Content's patrols and guides set it, the player's HUD goto clears it.
+    uint8_t bFlyThrough;           // +0x58  0
+    uint8_t Field_59;              // +0x59  1     -> MoveIdea::SetEnabled; no reader found
+    uint8_t bGotoCruise;           // +0x5A  0     "goto_cruise": force cruise on
+    uint8_t bGotoNoCruise;         // +0x5B  0     "goto_no_cruise": force cruise off (validate: not both)
+    uint32_t TetherObjectId;       // +0x5C  0
+    float   TetherNearRange;       // +0x60  200.0
+    float   TetherFarRange;        // +0x64  500.0  (validate: must be >= TetherNearRange)
+    uint32_t TetherCruiseRatio;    // +0x68  0     float bits
+    // +0x6C: set = the pathfinder's obstacle avoidance is switched off for this goto
+    // (Behavior::SetAvoidanceAllowed(bDisableAvoidance == 0, 3)).
+    uint8_t bDisableAvoidance;     // +0x6C  0
 
     DirectiveGotoOp();
     DirectiveGotoOp(DirectiveGotoOp const& Other);
@@ -698,10 +721,10 @@ public:
     bool validate() override;
 };
 
-static_assert(offsetof(DirectiveGotoOp, Field_0C) == 0x0C, "DirectiveGotoOp +0x0C");
+static_assert(offsetof(DirectiveGotoOp, GotoKind) == 0x0C, "DirectiveGotoOp +0x0C");
 static_assert(offsetof(DirectiveGotoOp, Destination) == 0x10, "DirectiveGotoOp +0x10");
-static_assert(offsetof(DirectiveGotoOp, Field_50) == 0x50, "DirectiveGotoOp +0x50");
-static_assert(offsetof(DirectiveGotoOp, Field_6C) == 0x6C, "DirectiveGotoOp +0x6C");
+static_assert(offsetof(DirectiveGotoOp, ArrivalRange) == 0x50, "DirectiveGotoOp +0x50");
+static_assert(offsetof(DirectiveGotoOp, bDisableAvoidance) == 0x6C, "DirectiveGotoOp +0x6C");
 static_assert(sizeof(DirectiveGotoOp) == 0x70, "DirectiveGotoOp size");
 
 class COMMON_API DirectiveFollowOp : public BaseOp
@@ -709,10 +732,12 @@ class COMMON_API DirectiveFollowOp : public BaseOp
 public:
     uint   TargetId;               // +0x0C  0      object to follow (validate: != 0)
     float  FollowDistance;         // +0x10  150.0
-    float  Field_14;               // +0x14  0.0
-    float  Field_18;               // +0x18  0.0
-    float  Field_1C;               // +0x1C  0.0
-    float  Field_20;               // +0x20  400.0
+    // +0x14..+0x1C: the offset from the leader FollowBehavior hands to set_follow_offset
+    // (Content's Follow / Guide "offset" values, Server's FollowOffset).
+    float  FollowOffsetX;          // +0x14  0.0
+    float  FollowOffsetY;          // +0x18  0.0
+    float  FollowOffsetZ;          // +0x1C  0.0
+    float  EngageRange;            // +0x20  400.0  FollowBehavior's readiness range
 
     DirectiveFollowOp();
     DirectiveFollowOp(DirectiveFollowOp const& Other);
@@ -735,7 +760,7 @@ public:
     uint     TargetId;             // +0x10  0  mode 1 object (validate: != 0)
     Vector   FacePoint;            // +0x14  0,0,0  mode 2 point
     Matrix   Orientation;          // +0x20  mode 3; not written by retail default ctor
-    uint8_t  Field_44;             // +0x44  1  copied into FaceBehavior +0x1c4 (TODO: meaning)
+    uint8_t  bKillEngine;          // +0x44  1  FaceBehavior: SetEngineActive(bKillEngine == 0) on engage
 
     DirectiveFaceOp();
     DirectiveFaceOp(DirectiveFaceOp const& Other);
@@ -747,7 +772,7 @@ public:
 static_assert(offsetof(DirectiveFaceOp, Mode) == 0x0C, "DirectiveFaceOp +0x0C");
 static_assert(offsetof(DirectiveFaceOp, FacePoint) == 0x14, "DirectiveFaceOp +0x14");
 static_assert(offsetof(DirectiveFaceOp, Orientation) == 0x20, "DirectiveFaceOp +0x20");
-static_assert(offsetof(DirectiveFaceOp, Field_44) == 0x44, "DirectiveFaceOp +0x44");
+static_assert(offsetof(DirectiveFaceOp, bKillEngine) == 0x44, "DirectiveFaceOp +0x44");
 static_assert(sizeof(DirectiveFaceOp) == 0x48, "DirectiveFaceOp size");
 
 class COMMON_API DirectiveStrafeOp : public BaseOp
@@ -847,11 +872,14 @@ static_assert(sizeof(DirectiveEvadeOp) == 0x10, "DirectiveEvadeOp size");
 class COMMON_API DirectiveDrasticEvadeOp : public BaseOp
 {
 public:
-    uint     ThreatId;             // +0x0C  0      threat to evade drastically (validate() always returns true)
-    uint32_t Field_10;             // +0x10  0
-    uint32_t Field_14;             // +0x14  0
-    uint32_t Field_18;             // +0x18  0
-    float    Field_1C;             // +0x1C  1.0
+    // +0x0C: DrasticEvadeBehavior's mode (LAB_062c87c0 / LAB_062c8800): 0 = nudge sideways
+    // along NudgeX/NudgeY for Duration seconds, 1 = full reverse throttle for Duration, other
+    // values end at once. validate() always returns true.
+    uint     Mode;                 // +0x0C  0
+    uint32_t NudgeX;               // +0x10  0     float bits; copied with Y/Z only in mode 0
+    uint32_t NudgeY;               // +0x14  0
+    uint32_t NudgeZ;               // +0x18  0     copied but not used (the nudge's z is 0)
+    float    Duration;             // +0x1C  1.0
     uint32_t Field_20;             // +0x20  0
     uint32_t Field_24;             // +0x24  0
     uint32_t Field_28;             // +0x28  0
@@ -864,21 +892,25 @@ public:
     bool validate() override;
 };
 
-static_assert(offsetof(DirectiveDrasticEvadeOp, ThreatId) == 0x0C, "DirectiveDrasticEvadeOp +0x0C");
-static_assert(offsetof(DirectiveDrasticEvadeOp, Field_1C) == 0x1C, "DirectiveDrasticEvadeOp +0x1C");
+static_assert(offsetof(DirectiveDrasticEvadeOp, Mode) == 0x0C, "DirectiveDrasticEvadeOp +0x0C");
+static_assert(offsetof(DirectiveDrasticEvadeOp, Duration) == 0x1C, "DirectiveDrasticEvadeOp +0x1C");
 static_assert(sizeof(DirectiveDrasticEvadeOp) == 0x30, "DirectiveDrasticEvadeOp size");
 
 class COMMON_API DirectiveDockOp : public BaseOp
 {
 public:
     uint     DockObjectId;         // +0x0C  0      object to dock with
-    int32_t  Field_10;             // +0x10  0
-    uint8_t  Field_14;             // +0x14  0     (+0x15..+0x17 padding)
+    // +0x10: with a trade-lane ring as DockObjectId, the ring the ship continues to (Content's
+    // Dock second value, "NONE" = 0); DockBehavior keeps it as LaneNextRing.
+    int32_t  NextRingId;           // +0x10  0
+    // +0x14: DockPortIndex is given (every writer sets both; validate: not with index -1);
+    // DockBehavior otherwise picks its own port.
+    uint8_t  bHasDockPortIndex;    // +0x14  0     (+0x15..+0x17 padding)
     int32_t  DockPortIndex;        // +0x18  -1
-    int32_t  Field_1C;             // +0x1C  0
-    float    Field_20;             // +0x20  200.0
-    float    Field_24;             // +0x24  500.0  (validate: Field_24 must be >= Field_20)
-    int32_t  Field_28;             // +0x28  0
+    int32_t  TetherObjectId;       // +0x1C  0
+    float    TetherNearRange;      // +0x20  200.0
+    float    TetherFarRange;       // +0x24  500.0  (validate: must be >= TetherNearRange)
+    int32_t  TetherCruiseRatio;    // +0x28  0     float bits
 
     DirectiveDockOp();
     DirectiveDockOp(DirectiveDockOp const& Other);
@@ -889,15 +921,17 @@ public:
 
 static_assert(offsetof(DirectiveDockOp, DockObjectId) == 0x0C, "DirectiveDockOp +0x0C");
 static_assert(offsetof(DirectiveDockOp, DockPortIndex) == 0x18, "DirectiveDockOp +0x18");
-static_assert(offsetof(DirectiveDockOp, Field_20) == 0x20, "DirectiveDockOp +0x20");
+static_assert(offsetof(DirectiveDockOp, TetherNearRange) == 0x20, "DirectiveDockOp +0x20");
 static_assert(sizeof(DirectiveDockOp) == 0x2C, "DirectiveDockOp size");
 
 class COMMON_API DirectiveLaunchOp : public BaseOp
 {
 public:
     uint    LaunchObjectId;        // +0x0C  0      object to launch from (validate: != 0)
-    int32_t Field_10;              // +0x10  -1     (validate: != -1)
-    int32_t Field_14;              // +0x14  0      (validate: != 0)
+    int32_t DockPortIndex;         // +0x10  -1     (validate: != -1); LaunchBehavior's DockPortIndex
+    // +0x14: Content's Launch terminal kind, NONE / BERTH / PAD / MOOR_SMALL / MOOR_MEDIUM /
+    // MOOR_LARGE / RING / JUMP_GATE = 0..7 (validate: != 0).
+    int32_t TerminalType;          // +0x14  0
 
     DirectiveLaunchOp();
     DirectiveLaunchOp(DirectiveLaunchOp const& Other);
@@ -913,8 +947,11 @@ class COMMON_API DirectiveInstantTradelaneOp : public BaseOp
 {
 public:
     uint    TradeLaneId;           // +0x0C  0      tradelane to use (validate: != 0)
-    int32_t Field_10;              // +0x10  0
-    int32_t Field_14;              // +0x14  0
+    // +0x10: InstantTradeLaneBehavior's exit ring (go_tradelane's second ring); 0 lets
+    // get_lane_start find it.
+    int32_t ExitRingId;            // +0x10  0
+    // +0x14: float bits, go_tradelane's Speed (InstantTradeLaneBehavior::LaneSpeed).
+    int32_t LaneSpeed;             // +0x14  0
 
     DirectiveInstantTradelaneOp();
     DirectiveInstantTradelaneOp(DirectiveInstantTradelaneOp const& Other);
@@ -1009,13 +1046,15 @@ class COMMON_API DirectiveGuideOp : public BaseOp
 public:
     DirectiveGotoOp   GotoParams;      // +0x0C  size 0x70
     DirectiveFollowOp FollowParams;    // +0x7C  size 0x24
-    uint8_t Field_A0;                  // +0xA0  1     (+0xA1..+0xA3 padding)
-    float   Field_A4;                  // +0xA4  10.0
-    float   Field_A8;                  // +0xA8  0.3927  (pi/8)
-    int32_t Field_AC;                  // +0xAC  3
-    float   Field_B0;                  // +0xB0  10.0
-    float   Field_B4;                  // +0xB4  -10.0
-    float   Field_B8;                  // +0xB8  400.0
+    // GuideBehavior::OnApplyDirective (LAB_062cfc70) copies each of these into its own
+    // member of the same name. GotoParams.TetherObjectId is the escorted ship.
+    uint8_t bStartFollowing;       // +0xA0  1     the escort starts out following (Content's SetGuide)
+    float   SampleInterval;        // +0xA4  10.0  seconds between progress samples
+    float   CourseAngleThreshold;  // +0xA8  0.3927  (pi/8) escort heading error for "on course"
+    int32_t Field_AC;              // +0xAC  3     copied to GuideBehavior+0x110 as a float; no reader
+    float   ProgressHighThreshold; // +0xB0  10.0  distance closed per sample that counts as catching up
+    float   ProgressLowThreshold;  // +0xB4  -10.0 below this the escort counts as falling behind
+    float   GuideRange;            // +0xB8  400.0 OnEvaluateReadiness's range to the escort
 
     DirectiveGuideOp();
     DirectiveGuideOp(DirectiveGuideOp const& Other);
@@ -1026,8 +1065,8 @@ public:
 
 static_assert(offsetof(DirectiveGuideOp, GotoParams) == 0x0C, "DirectiveGuideOp +0x0C");
 static_assert(offsetof(DirectiveGuideOp, FollowParams) == 0x7C, "DirectiveGuideOp +0x7C");
-static_assert(offsetof(DirectiveGuideOp, Field_A0) == 0xA0, "DirectiveGuideOp +0xA0");
-static_assert(offsetof(DirectiveGuideOp, Field_B8) == 0xB8, "DirectiveGuideOp +0xB8");
+static_assert(offsetof(DirectiveGuideOp, bStartFollowing) == 0xA0, "DirectiveGuideOp +0xA0");
+static_assert(offsetof(DirectiveGuideOp, GuideRange) == 0xB8, "DirectiveGuideOp +0xB8");
 static_assert(sizeof(DirectiveGuideOp) == 0xBC, "DirectiveGuideOp size");
 
 // ============================================================================
@@ -1230,7 +1269,7 @@ struct DirectiveCallback
 {
     // Retail override: LaunchAction::OnDirectiveComplete (0x62b01f0). Dispatched when a
     // queued AI directive this callback was registered for finishes.
-    virtual void OnDirectiveComplete(int ResultWord11c, int ResultWord118) = 0;
+    virtual void OnDirectiveComplete(int CompletedBehavior, int DirectiveResult) = 0;
 };
 
 }} // namespace pub::AI

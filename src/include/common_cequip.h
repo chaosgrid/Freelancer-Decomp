@@ -149,17 +149,17 @@ static_assert(sizeof(FAnimScriptRef) == 0x04, "FAnimScriptRef sizeof 4");
 // destructor precedes it (retail never deletes through an INotify*).
 struct INotify
 {
-    // Event codes seen at retail CEquip::Notify call sites. Codes named Event_0xNN have no
-    // confirmed meaning; the numbering is not contiguous or CEquip-specific.
+    // Event codes seen at retail CEquip::Notify call sites. Names follow the sending site;
+    // the numbering is not contiguous or CEquip-specific.
     enum Event
     {
         DockAnimEnded             = 0x0,  // CEqObj::update_docking_animations (062aabac / 062aac5f): a docking animation reached an end; Param = unsigned char* (1 = back at the start, 0 = at the end)
         BayStateChanged           = 0x2,  // CShip::open_bay (062b2b5b) / close_bay (062b2ca7): Param = unsigned char* (1 = opening)
-        Event_0x5                 = 0x5,  // CAttachedEquip::Disconnect, FATE 2 (debris) with a debris object: Param = the CAttachedEquip*
-        Event_0x6                 = 0x6,  // CAttachedEquip::Disconnect, FATE other than 1/2: Param = the CAttachedEquip*
-        Event_0x7                 = 0x7,  // CArchGroup::Destroy, FATE 2 with a debris object: Param = the CArchGroup*
-        Event_0x8                 = 0x8,  // CArchGroup::Destroy, FATE 3/4/5: Param = the CArchGroup*
-        Event_0x9                 = 0x9,  // CArchGroup::SetHitPoints, a positive decrease: Param = the CArchGroup*
+        EquipSeparated            = 0x5,  // CAttachedEquip::Disconnect, FATE 2 (debris) with a debris object: Param = the CAttachedEquip*
+        EquipDetachedInPlace      = 0x6,  // CAttachedEquip::Disconnect, FATE other than 1/2: Param = the CAttachedEquip*
+        ArchGroupSeparated        = 0x7,  // CArchGroup::Destroy, FATE 2 with a debris object: Param = the CArchGroup*
+        ArchGroupDetachedInPlace  = 0x8,  // CArchGroup::Destroy, FATE 3/4/5: Param = the CArchGroup*
+        ArchGroupDamaged          = 0x9,  // CArchGroup::SetHitPoints, a positive decrease: Param = the CArchGroup*
         EquipDestroying           = 0xa,  // CEquip::Destroy: Param = equipment Id (ushort, zero-extended)
         EquipActivating           = 0xb,  // CEquip::Activate(true) on a 0->1 edge: Param = nullptr
         EquipDeactivating         = 0xc,  // CEquip::Activate(false) on a 1->0 edge: Param = nullptr
@@ -178,11 +178,12 @@ struct INotify
         ShieldCanReactivate       = 0x13, // CEShield::Update/SetHitPoints: an inactive-but-active
                                            // shield's relative health recovered above OfflineThreshold;
                                            // Param = nullptr
-        Event_0x14                = 0x14, // CETractor::AddTarget verify failure: Param = &TractorFailureCode
-        Event_0x15                = 0x15, // TractorArm::Update lost/invalid target: Param = the TractorArm*
-        Event_0x17                = 0x17, // TractorArm::Update target reached the beam tip: Param = the TractorArm*
-        Event_0x18                = 0x18, // TractorArm::Update consume timer elapsed: Param = the TractorArm*
-        Event_0x19                = 0x19,
+        TractorTargetRejected     = 0x14, // CETractor::AddTarget verify failure: Param = &TractorFailureCode
+        TractorArmFailed          = 0x15, // TractorArm::Update lost/invalid target: Param = the TractorArm*
+        TractorArmReachedTarget   = 0x17, // TractorArm::Update, the tip reached the target: Param = the TractorArm*
+        TractorArmAcquireTimeUp   = 0x18, // TractorArm::Update consume timer elapsed: Param = the TractorArm*
+        IncomingMissileDetected   = 0x19, // CECounterMeasureDropper::Update: a guided missile targeting the owner within AiRange; Param = nullptr.
+                                           // Server's and the client's dropper listeners fire the dropper on it.
     };
 
     virtual void notify(Event Code, void* Param) = 0;
@@ -755,10 +756,12 @@ public:
     // (.text:062960d6..06296101: a changed, non-zero throttle calls wakeup() and is stored here).
     float LastWakeThrottle;
     unsigned char Opaque48[0x4];      // +0x48  never written by the ctor (.text:06295c40)
-    float CruiseChargeRate;           // +0x4c  set by EngageCruise on charge-begin to
-                                       // CRUISE_ACCEL_TIME * ThrustMultiplier(Arch+0x70) /
-                                       // (ShipLinearDrag * CRUISING_SPEED), zeroed on disengage;
-                                       // no reader found
+    // +0x4c: the cruise thrust ramp's elapsed time. do_simulation_controller adds dt once the
+    // charge is done and scales cruise thrust by it / CRUISE_ACCEL_TIME (capped at 1). A
+    // non-instant EngageCruise seeds it with CRUISE_ACCEL_TIME * ThrustMultiplier /
+    // (ShipLinearDrag * CRUISING_SPEED), the point where the ramp matches full throttle
+    // thrust; disengage zeroes it.
+    float CruiseRampElapsed;
     float CruiseChargeTimeElapsed;    // +0x50
     unsigned char bCruiseActive;      // +0x54  CShip::is_cruise_active (+0x55..+0x57 padding)
 };
@@ -1217,7 +1220,7 @@ protected:
     // .text:0629d2d0 (ordinal 2443, protected virtual; slot 4 of the CPhysControllerEquip
     // table at +0x4c). Clears bCouldThrust; when functioning, drains Arch->PowerUsage * dt from
     // the ship's CShip::ThrustPower pool and pushes MaxThrust * dt along the owner's -Z, then sets
-    // bCouldThrust -- or, when the pool cannot cover it, fires Notify(Event_0xF, 0).
+    // bCouldThrust -- or, when the pool cannot cover it, fires Notify(NotEnoughPower, 0).
     virtual void do_simulation_controller(IVP_Event_Sim* EventSim,
                                           IVP_U_Vector<IVP_Core>* CoreList) override;
 
@@ -1314,10 +1317,9 @@ protected:
 class COMMON_API TractorArm
 {
 public:
-    // From TractorArm::Update: 0 = idle (no target locked,
-    // Update no-ops), 1 = pulling the target toward the beam tip, 2 = target reached the tip,
-    // Timer counting down before consumption.
-    enum Mode { MODE_0 = 0, MODE_1 = 1, MODE_2 = 2 };
+    // From TractorArm::Update: 0 = off (no target, Update no-ops), 1 = the tip extending toward
+    // the target, 2 = the tip on the target, Timer counting down before consumption.
+    enum Mode { MODE_OFF = 0, MODE_REACHING = 1, MODE_HOLDING = 2 };
 
     explicit TractorArm(CETractor* OwnerTractor);
     TractorArm(TractorArm const& Other);
@@ -1325,8 +1327,8 @@ public:
     ~TractorArm();
 
     Mode GetMode() const { return (Mode)State; }
-    // 0x0629d860 (ordinal 1778): on while State (+0x04) is anything but MODE_0.
-    bool IsOn() const { return State != 0; }
+    // 0x0629d860 (ordinal 1778): on while State (+0x04) is anything but MODE_OFF.
+    bool IsOn() const { return State != MODE_OFF; }
     // 0x0629d880 (ordinal 1577, ICF-folded with CECargo::GetContainer): the stored ErrorCode.
     TractorFailureCode GetErrorCode() const { return ErrorCode; }
     // 0x3d870: the watched Watchable* minus CSimple::SelfWatchable's offset (0x9c), as in
@@ -1340,8 +1342,8 @@ public:
     CETractor* Owner;             // +0x00
     unsigned State;               // +0x04  Mode
     BaseWatcher TargetWatch;      // +0x08  watches Target's CSimple::SelfWatchable
-    Vector PullOffset;            // +0x10  accumulated pull toward beam tip (State == MODE_1)
-    float Timer;                  // +0x1c  countdown after reaching the tip (State == MODE_2)
+    Vector PullOffset;            // +0x10  accumulated pull toward beam tip (State == MODE_REACHING)
+    float Timer;                  // +0x1c  countdown after reaching the tip (State == MODE_HOLDING)
     TractorFailureCode ErrorCode; // +0x20
 
 protected:
@@ -1533,7 +1535,7 @@ public:
     // this launcher's archetype AiRangeSq (already squared on read) is positive: scans the
     // owning ship's own CEScanner (Owner->EquipManager.FindFirst(EquipTypeScanner)) tracked-
     // contact list for a same-owner missile/projectile within AiRangeSq of this equip's own
-    // GetCenterOfMass(), and fires Notify(INotify::Event_0x19, nullptr) on the first hit -- see
+    // GetCenterOfMass(), and fires Notify(INotify::IncomingMissileDetected, nullptr) on the first hit -- see
     // the .cpp for the full IObjRW vtable-slot trace. Then the shared CELauncher::Update
     // epilogue (RefireElapsed accumulate + CAttachedEquip::Update).
     virtual bool Update(float Dt, unsigned Flags) override;
@@ -1675,8 +1677,8 @@ static_assert(sizeof(ActionDB) == 0x08, "ActionDB sizeof 0x08");
 static_assert(offsetof(ActionDB, Head) == 0x00, "ActionDB+0x00 Head");
 static_assert(offsetof(ActionDB, Tail) == 0x04, "ActionDB+0x04 Tail");
 
-// LaneRingTransform -- the lane frame at one ring, 0x34 bytes, LaneAction+0x28 (entrance) and
-// +0x5c (exit). The ctor (062c1268-062c12b2) seeds an identity Orient and a zero Pos;
+// LaneRingTransform -- the lane frame at one ring, 0x34 bytes, LaneAction+0x28 (the current
+// leg's start ring) and +0x5c (its end ring). The ctor (062c1268-062c12b2) seeds an identity Orient and a zero Pos;
 // LaneAction::BuildRingTransform (062c1880) fills all three fields.
 struct LaneRingTransform
 {
@@ -1706,7 +1708,7 @@ public:
     virtual char const* get_id() const override { return "LaneAction"; }
 
     // 062c13f0, IAction slot 1 (reached through the IAction sub-object at +0x10): the action
-    // stays in the owner's ActionDB while ExitState is nonzero.
+    // stays in the owner's ActionDB while LaneState is nonzero.
     virtual bool update(float Dt) override;
 
     // 062c1490: the ctor's last step -- picks the start state and ramp, takes the traveller out
@@ -1729,14 +1731,26 @@ public:
     BaseWatcher TradelaneObjWatcher;  // +0x18  watches the tradelane object's Watchable (+8)
     IObjInspect const* EntranceRing;  // +0x20
     IObjInspect const* ExitRing;      // +0x24
-    LaneRingTransform EntranceRingXform; // +0x28 .. +0x5b
-    LaneRingTransform ExitRingXform;     // +0x5c .. +0x8f
+    // +0x28 / +0x5c: the current leg. Built from EntranceRing / ExitRing by the ctor; at each
+    // ring hop the end frame becomes the start frame and the end frame is rebuilt from the next
+    // ring (LegEndXform.Ring is nulled when there is none).
+    LaneRingTransform LegStartXform;  // +0x28 .. +0x5b
+    LaneRingTransform LegEndXform;    // +0x5c .. +0x8f
 
-    // +0x90, the lane state: 0 idle/stopped, 1 spinning up, 2 cruising, 3 last leg, 4 leaving
-    // (request_exit, a cleared exit ring, the end of the lane or a departed formation leader),
-    // 5 done (do_simulation_controller then calls stop(0) in the same tick).
-    unsigned int ExitState;           // +0x90
-    unsigned char bExitFlag;          // +0x94: set with state 4; turns the pose while leaving
+    // +0x90 values. 4 is entered by request_exit, a damaged or missing next ring, the end of the
+    // lane or a departed formation leader; at 5 do_simulation_controller calls stop(0) in the
+    // same tick.
+    enum
+    {
+        LANE_STOPPED = 0,
+        LANE_SPIN_UP = 1,
+        LANE_CRUISE = 2,
+        LANE_LAST_LEG = 3,
+        LANE_LEAVING = 4,
+        LANE_DONE = 5,
+    };
+    unsigned int LaneState;           // +0x90
+    unsigned char bExitFlag;          // +0x94: set with LANE_LEAVING; turns the pose while leaving
 
     unsigned char Field95;            // +0x95: zeroed by the ctor (062c1370), no reader in
                                       // 062c1220..062c242a (LaneAction is not exported)
@@ -1783,9 +1797,9 @@ public:
 };
 
 static_assert(sizeof(LaneAction) == 0xfc, "LaneAction sizeof 0xfc");
-static_assert(offsetof(LaneAction, EntranceRingXform) == 0x28, "LaneAction+0x28 EntranceRingXform");
-static_assert(offsetof(LaneAction, ExitRingXform) == 0x5c, "LaneAction+0x5c ExitRingXform");
-static_assert(offsetof(LaneAction, ExitState) == 0x90, "LaneAction+0x90 ExitState");
+static_assert(offsetof(LaneAction, LegStartXform) == 0x28, "LaneAction+0x28 LegStartXform");
+static_assert(offsetof(LaneAction, LegEndXform) == 0x5c, "LaneAction+0x5c LegEndXform");
+static_assert(offsetof(LaneAction, LaneState) == 0x90, "LaneAction+0x90 LaneState");
 static_assert(offsetof(LaneAction, bExitFlag) == 0x94, "LaneAction+0x94 bExitFlag");
 static_assert(offsetof(LaneAction, Field95) == 0x95, "LaneAction+0x95 Field95");
 static_assert(offsetof(LaneAction, bHpLeftLane) == 0x96, "LaneAction+0x96 bHpLeftLane");
@@ -1818,7 +1832,7 @@ namespace LaunchActionVars
 class LaunchAction : public IAction, public PhySys::Controller, public pub::AI::DirectiveCallback
 {
 public:
-    LaunchAction(IObjRW* DockObj, CEqObj* BaseObj, int LaunchType);
+    LaunchAction(IObjRW* DockObj, CEqObj* BaseObj, int DockPortIndex);
     virtual ~LaunchAction();
 
     virtual char const* get_id() const override { return "Launch"; }
@@ -1840,7 +1854,7 @@ public:
     // when the DirectiveLaunchOp queued by Start() finishes: clears the docked object's
     // control exclusion, notifies the dock's IObjAffect (slot 28) with BaseObj->Id and sets
     // bUpdateComplete -- the only way an AI-directive LaunchAction leaves its ActionDB.
-    virtual void OnDirectiveComplete(int ResultWord11c, int ResultWord118) override;
+    virtual void OnDirectiveComplete(int CompletedBehavior, int DirectiveResult) override;
 
     // LAB_062b0560, PhySys::Controller slot 4. While LaunchFlags == 0x20, advances
     // CoastElapsed by the event's delta_time, eases the docked ship out along LaunchDir
@@ -1851,7 +1865,7 @@ public:
     BaseWatcher DockObjWatcher;       // +0x1c  watches the launching object's Watchable (+8)
     CEqObj* BaseObj;                  // +0x24
     unsigned int LaunchFlags;         // +0x28  copy of BaseObj's CSimple::TypeBits (ctor); tested for bits 0x20 / 0x200100 in Start()
-    int LaunchType;                   // +0x2c  forced to 1 by the ctor when LaunchFlags & 0x20
+    int DockPortIndex;                // +0x2c  docking sphere for launch_pos and the launch op; forced to 1 by the ctor when LaunchFlags & 0x20
     // +0x30: advanced by do_simulation_controller; update() compares it with
     // launch_coast_time + launch_decel_time (3.0).
     float CoastElapsed;               // +0x30
@@ -1867,7 +1881,7 @@ public:
 static_assert(sizeof(LaunchAction) == 0x78, "LaunchAction sizeof 0x78");
 static_assert(offsetof(LaunchAction, DockObjWatcher) == 0x1c, "LaunchAction+0x1c watcher");
 static_assert(offsetof(LaunchAction, BaseObj) == 0x24, "LaunchAction+0x24 BaseObj");
-static_assert(offsetof(LaunchAction, LaunchType) == 0x2c, "LaunchAction+0x2c LaunchType");
+static_assert(offsetof(LaunchAction, DockPortIndex) == 0x2c, "LaunchAction+0x2c DockPortIndex");
 static_assert(offsetof(LaunchAction, LaunchPos) == 0x34, "LaunchAction+0x34 LaunchPos");
 static_assert(offsetof(LaunchAction, LaunchOrient) == 0x50, "LaunchAction+0x50 LaunchOrient");
 static_assert(offsetof(LaunchAction, CoastTimer) == 0x74, "LaunchAction+0x74 CoastTimer");
@@ -1876,12 +1890,12 @@ static_assert(offsetof(LaunchAction, CoastTimer) == 0x74, "LaunchAction+0x74 Coa
 // constructor into CShip::jump_in (no separate ctor call site).
 // Its Controller vtable (PTR_core_is_going_to_be_deleted_event_0639e680) slot 4 is
 // LAB_062afbe0, the do_simulation_controller override: an eased approach toward JumpPos
-// over JumpSpeed seconds, not an instant teleport.
+// over JumpDuration seconds, not an instant teleport.
 // Not exported by retail (no JumpInAction name in its export table).
 class JumpInAction : public IAction, public PhySys::Controller
 {
 public:
-    JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Speed);
+    JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Orient, float Duration);
     virtual ~JumpInAction();
 
     virtual char const* get_id() const override { return "JumpIn"; }
@@ -1893,8 +1907,9 @@ public:
 
     BaseWatcher JumpObjWatcher;       // +0x18  watches the jumping object's Watchable (+8)
     float JumpElapsed;                // +0x20  elapsed-time accumulator for do_simulation_controller's ease-in
-    float JumpSpeed;                  // +0x24  also the elapsed-time cap (seconds)
-    float JumpApproachBudget;         // +0x28  JumpSpeed * 2000.0f; ease-out distance budget
+    float JumpDuration;               // +0x24  seconds of the eased approach (the ctor's float)
+
+    float JumpApproachBudget;         // +0x28  JumpDuration * 2000.0f; ease-out distance budget
     Matrix JumpOrient;                // +0x2c
     Vector JumpPos;                   // +0x50
     float Field5c;                    // +0x5c  retail constant 1500.0f; no reader found
@@ -1904,7 +1919,7 @@ public:
 
 static_assert(sizeof(JumpInAction) == 0x68, "JumpInAction sizeof 0x68");
 static_assert(offsetof(JumpInAction, JumpObjWatcher) == 0x18, "JumpInAction+0x18 watcher");
-static_assert(offsetof(JumpInAction, JumpSpeed) == 0x24, "JumpInAction+0x24 JumpSpeed");
+static_assert(offsetof(JumpInAction, JumpDuration) == 0x24, "JumpInAction+0x24 JumpDuration");
 static_assert(offsetof(JumpInAction, JumpApproachBudget) == 0x28, "JumpInAction+0x28 JumpApproachBudget");
 static_assert(offsetof(JumpInAction, JumpOrient) == 0x2c, "JumpInAction+0x2c JumpOrient");
 static_assert(offsetof(JumpInAction, JumpPos) == 0x50, "JumpInAction+0x50 JumpPos");

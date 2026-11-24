@@ -241,7 +241,6 @@ static ::Reputation::Relation* RpcServerRelationArrayFromList(
 void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient* Client)
 {
     unsigned int Opcode = Packet->GetOpcode();
-    const unsigned char* Payload = reinterpret_cast<const unsigned char*>(Packet) + 0x20;
 
         switch (Opcode)
         {
@@ -1149,8 +1148,8 @@ void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient
                 float Level;
                 RpcServerX87CopyFloat(&Level, &Typed->Duration);
                 Client->SendServerSendComm(1u, Typed->SenderId, Typed->ReceiverId, Typed->VoiceId,
-                    Local, Typed->CommType, Typed->TextIds,
-                    static_cast<int>(Typed->TextCount), Typed->Mood, Level, false);
+                    Local, Typed->CaptionIds, Typed->TextIds,
+                    static_cast<int>(Typed->TextCount), Typed->PermutationIds, Level, false);
                 break;
             }
             case 0x51: // USE_ITEM, caseD_51 06bd1f67: a stack FPayloadServerUseItem

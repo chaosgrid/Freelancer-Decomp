@@ -111,9 +111,6 @@ public:
     WinControl* Background;              // +0x670 "NewsBackground"
 
 private:
-    // Port-only helper for the tail every close shares (e.g. 0x004a4d90): delete the children,
-    // Destroy, delete this.
-    void DeleteSelf();
     // FUN_004a4fd0 -- copy the current base's news: flag +9 first, then category 1, then flag
     // +8, then the rest; rows from the top, item 0 selected.
     void LoadNews();

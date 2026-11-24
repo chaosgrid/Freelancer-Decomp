@@ -9,7 +9,7 @@
 #include "common_exports.h"
 #include "common_behavior.h"  // Behavior
 #include "common_goods.h"     // BaseWatcher
-#include "common_idea.h"      // MoveIdea, FaceIdea -- real classes behind SubObjectA/B (see below)
+#include "common_idea.h"      // MoveIdea, FaceIdea -- real classes behind Move/B (see below)
 
 #include <cstddef>
 
@@ -32,7 +32,7 @@ class LaunchBehavior : public Behavior
 {
 public:
     // Retail's ctor argument is the behavior type id (8, "Launch"), pushed by the factory out of
-    // the descriptor's +0x04 -- see Behavior::GetTypeId() in common_behavior.h.
+    // the descriptor's +0x04 -- see Behavior::TypeId in common_behavior.h.
     explicit LaunchBehavior(int InTypeId);
     ~LaunchBehavior() override;
 
@@ -52,44 +52,44 @@ public:
     // Ideas' watchers at +0xb8 / +0x40, then FUN_062d2080.
 
     // Slot 1, LAB_062cd790 (45 instructions): BindContext (FUN_062d2090); false -> false.
-    // Otherwise SubObjectA.SetContext(ThreatSourcePtr14, NavHelperPtr24, Param2) (Param2 is
-    // kept in a register across the bind), FUN_062d5980(&SubObjectA, 0), the same SetContext
-    // on SubObjectB, and LaunchTimeout = NestedNavQuery0xbc() ? 15.0f : 60.0f
+    // Otherwise Move.SetContext(OwnerContext, SysMgr, Param2) (Param2 is
+    // kept in a register across the bind), FUN_062d5980(&Move, 0), the same SetContext
+    // on Face, and LaunchTimeout = NestedNavQuery0xbc() ? 15.0f : 60.0f
     // (0x41700000 / 0x42700000).
     bool SetContext(void* Param1, void* Param2, void* Param3);
 
     // Slot 3, FUN_062cd830: Behavior::OnEngage (FUN_062d20d0); CachedSystemId170 =
     // FetchSystemId(); TargetType174 = GetObjectTypeOrZero (FUN_062e6200) of Watcher168's
-    // target; FUN_062e9a60(NavHelperPtr24+0x12c, 0); ModeState164 = 1, bStraightLaunch = 0,
-    // LaunchDwellElapsed = TotalLaunchElapsed = 0.0f; SetCruiseLock(0, 3) (FUN_062d21d0).
+    // target; FUN_062e9a60(SysMgr+0x12c, 0); ModeState164 = 1, bStraightLaunch = 0,
+    // LaunchDwellElapsed = TotalLaunchElapsed = 0.0f; SetAvoidanceAllowed(0, 3) (FUN_062d21d0).
     void Engage();
 
-    // Slot 4, FUN_062cd8b0: SubObjectA.Commit(), SubObjectB.Commit(), Behavior::OnDisengage
-    // (FUN_062d20f0), FUN_062e9a60(NavHelperPtr24+0x12c, 1), SetCruiseLock(1, 3), Flags28
-    // bit 0x2 cleared / bit 0x1 set, SetDirectiveResult(8, 0) on BehaviorMgrPtr20
+    // Slot 4, FUN_062cd8b0: Move.Commit(), Face.Commit(), Behavior::OnDisengage
+    // (FUN_062d20f0), FUN_062e9a60(SysMgr+0x12c, 1), SetAvoidanceAllowed(1, 3), Flags28
+    // bit 0x2 cleared / bit 0x1 set, SetDirectiveResult(8, 0) on BehaviorMgr
     // (FUN_062d29a0).
     void Disengage();
 
     // Slot 5, LAB_062cd910:
     //   int mode = (Flags28 & 0x2) ? 0 : 2;
-    //   if (UpdateResult10 == 2 || UpdateResult10 == 3) mode = 2;
-    //   if (Flag29 != 0) { ModeSelector0xc = 3; return 3; }
-    //   ModeSelector0xc = mode;
+    //   if (UpdateResult == 2 || UpdateResult == 3) mode = 2;
+    //   if (Flag29 != 0) { Readiness = 3; return 3; }
+    //   Readiness = mode;
     //   return mode;
     int SetModeFromFlags();
 
-    // Slot 10, FUN_062cdf30 (46 instructions). FUN_062e74a0(NavHelperPtr24+0x34,
-    // Param+0xc) (FindVerifiedObject), adjusted by -8; if that differs from the
+    // Slot 10, FUN_062cdf30 (46 instructions). FUN_062e74a0(SysMgr+0x34,
+    // &Op.LaunchObjectId) (FindVerifiedObject), adjusted by -8; if that differs from the
     // current Watcher168.Watched, re-points Watcher168 via
     // `BaseWatcher::set_pointer` (already-ported, common_goods.h); copies
     // Param->+0x10 into DockPortIndex; then re-derives the (possibly
     // just-updated) raw block from Watcher168 and, if non-null, sets Flags28
-    // bit 0x2 and UpdateResult10=1 and returns true, otherwise clears Flags28
+    // bit 0x2 and UpdateResult=1 and returns true, otherwise clears Flags28
     // bit 0x2 and returns false.
     bool ApplyDirective(void const* Param);
 
     // Slot 7, LAB_062cd950 (457 instructions): guards (CachedSystemId170 change -> 2,
-    // TotalLaunchElapsed > LaunchTimeout -> 3), DeltaTime1c accumulation and the
+    // TotalLaunchElapsed > LaunchTimeout -> 3), DeltaTime accumulation and the
     // ModeState164 dispatch, whose case payloads are the helpers below. Case 5 rotates
     // LaunchBasis by pi in the (x,z) plane (DAT_0639e2d0) behind a dot-vs-zero gate. See the
     // .cpp.
@@ -108,9 +108,9 @@ private:
     // .text:062cd838-062cd846 / 062cd980-062cd98c: `ECX=[this+0x18]; CALL [[ECX]+8]` (IObjDB::
     // GetZoneDb, a Universe::ISystem*), then `CALL [[EAX]+0]` (ISystem slot 0, the system id).
     unsigned FetchSystemId() const;
-    static void* FindLaunchHardpoint(void* NavHelper, void const* Param); // FUN_062e74a0, ApplyDirective()'s own lookup
+    static void* FindLaunchObject(SystemManager* SysMgr, void const* Param); // FUN_062e74a0, ApplyDirective()'s own lookup
 
-    // ---- Update() (slot 7) payload helpers. NavHelperPtr24 is the SystemManager. ----
+    // ---- Update() (slot 7) payload helpers. SysMgr is the SystemManager. ----
 
     // is_player() (vt+0xbc) on SystemManager::ExternalIface (+0x1580).
     bool NestedNavQuery0xbc();
@@ -119,7 +119,7 @@ private:
     //   * Watcher168's object -> get_dock_hardpoints (vt+0xc8): six pushes at
     //     .text:062cda42-062cda5f give (DockPortIndex, null, XformA = ESP+0x38,
     //     XformB = ESP+0x94, XformC = ESP+0x60, null).
-    //   * ThreatSourcePtr14->get_hardpoint("hpmount", ...) (vt+0xc0, .text:062cdb0d).
+    //   * OwnerContext->get_hardpoint("hpmount", ...) (vt+0xc0, .text:062cdb0d).
     //   * FUN_06391cf0 = Acquire3DMathEngine (cached in DAT_063fc538); its vt+0x38
     //     TransposeTransform yields LaunchOffset (.text:062cdbbe-062cdbd1).
     // Populates
@@ -132,19 +132,19 @@ private:
     // bFlipHeadingOnExit, pi rotation of the three bases). Returns retail's AL (false only when the
     // watcher target is gone); the only caller ignores it.
     bool StartLaunchSequence();
-    // MoveIdea::SetRange3c on SubObjectA (fold address .text:062a66b0, ICF-labelled
+    // MoveIdea::SetRange3c on Move (fold address .text:062a66b0, ICF-labelled
     // DeviceTRC::bind_to_dc).
     void SetApproachSpeedParam(float Value);
-    // FUN_062d5980(SubObjectA, Flag) = MoveIdea::SetMode (.text:062cdc6a / 062cdcc9).
+    // FUN_062d5980(Move, Flag) = MoveIdea::SetMode (.text:062cdc6a / 062cdcc9).
     void ReleaseApproachStep(int Flag);
-    // FUN_062d5840(SubObjectA, &Vector) = MoveIdea::SetPosition.
+    // FUN_062d5840(Move, &Vector) = MoveIdea::SetPosition.
     void SetApproachOffset(void const* OffsetVector);
-    // FUN_062d75c0 on SubObjectB = FaceIdea::SetBasis: tag 4 and the 9-dword basis copied
+    // FUN_062d75c0 on Face = FaceIdea::SetBasis: tag 4 and the 9-dword basis copied
     // in from the caller (LaunchBasis). Cases 4/5/6.
     void PushApproachBasisToSubObjectB(void const* SrcVectorBlock);
-    // FUN_062d5a20(SubObjectA, LaunchThrottleScale) = MoveIdea::SetThrottleScale.
+    // FUN_062d5a20(Move, LaunchThrottleScale) = MoveIdea::SetThrottleScale.
     void SetApproachThrottleScale(float Scale);
-    // FUN_062d88b0(SubObjectA, Mode): the folded `MOV [ECX+0x44],EAX` setter,
+    // FUN_062d88b0(Move, Mode): the folded `MOV [ECX+0x44],EAX` setter,
     // MoveIdea::StopStyle.
     void SetApproachMode(int Mode);
 
@@ -154,38 +154,21 @@ private:
     // Case 5: FUN_062e6d40's cache refresh, inlined -- SystemManager+0x14fc's +0x84
     // get_physical_radius (vt+0x2c), gated by +0x14fc+0x7e.
     void EnsureNestedNavPositionCached();
-    // FUN_062d93c0(SubObjectB, pi/8), case 6: the folded `MOV [ECX+0x8c],EAX` setter,
+    // FUN_062d93c0(Face, pi/8), case 6: the folded `MOV [ECX+0x8c],EAX` setter,
     // FaceIdea::FacingTolerance.
     void SetHardpointCone(float Angle);
-    // FUN_062e89a0(NavHelperPtr24+0x18, Value, 0) -- case 5, gated by bHalfThrottleOnExit:
+    // FUN_062e89a0(SysMgr+0x18, Value, 0) -- case 5, gated by bHalfThrottleOnExit:
     // ThrustManager::SetThrottle(Value, 0) on SystemManager::Thrust.
     void AdjustNavHelperThrottle(float Value);
 
 
 public:
     // ------------------------------------------------------------------
-    // Fields; +0x04..+0x29 is Behavior's shared prefix. Retail size 0x234.
+    // Fields; +0x04..+0x29 is Behavior's. Retail size 0x234.
     // ------------------------------------------------------------------
-    int TypeId;                 // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
-    unsigned CachedHandle08;    // +0x08, the binder's Owner->get_id() (an object id)
-    int ModeSelector0xc;        // +0x0c. Engage() (=1), SetModeFromFlags() (0/2/3).
-    int UpdateResult10;         // +0x10. Update()'s result.
-    void* ThreatSourcePtr14;    // +0x14. Set by SetContext() (Param1).
-    IObjDB* ObjectDb;            // +0x18. The manager's object database, stored by Behavior's
-                                 // own vtable slot 2 (Behavior::SetObjectDb, 0629afd0 `MOV [ECX+0x18],
-                                 // EAX`) from ConnectBehaviorManagerObjectDb (FUN_062d2830).
-                                 // Engage()/Update() read ObjectDb->GetZoneDb()->GetId().
-    float DeltaTime1c;           // +0x1c. Per-tick delta: Update() accumulates it and passes it
-                                  // to the Ideas' Update.
-    void* BehaviorMgrPtr20;     // +0x20. Set by SetContext() (Param2); read by Disengage().
-    SystemManager* NavHelperPtr24; // +0x24. Set by SetContext() (Param3).
-    unsigned char Flags28;      // +0x28. Bit 0x2 tested by SetModeFromFlags()/ApplyDirective();
-                                 // bit 0x1 set, bit 0x2 cleared by Disengage().
-    unsigned char Flag29;       // +0x29. Read by SetModeFromFlags().
-    unsigned char Pad2a[0x2c - 0x2a];
 
-    MoveIdea SubObjectA;    // +0x2c, ends +0xa4.
-    FaceIdea SubObjectB;    // +0xa4, ends +0x164.
+    MoveIdea Move;    // +0x2c, ends +0xa4.
+    FaceIdea Face;    // +0xa4, ends +0x164.
 
     int ModeState164;           // +0x164. Zeroed by ctor; set to 1 by Engage().
     BaseWatcher Watcher168;     // +0x168 (ends +0x170). Zeroed by ctor; cleared by dtor. The
@@ -194,7 +177,7 @@ public:
                                  // system's id); Update() aborts with 2 when it changes.
     unsigned TargetType174;     // +0x174. Engage(): FUN_062e6200 == GetObjectTypeOrZero on the
                                  // watched launch target (target - 8).
-    int DockPortIndex;      // +0x178. Zeroed by ctor; copied from ApplyDirective()'s Param+0x10.
+    int DockPortIndex;      // +0x178. Zeroed by ctor; copied from the DirectiveLaunchOp's DockPortIndex.
     unsigned char bStraightLaunch;      // +0x17c. Cleared by Engage().
     unsigned char Pad17d[0x180 - 0x17d];
     float LaunchDwellDuration;             // +0x180. Ctor 3.5f (0x40600000). Update()'s case 1
@@ -223,17 +206,8 @@ public:
     unsigned char bFlipHeadingOnExit;       // +0x231. Zeroed by ctor.
 };
 
-static_assert(offsetof(LaunchBehavior, CachedHandle08) == 0x08, "LaunchBehavior::CachedHandle08 offset");
-static_assert(offsetof(LaunchBehavior, ModeSelector0xc) == 0x0c, "LaunchBehavior::ModeSelector0xc offset");
-static_assert(offsetof(LaunchBehavior, UpdateResult10) == 0x10, "LaunchBehavior::UpdateResult10 offset");
-static_assert(offsetof(LaunchBehavior, ThreatSourcePtr14) == 0x14, "LaunchBehavior::ThreatSourcePtr14 offset");
-static_assert(offsetof(LaunchBehavior, ObjectDb) == 0x18, "LaunchBehavior::ObjectDb offset");
-static_assert(offsetof(LaunchBehavior, BehaviorMgrPtr20) == 0x20, "LaunchBehavior::BehaviorMgrPtr20 offset");
-static_assert(offsetof(LaunchBehavior, NavHelperPtr24) == 0x24, "LaunchBehavior::NavHelperPtr24 offset");
-static_assert(offsetof(LaunchBehavior, Flags28) == 0x28, "LaunchBehavior::Flags28 offset");
-static_assert(offsetof(LaunchBehavior, Flag29) == 0x29, "LaunchBehavior::Flag29 offset");
-static_assert(offsetof(LaunchBehavior, SubObjectA) == 0x2c, "LaunchBehavior::SubObjectA offset");
-static_assert(offsetof(LaunchBehavior, SubObjectB) == 0xa4, "LaunchBehavior::SubObjectB offset");
+static_assert(offsetof(LaunchBehavior, Move) == 0x2c, "LaunchBehavior::Move offset");
+static_assert(offsetof(LaunchBehavior, Face) == 0xa4, "LaunchBehavior::Face offset");
 static_assert(offsetof(LaunchBehavior, ModeState164) == 0x164, "LaunchBehavior::ModeState164 offset");
 static_assert(offsetof(LaunchBehavior, Watcher168) == 0x168, "LaunchBehavior::Watcher168 offset");
 static_assert(offsetof(LaunchBehavior, CachedSystemId170) == 0x170, "LaunchBehavior::CachedSystemId170 offset");

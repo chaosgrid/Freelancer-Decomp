@@ -74,7 +74,7 @@ public:
     // FUN_0635c310
     ~IVP_OV_Node();
 };
-static_assert(sizeof(IVP_OV_Node) == 0x28, "IVP_OV_Node size must be 0x28 (operator new(0x28), Common.dll.txt:0635d0cc)");
+static_assert(sizeof(IVP_OV_Node) == 0x28, "IVP_OV_Node size must be 0x28 (operator new(0x28), FUN_0635d030)");
 static_assert(offsetof(IVP_OV_Node, Level) == 0x0c, "IVP_OV_Node+0x0c");
 static_assert(offsetof(IVP_OV_Node, LevelPlus1) == 0x10, "IVP_OV_Node+0x10");
 static_assert(offsetof(IVP_OV_Node, Parent) == 0x14, "IVP_OV_Node+0x14");
@@ -136,7 +136,7 @@ public:
     // then reset the one that pointed here to -1.
     void remove_oo_collision(IVP_Collision* Collision);
 };
-static_assert(sizeof(IVP_OV_Element) == 0x30, "IVP_OV_Element size must be 0x30 (operator new(0x30), Common.dll.txt:0634f1ae)");
+static_assert(sizeof(IVP_OV_Element) == 0x30, "IVP_OV_Element size must be 0x30 (operator new(0x30), FUN_0634f180)");
 static_assert(offsetof(IVP_OV_Element, HullPoolSlot) == 0x04, "IVP_OV_Element+0x04");
 static_assert(offsetof(IVP_OV_Element, node) == 0x08, "IVP_OV_Element+0x08");
 static_assert(offsetof(IVP_OV_Element, hull_manager) == 0x0c, "IVP_OV_Element+0x0c");

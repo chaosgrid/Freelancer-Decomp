@@ -38,30 +38,9 @@
 #include <new>
 
 // ---------------------------------------------------------------------------
-// Shared helpers -- the two block writers retail uses on this channel.
+// Shared helpers. The block writers (RpcCopyBlock) and strlen (RpcStringLength) are in
+// rpc_payloads.h.
 // ---------------------------------------------------------------------------
-
-// FUN_06d97b00 / FUN_06d90a00 and the body of FUN_06d97470 / FUN_06d989b0: bare
-// operator new(N) -- a size of 0 included -- and copy the caller's bytes in; the packet's
-// destructor frees the block. FUN_06d97470 / FUN_06d989b0 add `if (len == 0 || src == 0)
-// return` in front; their callers here carry that test themselves.
-static void* RpcCh2CopyBlock(const void* Source, unsigned int InSize) {
-    unsigned char* Block = static_cast<unsigned char*>(::operator new(InSize, std::nothrow));
-    const unsigned char* Src = static_cast<const unsigned char*>(Source);
-    for (unsigned int i = 0; i < InSize; ++i) {
-        Block[i] = Src[i];
-    }
-    return Block;
-}
-
-// Inline strlen as retail computes it; no null test (retail faults on null).
-static unsigned int RpcCh2StringLength(const char* Text) {
-    unsigned int Length = 0;
-    while (Text[Length] != '\0') {
-        ++Length;
-    }
-    return Length;
-}
 
 // Float fields are moved as bit patterns: retail copies them with dword MOVs, not FLD/FSTP.
 static unsigned int RpcCh2FloatBits(const float& Value) {
@@ -127,7 +106,7 @@ static bool MarshalCh2DwordPair(FPacketBase* Packet, const unsigned int* Args, u
 // buffer at the 2nd argument.
 static bool MarshalCh2Blob(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     FPayloadServerBlob* Wire = Ch2Payload<FPayloadServerBlob>(Packet);
-    Wire->Buffer = RpcCh2CopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
+    Wire->Buffer = RpcCopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
     Wire->Size = Args[2];
     return true;
 }
@@ -135,7 +114,7 @@ static bool MarshalCh2Blob(FPacketBase* Packet, const unsigned int* Args, unsign
 // FUN_06d90a00: the same, fields the other way round.
 static bool MarshalCh2BlobReversed(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     FPayloadServerBlobReversed* Wire = Ch2Payload<FPayloadServerBlobReversed>(Packet);
-    Wire->Buffer = RpcCh2CopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
+    Wire->Buffer = RpcCopyBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
     Wire->Size = Args[2];
     return true;
 }
@@ -298,23 +277,22 @@ static bool DeliverActivateObject(const FPacketBase* Packet, IClient* Client, IC
 // ch2 0x0b FLPACKET_SERVER_LAND
 // Sender 0x06d8a990 (IClient+0x0ec), receiver caseD_b at 0x06d8237c.
 // ===========================================================================
-// The wire keeps the generic three-dword shape, in FServerLandInfo order.
+// The payload is FServerLandInfo as it stands (the generic three-dword shape on the wire).
 static bool MarshalThreeDwordsByRef(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const FServerLandInfo* Info = reinterpret_cast<const FServerLandInfo*>(Args[1]);
-    FPayloadServerThreeDwords* Wire = Ch2Payload<FPayloadServerThreeDwords>(Packet);
-    Wire->Field_0x00 = Info->ShipId;
-    Wire->Field_0x08 = Info->BaseId;
-    Wire->Field_0x04 = Info->DockId;
+    FServerLandInfo* Wire = Ch2Payload<FServerLandInfo>(Packet);
+    Wire->ShipId = Info->ShipId;
+    Wire->BaseId = Info->BaseId;
+    Wire->DockId = Info->DockId;
     return true;
 }
 
 static bool DeliverLand(const FPacketBase* Packet, IClient* Client, IChatClient*) {
-    const FPayloadServerThreeDwords Wire =
-        RpcPayloadRead<FPayloadServerThreeDwords>(Packet, 0);
+    const FServerLandInfo Wire = RpcPayloadRead<FServerLandInfo>(Packet, 0);
     FServerLandInfo Info;
-    Info.ShipId = Wire.Field_0x00;
-    Info.DockId = Wire.Field_0x04;
-    Info.BaseId = Wire.Field_0x08;
+    Info.ShipId = Wire.ShipId;
+    Info.DockId = Wire.DockId;
+    Info.BaseId = Wire.BaseId;
     Client->SendServerLand(1u, Info);
     return true;
 }
@@ -322,23 +300,24 @@ static bool DeliverLand(const FPacketBase* Packet, IClient* Client, IChatClient*
 // ===========================================================================
 // ch2 0x21 FLPACKET_SERVER_SYSTEM_SWITCH_OUT
 // Sender 0x06d8a860 (IClient+0x0e4). Receiver caseD_21 at 0x06d82351 delivers through the
-// statics .data:0x06dbb82c / 0x06dbb830. The wire keeps the generic dword-pair shape.
+// statics .data:0x06dbb82c / 0x06dbb830. The payload is FServerSystemSwitchOutInfo as it
+// stands (the generic dword-pair shape on the wire).
 // ===========================================================================
 static FServerSystemSwitchOutInfo GSystemSwitchOutStatic = { 0, 0 };
 
 static bool MarshalDwordPairByRef(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const FServerSystemSwitchOutInfo* Info =
         reinterpret_cast<const FServerSystemSwitchOutInfo*>(Args[1]);
-    FPayloadServerDwordPair* Wire = Ch2Payload<FPayloadServerDwordPair>(Packet);
-    Wire->Field_0x00 = Info->ShipId;
-    Wire->Field_0x04 = Info->GateId;
+    FServerSystemSwitchOutInfo* Wire = Ch2Payload<FServerSystemSwitchOutInfo>(Packet);
+    Wire->ShipId = Info->ShipId;
+    Wire->GateId = Info->GateId;
     return true;
 }
 
 static bool DeliverSystemSwitchOut(const FPacketBase* Packet, IClient* Client, IChatClient*) {
-    const FPayloadServerDwordPair Wire = RpcPayloadRead<FPayloadServerDwordPair>(Packet, 0);
-    GSystemSwitchOutStatic.ShipId = Wire.Field_0x00;
-    GSystemSwitchOutStatic.GateId = Wire.Field_0x04;
+    const FServerSystemSwitchOutInfo Wire = RpcPayloadRead<FServerSystemSwitchOutInfo>(Packet, 0);
+    GSystemSwitchOutStatic.ShipId = Wire.ShipId;
+    GSystemSwitchOutStatic.GateId = Wire.GateId;
     Client->SendServerSystemSwitchOut(1u, GSystemSwitchOutStatic);
     return true;
 }
@@ -447,9 +426,9 @@ static bool MarshalSetAddItem(FPacketBase* Packet, const unsigned int* Args, uns
     // non-empty interned cargo-bay name that retail still omits.
     if (!Desc->is_internal()) {
         // FUN_06d97470(packet, str, len), which no-ops when len == 0.
-        const unsigned int Length = RpcCh2StringLength(Desc->Hardpoint);
+        const unsigned int Length = RpcStringLength(Desc->Hardpoint);
         if (Length != 0) {
-            Wire.Hardpoint = static_cast<char*>(RpcCh2CopyBlock(Desc->Hardpoint, Length + 1u));
+            Wire.Hardpoint = static_cast<char*>(RpcCopyBlock(Desc->Hardpoint, Length + 1u));
             Wire.HardpointSize = Length + 1u;
         }
     }
@@ -506,25 +485,25 @@ static bool DeliverSetRemoveItem(const FPacketBase* Packet, IClient* Client, ICh
 // ch2 0x31 FLPACKET_SERVER_EXPLODEASTEROIDMINE
 // Sender 0x06d8a360 (IClient+0x0d0), receiver caseD_31 at 0x06d81b6d.
 // ===========================================================================
-// The argument is Server.dll's FMineExplosion (built by MedMine::update); the wire keeps the
-// generic four-dword shape, floats as bits.
+// The argument is Server.dll's FMineExplosion (built by MedMine::update); floats as bits.
 static bool MarshalFourDwordsByRef(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
     const FMineExplosion* Info = reinterpret_cast<const FMineExplosion*>(Args[1]);
-    FPayloadServerFourDwords* Wire = Ch2Payload<FPayloadServerFourDwords>(Packet);
-    Wire->Field_0x00 = Info->MineId;
-    Wire->Field_0x04 = RpcCh2FloatBits(Info->Offset.x);
-    Wire->Field_0x08 = RpcCh2FloatBits(Info->Offset.y);
-    Wire->Field_0x0c = RpcCh2FloatBits(Info->Offset.z);
+    FPayloadServerExplodeAsteroidMine* Wire = Ch2Payload<FPayloadServerExplodeAsteroidMine>(Packet);
+    Wire->MineId = Info->MineId;
+    Wire->OffsetXBits = RpcCh2FloatBits(Info->Offset.x);
+    Wire->OffsetYBits = RpcCh2FloatBits(Info->Offset.y);
+    Wire->OffsetZBits = RpcCh2FloatBits(Info->Offset.z);
     return true;
 }
 
 static bool DeliverExplodeAsteroidMine(const FPacketBase* Packet, IClient* Client, IChatClient*) {
-    const FPayloadServerFourDwords Wire = RpcPayloadRead<FPayloadServerFourDwords>(Packet, 0);
+    const FPayloadServerExplodeAsteroidMine Wire =
+        RpcPayloadRead<FPayloadServerExplodeAsteroidMine>(Packet, 0);
     FMineExplosion Info;
-    Info.MineId = Wire.Field_0x00;
-    RpcCh2SetFloatBits(Info.Offset.x, Wire.Field_0x04);
-    RpcCh2SetFloatBits(Info.Offset.y, Wire.Field_0x08);
-    RpcCh2SetFloatBits(Info.Offset.z, Wire.Field_0x0c);
+    Info.MineId = Wire.MineId;
+    RpcCh2SetFloatBits(Info.Offset.x, Wire.OffsetXBits);
+    RpcCh2SetFloatBits(Info.Offset.y, Wire.OffsetYBits);
+    RpcCh2SetFloatBits(Info.Offset.z, Wire.OffsetZBits);
     Client->SendServerExplodeAsteroidMine(1u, Info);
     return true;
 }
@@ -696,16 +675,16 @@ static bool DeliverRequestReturned(const FPacketBase* Packet, IClient* Client, I
 // Sender 0x06d8ace0 (IClient+0x12c), receiver caseD_46 at 0x06d82420.
 // ===========================================================================
 static bool MarshalMarkObj(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    FPayloadServerDwordByte* Wire = Ch2Payload<FPayloadServerDwordByte>(Packet);
-    Wire->Field_0x00 = Args[1];
-    Wire->Field_0x04 = (unsigned char)(Args[2] & 0xffu);
+    FPayloadServerMarkObj* Wire = Ch2Payload<FPayloadServerMarkObj>(Packet);
+    Wire->ObjectId = Args[1];
+    Wire->MarkType = (unsigned char)(Args[2] & 0xffu);
     return true;
 }
 
 static bool DeliverMarkObj(const FPacketBase* Packet, IClient* Client, IChatClient*) {
-    const FPayloadServerDwordByte Wire = RpcPayloadRead<FPayloadServerDwordByte>(Packet, 0);
+    const FPayloadServerMarkObj Wire = RpcPayloadRead<FPayloadServerMarkObj>(Packet, 0);
     unsigned int One = 1u;
-    Client->SendServerMarkObj(One, Wire.Field_0x00, static_cast<int>(Wire.Field_0x04));
+    Client->SendServerMarkObj(One, Wire.ObjectId, static_cast<int>(Wire.MarkType));
     return true;
 }
 
@@ -969,7 +948,7 @@ static bool MarshalRemoteObjectCargoUpdate(FPacketBase* Packet, const unsigned i
     // (FUN_06d9ece0).
     FPayloadServerRemoteObjectCargoUpdate* Wire =
         Ch2Payload<FPayloadServerRemoteObjectCargoUpdate>(Packet);
-    Wire->Field_0x04 = (unsigned char)(Args[3] & 0xffu);
+    Wire->Flag = (unsigned char)(Args[3] & 0xffu);
     Wire->ObjectId = Args[1];
     // bAll is false only here: keeps the items whose bEquipped byte is clear.
     return MarshalEquipVectorCommon(Packet, Args[2], false);
@@ -980,7 +959,7 @@ static bool DeliverRemoteObjectCargoUpdate(const FPacketBase* Packet, IClient* C
         RpcPayloadRead<FPayloadServerRemoteObjectCargoUpdate>(Packet, 0);
     FEquipVectorScope Scope(Packet);
     unsigned int One = 1u;
-    Client->SendServerRemoteObjectCargoUpdate(One, Wire.ObjectId, Scope.Vector, Wire.Field_0x04);
+    Client->SendServerRemoteObjectCargoUpdate(One, Wire.ObjectId, Scope.Vector, Wire.Flag);
     return true;
 }
 
@@ -1238,14 +1217,14 @@ static bool MarshalMiscObjUpdate(FPacketBase* Packet, const unsigned int* Args, 
 
     switch (Args[0]) {
     case kMiscObjUpdateVariant_ObjectGroup:   // 0x06d8c1f0: FUN_06d98ac0 + FUN_06d98af0
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x08);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagObjectId);
         Wire->ObjectId = Args[1];
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x14);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagGroupId);
         Wire->GroupId = Args[2];
         return true;
 
     case kMiscObjUpdateVariant_Mission:   // 0x06d8c290: FUN_06d98b00, the only pair setter
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagPair);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagMission);
         Wire->MissionId = Args[1];
         Wire->MissionSetBy = Args[2];
         return true;
@@ -1258,30 +1237,30 @@ static bool MarshalMiscObjUpdate(FPacketBase* Packet, const unsigned int* Args, 
     }
 
     case kMiscObjUpdateVariant_Affiliation:   // 0x06d8c240: FUN_06d98ac0 + FUN_06d98ae0
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x08);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagObjectId);
         Wire->ObjectId = Args[1];
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x34);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagAffiliation);
         Wire->Affiliation = Args[2];
         return true;
 
     case kMiscObjUpdateVariant_Rank:   // 0x06d8c2e0: FUN_06d98ad0 + FUN_06d98ce0 (word)
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x04);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagPlayerId);
         Wire->PlayerId = Args[1];
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x0c);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagRank);
         Wire->Rank = (unsigned short)(Args[2] & 0xffffu);
         return true;
 
     case kMiscObjUpdateVariant_PlayerGroup:   // 0x06d8c390: FUN_06d98ad0 + FUN_06d98af0
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x04);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagPlayerId);
         Wire->PlayerId = Args[1];
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x14);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagGroupId);
         Wire->GroupId = Args[2];
         return true;
 
     case kMiscObjUpdateVariant_System:   // 0x06d8c3e0: FUN_06d98ad0 + FUN_06d98cd0
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x04);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagPlayerId);
         Wire->PlayerId = Args[1];
-        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagField_0x10);
+        Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagSystemId);
         Wire->SystemId = Args[2];
         return true;
 
@@ -1306,19 +1285,19 @@ static bool DeliverMiscObjUpdate(const FPacketBase* Packet, IClient* Client, ICh
     const FPayloadServerMiscObjUpdate* Wire = Ch2MiscObjUpdate(Packet);
     bool bDelivered = false;
 
-    if ((Wire->Flags & kMiscObjUpdateFlagField_0x34) != 0) {
+    if ((Wire->Flags & kMiscObjUpdateFlagAffiliation) != 0) {
         Client->SendServerMiscObjUpdateAffiliation(1u, Wire->ObjectId, Wire->Affiliation);
         bDelivered = true;
     }
-    if ((Wire->Flags & kMiscObjUpdateFlagField_0x14) != 0) {
-        if ((Wire->Flags & kMiscObjUpdateFlagField_0x04) != 0) {
+    if ((Wire->Flags & kMiscObjUpdateFlagGroupId) != 0) {
+        if ((Wire->Flags & kMiscObjUpdateFlagPlayerId) != 0) {
             Client->SendServerMiscObjUpdatePlayerGroup(1u, Wire->PlayerId, Wire->GroupId);
         } else {
             Client->SendServerMiscObjUpdateObjectGroup(1u, Wire->ObjectId, Wire->GroupId);
         }
         bDelivered = true;
     }
-    if ((Wire->Flags & kMiscObjUpdateFlagPair) != 0) {
+    if ((Wire->Flags & kMiscObjUpdateFlagMission) != 0) {
         Client->SendServerMiscObjUpdateMission(1u, Wire->MissionId, Wire->MissionSetBy);
         bDelivered = true;
     }
@@ -1327,12 +1306,12 @@ static bool DeliverMiscObjUpdate(const FPacketBase* Packet, IClient* Client, ICh
         Client->SendServerMiscObjUpdateMotd(1u, Wire->Text);
         bDelivered = true;
     }
-    if ((Wire->Flags & kMiscObjUpdateFlagField_0x0c) != 0) {
+    if ((Wire->Flags & kMiscObjUpdateFlagRank) != 0) {
         // Zero-extended.
         Client->SendServerMiscObjUpdateRank(1u, Wire->PlayerId, static_cast<int>(Wire->Rank));
         bDelivered = true;
     }
-    if ((Wire->Flags & kMiscObjUpdateFlagField_0x10) != 0) {
+    if ((Wire->Flags & kMiscObjUpdateFlagSystemId) != 0) {
         Client->SendServerMiscObjUpdateSystem(1u, Wire->PlayerId, Wire->SystemId);
         bDelivered = true;
     }
@@ -1694,12 +1673,12 @@ static bool MarshalRequestSpaceScript(FPacketBase* Packet, const unsigned int* A
     // FUN_06d989b0: pointer at payload+0x18, count at payload+0x04. A zero-length name
     // ships nothing (the name is an inline array, so the null half of the guard never
     // fires).
-    const unsigned int Length = RpcCh2StringLength(Source->Name);
+    const unsigned int Length = RpcStringLength(Source->Name);
     if (Length == 0) {
         Wire.NameSize = 0;
         Wire.Name = nullptr;
     } else {
-        Wire.Name = static_cast<char*>(RpcCh2CopyBlock(Source->Name, Length + 1));
+        Wire.Name = static_cast<char*>(RpcCopyBlock(Source->Name, Length + 1));
         Wire.NameSize = Length + 1;
     }
     return RpcPayloadWrite(Packet, 0, Wire);
@@ -2300,7 +2279,7 @@ static bool MarshalSendComm(FPacketBase* Packet, const unsigned int* Args,
         IdSlots[i] = RpcSendCommFrameDword(Args, i);
     }
 
-    Wire->CommType = Args[17];
+    Wire->CaptionIds = Args[17];
     // The old pointer at payload+0x44 is tested and freed.
     if (Wire->Buffer != nullptr) {
         ::operator delete(Wire->Buffer);
@@ -2317,7 +2296,7 @@ static bool MarshalSendComm(FPacketBase* Packet, const unsigned int* Args,
         Wire->Buffer[i] = Source[i];
     }
 
-    Wire->Mood = Args[20];
+    Wire->PermutationIds = Args[20];
     Wire->DurationBits = Args[21];                         // FLD/FSTP in retail
     Wire->bReceiverIsOwnShip = (unsigned char)(Args[22] & 0xffu);
     return true;
@@ -2343,10 +2322,10 @@ static bool DeliverSendComm(const FPacketBase* Packet, IClient* Client, IChatCli
     Client->SendServerSendComm(1u,
                                Wire.SenderId, Wire.ReceiverId, Wire.VoiceId,
                                CommCostume,
-                               Wire.CommType,
+                               Wire.CaptionIds,
                                Wire.Buffer,
                                BufferCount,
-                               Wire.Mood,
+                               Wire.PermutationIds,
                                Duration,
                                // A literal 0, not payload+0x54, which retail writes and
                                // never reads.

@@ -32,7 +32,7 @@ CArchGroup::CArchGroup(Archetype::CollisionGroup const& GroupArch, CEqObj* const
     Arch = &GroupArch;
     HitPts = (float)GroupArch.HitPts;
     Field10 = 1;
-    State = 1;
+    State = STATE_ALIVE;
     Fate = 0;
     DestroyedObj = nullptr;
     // +0x20..+0x30; the padding +0x21..+0x23 is left alone.
@@ -136,9 +136,9 @@ void CArchGroup::AttachDamageObjs(CObject* Target, Archetype::DamageObjInfoList 
             Phy.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
             Phy.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
             Phy.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-            Phy.CollisionGroupId = Owner->PhysicsSystemId;
-            Phy.Type = 2;
-            Phy.bFlag1c = 0;
+            Phy.SystemId = Owner->PhysicsSystemId;
+            Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
+            Phy.bPhysicalUnmoveable = 0;
             Phy.bEnableCollisions = 1;
             Phy.bHasInertia = 0;
             Phy.Inertia.x = 0.0f;
@@ -166,7 +166,7 @@ double CArchGroup::GetRelativeHealth() const
 
 void CArchGroup::Kill(DamageEntry::SubObjFate FateValue)
 {
-    State = 2;
+    State = STATE_KILLED;
     Fate = (int)FateValue;
 }
 
@@ -180,7 +180,7 @@ DamageEntry::SubObjFate CArchGroup::GetFate() const
 void CArchGroup::Destroy()
 {
     // FUN_062a0450. Only a separable group (Arch+0x14) still on a live root instance does
-    // anything beyond State = 3.
+    // anything beyond State = STATE_DESTROYED.
     if (Arch->bSeparable && RootIndex != -1)
     {
         AttachDamageObjs(Owner, ParentDamageObjs());                      // Arch+0x40
@@ -232,29 +232,29 @@ void CArchGroup::Destroy()
                     PhySys::AddImpulseAtPoint(DestroyedObj, ChildPush, Point);
                 if (Owner->BodyPtr != nullptr)
                     PhySys::AddImpulseAtPoint(Owner, ParentPush, Point);
-                Owner->notify(INotify::Event_0x7, this);
+                Owner->notify(INotify::ArchGroupSeparated, this);
             }
         }
         else if (Fate == 3 || Fate == 4 || Fate == 5)
         {
-            Owner->notify(INotify::Event_0x8, this);
+            Owner->notify(INotify::ArchGroupDetachedInPlace, this);
             DetachInstanceInPlace(RootIndex);
         }
         RootIndex = -1;
     }
-    State = 3;
+    State = STATE_DESTROYED;
 }
 
 bool CArchGroup::IsDead() const
 {
     // FUN_062a0130. Killed (2) or destroyed (3).
-    return State == 2 || State == 3;
+    return State == STATE_KILLED || State == STATE_DESTROYED;
 }
 
 bool CArchGroup::IsDestroyed() const
 {
     // FUN_062a0150
-    return State == 3;
+    return State == STATE_DESTROYED;
 }
 
 void CArchGroup::GetCollisionGroupDesc(CollisionGroupDesc& Out) const
@@ -279,7 +279,7 @@ unsigned short CArchGroup::GetID() const
 long CArchGroup::GetRootIndex() const
 {
     // FUN_062a02a0
-    if (State == 3)
+    if (State == STATE_DESTROYED)
         return -1;
     return RootIndex;
 }
@@ -287,7 +287,7 @@ long CArchGroup::GetRootIndex() const
 bool CArchGroup::IsInstInGroup(long InstIndex) const
 {
     // FUN_062a02b0
-    if (State == 3)
+    if (State == STATE_DESTROYED)
         return false;
     return IsDescendant(RootIndex, InstIndex);
 }
@@ -299,7 +299,7 @@ bool CArchGroup::GetVelocity(Vector& Out) const
     Out.x = 0.0f;
     Out.y = 0.0f;
     Out.z = 0.0f;
-    if (State == 3 || RootIndex == -1)
+    if (State == STATE_DESTROYED || RootIndex == -1)
         return false;
     Out = PhySys::GetVelocity((CObject const*)DALib::Engine->GetInstanceUserData((void*)RootIndex));
     return true;
@@ -326,7 +326,7 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
     // retail keeps on the FPU stack are double; each float store is a rounding.
 
     // A destroyed group enumerates from the invalid handle.
-    long const RootInst = (State == 3) ? -1 : RootIndex;
+    long const RootInst = (State == STATE_DESTROYED) ? -1 : RootIndex;
 
     // Retail does not pre-set the outputs; every GetExtra path writes both.
     float RootExtent = 0.0f;
@@ -450,7 +450,7 @@ bool CArchGroup::GetCenterOfMass(Vector& Out) const
     Out.x = 0.0f;
     Out.y = 0.0f;
     Out.z = 0.0f;
-    if (State == 3 || RootIndex == -1)
+    if (State == STATE_DESTROYED || RootIndex == -1)
         return false;
 
     // The flag is set before the call, so a re-entrant call cannot recurse through here.
@@ -478,7 +478,7 @@ bool CArchGroup::GetRadius(float& Out) const
 {
     // FUN_062a0400
     Out = 0.0f;
-    if (State == 3 || RootIndex == -1)
+    if (State == STATE_DESTROYED || RootIndex == -1)
         return false;
 
     if (!bBoundsValid)
@@ -494,7 +494,7 @@ bool CArchGroup::GetRadius(float& Out) const
 int CArchGroup::InstDepthInGroup(long InstIndex) const
 {
     // FUN_062a0690
-    if (State == 3)
+    if (State == STATE_DESTROYED)
         return -1;
     return Hierarchy::GetDepth(RootIndex, InstIndex);
 }
@@ -517,7 +517,7 @@ void CArchGroup::SetHitPoints(float NewHitPts)
     float const OldHitPts = HitPts;
     HitPts = NewHitPts;
     if (NewHitPts > 0.0f && NewHitPts < OldHitPts)
-        Owner->notify(INotify::Event_0x9, this);
+        Owner->notify(INotify::ArchGroupDamaged, this);
 }
 
 unsigned CArchGroup::GetCollisionGroupType() const
@@ -719,7 +719,7 @@ int CArchGroupManager::NumLiving() const
     CArchGrpTraverser Traverser;
     for (CArchGroup const* Group = Traverse(Traverser); Group != nullptr; Group = Traverse(Traverser))
     {
-        if (Group->State != 2 && Group->State != 3)
+        if (Group->State != CArchGroup::STATE_KILLED && Group->State != CArchGroup::STATE_DESTROYED)
             ++LivingCount;
     }
     return LivingCount;
@@ -748,10 +748,10 @@ bool CArchGroupManager::DeleteArchGroup(unsigned short GroupId)
 bool CArchGroupManager::DestroyDeadGroups()
 {
     // FUN_062a1a50. Values are dereferenced without a null test; retail's two state tests
-    // reduce to State == 2. flush_animations is CEqObj vtable +0xcc.
+    // reduce to State == STATE_KILLED. flush_animations is CEqObj vtable +0xcc.
     for (std::map<unsigned short, CArchGroup*>::iterator It = Groups->begin(); It != Groups->end(); ++It)
     {
-        if (It->second->State != 2)
+        if (It->second->State != CArchGroup::STATE_KILLED)
             continue;
         Owner->flush_animations();
         CArchGroup* const Group = It->second;
@@ -776,7 +776,7 @@ bool CArchGroupManager::DestroyGroups(DamageList const& List, bool Param2)
         if (Found == Groups->end())
             continue;
         CArchGroup* const Group = Found->second;
-        if (Group == nullptr || Group->State == 2 || Group->State == 3)
+        if (Group == nullptr || Group->State == CArchGroup::STATE_KILLED || Group->State == CArchGroup::STATE_DESTROYED)
             continue;
         Group->Kill(EntryIt->Fate);
     }
@@ -784,7 +784,7 @@ bool CArchGroupManager::DestroyGroups(DamageList const& List, bool Param2)
     // DestroyDeadGroups, inlined.
     for (std::map<unsigned short, CArchGroup*>::iterator It = Groups->begin(); It != Groups->end(); ++It)
     {
-        if (It->second->State != 2)
+        if (It->second->State != CArchGroup::STATE_KILLED)
             continue;
         Owner->flush_animations();
         CArchGroup* const Group = It->second;
@@ -812,7 +812,7 @@ void CArchGroupManager::DestroyLowerGroups(CArchGroup const& DeadGroup)
         CArchGroup* const Entry = It->second;
         if (DeadGroup.GetID() != Entry->GetID() && DeadGroup.IsInstInGroup(Entry->GetRootIndex()))
         {
-            if (Entry->State == 2 || Entry->State == 3)
+            if (Entry->State == CArchGroup::STATE_KILLED || Entry->State == CArchGroup::STATE_DESTROYED)
             {
                 DestroyLowerGroups(*Entry);
                 Entry->Destroy();
@@ -884,7 +884,7 @@ bool CArchGroupManager::IsOnMap(unsigned short GroupId, bool CheckDestroyed) con
     if (It == Groups->end())
         return false;
     if (CheckDestroyed)
-        return It->second->State == 3;
+        return It->second->State == CArchGroup::STATE_DESTROYED;
     return true;
 }
 
@@ -897,7 +897,7 @@ CArchGroup* CArchGroupManager::FindByName(CacheString const& Name)
          It != Groups->end() && Result == nullptr; ++It)
     {
         CArchGroup* const Group = It->second;
-        if (Group->Name().Value == Name.Value && Group->State != 2 && Group->State != 3)
+        if (Group->Name().Value == Name.Value && Group->State != CArchGroup::STATE_KILLED && Group->State != CArchGroup::STATE_DESTROYED)
             Result = Group;
     }
     return Result;

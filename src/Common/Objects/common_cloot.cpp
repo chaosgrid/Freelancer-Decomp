@@ -6,7 +6,7 @@
 
 // CLoot (retail CLoot.cpp).
 #include "common_cobject.h"
-#include "Objects/common_cobject_internal.h" // CmnCobject::RotateWorldToObjectSpace, GetObjectDbCollisionGroup
+#include "Objects/common_cobject_internal.h" // CmnCobject::RotateWorldToObjectSpace, GetObjectDbSystemId
 
 #include "common_physys.h"
 
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-using CmnCobject::GetObjectDbCollisionGroup;
+using CmnCobject::GetObjectDbSystemId;
 using CmnCobject::RotateWorldToObjectSpace;
 
 // ============================================================================
@@ -82,10 +82,10 @@ void CLoot::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     Phy.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
     Phy.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
     Phy.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-    Phy.Type = 2;
+    Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     Phy.bEnableCollisions = 1;
     Phy.Mass = Archetype->Mass;
-    Phy.CollisionGroupId = GetObjectDbCollisionGroup(ObjectDb);
+    Phy.SystemId = GetObjectDbSystemId(ObjectDb);
     _itoa((int)((OwnerId != 0) ? OwnerId : Id), Phy.Name, 0x18);
     PhySys::BuildIVP_Real(this, Phy);
 

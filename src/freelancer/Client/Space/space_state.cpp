@@ -89,10 +89,11 @@ namespace
     unsigned G_PendingJumpSystem = 0;
     unsigned G_PendingJumpFlag = 0;
 
-    // The player's ship as a CEqObj through the watcher DAT_00679744: minus eight, the +0xc'd
-    // pointer's +0x4, ship class mask 0x503 -- the chain FUN_0054b230 walks twice. Null when any
-    // link is missing.
-    CEqObj* PlayerShipEqObj()
+    // The player's object as a CEqObj through the watcher DAT_00679744: minus eight, the +0xc'd
+    // pointer's +0x4, then the class mask (0x503 ship, 0x103 any CEqObj) -- the chain retail
+    // inlines (FUN_0054b230 twice, the death camera, DestroySpaceState). Null when any link is
+    // missing.
+    CEqObj* PlayerEqObj(unsigned ClassMask)
     {
         void* const ObjRW = GetPlayerObjRW();
         if (ObjRW == nullptr || ObjRW == reinterpret_cast<void*>(-0xc))
@@ -100,7 +101,7 @@ namespace
         CEqObj* const EqObj =
             *reinterpret_cast<CEqObj**>(static_cast<unsigned char*>(ObjRW) + 0x10);
         if (EqObj == nullptr ||
-            (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) != 0x503u)
+            (static_cast<unsigned>(EqObj->ObjectClass) & ClassMask) != ClassMask)
             return nullptr;
         return EqObj;
     }
@@ -124,7 +125,7 @@ namespace
             // Once the ship is no longer excluded from control bit 4
             // the launch is over -- +0xba9 drops and, unless +0xba8 holds it, the camera goes
             // back to "player" (attach target 0).
-            CEqObj* const EqObj = PlayerShipEqObj();
+            CEqObj* const EqObj = PlayerEqObj(0x503u);
             if (EqObj != nullptr && !EqObj->is_control_excluded(4u))
             {
                 State->bSpaceReady = 0;
@@ -142,7 +143,7 @@ namespace
                 Watched != nullptr ? reinterpret_cast<unsigned char const*>(Watched) - 8
                                    : nullptr;
             // The camera must be watching exactly the player's ship.
-            CEqObj* const EqObj = PlayerShipEqObj();
+            CEqObj* const EqObj = PlayerEqObj(0x503u);
             if (EqObj != nullptr && WatchedObjRW == GetPlayerObjRW())
             {
                 IObjRW const* Port = nullptr;
@@ -460,7 +461,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
         // gets through (to be released).
         if (HudIsMousePickBlocked() && GetHudStatus()->bRearView == 0)
             return false;
-        GetHudStatus()->bRearView = HudCommandRecord()->Byte18 != 0 ? 1 : 0;
+        GetHudStatus()->bRearView = HudCommandRecord()->bKeyDown != 0 ? 1 : 0;
         if (GetHudStatus()->bRearView != 0)
         {
             if (App->bCameraReady != 0)
@@ -498,7 +499,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
             return false;
         if (App->bDockingPending == 0)
             return false;
-        CEqObj* const EqObj = PlayerShipEqObj();
+        CEqObj* const EqObj = PlayerEqObj(0x503u);
         if (EqObj == nullptr)
             return false;
         IBehaviorManager* const Manager = EqObj->get_behavior_interface();
@@ -636,18 +637,9 @@ void SpaceAppArmDeathCamera()
 
     // The player's object narrowed with mask 0x103 (a CEqObj); control exclusion 3 set unless
     // it already is.
-    void* const PlayerRW = GetPlayerObjRW();
-    if (PlayerRW != nullptr && PlayerRW != reinterpret_cast<void*>(-0xc))
-    {
-        CEqObj* const EqObj =
-            *reinterpret_cast<CEqObj**>(static_cast<unsigned char*>(PlayerRW) + 0x10);
-        if (EqObj != nullptr &&
-            (static_cast<unsigned>(EqObj->ObjectClass) & 0x103u) == 0x103u &&
-            !EqObj->is_control_excluded(3u))
-        {
-            EqObj->set_control_exclusion(3u);
-        }
-    }
+    CEqObj* const EqObj = PlayerEqObj(0x103u);
+    if (EqObj != nullptr && !EqObj->is_control_excluded(3u))
+        EqObj->set_control_exclusion(3u);
 
     // The player's object is re-read.
     SwitchSpaceCameraMode("death", GetPlayerObjRW());
@@ -675,7 +667,7 @@ void EnterBaseFromDock(unsigned const* BaseId)
 {
     // FUN_0054bc60
     SetPlayerBaseIdRetail(*BaseId);
-    SetPlayerFactionScratchRetail(0);
+    SetPlayerLocationIdRetail(0);
     G_SpaceNextState = 4;
 }
 
@@ -718,9 +710,9 @@ namespace
             Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
             Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
             Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
-            Parms.CollisionGroupId = 0;
+            Parms.SystemId = 0;
             Parms.Type = 2;
-            Parms.bFlag1c = 0;
+            Parms.bPhysicalUnmoveable = 0;
             Parms.bEnableCollisions = 1;
             Parms.Name[0] = '\0';
             Parms.bHasInertia = 0;
@@ -766,7 +758,7 @@ namespace
             StarSysEnter(G_PendingJumpSystem);
 
             // Back into the physics in the new system, radius 0.
-            Parms.CollisionGroupId = G_PendingJumpSystem;
+            Parms.SystemId = G_PendingJumpSystem;
             Object->remake_physical(Parms, 0.0f);
 
             // IServer slot 47.
@@ -782,7 +774,7 @@ namespace
         if (G_PendingLandBase != 0)
         {
             SetPlayerBaseIdRetail(G_PendingLandBase);
-            SetPlayerFactionScratchRetail(0);
+            SetPlayerLocationIdRetail(0);
             G_SpaceNextState = 3;
             G_PendingLandBase = 0;
         }
@@ -1150,18 +1142,9 @@ void DestroySpaceState(SpaceApp* State)
     State->bDockingActive = 0;  // +0xbab
 
     // The player's ship CEqObj; when control exclusion 7 is set it is cleared (0).
-    void* const ObjRW = GetPlayerObjRW();
-    if (ObjRW != nullptr && ObjRW != reinterpret_cast<void*>(-0xc))
-    {
-        CEqObj* const EqObj =
-            *reinterpret_cast<CEqObj**>(static_cast<unsigned char*>(ObjRW) + 0x10);
-        if (EqObj != nullptr &&
-            (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) == 0x503u &&
-            EqObj->is_control_excluded(7u))
-        {
-            EqObj->set_control_exclusion(0u);
-        }
-    }
+    CEqObj* const EqObj = PlayerEqObj(0x503u);
+    if (EqObj != nullptr && EqObj->is_control_excluded(7u))
+        EqObj->set_control_exclusion(0u);
 
     State->bCameraReady = 0;
 

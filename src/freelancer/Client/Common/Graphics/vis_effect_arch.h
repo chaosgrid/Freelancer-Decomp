@@ -91,11 +91,16 @@ struct FEffectArch
     unsigned char LgtColorG;             // +0x4D
     unsigned char LgtColorB;             // +0x4E
     unsigned char LgtColorA;             // +0x4F
-    unsigned char Flags50;               // +0x50  bit0 from EffectType.RunTime<0
-    unsigned char Pad51[3];
+    unsigned char Flags;                 // +0x50  retail 'flags' (FUN_0040e6e0's warning);
+                                         // kEffectArchFlagLooping is the only bit set
+    unsigned char FlagsHigh[3];          // +0x51  the flags dword's upper bytes, always 0
     int RefCount;                        // +0x54
 };
 static_assert(sizeof(FEffectArch) == 0x58, "EffectArch 0x58");
+
+// FEffectArch::Flags bit 0: the [EffectType]'s run_time is below 0 (runs until stopped). The
+// effect players hand it to the sound's SetLooping.
+static unsigned char const kEffectArchFlagLooping = 1u;
 
 // FUN_0040eac0 (cdecl Path, bReload; caller the [Data] effects = key, with 0) --
 // binds the FxRuntime once (FUN_0042e290), then reads [Effect] (new EffectArch into the

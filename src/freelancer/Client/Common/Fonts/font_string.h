@@ -253,7 +253,7 @@ struct FFontString
     wchar_t* Text;              // +0x00
     unsigned Capacity;          // +0x04
     int MaxLines;                // +0x08  sentinel 0x7fff
-    unsigned char Field0C;      // +0x0c
+    unsigned char ChildAlloc;   // +0x0c the child vector's allocator byte (ctor: this >> 24)
     unsigned char Pad0D[3];
     FFontStringChildSlot* ChildBegin; // +0x10
     FFontStringChildSlot* ChildEnd;   // +0x14
@@ -276,7 +276,7 @@ void FontStringChildSlotsDestroy(FFontStringChildSlot* First, FFontStringChildSl
 // FUN_00445d70 -- the child vector's destructor: children released, buffer freed, zeroed.
 void FontStringChildVectorDestroy(FFontString* Self);
 void FontStringSetText(FFontString* Self, wchar_t const* Text);
-void FontStringSetScale(FFontString* Self, float Param1, float Param2);
+void FontStringSetScale(FFontString* Self, float WorldSize, float ViewDepth);
 void FontStringSetFont(FFontString* Self, IFont* Font); // FUN_004ea670
 // FUN_004159a0 (thiscall, RET 8; the first argument is always 0 and never read) — when the
 // wide text is non-empty it is freed and every child released (the FUN_004144f0 body, gated);

@@ -521,7 +521,7 @@ namespace
         const char* Value = lua_getstring(ValueObj);
         const char* Key = lua_getstring(KeyObj);
         // Nested loads may change the receiver; every engine uses the same implementation.
-        G_LoadScriptEngine->Slot34SetUserProp(G_LoadEntityHandle, Key, Value);
+        G_LoadScriptEngine->SetUserProp(G_LoadEntityHandle, Key, Value);
     }
 
     void LoadSpatialProps(lua_Object Table, float* Pos, float* Orient, bool* bPos, bool* bOrient)
@@ -602,7 +602,7 @@ namespace
                 {
                     const char* Text = lua_getstring(Data);
                     // This descriptor is unpublished; Persist retains its interface through GC.
-                    Descriptor->MotionPath.MotionPath->Slot3Load(Text);
+                    Descriptor->MotionPath.MotionPath->Load(Text);
                 }
             }
             return;
@@ -1581,7 +1581,7 @@ namespace
                 Descriptor->SrtGrp = SortGroup;
                 Descriptor->UsrFlg = UserFlags;
                 LoadEntitySpatialDesc(Table, Descriptor);
-                G_LoadScriptEngine->Slot35AddEntity(Descriptor, &G_LoadEntityHandle);
+                G_LoadScriptEngine->AddEntity(Descriptor, &G_LoadEntityHandle);
                 {
                     // 2a028 retains Name before key construction; 2a06d
                     // reads the shared handle AFTER map[] and BEFORE key cleanup.
@@ -1646,7 +1646,7 @@ namespace
             {
                 FThornUserEventDesc* Descriptor = &Temporary->UserEventDesc;
                 int ResultId;
-                G_LoadScriptEngine->Slot38AddEvent(Descriptor, &ResultId);
+                G_LoadScriptEngine->AddEvent(Descriptor, &ResultId);
                 // 25fc8 changes only the temporary packet after the published copy.
                 Temporary->UserEventDesc.Common.UniqueId = ResultId;
                 const char* String = lua_getstring(StringObject);
@@ -1681,7 +1681,7 @@ namespace
         FThornPsysPropEventDesc* Descriptor = &Temporary->PsysPropDesc;
         int ResultId;
         // 27b39 reads the module engine AFTER all property callbacks.
-        G_LoadScriptEngine->Slot38AddEvent(Descriptor, &ResultId);
+        G_LoadScriptEngine->AddEvent(Descriptor, &ResultId);
         // 27b51 modifies only this temporary packet AFTER the factory copy.
         Descriptor->Common.UniqueId = ResultId;
         FThornEvent::DestroyNative(Temporary);
@@ -1698,7 +1698,7 @@ namespace
         if (Descriptor != nullptr)
         {
             int ResultId;
-            G_LoadScriptEngine->Slot38AddEvent(Descriptor, &ResultId);
+            G_LoadScriptEngine->AddEvent(Descriptor, &ResultId);
             // Exact common object, not a spanning array view; word5 at +14.
             static_cast<FThornEventDesc*>(Descriptor)->UniqueId = ResultId;
         }
@@ -2079,7 +2079,7 @@ namespace
             FindLuaEntityHandle(lua_getstring(PrimaryName), &Common.PrimaryIndex))
         {
             PrimaryDesc = static_cast<const FThornEntitySnap*>(
-                G_LoadScriptEngine->Slot9Entity(Common.PrimaryIndex));
+                G_LoadScriptEngine->GetEntityDesc(Common.PrimaryIndex));
         }
         const lua_Object SecondaryName = GetIndexOrNil(Names, 2.0);
         if (lua_isnil(SecondaryName) == 0)
@@ -2087,7 +2087,7 @@ namespace
             if (FindLuaEntityHandle(lua_getstring(SecondaryName), &Common.SecondaryIndex))
             {
                 SecondaryDesc = static_cast<const FThornEntitySnap*>(
-                    G_LoadScriptEngine->Slot9Entity(Common.SecondaryIndex));
+                    G_LoadScriptEngine->GetEntityDesc(Common.SecondaryIndex));
             }
             else
             {
@@ -2115,7 +2115,7 @@ namespace
                 const unsigned int PositionBits = static_cast<unsigned int>(SpatialSnap.Flags) | 2u;
                 std::memcpy(&SpatialSnap.Pos[0], &PositionBits, sizeof(PositionBits));
                 // 25904..2593c copies common17+SOUND8 before Slot37 and before any temporary.
-                G_LoadScriptEngine->Slot37UpdateEntity(Common.PrimaryIndex, &SpatialSnap);
+                G_LoadScriptEngine->UpdateEntity(Common.PrimaryIndex, &SpatialSnap);
             }
             Common.Flags &= ~(kThornFlagPosition | kThornFlagOrientation);
         }

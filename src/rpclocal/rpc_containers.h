@@ -887,7 +887,7 @@ bool RpcGetSizedBlock(FRpcMarshalStream& Stream, unsigned int& OutSize, void*& O
 // ===========================================================================
 // FUN_06da2240 / FUN_06da2480 -- the equipment/cargo list on the wire, { word Count;
 // Count * { dword Count, float Status, dword ArchId, word Id, byte bEquipped, byte
-// Field_0x0f, word HardpointSize, HardpointSize bytes } }.
+// bMission, word HardpointSize, HardpointSize bytes } }.
 //
 // Retail calls both out of line from TWO slot families, not one: 06d916f6 / 06d95c3f are
 // the SETEQUIPMENT / SETCARGO / REQEQUIPMENT / REQCARGO slots, and 06d8f902 / 06d8fa17

@@ -467,7 +467,6 @@ namespace
         FEffectBase* const Effect = (FEffectBase*)Ring->EffectSlot2;
         if (Effect == nullptr)
             return;
-        typedef void(__thiscall * FSetScaleSlot)(void*, float);
         Effect->SetIntensity(Glow);
     }
 

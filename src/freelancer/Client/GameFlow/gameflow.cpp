@@ -224,7 +224,7 @@ namespace
         bool OnButton(int const* Point)
         {
             // Only a button-down record (+0x18), and not while locked.
-            if (HudCommandRecord()->Byte18 == 0)
+            if (HudCommandRecord()->bKeyDown == 0)
                 return false;
             if (G_HotspotInputLock != 0)
                 return false;
@@ -301,7 +301,7 @@ namespace
         FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
         if (Runtime == nullptr)
             return;
-        if (RoomControlGetField1338(Runtime) != 0)
+        if (RoomControlIsCameraMoving(Runtime) != 0)
             return;
         if (GetClientMouseCursorDrawFlag() != 0)
             return;
@@ -526,7 +526,7 @@ namespace
             RefreshLoadingProgress();
 
             unsigned const Base = GetPlayerBaseIdRetail();        // *FUN_004c4900()
-            unsigned Location = GetPlayerFactionScratchRetail();  // FUN_004c4a00
+            unsigned Location = GetPlayerLocationIdRetail();  // FUN_004c4a00
             if (!SinglePlayer() && Location != 0)
             {
                 FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid non-empty location %d in multiplayer\n",
@@ -652,7 +652,7 @@ bool EnterGameflowBase(unsigned BaseId, unsigned LocationId, bool bFromIntro)
     SetClientLocationInTransition();          // DAT_00668761 (controller +0x59) = 1
     G_GameflowArrivalDelayMs = 0;             // DAT_006799e4
     SetPlayerBaseIdRetail(BaseId);            // FUN_004c4910(&BaseId)
-    SetPlayerFactionScratchRetail(LocationId); // FUN_004c4a10(LocationId)
+    SetPlayerLocationIdRetail(LocationId); // FUN_004c4a10(LocationId)
     SetGameflowLocationBase(BaseId);          // FUN_0043d590
     LoadFlashlightTextures();                 // FUN_00557550
     PreloadClientSoundArchesByCategory(2);    // FUN_0042acb0
@@ -695,7 +695,7 @@ bool EnterGameflowBase(unsigned BaseId, unsigned LocationId, bool bFromIntro)
     // the intro. A runtime whose FUN_0044ab60 is false zeroes the delay first.
     FRoomRuntime* const Runtime = static_cast<FRoomRuntime*>(GetClientCurrentLocationRuntime());
     bool const bShowCaption = !bFromIntro;
-    if ((Runtime == nullptr || RoomControlGetField517(Runtime) == 0) && bShowCaption)
+    if ((Runtime == nullptr || RoomControlStartScriptRan(Runtime) == 0) && bShowCaption)
     {
         if (Runtime != nullptr && !RoomControlHasLandingScript(Runtime))
             G_GameflowArrivalDelayMs = 0;
@@ -729,7 +729,7 @@ void LeaveGameflowBase()
     ReleaseFlashlightTextures();              // FUN_005575e0
     ResetEngineInstanceCache();               // FUN_004348b0 on DAT_00667e50
     SetPlayerBaseIdRetail(0);                 // FUN_004c4910(&0)
-    SetPlayerFactionScratchRetail(0);         // FUN_004c4a10(0)
+    SetPlayerLocationIdRetail(0);         // FUN_004c4a10(0)
 }
 
 void SetGameflowArrivalDelayMs(unsigned DelayMs)

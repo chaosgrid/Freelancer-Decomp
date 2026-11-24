@@ -15,8 +15,7 @@
 #include <cmath>
 
 // Constructed at DLL load (LAB_0634da30 -> LAB_0634da40 -> FUN_0634db40).
-FIVP_MindistSettingsStorage G_IVP_MindistSettingsStorage;
-IVP_Mindist_Settings& G_IVP_MindistSettings = G_IVP_MindistSettingsStorage.Settings;
+IVP_Mindist_Settings G_IVP_MindistSettings;
 
 // FUN_0634db40. +0x134 is left alone.
 IVP_Mindist_Settings::IVP_Mindist_Settings()

@@ -8,10 +8,11 @@
 
 // Retail Client/Space/CliAsteroid.cpp — client asteroid-field object (operator new 0x238),
 // registered in DAT_006753c4. Distinct from Archetype::CliAsteroid (ICliObj companion) and from
-// CmnAsteroid::CAsteroidField (Common.dll field sim at this+0x04). No vtable at +0 (Flag00).
+// CmnAsteroid::CAsteroidField (Common.dll field sim at this+0x04). No vtable at +0
+// (bTestPlacement).
 //
 // Subobjects:
-//   +0xFC  Band blob 0x84 (FUN_0054c580 / [Band] FUN_0054c630)
+//   +0xFC  FAsteroidBand 0x84 (FUN_0054c580 / [Band] FUN_0054c630)
 //   +0x19C FAsteroidBillboardBlock ([AsteroidBillboards] FUN_0054dbe0 / 00550000 / 0054fee0)
 
 #include "common_casteroid.h"
@@ -44,15 +45,15 @@ struct FAsteroidBillboardRock
 
 static_assert(sizeof(FAsteroidBillboardRock) == 0x20, "billboard rock stride 0x20");
 
-// Billboard subobject at FCliAsteroid+0x19C, 0x80 bytes (the parent's Flag21C follows at
-// +0x21C). Retail source: Client\Space\SpaceTerrainRenderComp.cpp (the FDUMP path at
+// Billboard subobject at FCliAsteroid+0x19C, 0x80 bytes (the parent's bNebulaLookupPending
+// follows at +0x21C). Retail source: Client\Space\SpaceTerrainRenderComp.cpp (the FDUMP path at
 // .rdata:005e0b08).
 #pragma pack(push, 1)
 struct FAsteroidBillboardBlock
 {
-    float Float00;                    // +0x00 (+0x19C) ctor 2500; FUN_0054de10: the fade radius
+    float SphereRadius;               // +0x00 (+0x19C) ctor 2500; FUN_0054de10: the rock sphere's
                                       //        R = Q*start_dist*tan(35deg) / (1 - tan(35deg))
-    float Float04;                    // +0x04 (+0x1A0) ctor 4000; FUN_0054de10: R + Q*start_dist,
+    float SphereAhead;                // +0x04 (+0x1A0) ctor 4000; FUN_0054de10: R + Q*start_dist,
                                       //        the distance of the rock sphere's centre ahead
     float StartDist;                  // +0x08 (+0x1A4) ctor 1500 / start_dist
     FAsteroidBillboardRock* Rocks;    // +0x0C (+0x1A8) FUN_0054de10 operator new
@@ -63,12 +64,15 @@ struct FAsteroidBillboardBlock
     FTexShape const* Shape;           // +0x20 (+0x1BC) shape
     float SizeMin;                    // +0x24 (+0x1C0) size[0]
     float SizeMax;                    // +0x28 (+0x1C4) size[1]
-    float Float2C;                    // +0x2C (+0x1C8) ctor 700; FUN_0054de10: R * fade pct
+    float SphereFadeWidth;            // +0x2C (+0x1C8) ctor 700; FUN_0054de10: R * fade pct, the
+                                      //        shell of the sphere the rocks fade out in
     float FadeDistPercent;            // +0x30 (+0x1CC) fade_dist_percent (def 0.3)
     float Up[3];                      // +0x34 (+0x1D0) ctor (0, 1, 0); FUN_0054e900 rewrites it
                                       //        every draw as normalise(right x forward)
-    float Float40;                    // +0x40 (+0x1DC) FUN_0054feb0 max(fade planes)
-    float Float44;                    // +0x44 (+0x1E0) FUN_0054feb0 min(fade planes)
+    float NearFadeEnd;                // +0x40 (+0x1DC) FUN_0054feb0 max(fade planes): fully drawn
+                                      //        from this depth on
+    float NearFadeStart;              // +0x44 (+0x1E0) FUN_0054feb0 min(fade planes): hidden
+                                      //        below this depth
     int MaxLights;                    // +0x48 (+0x1E4) ctor 4, FUN_0054e130's light cap
     float TintedDiffuse0;             // +0x4C (+0x1E8) FUN_0054fee0 out
     float TintedDiffuse1;
@@ -82,7 +86,8 @@ struct FAsteroidBillboardBlock
     float AmbientIntensity;           // +0x70 (+0x20C)
     float QualityA;                   // +0x74 (+0x210) FUN_00550000
     float QualityB;                   // +0x78 (+0x214)
-    unsigned char Flag7C;             // +0x7C (+0x218)
+    unsigned char bParsed;            // +0x7C (+0x218) FUN_0054dbe0; FUN_0054de10 builds no rocks
+                                      //        while it is clear
     unsigned char Pad7D[3];
 };
 #pragma pack(pop)
@@ -94,6 +99,76 @@ static_assert(offsetof(FAsteroidBillboardBlock, MaxLights) == 0x48, "billboard M
 static_assert(offsetof(FAsteroidBillboardBlock, TintedDiffuse0) == 0x4C, "billboard diffuse +0x4C");
 static_assert(offsetof(FAsteroidBillboardBlock, AmbientIntensity) == 0x70, "billboard amb +0x70");
 
+// One band particle, 0x3c bytes: the ring FUN_0054c8b0 allocates at band +0x3C.
+#pragma pack(push, 1)
+struct FAsteroidBandParticle
+{
+    float Pos[3];                     // +0x00 on the ring, in world space
+    float HalfHeight;                 // +0x0C 1000 at creation, then the band's halved height
+    float Normal[3];                  // +0x10 from the two neighbours
+    float ColorFront[3];              // +0x1C FUN_0054cfb0: drawn when bFacing (1.0 at creation)
+    float ColorBack[3];               // +0x28 FUN_0054cfb0: drawn otherwise (0.2 at creation)
+    float Fade;                       // +0x34 FUN_0054c420 (1.0 at creation)
+    unsigned char bFacing;            // +0x38 FUN_0054c420: the camera on the normal's side
+    unsigned char Pad39[3];
+};
+#pragma pack(pop)
+
+static_assert(sizeof(FAsteroidBandParticle) == 0x3c, "band particle stride 0x3c");
+
+// One band piece, 0x18 bytes: the render_parts table FUN_0054c8b0 allocates at band +0x60.
+// A piece is one far-draw unit (CliAsteroidDrawFarPiece).
+#pragma pack(push, 1)
+struct FAsteroidBandPiece
+{
+    int FirstParticle;                // +0x00
+    int EndParticle;                  // +0x04 one past the last; may equal the particle count
+    float Center[3];                  // +0x08 the middle particle, or the middle two averaged
+    float Radius;                     // +0x14 the larger distance to the two end particles
+};
+#pragma pack(pop)
+
+static_assert(sizeof(FAsteroidBandPiece) == 0x18, "band piece stride 0x18");
+
+// A [Band] / [ExclusionBand] ring, 0x84 bytes: embedded at FCliAsteroid+0xFC and allocated
+// (operator new(0x84)) per exclusion band. FUN_0054c580 initialises it, FUN_0054c630 parses it.
+#pragma pack(push, 1)
+struct FAsteroidBand
+{
+    FTexShape const* Shape;           // +0x00 shape
+    Universe::IZone* Zone;            // +0x04 the field's zone, or the exclusion band's "zone"
+    float AmbientIntensity;           // +0x08 ambient_intensity
+    float TintedDiffuse[3];           // +0x0C FUN_0054d970: color_shift * field diffuse
+    float TintedAmbient[3];           // +0x18 FUN_0054d970: color_shift * field ambient
+    float ColorShift[3];              // +0x24 color_shift
+    float AmbientIncrease[3];         // +0x30 FUN_0054dab0: the field's ambient_increase / 255
+    FAsteroidBandParticle* Particles; // +0x3C
+    float TextureAspect;              // +0x40 texture_aspect * 1.15
+    int ParticleCount;                // +0x44
+    float Height;                     // +0x48 height; halved by FUN_0054c8b0
+    int VertIncrease;                 // +0x4C vert_increase (at least 1)
+    int CullMode;                     // +0x50 cull_mode: 1 drops the front pass, 2 the back pass
+    float MaxAlpha;                   // +0x54 1.0; an exclusion band's near-field fraction
+    int RenderParts;                  // +0x58 render_parts: the piece count
+    int FirstPiece;                   // +0x5C the field-wide index of piece 0
+    FAsteroidBandPiece* Pieces;       // +0x60
+    float FadeDist[4];                // +0x64 fade; multiplied by height in FUN_0054c8b0
+    unsigned char bOffsetPercent;     // +0x74 offset_percent (1) or offset_dist (0)
+    unsigned char Pad75[3];
+    float Offset;                     // +0x78
+    unsigned char bLit;               // +0x7C FUN_0054cfb0 has baked the particle colours
+    unsigned char Pad7D[3];
+    int UpdateCount;                  // +0x80 FUN_0054d410 calls while bLit is clear
+};
+#pragma pack(pop)
+
+static_assert(sizeof(FAsteroidBand) == 0x84, "band 0x84");
+static_assert(offsetof(FAsteroidBand, Particles) == 0x3C, "band Particles +0x3C");
+static_assert(offsetof(FAsteroidBand, MaxAlpha) == 0x54, "band MaxAlpha +0x54");
+static_assert(offsetof(FAsteroidBand, Pieces) == 0x60, "band Pieces +0x60");
+static_assert(offsetof(FAsteroidBand, bLit) == 0x7C, "band bLit +0x7C");
+static_assert(offsetof(FAsteroidBand, UpdateCount) == 0x80, "band UpdateCount +0x80");
+
 // FUN_0051feb0 fills the vertex-source descriptor at FCliAsteroid+0x30 (0x70 bytes): the
 // published FRpVertexSrcDesc (render/IRenderPipeline.h), flags 2, five streams into the
 // merged 0x2C-byte vertices -- position +0 (0xc), normal +0xc (0xc), diffuse +0x18 (4),
@@ -103,60 +178,60 @@ static_assert(sizeof(FRpVertexSrcDesc) == 0x70, "MeshDesc 0x70 at +0x30");
 #pragma pack(push, 1)
 struct FCliAsteroid
 {
-    unsigned char Flag00;                              // +0x00
+    unsigned char bTestPlacement;                      // +0x00  test_asteroid_placement: no near draw
     unsigned char Pad01[3];
     CmnAsteroid::CAsteroidField* CmnField;             // +0x04
-    unsigned char MapAt08[0x14];                       // +0x08
+    unsigned char CubeMapStorage[0x14];                // +0x08  FCliAsteroidCubeMap in place
     Universe::IZone* Zone;                             // +0x1C
-    int CubeSize;                                      // +0x20
-    int FillDistAt24;                                  // +0x24
+    int CubeSize;                                      // +0x20  cube_size
+    int FillDist;                                      // +0x24  fill_dist
     float EmptyCubeFreq;                               // +0x28  empty_cube_frequency
-    unsigned char Flag2C;                              // +0x2C
+    unsigned char bLoaded;                             // +0x2C  the field ini opened
     unsigned char Pad2D[3];                            // +0x2D
     FRpVertexSrcDesc MeshDesc;                         // +0x30  FUN_0051feb0
     IMaterial* Material;                               // +0xA0 first IMesh material
     void* MeshVerts;                                   // +0xA4  merged stride-0x2C verts
     void* MeshIndices;                                 // +0xA8  ushort indices
     unsigned MeshIndexCount;                           // +0xAC
-    unsigned FieldB0;                                  // +0xB0  IMesh slot write
-    float TintB4;                                      // +0xB4
-    float TintB8;
-    float TintBC;
-    float TintC0;                                      // +0xC0
-    float TintC4;
-    float TintC8;
-    float ScaleCC;                                     // +0xCC  max_alpha
-    unsigned char FlagD0;                              // +0xD0  ambient_increase
-    unsigned char FlagD1;
-    unsigned char FlagD2;
-    unsigned char FlagD3;                              // +0xD3  contains_fog_zone
-    unsigned ZeroD4;
-    float FloatD8;
+    unsigned PrimitiveType;                            // +0xB0  IMesh face-group primitive type
+    float DiffuseColor0;                               // +0xB4  diffuse_color / tint_field / 255
+    float DiffuseColor1;
+    float DiffuseColor2;
+    float AmbientColor0;                               // +0xC0  ambient_color / tint_field / 255
+    float AmbientColor1;
+    float AmbientColor2;
+    float MaxAlpha;                                    // +0xCC  max_alpha
+    unsigned char AmbientIncrease0;                    // +0xD0  ambient_increase
+    unsigned char AmbientIncrease1;
+    unsigned char AmbientIncrease2;
+    unsigned char bContainsFogZone;                    // +0xD3  contains_fog_zone
+    unsigned FogNebula;                                // +0xD4  the nebula the lighting pass fogs with
+    float ExclusionSortTimer;                          // +0xD8
     Exclusion::AsteroidExclusionZoneMgr* ExclusionMgr; // +0xDC
-    unsigned char ShapeDbE0[0x18];                     // +0xE0  the field's ShapeDB (FShapeDB in place)
-    unsigned char FlagF8;                              // +0xF8  [Band]
+    unsigned char ShapeDbStorage[0x18];                // +0xE0  the field's ShapeDB (FShapeDB in place)
+    unsigned char bHasBand;                            // +0xF8  [Band]
     unsigned char PadF9[3];
-    unsigned char BandBlob[0x84];                      // +0xFC  FUN_0054c580 / Band
-    unsigned char Flag180;
+    FAsteroidBand Band;                                // +0xFC  FUN_0054c580 / [Band]
+    unsigned char bHasExclusionBands;                  // +0x180
     unsigned char Pad181[3];
-    unsigned char VecAlloc184;
+    unsigned char BandVecAllocator;                    // +0x184
     unsigned char Pad185[3];
-    unsigned char** BandBegin;                         // +0x188  ExclusionBand* vector
-    unsigned char** BandEnd;                           // +0x18C
-    unsigned char** BandCap;                           // +0x190
-    unsigned BandVertSum;                              // +0x194
-    unsigned char Flag198;                             // +0x198  [AsteroidBillboards]
+    FAsteroidBand** BandBegin;                         // +0x188  [ExclusionBand] vector
+    FAsteroidBand** BandEnd;                           // +0x18C
+    FAsteroidBand** BandCap;                           // +0x190
+    unsigned ExclusionPieceCount;                      // +0x194  the exclusion bands' RenderParts
+    unsigned char bHasBillboards;                      // +0x198  [AsteroidBillboards]
     unsigned char Pad199[3];
     FAsteroidBillboardBlock Billboard;                 // +0x19C
-    unsigned char Flag21C;
+    unsigned char bNebulaLookupPending;                // +0x21C  the first update's nebula lookup
     unsigned char Pad21D[3];
-    unsigned char VecAlloc220;
+    unsigned char DynVecAllocator;                     // +0x220
     unsigned char Pad221[3];
     void** DynBegin;                                   // +0x224
     void** DynEnd;
     void** DynCap;
-    float Scale230;
-    unsigned char Flag234;
+    float FillDetailScale;                             // +0x230  FUN_00524880: (1 - d) * 0.65 + d
+    unsigned char bDrawFarBands;                       // +0x234  1 from the constructor, no writer
     unsigned char Pad235[3];
 };
 #pragma pack(pop)
@@ -165,29 +240,30 @@ static_assert(sizeof(FCliAsteroid) == 0x238, "FCliAsteroid must match retail ope
 static_assert(offsetof(FCliAsteroid, CmnField) == 0x04, "CmnField +0x04");
 static_assert(offsetof(FCliAsteroid, Zone) == 0x1C, "Zone +0x1C");
 static_assert(offsetof(FCliAsteroid, CubeSize) == 0x20, "CubeSize +0x20");
-static_assert(offsetof(FCliAsteroid, FillDistAt24) == 0x24, "FillDistAt24 +0x24");
+static_assert(offsetof(FCliAsteroid, FillDist) == 0x24, "FillDist +0x24");
 static_assert(offsetof(FCliAsteroid, EmptyCubeFreq) == 0x28, "EmptyCubeFreq +0x28");
-static_assert(offsetof(FCliAsteroid, Flag2C) == 0x2C, "Flag2C +0x2C");
+static_assert(offsetof(FCliAsteroid, bLoaded) == 0x2C, "bLoaded +0x2C");
 static_assert(offsetof(FCliAsteroid, MeshDesc) == 0x30, "MeshDesc +0x30");
 static_assert(offsetof(FCliAsteroid, Material) == 0xA0, "Material +0xA0");
 static_assert(offsetof(FCliAsteroid, MeshVerts) == 0xA4, "MeshVerts +0xA4");
 static_assert(offsetof(FCliAsteroid, MeshIndices) == 0xA8, "MeshIndices +0xA8");
 static_assert(offsetof(FCliAsteroid, MeshIndexCount) == 0xAC, "MeshIndexCount +0xAC");
-static_assert(offsetof(FCliAsteroid, TintB4) == 0xB4, "TintB4 +0xB4");
-static_assert(offsetof(FCliAsteroid, ScaleCC) == 0xCC, "ScaleCC +0xCC");
-static_assert(offsetof(FCliAsteroid, FlagF8) == 0xF8, "FlagF8 +0xF8");
-static_assert(offsetof(FCliAsteroid, BandBlob) == 0xFC, "BandBlob +0xFC");
-static_assert(offsetof(FCliAsteroid, Flag180) == 0x180, "Flag180 +0x180");
+static_assert(offsetof(FCliAsteroid, DiffuseColor0) == 0xB4, "DiffuseColor +0xB4");
+static_assert(offsetof(FCliAsteroid, MaxAlpha) == 0xCC, "MaxAlpha +0xCC");
+static_assert(offsetof(FCliAsteroid, FogNebula) == 0xD4, "FogNebula +0xD4");
+static_assert(offsetof(FCliAsteroid, bHasBand) == 0xF8, "bHasBand +0xF8");
+static_assert(offsetof(FCliAsteroid, Band) == 0xFC, "Band +0xFC");
+static_assert(offsetof(FCliAsteroid, bHasExclusionBands) == 0x180, "bHasExclusionBands +0x180");
 static_assert(offsetof(FCliAsteroid, BandBegin) == 0x188, "BandBegin +0x188");
-static_assert(offsetof(FCliAsteroid, Flag198) == 0x198, "Flag198 +0x198");
+static_assert(offsetof(FCliAsteroid, bHasBillboards) == 0x198, "bHasBillboards +0x198");
 static_assert(offsetof(FCliAsteroid, Billboard) == 0x19C, "Billboard +0x19C");
 static_assert(offsetof(FCliAsteroid, Billboard.StartDist) == 0x1A4, "StartDist +0x1A4");
 static_assert(offsetof(FCliAsteroid, Billboard.Count) == 0x1AC, "Count +0x1AC");
 static_assert(offsetof(FCliAsteroid, Billboard.ColorShift0) == 0x200, "ColorShift +0x200");
-static_assert(offsetof(FCliAsteroid, Flag21C) == 0x21C, "Flag21C +0x21C");
+static_assert(offsetof(FCliAsteroid, bNebulaLookupPending) == 0x21C, "bNebulaLookupPending +0x21C");
 static_assert(offsetof(FCliAsteroid, DynBegin) == 0x224, "DynBegin +0x224");
-static_assert(offsetof(FCliAsteroid, Scale230) == 0x230, "Scale230 +0x230");
-static_assert(offsetof(FCliAsteroid, Flag234) == 0x234, "Flag234 +0x234");
+static_assert(offsetof(FCliAsteroid, FillDetailScale) == 0x230, "FillDetailScale +0x230");
+static_assert(offsetof(FCliAsteroid, bDrawFarBands) == 0x234, "bDrawFarBands +0x234");
 
 class FCliDynamicAsteroidGameobj; // cli_asteroid_dynamic.h
 struct IMaterial;                 // render/IMaterial.h
@@ -297,13 +373,20 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel);
 // FUN_005201c0.
 unsigned CliAsteroidRegistryCount();
 
-// FUN_00524730 — BandBlob[0x16] (+0x154) + BandVertSum (+0x194).
+// FUN_00524730 — Band.RenderParts (+0x154) + ExclusionPieceCount (+0x194).
 int CliAsteroidPieceCount(FCliAsteroid* Field);
 // FUN_00524740 — piece world position; returns OutXYZ (zeroed, with an FDUMP warning, for a
 // piece no band holds).
 float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ);
 // FUN_005247f0 — piece radius (1.0f, with an FDUMP warning, for a piece no band holds).
 float CliAsteroidGetPieceRadius(FCliAsteroid* Field, int PieceIndex);
+
+// DAT_005dc374: LIGHTING (0x89) on, SPECULARENABLE (0x1d) off, ALPHABLENDENABLE (0x1b) off
+// (the opaque asteroid draw state). DAT_005dc394: the same with ALPHABLENDENABLE on, SRCBLEND
+// (0x13) SRCALPHA (5), DESTBLEND (0x14) INVSRCALPHA (6). {state, value} pairs ending in 0, read
+// by the field's near draw and the dynamic asteroid draw.
+extern unsigned const kRsAsteroidOpaque[7];
+extern unsigned const kRsAsteroidBlend[11];
 
 typedef void (*FCliAsteroidVisitFn)(FCliAsteroid* Field, void* Ctx);
 // Walk of the DAT_006753c4 registry, as FUN_0051ba20 and FUN_00511b90 inline it.

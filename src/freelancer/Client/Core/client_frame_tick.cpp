@@ -28,7 +28,6 @@
 #include "Space/player_behavior.h"
 #include "Network/server_connect.h"
 #include "Space/Cameras/space_camera.h"
-#include "Space/space_scene_draw.h"
 #include "Space/space_scene_load.h"
 #include "Space/space_scene_obj_draw.h"
 #include "Common/engine_light.h"

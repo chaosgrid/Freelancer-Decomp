@@ -19,7 +19,7 @@ namespace
     Timing::Delta G_FrameDelta;   // DAT_00667cf8
 
     double G_ElapsedTime = 0.0;   // _DAT_00667d38 — sum of capped dt, never pause-gated
-    double G_FrameDtCapped = 0.0; // _DAT_00667d40 — dt clamped to kMaxFrameSeconds
+    double G_FrameDtCapped = 0.0; // _DAT_00667d40 — dt clamped to 1 / kMinFps
     double G_FrameDtRaw = 0.0;    // _DAT_00667d48 — dt as measured
     double G_AvgFrameTime = 0.0;  // _DAT_00667d60 — seconds/frame over the last window
     // _DAT_00610a00 — seconds accumulated in the window. .data ships the double 10.0, so the
@@ -38,9 +38,10 @@ namespace
     // DAT_00610a0c — busy-wait fps cap; .data ships 200.0f and both writers take it from
     // COMMON.DLL::RtcSlider.
     float G_FpsCap = 200.0f;
-    // DAT_00610a08 — dt clamp, .data ships 1.0f and nothing in the PE ever writes it, so the
-    // capped and raw dt only diverge on frames longer than a whole second.
-    const float kMaxFps = 1.0f;
+    // DAT_00610a08 — the minimum frame rate: dt is clamped to 1 / it. .data ships 1.0f and
+    // nothing in the PE ever writes it, so the capped and raw dt only diverge on frames longer
+    // than a whole second.
+    const float kMinFps = 1.0f;
     // DAT_005ca228 — the fps window length.
     const double kFpsWindowSeconds = 2.0;
 
@@ -61,7 +62,7 @@ namespace
 
         G_FrameDtRaw = Dt;
 
-        const double MaxFrameSeconds = 1.0 / static_cast<double>(kMaxFps);
+        const double MaxFrameSeconds = 1.0 / static_cast<double>(kMinFps);
         // x87 compare: keep Dt only when Dt < Max; Max otherwise, including a NaN Dt.
         G_FrameDtCapped = (Dt < MaxFrameSeconds) ? Dt : MaxFrameSeconds;
 

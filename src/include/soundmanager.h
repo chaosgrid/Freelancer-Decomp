@@ -183,8 +183,9 @@ struct ISoundSource : IDAComponent
 // manager's own listener state. Every getter answers >= 0 when it has a value, and the mixer
 // keeps its current setting otherwise.
 //
-// NOT IMPLEMENTED ANYWHERE IN THE PORT YET: both MixerTick call sites in
-// menu_sound_arch.cpp pass nullptr, so the listener never moves.
+// Retail Freelancer.exe never supplies one: both of its MixerTick calls push 0 (004283ce in the
+// mixer FUN_00428040, 004284b7 in FUN_00428430), and the mixer moves the listener itself through
+// slots 14 / 15 / 16 just before. No port class implements it.
 struct ISoundListenerPose : IDAComponent
 {
     virtual int DACOM_API GetOrientation(FVec3* OutFront, FVec3* OutUp) = 0; // +0x0C

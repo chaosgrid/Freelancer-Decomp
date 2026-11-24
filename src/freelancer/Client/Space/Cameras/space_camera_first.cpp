@@ -119,30 +119,27 @@ void FirstPersonCameraConstruct(FFirstPersonCamera* Cam)
 
     // Three transforms, each a zero position and an identity matrix (retail stores them in a
     // different order, same result).
-    Cam->PositionA[0] = 0.0f;
-    Cam->PositionA[1] = 0.0f;
-    Cam->PositionA[2] = 0.0f;
-    SetIdentity(Cam->OrientationA);
+    Cam->CockpitHpPosition[0] = 0.0f;
+    Cam->CockpitHpPosition[1] = 0.0f;
+    Cam->CockpitHpPosition[2] = 0.0f;
+    SetIdentity(Cam->CockpitHpOrientation);
 
     Cam->HeadPosition[0] = 0.0f;
     Cam->HeadPosition[1] = 0.0f;
     Cam->HeadPosition[2] = 0.0f;
     SetIdentity(Cam->HeadOrientation);
 
-    Cam->PositionC[0] = 0.0f;
-    Cam->PositionC[1] = 0.0f;
-    Cam->PositionC[2] = 0.0f;
-    SetIdentity(Cam->OrientationC);
+    Cam->EyePosition[0] = 0.0f;
+    Cam->EyePosition[1] = 0.0f;
+    Cam->EyePosition[2] = 0.0f;
+    SetIdentity(Cam->EyeOrientation);
 
     // Clears BOTH HUDCamera bytes +0xfc and +0xfd -- the only evidence +0xfd is a field rather
     // than padding. +0xfe keeps the 1 the HUDCamera ctor put there.
     Cam->bFlagFC = 0;
     Cam->bFlagFD = 0;
 
-    Cam->bFlag1A0 = 1;
-    Cam->Pad1A1[0] = 0;
-    Cam->Pad1A1[1] = 0;
-    Cam->Pad1A1[2] = 0;
+    Cam->bJustAttached = 1;
 }
 
 const char* FirstPersonCameraGetName()
@@ -187,26 +184,26 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         HardpointInfo Info;
         if (FindHardpoint_PS(Inspect->get_index(), "HpCockpit", Handle, Info))
         {
-            Cam->PositionA[0] = Info.Position.x;                           // +0x100
-            Cam->PositionA[1] = Info.Position.y;
-            Cam->PositionA[2] = Info.Position.z;
-            memcpy(Cam->OrientationA, &Info.Orient, 9 * sizeof(float));   // +0x10c
+            Cam->CockpitHpPosition[0] = Info.Position.x;                           // +0x100
+            Cam->CockpitHpPosition[1] = Info.Position.y;
+            Cam->CockpitHpPosition[2] = Info.Position.z;
+            memcpy(Cam->CockpitHpOrientation, &Info.Orient, 9 * sizeof(float));   // +0x10c
         }
         else
         {
             // No cockpit hardpoint: four units behind the origin, identity.
-            Cam->PositionA[0] = 0.0f;
-            Cam->PositionA[1] = 0.0f;
-            Cam->PositionA[2] = -4.0f;                                     // 0xc0800000
-            Cam->OrientationA[8] = 1.0f;
-            Cam->OrientationA[4] = 1.0f;
-            Cam->OrientationA[0] = 1.0f;
-            Cam->OrientationA[7] = 0.0f;
-            Cam->OrientationA[6] = 0.0f;
-            Cam->OrientationA[5] = 0.0f;
-            Cam->OrientationA[3] = 0.0f;
-            Cam->OrientationA[2] = 0.0f;
-            Cam->OrientationA[1] = 0.0f;
+            Cam->CockpitHpPosition[0] = 0.0f;
+            Cam->CockpitHpPosition[1] = 0.0f;
+            Cam->CockpitHpPosition[2] = -4.0f;                                     // 0xc0800000
+            Cam->CockpitHpOrientation[8] = 1.0f;
+            Cam->CockpitHpOrientation[4] = 1.0f;
+            Cam->CockpitHpOrientation[0] = 1.0f;
+            Cam->CockpitHpOrientation[7] = 0.0f;
+            Cam->CockpitHpOrientation[6] = 0.0f;
+            Cam->CockpitHpOrientation[5] = 0.0f;
+            Cam->CockpitHpOrientation[3] = 0.0f;
+            Cam->CockpitHpOrientation[2] = 0.0f;
+            Cam->CockpitHpOrientation[1] = 0.0f;
         }
     }
 
@@ -218,7 +215,7 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
 
         // The head's base orientation in world space; kept in a second stack copy.
         FMatrix Product;
-        Math->MulMatrix(Product, AsMatrix(Space->World), AsMatrix(Cam->OrientationA));
+        Math->MulMatrix(Product, AsMatrix(Space->World), AsMatrix(Cam->CockpitHpOrientation));
         FMatrix const Head = Product;
 
         Vector const& ObjectPosition = static_cast<IObjInspect*>(Again)->get_position();
@@ -227,7 +224,7 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         // + world rotation x hardpoint position.
         FVector Offset;
         FirstPersonMathEngine()->TransformMatrix(Offset, AsMatrix(Space->World),
-                                                 AsVector(Cam->PositionA));
+                                                 AsVector(Cam->CockpitHpPosition));
         Position[0] = Offset.X + Position[0];
         Position[1] = Offset.Y + Position[1];
         Position[2] = Offset.Z + Position[2];
@@ -239,9 +236,9 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         Position[2] = Offset.Z + Position[2];
 
         // +0x160 keeps the eye point; world = {head orientation, eye point}.
-        Cam->PositionC[0] = Position[0];
-        Cam->PositionC[1] = Position[1];
-        Cam->PositionC[2] = Position[2];
+        Cam->EyePosition[0] = Position[0];
+        Cam->EyePosition[1] = Position[1];
+        Cam->EyePosition[2] = Position[2];
         Space->bViewDirty = 1;
         memcpy(Space->World, &Head, 9 * sizeof(float));
         Space->WorldPos[0] = Position[0];
@@ -249,7 +246,7 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         Space->WorldPos[2] = Position[2];
     }
 
-    Cam->bFlag1A0 = 1;
+    Cam->bJustAttached = 1;
 }
 
 void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
@@ -258,29 +255,8 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
     FHudCamera* const Hud = (FHudCamera*)Cam;
     FSpaceCamera* const Space = SpaceCameraOf(Hud);
 
-    // Only with a watched client ship: watcher - 8, the CEqObj at +0xc+4, CObject mask 0x503.
-    bool bShip = false;
-    {
-        unsigned char* const Held = const_cast<unsigned char*>(
-            reinterpret_cast<const unsigned char*>(Hud->Watched.target()));
-        if (Held != nullptr)
-        {
-            unsigned char* const Object = Held - 8;
-            if (Object != nullptr)
-            {
-                unsigned char* const Plus0c = Object + 0xc;
-                if (Plus0c != nullptr)
-                {
-                    CEqObj* const EqObj = *reinterpret_cast<CEqObj**>(Plus0c + 4);
-                    if (EqObj != nullptr &&
-                        (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) == 0x503u)
-                        bShip = true;
-                }
-            }
-        }
-    }
-
-    if (bShip)
+    // Only with a watched client ship.
+    if (GameCameraWatchedShip(Hud) != nullptr)
     {
         IObjRW* const Object = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
 
@@ -290,7 +266,7 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
 
         // Ship rotation x cockpit hardpoint orientation (+0x10c) -> this frame's mesh rotation.
         FMatrix CockpitRot;
-        FirstPersonMathEngine()->MulMatrix(CockpitRot, ShipRot, AsMatrix(Cam->OrientationA));
+        FirstPersonMathEngine()->MulMatrix(CockpitRot, ShipRot, AsMatrix(Cam->CockpitHpOrientation));
         FMatrix MeshRot = CockpitRot;
 
         Vector const& ShipPos = Object->get_position();
@@ -298,18 +274,18 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
 
         // On the first update after an attach (+0x1a0), back to the normal camera mode.
         IBehaviorManager* const Manager = GetBehaviorManager(Object);
-        if (Cam->bFlag1A0 != 0 && Manager != nullptr)
+        if (Cam->bJustAttached != 0 && Manager != nullptr)
             Manager->set_camera_mode(IBehaviorManager::CameraModeNormal);
 
         // + ship rotation x cockpit hardpoint position (+0x100), kept in +0x160.
         FVector Offset;
-        FirstPersonMathEngine()->TransformMatrix(Offset, ShipRot, AsVector(Cam->PositionA));
+        FirstPersonMathEngine()->TransformMatrix(Offset, ShipRot, AsVector(Cam->CockpitHpPosition));
         Eye[0] = Offset.X + Eye[0];
-        Cam->PositionC[0] = Eye[0];
+        Cam->EyePosition[0] = Eye[0];
         Eye[1] = Offset.Y + Eye[1];
-        Cam->PositionC[1] = Eye[1];
+        Cam->EyePosition[1] = Eye[1];
         Eye[2] = Offset.Z + Eye[2];
-        Cam->PositionC[2] = Eye[2];
+        Cam->EyePosition[2] = Eye[2];
 
         // The cockpit mesh follows.
         ClientMeshHolderSetPosition(&Cam->Mesh, Eye);
@@ -418,9 +394,9 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         FirstPersonMathEngine()->TransformMatrix(Moved, MeshRot, AsVector(Local));
         {
             float const* const MeshPos = ClientMeshHolderGetPosition(&Cam->Mesh);
-            Cam->PositionC[0] = Moved.X + MeshPos[0];
-            Cam->PositionC[1] = Moved.Y + MeshPos[1];
-            Cam->PositionC[2] = Moved.Z + MeshPos[2];
+            Cam->EyePosition[0] = Moved.X + MeshPos[0];
+            Cam->EyePosition[1] = Moved.Y + MeshPos[1];
+            Cam->EyePosition[2] = Moved.Z + MeshPos[2];
         }
 
         // The "cockpit" perf option (no null test) under 0.999 keeps the head rigid; otherwise
@@ -429,13 +405,13 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         if (FindPerfOption("cockpit")->Applied < 0.999)
         {
             // The eye back to the rigid point; mesh x part (+0x13c) x +0x16c.
-            Cam->PositionC[0] = Eye[0];
-            Cam->PositionC[1] = Eye[1];
-            Cam->PositionC[2] = Eye[2];
+            Cam->EyePosition[0] = Eye[0];
+            Cam->EyePosition[1] = Eye[1];
+            Cam->EyePosition[2] = Eye[2];
             FMatrix Head;
             FirstPersonMathEngine()->MulMatrix(Head, MeshRot, AsMatrix(Cam->HeadOrientation));
             const FMatrix HeadCopy = Head;
-            FirstPersonMathEngine()->MulMatrix(Final, HeadCopy, AsMatrix(Cam->OrientationC));
+            FirstPersonMathEngine()->MulMatrix(Final, HeadCopy, AsMatrix(Cam->EyeOrientation));
         }
         else
         {
@@ -444,7 +420,7 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
             FirstPersonMathEngine()->MulMatrix(Head, MeshRot, AsMatrix(Cam->HeadOrientation));
             const FMatrix HeadCopy = Head;
             FMatrix Offsetted;
-            FirstPersonMathEngine()->MulMatrix(Offsetted, HeadCopy, AsMatrix(Cam->OrientationC));
+            FirstPersonMathEngine()->MulMatrix(Offsetted, HeadCopy, AsMatrix(Cam->EyeOrientation));
             const FMatrix OffsettedCopy = Offsetted;
             FirstPersonMathEngine()->MulMatrix(Final, OffsettedCopy, AsMatrix(&RollMatrix.E[0][0]));
         }
@@ -452,15 +428,15 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         HudCameraApplyShake(Hud, &Final.D[0][0]);
 
         memcpy(Space->World, &Final, 9 * sizeof(float));
-        Space->WorldPos[0] = Cam->PositionC[0];
-        Space->WorldPos[1] = Cam->PositionC[1];
-        Space->WorldPos[2] = Cam->PositionC[2];
+        Space->WorldPos[0] = Cam->EyePosition[0];
+        Space->WorldPos[1] = Cam->EyePosition[1];
+        Space->WorldPos[2] = Cam->EyePosition[2];
         Space->bViewDirty = 1;
     }
 
     // HUDCamera's update, then the attach flag drops.
     HudCameraUpdate(Hud, DeltaSeconds);
-    Cam->bFlag1A0 = 0;
+    Cam->bJustAttached = 0;
 }
 
 void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, unsigned Param2)

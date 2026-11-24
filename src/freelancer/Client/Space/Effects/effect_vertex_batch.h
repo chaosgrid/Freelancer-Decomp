@@ -45,7 +45,7 @@ struct FEffectVertexBatch
     int Growth;                   // +0x1C  DAT_00674c98 = 0x80
     unsigned VertCapacity;        // +0x20  DAT_00674c9c
     unsigned IndexCapacity;       // +0x24  DAT_00674ca0
-    unsigned char Flag28;         // +0x28  DAT_00674ca4
+    unsigned char bCloseLoop;     // +0x28  DAT_00674ca4  the flush repeats vertex 0 at the end
     unsigned char bStripMode;     // +0x29  DAT_00674ca5
     unsigned char Pad2A;
     unsigned char Pad2B;

@@ -1038,7 +1038,7 @@ void FMissionPlayer::SendObjectives()
         return;
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
         return;
-    unsigned int LiveMission = PlayerState->ValueD8;
+    unsigned int LiveMission = PlayerState->LiveMissionId;
     if (LiveMission != Mission->ControllerId && LiveMission != 0)
         return;
 
@@ -1663,11 +1663,11 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         }
         // Every label entry of that SpaceObj leaves +0xec.
         {
-            std::multimap<unsigned int, unsigned int>::iterator It = FormationMembers.begin();
-            while (It != FormationMembers.end())
+            std::multimap<unsigned int, unsigned int>::iterator It = LabelObjects.begin();
+            while (It != LabelObjects.end())
             {
                 if (It->second == Parms[0])
-                    It = FormationMembers.erase(It);
+                    It = LabelObjects.erase(It);
                 else
                     ++It;
             }
@@ -1788,7 +1788,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         // Every label id on the NPC (+0x17c) goes into the +0xec multimap.
         std::list<unsigned int>::iterator FormIt = Npc->LabelIds.begin();
         for (; FormIt != Npc->LabelIds.end(); ++FormIt)
-            FormationMembers.insert(std::make_pair(*FormIt, Npc->SpaceObjId));
+            LabelObjects.insert(std::make_pair(*FormIt, Npc->SpaceObjId));
         break;
     }
 
@@ -1818,7 +1818,7 @@ void FMissionObject::OnMissionSucceed()
     State->RewardGroup(static_cast<int>(Reward / GroupSize));
     ClearObjectives();
     EndMission();
-    State->EndLiveMission(ControllerId, 2, true);
+    State->EndLiveMission(ControllerId, VNPC_MISSION_SUCCEEDED, true);
 }
 
 // FUN_06f0fea0 (ClearObjectives inlined).
@@ -1829,7 +1829,7 @@ void FMissionObject::OnMissionFail()
     if (State != nullptr && State->GetLiveMission() == ControllerId)
     {
         EndMission();
-        State->EndLiveMission(ControllerId, 3, true);
+        State->EndLiveMission(ControllerId, VNPC_MISSION_FAILED, true);
         return;
     }
     EndMission();
@@ -1886,6 +1886,7 @@ FContentNpcShip* FMissionObject::FindNpcByName(TString<0x30> const* Label)
         std::map<unsigned int, FContentNpcShip*>::iterator It = NpcObjects.begin();
         for (; It != NpcObjects.end(); ++It)
         {
+            // Retail: the nickname is read before the null test below.
             if (_stricmp(It->second->Nickname.Data, Label->Data) != 0)
                 continue;
             if (It->second != nullptr)
@@ -1911,6 +1912,7 @@ FContentNpcShip* FMissionObject::FindFormationNpc(TString<0x30> const* Label)
             std::map<unsigned int, FContentNpcShip*>::iterator It = NpcObjects.begin();
             for (; It != NpcObjects.end(); ++It)
             {
+                // Retail: the nickname is read before the null test below.
                 if (_stricmp(It->second->Nickname.Data, SlotIt->Nickname.Data) == 0)
                     break;
             }
@@ -2513,8 +2515,8 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
         for (; Arm != EncIt->Arms.end(); ++Arm)
         {
             std::multimap<unsigned int, unsigned int>::iterator Member =
-                FormationMembers.lower_bound(Arm->Id);
-            for (; Member != FormationMembers.upper_bound(Arm->Id); ++Member)
+                LabelObjects.lower_bound(Arm->Id);
+            for (; Member != LabelObjects.upper_bound(Arm->Id); ++Member)
             {
                 std::map<unsigned int, FContentNpcShip*>::iterator Object =
                     NpcObjects.find(Member->second);
@@ -3079,7 +3081,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
 
     std::list<unsigned int>::iterator Label = Solar->LabelIds.begin();
     for (; Label != Solar->LabelIds.end(); ++Label)
-        FormationMembers.insert(std::make_pair(*Label, Solar->SpaceObjId));
+        LabelObjects.insert(std::make_pair(*Label, Solar->SpaceObjId));
 
     // [Invulnerables] rows of this nickname (strcmp).
     std::list<FMissionInvulnerable>::iterator InvIt = Invulnerables.begin();
@@ -3166,7 +3168,7 @@ void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
     Loot->bSpawned = 1;
     std::list<unsigned int>::iterator Label = Loot->LabelIds.begin();
     for (; Label != Loot->LabelIds.end(); ++Label)
-        FormationMembers.insert(std::make_pair(*Label, Loot->SpaceObjId));
+        LabelObjects.insert(std::make_pair(*Label, Loot->SpaceObjId));
 
     std::list<FMissionInvulnerable>::iterator InvIt = Invulnerables.begin();
     for (; InvIt != Invulnerables.end(); ++InvIt)

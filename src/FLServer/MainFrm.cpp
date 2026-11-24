@@ -32,6 +32,13 @@ namespace
 	// .rdata:0041dea8 (1/1024: bytes to KB) and .rdata:0041deb0 (0.001: bits to kbit).
 	const double GBytesToKb = 0.0009765625;
 	const double GBitsToKbit = 0.001;
+
+	// OnCreate's two timers. 0x111 drives the bandwidth sample in OnTimer; 0x112 is set and
+	// killed but OnTimer does not test for it.
+	const UINT_PTR BandwidthSampleTimerId = 0x111;
+	const UINT BandwidthSampleMs = 1000;
+	const UINT_PTR Timer112Id = 0x112;
+	const UINT Timer112Ms = 11000;
 }
 
 IMPLEMENT_DYNCREATE(CMainFrame, CFrameWnd)
@@ -87,7 +94,7 @@ int CMainFrame::OnCreate(LPCREATESTRUCT CreateStruct)
 	{
 		return -1;
 	}
-	if (!StatusBar.Create(this, 0x50008200, 0xe801))
+	if (!StatusBar.Create(this, WS_CHILD | WS_VISIBLE | CBRS_BOTTOM, AFX_IDW_STATUS_BAR)) // 0x50008200, 0xe801
 	{
 		return -1;
 	}
@@ -95,8 +102,8 @@ int CMainFrame::OnCreate(LPCREATESTRUCT CreateStruct)
 	{
 		return -1;
 	}
-	::SetTimer(m_hWnd, 0x111, 1000, NULL);
-	::SetTimer(m_hWnd, 0x112, 11000, NULL);
+	::SetTimer(m_hWnd, BandwidthSampleTimerId, BandwidthSampleMs, NULL);
+	::SetTimer(m_hWnd, Timer112Id, Timer112Ms, NULL);
 	CMenu* Menu = CMenu::FromHandle(::GetMenu(m_hWnd));
 	if (Menu != NULL)
 	{
@@ -203,7 +210,7 @@ void CMainFrame::OnUpdateUptime(CCmdUI* CmdUI)
 // than 16, the sample stops early and the message is not passed on.
 void CMainFrame::OnTimer(UINT_PTR IdEvent)
 {
-	if (IdEvent == 0x111)
+	if (IdEvent == BandwidthSampleTimerId)
 	{
 		if (!GbClientStatsCleared)
 		{
@@ -313,8 +320,8 @@ void CMainFrame::CloseBandwidthLog()
 void CMainFrame::OnClose()
 {
 	GApp->WaitForStartupThread();
-	::KillTimer(m_hWnd, 0x111);
-	::KillTimer(m_hWnd, 0x112);
+	::KillTimer(m_hWnd, BandwidthSampleTimerId);
+	::KillTimer(m_hWnd, Timer112Id);
 	GApp->BeginShutdown();
 	CFrameWnd::OnClose();
 }

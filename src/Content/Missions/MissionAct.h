@@ -914,7 +914,7 @@ public:
     // ("NO_HEAD" 0), s7 body, s8.. accessories.
     Costume SpeakerCostume;
     unsigned int VoiceId;    // +0xac (ctor 0) pub::GetVoiceID(s4)
-    unsigned int CommType;   // +0xb0 (ctor 0) optional i5
+    unsigned int CaptionIds;   // +0xb0 (ctor 0) optional i5
     int Duration;            // +0xb4 (ctor -1) optional i3; kept only for -1 and 1..10
 };
 
@@ -931,7 +931,7 @@ public:
     // ("NO_HEAD" 0), s6 body, s7.. accessories.
     Costume SpeakerCostume;
     unsigned int VoiceId;    // +0x74 (ctor 0) pub::GetVoiceID(s0)
-    unsigned int CommType;   // +0x78 (ctor 0) i1
+    unsigned int CaptionIds;   // +0x78 (ctor 0) i1
     unsigned int TextId;     // +0x7c (ctor 0) pub::GetNicknameId(s3)
     int Duration;            // +0x80 (ctor -1) i4; kept only for -1 and 1..10
 };

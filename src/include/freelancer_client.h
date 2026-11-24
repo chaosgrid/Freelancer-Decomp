@@ -116,8 +116,8 @@ public:
     void SendServerSetReputation(unsigned int ClientId, const FServerSetReputationInfo& Info) override;
     void SendServerAdjustAttitude(unsigned int ClientId, const FPayloadServerAdjustAttitude& Info) override;
     void SendServerSendComm(unsigned int ClientId, unsigned int SenderId, unsigned int ReceiverId,
-                            unsigned int VoiceId, Costume CommCostume, unsigned int CommType,
-                            const unsigned int* TextIds, int TextCount, unsigned int Mood, float Duration,
+                            unsigned int VoiceId, Costume CommCostume, unsigned int CaptionIds,
+                            const unsigned int* TextIds, int TextCount, unsigned int PermutationIds, float Duration,
                             bool bReceiverIsOwnShip) override;
     void SendServerSendNNMessage(unsigned int ClientId, unsigned int MessageId) override;
     void SendServerSetMissionMessage(const unsigned int& ClientId, const CSetMissionMessage& Message) override;

@@ -51,14 +51,15 @@ struct FDockQueueEntry
     unsigned int ShipId;             // +0x04
     unsigned int DockTargetId;       // +0x08
     int DockIndex;                   // +0x0c terminal index, -1 = any
-    // +0x10: in the waiting list a docking ring's terminal choice; in the docking list set
-    // once the ship is inside -- it is then finished by FUN_06f6e9d0 instead of timing out.
-    // TODO: its writer (SpaceSupport).
-    bool bField_0x10;
+    // +0x10: set on a docking entry for a ship leaving the terminal (player launch, airlock
+    // arrival, NPC launch out of LaunchQueuedShips) and by SpaceSupport message 0x27: the entry
+    // then does not time out and is finished by FUN_06f6e9d0 once the ship is off the dock
+    // point. Waiting entries keep 0, which FinishDocking reads as a docking ring's terminal.
+    bool bFinishOnClear;
     double Time;                     // +0x18 game time the ship entered the docking list
     // +0x20: set, the docking entry never times out. It is the dock request's +0x0c byte;
     // waiting entries keep 0, so a grant out of the wait queue passes 0.
-    bool bField_0x20;
+    bool bNoTimeout;
 };
 
 // The GCS events of the dock queues: the dock target speaks (Speaker +0x08) to the ship
@@ -186,7 +187,7 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It);
 
 // FUN_06f6d820: ask for a terminal; on 4 the ship enters the docking list.
 int __cdecl TryStartDocking(unsigned int SystemId, unsigned int const* ShipId,
-                            unsigned int const* DockTargetId, int* DockIndex, bool bField_0x20);
+                            unsigned int const* DockTargetId, int* DockIndex, bool bNoTimeout);
 
 // FUN_06f6c920: gate locks, the player's dock permission and the target's attitude, then
 // ChooseDockTerminal; with 4 a moving target answers 3.
@@ -245,7 +246,7 @@ struct FDockRequest
     unsigned int ShipId;          // +0x00
     unsigned int DockTargetId;    // +0x04
     unsigned int SystemId;        // +0x08
-    bool bField_0x0c;             // +0x0c handed to TryStartDocking (its bField_0x20 argument)
+    bool bNoTimeout;              // +0x0c handed to TryStartDocking
 };
 
 // FUN_06f6e110: SpaceSupport message 0x12. A __thiscall on the support object in retail, but
@@ -263,7 +264,7 @@ void __cdecl DropPlayersLockedOutOfGate(unsigned int const* ShipId, unsigned int
 void __cdecl PlaceFormationBlocks(std::list<FContentNpcShipParams>* Blocks, FFormation* Formation,
                                   FTransform const* Placement);
 
-// FUN_06f67440: the NPC ships of System (those with +0x5a8 clear) within *Radius of the
+// FUN_06f67440: the NPC ships of System (bExcludeFromShipCount clear) within *Radius of the
 // placement, or -- when *ConeRange > 0 -- within *ConeRange and inside the 35 degree cone
 // around the placement's -z axis; with ClassId only ships of that class count.
 int __cdecl CountNpcShipsNear(FSystemInfo* System, FSpaceObjPlacement const* Placement,

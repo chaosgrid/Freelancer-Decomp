@@ -123,10 +123,10 @@ namespace
     {
         FEffectListNode* Next; // +0x00
         FEffectListNode* Prev; // +0x04
-        void* EffectArch;           // +0x08
-        void* SlotOther;       // +0x0C
+        void* EffectArch;      // +0x08
+        void* Sound;           // +0x0C  ISoundSource*
         FEffectBase* Effect;   // +0x10
-        void* SlotExplosion;   // +0x14
+        void* Light;           // +0x14  FGameLight*
     };
     static_assert(sizeof(FEffectListNode) == 0x18, "effect list node 0x18");
 }
@@ -136,11 +136,11 @@ void BeamEffectSetProgressFromSpeed(FBeamEffect* This, float Speed)
     FBeamEffectArch* Arch = This->Arch;
     if (Arch != nullptr)
     {
-        This->ProgressDenom80 =
+        This->ExtendTime =
             (Arch->RadiusMid + Arch->Radius1 + kProgressLengthPad) / Speed;
         return;
     }
-    This->ProgressDenom80 = kProgressFallback / Speed;
+    This->ExtendTime = kProgressFallback / Speed;
 }
 
 void BeamEffectSetHitFlags(FBeamEffect* This, bool bHit, bool bHitPlayer)
@@ -261,7 +261,6 @@ void CliEffectCompanionArmStop(void* Companion16)
     // CliEquipLight, whose slot 1 is FUN_004f7bd0 (EffectKill).
     if (Slots[2] != nullptr)
     {
-        typedef void(__thiscall * FEffectSlot1)(void*);
         ((FEffectBase*)Slots[2])->Kill();
     }
     if (Slots[1] != nullptr)
@@ -303,13 +302,13 @@ unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16)
     void** const Want = static_cast<void**>(Payload16);
     for (FEffectListNode* Cursor = Head->Next; Cursor != Head; Cursor = Cursor->Next)
     {
-        if (Cursor->Effect != Want[2] || Cursor->SlotOther != Want[1] ||
-            Cursor->SlotExplosion != Want[3])
+        if (Cursor->Effect != Want[2] || Cursor->Sound != Want[1] ||
+            Cursor->Light != Want[3])
             continue;
 
         // Clear node-owned copies first.
-        void* NodeSlots[4] = {Cursor->EffectArch, Cursor->SlotOther, Cursor->Effect,
-                              Cursor->SlotExplosion};
+        void* NodeSlots[4] = {Cursor->EffectArch, Cursor->Sound, Cursor->Effect,
+                              Cursor->Light};
         if (NodeSlots[2] != nullptr)
         {
             EffectRelease(static_cast<FEffectBase*>(NodeSlots[2]));
@@ -318,12 +317,12 @@ unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16)
         if (NodeSlots[1] != nullptr)
         {
             static_cast<ISoundSource*>(NodeSlots[1])->Release();
-            Cursor->SlotOther = nullptr;
+            Cursor->Sound = nullptr;
         }
         if (NodeSlots[3] != nullptr)
         {
             GameLightRelease(static_cast<FGameLight*>(NodeSlots[3]));
-            Cursor->SlotExplosion = nullptr;
+            Cursor->Light = nullptr;
         }
         Cursor->EffectArch = nullptr;
 
@@ -1050,7 +1049,6 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
         // A failed attach disables the light; the creation reference is dropped either way.
         if (!GameLightAttachAnim(Light, Anim, 1.0f, 1.0f, 0.0f))
         {
-            typedef void(__thiscall * FDisableFn)(FGameLight*);
             Light->Disable();
         }
         GameLightRelease(Light);
@@ -1741,7 +1739,6 @@ FCliLauncherFx::~FCliLauncherFx()
         FEffectBase* const Effect = static_cast<FEffectBase*>(MuzzleEffect);
         FTransform const Identity = IdentityTransform();
         EffectAttach(Effect, nullptr, -1, &Identity);
-        typedef void(__thiscall * FEffectKill)(FEffectBase*);
         Effect->Kill();
         EffectRelease(Effect);
         MuzzleEffect = nullptr;
@@ -1787,7 +1784,6 @@ void FCliLauncherFx::DropOnDestroying()
     if (MuzzleEffect != nullptr)
     {
         FEffectBase* const Effect = static_cast<FEffectBase*>(MuzzleEffect);
-        typedef void(__thiscall * FEffectKill)(FEffectBase*);
         Effect->Kill();
         EffectRelease(Effect);
         MuzzleEffect = nullptr;
@@ -1857,7 +1853,7 @@ void FCliCmDropperFx::notify(Event Code, void* Param)
             NnVoiceEnqueue(G_CmDropperDestroyedId, 0);
         DropOnDestroying();
     }
-    else if (Code == Event_0x19)
+    else if (Code == IncomingMissileDetected)
     {
         // When the host object's owner is this client, fire this one equipment (no target).
         unsigned Owner = 0;

@@ -117,17 +117,10 @@ void GameCameraConstruct(FGameCamera* Cam)
     for (int i = 0; i < 3; ++i)
     {
         Cam->Velocity[i] = 0.0f;
-        Cam->VectorD0[i] = 0.0f;
+        Cam->LastPosition[i] = 0.0f;
     }
 
-    Cam->Pad0CC[0] = 0;
-    Cam->Pad0CC[1] = 0;
-    Cam->Pad0CC[2] = 0;
-    Cam->Pad0CC[3] = 0;
-    Cam->ClearColor[0] = 0;
-    Cam->ClearColor[1] = 0;
-    Cam->ClearColor[2] = 0;
-    Cam->Pad0F7 = 0;
+    // +0xcc, the ClearColor bytes and +0xf7 are left as they are, as in retail.
 }
 
 void HudCameraConstruct(FHudCamera* Cam)
@@ -166,18 +159,18 @@ void GameCameraUpdate(FGameCamera* Cam, float DeltaSeconds)
     // Only an exact zero dt skips (a NaN does not). The reciprocal is taken once.
     if (!(DeltaSeconds == 0.0f))
     {
-        const float DiffZ = Position[2] - Cam->VectorD0[2];
-        const float DiffX = Position[0] - Cam->VectorD0[0];
-        const float DiffY = Position[1] - Cam->VectorD0[1];
+        const float DiffZ = Position[2] - Cam->LastPosition[2];
+        const float DiffX = Position[0] - Cam->LastPosition[0];
+        const float DiffY = Position[1] - Cam->LastPosition[1];
         const float InvDt = 1.0f / DeltaSeconds;
         Cam->Velocity[0] = InvDt * DiffX;
         Cam->Velocity[1] = InvDt * DiffY;
         Cam->Velocity[2] = InvDt * DiffZ;
     }
 
-    Cam->VectorD0[0] = Position[0];
-    Cam->VectorD0[1] = Position[1];
-    Cam->VectorD0[2] = Position[2];
+    Cam->LastPosition[0] = Position[0];
+    Cam->LastPosition[1] = Position[1];
+    Cam->LastPosition[2] = Position[2];
 }
 
 void GameCameraBeginFrame(FGameCamera* Cam)
@@ -303,6 +296,23 @@ void* GameCameraGetTarget(const FGameCamera* Cam)
         return nullptr;
     return const_cast<unsigned char*>(
         reinterpret_cast<const unsigned char*>(Cam->Watched.target())) - kWatchableOffset;
+}
+
+CEqObj* GameCameraShipOf(IObjRW* Object)
+{
+    // The CBase sub-object (+0x0c; null stays null), then its CObject (+0x10).
+    CBase* const Base = static_cast<IObjInspectImpl*>(Object);
+    if (Base == nullptr)
+        return nullptr;
+    CEqObj* const EqObj = static_cast<CEqObj*>(Base->Object);
+    if (EqObj == nullptr || (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) != 0x503u)
+        return nullptr;
+    return EqObj;
+}
+
+CEqObj* GameCameraWatchedShip(const FGameCamera* Cam)
+{
+    return GameCameraShipOf(static_cast<IObjRW*>(GameCameraGetTarget(Cam)));
 }
 
 bool GameCameraActivate(FGameCamera* Cam, const int* ViewRect4)
@@ -444,28 +454,28 @@ bool HudCameraOnEvent(FHudCamera* Cam, unsigned MsgId)
         Record.Op = static_cast<int>(MsgId);
         break;
     case 0x2a:
-        G_HudKeySteerPosX = (HudCommandRecord()->Byte18 != 0) ? 1.0f : 0.0f;
+        G_HudKeySteerPosX = (HudCommandRecord()->bKeyDown != 0) ? 1.0f : 0.0f;
         break;
     case 0x2b:
-        G_HudKeySteerNegX = (HudCommandRecord()->Byte18 != 0) ? -1.0f : 0.0f;
+        G_HudKeySteerNegX = (HudCommandRecord()->bKeyDown != 0) ? -1.0f : 0.0f;
         break;
     case 0x2c:
-        G_HudKeySteerPosY = (HudCommandRecord()->Byte18 != 0) ? 1.0f : 0.0f;
+        G_HudKeySteerPosY = (HudCommandRecord()->bKeyDown != 0) ? 1.0f : 0.0f;
         break;
     case 0x2d:
-        G_HudKeySteerNegY = (HudCommandRecord()->Byte18 != 0) ? -1.0f : 0.0f;
+        G_HudKeySteerNegY = (HudCommandRecord()->bKeyDown != 0) ? -1.0f : 0.0f;
         break;
     case 0x2e:
-        G_HudKeySteerPosZ = (HudCommandRecord()->Byte18 != 0) ? 1.0f : 0.0f;
+        G_HudKeySteerPosZ = (HudCommandRecord()->bKeyDown != 0) ? 1.0f : 0.0f;
         break;
     case 0x2f:
-        G_HudKeySteerNegZ = (HudCommandRecord()->Byte18 != 0) ? -1.0f : 0.0f;
+        G_HudKeySteerNegZ = (HudCommandRecord()->bKeyDown != 0) ? -1.0f : 0.0f;
         break;
     case 0xc7:
         // Ignored while the arrow cursor is up.
         if (!MouseIsArrowCursor())
         {
-            G_bHudFireHeld = (HudCommandRecord()->Byte18 != 0) ? 1 : 0;
+            G_bHudFireHeld = (HudCommandRecord()->bKeyDown != 0) ? 1 : 0;
             G_HudFireChanged = 1;
         }
         break;
@@ -627,17 +637,7 @@ namespace
 
         // Pass 3. The radar range: the player ship's first scanner (ship pointer unchecked) or
         // the .data default.
-        CEqObj* PlayerShip = nullptr;
-        {
-            unsigned char* const Plus0c = reinterpret_cast<unsigned char*>(Player) + 0xc;
-            if (Plus0c != nullptr)
-            {
-                CEqObj* const EqObj = *reinterpret_cast<CEqObj**>(Plus0c + 4);
-                if (EqObj != nullptr &&
-                    (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) == 0x503u)
-                    PlayerShip = EqObj;
-            }
-        }
+        CEqObj* const PlayerShip = GameCameraShipOf(Player);
         float RadarRange = kDefaultRadarRange;
         CEquip* const Scanner = PlayerShip->EquipManager.FindFirst(0x80000);
         if (Scanner != nullptr)
@@ -655,17 +655,7 @@ namespace
 
             // Its ship (mask 0x503, else null -- read unchecked); only while not fully cloaked
             // (a NaN passes).
-            CEqObj* Ship = nullptr;
-            {
-                unsigned char* const Plus0c = reinterpret_cast<unsigned char*>(Go) + 0xc;
-                if (Plus0c != nullptr)
-                {
-                    CEqObj* const EqObj = *reinterpret_cast<CEqObj**>(Plus0c + 4);
-                    if (EqObj != nullptr &&
-                        (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) == 0x503u)
-                        Ship = EqObj;
-                }
-            }
+            CEqObj* const Ship = GameCameraShipOf(Go);
             if (Ship->CloakPercent >= 1.0f)
                 continue;
 
@@ -702,27 +692,7 @@ void HudCameraUpdate(FHudCamera* Cam, float DeltaSeconds)
 {
     // FUN_0051d070 (slot 0x6c).
     //
-    // The watched object's CEqObj (ObjRW + 0x10) when its class has ship mask 0x503, else null.
-    CEqObj* Ship = nullptr;
-    {
-        unsigned char* const Held = const_cast<unsigned char*>(
-            reinterpret_cast<const unsigned char*>(Cam->Watched.target()));
-        if (Held != nullptr)
-        {
-            unsigned char* const Object = Held - kWatchableOffset;
-            if (Object != nullptr)
-            {
-                unsigned char* const Plus0c = Object + 0xc;
-                if (Plus0c != nullptr)
-                {
-                    CEqObj* const EqObj = *reinterpret_cast<CEqObj**>(Plus0c + 4);
-                    if (EqObj != nullptr &&
-                        (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) == 0x503u)
-                        Ship = EqObj;
-                }
-            }
-        }
-    }
+    CEqObj* const Ship = GameCameraWatchedShip(Cam);
 
     // With a ship, control exclusion 4 (cinematic) drives the cursor latch and the letterbox.
     // Excluded: unless the local server tick is held, cursor off and bars in. Not excluded:

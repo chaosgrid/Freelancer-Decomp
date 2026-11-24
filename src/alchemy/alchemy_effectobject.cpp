@@ -279,7 +279,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectObject::Slot17()
+    GENRESULT DACOM_API FFxEffectObject::DestructorSlot()
     {
         Unbind();
         return GR_OK;
@@ -355,11 +355,11 @@ namespace AlchemyImpl
 
             if (Flags == 7)
                 return static_cast<GENRESULT>(0);
-            if ((Flags & 0x1) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetFlagBit1) != 0)
+            if ((Flags & 0x1) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsEmitter) != 0)
                 return static_cast<GENRESULT>(0);
-            if ((Flags & 0x2) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetFlagBit2) != 0)
+            if ((Flags & 0x2) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsField) != 0)
                 return static_cast<GENRESULT>(0);
-            if ((Flags & 0x4) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetFlagBit4) != 0)
+            if ((Flags & 0x4) != 0 && CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsAppearance) != 0)
                 return static_cast<GENRESULT>(0);
         }
         return static_cast<GENRESULT>(1);
@@ -383,19 +383,20 @@ namespace AlchemyImpl
         }
         if (NodeCount_ == 0)
             return GR_OK;
+        // Retail: a node matching several bits is submitted once per bit.
         do
         {
             IDAComponent* Node = Record->Node;
             if (static_cast<unsigned char>(AsFx(Node)->IsNodeDead()) == 0)
             {
                 if ((Flags & 0x1) != 0 &&
-                    CallNodeFlagSlot(Record->Node, &IGenericFx::GetFlagBit1) != 0)
+                    CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsEmitter) != 0)
                     G_EffectAlchemy->SubmitNode(Node);
                 if ((Flags & 0x2) != 0 &&
-                    CallNodeFlagSlot(Record->Node, &IGenericFx::GetFlagBit2) != 0)
+                    CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsField) != 0)
                     G_EffectAlchemy->SubmitNode(Node);
                 if ((Flags & 0x4) != 0 &&
-                    CallNodeFlagSlot(Record->Node, &IGenericFx::GetFlagBit4) != 0)
+                    CallNodeFlagSlot(Record->Node, &IGenericFx::GetIsAppearance) != 0)
                     G_EffectAlchemy->SubmitNode(Node);
             }
             ++Record;
@@ -505,6 +506,7 @@ namespace AlchemyImpl
             IDAComponent* Child = Fx->GetFirstChild();
             if (Child != nullptr)
             {
+                // Retail evaluates the child subtree twice.
                 const float SubtreeMax = ComputeMaxSubtreeDuration(Child);
                 if (!(SubtreeMax < MaxDuration))
                     MaxDuration = ComputeMaxSubtreeDuration(Child);
@@ -717,6 +719,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
+    // Inlined in FUN_0621eed0. Retail: a miss reads End->Node, past the array.
     IDAComponent* FFxEffectObject::FindNodeById(unsigned long Id) const
     {
         const FFxEffectNodeRec* const End = NodeRecordsEnd();

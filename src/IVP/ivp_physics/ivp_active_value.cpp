@@ -110,7 +110,7 @@ IVP_U_Active_Terminal_Double::IVP_U_Active_Terminal_Double(const char* NameIn, f
 }
 
 // LAB_063621f0.
-int IVP_U_Active_Terminal_Double::Slot1()
+int IVP_U_Active_Terminal_Double::PrintTypeName()
 {
     printf("DoubleVal");
     return 0;
@@ -155,7 +155,7 @@ IVP_U_Active_Terminal_Int::IVP_U_Active_Terminal_Int(const char* NameIn, int32_t
 }
 
 // LAB_06362260.
-int IVP_U_Active_Terminal_Int::Slot1()
+int IVP_U_Active_Terminal_Int::PrintTypeName()
 {
     printf("IntVal");
     return 0;

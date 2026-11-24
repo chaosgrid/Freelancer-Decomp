@@ -149,8 +149,8 @@ struct FCommonUpdateObjectInfo {
     Quaternion Orientation;      // +0x04
     Vector Position;             // +0x14
     float Timestamp;            // +0x20  timestamp
-    float Throttle;            // +0x24  SSPObjUpdateInfo::State, bit copy
-    unsigned char State;    // +0x28  SSPObjUpdateInfo::Field_0x2c
+    float Throttle;             // +0x24  SSPObjUpdateInfo::ThrottleBits, bit copy
+    unsigned char State;        // +0x28  SSPObjUpdateInfo::State (the ship's BehaviorIndex)
     unsigned char Pad_0x29[3];
 };
 static_assert(sizeof(FCommonUpdateObjectInfo) == 0x2c, "UPDATEOBJECT arg struct 0x2c");
@@ -205,7 +205,7 @@ struct FPayloadServerSetDirective {
     unsigned int FollowTargetId;        // +0x28  follow op+0x0c (TargetId)
     float FollowDistance;               // +0x2c  follow op+0x10 (FollowDistance)
     Vector FollowOffset;              // +0x30  follow op+0x14..0x1c
-    float Field_0x3c;               // +0x3c  follow op+0x20
+    float FollowEngageRange;        // +0x3c  follow op+0x20 (EngageRange)
     int GotoMode;                 // +0x40  ctor seed 3; goto op+0x0c
     Vector GotoDestination;              // +0x44  goto op+0x10 (Destination)
     int GotoTargetId;                 // +0x50  goto op+0x1c
@@ -215,17 +215,17 @@ struct FPayloadServerSetDirective {
     FRpcDirectiveBlock SplineP3;  // +0x78  goto op+0x44..0x4c
     float GotoRange;               // +0x84  goto op+0x50
     float GotoSpeed;               // +0x88  goto op+0x54
-    unsigned char Field_0x8c;       // +0x8c  goto op+0x58
-    unsigned char Field_0x8d;       // +0x8d  goto op+0x59
+    unsigned char bGotoFlyThrough;  // +0x8c  goto op+0x58 (bFlyThrough)
+    unsigned char Field_0x8d;       // +0x8d  goto op+0x59 (Field_59, meaning unknown)
     unsigned char bGotoCruise;       // +0x8e  goto op+0x5a
     unsigned char bGotoNoCruise;       // +0x8f  goto op+0x5b
-    unsigned char bGotoAllowCruise;       // +0x90  goto op+0x6c
+    unsigned char bGotoDisableAvoidance; // +0x90  goto op+0x6c (bDisableAvoidance)
     unsigned char Pad_0x91[3];      // +0x91  swept up by the receiver's REP MOVSD
 };
 static_assert(offsetof(FPayloadServerSetDirective, FollowOffset) == 0x30, "SETDIRECTIVE +0x30");
 static_assert(offsetof(FPayloadServerSetDirective, GotoDestination) == 0x44, "SETDIRECTIVE +0x44");
 static_assert(offsetof(FPayloadServerSetDirective, SplineP3) == 0x78, "SETDIRECTIVE +0x78");
-static_assert(offsetof(FPayloadServerSetDirective, bGotoAllowCruise) == 0x90, "SETDIRECTIVE +0x90");
+static_assert(offsetof(FPayloadServerSetDirective, bGotoDisableAvoidance) == 0x90, "SETDIRECTIVE +0x90");
 static_assert(sizeof(FPayloadServerSetDirective) == 0x94, "SETDIRECTIVE payload 0x94");
 
 // ---------------------------------------------------------------------------
@@ -371,8 +371,8 @@ static_assert(sizeof(FServerSetGroupFeelingsInfo) == 0x18,
 // rpclocal's sender 0x06d8a860 copies the two dwords to packet+0x20 / +0x24 and its
 // receiver caseD_21 spills them into a file-static pair. Server.dll's builder
 // (FUN_06cf6e60) puts *ObjId at +0x00 and *Destination at +0x04; freelancer.exe's
-// LAB_0053d500 reads them as the ship and the gate. rpclocal still marshals it through
-// its generic FPayloadServerDwordPair.
+// LAB_0053d500 reads them as the ship and the gate. The payload is this struct as it
+// stands.
 // ---------------------------------------------------------------------------
 struct FServerSystemSwitchOutInfo {
     unsigned int ShipId;        // +0x00
@@ -387,8 +387,8 @@ static_assert(sizeof(FServerSystemSwitchOutInfo) == 0x08, "SYSTEM_SWITCH_OUT arg
 // rpclocal's sender 0x06d8a990 copies the three dwords to packet+0x20.. in order.
 // Server.dll's builder (FUN_06cf6fc0) fills {*ObjId, *Arg2, *Arg3}; freelancer.exe's
 // FUN_0053d720 looks +0x00 up as the ship, +0x04 as the dock object (its CEqObj +0x164 is
-// the docking base) and hands &+0x08 to FUN_00543b40 as the base id. rpclocal still
-// marshals it through its generic FPayloadServerThreeDwords.
+// the docking base) and hands &+0x08 to FUN_00543b40 as the base id. The payload is this
+// struct as it stands.
 // ---------------------------------------------------------------------------
 struct FServerLandInfo {
     unsigned int ShipId;        // +0x00

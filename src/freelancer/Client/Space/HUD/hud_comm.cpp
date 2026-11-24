@@ -22,7 +22,7 @@
 #include "NeuroNet/nn_button_control.h"
 #include "NeuroNet/nn_text_control.h"
 #include "NeuroNet/nn_text_scratch.h"  // G_NnTextScratchB (DAT_0066fc60)
-#include "NeuroNet/nn_ui_pulse.h"      // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteArgb_679bb0
+#include "NeuroNet/nn_ui_pulse.h"      // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteCyan
 #include "Core/perf_options.h"     // GetPerfOptionSlot (FUN_005b3510)
 #include "Space/player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
 #include "Common/Audio/sound_config.h"     // the [CFG] comm ducking / dialogue pan values
@@ -745,7 +745,7 @@ bool FCommWindow::ReadIni(INI_Reader& Reader)
     {
         ClientMeshLoadFromPath(&Corner, Reader.get_value_string(), 0, false); // FUN_0059ec80(p, 0, 0)
         // The palette colour DAT_00679bb0 (FUN_004a1af0's body inlined).
-        unsigned long const Palette = G_NnPaletteArgb_679bb0;
+        unsigned long const Palette = G_NnPaletteCyan;
         unsigned char Colour[4];
         memcpy(Colour, &Palette, sizeof(Colour));
         ClientMeshHolderSetColor(&Corner, Colour);

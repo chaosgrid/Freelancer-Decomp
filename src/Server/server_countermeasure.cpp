@@ -33,7 +33,7 @@ unsigned int CounterMeasure::get_type_bits() const
 CCounterMeasure* CounterMeasure::ccountermeasure() const
 {
     CObject* const Obj = Object;
-    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x17u) != 0x17u)
+    if (Obj == nullptr || (static_cast<unsigned int>(Obj->ObjectClass) & CObject::ClassCounterMeasure) != CObject::ClassCounterMeasure)
         return nullptr;
     return static_cast<CCounterMeasure*>(Obj);
 }
@@ -49,7 +49,7 @@ bool CounterMeasure::create(Archetype::Root* Arch)
 
     // The (& 3) narrowing is not null-tested.
     CObject* Narrowed = Object;
-    if (Narrowed == nullptr || (static_cast<unsigned>(Narrowed->ObjectClass) & 3u) != 3u)
+    if (Narrowed == nullptr || (static_cast<unsigned int>(Narrowed->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         Narrowed = nullptr;
     Narrowed->open(Arch);
 
@@ -96,7 +96,7 @@ void CounterMeasure::divert_missiles()
     {
         // Missiles only ((& 0xa7), a CGuided).
         CObject* const Hit = GCounterMeasureHits[Index];
-        if (Hit == nullptr || (static_cast<unsigned>(Hit->ObjectClass) & 0xa7u) != 0xa7u)
+        if (Hit == nullptr || (static_cast<unsigned int>(Hit->ObjectClass) & CObject::ClassGuided) != CObject::ClassGuided)
             continue;
 
         // Not a missile of this countermeasure's own owner (this side's narrowing is not

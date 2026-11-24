@@ -613,7 +613,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635d5b0(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635d5b0(this, FrameA, FrameB);
         }
     };
     static_assert(sizeof(IVP_Sweep_PointPlane_Evaluator) == 0x44,
@@ -636,7 +636,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635da20(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635da20(this, FrameA, FrameB);
         }
     };
     static_assert(sizeof(IVP_Sweep_EdgeNormal_Evaluator) == 0x34,
@@ -674,7 +674,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635e080(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635e080(this, FrameA, FrameB);
         }
     };
     // offsetof is not used: offsetof on a polymorphic type is only
@@ -698,7 +698,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635e160(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635e160(this, FrameA, FrameB);
         }
     };
     static_assert(sizeof(IVP_Sweep_EdgeParallel_Evaluator) == 0x34,
@@ -718,7 +718,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635d6d0(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635d6d0(this, FrameA, FrameB);
         }
     };
     static_assert(sizeof(IVP_Sweep_EdgeFace_Evaluator) == 0x34,
@@ -756,7 +756,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635d950(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635d950(this, FrameA, FrameB);
         }
     };
     static_assert(sizeof(IVP_Sweep_VertexEdgeMoment_Evaluator) == 0x58,
@@ -779,7 +779,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635d830(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635d830(this, FrameA, FrameB);
         }
     };
     static_assert(sizeof(IVP_Sweep_EdgeFanEdge_Evaluator) == 0x54,
@@ -817,7 +817,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635d720(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635d720(this, FrameA, FrameB);
         }
     };
     static_assert(sizeof(IVP_Sweep_CenterDistance_Evaluator) == 0x44,
@@ -849,7 +849,7 @@ namespace
 
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluatorsDeferred::Evaluate_0635d7b0(this, FrameA, FrameB);
+            return IVP_LedgeSweepEvaluators::Evaluate_0635d7b0(this, FrameA, FrameB);
         }
     };
     static_assert(sizeof(IVP_Sweep_VertexFanEdge_Evaluator) == 0x44,
@@ -974,11 +974,9 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
     IVP_Sweep_Frame_Cache CacheB;
     CacheB.Init(SideB->Source);
 
-    // B is loaded first and A is added. IVP_Core+0x148 is named
-    // `MaxSurfaceDeviation`, but here it is used with units of speed (handed
-    // to the solver as MaxRelativeSpeed); the name may be wrong.
+    // The summed angular speeds (IVP_Core+0x148); B is loaded first and A is added.
     const float SpeedBound =
-        CacheB.Core->MaxSurfaceDeviation + CacheA.Core->MaxSurfaceDeviation;
+        CacheB.Core->AbsOmega + CacheA.Core->AbsOmega;
 
     this->OutEventBase = this->NextBase;
     this->OutEventOffset = this->NextOffset;
@@ -1167,7 +1165,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
     // A's core first, B's added (the reverse of FUN_0635da70's sum). Same
     // naming caveat on IVP_Core+0x148 as there.
     const float SpeedBound =
-        SideA->Object->core->MaxSurfaceDeviation + SideB->Object->core->MaxSurfaceDeviation;
+        SideA->Object->core->AbsOmega + SideB->Object->core->AbsOmega;
 
     this->OutEventBase = this->NextBase;
     this->OutEventOffset = this->NextOffset;
@@ -1367,11 +1365,12 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
 //   3. Pass 1 passes Next* as the interval end, passes 2 and 3 OutEvent*.
 //      Equal when pass 1 runs; kept as written.
 //   4. The two cores are measured differently in pass 3: A uses the LIVE
-//      length of its feature vertex (FUN_06347e60), B the cached
-//      IVP_Core::BoundingRadius (+0x14c). Symmetrizing would change which
-//      contact is found first.
-//   5. Context +0x0c (MarginSpan) is read only here, as pass 2's speed bound
-//      and a speed multiplier in pass 3 -- i.e. with units of speed.
+//      length of its feature vertex (FUN_06347e60) times AbsOmega, B the
+//      cached IVP_Core::MaxSurfaceRotSpeed (+0x14c) times AbsOmega again
+//      (0635f6c7 / 0635f6d1, both B's core). Retail: B's term carries AbsOmega
+//      twice. Symmetrizing would change which contact is found first.
+//   5. Context +0x0c (MaxSpeedSum) is read here as pass 2's speed bound and
+//      as the speed that turns pass 3's elapsed time into a distance.
 //
 // .rdata constants:
 //   DAT_063a53d0 = 00 00 80 3f -> 1.0f
@@ -1393,7 +1392,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     // Both cores are spilled and read back in pass 3.
     const IVP_Core *const CoreA = SideA->Object->core;
     const IVP_Core *const CoreB = SideB->Object->core;
-    const float SpeedBound = CoreA->MaxSurfaceDeviation + CoreB->MaxSurfaceDeviation;
+    const float SpeedBound = CoreA->AbsOmega + CoreB->AbsOmega;
 
     this->OutEventBase = this->NextBase;
     this->OutEventOffset = this->NextOffset;
@@ -1473,7 +1472,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     IVP_Sweep_PointPlane_Evaluator EdgePlane;
 
     // The speed bound is the context's +0x0c, not ClosingBound.
-    EdgePlane.MaxRelativeSpeed = this->MarginSpan;
+    EdgePlane.MaxRelativeSpeed = this->MaxSpeedSum;
     EdgePlane.IMaxRelativeSpeed = 1.0f / EdgePlane.MaxRelativeSpeed;
 
     EdgePlane.PointA.set(VertexA->X, VertexA->Y, VertexA->Z);
@@ -1538,7 +1537,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
         (double)(SeparationGap)
         - ((((double)(this->OutEventBase) - this->NowBase) + this->OutEventOffset)
            - this->NowOffset)
-              * this->MarginSpan;
+              * this->MaxSpeedSum;
     float Span = (float)(SpanExt);
     if (!(SpanExt >= (double)(0.003f)))
     {
@@ -1546,9 +1545,9 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     }
 
     // The asymmetric speed bound (note 4); rounded once.
-    const double TermA = SweepPointLength(VertexA) * CoreA->MaxSurfaceDeviation + CoreA->Margin;
+    const double TermA = SweepPointLength(VertexA) * CoreA->AbsOmega + CoreA->CurrentSpeed;
     const double TermB =
-        (double)(CoreB->BoundingRadius) * CoreB->MaxSurfaceDeviation + CoreB->Margin;
+        (double)(CoreB->MaxSurfaceRotSpeed) * CoreB->AbsOmega + CoreB->CurrentSpeed;
     const float FanSpeedBound = (float)((TermB + TermA) / Span + SpeedBound);
 
     FanEdge.PositionA.set(VertexA->X, VertexA->Y, VertexA->Z);
@@ -1758,27 +1757,27 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
     }
 
     // ---- The two pass-2 speed bounds ---------------------------------------
-    // MarginSpan (+0x0c) is read here too. Retail's association order; one
+    // MaxSpeedSum (+0x0c) is read here too. Retail's association order; one
     // rounding.
     const float Span = (float)(
         (((((double)(this->OutEventBase) - this->NowBase) + this->OutEventOffset)
           - this->NowOffset)
-         * this->MarginSpan)
+         * this->MaxSpeedSum)
         + LedgeMindist->SeparationGap);
 
     // FUN_06347e60: each vertex's distance from its own frame origin. TermA is
     // rounded, TermB stays unrounded for both sums below.
     const float TermA = (float)(
-        SweepPointLength(VertexA) * CoreA->MaxSurfaceDeviation + CoreA->Margin);
+        SweepPointLength(VertexA) * CoreA->AbsOmega + CoreA->CurrentSpeed);
     const double TermB =
-        SweepPointLength(VertexB) * CoreB->MaxSurfaceDeviation + CoreB->Margin;
+        SweepPointLength(VertexB) * CoreB->AbsOmega + CoreB->CurrentSpeed;
 
-    // Two bounds, differing only in whose MaxSurfaceDeviation scales the span;
+    // Two bounds, differing only in whose AbsOmega scales the span;
     // the CoreB-weighted one goes with the B-side pass (frame+0x9c at j == 0).
     const float SpeedForSideB = (float)(
-        ((double)(Span) * CoreB->MaxSurfaceDeviation + TermB) + TermA);
+        ((double)(Span) * CoreB->AbsOmega + TermB) + TermA);
     const float SpeedForSideA = (float)(
-        ((double)(Span) * CoreA->MaxSurfaceDeviation + TermB) + TermA);
+        ((double)(Span) * CoreA->AbsOmega + TermB) + TermA);
 
     // max(A, B), B winning ties; unordered gives A's.
     const float LargerRadius = (CoreB->UpperLimitRadius >= CoreA->UpperLimitRadius)
@@ -1954,14 +1953,14 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
     const float Span = (float)(
         (((((double)(this->OutEventBase) - this->NowBase) + this->OutEventOffset)
           - this->NowOffset)
-         * this->MarginSpan)
+         * this->MaxSpeedSum)
         + LedgeMindist->SeparationGap);
 
-    // CoreA contributes only its Margin. The whole bound stays unrounded.
+    // CoreA contributes only its CurrentSpeed. The whole bound stays unrounded.
     const double SpeedBoundExt =
-        ((SweepPointLength(VertexB) * CoreB->MaxSurfaceDeviation + CoreB->Margin)
-         + (double)(Span) * CoreB->MaxSurfaceDeviation)
-        + CoreA->Margin;
+        ((SweepPointLength(VertexB) * CoreB->AbsOmega + CoreB->CurrentSpeed)
+         + (double)(Span) * CoreB->AbsOmega)
+        + CoreA->CurrentSpeed;
 
     // Same min(Span^2, Ramp^2) as FUN_0635e790, then scaled by CoreB's
     // DAngularLimitFactor and negated.
@@ -2048,7 +2047,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
 //
 // Departures from the family pattern:
 //   * reads no IVP_Core at all; speed bounds are Ctx->ClosingBound (pass 1)
-//     and Ctx->MarginSpan (pass 2);
+//     and Ctx->MaxSpeedSum (pass 2);
 //   * inner threshold is CombinedRadius * 0.9f (DAT_063a53fc), as in
 //     FUN_0635f180, not * 0.5f;
 //   * pass 2's threshold is the bare -DAT_0658ab34 (SweepToleranceBias).
@@ -2152,7 +2151,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
 
         // Retail sets these once before the loop on the single rebound
         // evaluator; written per local here.
-        SidePlane.MaxRelativeSpeed = this->MarginSpan;
+        SidePlane.MaxRelativeSpeed = this->MaxSpeedSum;
         SidePlane.IMaxRelativeSpeed = 1.0f / SidePlane.MaxRelativeSpeed;
 
         const IVP_U_Float_Point *const PointCur = PointsB + Edge->GetStartPointIndex();

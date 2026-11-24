@@ -12,7 +12,7 @@
 
 #include "common_systemmanager.h"
 #include "AI/common_systemmanager_internal.h" // CmnSysMgr:: -- WriteFloatAt / IsWatcherLive / WatchedObject
-#include "common_aisteer.h"   // SustainedThresholdTimer, ConstructGunConvergenceState, RefreshWeaponFireControlConfig
+#include "common_aisteer.h"   // SustainedThresholdTimer, RefreshWeaponFireControlConfig
 #include "common_behavior.h"
 #include "common_misc.h"      // SUBOBJ_ID_NONE
 #include "common_iface.h"     // IBehaviorManager::Pathfind, IObjInspect, ObjRwFromWatchable
@@ -37,33 +37,33 @@ using CmnSysMgr::WatchedObject;
 // SystemManager
 // ============================================================================
 SystemManager::SystemManager()
-    : Unknown0(0)
+    : OwnerObjectId(0)
     , Owner(nullptr)
     , Watcher()
     , ObjectDb(nullptr)
-    , Unknown14(0)
-    , Owner1498(nullptr)
-    , Watcher149C()
-    , Unknown14A4(SUBOBJ_ID_NONE)
+    , bLeaderParamsBorrowed(0)
+    , TractorOwner(nullptr)
+    , TractorTargetWatcher()
+    , TractorEquipId(SUBOBJ_ID_NONE)
     , Repair()
     , PersonalityData()
 {
     // FUN_062e6260. Retail order: Watcher zeroed, Thrust.Owner = 0, Timers (FUN_062e6af0),
-    // GunGroups (FUN_062e9330), gun-convergence state (FUN_062ebbc0), Targeting
-    // (FUN_062ed570), the +0x1498 loot sub-object's watcher and id, the RepairManager,
-    // SelfTarget's guards and interface pointers, Personality, then Owner/Unknown10/Unknown14
+    // GunGroups (FUN_062e9330), FormationLeaders (FUN_062ebbc0), Targeting
+    // (FUN_062ed570), the +0x1498 tractor record's watcher and id, the RepairManager,
+    // SelfTarget's guards and interface pointers, Personality, then Owner/ObjectDb/bLeaderParamsBorrowed
     // zeroed last. Owner gets its real value from InitSystemManager (FUN_062e6490), called by
     // IBehaviorManager's ctor right after this one.
     //
-    // Deviation (determinism only): Unknown0, Pad15, the rest of the ThrustManager after its
-    // Owner (InitThrustManager fills it), Owner1498, RepairManager::Owner/CheckTimer and
+    // Deviation (determinism only): OwnerObjectId, Pad15, the rest of the ThrustManager after its
+    // Owner (InitThrustManager fills it), TractorOwner, RepairManager::Owner/CheckTimer and
     // SelfTarget's cached slices are not written by retail's ctor; zeroed here.
     std::memset(Pad15, 0, sizeof(Pad15));
     std::memset(&Thrust, 0, sizeof(Thrust));
 
     ConstructSystemManagerTimerTable(&Timers);
     ConstructSystemManagerGunGroupManager(&GunGroups);
-    // GunConvergenceStateBytes (+0x1364) and Targeting (+0x142C) are built as member
+    // FormationLeaders (+0x1364) and Targeting (+0x142C) are built as member
     // initializers.
 
     std::memset(Pad14A6, 0, sizeof(Pad14A6));
@@ -78,7 +78,7 @@ SystemManager::SystemManager()
 //
 // The sub-objects with destructor work are RAII members (retail's ctor unwind funclets call
 // their out-of-line destructors FUN_062d2700 / FUN_062d27d0), so they unwind in reverse
-// declaration order, which is retail's inlined order: Watcher149C, the +0x1364 record
+// declaration order, which is retail's inlined order: TractorTargetWatcher, the +0x1364 record
 // (+0x14 then +0x0C), GunGroups' target watcher (Sys+0x134), Timers, Watcher.
 SystemManager::~SystemManager()
 {
@@ -86,18 +86,18 @@ SystemManager::~SystemManager()
 
 // FUN_062d27d0: the member destructors of FollowLeaderWatcher (+0x14) then
 // FormationLeaderWatcher (+0x0C).
-FGunConvergenceStateBlock::~FGunConvergenceStateBlock()
+FFormationLeaderState::~FFormationLeaderState()
 {
 }
 
 // FUN_062e6990, thiscall on the SystemManager, RET 4: drops either leader watcher
 // (Sys+0x1370 / +0x1378) that watches TargetId.
-void ClearGunConvergenceStateWatcherIfTarget(SystemManager* Self, int TargetId)
+void ClearFormationLeaderWatcherIfTarget(SystemManager* Self, int TargetId)
 {
     BaseWatcher* const Watchers[2] =
     {
-        &Self->GunConvergenceStateBytes.FormationLeaderWatcher, // Sys + 0x1370
-        &Self->GunConvergenceStateBytes.FollowLeaderWatcher,    // Sys + 0x1378
+        &Self->FormationLeaders.FormationLeaderWatcher, // Sys + 0x1370
+        &Self->FormationLeaders.FollowLeaderWatcher,    // Sys + 0x1378
     };
 
     for (int Index = 0; Index < 2; ++Index)
@@ -150,9 +150,9 @@ void NotifySystemManagerPersonalityChanged(SystemManager* Self)
 
     // JobParams.bForceAttackFormation (+0x1958) copied to Sys+0x1427; UpdateSystemManager
     // makes the same copy.
-    SystemManager* const StateOwner = Self->GunConvergenceStateBytes.Owner;
+    SystemManager* const StateOwner = Self->FormationLeaders.Owner;
     if (StateOwner != nullptr)
-        Self->GunConvergenceStateBytes.bForceAttackFormation = StateOwner->PersonalityData.JobParams.bForceAttackFormation;
+        Self->FormationLeaders.bForceAttackFormation = StateOwner->PersonalityData.JobParams.bForceAttackFormation;
 }
 
 // ============================================================================
@@ -166,7 +166,7 @@ bool InitSystemManager(SystemManager* Self, IObjRW* Object, IBehaviorManager* Ma
     Self->Owner = Manager;
 
     // The object is dereferenced without a test.
-    Self->Unknown0 = static_cast<int>(static_cast<IObjInspect*>(WatchedObject(Self->Watcher))->get_id());
+    Self->OwnerObjectId = static_cast<int>(static_cast<IObjInspect*>(WatchedObject(Self->Watcher))->get_id());
 
     (void)ArmSystemManagerTimerTable(&Self->Timers, Self);
 
@@ -199,16 +199,16 @@ bool InitSystemManager(SystemManager* Self, IObjRW* Object, IBehaviorManager* Ma
 
     if (IsWatcherLive(Self->Watcher))
     {
-        Self->GunConvergenceStateBytes.Owner = Self;
+        Self->FormationLeaders.Owner = Self;
     }
 
     (void)Self->Targeting.Attach(Self);
 
     if (IsWatcherLive(Self->Watcher))
     {
-        Self->Owner1498 = Self;
+        Self->TractorOwner = Self;
         (void)static_cast<IObjInspect*>(WatchedObject(Self->Watcher))
-            ->find_equipment(&Self->Unknown14A4, 1, 0x100000);
+            ->find_equipment(&Self->TractorEquipId, 1, 0x100000);
     }
 
     if (IsWatcherLive(Self->Watcher))
@@ -271,33 +271,33 @@ void UpdateSystemManager(SystemManager* Self, float Dt)
     Repair.Hull.Update(Dt, WatchedObject(Repair.Owner->Watcher));
     Repair.Shield.Update(Dt, WatchedObject(Repair.Owner->Watcher));
 
-    Self->GunConvergenceStateBytes.Update(Dt);
+    Self->FormationLeaders.Update(Dt);
 
-    // The personality-refresh latch. Unknown14 is set by
+    // The personality-refresh latch. bLeaderParamsBorrowed is set by
     // RefreshRepairManagerFromPersonality / RefreshWeaponFireControlConfig when they copied
     // another ship's parameters; it is consumed here once that borrowing no longer applies.
-    if (Self->Unknown14 == 0)
+    if (Self->bLeaderParamsBorrowed == 0)
         return;
     if (Self->SelfTarget.Iface->is_player())
         return;
     if (Self->PersonalityData.FormationParams.bLeaderMakesMeTougher == 0)   // byte +0x1820
         return;
-    if (Self->GunConvergenceStateBytes.bLeaderSuppressed == 0)
+    if (Self->FormationLeaders.bLeaderSuppressed == 0)
     {
         // A live formation leader keeps the borrowed parameters.
-        Watchable const* const Node = Self->GunConvergenceStateBytes.FormationLeaderWatcher.target();
+        Watchable const* const Node = Self->FormationLeaders.FormationLeaderWatcher.target();
         if (Node != nullptr && Node != (Watchable const*)8)
             return;
     }
 
-    Self->Unknown14 = 0;
+    Self->bLeaderParamsBorrowed = 0;
     Self->PersonalityData.FormationParams.bLeaderMakesMeTougher = 0;
     (void)Self->GunGroups.RefreshFromPersonality();
     (void)RefreshSystemManagerTimerThresholdsFromPersonality(&Self->Timers);
     (void)RefreshRepairManagerFromPersonality(&Self->Repair);
 
     // The same copy NotifySystemManagerPersonalityChanged makes.
-    SystemManager* const StateOwner = Self->GunConvergenceStateBytes.Owner;
+    SystemManager* const StateOwner = Self->FormationLeaders.Owner;
     if (StateOwner != nullptr)
-        Self->GunConvergenceStateBytes.bForceAttackFormation = StateOwner->PersonalityData.JobParams.bForceAttackFormation;
+        Self->FormationLeaders.bForceAttackFormation = StateOwner->PersonalityData.JobParams.bForceAttackFormation;
 }

@@ -30,6 +30,7 @@
 #include "Space/star_sys.h"               // GetAttitudeClass (FUN_0045a490)
 #include "Interface/win3d.h"
 #include "Interface/win_factory.h"
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_cobject.h"         // CObject::ObjectClass
 #include "common_goods.h"           // Arch2Good / Good2Arch, EquipDesc, CBase
@@ -325,7 +326,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
     FmtStrSprintf(&G_NnMissionMessageText, G_NnTextScratchB, G_NnTextScratchCapacity);
     RenderDisplayList Body;
     {
-        StyleNode const Style(0x9ca4);
+        StyleNode const Style(kTextStyleBody);
         RDLNode* const Temp = Style.Clone();
         RdlAppendNode(Body, Temp->Clone());
         delete Temp;

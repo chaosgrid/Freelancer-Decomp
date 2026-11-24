@@ -4,61 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "common_physys.h"
-#include "Physics/physics_tick_profile.h" // Port-only owner-requested diagnostics
-
-#include "common_archetype.h"
-#include "common_cobject.h"
-#include "common_cobjdb.h"
-#include "common_id.h"
-#include "common_universe.h"
-#include "common_net.h"
-#include "common_phyarch.h"
-#include "common_misc.h"     // SinglePlayer
-#include "common_server.h"
-
-#include "dacom.h"
-#include "DALib.h"
-#include "x86math.h"  // FQuaternion, FMatrix
-#include "ivp_collision/ivp_collision.h"
-#include "ivp_physics/ivp_core.h"
-#include "ivp_physics/ivp_real_object.h"
-#include "ivp_physics/ivp_environment.h"
-#include "ivp_physics/ivp_controller.h"
-#include "ivp_physics/ivp_material.h"
-#include "ivp_physics/ivp_listener.h"
-#include "ivp_physics/ivp_mindist_settings.h"
-#include "ivp_physics/ivp_mindist.h"
-#include "common_csys.h"  // Acquire3DMathEngine
-#include "ivp_compact_builder/ivp_compact_ledge.h"
-#include "ivp_compact_builder/ivp_surface_builder_pointsoup.h"
-#include "ivp_compact_builder/ivp_surface_builder_ledge_soup.h"
-#include "ivp_physics/ivp_surman_polygon.h"
-#include "ivp_collision/ivp_ray_solver.h"
-#include "ivp_collision/ivp_sphere_query.h" // PhysicalSystem::FindSphereCollisions
-
-#include <assert.h>
-#include <float.h>
-#include <math.h>
-#include <new>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <map>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <mmsystem.h>  // timeGetTime (PhysicalSystem::Update); winmm is linked by common_playeraccount.cpp
-
-// Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
-#ifdef GetCurrentTime
-#undef GetCurrentTime
-#endif
-
 #include "Physics/common_physys_internal.h"
+#include "Physics/physics_tick_profile.h" // Port-only owner-requested diagnostics
 
 using namespace CmnPhySys;
 
@@ -301,7 +248,7 @@ void PhysicalSystem::AddRef()
     IVP_Listener_Object* const ObjectListener = this;
     IVP_Listener_Collision* const CollisionListener = this;
     IVP_Environment_Append_Object_Listener(Environment, ObjectListener);
-    IVP_Environment_Append_Listener_C8(Environment, CollisionListener);
+    IVP_Environment_Add_Listener_Collision(Environment, CollisionListener);
 
     Environment->anomaly_limits->MaxVelocity = PhySys::ANOM_LIMITS_MAX_VELOCITY;
     Environment->anomaly_limits->MaxAngularVelocityPerPsi = PhySys::ANOM_LIMITS_MAX_ANGULAR_VELOCITY_PER_PSI;

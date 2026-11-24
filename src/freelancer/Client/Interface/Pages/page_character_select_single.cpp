@@ -21,6 +21,7 @@
 #include "Interface/ui_rich_text_win.h"
 #include "Interface/ui_scroll.h"
 #include "Interface/ui_text_msg_button.h"
+#include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_archetype.h"  // Archetype::GetShip
 #include "common_misc.h"       // filetime_to_wstring
@@ -155,7 +156,7 @@ PageCharacterSelectSingle::~PageCharacterSelectSingle()
 void PageCharacterSelectSingle::Destroy()
 {
     // LAB_0056b240. Hidden first.
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
 
     // Every child is destroyed; the StaticControls IntroFocus built are also deleted. The class
     // name is copied before Destroy and compared afterwards (14 bytes, terminator included).
@@ -278,9 +279,11 @@ bool PageCharacterSelectSingle::Create(Win3D* NewParent, void* /*Payload*/)
     }
 
     CharacterShip->ClearContent();
-    LoadCharacter->Flags = static_cast<unsigned char>(LoadCharacter->Flags | 3);
-    DeleteCharacter->Flags = static_cast<unsigned char>(DeleteCharacter->Flags | 3);
-    MainMenu->Flags = static_cast<unsigned char>(MainMenu->Flags | 3);
+    LoadCharacter->Flags =
+        static_cast<unsigned char>(LoadCharacter->Flags | kWin3DActive | kWin3DVisible);
+    DeleteCharacter->Flags =
+        static_cast<unsigned char>(DeleteCharacter->Flags | kWin3DActive | kWin3DVisible);
+    MainMenu->Flags = static_cast<unsigned char>(MainMenu->Flags | kWin3DActive | kWin3DVisible);
 
     CharSelDesc->bDrawFrame = 0;
     CharSelDesc->bDrawRowRules = 1;
@@ -325,7 +328,7 @@ bool PageCharacterSelectSingle::Create(Win3D* NewParent, void* /*Payload*/)
     AppendStyle(ShipLabel, 0x5724);
     AppendRef(ShipLabel, ShipLabelText);
     ScreenTitle->ClearContent();
-    AppendStyle(ScreenTitle, 0x1df5);
+    AppendStyle(ScreenTitle, kTextStyleScreenTitle);
     AppendRef(ScreenTitle, TitleText);
 
     // Retail repeats ShowDetails(nullptr)'s dash fill here, without the button changes.
@@ -355,9 +358,11 @@ void PageCharacterSelectSingle::UpdateScrollVisibility()
 {
     // FUN_0056bd10.
     if (CharSelDesc->ItemCount - 0x14 >= 1)
-        CharScroll->Flags = static_cast<unsigned char>(CharScroll->Flags | 3);
+        CharScroll->Flags =
+            static_cast<unsigned char>(CharScroll->Flags | kWin3DActive | kWin3DVisible);
     else
-        CharScroll->Flags = static_cast<unsigned char>(CharScroll->Flags & 0xfc);
+        CharScroll->Flags =
+            static_cast<unsigned char>(CharScroll->Flags & ~(kWin3DActive | kWin3DVisible));
 }
 
 void PageCharacterSelectSingle::ShowDetails(CCharacterSet::CharacterInfo const* Info)

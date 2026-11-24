@@ -374,7 +374,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
     // IFont vt+0x0c (LAB_00416570) returns the HFONT, selected without a test.
     unsigned char bOk = 1;
     FFontAtlasPage* Row = This->GlyphHead_;
-    HFONT const Font = This->Font_->Slot03();
+    HFONT const Font = This->Font_->GetHFont();
     FAtlasFontSelection const Selection(G_AtlasDc, Font);
 
     // Row and column counts follow the raw extents alone (no null test on the page links).

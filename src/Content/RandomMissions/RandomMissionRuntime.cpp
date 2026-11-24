@@ -26,27 +26,27 @@
 // Common function that does the same.
 // =======================================================================================
 
-unsigned int const GRmMsgStartMachine = StateMachineMessage::GenerateUniqueMessageType();      // 06f842a0
-unsigned int const GRmMsgMachineStarted = StateMachineMessage::GenerateUniqueMessageType();    // 06f842c0
-unsigned int const GRmMsgMachineSucceeded = StateMachineMessage::GenerateUniqueMessageType();  // 06f842e0
-unsigned int const GRmMsgMachineFailed = StateMachineMessage::GenerateUniqueMessageType();     // 06f84300
-unsigned int const GRmMsgRefreshObjectives = StateMachineMessage::GenerateUniqueMessageType(); // 06f84320
-unsigned int const GRmMsgType06fd3ba8 = StateMachineMessage::GenerateUniqueMessageType();      // 06f84340
-unsigned int const GRmMsgType06fd3ba4 = StateMachineMessage::GenerateUniqueMessageType();      // 06f84360
-unsigned int const GRmMsgType06fd3ba0 = StateMachineMessage::GenerateUniqueMessageType();      // 06f84380
-unsigned int const GRmMsgType06fd3b9c = StateMachineMessage::GenerateUniqueMessageType();      // 06f843a0
-unsigned int const GRmMsgType06fd3b98 = StateMachineMessage::GenerateUniqueMessageType();      // 06f843c0
-unsigned int const GRmMsgType06fd3b94 = StateMachineMessage::GenerateUniqueMessageType();      // 06f843e0
-unsigned int const GRmMsgType06fd3b90 = StateMachineMessage::GenerateUniqueMessageType();      // 06f84400
-unsigned int const GRmMsgType06fd3b8c = StateMachineMessage::GenerateUniqueMessageType();      // 06f84420
-unsigned int const GRmMsgType06fd3b88 = StateMachineMessage::GenerateUniqueMessageType();      // 06f84440
-unsigned int const GRmMsgType06fd3b84 = StateMachineMessage::GenerateUniqueMessageType();      // 06f84460
-unsigned int const GRmMsgType06fd3b80 = StateMachineMessage::GenerateUniqueMessageType();      // 06f84480
-unsigned int const GRmMsgType06fd3b7c = StateMachineMessage::GenerateUniqueMessageType();      // 06f844a0
-unsigned int const GRmMsgType06fd3b78 = StateMachineMessage::GenerateUniqueMessageType();      // 06f844c0
-unsigned int const GRmMsgType06fd3b74 = StateMachineMessage::GenerateUniqueMessageType();      // 06f844e0
-unsigned int const GRmMsgPlayerLeft = StateMachineMessage::GenerateUniqueMessageType();        // 06f84500
-unsigned int const GRmMsgType06fd3b6c = StateMachineMessage::GenerateUniqueMessageType();      // 06f84520
+unsigned int const GRmMsgStartMachine = StateMachineMessage::GenerateUniqueMessageType();         // 06f842a0
+unsigned int const GRmMsgMachineStarted = StateMachineMessage::GenerateUniqueMessageType();       // 06f842c0
+unsigned int const GRmMsgMachineSucceeded = StateMachineMessage::GenerateUniqueMessageType();     // 06f842e0
+unsigned int const GRmMsgMachineFailed = StateMachineMessage::GenerateUniqueMessageType();        // 06f84300
+unsigned int const GRmMsgRefreshObjectives = StateMachineMessage::GenerateUniqueMessageType();    // 06f84320
+unsigned int const GRmMsgShipDestroyed = StateMachineMessage::GenerateUniqueMessageType();        // 06f84340
+unsigned int const GRmMsgGroupDestroyed = StateMachineMessage::GenerateUniqueMessageType();       // 06f84360
+unsigned int const GRmMsgGroupTargetsDestroyed = StateMachineMessage::GenerateUniqueMessageType();// 06f84380
+unsigned int const GRmMsgSolarDestroyed = StateMachineMessage::GenerateUniqueMessageType();       // 06f843a0
+unsigned int const GRmMsgCriticalLootSpawned = StateMachineMessage::GenerateUniqueMessageType();  // 06f843c0
+unsigned int const GRmMsgLootDestroyed = StateMachineMessage::GenerateUniqueMessageType();        // 06f843e0
+unsigned int const GRmMsgLootPickedUp = StateMachineMessage::GenerateUniqueMessageType();         // 06f84400
+unsigned int const GRmMsgCriticalLootGone = StateMachineMessage::GenerateUniqueMessageType();     // 06f84420
+unsigned int const GRmMsgLootHolderDocked = StateMachineMessage::GenerateUniqueMessageType();     // 06f84440
+unsigned int const GRmMsgLootDropped = StateMachineMessage::GenerateUniqueMessageType();          // 06f84460
+unsigned int const GRmMsgLootLost = StateMachineMessage::GenerateUniqueMessageType();             // 06f84480
+unsigned int const GRmMsgCountdownTick = StateMachineMessage::GenerateUniqueMessageType();        // 06f844a0
+unsigned int const GRmMsgSpawnGroup = StateMachineMessage::GenerateUniqueMessageType();           // 06f844c0
+unsigned int const GRmMsgConversation = StateMachineMessage::GenerateUniqueMessageType();         // 06f844e0
+unsigned int const GRmMsgPlayerLeft = StateMachineMessage::GenerateUniqueMessageType();           // 06f84500
+unsigned int const GRmMsgDropLoot = StateMachineMessage::GenerateUniqueMessageType();             // 06f84520
 
 // FUN_06f86d90.
 FRmMachineFailedMessage::FRmMachineFailedMessage(int InReason)

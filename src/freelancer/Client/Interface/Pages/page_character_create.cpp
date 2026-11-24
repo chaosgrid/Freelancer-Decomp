@@ -183,21 +183,21 @@ bool PageCharacterCreate::Create(Win3D* NewParent, void* /*Payload*/)
     SelectShip->GetToolTipHoverInfo()->IdsAlt = 0xadd;
 
     LoadIdsAlwaysCut(BackText, 0x60029);
-    LoadIdsAlwaysCut(Text60028, 0x60028);
+    LoadIdsAlwaysCut(SelectAnotherAccountText, 0x60028);
     LoadIdsAlwaysCut(NameLabelText, 0x6006c);
     LoadIdsAlwaysCut(BaseLabelText, 0x6006b);
     LoadIdsAlwaysCut(ShipLabelText, 0x6006e);
-    LoadIdsAlwaysCut(Text6006a, 0x6006a);
+    LoadIdsAlwaysCut(LoadoutLabelText, 0x6006a);
     LoadIdsAlwaysCut(MoneyLabelText, 0x60063);
     LoadIdsAlwaysCut(TitleText, 0x60034);
 
     // NameLabel is not emptied first.
     AppendJustify(NameLabel, TextJustifyCenter);
-    AppendStyle(NameLabel, 0x9ca4);
+    AppendStyle(NameLabel, kTextStyleBody);
     AppendRef(NameLabel, NameLabelText);
 
     Title->ClearContent();
-    AppendStyle(Title, 0x1df5);
+    AppendStyle(Title, kTextStyleScreenTitle);
     AppendRef(Title, TitleText);
 
     BaseCostume->PoseZ = -6.0f;
@@ -242,7 +242,7 @@ bool PageCharacterCreate::Create(Win3D* NewParent, void* /*Payload*/)
     CharacterName->SetFixedStyle(true);
 
     {
-        StyleNode const Node(0x9ca4);
+        StyleNode const Node(kTextStyleBody);
         AppendNodeClone(CharacterName->FixedStyle, Node);
     }
     {
@@ -285,10 +285,10 @@ void PageCharacterCreate::ShowSelection(bool bWithCostume)
     CharacterName->SetText(Selection->Name, nullptr);
 
     StartingDesc->ClearContent();
-    AppendStyle(StartingDesc, 0x4433);
+    AppendStyle(StartingDesc, kTextStyleList);
     AppendRef(StartingDesc, BaseLabelText);
     AppendParagraph(StartingDesc);
-    AppendStyle(StartingDesc, 0x9ca4);
+    AppendStyle(StartingDesc, kTextStyleBody);
     AppendJustify(StartingDesc, TextJustifyCenter);
     AppendRef(StartingDesc, *ChatGetBaseName(Selection->BaseId));
     AppendParagraph(StartingDesc);
@@ -298,10 +298,10 @@ void PageCharacterCreate::ShowSelection(bool bWithCostume)
     if (Package != nullptr)
     {
         // Retail formats the money through a basic_stringstream<unsigned short>.
-        AppendStyle(StartingDesc, 0x4433);
+        AppendStyle(StartingDesc, kTextStyleList);
         AppendRef(StartingDesc, MoneyLabelText);
         AppendParagraph(StartingDesc);
-        AppendStyle(StartingDesc, 0x9ca4);
+        AppendStyle(StartingDesc, kTextStyleBody);
         AppendJustify(StartingDesc, TextJustifyCenter);
         {
             std::wstringstream Money;
@@ -315,10 +315,10 @@ void PageCharacterCreate::ShowSelection(bool bWithCostume)
             AppendParagraph(StartingDesc);
         }
 
-        AppendStyle(StartingDesc, 0x4433);
+        AppendStyle(StartingDesc, kTextStyleList);
         AppendRef(StartingDesc, ShipLabelText);
         AppendParagraph(StartingDesc);
-        AppendStyle(StartingDesc, 0x9ca4);
+        AppendStyle(StartingDesc, kTextStyleBody);
         AppendJustify(StartingDesc, TextJustifyCenter);
         ID_String ShipNickname;
         ShipNickname.Id = CreateID(Package->Ship.c_str());
@@ -330,7 +330,7 @@ void PageCharacterCreate::ShowSelection(bool bWithCostume)
         RdlClear(PackageDescText);
         if (LoadIdsIntoRdl(static_cast<unsigned>(Package->StridDesc), PackageDescText))
         {
-            AppendStyle(StartingDesc, 0x9ca4);
+            AppendStyle(StartingDesc, kTextStyleBody);
             AppendJustify(StartingDesc, TextJustifyLeft);
             AppendRef(StartingDesc, PackageDescText);
         }
@@ -465,9 +465,9 @@ bool PageCharacterCreate::OnEvent(unsigned MsgId)
 
 bool PageCharacterCreate::MouseEvent(FWin3DMouseEvent const* Event)
 {
-    // LAB_00561730 (RET 4): a press (Field1 == 2) drops the name box's focus and gives it back
+    // LAB_00561730 (RET 4): a single press (any button) drops the name box's focus and gives it back
     // when the mouse ray hits the box. Always false.
-    if (Event->Field1 == 2)
+    if (Event->Action == kWin3DMousePress)
     {
         CharacterName->Deactivate(false);
         float Ray[3];

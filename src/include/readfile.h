@@ -40,7 +40,13 @@ struct FFileSystemDesc
 static_assert(offsetof(FFileSystemDesc, FindHandle) == 0x30, "DOS/UTF desc prefix is 0x34");
 static_assert(sizeof(FFileSystemDesc) == 0x40, "MEM tail extends the desc to 0x40");
 
-// File-system instances also expose their component factory.
+// File-system instances also expose their component factory. Slots +0x10..+0x78 follow the
+// Win32 file API one for one, in winbase.h order and with its argument counts (the MEM table
+// 06b792f0 confirms each RET size): CloseHandle, ReadFile, WriteFile, GetOverlappedResult,
+// SetFilePointer, SetEndOfFile, GetFileSize, LockFile, UnlockFile, Get/SetFileTime, the mapping
+// trio, FindFirst/Next/Close, Create/RemoveDirectory, Get/SetCurrentDirectory (OpenNode),
+// DeleteFile, CopyFile, MoveFile, Get/SetFileAttributes, GetLastError. The names avoid the
+// Win32 A/W macros.
 struct IFileSystem : IComponentFactory
 {
     virtual int DACOM_API CloseFile(unsigned long Handle) = 0;                          // +0x10
@@ -48,37 +54,40 @@ struct IFileSystem : IComponentFactory
                                unsigned long* BytesRead, unsigned long Extra) = 0;      // +0x14
     virtual int DACOM_API Write(unsigned long Handle, const void* Buffer, unsigned long Size,
                                  unsigned long* BytesWritten, const void* PositionOverride) = 0; // +0x18
-    virtual int DACOM_API RejectOperation1C(unsigned long A1, unsigned long A2, unsigned long A3,
-                                 unsigned long A4) = 0; // +0x1C TODO: original operation contract.
+    virtual int DACOM_API GetOverlappedResult(unsigned long Handle, unsigned long Overlapped,
+                                 unsigned long BytesTransferredOut, unsigned long bWait) = 0; // +0x1C
     virtual int DACOM_API SeekFile(unsigned long Handle, unsigned long OffLow, unsigned long* OffHighOut,
                                   unsigned long Origin) = 0; // +0x20
-    virtual int DACOM_API SetEndOfFile(unsigned long A1) = 0; // +0x24
+    virtual int DACOM_API SetEndOfFile(unsigned long Handle) = 0; // +0x24
     virtual unsigned long DACOM_API GetSize(unsigned long Handle, unsigned long* HighOut) = 0; // +0x28
-    virtual int DACOM_API ReturnOne2C(unsigned long A1, unsigned long A2, unsigned long A3,
-                                 unsigned long A4, unsigned long A5) = 0; // +0x2C TODO: original operation contract.
-    virtual int DACOM_API ReturnOne30(unsigned long A1, unsigned long A2, unsigned long A3,
-                                 unsigned long A4, unsigned long A5) = 0; // +0x30 TODO: original operation contract.
+    virtual int DACOM_API LockFileRegion(unsigned long Handle, unsigned long OffLow, unsigned long OffHigh,
+                                 unsigned long CountLow, unsigned long CountHigh) = 0; // +0x2C
+    virtual int DACOM_API UnlockFileRegion(unsigned long Handle, unsigned long OffLow, unsigned long OffHigh,
+                                 unsigned long CountLow, unsigned long CountHigh) = 0; // +0x30
     virtual int DACOM_API GetFileTimes(unsigned long Handle, FILETIME* CreationOut, FILETIME* AccessOut,
                                   FILETIME* WriteOut) = 0; // +0x34
-    virtual int DACOM_API RejectOperation38(unsigned long A1, unsigned long A2, unsigned long A3,
-                                 unsigned long A4) = 0; // +0x38 TODO: original operation contract.
-    virtual int DACOM_API CreateMapping(unsigned long A1, unsigned long A2, unsigned long A3,
-                                 unsigned long A4, unsigned long A5, unsigned long A6) = 0; // +0x3C
-    virtual int DACOM_API MapFileView(unsigned long A1, unsigned long A2, unsigned long A3,
-                                 unsigned long A4, unsigned long A5) = 0; // +0x40
-    virtual int DACOM_API UnmapFileView(unsigned long A1) = 0; // +0x44
+    virtual int DACOM_API SetFileTimes(unsigned long Handle, unsigned long Creation, unsigned long Access,
+                                 unsigned long Write) = 0; // +0x38
+    virtual int DACOM_API CreateMapping(unsigned long Handle, unsigned long Security, unsigned long Protect,
+                                 unsigned long MaxSizeHigh, unsigned long MaxSizeLow,
+                                 unsigned long Name) = 0; // +0x3C
+    virtual int DACOM_API MapFileView(unsigned long Mapping, unsigned long Access, unsigned long OffHigh,
+                                 unsigned long OffLow, unsigned long ByteCount) = 0; // +0x40
+    virtual int DACOM_API UnmapFileView(unsigned long View) = 0; // +0x44
     virtual int DACOM_API FindFirst(const char* Pattern, WIN32_FIND_DATAA* FindData) = 0; // +0x48
     virtual int DACOM_API FindNext(unsigned long Handle, WIN32_FIND_DATAA* FindData) = 0; // +0x4C
     virtual int DACOM_API FindClose(unsigned long Handle) = 0; // +0x50
-    virtual int DACOM_API RejectOperation54(const char* Name, unsigned long Extra) = 0; // +0x54 TODO: original operation contract.
-    virtual int DACOM_API RejectOperation58(unsigned long A1) = 0; // +0x58 TODO: original operation contract.
+    // +0x54: alchemy's library savers call it with (name, 0) before OpenNode on that name.
+    virtual int DACOM_API CreateNode(const char* Name, unsigned long Security) = 0; // +0x54
+    virtual int DACOM_API RemoveNode(unsigned long Name) = 0; // +0x58
     virtual int DACOM_API GetCurrentPath(unsigned long MaxChars, char* Out) = 0;        // +0x5C
     virtual int DACOM_API OpenNode(const char* Name) = 0;                               // +0x60
-    virtual int DACOM_API RejectOperation64(unsigned long A1) = 0; // +0x64 TODO: original operation contract.
-    virtual int DACOM_API RejectOperation68(unsigned long A1, unsigned long A2, unsigned long A3) = 0; // +0x68 TODO: original operation contract.
-    virtual int DACOM_API RejectOperation6C(unsigned long A1, unsigned long A2) = 0; // +0x6C TODO: original operation contract.
+    virtual int DACOM_API RemoveFile(unsigned long Name) = 0; // +0x64
+    virtual int DACOM_API CopyFileTo(unsigned long ExistingName, unsigned long NewName,
+                                 unsigned long bFailIfExists) = 0; // +0x68
+    virtual int DACOM_API MoveFileTo(unsigned long ExistingName, unsigned long NewName) = 0; // +0x6C
     virtual int DACOM_API GetPathAttributes(const char* Path) = 0; // +0x70
-    virtual int DACOM_API RejectOperation74(unsigned long A1, unsigned long A2) = 0; // +0x74 TODO: original operation contract.
+    virtual int DACOM_API SetPathAttributes(unsigned long Name, unsigned long Attributes) = 0; // +0x74
     virtual int DACOM_API GetFileSystemError() = 0; // +0x78
     virtual int DACOM_API OpenByDesc(FFileSystemDesc* Desc) = 0;                        // +0x7C
     virtual int DACOM_API GetFilePosition(unsigned long Handle, unsigned long* HighOut) = 0; // +0x80
@@ -91,7 +100,9 @@ struct IFileSystem : IComponentFactory
                                  unsigned long A4, unsigned long A5) = 0; // +0x98 TODO: original operation contract.
     virtual int DACOM_API FailOperation9C(unsigned long A1, unsigned long A2, unsigned long A3,
                                  unsigned long A4, unsigned long A5) = 0; // +0x9C TODO: original operation contract.
-    virtual int DACOM_API InvokeLockedCallback(unsigned long A1, unsigned long A2, unsigned long A3) = 0; // +0xA0
+    // +0xA0: Callback(Arg0, Arg1) under the instance lock (DOS: its critical section).
+    virtual int DACOM_API InvokeLockedCallback(unsigned long Arg0, unsigned long Callback,
+                                 unsigned long Arg1) = 0; // +0xA0
     virtual int DACOM_API ResolvePath(char* Dest, const char* Src,
                                  unsigned long DestChars) = 0; // +0xA4
 };

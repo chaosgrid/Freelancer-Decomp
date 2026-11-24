@@ -57,7 +57,7 @@ SMControllerEvent::SMControllerEvent(int Id, const void* Data)
 // ===========================================================================
 
 SMMessage::SMMessage(StateMachineMessage* Msg)
-    : SMEventData(SMET_UserEvent)
+    : SMEventData(SMET_Message)
     , Message(Msg)
 {
 }
@@ -264,10 +264,10 @@ int StateMachine::get_state() const
 
 void StateMachine::start()
 {
-    // RVA 0xd3230: a virtual process() of a stack SMET_Tick event. Vtable: 0 dtor,
+    // RVA 0xd3230: a virtual process() of a stack SMET_Enter event. Vtable: 0 dtor,
     // 1 process, 2 pure (OnStateEvent), 3 handle_state_change.
-    SMEventData TickEvent(SMET_Tick);
-    process(&TickEvent);
+    SMEventData EnterEvent(SMET_Enter);
+    process(&EnterEvent);
 }
 
 void StateMachine::reset()
@@ -301,15 +301,15 @@ void StateMachine::process(const SMEventData* Event)
 
 void StateMachine::handle_state_change()
 {
-    // FUN_06333a00: type 2 against the old state, commit, then type 1 against the new state. A
+    // FUN_06333a00: Exit against the old state, commit, then Enter against the new state. A
     // handler that calls set_state again re-arms the loop.
     while (bPendingChange != 0)
     {
-        SMEventData Event(SMET_Message);
+        SMEventData Event(SMET_Exit);
         OnStateEvent(&Event, CurrentState);
         CurrentState = PendingState;
         bPendingChange = 0;
-        Event.EventType = SMET_Tick;
+        Event.EventType = SMET_Enter;
         OnStateEvent(&Event, CurrentState);
     }
 }
@@ -428,7 +428,7 @@ void StateMachineGroup::process(const SMEventData* Event)
 
     remove_dying_machines();
 
-    if (Event->get_event_type() == SMET_UserEvent)
+    if (Event->get_event_type() == SMET_Message)
         return;
 
     for (FMachineList::iterator It = Machines.begin(); It != Machines.end(); ++It)
@@ -441,8 +441,8 @@ void StateMachineGroup::add_state_machine(StateMachineMessageHandler* Handler)
 {
     // FUN_06333730. No null test of Handler.
     Machines.push_back(Handler);
-    SMEventData TickEvent(SMET_Tick);
-    Handler->process(&TickEvent);
+    SMEventData EnterEvent(SMET_Enter);
+    Handler->process(&EnterEvent);
 }
 
 void StateMachineGroup::remove_state_machine(const StateMachineMessageHandler* Handler)

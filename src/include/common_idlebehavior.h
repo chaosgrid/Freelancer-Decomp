@@ -32,7 +32,7 @@ class IdleBehavior : public Behavior
 {
 public:
     // Retail's ctor argument is the behavior type id (6, "Idle"), pushed by the factory out of
-    // the descriptor's +0x04 -- see Behavior::GetTypeId() in common_behavior.h.
+    // the descriptor's +0x04 -- see Behavior::TypeId in common_behavior.h.
     explicit IdleBehavior(int InTypeId);
     ~IdleBehavior() override;
 
@@ -49,7 +49,7 @@ public:
     // ------------------------------------------------------------------
 
     // Slot 1, LAB_062cd590: BindContext (FUN_062d2090); on success
-    // Watcher2c.SetContext(OwnerContextPtr14, NavHelperPtr24, Param2).
+    // Watcher2c.SetContext(OwnerContext, SysMgr, Param2).
     bool SetContext(void* Param1, void* Param2, void* Param3);
 
     // Slot 3, LAB_062cd5d0: Behavior::OnEngage.
@@ -58,11 +58,11 @@ public:
     // Slot 4, FUN_062cd5e0: Watcher2c.Commit(), then Behavior::OnDisengage.
     void Disengage();
 
-    // Slot 5, LAB_062ce3c0: ModeSelector0xc = Flag29 ? 3 : 1, returned.
+    // Slot 5, LAB_062ce3c0: Readiness = Flag29 ? 3 : 1, returned.
     int SetModeFromFlags();
 
-    // Slot 7, FUN_062cd600: OwnerContextPtr14 null -> UpdateResult10 = 3; else
-    // Watcher2c.Update(DeltaTime1c) (result discarded) and UpdateResult10 = 1.
+    // Slot 7, FUN_062cd600: OwnerContext null -> UpdateResult = 3; else
+    // Watcher2c.Update(DeltaTime) (result discarded) and UpdateResult = 1.
     int Update();
 
     // Slot 7: IBehaviorManager::UpdateBehaviorTick dispatches through vtable +0x1c.
@@ -78,36 +78,12 @@ public:
 
 public:
     // ------------------------------------------------------------------
-    // Fields; +0x04..+0x29 is Behavior's shared prefix.
+    // Fields; +0x04..+0x29 is Behavior's.
     // ------------------------------------------------------------------
-    int TypeId;                // +0x04, FUN_062d2020's argument (Behavior::GetTypeId)
-    unsigned CachedHandle08;   // +0x08, the binder's Owner->get_id() (an object id)
-    int ModeSelector0xc;       // +0x0c. ResetTickState() (=1), SetModeFromFlags() (1/3).
-    int UpdateResult10;        // +0x10. Update()'s result (1 active / 3 idle).
-    void* OwnerContextPtr14;   // +0x14. SetContext() Param1; null-checked by Update().
-    IObjDB* ObjectDb;
-    float DeltaTime1c;         // +0x1c. Zeroed by ResetTickState(); passed to Watcher2c.
-    // +0x20. SetContext() Param2. Left void*: no IdleBehavior method
-    // (.text:062cd530..062cd640) dereferences it, so nothing in this class types it.
-    void* BehaviorMgrPtr20;
-    SystemManager* NavHelperPtr24; // +0x24. SetContext() Param3.
-    unsigned char Flags28;     // +0x28. Bit 0x1 cleared by ResetTickState(); bit 0x2 set
-                               // by RequestFlag().
-    unsigned char Flag29;      // +0x29. Read by SetModeFromFlags(); cleared by Disengage().
-    unsigned char Pad2a[0x2c - 0x2a];
 
     IdleIdea Watcher2c;        // +0x2c, ends +0x40.
 };
 
-static_assert(offsetof(IdleBehavior, CachedHandle08) == 0x08, "IdleBehavior::CachedHandle08 offset");
-static_assert(offsetof(IdleBehavior, ModeSelector0xc) == 0x0c, "IdleBehavior::ModeSelector0xc offset");
-static_assert(offsetof(IdleBehavior, UpdateResult10) == 0x10, "IdleBehavior::UpdateResult10 offset");
-static_assert(offsetof(IdleBehavior, OwnerContextPtr14) == 0x14, "IdleBehavior::OwnerContextPtr14 offset");
-static_assert(offsetof(IdleBehavior, DeltaTime1c) == 0x1c, "IdleBehavior::DeltaTime1c offset");
-static_assert(offsetof(IdleBehavior, BehaviorMgrPtr20) == 0x20, "IdleBehavior::BehaviorMgrPtr20 offset");
-static_assert(offsetof(IdleBehavior, NavHelperPtr24) == 0x24, "IdleBehavior::NavHelperPtr24 offset");
-static_assert(offsetof(IdleBehavior, Flags28) == 0x28, "IdleBehavior::Flags28 offset");
-static_assert(offsetof(IdleBehavior, Flag29) == 0x29, "IdleBehavior::Flag29 offset");
 static_assert(offsetof(IdleBehavior, Watcher2c) == 0x2c, "IdleBehavior::Watcher2c offset");
 
 // Retail object size from the factory's `PUSH 0x40` before operator_new.

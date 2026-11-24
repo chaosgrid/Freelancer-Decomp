@@ -27,10 +27,10 @@ public:
     // FUN_00589d50.
     ~NnTextControl() override;
 
-    // FUN_0058a110 (thiscall, RET 0x28). Arg6 is never read by the retail body.
+    // FUN_0058a110 (thiscall, RET 0x28). FontScale is never read by the retail body.
     void Init(char const* StyleName, float const* InPosition, char const* Hardpoint,
-              float InWidth, float InHeight, float Arg6, unsigned Ids, int InDword358,
-              int InDword344, unsigned char InByte378);
+              float InWidth, float InHeight, float FontScale, unsigned Ids, int InJustification,
+              int InTextToolTipIds, unsigned char bInTopLeftAnchor);
 
     // FUN_0058a5f0 (thiscall, RET 4) -- the ids' string (FUN_004347e0, "IDS?" when it is
     // missing; an empty string for ids 0) into the Font::String, after FUN_004145d0.
@@ -117,15 +117,15 @@ public:
     FFontString* FontString;        // +0x334 -- operator_new(0x34) + FUN_004144b0 in the ctor
     int Field338;                   // +0x338 -- ctor -1; property 0x22 (A)
     int Field33c;                   // +0x33c -- ctor -1; property 0x22 (B)
-    int Field340;                   // +0x340 -- ctor 0; property 0x21 returns it
-    int Dword344;                   // +0x344 -- Init's 9th argument
+    int LineCount;                  // +0x340 -- ctor 0; Draw stores the line count; property 0x21
+    int TextToolTipIds;             // +0x344 -- Init's 9th argument, INI "tooltip"; HitTest feeds it
     unsigned long TextColour;       // +0x348 -- ctor DAT_00679bb0 with the top byte forced 0xff
     int Field34c;                   // +0x34c -- property 0x23 (A)
     int Field350;                   // +0x350 -- property 0x23 (B)
-    unsigned char Byte354;          // +0x354 -- property 0xc (A != 0)
+    unsigned char bHighlighted;     // +0x354 -- property 0xc (A != 0); Draw uses the amber colour
     unsigned char Pad355[3];
-    int Dword358;                   // +0x358 -- Init's 8th argument
-    unsigned char Byte35c;          // +0x35c -- property 0x24 (A != 0)
+    int Justification;              // +0x358 -- Init's 8th argument, INI "justification"; HAlign
+    unsigned char bClickable;       // +0x35c -- property 0x24 (A != 0); hit test, 0x26 / 0x27
     unsigned char bColourOverride;  // +0x35d -- property 0x33 (B == 1); property 0x51 sets it
     unsigned char OverrideColour[4]; // +0x35e -- property 0x33: *(DWORD*)A (unaligned dword)
     unsigned char bTypewriter;      // +0x362 -- property 0x50 (A == 1)
@@ -136,20 +136,20 @@ public:
     float TypeInterval;             // +0x36c -- ctor 0.05f; property 0x50: B * 0.001f
     wchar_t* PendingText;           // +0x370 -- the typewriter's full text (free()d)
     unsigned PendingCapacity;       // +0x374
-    unsigned char Byte378;          // +0x378 -- Init's last argument; 0 = property 6 re-centres
+    unsigned char bTopLeftAnchor;   // +0x378 -- Init's last argument; 0 = property 6 re-centres
     unsigned char bBlink;           // +0x379 -- property 0x51; Update's colour blink runs
     unsigned char BlinkPhase;       // +0x37a -- toggled once per whole second of blink time
     unsigned char Pad37b;
     float BlinkElapsed;             // +0x37c -- ctor 0
-    unsigned char Byte380;          // +0x380 -- ctor 1
+    unsigned char bHoverPulse;      // +0x380 -- ctor 1; a hovered clickable text pulses
     unsigned char BlinkColourOn[4]; // +0x381 -- ctor 0; copied to +0x35e while BlinkPhase != 0
     unsigned char BlinkColourOff[4]; // +0x385 -- ctor 0; copied to +0x35e while BlinkPhase == 0
     unsigned char bTyping;          // +0x389 -- a typewriter run holds DAT_0067d8c8
     unsigned char Pad38a[2];
     float CachedX;                  // +0x38c -- Draw's cached screen x
     float CachedY;                  // +0x390 -- Draw's cached screen y
-    unsigned char Byte394;          // +0x394 -- ctor 0; the cached placement is valid
-    unsigned char Byte395;          // +0x395 -- ctor 0; Draw uses the cached placement
+    unsigned char bCachedPlacementValid; // +0x394 -- ctor 0
+    unsigned char bUseCachedPlacement;   // +0x395 -- ctor 0; Draw uses CachedX / CachedY
     unsigned char Pad396[2];
     unsigned CachedSurfaceWidth;    // +0x398 -- DAT_00610850 when the cache was filled
     unsigned char bInCaptureList;   // +0x39c -- dtor unlinks through FUN_0059d960 when set
@@ -159,13 +159,13 @@ public:
 static_assert(offsetof(NnTextControl, Width) == 0x32c, "TextControl +0x32c width");
 static_assert(offsetof(NnTextControl, FontString) == 0x334, "TextControl +0x334 Font::String");
 static_assert(offsetof(NnTextControl, TextColour) == 0x348, "TextControl +0x348 colour");
-static_assert(offsetof(NnTextControl, Dword358) == 0x358, "TextControl +0x358");
+static_assert(offsetof(NnTextControl, Justification) == 0x358, "TextControl +0x358");
 static_assert(offsetof(NnTextControl, bColourOverride) == 0x35d, "TextControl +0x35d");
 static_assert(offsetof(NnTextControl, OverrideColour) == 0x35e, "TextControl +0x35e");
 static_assert(offsetof(NnTextControl, bTypewriter) == 0x362, "TextControl +0x362");
 static_assert(offsetof(NnTextControl, TypeInterval) == 0x36c, "TextControl +0x36c");
 static_assert(offsetof(NnTextControl, PendingText) == 0x370, "TextControl +0x370");
-static_assert(offsetof(NnTextControl, Byte378) == 0x378, "TextControl +0x378");
+static_assert(offsetof(NnTextControl, bTopLeftAnchor) == 0x378, "TextControl +0x378");
 static_assert(offsetof(NnTextControl, TypedCount) == 0x364, "TextControl +0x364");
 static_assert(offsetof(NnTextControl, TypeElapsed) == 0x368, "TextControl +0x368");
 static_assert(offsetof(NnTextControl, bBlink) == 0x379, "TextControl +0x379");
@@ -174,7 +174,7 @@ static_assert(offsetof(NnTextControl, BlinkColourOn) == 0x381, "TextControl +0x3
 static_assert(offsetof(NnTextControl, BlinkColourOff) == 0x385, "TextControl +0x385");
 static_assert(offsetof(NnTextControl, bTyping) == 0x389, "TextControl +0x389");
 static_assert(offsetof(NnTextControl, CachedX) == 0x38c, "TextControl +0x38c");
-static_assert(offsetof(NnTextControl, Byte394) == 0x394, "TextControl +0x394");
+static_assert(offsetof(NnTextControl, bCachedPlacementValid) == 0x394, "TextControl +0x394");
 static_assert(offsetof(NnTextControl, CachedSurfaceWidth) == 0x398, "TextControl +0x398");
 static_assert(offsetof(NnTextControl, bInCaptureList) == 0x39c, "TextControl +0x39c");
 static_assert(sizeof(NnTextControl) == 0x3a0, "retail TextControl is 0x3a0 bytes");

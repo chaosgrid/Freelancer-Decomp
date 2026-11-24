@@ -30,7 +30,7 @@ struct FContentPlayerState;         // ContentPlayerState.h
 // =======================================================================================
 // Messages of the sub-machines. Every class shares the deleting dtor FUN_06f86dc0 (see
 // FRmMachineFailedMessage); clone = StateMachineMessage::operator new, the exported copy ctor
-// and the field copies. The message type is the caller's (the GRmMsgType* globals).
+// and the field copies. The message type is the caller's (the GRmMsg* globals).
 // =======================================================================================
 
 // Vtable 06fbc804 (0x20 bytes, clone FUN_06f87cb0): a solar the solar machine tracked was
@@ -153,8 +153,9 @@ public:
 class FRmShipRecord : public FRmSpawnRecord
 {
 public:
-    // +0x60: 2 the big ship, 1 a defensive ship (FUN_06f89e90 speaker kinds 3 / 4). TODO: the
-    // other values.
+    // +0x60: FRmShipSpawn::ShipKind -- 2 the big ship, 1 a defensive ship (FUN_06f89e90
+    // speaker kinds 3 / 4). No other value: the only BuildRmShips call (06f97d11) passes
+    // (target ? 2 : 1) for the first ship and 1 for the others.
     int Kind = 0;
     unsigned int Group = 0;                         // +0x64 the ship group's serial
 };
@@ -264,9 +265,9 @@ public:
     // LAB_06f86fb0: state 0; messages DAT_06fd3b6c, 0x39, 0x18, 0x27, 0x3d.
     bool OnStateEvent(SMEventData const* Event, int const& State) override;
 
-    // FUN_06f877c0: every argument 0 = any; compared in the retail order ParentId (Field60),
-    // HolderId, CriticalLootMode (Field6c), Kind, State.
-    FRmRecordList Query(int Field6c, int Kind, unsigned int Field60, int InState,
+    // FUN_06f877c0: every argument 0 = any; compared in the retail order ParentId, HolderId,
+    // CriticalLootMode, Kind, State.
+    FRmRecordList Query(int InCriticalLootMode, int Kind, unsigned int InParentId, int InState,
                         unsigned int InHolderId);
 
     FRmRecordList Records;                          // +0x20
@@ -467,6 +468,24 @@ protected:
 // TU61 -- DAT_06fce778: 30.0, set to 45.0 (DAT_06fbc2dc) by the first runtime machine built
 // outside single player: the "return to the combat area" countdown of the vignette machine.
 extern float GRmMultiplayerDelay;
+
+// The runtime machine's states (0..3 the base's, FRmRuntimeMachine slots 13..15; 5..12 the
+// vignette machine's, FUN_06f8c460). 4 is never entered.
+enum ERmMachineState
+{
+    RmStateIdle = 0,                // enter -> RmStateWaitStart
+    RmStateWaitStart = 1,           // GRmMsgStartMachine -> RmStateStarted
+    RmStateStarted = 2,             // enter -> RmStateStart
+    RmStateStart = 3,               // HandleStart
+    RmStateSucceeded = 5,           // HandleSucceeded
+    RmStateFailed = 6,              // HandleFailed
+    RmStateDone = 7,                // HandleDone
+    RmStatePreBattle = 8,           // HandlePreBattle
+    RmStateTargetBattle = 9,        // HandleTargetBattle
+    RmStateApproachMain = 10,       // HandleApproachMain
+    RmStateMainBattle = 11,         // HandleMainBattle
+    RmStateCriticalLoot = 12,       // HandleCriticalLoot
+};
 
 // =======================================================================================
 // TU61 -- the vignette runtime machine (retail 0xb4 bytes). Vtable 06fbc928 (29 slots),

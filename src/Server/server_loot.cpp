@@ -39,7 +39,7 @@ bool Loot::create(Archetype::Root* Arch)
     // The CLoot narrowing is applied only to the open() call, with no null test.
     CObject* Narrowed = Object;
     if (Narrowed == nullptr ||
-        (static_cast<unsigned>(Narrowed->ObjectClass) & 0x803u) != 0x803u)
+        (static_cast<unsigned>(Narrowed->ObjectClass) & CObject::ClassLoot) != CObject::ClassLoot)
     {
         Narrowed = nullptr;
     }
@@ -243,7 +243,7 @@ bool Loot::update_decay(float Dt)
     // turns that into "one unit fewer".
     {
         DamageList Damage;
-        Damage.Cause = static_cast<DamageCause>(0x14);
+        Damage.Cause = DamageCause::LootDecay;
         Damage.add_damage_entry(SUBOBJ_ID_POWER, 0.0f, DamageEntry::SubObjFate::None);
         apply_damage_list(Damage);
     }
@@ -284,7 +284,7 @@ void Loot::explode_on_destroy()
     Blast.InflictorId = 0;
     Blast.SkipCollisionGroup = nullptr;
     Blast.ExplodingObjId = get_id();
-    Blast.Cause = static_cast<DamageCause>(4);
+    Blast.Cause = DamageCause::Explosion;
     Blast.Position = get_position();
     Blast.Explosion = Explosion;
     OwnerSystem->explode(Blast);

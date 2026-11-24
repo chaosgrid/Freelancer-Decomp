@@ -88,7 +88,7 @@ TextMsgButton::TextMsgButton()
     : Command(0)
 {
     // FUN_00566380.
-    bUsePalette = 1;
+    bEnabled = 1;
 }
 
 TextMsgButton::~TextMsgButton()
@@ -98,18 +98,18 @@ TextMsgButton::~TextMsgButton()
 void TextMsgButton::MouseEnter(float const* /*Ray*/)
 {
     // FUN_005664e0.
-    if (bUsePalette != 0)
+    if (bEnabled != 0)
         PlayUiRolloverSound();
 }
 
 bool TextMsgButton::MouseEvent(FWin3DMouseEvent const* Event)
 {
     // FUN_005664a0.
-    if (Event->Field1 != 2)
+    if (Event->Action != kWin3DMousePress)
         return false;
-    if (bUsePalette == 0)
+    if (bEnabled == 0)
         return false;
-    if (Event->Field0 != -1)
+    if (Event->Button != kWin3DMouseLeft)
         return false;
     if (Parent == nullptr)
         return false;
@@ -121,7 +121,7 @@ void TextMsgButton::Init(Win3D* NewParent, wchar_t const* Caption, float BoxWidt
 {
     // FUN_005753d0.
     Command = NewCommand;
-    bUsePalette = 1;
+    bEnabled = 1;
     Create(NewParent, nullptr); // result not checked
     Width = BoxWidth;
     Height = BoxHeight;
@@ -275,7 +275,7 @@ bool TypeSelect::Create(Win3D* NewParent, void* /*Data*/)
         }
     }
 
-    Buttons[2].bUsePalette = ProbeMultiplayerAvailable(); // +0x34a, Multiplayer
+    Buttons[2].bEnabled = ProbeMultiplayerAvailable(); // +0x34a, Multiplayer
     PollIntervalMs = 1000;
     LastPollMs = timeGetTime();
     return true;
@@ -293,7 +293,7 @@ void TypeSelect::Destroy()
         SensApi = nullptr;
     }
     IsNetworkAlive = nullptr;
-    Flags = static_cast<unsigned char>(Flags & 0xfc);
+    Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
 
     // Every child is destroyed; StaticControls are also deleted. The class name (<= 31 chars) is
     // copied before Destroy and compared afterwards (14 bytes, terminator included).
@@ -331,7 +331,7 @@ void TypeSelect::Update()
     unsigned const Now = timeGetTime();
     if (Now - LastPollMs > PollIntervalMs)
     {
-        Buttons[2].bUsePalette = ProbeMultiplayerAvailable();
+        Buttons[2].bEnabled = ProbeMultiplayerAvailable();
         LastPollMs = Now;
     }
 
@@ -375,8 +375,10 @@ void TypeSelect::Update()
     Phase = Phase + 1;
     for (unsigned Index = 0; Index < 5; ++Index)
     {
-        Buttons[Index].Flags = static_cast<unsigned char>(Buttons[Index].Flags & 0xfc);
-        Statics[Index]->Flags = static_cast<unsigned char>(Statics[Index]->Flags & 0xfc);
+        Buttons[Index].Flags =
+            static_cast<unsigned char>(Buttons[Index].Flags & ~(kWin3DActive | kWin3DVisible));
+        Statics[Index]->Flags =
+            static_cast<unsigned char>(Statics[Index]->Flags & ~(kWin3DActive | kWin3DVisible));
     }
     if (Phase >= 2)
     {

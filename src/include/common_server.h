@@ -574,12 +574,12 @@ namespace Market {
 
 namespace Audio {
     struct Tryptich {
-        unsigned int Field0;
-        unsigned int Field4;
-        unsigned int Field8;
-        unsigned int FieldC;
+        unsigned int SpaceMusic;
+        unsigned int DangerMusic;
+        unsigned int BattleMusic;
+        unsigned int OverrideMusic;
         unsigned char Field10;
-        unsigned int Field14;
+        unsigned int FadeBits;
     };
 
     SERVER_API int __cdecl SetMusic(unsigned int PlayerId, const Tryptich& Track);
@@ -829,8 +829,9 @@ public:
     // simulation time, sync backoff) without touching the DRV sub-objects or m_bLogging.
     void Reset();
 
-    // Common.dll.c 0x31bb0: gated on m_bLogging. Writes to c:\flservertrace.txt (MP server,
-    // handle kept open across calls) or appends to c:\client.updates (single-player/client).
+    // FUN_06291bb0: gated on m_bLogging. Writes to c:\flservertrace.txt (MP server, fopen "wt"
+    // once, handle kept open) or appends to c:\client.updates (otherwise, fopen "a+" per call).
+
     void tracef(char const* Format, ...);
 
 public:
@@ -986,10 +987,10 @@ namespace SpaceObj {
 
     // ClientId is the client the request goes to (IClient::SendServerRequestSpaceScript).
     SERVER_API int __cdecl RequestSpaceScript(const unsigned int& ObjId, const Vector& Pos,
-                                              const int& Priority, unsigned int ClientId,
+                                              const int& CameraMode, unsigned int ClientId,
                                               const char* ScriptName);
 
-    // Server.dll 0x18732.
+    // Server.dll .text:06cf8a80.
     SERVER_API int __cdecl GetLocation(unsigned int ObjId, Vector& OutPos, Matrix& OutOrient);
 
     // Server.dll .text:06cf8e00.
@@ -1021,8 +1022,8 @@ namespace SpaceObj {
     // Server.dll .text:06cf9230.
     SERVER_API int __cdecl SendComm(unsigned int SenderId, unsigned int TargetId,
                                      unsigned int VoiceId, const Costume* CommCostume,
-                                     unsigned int CommType, unsigned int* TextIds,
-                                     int TextCount, unsigned int Mood, float Duration,
+                                     unsigned int CaptionIds, unsigned int* TextIds,
+                                     int TextCount, unsigned int PermutationIds, float Duration,
                                      bool bInterrupt);
 
     SERVER_API int __cdecl DrainShields(unsigned int ObjId);
@@ -1051,7 +1052,7 @@ namespace SpaceObj {
 
     // Server.dll .text:06cfa520.
     SERVER_API int __cdecl Launch(const unsigned int& LaunchObjId, const unsigned int& DockObjId,
-                                  int LaunchType);
+                                  int DockPortIndex);
 
     // Server.dll .text:06cf9ac0. Content passes (dock target, occupied, terminal).
     SERVER_API int __cdecl Activate(const unsigned int& ObjId, bool bActivate, int Param);

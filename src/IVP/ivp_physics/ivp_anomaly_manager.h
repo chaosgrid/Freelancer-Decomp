@@ -51,7 +51,7 @@ public:
     float   MaxAngularVelocityPerPsi;   // +0x10: 1.5707964f (pi/2)
 };
 
-static_assert(sizeof(IVP_Anomaly_Limits) == 0x14, "IVP_Anomaly_Limits size must be 0x14 (operator_new(0x14) at Common.dll.txt:420159)");
+static_assert(sizeof(IVP_Anomaly_Limits) == 0x14, "IVP_Anomaly_Limits size must be 0x14 (operator_new(0x14) in FUN_0634bf50, 0634c142)");
 static_assert(offsetof(IVP_Anomaly_Limits, bDeleteOnEnvironmentDelete) == 0x04, "IVP_Anomaly_Limits+0x04");
 static_assert(offsetof(IVP_Anomaly_Limits, MaxVelocity) == 0x08, "IVP_Anomaly_Limits+0x08");
 static_assert(offsetof(IVP_Anomaly_Limits, MaxCollisionsPerPsi) == 0x0C, "IVP_Anomaly_Limits+0x0C");
@@ -112,5 +112,5 @@ public:
     int32_t bDeleteOnEnvironmentDelete; // +0x04: ctor argument, 1 for the Environment-owned singleton
 };
 
-static_assert(sizeof(IVP_Anomaly_Manager) == 0x08, "IVP_Anomaly_Manager size must be 0x8 (operator_new(0x8) at Common.dll.txt:420138)");
+static_assert(sizeof(IVP_Anomaly_Manager) == 0x08, "IVP_Anomaly_Manager size must be 0x8 (operator_new(0x8) in FUN_0634bf50, 0634c106)");
 static_assert(offsetof(IVP_Anomaly_Manager, bDeleteOnEnvironmentDelete) == 0x04, "IVP_Anomaly_Manager+0x04");

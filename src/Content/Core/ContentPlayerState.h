@@ -23,22 +23,55 @@
 
 struct ID_String;   // common_id.h
 
+// FVnpcRecord::MissionState: the outcome of the mission a bar character gave
+// (JoinMissionAsGroup sets ACTIVE; EndLiveMission turns ACTIVE into the callers' 2 on
+// success, 3 on failure, 4 on abort or when another mission replaces it).
+enum EVnpcMissionState : unsigned int
+{
+    VNPC_MISSION_NONE = 0,
+    VNPC_MISSION_ACTIVE = 1,
+    VNPC_MISSION_SUCCEEDED = 2,
+    VNPC_MISSION_FAILED = 3,
+    VNPC_MISSION_ABORTED = 4,
+};
+
 // [mPlayer] "vnpc" record (vector at player +0xec, 0x10 stride): base, npc, and two values.
 struct FVnpcRecord
 {
-    unsigned int Values[4];
+    unsigned int BaseId;          // +0x00
+    unsigned int NpcId;           // +0x04 the bar character's nickname id
+    unsigned int TalkCount;       // +0x08 RecordVnpcTalk: 1 on the first talk, then ++
+    unsigned int MissionState;    // +0x0c EVnpcMissionState
 };
 
 // [mPlayer] "rumor" record (vector at player +0xfc, 8 stride).
 struct FRumorRecord
 {
-    unsigned int Values[2];
+    unsigned int RumorId;         // +0x00
+    unsigned int Count;           // +0x04 AddRumor: 1 on the first, then ++
 };
 
-// [mPlayer] "tlr_exception" record (vector at player +0x38, 8 stride).
+// [mPlayer] "tlr_exception" record (vector at player +0x38, 8 stride): the two rings that
+// bound an exempt stretch of a lane (Act_PlayerCanTradelane's nickname pairs).
 struct FTlrException
 {
-    unsigned int Values[2];
+    unsigned int FirstRingId;     // +0x00
+    unsigned int SecondRingId;    // +0x04
+};
+
+// FContentPlayerState::EncounterFlags (+0xd0) bits, named after their readers.
+enum EContentPlayerFlags : unsigned int
+{
+    // EncounterParams: the player gets no encounter of a hostile (<= -0.6) faction.
+    PLAYER_FLAG_NO_HOSTILE_ENCOUNTERS = 0x1,
+    // EncounterParams: the player gets no encounter of any other faction.
+    PLAYER_FLAG_NO_FRIENDLY_ENCOUNTERS = 0x2,
+    // Set by the random mission in its offer / destination system or near its objective
+    // (with a 120 s MissionAreaTimeout); SpacePopClampBlockAttitudes clamps for it.
+    PLAYER_FLAG_MISSION_AREA = 0x4,
+    // Set by the random mission in its destination system; no trade lane attacks
+    // (FSystemInfo::SpawnTradeLaneAttack).
+    PLAYER_FLAG_MISSION_DEST_SYSTEM = 0x8,
 };
 
 // Retail player +0x48 (0x5c bytes): statistics block, saved by FUN_06f495f0 and
@@ -146,16 +179,21 @@ struct FContentPlayerState : FContentPlayerStateBase
     unsigned char bCanTradelane;                              // +0x34
     std::vector<FTlrException> TradelaneExceptions;           // +0x38
     FContentPlayerStats Stats;                                // +0x48
-    unsigned int ValueD0;                                     // +0xd0 flags; bit 2 cleared when ValueD4 runs out
-    float ValueD4;                                            // +0xd4 countdown, -1 = idle
-    // Retail +0xd8: RandomMission controller id from FUN_06f483d0 Create.
-    unsigned int ValueD8;
+    unsigned int EncounterFlags;                              // +0xd0 EContentPlayerFlags
+    // +0xd4: seconds until PLAYER_FLAG_MISSION_AREA clears (UpdateTime), -1 = idle.
+    float MissionAreaTimeout;
+    // +0xd8: the controller id of the mission the player is on (JoinMission,
+    // JoinMissionAsGroup; 0 after LeaveLiveMission).
+    unsigned int LiveMissionId;
     unsigned int MissionNumber;                               // +0xdc
     // +0xe0: the next mission vendor offer id, 1 at first; only AllocateVendorOfferId
     // (FUN_06f48c50) reads and writes it.
     unsigned int NextVendorOfferId;
-    unsigned int ValueE4;                                   // +0xe4
-    unsigned int ValueE8;                                     // +0xe8
+    // +0xe4 / +0xe8: the player's last maneuver, SpaceSupport msg PlayerManeuver {player,
+    // target, behavior id}: the behavior id (BehaviorTypes; 10 formation is reset to 0 when the
+    // player leaves the formation) and its target (0 when that object is destroyed).
+    unsigned int ManeuverBehaviorId;
+    unsigned int ManeuverTargetId;
     std::vector<FVnpcRecord> Vnpcs;                           // +0xec
     std::vector<FRumorRecord> Rumors;                         // +0xfc
 
@@ -216,16 +254,16 @@ struct FContentPlayerState : FContentPlayerStateBase
     unsigned int GetShipTypesKilledCount() const;
     // FUN_06f493c0: {ship type, count} pairs in key order.
     void CopyShipTypesKilled(unsigned int* Out) const;
-    // FUN_06f48d80 (thiscall, RET 4): Values[1] of the first Rumors record whose
-    // Values[0] is Id, 0 when none.
+    // FUN_06f48d80 (thiscall, RET 4): Count of the first Rumors record whose RumorId is
+    // Id, 0 when none.
     unsigned int FindRumor(unsigned int Id) const;
-    // FUN_06f48db0 (thiscall, RET 4; callers TU19, TU17): ++Values[1] of the first Rumors
+    // FUN_06f48db0 (thiscall, RET 4; callers TU19, TU17): ++Count of the first Rumors
     // record for Id, else a new record {Id, 1} at the end.
     void AddRumor(unsigned int Id);
     // FUN_06f48ca0 (thiscall, RET 8; caller TU19): a bar character was talked to.
-    // NpcId 0 -> nothing. The first Vnpcs record {BaseId, NpcId}: none, or Values[2] == 0
-    // -> a new record {BaseId, NpcId, 1, 0} at the end; else Values[3] != 1 -> 0, and
-    // ++Values[2].
+    // NpcId 0 -> nothing. The first Vnpcs record {BaseId, NpcId}: none, or TalkCount == 0
+    // -> a new record {BaseId, NpcId, 1, 0} at the end; else a MissionState other than
+    // ACTIVE -> NONE, and ++TalkCount.
     void RecordVnpcTalk(unsigned int BaseId, unsigned int NpcId);
     // FUN_06f487d0 (thiscall; callers TU19, TU17): +0xd8, else the
     // first non-zero +0xd8 among the group members that have a state, else 0.
@@ -249,8 +287,9 @@ struct FContentPlayerState : FContentPlayerStateBase
     unsigned int GetGroupSize() const;
     // FUN_06f487c0: +0xd8, the live mission controller.
     unsigned int GetLiveMission() const;
-    // FUN_06f48a20 (RET 0xc): +0xec records in state 1 take VnpcState; then the player (or,
-    // with bGroup, every group member that has a state) leaves its mission.
+    // FUN_06f48a20 (RET 0xc): +0xec records in MissionState ACTIVE take VnpcState
+    // (EVnpcMissionState); then the player (or, with bGroup, every group member that has a
+    // state) leaves its mission.
     void EndLiveMission(unsigned int Unused, int VnpcState, bool bGroup);
 
     // Random-mission support (TU47 mission object).
@@ -258,7 +297,7 @@ struct FContentPlayerState : FContentPlayerStateBase
     unsigned int GetFlags() const;
     // FUN_06f471b0 (RET 4): +0xd0 = Flags.
     void SetFlags(unsigned int Flags);
-    // FUN_06f471c0 (RET 4): +0xd4 = Countdown.
+    // FUN_06f471c0 (RET 4): +0xd4 (MissionAreaTimeout) = Countdown.
     void SetCountdown(float Countdown);
     // FUN_06f480e0 (RET 4): *Out = pub::Player::GetName(+0xc); returns Out.
     std::wstring* GetName(std::wstring* Out) const;
@@ -277,35 +316,36 @@ struct FContentPlayerState : FContentPlayerStateBase
     void CountRandomMissionFailed(unsigned char MissionType);
 
     // SpaceSupport support.
-    // FUN_06f48c20 (RET 4): +0xe4 = Value (SpaceSupport msg 0x1a with 0, msg 0x2f with
-    // parms[2]).
-    void SetValueE4(unsigned int Value);
+    // FUN_06f48c20 (RET 4): +0xe4 = Value (SpaceSupport FormationLeave with 0,
+    // PlayerManeuver with parms[2]).
+    void SetManeuverBehaviorId(unsigned int Value);
     // FUN_06f48c40 (RET 4): +0xe8 = Value (SpaceSupport msg 0x39 with 0 when it holds the
-    // destroyed object, msg 0x2f with parms[1]).
-    void SetValueE8(unsigned int Value);
-    // FUN_06f48c10 (callers SpaceSupport, TU37 goto guide): +0xe4. With GetValueE8 the goto
-    // guide reads the pair that SpaceSupport msg 0x2f stores (parms[2], parms[1]).
-    unsigned int GetValueE4() const;
+    // destroyed object, PlayerManeuver with parms[1]).
+    void SetManeuverTargetId(unsigned int Value);
+    // FUN_06f48c10 (callers SpaceSupport, TU37 goto guide): +0xe4. With
+    // GetManeuverTargetId the goto guide reads the pair PlayerManeuver stores.
+    unsigned int GetManeuverBehaviorId() const;
     // FUN_06f48c30 (callers TU37 goto guide, SpaceSupport): +0xe8.
-    unsigned int GetValueE8() const;
+    unsigned int GetManeuverTargetId() const;
     // FUN_06f48fb0 (RET 4; caller SpaceSupport msg 0x39 with the killed ship's arch):
     // ++ ShipTypesKilled[ShipArchId], a new entry starting at 1.
     void CountShipTypeKilled(unsigned int ShipArchId);
     // FUN_06f488b0 (RET 0x14; callers in TU2, TU17, TU19, TU21): the vnpc record
-    // {VnpcOwner, *Vnpc} (+0xec) gets its last value 1 (VnpcOwner 0 or an empty Vnpc: none);
+    // {VnpcOwner, *Vnpc} (+0xec) gets MissionState ACTIVE (VnpcOwner 0 or an empty Vnpc:
+    // none);
     // then every group member with a state joins ControllerId as JoinMission does (+0xd8,
     // message 0x100b to controller 0 -- retail reuses param 1's slot for that 0 --,
     // pub::Player::SetMsnID with SubId = this player's id, or the member's when that is 0).
     void JoinMissionAsGroup(unsigned int ControllerId, unsigned int VnpcOwner,
                             ID_String const* Vnpc, bool bNotify, unsigned int NotifyArg);
     // FUN_06f48770 (RET 0xc; caller TU34 FUN_06f011f0): the first vnpc record
-    // {BaseId, *NpcId} (+0xec) -> *OutValue = its Values[3], true; false (OutValue untouched)
-    // when there is none.
-    bool FindVnpcValue3(unsigned int BaseId, unsigned int const* NpcId,
-                        unsigned int* OutValue) const;
-    // FUN_06f48c60 (RET 8; caller TU34 FUN_06f00b90): Values[2] of the first vnpc
+    // {BaseId, *NpcId} (+0xec) -> *OutValue = its MissionState, true; false (OutValue
+    // untouched) when there is none.
+    bool FindVnpcMissionState(unsigned int BaseId, unsigned int const* NpcId,
+                              unsigned int* OutValue) const;
+    // FUN_06f48c60 (RET 8; caller TU34 FUN_06f00b90): TalkCount of the first vnpc
     // record {BaseId, NpcId} (+0xec), 0 when there is none.
-    unsigned int GetVnpcValue2(unsigned int BaseId, unsigned int NpcId) const;
+    unsigned int GetVnpcTalkCount(unsigned int BaseId, unsigned int NpcId) const;
 };
 
 class INI_Reader;

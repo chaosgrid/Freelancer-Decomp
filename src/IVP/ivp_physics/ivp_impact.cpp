@@ -75,27 +75,27 @@ void IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(IVP_Impact_Solver_Long_Term
     IVP_Impact_Solver ImpactSolver;
     Vector NegatedNormal;
 
-    if (LongTerm->ChildCandidate[1] == nullptr)
+    if (LongTerm->ContactCores[1] == nullptr)
     {
         NegatedNormal.x = -LongTerm->ContactNormalWS.x;
         NegatedNormal.y = -LongTerm->ContactNormalWS.y;
         NegatedNormal.z = -LongTerm->ContactNormalWS.z;
         ImpactSolver.Cores[0] = LongTerm->Objects[1]->core;
-        ImpactSolver.Cores[1] = LongTerm->ChildCandidate[0];
+        ImpactSolver.Cores[1] = LongTerm->ContactCores[0];
         ImpactSolver.ContactCoordsOS[0] = &LongTerm->CoordOS[1];
         ImpactSolver.ContactCoordsOS[1] = &LongTerm->CoordOS[0];
         ImpactSolver.NormalVectorWS = &NegatedNormal;
     }
     else
     {
-        IVP_Core* Core0 = LongTerm->ChildCandidate[0];
+        IVP_Core* Core0 = LongTerm->ContactCores[0];
         if (Core0 == nullptr)
         {
             Core0 = LongTerm->Objects[0]->core;
         }
         ImpactSolver.Cores[0] = Core0;
         ImpactSolver.ContactCoordsOS[0] = &LongTerm->CoordOS[0];
-        ImpactSolver.Cores[1] = LongTerm->ChildCandidate[1];
+        ImpactSolver.Cores[1] = LongTerm->ContactCores[1];
         ImpactSolver.ContactCoordsOS[1] = &LongTerm->CoordOS[1];
         ImpactSolver.NormalVectorWS = &LongTerm->ContactNormalWS;
     }
@@ -180,8 +180,8 @@ void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IV
 
     const double EnergyAfter0 = IVP_Impact_Core_Energy(Core0);
     const float EnergyAfter1 = (float)(IVP_Impact_Core_Energy(Core1));
-    LongTerm->_field48 = (float)(EnergyAfter0 - EnergyBefore0);
-    LongTerm->_field4c = (float)((double)(EnergyAfter1) - EnergyBefore1);
+    LongTerm->EnergyDelta0 = (float)(EnergyAfter0 - EnergyBefore0);
+    LongTerm->EnergyDelta1 = (float)((double)(EnergyAfter1) - EnergyBefore1);
 
     IVP_Event_Collision Event;
     Event.d_time_since_last_collision = (float)(
@@ -190,7 +190,7 @@ void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IV
     Event.contact_situation = reinterpret_cast<IVP_Contact_Situation*>(LongTerm);
     LongTerm->Speed = SavedSpeed;
 
-    IVP_Environment_Notify_Listeners_C8(Env, &Event); // FUN_0634cf60
+    IVP_Environment_Fire_Event_Pre_Collision(Env, &Event); // FUN_0634cf60
     if ((ObjA->flags & 0x2000u) != 0)
     {
         Env->cluster_manager->fire_event_pre_collision(ObjA, &Event); // FUN_0634b030
@@ -259,7 +259,7 @@ void IVP_Impact_System::init_and_solve_impact_system(IVP_Ledge_Mindist* Mindist,
         }
     }
 
-    LEnvironment->counter_50 += Count + 1;
+    LEnvironment->impact_loop_count += Count + 1;
     recalc_all_affected_cores(); // FUN_063596b0
 }
 
@@ -306,7 +306,7 @@ void IVP_Impact_System::synchronize_core_if_simulated(IVP_Core* Core)
 void IVP_Impact_System::add_pushed_core_with_pairs_except(IVP_Core* Core, IVP_ListManager_CorePairEntry* PairNot)
 {
     PushedCores.Add(Core);
-    static_cast<IVP_Old_Sync_Rot_Z*>(Core->FastSimUnitData)->WasPushedDuringImpactSystem = 1;
+    static_cast<IVP_Old_Sync_Rot_Z*>(Core->OldSyncInfo)->WasPushedDuringImpactSystem = 1;
 
     for (int32_t Index = static_cast<int32_t>(AssociatedFs->CorePairEntries.n_elems) - 1; Index >= 0; --Index)
     {
@@ -362,7 +362,7 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
             IVP_Contact_Point* const Cp = Pair->AttachedCtx.elems[CpIndex];
             if (Cp->Owner->StateProcessed != 1)
             {
-                ++LEnvironment->counter_60;
+                ++LEnvironment->impact_priority_calc_count;
                 IVP_Contact_Point_Calc_Impact_Priority(Cp); // FUN_063595c0
             }
             const float Priority = Cp->Owner->WinnerPriority;
@@ -382,8 +382,8 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
 
     for (int32_t Side = 1; Side >= 0; --Side)
     {
-        IVP_Core* const Core = BestCp->Owner->ChildCandidate[Side];
-        if (Core == nullptr || Core->FastSimUnitData != nullptr)
+        IVP_Core* const Core = BestCp->Owner->ContactCores[Side];
+        if (Core == nullptr || Core->OldSyncInfo != nullptr)
         {
             continue;
         }
@@ -404,7 +404,7 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
         {
             continue;
         }
-        if (static_cast<IVP_Old_Sync_Rot_Z*>(Core->FastSimUnitData)->WasPushedDuringImpactSystem == 0)
+        if (static_cast<IVP_Old_Sync_Rot_Z*>(Core->OldSyncInfo)->WasPushedDuringImpactSystem == 0)
         {
             add_pushed_core_with_pairs_except(Core, BestPair); // FUN_063590e0
         }
@@ -438,11 +438,11 @@ void IVP_Impact_System::recalc_all_affected_cores()
     for (int32_t Index = static_cast<int32_t>(SyncedCores.n_elems) - 1; Index >= 0; --Index)
     {
         IVP_Core* const Core = SyncedCores.elems[Index];
-        if (static_cast<IVP_Old_Sync_Rot_Z*>(Core->FastSimUnitData)->WasPushedDuringImpactSystem == 0)
+        if (static_cast<IVP_Old_Sync_Rot_Z*>(Core->OldSyncInfo)->WasPushedDuringImpactSystem == 0)
         {
             Core->restore_fast_sim_snapshot(); // FUN_063473b0
         }
-        Core->FastSimUnitData = nullptr;
+        Core->OldSyncInfo = nullptr;
     }
 
     IVP_Environment* const Env = LEnvironment;
@@ -473,7 +473,7 @@ void IVP_Impact_System::recalc_all_affected_cores()
             }
             IVP_Calc_Next_PSI_Solver Solver(Core);
             Solver.calc_next_PSI_matrix(&EventSim, &ActiveHullManagers); // FUN_06351310
-            Core->FastSimUnitData = nullptr;
+            Core->OldSyncInfo = nullptr;
             clear_processed_state_of_core_dists(Core); // FUN_06359340
         }
         IVP_Calc_Next_PSI_Solver::commit_all_hull_managers(LEnvironment, &ActiveHullManagers); // FUN_06351f80

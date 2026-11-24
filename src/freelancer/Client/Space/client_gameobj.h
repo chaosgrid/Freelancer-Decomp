@@ -25,6 +25,7 @@ struct FCliEquipFirePacket; // cli_projectile_fx.h
 struct FEffectArch;         // vis_effect_arch.h
 struct FParticleEffect;
 struct FStarSphere;         // star_sphere.h (Solar +0xe4)
+struct FNebulaEffect;       // cli_nebula.h (Gameobj +0x38)
 struct ISoundSource;
 namespace Archetype { struct ISound; }
 
@@ -212,11 +213,11 @@ public:
     // free function GameobjPickLod in space_scene_obj_draw.cpp.
     virtual unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod);
     // 96 +0x180 LAB_00401e90: empty (EquippedObj overrides).
-    virtual void Slot180();
+    virtual void PreSubmitDraw();
     // 97 +0x184 FUN_00539b40: per-object lighting (FUN_005554d0). Body: the free function
     // GameobjUpdateDrawLightingRetail in space_scene_obj_draw.cpp.
     virtual void UpdateDrawLighting(void* Camera);
-    // 98 +0x188 FUN_00539980: draw submit -- Slot180, PickLod, the LOD gate (a failed gate
+    // 98 +0x188 FUN_00539980: draw submit -- PreSubmitDraw, PickLod, the LOD gate (a failed gate
     // writes the LOD to *OutLod and returns), the effect-list sweep, UpdateDrawLighting, the
     // player flags, get_index, the envmap arm, IRenderer2::Slot7(Camera, Inst, 1.0f, Flags,
     // Matrix, Extra). A non-null Matrix ors 0x120 into the flags; Extra is the IFLAppearance
@@ -224,9 +225,9 @@ public:
     // space_scene_obj_draw.cpp; the draw drain calls this slot through the node LAB_0051f7a0.
     virtual unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
                               void* Extra);
-    // 99 +0x18c LAB_00524e50: *OutB = DrawStateB; return DrawStateA.
+    // 99 +0x18c LAB_00524e50: *OutB = NebulaFogFactor (as bits); return CurrentNebula.
     virtual unsigned GetNebula(unsigned* OutB);
-    // 100 +0x190 LAB_00524e60: DrawStateA = DrawStateB = 0, NebulaUpdateTimer = 10.0f.
+    // 100 +0x190 LAB_00524e60: CurrentNebula = NebulaFogFactor = 0, NebulaUpdateTimer = 10.0f.
     virtual void ResetNebula();
     // 101 +0x194 FUN_00539c90: the collision pair -- Other->OnSurfaceCollisionHit(A, D, this, B),
     // then this->ReportCollisionToServer(A, B, Other, D).
@@ -332,8 +333,8 @@ public:
                      bool bFastExit, float Speed) override;
     int stop_tradelane() override;
     int slot_6c(int ArgA, int ArgB) override;
-    int slot_70(unsigned Id) override;
-    int slot_74(unsigned Arg) override;
+    int launch_complete(unsigned BaseObjId) override;
+    int jump_in_complete(unsigned SystemId) override;
 
     // ---- data (IObjInspectImpl ends at +0x14) ---------------------------------------
     FClientGameobj* ListNext;          // +0x14  ObjDB bucket link (FUN_00542350 / 00542390)
@@ -342,8 +343,8 @@ public:
     ActionDB Actions;                  // +0x20  update(Dt) by slot 93, add by slot 108
     FGameobjEffectList EffectList;     // +0x28
     float NebulaUpdateTimer;                  // +0x34  ctor 0; slot 100 sets 10.0f; Ship ctor rand()/32768
-    unsigned DrawStateA;               // +0x38  slot 99 / slot 100; lighting FUN_005554d0 arg
-    unsigned DrawStateB;               // +0x3c
+    FNebulaEffect* CurrentNebula;      // +0x38  the nebula at the position (FUN_005553b0)
+    float NebulaFogFactor;             // +0x3c  its fog factor; both feed FUN_005554d0
     Archetype::Explosion* ExplosionArch; // +0x40 slot 92 resolves; the dtor releases
     unsigned char Flags;               // +0x44  bit0 slot 86/87, bit1 slot 88/89, bit2 slot 85
     unsigned char Pad45[3];
@@ -374,8 +375,8 @@ static_assert(offsetof(FClientGameobj, ManagerKind) == 0x1c, "Gameobj ManagerKin
 static_assert(offsetof(FClientGameobj, Actions) == 0x20, "Gameobj ActionDB +0x20");
 static_assert(offsetof(FClientGameobj, EffectList) == 0x28, "Gameobj effect list +0x28");
 static_assert(offsetof(FClientGameobj, NebulaUpdateTimer) == 0x34, "Gameobj +0x34");
-static_assert(offsetof(FClientGameobj, DrawStateA) == 0x38, "Gameobj +0x38");
-static_assert(offsetof(FClientGameobj, DrawStateB) == 0x3c, "Gameobj +0x3c");
+static_assert(offsetof(FClientGameobj, CurrentNebula) == 0x38, "Gameobj +0x38");
+static_assert(offsetof(FClientGameobj, NebulaFogFactor) == 0x3c, "Gameobj +0x3c");
 static_assert(offsetof(FClientGameobj, ExplosionArch) == 0x40, "Gameobj explosion +0x40");
 static_assert(offsetof(FClientGameobj, Flags) == 0x44, "Gameobj flags +0x44");
 static_assert(offsetof(FClientGameobj, HudLabel) == 0x48, "Gameobj font string +0x48");
@@ -442,7 +443,7 @@ public:
     // 95 +0x17c FUN_00533710.
     unsigned* PickLod(unsigned* OutLod, void* Camera, unsigned const* CachedLod) override;
     // 96 +0x180 LAB_0051b480.
-    void Slot180() override;
+    void PreSubmitDraw() override;
     // 98 +0x188 FUN_00533780.
     unsigned* SubmitDraw(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix,
                       void* Extra) override;
@@ -645,8 +646,8 @@ public:
                      bool bFastExit, float Speed) override;                  // 00546e90
     int stop_tradelane() override;                                           // 00546f80
     int slot_6c(int ArgA, int ArgB) override;                                // 00547250
-    int slot_70(unsigned Id) override;                                       // 005471f0
-    int slot_74(unsigned Arg) override;                                      // 00547220
+    int launch_complete(unsigned BaseObjId) override;                        // 005471f0
+    int jump_in_complete(unsigned SystemId) override;                         // 00547220
 
     // FUN_00543d50 -- the client side of a launch, called by the IClient launch handler
     // (LAB_0053d7e0) with the dock gameobj found in bucket 0 and the launch-point index. Only the player's character launches (get_id vs DAT_00673378):
@@ -911,7 +912,7 @@ public:
     // munition-hit effect (FUN_00539d80).
     void OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition) override;
     // 110 +0x1b8 FUN_0053ea60: while NebulaUpdateTimer is exactly 0, the nebula at the position
-    // into DrawStateA / its fog factor into DrawStateB, and NebulaUpdateTimer = 1.0f.
+    // into CurrentNebula / its fog factor into NebulaFogFactor, and NebulaUpdateTimer = 1.0f.
     void UpdateNebula(float Dt) override;
 };
 static_assert(sizeof(FClientMineGameobj) == 0xc0, "Mine sizeof 0xc0 (operator new(0xc0))");
@@ -992,7 +993,7 @@ public:
     // 91 +0x16c LAB_0053e5a0: CObject::Find(Id, 0x803), advise(true), Object != 0.
     bool find(unsigned const& Id) override;
     // 92 +0x170 LAB_0053e5e0: GameObject's slot 92, the crate's tractored_explosion into +0xac,
-    // then the nebula lookup (FUN_005553b0) into DrawStateA / DrawStateB.
+    // then the nebula lookup (FUN_005553b0) into CurrentNebula / NebulaFogFactor.
     void PostCreateInit() override;
     // 93 +0x174 FUN_0053e6a0: GameObject's update, then the CLoot's update.
     void update(float Dt) override;

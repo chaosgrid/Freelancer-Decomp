@@ -10,6 +10,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// 0x06acf3db. movie.dll operator new: __nh_malloc(size, 1). Null on failure, does not throw.
+void* __cdecl MovieOperatorNew(unsigned int Size);
+
+// FUN_06acf3d0. movie.dll operator delete: forwards to free (FUN_06ad07b3).
+void __cdecl MovieOperatorDelete(void* Block);
+
 // VC6 basic_string<char> embedded at FApproach2Player+0x10. 0x10 bytes.
 // Ptr addresses the characters; the allocation byte immediately before Ptr is the refcount
 // (0 or 0xFF: unique/frozen, operator delete the block; otherwise decrement and detach).

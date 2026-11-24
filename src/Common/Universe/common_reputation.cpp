@@ -414,7 +414,8 @@ void __cdecl Reputation::set(TString<16> const& Name, Relation* const Rels, unsi
     // Unique inserts: for a repeated GroupId in Rels the first value wins.
     // Retail UB: the loop at 0631f3b0 has no exit -- after the Count == 0 test it jumps back
     // unconditionally, reading past Rels until the read faults. The port stops after Count
-    // entries.
+    // entries. Retail's only caller is freelancer's SETGROUPFEELINGS handler (FUN_0053da90),
+    // and no server.dll code sends that packet.
     if (Count == 0)
         return;
     std::map<unsigned, float>& Feelings = It->second.Feelings;

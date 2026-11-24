@@ -31,6 +31,37 @@ class INI_Reader;
 class FContentShipBase;
 struct FFormation;            // Encounters.h (TU31)
 
+// The directive types of CreateObjListDirective, named after the [ObjList] keys LoadObjList
+// (FUN_06f25260) maps to them. 0x19 has no key (only PatrolGuides creates it); 0x17 / 0x18
+// make nothing.
+enum EObjListDirectiveType
+{
+    OBJLIST_AVOIDANCE = 0x0,                  // "Avoidance"
+    OBJLIST_DELAY = 0x1,                      // "Delay"
+    OBJLIST_IDLE = 0x2,                       // "Idle"
+    OBJLIST_GOTO_SHIP = 0x3,                  // "GotoShip"
+    OBJLIST_GOTO_SPLINE = 0x4,                // "GotoSpline"
+    OBJLIST_GOTO_VEC = 0x5,                   // "GotoVec"
+    OBJLIST_TRAIL = 0x6,                      // "Trail"
+    OBJLIST_FOLLOW = 0x7,                     // "Follow"
+    OBJLIST_GUIDE = 0x8,                      // "Guide"
+    OBJLIST_GUIDE_SHIP = 0x9,                 // "GuideShip"
+    OBJLIST_FACE = 0xa,                       // "Face"
+    OBJLIST_SET_LIFE_TIME = 0xb,              // "SetLifeTime"
+    OBJLIST_SET_PRIORITY = 0xc,               // "SetPriority"
+    OBJLIST_STAY_IN_RANGE = 0xd,              // "StayInRange"
+    OBJLIST_STAY_OUT_OF_RANGE = 0xe,          // "StayOutOfRange"
+    OBJLIST_MAKE_NEW_FORMATION = 0xf,         // "MakeNewFormation"
+    OBJLIST_FOLLOW_PLAYER = 0x10,             // "FollowPlayer"
+    OBJLIST_BREAK_FORMATION = 0x11,           // "BreakFormation"
+    OBJLIST_CANCEL_OBJECTIVE = 0x12,          // "CancelObjective"
+    OBJLIST_DOCK = 0x13,                      // "Dock"
+    OBJLIST_INSTANT_TRADELANE = 0x14,         // "InstantTradelane"
+    OBJLIST_LAUNCH = 0x15,                    // "Launch"
+    OBJLIST_WAIT_FOR_PLAYER_MANEUVER = 0x16,  // "WaitForPlayerManeuver"
+    OBJLIST_TRACTOR_BEAM = 0x19,              // FObjListTractorBeam
+};
+
 // FUN_06f24870 (cdecl): *Out = a new directive of Type (0..0x16, 0x19; 0x17 / 0x18 and
 // anything above 0x19 give null); returns *Out != null.
 bool __cdecl CreateObjListDirective(int Type, FObjListDirective** Out);
@@ -85,14 +116,14 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f26040
     void Parse(INI_Reader* Reader) override;         // 06f26190
     int GetType() override;                          // 06f5e540: 3
-    // FUN_06f26150 (callers TU31, TU37): Field_0C = 0 (target
-    // object), Field_1C = *TargetId, Field_58 = 0, Field_50 = Range, Field_54 = Param3.
+    // FUN_06f26150 (callers TU31, TU37): GotoKind = 0 (target
+    // object), TargetId = *TargetId, bFlyThrough = 0, ArrivalRange = Range, MaxSpeed = Param3.
     void SetTarget(unsigned int const* TargetId, float Range, float Param3);
 
     pub::AI::DirectiveGotoOp Op;                     // +0x10c
     int bNoFailOnTimeout = 0;                        // +0x17c Parse: 1, value 9 (0 = fail mission on comm expire)
-    TString<0x30> TargetName;                        // +0x180 -> Op.Field_1C
-    TString<0x30> ObjectName;                        // +0x1b4 -> Op.Field_5C
+    TString<0x30> TargetName;                        // +0x180 -> Op.TargetId
+    TString<0x30> ObjectName;                        // +0x1b4 -> Op.TetherObjectId
 };
 
 // Factory case 4, "GotoSpline" (0x1b4, vtable 06fb8f48).
@@ -106,7 +137,7 @@ public:
 
     pub::AI::DirectiveGotoOp Op;                     // +0x10c
     int bNoFailOnTimeout = 0;                        // +0x17c Parse: 1, value 20 (0 = fail mission on comm expire)
-    TString<0x30> ObjectName;                        // +0x180 -> Op.Field_5C
+    TString<0x30> ObjectName;                        // +0x180 -> Op.TetherObjectId
 };
 
 // Factory case 5, "GotoVec" (0x1b4, vtable 06fb8f2c).
@@ -117,16 +148,16 @@ public:
     bool Execute(FContentShipBase* Ship) override;   // 06f263a0
     void Parse(INI_Reader* Reader) override;         // 06f264d0
     int GetType() override;                          // 06ee99a0: 5
-    // FUN_06f26460 (callers TU37, TU43, ...): Field_0C = 1 (a point), Destination,
-    // Field_50 / Field_54, Field_5C =
-    // ObjectId when (ObjectId & 0x3fffffff) != 0, Field_58 = 0, Field_5A = bCruise, Field_5B
+    // FUN_06f26460 (callers TU37, TU43, ...): GotoKind = 1 (a point), Destination,
+    // ArrivalRange / MaxSpeed, TetherObjectId =
+    // ObjectId when (ObjectId & 0x3fffffff) != 0, bFlyThrough = 0, bGotoCruise = bCruise, bGotoNoCruise
     // = bNoCruise.
     void SetDestination(Vector const* Destination, float Range, float MaxSpeed,
                         unsigned int ObjectId, bool bNoCruise, bool bCruise);
 
     pub::AI::DirectiveGotoOp Op;                     // +0x10c
     int bNoFailOnTimeout = 0;                        // +0x17c Parse: 1, value 11 (0 = fail mission on comm expire)
-    TString<0x30> ObjectName;                        // +0x180 -> Op.Field_5C
+    TString<0x30> ObjectName;                        // +0x180 -> Op.TetherObjectId
 };
 
 // Factory case 6, "Trail" (0x15c, vtable 06fb8e30).
@@ -168,12 +199,12 @@ public:
     int GetType() override;                          // 06ee99a0: 5
     // FUN_06f26770 (callers TU37).
     void SetGuide(unsigned int const* TargetId, Vector const* FollowOffset,
-                  Vector const* Destination, float Field50, bool bNoCruise, bool bCruise,
-                  bool FieldA0, bool Field58);
+                  Vector const* Destination, float Range, bool bNoCruise, bool bCruise,
+                  bool bStartFollowing, bool bFlyThrough);
 
     pub::AI::DirectiveGuideOp Op;                    // +0x10c
     int bNoFailOnTimeout = 0;                        // +0x1c8 Parse: 1, value 19 (0 = fail mission on comm expire)
-    TString<0x30> TargetName;                        // +0x1cc -> GotoParams.Field_5C
+    TString<0x30> TargetName;                        // +0x1cc -> GotoParams.TetherObjectId
 };
 
 // Factory case 9, "GuideShip" (0x234, vtable 06fb8f80).
@@ -187,8 +218,8 @@ public:
 
     pub::AI::DirectiveGuideOp Op;                    // +0x10c
     int bNoFailOnTimeout = 0;                        // +0x1c8 Parse: 1, value 17 (0 = fail mission on comm expire)
-    TString<0x30> ObjectName;                        // +0x1cc -> GotoParams.Field_1C
-    TString<0x30> TargetName;                        // +0x200 -> GotoParams.Field_5C
+    TString<0x30> ObjectName;                        // +0x1cc -> GotoParams.TargetId
+    TString<0x30> TargetName;                        // +0x200 -> GotoParams.TetherObjectId
 };
 
 // Factory case 0xa, "Face" (0x188, vtable 06fb8f10).
@@ -201,7 +232,7 @@ public:
     int GetType() override;                          // 06f25070: 0xa
 
     pub::AI::DirectiveFaceOp Op;                     // +0x10c
-    TString<0x30> TargetName;                        // +0x154 -> Op.Field_10
+    TString<0x30> TargetName;                        // +0x154 -> Op.TargetId
 };
 
 // Factory case 0xb, "SetLifeTime" (0x110, vtable 06fb8e84).
@@ -229,7 +260,7 @@ public:
 // Factory cases 0xd "StayInRange" (vtable 06fb8e68) and 0xe "StayOutOfRange" (06fb8e4c),
 // both 0x180 with SetZoneBehaviorParams at +0x10c and a TString at +0x14c. Their Execute
 // (06f27cb0 / 06f27fa0) and Parse (06f27df0 / 06f280a0) bodies differ only in the value
-// Parse gives Op.Field_10 first (0 / 1).
+// Parse gives Op.InvertMode first (0 / 1).
 class FObjListStayInRange : public FObjListDirective
 {
 public:
@@ -310,7 +341,7 @@ public:
     void SetTarget(unsigned int const* DockObjectId, unsigned int const* NextRingId);
 
     pub::AI::DirectiveDockOp Op;                     // +0x10c
-    TString<0x30> ObjectName;                        // +0x138 -> Op.Field_1C
+    TString<0x30> ObjectName;                        // +0x138 -> Op.TetherObjectId
 };
 
 // Factory case 0x14, "InstantTradelane" (0x124, vtable 06fb8fd4).
@@ -370,16 +401,16 @@ public:
 // directive's GetType() code (the NPC ship's comm-line-done FUN_06f34100: 3/4/5 -> +0x17c,
 // 7 -> +0x10c, 8/9 -> +0x1c8). GetType 5 is shared by GotoVec, Guide and GuideShip (all
 // three vtables' slot +0x14 are 06ee99a0), so the +0x17c read also lands on the Guide ops'
-// GotoParams.Field_64. These asserts pin the offsets that read depends on.
+// GotoParams.TetherFarRange. These asserts pin the offsets that read depends on.
 static_assert(offsetof(FObjListGotoShip, bNoFailOnTimeout) == 0x17c, "GotoShip +0x17c");
 static_assert(offsetof(FObjListGotoSpline, bNoFailOnTimeout) == 0x17c, "GotoSpline +0x17c");
 static_assert(offsetof(FObjListGotoVec, bNoFailOnTimeout) == 0x17c, "GotoVec +0x17c");
 static_assert(offsetof(FObjListFollow, bNoFailOnTimeout) == 0x10c, "Follow +0x10c");
 static_assert(offsetof(FObjListGuide, Op) + offsetof(pub::AI::DirectiveGuideOp, GotoParams) +
-                  offsetof(pub::AI::DirectiveGotoOp, Field_64) == 0x17c,
-              "Guide +0x17c is GotoParams.Field_64");
+                  offsetof(pub::AI::DirectiveGotoOp, TetherFarRange) == 0x17c,
+              "Guide +0x17c is GotoParams.TetherFarRange");
 static_assert(offsetof(FObjListGuideShip, Op) + offsetof(pub::AI::DirectiveGuideOp, GotoParams) +
-                  offsetof(pub::AI::DirectiveGotoOp, Field_64) == 0x17c,
-              "GuideShip +0x17c is GotoParams.Field_64");
+                  offsetof(pub::AI::DirectiveGotoOp, TetherFarRange) == 0x17c,
+              "GuideShip +0x17c is GotoParams.TetherFarRange");
 static_assert(offsetof(FObjListGuide, bNoFailOnTimeout) == 0x1c8, "Guide +0x1c8");
 static_assert(offsetof(FObjListGuideShip, bNoFailOnTimeout) == 0x1c8, "GuideShip +0x1c8");
