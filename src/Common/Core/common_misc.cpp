@@ -961,7 +961,7 @@ void __cdecl DAEngine_create_filesystem(char const* Path, IFileSystem** Out,
 
     if (*Out == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not load file %s\n", kCmnMiscSource, 0xd8,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not load file %s\n", kCmnMiscSource, 0xd8,
               Path);
     }
 }

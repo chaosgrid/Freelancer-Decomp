@@ -433,6 +433,16 @@ int NnItemFilterMode(unsigned ArchId);
 // whose projectile archetype is AmmoArchId.
 bool NnListHasLauncherFor(EquipDescList const* List, unsigned AmmoArchId);
 
+// NN_Dealer's TradeMode (+0x978), NnInventoryOpenDealer's first argument: what the dealer
+// trades, from its callers (NavBar 0x0044107a commodity, 0x00441235 equipment, FUN_00477bf0 ship).
+enum ENnTradeMode : int
+{
+    kTradeModeNone = 0,       // the dealer window closed (ProcessMessage kWinMsgHide)
+    kTradeModeCommodity = 1,
+    kTradeModeShip = 2,
+    kTradeModeEquipment = 3,
+};
+
 // FUN_00477ab0 (cdecl) -- open the dealer: nothing while an NN_Dealer window exists; else the
 // NN_Inventory window (made under NN_MainButton panel 0x66's button when missing or flagged 4)
 // and an NN_Dealer beside it, then the inventory's slot 42 with 0x47 (TradeMode), 0x48

@@ -8,8 +8,8 @@
 //
 // Retail source file: "E:\FL\Scratch\Source\Server\FLChatServer.cpp", the __FILE__
 // every FDUMP notice below carries. Reached from exactly one place:
-// IServerImpl::SubmitChat (0x06d191b0, the IChatServer slot), which IServerImpl.cpp
-// forwards here.
+// IServerImpl::SubmitChat (0x06d191b0, the IChatServer slot), defined at the bottom of
+// this file, which forwards to Server_SubmitChat.
 //
 // What SubmitChat does, in retail order:
 //   1. builds the slash-command table once (flag DAT_06d8f610);
@@ -24,10 +24,10 @@
 #include "../include/common_server.h"
 #include "../include/common_server_playerdb.h"
 #include "../include/common_text.h"
-#include "../include/common_reputation.h"   // Reputation::Vibe::GetName
 #include "../include/common_net.h"          // IsMPServer
 #include "../include/server_sysdb.h"
 #include "../include/rpc_iclient.h"
+#include "server_internal.h"
 #include <windows.h>
 #include <cstring>
 #include <cwchar>
@@ -37,16 +37,23 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "../include/server_iserverimpl.h"   // IServerImpl, Server
+#include "../include/server_gameobject.h"
+#include "../include/common_goods.h"
+#include "../include/server_basedb.h"
+#include <cstdarg>
+#include <cstdlib>
 
 // Retail .data:DAT_06d8fb18, defined in IServerImpl.cpp.
 extern IChatClient* g_pChatClientInterface;
 
-// FUN_06d1b1b0's port, defined in server_classes.cpp (shared with the cheat report).
-void Server_RdlAppend(RenderDisplayList& Rdl, const RDLNode& Node);
+// FUN_06d19180: a CHAT_ID from a player/session id, bytes 2 and 3 zero (CHAT_ID{word}).
+// FUN_06d19ef0 is the same with word 0.
+unsigned int MakeChatId(unsigned int Id) { return Id & 0xffff; }
 
 // The exported hook slots g_pPrivateChatHook / g_pSystemChatHook /
-// g_pUniverseChatHook are declared in common_server.h and defined with the other
-// Server.dll data exports in server_classes.cpp.
+// g_pUniverseChatHook are declared in common_server.h and defined further down this
+// file.
 
 // ---------------------------------------------------------------------------
 // Chat ids. Each is a CHAT_ID global set by its own CRT initializer, which
@@ -68,6 +75,24 @@ static const unsigned int GChatIdGroup    = 0x00010003u;
 // server_classes.cpp's CPlayerGroup senders use the same global, hence extern.
 extern const unsigned int GGroupChatSourceId = 0x00010004u;
 
+// FUN_06d19110 (cdecl): the control block to every active slot, through the IChatClient
+// with no null test. The ushort param is read once, before the loop.
+void Server_BroadcastGroupControl(unsigned int MsgType, unsigned int Param) {
+    PlayerData* Slot = Players.traverse_active(nullptr);
+    if (Slot == nullptr)
+        return;
+    unsigned int const Word = Param & 0xffff;
+    do {
+        unsigned int const Target = MakeChatId(Slot->client_id);
+        FGroupMsgPayload Payload;
+        Payload.MsgType = MsgType;
+        Payload.Param = Word;
+        g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(Target), CHAT_ID(GGroupChatSourceId),
+                                                  sizeof(Payload), &Payload);
+        Slot = Players.traverse_active(Slot);
+    } while (Slot != nullptr);
+}
+
 // ---------------------------------------------------------------------------
 // Buffers and codec objects.
 // ---------------------------------------------------------------------------
@@ -88,13 +113,7 @@ static const char* const GChatServerFile = "E:\\FL\\Scratch\\Source\\Server\\FLC
 // Every notice in this file has this shape, unconditionally.
 static void ChatNotice(int Line, const char* Message)
 {
-    FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", GChatServerFile, Line, Message);
-}
-
-// FUN_06d19180: CHAT_ID{word}, bytes 2 and 3 zero. FUN_06d19ef0 is the same with word 0.
-static unsigned int ChatIdFromWord(unsigned int Id)
-{
-    return Id & 0xffffu;
+    FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", GChatServerFile, Line, Message);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +129,7 @@ bool PlayerData::has_selected_character() const
 }
 
 // FUN_06d4eda0 (thiscall on the slot): the fallback is .data:06d8d40c; the result aliases
-// the vibe's own name buffer. Also ported in server_basedb.cpp and server_classes.cpp.
+// the vibe's own name buffer.
 static const wchar_t GChatBadName[] = L">>>BAD   NAME<<<";
 
 const wchar_t* PlayerData::get_character_name() const
@@ -138,7 +157,7 @@ static void ChatGroup_Send(unsigned int Recipient, unsigned int Type, unsigned i
     FChatGroupControl Payload;
     Payload.Type = Type;
     Payload.Param = Param & 0xffffu;
-    g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(ChatIdFromWord(Recipient)),
+    g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(MakeChatId(Recipient)),
                                               CHAT_ID(GGroupChatSourceId), sizeof(Payload), &Payload);
 }
 
@@ -259,6 +278,24 @@ struct FChatCommandContext {
 
 // Callbacks are cdecl and return a bool the matcher ignores.
 typedef bool (__cdecl* FChatCommandFn)(FChatCommandContext* Ctx, std::vector<std::wstring>* Args);
+
+// Server.dll's own RDL append (FUN_06d1b1b0). Retail clones the node, inserts it at the
+// tail (the insert clones AGAIN, FUN_06d1b4a0) and deletes the first clone; the net effect
+// is one clone at the tail, which this does with a single Clone. No null or allocation
+// tests, as in retail. Common.dll keeps its own copy, as retail does. Shared with
+// PlayerData::report_cheat (server_playerdb.cpp).
+void Server_RdlAppend(RenderDisplayList& Rdl, const RDLNode& Node) {
+    RDLNode* Copy = Node.Clone();
+    void** Sentinel = (void**)Rdl.NodeList;
+    void** Tail = static_cast<void**>(Sentinel[1]);
+    void** Entry = static_cast<void**>(malloc(0xC));
+    Entry[0] = Sentinel;   // next
+    Entry[1] = Tail;       // prev
+    Entry[2] = Copy;
+    Sentinel[1] = Entry;
+    Tail[0] = Entry;
+    Rdl.Count++;
+}
 
 // One list element, 8 bytes in retail: {rpattern*, callback}.
 //
@@ -652,7 +689,7 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
             g_pUniverseChatHook(GChatText, static_cast<int>(SenderWord));
         for (PlayerData* Slot = Players.traverse_active(nullptr); Slot != nullptr;
              Slot = Players.traverse_active(Slot)) {
-            g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(ChatIdFromWord(Slot->client_id)), Target,
+            g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(MakeChatId(Slot->client_id)), Target,
                                                       EncodedSize, SendBuffer);
         }
         return;
@@ -672,7 +709,7 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
         for (; Slot != nullptr; Slot = Players.traverse_active(Slot)) {
             if ((SenderSlot != nullptr && Slot->system_id == SenderSlot->system_id) ||
                 static_cast<int>(Slot->system_id) == SystemId) {
-                g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(ChatIdFromWord(Slot->client_id)), Target,
+                g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(MakeChatId(Slot->client_id)), Target,
                                                           EncodedSize, SendBuffer);
             }
         }
@@ -694,7 +731,7 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
             Found->second.collect_created_owners(SenderWord, &Owners);
             std::set<unsigned int>::const_iterator It = Owners.begin();
             for (; It != Owners.end(); ++It) {
-                g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(ChatIdFromWord(*It)), Target,
+                g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(MakeChatId(*It)), Target,
                                                           EncodedSize, SendBuffer);
             }
         }
@@ -714,3 +751,19 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
 
     ChatNotice(0x381, "Received message to unknown chat list. Ignoring.\n");
 }
+
+    // IChatServer::SubmitChat -- retail 0x06d191b0. Retail's FLChatServer.cpp lives in
+    // server_chat.cpp; the body touches no member of IServerImpl.
+void IServerImpl::SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHAT_ID Target, int SystemId) {
+        Server_SubmitChat(Sender, Size, Data, Target, SystemId);
+    }
+
+// Chat hooks -- RVAs 0xAF604, 0xAF608, 0xAF60C. Retail type void (__cdecl*)(unsigned short*,
+// int) (VC6's wchar_t); the text is the decoded chat message (DAT_06d8e9b0).
+typedef void (__cdecl *ChatHookFn)(wchar_t*, int);
+
+SERVER_API ChatHookFn g_pUniverseChatHook = nullptr;  // RVA 0xAF604
+
+SERVER_API ChatHookFn g_pPrivateChatHook = nullptr;   // RVA 0xAF608
+
+SERVER_API ChatHookFn g_pSystemChatHook = nullptr;    // RVA 0xAF60C

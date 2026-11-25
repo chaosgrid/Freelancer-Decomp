@@ -67,7 +67,7 @@ namespace AlchemyImpl
             AsFxNode(Existing.Component)->GetInstanceName(&ExistingName);
             if (std::strcmp(ExistingName, Name) != 0)
             {
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxNodeLibrary.cpp",
                       0x43, "Different name generates same Hash");
             }
@@ -257,7 +257,7 @@ namespace AlchemyImpl
             {
                 const std::string Message = std::string("Unable to create instance of node \"") +
                     Name + "\". Aborting node library load.\n";
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxNodeLibrary.cpp",
                       0x3bb, Message.c_str());
                 break;
@@ -269,7 +269,7 @@ namespace AlchemyImpl
             {
                 const std::string Message = std::string("DACOM class \"") + Name +
                     "\" does not implement IFxNode. Aborting node library load.\n";
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxNodeLibrary.cpp",
                       0x3c8, Message.c_str());
                 break;
@@ -282,7 +282,7 @@ namespace AlchemyImpl
             Set.Value->GetPropName(0xefa8ce01, &CurrentName);
             if (CurrentName == nullptr || CurrentName[0] == '\0')
             {
-                FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxNodeLibrary.cpp",
                       0x3d8, "This node has empty name. Alchemy give new name for this node.");
                 CurrentName = "unnamed";
@@ -312,7 +312,7 @@ namespace AlchemyImpl
     {
         // LAB_0622afe0: a 2-entry IID table (0624e114) of "1.11_IFxNodeLibrary" and
         // "1.11_IDAComponent", both at offset 0.
-        if (IidEqual(Iid, Iids::FxNodeLibrary) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::FxNodeLibrary) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IFxNodeLibrary*>(this);

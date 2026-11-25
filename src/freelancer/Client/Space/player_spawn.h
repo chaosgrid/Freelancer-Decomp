@@ -40,8 +40,8 @@ bool AddPlayerWaypointRetail(Vector const& Pos, unsigned SystemId, unsigned Obje
 unsigned GetPlayerWaypointTailTagRetail();
 // FUN_004c4eb0 -- DAT_00673390 = Tag, and ask the server for a best path From -> To (IServer
 // slot 72 RequestBestPath, 0x34 bytes: player vibe DAT_0061226c, 2, From, the player's system
-// DAT_00673354, To, Field30). Caller: the nav map's best-path button.
-void RequestBestPathRetail(Vector const& From, Vector const& To, unsigned Tag, unsigned Field30);
+// DAT_00673354, To, ToSystemId). Caller: the nav map's best-path button.
+void RequestBestPathRetail(Vector const& From, Vector const& To, unsigned Tag, unsigned ToSystemId);
 
 // The multiplayer group mission-offer answer. DAT_00673350 is the Gf ScriptSequence showing
 // the offer (the sequence stores itself there when it asks a type-3 offer in multiplayer; its

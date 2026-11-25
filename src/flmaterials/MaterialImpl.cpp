@@ -2222,7 +2222,7 @@ GENRESULT DACOM_API FWire2Material::ApplyVerify(void* /*Context*/, void* /*Extra
     if (Verify != GR_OK)
     {
         char Message[0x2000];
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kWire2File, 0x78,
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kWire2File, 0x78,
             FlmFormatMessage(Message, "failed to verify material %s", InstanceName_));
     }
     return Verify;
@@ -3877,7 +3877,7 @@ GENRESULT DACOM_API FShadowMaterial::Bind(void* Context)
             struct FTextureQuery { const char* Name; unsigned long Crc; };
             FTextureQuery Query = {"efxshadow", DACOM_CRC::GetCRC32("efxshadow")};
             if (ShadowTextureLibrary_->FindTextureByCrc(&Query, &ShadowTextureRecord_) < 0)
-                FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                     "E:\\FL\\Scratch\\Source\\FLMaterials\\shadows_inl.h", 0x24,
                     "couldnt find texture 'efxshadow' (from efx.txm?)");
             else

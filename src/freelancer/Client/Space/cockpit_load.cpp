@@ -105,7 +105,7 @@ bool InitPlayerCockpitSlice()
     char FullPath[MAX_PATH];
     if (CockpitPath[0] == '\0')
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kSpaceCpp, kNoCockpitWarningLine,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kSpaceCpp, kNoCockpitWarningLine,
               "ship has no cockpit definition");
         GetFileSysPath(FullPath, kDefaultCockpitIniRel, nullptr);
     }

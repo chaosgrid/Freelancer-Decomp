@@ -152,13 +152,13 @@ void BaseData::read_Base_block(INI_Reader* Reader)
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid ini data in file %s\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid ini data in file %s\n",
                   kBaseDataSource, 0x89, Reader->get_file_name());
         }
     }
     if (StartRoomId == 0)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: No start room in base ini file %s\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: No start room in base ini file %s\n",
               kBaseDataSource, 0x90, Reader->get_file_name());
     }
 }
@@ -183,7 +183,7 @@ void BaseData::read_Room_block(INI_Reader* Reader)
             File = Reader->get_value_string();
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid ini data in file %s\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid ini data in file %s\n",
                   kBaseDataSource, 0xb5, Reader->get_file_name());
         }
     }
@@ -196,7 +196,7 @@ void BaseData::read_Room_block(INI_Reader* Reader)
     }
     else
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Invalid [Room] entry in ini file %s, nickname or file is missing\n",
               kBaseDataSource, 0xc1, Reader->get_file_name());
     }
@@ -225,7 +225,7 @@ void BaseData::read_from_ini(char const* RelPath, unsigned NewBaseId)
             }
             else
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid ini block in file %s\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid ini block in file %s\n",
                       kBaseDataSource, 0xe2, Reader.get_file_name());
             }
         }
@@ -233,7 +233,7 @@ void BaseData::read_from_ini(char const* RelPath, unsigned NewBaseId)
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot open base .ini file %s\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot open base .ini file %s\n",
               kBaseDataSource, 0xea, FullPath);
     }
 }
@@ -258,7 +258,7 @@ BaseData* BaseDataList::get_base_data(unsigned BaseId) const
     std::map<unsigned, BaseData*>::const_iterator Found = ById.find(BaseId);
     if (Found != ById.end())
         return Found->second;
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find base %u\n", kBaseDataSource, 0x1e8,
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find base %u\n", kBaseDataSource, 0x1e8,
           BaseId);
     return nullptr;
 }
@@ -281,7 +281,7 @@ RoomData* BaseDataList::get_room_data(unsigned RoomId) const
     std::map<unsigned, RoomData*>::const_iterator Found = RoomById.find(RoomId);
     if (Found != RoomById.end())
         return Found->second;
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find room %u\n", kBaseDataSource, 0x1fc,
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find room %u\n", kBaseDataSource, 0x1fc,
           RoomId);
     return nullptr;
 }
@@ -292,7 +292,7 @@ RoomData* BaseDataList::get_unloaded_room_data(unsigned RoomId) const
     std::map<unsigned, RoomData*>::const_iterator Found = RoomById.find(RoomId);
     if (Found != RoomById.end())
         return Found->second;
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find room %u\n", kBaseDataSource, 0x1fc,
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find room %u\n", kBaseDataSource, 0x1fc,
           RoomId);
     return nullptr;
 }
@@ -315,7 +315,7 @@ void BaseDataList::load()
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: No ini file for base %u\n", kBaseDataSource,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: No ini file for base %u\n", kBaseDataSource,
                   0x11b, Base->GetId());
         }
 
@@ -343,7 +343,7 @@ void BaseDataList::load_market_data(char const* RelPath)
     INI_Reader Reader;
     if (!Reader.open(FullPath, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot open market .ini file %s\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot open market .ini file %s\n",
               kBaseDataSource, 0x1d2, FullPath);
         return;
     }
@@ -352,7 +352,7 @@ void BaseDataList::load_market_data(char const* RelPath)
     {
         if (!Reader.is_header("BaseGood"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: Unknown ini block [%s] in market .ini file %s - ignoring\n",
                   kBaseDataSource, 0x1ca, Reader.get_header_ptr(), FullPath);
             continue;
@@ -367,7 +367,7 @@ void BaseDataList::load_market_data(char const* RelPath)
                 unsigned BaseId = Universe::get_base_id(Nickname);
                 if (BaseId == 0)
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: base name %s is unknown in market data file %s",
                           kBaseDataSource, 0x153, Nickname, FullPath);
                 }
@@ -438,7 +438,7 @@ void BaseDataList::load_market_data(char const* RelPath)
             }
             else
             {
-                FDUMP(0x100002,
+                FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: Unknown ini data: [%s]  %s = %s in market .ini file - ignoring\n",
                       kBaseDataSource, 0x1c2, Reader.get_header_ptr(), Reader.get_name_ptr(),
                       Reader.get_value_string());

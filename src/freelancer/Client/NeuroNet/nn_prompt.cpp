@@ -173,13 +173,13 @@ bool NnPrompt::Create(Win3D* NewParent, void* Data)
 
     if (Mode == 1)
     {
-        RegisterEvent(0x13);
-        RegisterEvent(0x12);
-        RegisterEvent(0xf);
+        RegisterEvent(USER_YES);
+        RegisterEvent(USER_NO);
+        RegisterEvent(USER_CANCEL);
     }
     else if (Mode == 2)
     {
-        RegisterEvent(0xf);
+        RegisterEvent(USER_CANCEL);
     }
 
     Win3DSetKeyFocus(this);
@@ -214,9 +214,9 @@ bool NnPrompt::OnEvent(unsigned MsgId)
 {
     // LAB_00473070 (RET 4).
     int Answer = 0;
-    if (MsgId == 0x13)
+    if (MsgId == USER_YES)
         Answer = 1;
-    else if (MsgId != 0xf && MsgId != 0x12)
+    else if (MsgId != USER_CANCEL && MsgId != USER_NO)
         return false;
 
     CopyEditText();
@@ -230,9 +230,9 @@ bool NnPrompt::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00473240 (RET 0xc).
     int Answer = 0;
-    if (Msg == 0xf004)
+    if (Msg == kWinMsgEnter)
         Answer = 1;
-    else if (Msg != 0xf003)
+    else if (Msg != kWinMsgEscape)
         return WinControl::ProcessMessage(Msg, A, B);
 
     CopyEditText();
@@ -246,14 +246,14 @@ intptr_t NnPrompt::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_00473420 (RET 0xc): every path returns 0 and none reaches WinControl's switch.
     (void)B;
-    if (Msg == 0x42)
+    if (Msg == kWinPropPlaceAtOffset)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
         SetPosition(Position);
         return 0;
     }
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
 
     if (A == reinterpret_cast<uintptr_t>(PromptExit))
@@ -361,7 +361,7 @@ namespace
     void CentrePrompt(NnPrompt* Dialog)
     {
         float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        Dialog->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
     }
 
     // Port-only helper for the modal pump the three entry points inline (e.g. 0x00474034).

@@ -221,7 +221,7 @@ int LoadClientVoicesIni(char const* FullPath)
                         }
                         else
                         {
-                            FDUMP(0x100002,
+                            FDUMP(kFdumpWarning,
                                   "%s(%d) : *** WARNING: Voice (%s) has invalid parameter %s",
                                   kVoiceSource, 0x203, Local.Id.get_string(),
                                   Reader.get_name_ptr());
@@ -257,7 +257,7 @@ int LoadClientVoicesIni(char const* FullPath)
             {
                 if (Current == nullptr)
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kVoiceSource, 0x21f,
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kVoiceSource, 0x21f,
                           "Voice [Sound] listed outside [Voice] block\n");
                     Reader.log_link("");
                 }
@@ -294,7 +294,7 @@ int LoadClientVoicesIni(char const* FullPath)
                             }
                             else
                             {
-                                FDUMP(0x100002,
+                                FDUMP(kFdumpWarning,
                                       "%s(%d) : *** WARNING: Voice (%s) has invalid [Sound] "
                                       "parameter %s",
                                       kVoiceSource, 0x249, Current->GetName(),
@@ -306,7 +306,7 @@ int LoadClientVoicesIni(char const* FullPath)
 
                     if (Msg.Id.IsEmpty())
                     {
-                        FDUMP(0x100001,
+                        FDUMP(kFdumpError,
                               "%s(%d) : *** ERROR: Voice (%s) missing [Sound] msg parameter",
                               kVoiceSource, 0x250, Current->GetName());
                         Reader.log_link("");

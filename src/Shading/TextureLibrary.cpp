@@ -741,7 +741,7 @@ GENRESULT DACOM_API FTexLibAggregate::Initialize()
         Iids::RenderPipeline8B, (void**)&Owner->Pipeline);
     if (PipelineResult < 0)
     {
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\TextureLibrary\\TextureLibrary.cpp", 0x308,
               "TextureLibrary: init: unable to acquire IID_IRenderPipeline");
         return GR_GENERIC;
@@ -1086,7 +1086,7 @@ namespace
     {
         char Message[8192];
         std::sprintf(Message, Format, Name, Mip);
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\TextureLibrary\\DX8TexLoader_inl.h",
               Line, Message);
     }
@@ -1325,7 +1325,7 @@ namespace
         va_start(Arguments, Format);
         std::vsprintf(Message, Format, Arguments);
         va_end(Arguments);
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\TextureLibrary\\DX8TexLoader_inl.h",
               Line, Message);
     }
@@ -1479,7 +1479,7 @@ GENRESULT FTextureLibrary::LoadTextureRecord(IFileSystem* RootFileSystem, FFileS
     {
         char Message[8192];
         std::sprintf(Message, "load texture: file contains an old or unknown format, ignoring\n%s", ChildName);
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\TextureLibrary\\TextureLibrary.cpp",
               0x54b, Message);
     }
@@ -1514,7 +1514,7 @@ GENRESULT DACOM_API FTextureLibrary::LoadTextureGroup(void* FileSystem, int* Out
     IFileSystem* Source = AsFileSystem(FileSystem);
     if (Source == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\TextureLibrary\\TextureLibrary.cpp",
               0x58e, "IFileSystem argument is NULL in load_library");
         return GR_GENERIC; // Output is unchanged on this early return.
@@ -1546,7 +1546,7 @@ GENRESULT DACOM_API FTextureLibrary::LoadTextureGroup(void* FileSystem, int* Out
                     {
                         char Message[0x2000];
                         _snprintf(Message, sizeof(Message), "failed to load '%s'", FindData.cFileName);
-                        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+                        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\TextureLibrary\\TextureLibrary.cpp",
                               0x5b4, Message);
                     }

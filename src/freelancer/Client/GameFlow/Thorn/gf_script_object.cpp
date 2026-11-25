@@ -634,8 +634,8 @@ FGfScriptSequence::FGfScriptSequence()
       bHoldTime(1),
       Priority(0),
       bPropsToRoom(0),
-      Field_0x15(1),
-      Field_0x16(0),
+      bSkippable(1),
+      bTransition(0),
       Callback(nullptr),
       CallbackA(nullptr),
       CallbackB(nullptr),
@@ -776,7 +776,7 @@ void FGfScriptSequence::StartEntry(int Index)
                           bApplySpatial, Priority, bScriptFade, Name, bPropsToRoom,
                           bSoundsUseFade);
 
-    if (Field_0x16 != 0 && GfScriptSequenceSkipLatch() && bPlaying != 0 && Field_0x15 != 0)
+    if (bTransition != 0 && GfScriptSequenceSkipLatch() && bPlaying != 0 && bSkippable != 0)
         bSkip = 1;
     if (bHoldTime != 0)
         HoldGameflowTime();
@@ -1080,7 +1080,7 @@ void FGfScriptSequence::ShowOfferDialog(unsigned char bHasAcceptBranch,
     else
     {
         Text = DialogTextA;
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Invalid offer type %d\n", GScriptSequenceFile,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Invalid offer type %d\n", GScriptSequenceFile,
               0x38b, OfferType);
     }
 
@@ -1494,7 +1494,7 @@ FThornComponent* FGfScriptManager::FindCreatedEntity(int Type, char const* Entit
 // LAB_00456840. NnArrivalTextHurry is FUN_0045b3c0.
 bool FGfScriptManager::OnEvent(unsigned MsgId)
 {
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return false;
     bool bAny = false;
     std::list<FGfScriptSequence*>::iterator It = Sequences.begin();
@@ -1503,7 +1503,7 @@ bool FGfScriptManager::OnEvent(unsigned MsgId)
         FGfScriptSequence* const Sequence = *It;
         if (Sequence->bLetterbox == 0)
             continue;
-        if (Sequence->bPlaying != 0 && Sequence->Field_0x15 != 0)
+        if (Sequence->bPlaying != 0 && Sequence->bSkippable != 0)
             Sequence->bSkip = 1;
         bAny = true;
     }
@@ -1519,7 +1519,7 @@ bool FGfScriptManager::CanSkipAll() const
     std::list<FGfScriptSequence*>::const_iterator It = Sequences.begin();
     for (; It != Sequences.end(); ++It)
     {
-        if ((*It)->bLetterbox != 0 && (*It)->Field_0x15 == 0)
+        if ((*It)->bLetterbox != 0 && (*It)->bSkippable == 0)
             return false;
     }
     return true;
@@ -1569,14 +1569,14 @@ void FGfScriptManager::DestroyAll()
 // FUN_004564d0 -- FUN_005760d0(0xf) on the handler face.
 void FGfScriptManager::RegisterEvents()
 {
-    RegisterEvent(0xf);
+    RegisterEvent(USER_CANCEL);
 }
 
 // FUN_004564e0 -- FUN_00456930's body, then FUN_005760f0(0xf).
 void FGfScriptManager::Shutdown()
 {
     DestroyAll();
-    UnregisterEvent(0xf);
+    UnregisterEvent(USER_CANCEL);
 }
 
 // =========================================================================================

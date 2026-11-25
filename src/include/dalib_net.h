@@ -467,7 +467,7 @@ public:
 
 private:
     HMODULE Module;                         // +0x04 -- LoadLibraryA(DllPath)
-    unsigned char Field_0x08;               // +0x08 -- zeroed by ctor and dtor, never read. TODO: meaning
+    unsigned char Field_0x08;               // +0x08 -- zeroed by ctor and dtor, never read
     IGunConnection* Connection;             // +0x0c
     IGunHost* Host;                         // +0x10
     IGunBrowser* Browser;                   // +0x14

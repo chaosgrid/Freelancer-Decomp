@@ -28,7 +28,7 @@ class CCharacterSet;       // server_characterset.h (PlayerData::build_character
 // Retail keeps one player table in Server.dll: the exported `PlayerDB Players`
 // (.data:06d90260, ordinal 352) whose first member is a pointer to the heap array that
 // PlayerDB::init (0x06d510c0) allocates (count dword, then MaxPlayers*0x418 bytes). The
-// port's single store lives in PlayerDB (src/Server/server_classes.cpp); `PlayerSlot`
+// port's single store lives in PlayerDB (src/Server/server_playerdb.cpp); `PlayerSlot`
 // below is a compatibility alias.
 //
 // Offsets in the comments are retail PlayerData offsets in the two bases Server.dll uses:
@@ -40,7 +40,7 @@ class CCharacterSet;       // server_characterset.h (PlayerData::build_character
 // ---------------------------------------------------------------------------
 struct PlayerData {
     // FUN_06d494f0 -- the element constructor PlayerDB::init runs over every slot.
-    // Defined in src/Server/server_classes.cpp.
+    // Defined in src/Server/server_playerdb.cpp.
     PlayerData();
     // FUN_06d50e90 -- the element destructor PlayerDB::free runs. Its first act is the
     // slot teardown FUN_06d49230 (teardown); the member destructors follow.
@@ -432,7 +432,7 @@ struct PlayerData {
     // FUN_06d4b270. Appends {Key, Flags} to the pending-visit vector.
     void queue_visit(unsigned int Key, unsigned char Flags);
 
-    // FUN_06d4ccd0 (server_pub.cpp). FileName is a base file name, not a path: the function
+    // FUN_06d4ccd0 (server_playerdb.cpp). FileName is a base file name, not a path: the function
     // builds the destination from GetUserDataPath, "Accts" / "Accts\MultiPlayer" and the
     // account directory, and appends ".fl" in single player. False when the cheat gate fires
     // or the file cannot be opened.
@@ -493,7 +493,7 @@ struct PlayerData {
 
     // Retail FUN_06d4a4a0 (thiscall, `RET 4`) -- MP only: leave the world
     // (system, base, trade, events 0x3a / 8 / 7, group logout, player-list
-    // removal) and clear +0x64. Defined in server_classes.cpp, next to logout.
+    // removal) and clear +0x64. Defined in server_playerdb.cpp, next to logout.
     void deselect_character(unsigned int SessionId);
 
     // Retail FUN_06d4a5d0 (thiscall, `RET 8`), IServerImpl::CharacterSelect's worker:
@@ -501,24 +501,24 @@ struct PlayerData {
     // selected, drop from the player lists when the id changes, assign +0x64,
     // IClient +0x1c0 and the reputation / player-list exchange with every session;
     // then the shared tail PlayerData::load_selected_character. Defined in
-    // server_classes.cpp, next to PlayerData::deselect_character.
+    // server_playerdb.cpp, next to PlayerData::deselect_character.
     bool select_character(CHARACTER_ID const& Id, unsigned int SessionId);
 
     // Retail FUN_06d499c0 (thiscall, `RET 4`), IServerImpl::CharacterInfoReq's
     // worker (.text:06d452aa): in MP with a selected character, autosave and leave
     // the world; then one CCharacterSet::CharacterInfo per saved character, sorted
     // Restart.fl first, AutoSave.fl next, then newest first; the failed-save
-    // counter moves into Out.SaveFailureCount. Defined in server_classes.cpp.
+    // counter moves into Out.SaveFailureCount. Defined in server_playerdb.cpp.
     void build_character_set(CCharacterSet& Out);
 
     // Retail FUN_06d49f60 (thiscall, `RET 8`), IServerImpl::DestroyCharacter's
     // worker: deselect if selected, find the record, refuse Restart.fl, drop the
     // character from Players' id map and its account, unlink the file, erase the
-    // record, FDUMP in MP. Defined in server_classes.cpp.
+    // record, FDUMP in MP. Defined in server_playerdb.cpp.
     bool destroy_character(CHARACTER_ID const& Id, unsigned int SessionId);
 
     // FUN_06d48d20: outside single player, IClient::PushToClient(client_id, a null packet).
-    // Defined in IServerImpl.cpp.
+    // Defined in server_playerdb.cpp.
     void send_client_null_packet();
 
     // FUN_06d4eda0: the character's name from its reputation vibe, or the ">>>BAD   NAME<<<"
@@ -533,7 +533,7 @@ struct PlayerData {
     // character. Inlined in retail.
     bool equip_gate_open() const;
 
-    // FUN_06d48e80; only caller PlayerDB::load_user_data. Defined in server_classes.cpp.
+    // FUN_06d48e80; only caller PlayerDB::load_user_data. Defined in server_playerdb.cpp.
     unsigned char login_account(const char* AccountDir, const SLoginInfo& Info,
                                 unsigned int SessionId);
 
@@ -541,10 +541,10 @@ struct PlayerData {
     unsigned short next_equip_id();
 
     // FUN_06d4f570; its only caller is the cheat gate of the save. Defined in
-    // server_classes.cpp.
+    // server_playerdb.cpp.
     void report_cheat(int Reason);
 
-    // FUN_06d49230: the slot teardown the destructor runs first. Defined in server_classes.cpp.
+    // FUN_06d49230: the slot teardown the destructor runs first. Defined in server_playerdb.cpp.
     void teardown();
 };
 

@@ -168,7 +168,9 @@ struct FRmCommSequence
 {
     int Trigger;                                // +0x00 GRmCommTriggerNames value
     int Target;                                 // +0x04 GRmCommTargetNames value, default 1
-    float Field_0x08;                           // +0x08 value 2 TODO: meaning unknown
+    // +0x08: value 2 as read (FUN_06f98df0). FUN_06f9e770, which builds the conversation from
+    // the sequence, reads +0x00, +0x04, +0x0c, +0x10 and the lines, not +0x08.
+    float Field_0x08;
     // +0x0c / +0x10 values 3 / 4: the conversation's delay is MinDelay + (MaxDelay - MinDelay)
     // * rand() / 32768 (FUN_06f9e770).
     float MinDelay;                             // +0x0c

@@ -349,7 +349,7 @@ namespace
             break;
         default:
             // Neither slot is written.
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPhySysSource, 0xc8,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kPhySysSource, 0xc8,
                   "PhySys::GetRadiusR(): Unknown anim_technique!");
             break;
         }
@@ -524,7 +524,7 @@ namespace
             }
             else
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPhyObjSource, 0x21d,
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kPhyObjSource, 0x21d,
                       "Unknown anim_technique in PhySys::_BeamR_Children()");
             }
 

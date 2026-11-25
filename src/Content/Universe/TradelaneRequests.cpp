@@ -9,6 +9,7 @@
 #include "Universe/TradelaneRequests.h"
 
 #include "Core/ContentStaticIds.h"     // TU55 static IDs (DAT_06fd1d4c..DAT_06fd1d10)
+#include "Core/ContentInternal.h"     // EObjectType
 #include "Core/ContentPlayerState.h"   // FindContentPlayerStateByShip (FUN_06f49bc0)
 #include "NPCs/DockQueues.h"           // FGcsDockGrantedEvent (vtable 06fbbd70)
 #include "Comms/Gcs.h"                  // GGcsConversations (DAT_06fd1c08)
@@ -27,8 +28,8 @@ void HandleTradelaneRequest(FTradelaneRequest const* Request)
     // nothing on -4/-2) leaves the parameter pointer there and its low byte is tested.
     unsigned int RingType = static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(Request));
     pub::SpaceObj::GetType(Request->RingId, RingType);
-    int Response = 5;
-    if ((RingType & 0x80u) != 0)
+    int Response = DOCK_HOST_RESPONSE_NO_TERMINAL;
+    if ((RingType & OBJ_TRADELANE_RING) != 0)
     {
         bool bAnswered = false;
         FContentPlayerState* Player = FindContentPlayerStateByShip(&Request->ShipId);
@@ -42,13 +43,13 @@ void HandleTradelaneRequest(FTradelaneRequest const* Request)
             }
             else if (Check == 2)
             {
-                Response = 1;
+                Response = DOCK_HOST_RESPONSE_ACCESS_DENIED;
                 bAnswered = true;
             }
         }
         if (!bAnswered)
         {
-            Response = 4;
+            Response = DOCK_HOST_RESPONSE_PROCEED;
             FGcsDockGrantedEvent Event;
             Event.System = FindSystemInfo(&Request->SystemId);
             Event.Speaker = Request->RingId;
@@ -61,7 +62,7 @@ void HandleTradelaneRequest(FTradelaneRequest const* Request)
         }
     }
     pub::SpaceObj::LaneResponse(Request->ShipId, Response);
-    if (Response == 4)
+    if (Response == DOCK_HOST_RESPONSE_PROCEED)
         pub::SpaceObj::Activate(Request->RingId, true, static_cast<int>(Request->ShipId));
 }
 

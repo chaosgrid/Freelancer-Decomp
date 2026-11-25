@@ -104,7 +104,7 @@ CELauncher::CELauncher(unsigned TypeBits, CEqObj* OwnerObj, unsigned short Equip
     Projectile = Archetype::GetEquipment(LauncherArch->ProjectileArchetype.Id);
     if (Projectile == nullptr)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Failed to find projectile archetype for gun.  Archetype is \"%s\"",
               kCELauncherSource, 0x22, LauncherArch->ProjectileArchetype.get_string());
     }
@@ -196,7 +196,7 @@ bool CELauncher::Connect(char const* HpName)
         {
             if (Barrel != 0)
                 return true;
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s has no HpFire01 hardpoint.", kCELauncherSource,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s has no HpFire01 hardpoint.", kCELauncherSource,
                   0x6f, Arch->DaArchetype.Value);
             return false;
         }
@@ -346,7 +346,7 @@ void CELauncher::DrawAmmoFromCargo(int BarrelCount)
         }
         Equip = Owner->EquipManager.Traverse(Walk);
     }
-    FDUMP(0x100002,
+    FDUMP(kFdumpWarning,
           "%s(%d) : *** WARNING: CELauncher::DrawAmmoFromCargo(%d).  Ammo pack not found!",
           kCELauncherSource, 0x197, BarrelCount);
 }

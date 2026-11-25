@@ -120,7 +120,7 @@ struct DirectiveCallback;
 // Retail exports only two members, both ICF-folded:
 //   ctor      .text:06261260  `MOV EAX,this; RET` -- initialises nothing.
 //   operator= .text:06274100  shared with Csys::operator=: a flat 12-dword copy, so size 0x30.
-// No retail module imports either, so the field layout is not recovered (TODO).
+// No retail module imports either, so the field layout is not recovered.
 struct COMMON_API GSplinePath
 {
     uint32_t Opaque[12];   // +0x00 .. +0x2F  meaning not recovered
@@ -528,8 +528,10 @@ public:
             uint32_t WeaponFlags; // +0x8
         };
 
-        int32_t  Field_00;                  // +0x000  0   read by get_range_threshold_value; no
-                                            //             [JobBlock] key writes it (TODO: meaning)
+        // +0x000  0. The selector get_range_threshold_value (062a87e0) maps to a range: 1 ->
+        // 3333.33, 2 -> 1666.67, else 5000; TargetManager applies the same 5000 x 2/3 / 1/3
+        // tiers to the target proximity limit (Sys+0x1824). No [JobBlock] key writes it.
+        int32_t  RangeThreshold;
         int32_t  SceneToughnessThreshold;   // +0x004  2
         int32_t  TargetToughnessPreference; // +0x008  2
         // +0x00C: TargetManager fires combat_drift_event once the owner is this far from its
@@ -703,7 +705,9 @@ public:
     // +0x58: set = no stop at the destination (the Move / SplineMove Ideas get StopStyle 2,
     // "no slow-down"); Content's patrols and guides set it, the player's HUD goto clears it.
     uint8_t bFlyThrough;           // +0x58  0
-    uint8_t Field_59;              // +0x59  1     -> MoveIdea::SetEnabled; no reader found
+    // +0x59  1. GotoBehavior::OnApplyDirective copies it to GotoBehavior+0x367 (.text:062fe86c)
+    // and through FUN_062d5a10 to MoveIdea+0x58; no instruction in common.dll reads either copy.
+    uint8_t Field_59;
     uint8_t bGotoCruise;           // +0x5A  0     "goto_cruise": force cruise on
     uint8_t bGotoNoCruise;         // +0x5B  0     "goto_no_cruise": force cruise off (validate: not both)
     uint32_t TetherObjectId;       // +0x5C  0
@@ -795,8 +799,10 @@ class COMMON_API DirectiveTrailOp : public BaseOp
 public:
     uint   TargetId;               // +0x0C  0      object to trail (validate: != 0)
     float  TrailDistance;          // +0x10  150.0
-    float  Field_14;               // +0x14  0.0
-    float  Field_18;               // +0x18  0.0
+    // +0x14 / +0x18  0.0: written by the ctor and the client's HUD trail request (0); copied by
+    // the copy ctor. TrailBehavior::OnApplyDirective reads only +0x0c / +0x10.
+    float  Field_14;
+    float  Field_18;
 
     DirectiveTrailOp();
     DirectiveTrailOp(DirectiveTrailOp const& Other);
@@ -827,7 +833,10 @@ class COMMON_API DirectiveTractorBeamOp : public BaseOp
 {
 public:
     uint    TargetId;              // +0x0C  0      object to tractor (validate: != 0)
-    uint8_t Field_10;              // +0x10  1     (+0x11..+0x13 padding)
+    // +0x10  1 (+0x11..+0x13 padding). Content's FObjListTractorBeam::SetTarget (FUN_06f28df0)
+    // writes its bool argument (PatrolGuides passes false); LootBehavior::OnApplyDirective
+    // copies it to LootBehavior+0x16c (.text:062cee35), which nothing reads.
+    uint8_t Field_10;
 
     DirectiveTractorBeamOp();
     DirectiveTractorBeamOp(DirectiveTractorBeamOp const& Other);
@@ -880,6 +889,8 @@ public:
     uint32_t NudgeY;               // +0x14  0
     uint32_t NudgeZ;               // +0x18  0     copied but not used (the nudge's z is 0)
     float    Duration;             // +0x1C  1.0
+    // +0x20..+0x2C  0: written by the ctor, copied by the copy ctor; DrasticEvadeBehavior
+    // reads only +0x0c..+0x1c.
     uint32_t Field_20;             // +0x20  0
     uint32_t Field_24;             // +0x24  0
     uint32_t Field_28;             // +0x28  0
@@ -1051,7 +1062,10 @@ public:
     uint8_t bStartFollowing;       // +0xA0  1     the escort starts out following (Content's SetGuide)
     float   SampleInterval;        // +0xA4  10.0  seconds between progress samples
     float   CourseAngleThreshold;  // +0xA8  0.3927  (pi/8) escort heading error for "on course"
-    int32_t Field_AC;              // +0xAC  3     copied to GuideBehavior+0x110 as a float; no reader
+    // +0xAC  3. Content's Guide parsers write value 14 / 12 of the [ObjList] line
+    // (MissionObjList.cpp); GuideBehavior::OnApplyDirective FILDs it into GuideBehavior+0x110,
+    // which nothing reads.
+    int32_t Field_AC;
     float   ProgressHighThreshold; // +0xB0  10.0  distance closed per sample that counts as catching up
     float   ProgressLowThreshold;  // +0xB4  -10.0 below this the escort counts as falling behind
     float   GuideRange;            // +0xB8  400.0 OnEvaluateReadiness's range to the escort

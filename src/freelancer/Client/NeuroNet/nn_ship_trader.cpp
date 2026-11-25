@@ -237,7 +237,7 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
             ShipPrices[Row] = CreateTextControl(Name, "ItemName", Position, nullptr, 0.153f, 0.03f,
                                                 1.6f, static_cast<unsigned>(NameIds), 2, 0, 1);
             FormatGroupedNumber(PriceText, Price, -1); // FUN_004779a0
-            ShipPrices[Row]->SetProperty(0x1d, PointerArg(PriceText), 0);
+            ShipPrices[Row]->SetProperty(kTextPropSetText, PointerArg(PriceText), 0);
         }
 
         RowPrices[Row] = Price;
@@ -299,7 +299,7 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
                                        1.6f, 0, 1, 0, 0);
         wchar_t CashText[0x100];
         FormatGroupedNumber(CashText, static_cast<int>(GetPlayerCreditsRetail()), 0x476); // FUN_004c4ce0
-        PlayerCash->SetProperty(0x1d, PointerArg(CashText), 0);
+        PlayerCash->SetProperty(kTextPropSetText, PointerArg(CashText), 0);
     }
 
     // The title (not kept).
@@ -382,17 +382,17 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
                 2, 0, 1);
             wchar_t ValueText[0x100];
             FormatGroupedNumber(ValueText, ShipValue, -1);
-            PriceControl->SetProperty(0x1d, PointerArg(ValueText), 0);
+            PriceControl->SetProperty(kTextPropSetText, PointerArg(ValueText), 0);
         }
     }
 
     // The view and the buy controls start hidden. Retail's FUN_0053e4a0 (a bare `RET 4`) on the
     // view is not ported.
-    ShipView->SetProperty(1, 1, 0);
-    BuyButton->SetProperty(1, 1, 0);
-    BuyText->SetProperty(1, 1, 0);
-    ViewName->SetProperty(1, 1, 0);
-    ViewClass->SetProperty(1, 1, 0);
+    ShipView->SetProperty(kWinPropHide, 1, 0);
+    BuyButton->SetProperty(kWinPropHide, 1, 0);
+    BuyText->SetProperty(kWinPropHide, 1, 0);
+    ViewName->SetProperty(kWinPropHide, 1, 0);
+    ViewClass->SetProperty(kWinPropHide, 1, 0);
 
     {
         float const Position[3] = {0.645f, -0.061f, 0.0f};
@@ -431,17 +431,17 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
         GetIdsStringWWithRawFallback(0x477, Format, 0x3f);
         swprintf(Title, 0x100, Format, BaseName, Dealer);
         CharUpperW(Title);
-        WelcomeText->SetProperty(0x1d, PointerArg(Title), 0);
+        WelcomeText->SetProperty(kTextPropSetText, PointerArg(Title), 0);
     }
 
     {
         float const Position[3] = {0.657f, -0.438f, 0.0f};
         ErrorHelp = CreateTextControl("ErrorHelp", "Normal", Position, nullptr, 0.37f, 0.06f, 1.4f,
                                       0x49a, 0, 0, 0);
-        ErrorHelp->SetProperty(1, 1, 0);
+        ErrorHelp->SetProperty(kWinPropHide, 1, 0);
         MakeMultiLine(ErrorHelp);
         unsigned char const White[4] = {0xff, 0xff, 0xff, 0xff};
-        ErrorHelp->SetProperty(0x33, PointerArg(White), 1);
+        ErrorHelp->SetProperty(kWinPropColour, PointerArg(White), 1);
     }
 
     // What the player is worth: cash, loadout and ship at this market.
@@ -537,21 +537,21 @@ void NnShipTrader::RefreshRows()
     wchar_t PriceText[0x100]; // [ESP+0x1c]
     for (int Row = 0; Row < RowCount; ++Row)
     {
-        ShipMeshes[Row]->SetProperty(4, PointerArg(RowMeshPaths[Row]), 0);
-        ShipNames[Row]->SetProperty(0x1e, static_cast<uintptr_t>(RowNameIds[Row]), 0);
+        ShipMeshes[Row]->SetProperty(kWinPropMesh, PointerArg(RowMeshPaths[Row]), 0);
+        ShipNames[Row]->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(RowNameIds[Row]), 0);
         RowClassTexts[Row]->SetProperty(
             0x1e, static_cast<uintptr_t>(G_ShipTraderClassIds[RowShipClasses[Row]]), 0);
         FormatGroupedNumber(PriceText, RowPrices[Row], -1); // FUN_004779a0
-        ShipPrices[Row]->SetProperty(0x1d, PointerArg(PriceText), 0);
+        ShipPrices[Row]->SetProperty(kTextPropSetText, PointerArg(PriceText), 0);
 
         uintptr_t const bLocked = RowStatus[Row] != 0 ? 1 : 0;
         unsigned char const FrameColor[4] = {0x80, 0x80, 0x80, 0xff};
-        NameFrames[Row]->SetProperty(0x33, PointerArg(FrameColor), bLocked);
-        NameIconFrames[Row]->SetProperty(0x33, PointerArg(FrameColor), bLocked);
+        NameFrames[Row]->SetProperty(kWinPropColour, PointerArg(FrameColor), bLocked);
+        NameIconFrames[Row]->SetProperty(kWinPropColour, PointerArg(FrameColor), bLocked);
         unsigned char const TextColor[4] = {0xc0, 0xc0, 0xc0, 0xff};
-        ShipNames[Row]->SetProperty(0x33, PointerArg(TextColor), bLocked);
-        RowClassTexts[Row]->SetProperty(0x33, PointerArg(TextColor), bLocked);
-        ShipPrices[Row]->SetProperty(0x33, PointerArg(TextColor), bLocked);
+        ShipNames[Row]->SetProperty(kWinPropColour, PointerArg(TextColor), bLocked);
+        RowClassTexts[Row]->SetProperty(kWinPropColour, PointerArg(TextColor), bLocked);
+        ShipPrices[Row]->SetProperty(kWinPropColour, PointerArg(TextColor), bLocked);
     }
 }
 
@@ -625,7 +625,7 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     WinControl* const Sender = reinterpret_cast<WinControl*>(A);
     switch (Msg)
     {
-    case 0x26:
+    case kWinNotifyClick:
     {
         // caseD_26: a click.
         if (Sender == CancelButton)
@@ -658,7 +658,7 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         return 0;
     }
-    case 0x27:
+    case kWinNotifyDoubleClick:
     {
         // caseD_27: a double click buys a row the player can afford and is not locked out of.
         int Row = 0;
@@ -680,8 +680,8 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         NavBarOpenDealer(Index);
         return 1;
     }
-    case 0x2c:
-    case 0x2d:
+    case kWinNotifyHighlight:
+    case kWinNotifyUnhighlight:
     {
         // caseD_2c / caseD_2d: hover in / out. The row's other frame (or the current ship's
         // other frame) gets the same message; a row updates Hovered (row / -1).
@@ -705,7 +705,7 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 Frame->SetProperty(Property, 0, 0);
             if (Sender != NameIconFrames[Row])
                 NameIconFrames[Row]->SetProperty(Property, 0, 0);
-            Hovered = Msg == 0x2c ? Row : -1;
+            Hovered = Msg == kWinNotifyHighlight ? Row : -1;
         }
         return 0;
     }
@@ -723,7 +723,7 @@ intptr_t NnShipTrader::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool NnShipTrader::OnEvent(unsigned MsgId)
 {
     // LAB_004b9370 (RET 4), the Event::Handler face (this - 0x32c): USER_CANCEL closes the window.
-    if (MsgId != 0x10)
+    if (MsgId != USER_STACKABLE_CANCEL)
         return false;
     NavBarCloseService(false);
     NavBarShowDealerTab();
@@ -756,14 +756,14 @@ void NnShipTrader::SelectRow(int Row)
         CurrentShipFrame->SetProperty(0xc, 0, 0);
     }
 
-    ShipView->SetProperty(1, 0, 0);
-    BuyButton->SetProperty(1, 0, 0);
-    BuyText->SetProperty(1, 0, 0);
-    ViewName->SetProperty(1, 0, 0);
-    ViewClass->SetProperty(1, 0, 0);
-    WelcomeText->SetProperty(1, 1, 0);
-    WelcomeLine->SetProperty(1, 1, 0);
-    WelcomeHelp->SetProperty(1, 1, 0);
+    ShipView->SetProperty(kWinPropHide, 0, 0);
+    BuyButton->SetProperty(kWinPropHide, 0, 0);
+    BuyText->SetProperty(kWinPropHide, 0, 0);
+    ViewName->SetProperty(kWinPropHide, 0, 0);
+    ViewClass->SetProperty(kWinPropHide, 0, 0);
+    WelcomeText->SetProperty(kWinPropHide, 1, 0);
+    WelcomeLine->SetProperty(kWinPropHide, 1, 0);
+    WelcomeHelp->SetProperty(kWinPropHide, 1, 0);
 
     // The ship in the view and its three info ids.
     int FactsIds = 0;  // EBP
@@ -782,7 +782,7 @@ void NnShipTrader::SelectRow(int Row)
             EquipDescList Addons;
             Addons.Items.assign(Package->AddonLow.begin(), Package->AddonLow.end());
             ShipView->LoadEquipment(&Addons);
-            ViewName->SetProperty(0x1e, static_cast<uintptr_t>(Ship->IdsName), 0);
+            ViewName->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(Ship->IdsName), 0);
             ViewClass->SetProperty(
                 0x1e, static_cast<uintptr_t>(G_ShipTraderClassIds[RowShipClasses[Row]]), 0);
             FactsIds = Ship->IdsInfo1;  // +0xec
@@ -795,8 +795,8 @@ void NnShipTrader::SelectRow(int Row)
         Archetype::Ship const* const Ship = Archetype::GetShip(GetPlayerShipArchetypeIdRetail());
         ShipView->LoadShip(&Ship->Nickname, true, false);
         ShipView->LoadEquipment(&GetPlayerEquipDescListRetail()); // FUN_004c4060
-        ViewName->SetProperty(0x1e, static_cast<uintptr_t>(Ship->IdsName), 0);
-        ViewClass->SetProperty(0x1e, static_cast<uintptr_t>(G_ShipTraderClassIds[CurrentShipClass]),
+        ViewName->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(Ship->IdsName), 0);
+        ViewClass->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(G_ShipTraderClassIds[CurrentShipClass]),
                                0);
         FactsIds = Ship->IdsInfo1;
         StatsIds = Ship->IdsInfo2;
@@ -843,40 +843,40 @@ void NnShipTrader::SelectRow(int Row)
         GetIdsStringWWithRawFallback(0x61b, G_NnTextScratchA, G_NnTextScratchCapacity); // FUN_004347e0
         swprintf(G_NnTextScratchB, 0x1000, G_NnTextScratchA,
                  RowDword(offsetof(NnShipTrader, RowRequiredLevels), Selected));
-        ErrorHelp->SetProperty(0x1d, PointerArg(G_NnTextScratchB), 0);
-        ErrorHelp->SetProperty(1, 0, 0);
-        BuyButton->SetProperty(1, 1, 0);
-        BuyText->SetProperty(1, 1, 0);
+        ErrorHelp->SetProperty(kTextPropSetText, PointerArg(G_NnTextScratchB), 0);
+        ErrorHelp->SetProperty(kWinPropHide, 0, 0);
+        BuyButton->SetProperty(kWinPropHide, 1, 0);
+        BuyText->SetProperty(kWinPropHide, 1, 0);
     }
     else if (Status == 2)
     {
         // Reputation (ids 0x61c).
-        ErrorHelp->SetProperty(0x1e, 0x61c, 0);
-        ErrorHelp->SetProperty(1, 0, 0);
-        BuyButton->SetProperty(1, 1, 0);
-        BuyText->SetProperty(1, 1, 0);
+        ErrorHelp->SetProperty(kTextPropSetIds, 0x61c, 0);
+        ErrorHelp->SetProperty(kWinPropHide, 0, 0);
+        BuyButton->SetProperty(kWinPropHide, 1, 0);
+        BuyText->SetProperty(kWinPropHide, 1, 0);
     }
     else if (RowDword(offsetof(NnShipTrader, RowPrices), Selected) > PlayerWorth)
     {
         // Too expensive (ids 0x49a).
-        ErrorHelp->SetProperty(0x1e, 0x49a, 0);
-        ErrorHelp->SetProperty(1, 0, 0);
-        BuyButton->SetProperty(1, 1, 0);
-        BuyText->SetProperty(1, 1, 0);
+        ErrorHelp->SetProperty(kTextPropSetIds, 0x49a, 0);
+        ErrorHelp->SetProperty(kWinPropHide, 0, 0);
+        BuyButton->SetProperty(kWinPropHide, 1, 0);
+        BuyText->SetProperty(kWinPropHide, 1, 0);
     }
     else
     {
         // Buyable.
-        ErrorHelp->SetProperty(1, 1, 0);
-        BuyButton->SetProperty(1, 0, 0);
-        BuyText->SetProperty(1, 0, 0);
+        ErrorHelp->SetProperty(kWinPropHide, 1, 0);
+        BuyButton->SetProperty(kWinPropHide, 0, 0);
+        BuyText->SetProperty(kWinPropHide, 0, 0);
     }
 
     // The current ship cannot be bought.
     if (Selected == -2)
     {
-        BuyButton->SetProperty(1, 1, 0);
-        BuyText->SetProperty(1, 1, 0);
-        ErrorHelp->SetProperty(1, 1, 0);
+        BuyButton->SetProperty(kWinPropHide, 1, 0);
+        BuyText->SetProperty(kWinPropHide, 1, 0);
+        ErrorHelp->SetProperty(kWinPropHide, 1, 0);
     }
 }

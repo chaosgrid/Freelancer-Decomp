@@ -227,7 +227,7 @@ void PhySys::PhyCollisionStateManager::mindist_left_volume(IVP_Controller_Phanto
     // A negative count is reported (and kept).
     --IntruderCount;
     if ((int)IntruderCount < 0)
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPhyCollisionStateManagerSource, 0x11d,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kPhyCollisionStateManagerSource, 0x11d,
               "Negative intruder count!");
 }
 

@@ -83,7 +83,7 @@ CAttachedEquip::~CAttachedEquip()
     // FUN_06293160
     if (Debris != nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCAttachedEquipSource, 0x22,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCAttachedEquipSource, 0x22,
               "Deleting equipment with un-retrieved debris object!");
         Debris->Release();
         Debris = nullptr;
@@ -188,7 +188,7 @@ void CAttachedEquip::Disconnect()
             Owner->notify(INotify::EquipDetachedInPlace, this);
             Attachment->Disconnect(this, false);
             if (Fate != 3 && Fate != 4)
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCAttachedEquipSource, 0xd1,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCAttachedEquipSource, 0xd1,
                       "Disconnecting equipment with FATE_UNKNOWN, using FATE_DISAPPEAR");
         }
         if (Attachment != nullptr)

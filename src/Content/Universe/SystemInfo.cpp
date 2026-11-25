@@ -721,7 +721,7 @@ int FSystemInfo::CreateNpcShip(FContentNpcShipParams const* Params, unsigned int
     FContentNpcShipParams Copy(*Params);
     Copy.System = this;
 
-    if ((DockTarget & 0x3fffffffu) != 0)
+    if ((DockTarget & GIdValueMask) != 0)
     {
         // TU53 FUN_06f60340: its bool is returned as the result.
         return QueueDockLaunch(&Copy, DockTarget, OutShip) ? 1 : 0;
@@ -899,7 +899,7 @@ void FSystemInfo::UpdateNpcShipLives(float DeltaTime)
         FContentNpcShip* Ship = static_cast<FContentNpcShip*>(*It);
 
         // A formation member only has its life refilled.
-        if (Ship->FormationSlot != 0 && Ship->FormationId != 0xffffffffu)
+        if (Ship->FormationSlot != 0 && Ship->FormationId != GNoFormationId)
         {
             if (Ship->LifeTime < Ship->Longevity)
                 Ship->LifeTime = Ship->Longevity;
@@ -932,7 +932,7 @@ void FSystemInfo::UpdateNpcShipLives(float DeltaTime)
         if (pub::SinglePlayer() && IsTargetedByPlayerShip(Players, Ship->SpaceObjId))
             continue;
 
-        if (Ship->FormationId == 0xffffffffu)
+        if (Ship->FormationId == GNoFormationId)
         {
             Expired.push_back(Ship);
             continue;
@@ -1097,7 +1097,9 @@ int FSystemInfo::BuildPatrolPaths(std::vector<FZonePathLabel>* Labels)
     Origin.y = 0.0f;
     Origin.z = 0.0f;
     unsigned int ObjectCount;
-    pub::System::ScanObjects(SystemId, ObjectIds, 0x20, Origin, -1.0f, 0x600d60, ObjectCount);
+    pub::System::ScanObjects(SystemId, ObjectIds, 0x20, Origin, -1.0f,
+                             OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_STATION | OBJ_AIRLOCK_GATE |
+                             OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING, ObjectCount);   // 0x600d60
 
     // sqrt of DAT_06fbbee8, stored as float.
     float const Radius = static_cast<float>(std::sqrt(static_cast<double>(25000000.0f)));
@@ -1228,7 +1230,7 @@ int FSystemInfo::RebuildTradeLanes()
     Origin.x = 0.0f;
     Origin.y = 0.0f;
     Origin.z = 0.0f;
-    pub::System::ScanObjects(SystemId, Rings, 0x80, Origin, -1.0f, 0x80, RingCount);
+    pub::System::ScanObjects(SystemId, Rings, 0x80, Origin, -1.0f, OBJ_TRADELANE_RING, RingCount);
 
     for (unsigned int Index = 0; Index < RingCount; ++Index)
     {
@@ -1711,7 +1713,6 @@ int FSystemInfo::BuildTradeLanes(std::map<unsigned int, FTradeLaneRingInfo>* Rin
 {
     TradeLanes.clear();
 
-    unsigned int const RingIdMask = 0x3fffffff;
     // Each lane restarts from begin().
     while (!Rings->empty())
     {
@@ -1720,9 +1721,9 @@ int FSystemInfo::BuildTradeLanes(std::map<unsigned int, FTradeLaneRingInfo>* Rin
 
         Lane.Rings.insert(Lane.Rings.end(), MakeTradeLaneRing(It->second));
         Lane.Placement.Rotation = It->second.Placement.Rotation;
-        if ((It->second.PrevRing & RingIdMask) == 0)
+        if ((It->second.PrevRing & GIdValueMask) == 0)
             Lane.StartPosition = It->second.Position;
-        if ((It->second.NextRing & RingIdMask) == 0)
+        if ((It->second.NextRing & GIdValueMask) == 0)
             Lane.EndPosition = It->second.Position;
 
         unsigned int const FirstId = It->second.ObjectId;
@@ -1740,7 +1741,7 @@ int FSystemInfo::BuildTradeLanes(std::map<unsigned int, FTradeLaneRingInfo>* Rin
             while (Before != Lane.Rings.end() && Before->ObjectId != LastId)
                 ++Before;
             Lane.Rings.insert(Before, 1, MakeTradeLaneRing(It->second));
-            if ((It->second.PrevRing & RingIdMask) == 0)
+            if ((It->second.PrevRing & GIdValueMask) == 0)
                 Lane.StartPosition = It->second.Position;
             LastId = PrevKey;
             PrevKey = It->second.PrevRing;
@@ -1759,7 +1760,7 @@ int FSystemInfo::BuildTradeLanes(std::map<unsigned int, FTradeLaneRingInfo>* Rin
             while (After != Lane.Rings.end() && After->ObjectId != LastId)
                 ++After;
             Lane.Rings.insert(After + 1, 1, MakeTradeLaneRing(It->second));
-            if ((It->second.NextRing & RingIdMask) == 0)
+            if ((It->second.NextRing & GIdValueMask) == 0)
                 Lane.EndPosition = It->second.Position;
             LastId = NextKey;
             NextKey = It->second.NextRing;
@@ -2050,7 +2051,7 @@ int FSystemInfo::CollectDockTargets(std::vector<unsigned int> const* ClassIds, i
         pub::SpaceObj::GetType(*Id, Type);
         if (!CanUseDockTarget(ClassIds, ShipRep, Group, &GNoDockingShipId, Id))     // FUN_06f6cb90
             continue;
-        if ((Type & 0xc40) == 0)
+        if ((Type & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
         {
             // The ship's reputation, or the group when it has none.
             unsigned int const OwnerGroup = *ShipRep != -1 ? static_cast<unsigned int>(*ShipRep)
@@ -2058,7 +2059,7 @@ int FSystemInfo::CollectDockTargets(std::vector<unsigned int> const* ClassIds, i
             if (!IsGroupAtDockBase(&OwnerGroup, Id))                                // FUN_06f6cb20
                 continue;
             // Retail tests the type again (always clear here).
-            if ((Type & 0xc40) == 0)
+            if ((Type & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
             {
                 unsigned int DockingTarget;
                 pub::SpaceObj::GetDockingTarget(*Id, DockingTarget);
@@ -2125,7 +2126,7 @@ unsigned int FSystemInfo::PickPathDockTarget(std::vector<unsigned int> const* Cl
         pub::SpaceObj::GetType(Id, Type);
         if (!CanUseDockTarget(ClassIds, ShipRep, Group, &GNoDockingShipId, &Id))    // FUN_06f6cb90
             continue;
-        if ((Type & 0xc40) == 0)
+        if ((Type & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
         {
             unsigned int const OwnerGroup = *ShipRep != -1 ? static_cast<unsigned int>(*ShipRep)
                                                            : *Group;

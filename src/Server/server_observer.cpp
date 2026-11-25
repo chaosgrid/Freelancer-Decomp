@@ -48,6 +48,114 @@ static bool HasBandwidth(unsigned int PlayerId)
     return g_pClientInterface->GetLinkSaturation(PlayerId) < kBandwidthCeiling;
 }
 
+// FObserverTrackedList -- Observer+0x08, retail's std::list<SystemTrackedObject*>. See
+// server_sysdb.h.
+
+// Inside FUN_06cf51e0.
+FObserverTrackedList::FObserverTrackedList()
+{
+    // Retail's allocator byte is a leftover argument byte with no value; the port writes 0.
+    Alloc = 0;
+    SystemTrackedNode* const Sentinel = new SystemTrackedNode;
+    Sentinel->Next = Sentinel;
+    Sentinel->Prev = Sentinel;
+    Head = Sentinel;
+    Size = 0;
+}
+
+// FUN_06cf51e0 -- Observer's constructor; members in retail's order. +0x04 and +0x2C are
+// not written, in retail or here.
+Observer::Observer(unsigned int InPlayerId)
+    : Tracked()
+    , PendingDamageIds()
+{
+    bShipGone = 0;
+    ElapsedTime = 0.0;
+    PlayerId = InPlayerId;
+    Position.x = 0.0f;
+    Position.y = 0.0f;
+    Position.z = 0.0f;
+}
+
+// Inside FUN_06d0f6d0.
+FObserverTrackedList::FObserverTrackedList(FObserverTrackedList const& Source)
+{
+    Alloc = Source.Alloc;
+    SystemTrackedNode* const Sentinel = new SystemTrackedNode;
+    Sentinel->Next = Sentinel;
+    Sentinel->Prev = Sentinel;
+    Head = Sentinel;
+    Size = 0;
+
+    // The record pointers are copied: the RECORD is shared, not duplicated.
+    SystemTrackedNode* const SrcSentinel = Source.Head;
+    for (SystemTrackedNode* Src = SrcSentinel->Next; Src != SrcSentinel; Src = Src->Next) {
+        SystemTrackedNode* const Node = new SystemTrackedNode;
+        Node->Next = Sentinel;
+        Node->Prev = Sentinel->Prev;
+        Sentinel->Prev = Node;
+        Node->Prev->Next = Node;
+        Node->Data = Src->Data;
+        ++Size;
+    }
+}
+
+// FUN_06d0f6d0 -- Observer's copy constructor, compiled as std::list's _Construct (a
+// placement new). Callers: list::insert (StarSystem::add_player) and StarSystem's copy
+// constructor (FUN_06d109c0). +0x04 and +0x2c are not written.
+Observer::Observer(Observer const& Source)
+    : Tracked(Source.Tracked)
+    , PendingDamageIds(Source.PendingDamageIds)
+{
+    bShipGone = Source.bShipGone;
+    ElapsedTime = Source.ElapsedTime;
+    PlayerId = Source.PlayerId;
+    Position = Source.Position;
+}
+
+// The tail of FUN_06cf52d0, MSVC6's ~list(). ~Observer's body has already emptied the
+// list, so the walk finds nothing, in retail as here.
+FObserverTrackedList::~FObserverTrackedList()
+{
+    SystemTrackedNode* const Sentinel = Head;
+    SystemTrackedNode* Node = Sentinel->Next;
+    while (Node != Sentinel) {
+        SystemTrackedNode* const Next = Node->Next;
+        Node->Prev->Next = Node->Next;
+        Node->Next->Prev = Node->Prev;
+        delete Node;
+        --Size;
+        Node = Next;
+    }
+    delete Sentinel;
+    Head = nullptr;
+    Size = 0;
+}
+
+// FUN_06cf52d0 -- ~Observer. Its scalar deleting destructor (FUN_06cf52b0) is vtable slot
+// 0; every retail dispatch passes flag 0.
+Observer::~Observer()
+{
+    // No null test on the list head; both constructors always allocate the sentinel.
+    SystemTrackedNode* const Sentinel = Tracked.Head;
+    SystemTrackedNode* Node;
+    // Pass 1: every RECORD (its CRemotePhysicsSimulation destroyed with it).
+    for (Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
+        delete Node->Data;
+    }
+    // Pass 2: every node erased.
+    Node = Sentinel->Next;
+    while (Node != Sentinel) {
+        SystemTrackedNode* const Next = Node->Next;
+        Node->Prev->Next = Node->Next;
+        Node->Next->Prev = Node->Prev;
+        delete Node;
+        --Tracked.Size;
+        Node = Next;
+    }
+    // ~PendingDamageIds, then ~Tracked, follow.
+}
+
 // ---------------------------------------------------------------------------
 // Wire records sent from here (layouts from the raw stores):
 //
@@ -652,5 +760,648 @@ void ObjectList::tick(float Dt, ObjectList* Deferred)
         GameObject* const Data = Node->Data;
         remove(Node);
         Deferred->append(Data);
+    }
+}
+
+// FUN_06cf65b0 (thiscall on the view); only caller StarSystem::sp_obj_update. The update
+// goes to the client only once the object was created there, but the simulation is
+// always fed.
+void Observer::send_object_update(FCommonUpdateObjectInfo const* Rec)
+{
+    if (SinglePlayer())
+        return;
+
+    for (SystemTrackedNode* Node = this->Tracked.Head->Next; Node != this->Tracked.Head; Node = Node->Next)
+    {
+        SystemTrackedObject* const Tracked = Node->Data;
+        if (Tracked->Object->get_id() != Rec->ObjectId)
+            continue;
+
+        if (Tracked->bCreatedOnClient)
+            ::g_pClientInterface->SendCommonUpdateObject(PlayerId, *Rec);
+
+        Tracked->Simulation.RemoteUpdate(Rec->Position, Rec->Orientation,
+                                         static_cast<double>(Rec->Timestamp));
+        return;
+    }
+}
+
+// ===========================================================================
+// The five "create this object on that player's client" notifiers. Declared in
+// server_sysdb.h. Retail's source file for all five is Observer.cpp (.rdata:06d669dc),
+// not StarSys.cpp; RTTI .?AVObserver@@ names the class.
+// ===========================================================================
+
+static char const kObserverCppPath[] =
+    "E:\\FL\\Scratch\\Source\\Server\\space\\Observer.cpp";
+
+// FUN_06cf6630 -- CREATESHIP. The odd one out: it does NOT consult ShouldBeVisible or set
+// bCreatedOnClient, and sends only in SINGLE player (consistent, since AddTrackedObject
+// seeds the flag from SinglePlayer()). In multiplayer it only registers the ship and lets
+// the per-frame range check send the create later.
+void Observer::create_ship_for_player(CShipCreateInfo* Info, GameObject* Obj)
+{
+    // No test of View or Obj, nor on the (& 3) narrowing; every object here is a ship.
+    unsigned int const OwnerPlayer = Obj->csimple()->OwnerPlayer;
+
+    // A player is never told to create their own ship.
+    if (OwnerPlayer == PlayerId)
+        return;
+
+    if (bShipGone != 0)
+        return;
+
+    if (Obj->is_destroyed()) {
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Ship(%d) 'dead' before creation packet sent.",
+              kObserverCppPath, 0x19b, Obj->get_id());
+        return;
+    }
+
+    // The record is discarded here, unlike in the other four.
+    add_tracked_object(Obj);
+
+    if (!SinglePlayer())
+        return;
+
+    // Raw slot, no is_valid; the same value goes into CREATESOLAR's payload.
+    Info->VibeOtherGroupId = Players[PlayerId].rep_vibe;
+
+    // The player id goes by VALUE.
+    g_pClientInterface->SendServerCreateShip(PlayerId, *Info);
+}
+
+// FUN_06cf66f0 (thiscall on the view). A dynamic solar is sent even out of range. Unlike
+// the other notifiers a solar never gets a tracked record.
+void Observer::create_solar_for_player(CSolarCreateInfo* Info, GameObject* Obj)
+{
+    if (bShipGone != 0)
+        return;
+    if (!should_be_visible(Obj) && Info->bDynamic == 0)
+        return;
+    g_pClientInterface->SendServerCreateSolar(PlayerId, *Info);
+}
+
+// FUN_06cf6730 (thiscall on the view): the ship's equipment list, only for a tracked
+// object already created on the client. NO null test on the CShip narrowing: retail calls
+// through it.
+void Observer::send_remote_cargo_update(GameObject* Obj)
+{
+    SystemTrackedNode* const Head = Tracked.Head;
+    SystemTrackedNode* Node = Head->Next;
+    for (; Node != Head; Node = Node->Next)
+    {
+        if (Node->Data->Object == Obj)
+            break;
+    }
+    if (Node == Head)
+        return;
+    if (!Node->Data->bCreatedOnClient)
+        return;
+
+    EquipDescVector Items;
+    CObject const* const Cobj = Obj->cobject();
+    CShip const* Ship = nullptr;
+    if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
+        Ship = static_cast<CShip const*>(Cobj);
+    Ship->get_equip_desc_list(Items);
+    g_pClientInterface->SendServerRemoteObjectCargoUpdate(PlayerId, Ship->Id, Items, 1u);
+}
+
+// The mask FUN_06cf6820's third exit tests get_type_bits against: every OBJECT_TYPE bit
+// below 0x10000 except WAYPOINT (0x200), per Common.dll's DecodeType table
+// (.data:063ec810). So it reads "a solar, not a waypoint": static system furniture the
+// client builds from the system ini, which is why retail still sends the destroy for an
+// object never in this player's tracked list. Ships, projectiles, mines, loot and
+// asteroids stay silent.
+static unsigned int const kSolarTypeBits = OBJ_SOLAR_NO_WAYPOINT_MASK;
+
+// FUN_06cf6820. Returns nothing in retail; the bool says whether the record was found and
+// dropped, which the callers ignore.
+bool Observer::on_object_destroyed(GameObject* Obj, int Kind)
+{
+    // No null test on View or Obj.
+
+    // Built BEFORE the search and reused on every exit. Retail stores Kind as a whole
+    // dword, so its upper three bytes land in the pad.
+    FServerDestroyObjectInfo Wire;
+    Wire.ObjectId = Obj->get_id();
+    unsigned int const KindDword = (unsigned int)Kind;
+    Wire.DestroyType = static_cast<unsigned char>(KindDword & 0xffu);
+    Wire.Pad_0x05[0] = static_cast<unsigned char>((KindDword >> 8) & 0xffu);
+    Wire.Pad_0x05[1] = static_cast<unsigned char>((KindDword >> 16) & 0xffu);
+    Wire.Pad_0x05[2] = static_cast<unsigned char>((KindDword >> 24) & 0xffu);
+
+    SystemTrackedNode* const Node = find_by_id(Wire.ObjectId);
+
+    if (Node == nullptr) {
+        // Not tracked. Retail still tells the client when the object belonged to this very
+        // player (OwnerPlayer read through the narrowing with no null test)...
+        unsigned int const OwnerPlayer = Obj->csimple()->OwnerPlayer;
+        if (OwnerPlayer == PlayerId) {
+            g_pClientInterface->SendServerDestroyObject(PlayerId, Wire);
+            return false;
+        }
+
+        // ...or when it is a solar other than a waypoint (kSolarTypeBits): those exist on
+        // the client whether or not this player ever tracked them.
+        if ((Obj->get_type_bits() & kSolarTypeBits) != 0) {
+            g_pClientInterface->SendServerDestroyObject(PlayerId, Wire);
+        }
+        return false;
+    }
+
+    // Tracked: notify only when the client was ever told the object exists. The record is
+    // read with no null test here; the only null test is the one before the free below.
+    SystemTrackedObject* const Record = Node->Data;
+    if (Record->bCreatedOnClient) {
+        g_pClientInterface->SendServerDestroyObject(PlayerId, Wire);
+    }
+
+    // delete runs ~CRemotePhysicsSimulation, as FUN_06cf6940 does before retail frees the
+    // record.
+    if (Record != nullptr) {
+        delete Record;
+        Node->Data = nullptr;
+    }
+
+    Node->Prev->Next = Node->Next;
+    Node->Next->Prev = Node->Prev;
+    delete Node;
+    Tracked.Size--;
+    return true;
+}
+
+// FUN_06cf6950 -- the per-player DAMAGEOBJECT gate, and the only writer of the deferred-
+// damage set at View+0x14. The send takes `(PlayerId, ObjId, record)`, where `record` is
+// the PRIMARY list on the visible path and the DEFERRED one on the deferred-but-non-empty
+// path -- two arguments reaching one PUSH, which Ghidra's `piVar7` hides.
+void Observer::damage_object(unsigned int ObjId, DamageList* PrimaryRecord,
+                             DamageList* DeferredRecord)
+{
+    // No null test on View.
+    GameObject* const Obj = Server_LookupGameObject(ObjId);
+    if (Obj == nullptr)
+        return;
+
+    // Solar only ((& 0x303), composed with cobj()'s (& 3)).
+    CObject* const Raw = Obj->cobj();
+    CSimple* Solar = nullptr;
+    if (Raw != nullptr &&
+        (static_cast<unsigned int>(Raw->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar) {
+        Solar = Obj->csimple();
+    }
+
+    // Visible, or a tradelane ring (TypeBits 0x80): a ring's damage state has to reach the
+    // client whether or not it is in range.
+    bool bSend = is_object_visible(Obj);
+    DamageList* Record = PrimaryRecord;
+    if (!bSend && Solar != nullptr && (Solar->TypeBits & OBJ_TRADELANE_RING) != 0)
+        bSend = true;
+
+    if (!bSend) {
+        // In single player there is nothing to defer TO.
+        if (SinglePlayer())
+            return;
+        // A non-solar is dropped outright.
+        if (Solar == nullptr)
+            return;
+        if (DeferredRecord->Count != 0) {
+            // The caller's second record is already populated, so send that one instead of
+            // remembering the id.
+            Record = DeferredRecord;
+            bSend = true;
+        } else {
+            PendingDamageIds.insert(ObjId);
+            return;
+        }
+    }
+
+    // The player id goes by VALUE.
+    g_pClientInterface->SendServerDamageObject(PlayerId, ObjId, *Record);
+}
+
+// FUN_06cf6ac0 (thiscall on the view, 21 stack dwords; the Costume by value). Outside
+// single player both sender and receiver must be visible (SinglePlayer() is called twice).
+// Retail sets only the low byte of the own-ship flag; the marshaller reads & 0xff, so the
+// port passes 0/1.
+void Observer::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsigned int VoiceId,
+                         Costume const& Cost, unsigned int CaptionIds, unsigned int* TextIds,
+                         int TextCount, unsigned int PermutationIds, float Duration)
+{
+    if (!SinglePlayer()) {
+        GameObject* SenderObj = nullptr;
+        StarSystem* SenderSystem = nullptr;
+        if (!Server_FindObject(SenderId, SenderObj, SenderSystem))
+            SenderObj = nullptr;
+        if (!is_object_visible(SenderObj))
+            return;
+    }
+    if (!SinglePlayer()) {
+        GameObject* ReceiverObj = nullptr;
+        StarSystem* ReceiverSystem = nullptr;
+        if (!Server_FindObject(ReceiverId, ReceiverObj, ReceiverSystem))
+            ReceiverObj = nullptr;
+        if (!is_object_visible(ReceiverObj))
+            return;
+    }
+
+    bool const bReceiverIsOwnShip =
+        ReceiverId == Players[PlayerId].ship_object_id;
+    static_assert(sizeof(Costume) == 13 * sizeof(unsigned int), "Costume is 13 dwords");
+    g_pClientInterface->SendServerSendComm(PlayerId, SenderId, ReceiverId, VoiceId,
+                                           Cost, CaptionIds, TextIds, TextCount, PermutationIds, Duration,
+                                           bReceiverIsOwnShip);
+}
+
+// FUN_06cf6bc0 -- CREATECOUNTER.
+void Observer::create_counter_for_player(void* Payload, GameObject* Obj)
+{
+    // No null test on View or Obj.
+    if (bShipGone != 0)
+        return;
+
+    if (Obj->is_destroyed()) {
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: CounterMeasure(%d) 'dead' before creation packet sent.",
+              kObserverCppPath, 0x23c, Obj->get_id());
+        return;
+    }
+
+    // The record is KEPT this time.
+    SystemTrackedObject* const Record = add_tracked_object(Obj);
+
+    // Outside single player the object has to be in range before the client hears of it.
+    if (!SinglePlayer() && !should_be_visible(Obj))
+        return;
+
+    Record->bCreatedOnClient = true;
+
+    // This slot takes the ADDRESS of the player id (const unsigned int&), unlike the
+    // ship / loot / mine slots.
+    g_pClientInterface->SendServerCreateCounter(
+        PlayerId, *static_cast<const FServerCreateProjectileInfo*>(Payload));
+}
+
+// FUN_06cf6c50 -- CREATELOOT. The only notifier that tracks MORE THAN ONE object per call:
+// it walks [First, Last) and sends one packet afterwards. No null tests on View, the
+// elements or the payload.
+void Observer::create_loot_for_player(FServerCreateLootRequest* Payload, GameObject* const* First,
+                                      GameObject* const* Last)
+{
+    if (bShipGone != 0)
+        return;
+
+    // An empty range skips straight to the send; it does not return.
+    for (GameObject* const* It = First; It != Last; ++It) {
+        GameObject* const Obj = *It;
+
+        // Retail ABANDONS the whole call on the first dead entry (not a `continue`), and
+        // at ERROR level, unlike the other three.
+        if (Obj->is_destroyed()) {
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Loot(%d) 'dead' before creation packet sent.",
+                  kObserverCppPath, 0x256, Obj->get_id());
+            return;
+        }
+
+        // Stored INSIDE the loop, so the last element wins -- retail's own behaviour; do
+        // not hoist it.
+        Payload->bMarkedBy = Obj->is_marked_by(PlayerId) ? 1u : 0u;
+
+        add_tracked_object(Obj);
+    }
+
+    // The loot packet goes out ONLY in single player; there is no ShouldBeVisible arm and
+    // bCreatedOnClient is left to AddTrackedObject's seeding.
+    if (!SinglePlayer())
+        return;
+
+    g_pClientInterface->SendServerCreateLoot(PlayerId, *Payload);
+}
+
+// FUN_06cf6cf0 -- CREATEGUIDED. Takes the loot one's vector but uses ONLY its first element.
+void Observer::create_guided_for_player(void* Payload, GameObject* const* First,
+                                        GameObject* const* Last)
+{
+    // No null test on View, the element or the record; the null-first and empty-range
+    // exits are retail's.
+    if (bShipGone != 0)
+        return;
+
+    if (First == nullptr || First == Last)
+        return;
+
+    GameObject* const Obj = *First;
+
+    // No is_destroyed() guard and no FDUMP in this one -- the only member of the family
+    // without them. Do not add one.
+    SystemTrackedObject* const Record =
+        add_tracked_object(Obj);
+
+    if (!SinglePlayer() && !should_be_visible(Obj))
+        return;
+
+    Record->bCreatedOnClient = true;
+
+    // Like the countermeasure slot, this one takes the ADDRESS of the player id.
+    g_pClientInterface->SendServerCreateGuided(
+        PlayerId, *static_cast<const FServerCreateGuidedInfo*>(Payload));
+}
+
+// FUN_06cf6d60 -- CREATEMINE: the countermeasure one with a different FDUMP line and slot,
+// and the player id passed BY VALUE.
+void Observer::create_mine_for_player(void* Payload, GameObject* Obj)
+{
+    if (bShipGone != 0)
+        return;
+
+    if (Obj->is_destroyed()) {
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Mine(%d) 'dead' before creation packet sent.",
+              kObserverCppPath, 0x28a, Obj->get_id());
+        return;
+    }
+
+    SystemTrackedObject* const Record =
+        add_tracked_object(Obj);
+
+    if (!SinglePlayer() && !should_be_visible(Obj))
+        return;
+
+    Record->bCreatedOnClient = true;
+
+    g_pClientInterface->SendServerCreateMine(
+        PlayerId, *static_cast<const FServerCreateProjectileInfo*>(Payload));
+}
+
+// FUN_06cf6df0 -- EXPLODEASTEROIDMINE; only caller StarSystem::send_mine_explosion.
+// Neither the IClient pointer nor the record is tested.
+void Observer::send_mine_explosion(FMineExplosion* Rec)
+{
+    unsigned int const MineId = Rec->MineId;
+    if (!SinglePlayer()) {
+        GameObject* const Obj = Server_LookupGameObject(MineId);
+        if (!is_object_visible(Obj))
+            return;
+    }
+    g_pClientInterface->SendServerExplodeAsteroidMine(PlayerId, *Rec);
+}
+
+// FUN_06cf6e60 -- "this object has left the system": the tracked-list drop, the
+// deferred-damage set CLEAR, and the bShipGone latch.
+void Observer::on_object_left_system(unsigned int const* ObjId, unsigned int const* Destination)
+{
+    // No null test on View, ObjId or Destination, nor on the sentinel, nodes, records or
+    // their objects. The first hit ends the walk; +0x2f0 is read before the record's null
+    // test, and size-- is unconditional.
+    bool bWasCreatedOnClient = false;
+    SystemTrackedNode* const Sentinel = Tracked.Head;
+    for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
+        SystemTrackedObject* const Record = Node->Data;
+        if (Record->Object->get_id() != *ObjId)
+            continue;
+        bWasCreatedOnClient = (Record->bCreatedOnClient != false);
+        delete Record;
+        Node->Prev->Next = Node->Next;
+        Node->Next->Prev = Node->Prev;
+        delete Node;
+        --Tracked.Size;
+        break;
+    }
+
+    PendingDamageIds.clear();
+
+    // The latch: the player's own ship (raw slot, no is_valid).
+    if (*ObjId == Players[PlayerId].ship_object_id)
+        bShipGone = 1;
+
+    // Sent when EITHER the dropped record had been created on the client OR bShipGone is set.
+    if (bWasCreatedOnClient || bShipGone != 0) {
+        FServerSystemSwitchOutInfo Wire;
+        Wire.ShipId = *ObjId;
+        Wire.GateId = *Destination;
+        g_pClientInterface->SendServerSystemSwitchOut(PlayerId, Wire);
+    }
+}
+
+// FUN_06cf6fc0 (thiscall on the view) -- "this object has landed". The LAND twin of the
+// function above: same tracked-list drop, no set clear, no latch.
+void Observer::on_object_landed(unsigned int const* ObjId, unsigned int const* Arg2,
+                                unsigned int const* Arg3)
+{
+    // As above: one hit at most, +0x2f0 read before the null test, size-- unguarded.
+    bool bWasCreatedOnClient = false;
+    SystemTrackedNode* const Sentinel = Tracked.Head;
+    for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
+        SystemTrackedObject* const Record = Node->Data;
+        if (Record->Object->get_id() != *ObjId)
+            continue;
+        bWasCreatedOnClient = (Record->bCreatedOnClient != false);
+        delete Record;
+        Node->Prev->Next = Node->Next;
+        Node->Next->Prev = Node->Prev;
+        delete Node;
+        --Tracked.Size;
+        break;
+    }
+
+    // Built before either test.
+    FServerLandInfo Wire;
+    Wire.ShipId = *ObjId;
+    Wire.DockId = *Arg2;
+    Wire.BaseId = *Arg3;
+
+    // A record never created on the client only goes out for this player's own ship.
+    PlayerData& Owner = Players[PlayerId];
+    if (!bWasCreatedOnClient && Wire.ShipId != Owner.ship_object_id)
+        return;
+
+    // Outside single player, the player's own ship landing autosaves the slot.
+    if (!SinglePlayer() && *ObjId == Owner.ship_object_id)
+        Owner.auto_save();                                 // FUN_06d4c430
+
+    g_pClientInterface->SendServerLand(PlayerId, Wire);
+}
+
+// FUN_06cf70c0 (thiscall on the view); only caller FUN_06d0f1c0. Tells this view's client
+// the group id CPlayerGroup::AddMember / DelMember just stamped on a visible ship.
+// Server_LookupGameObject's null covers both of retail's lookup early-outs.
+void Observer::send_group_change(unsigned int ObjId)
+{
+    GameObject* const Obj = Server_LookupGameObject(ObjId);
+    if (Obj == nullptr)
+        return;
+    if (!is_object_visible(Obj))
+        return;
+    CObject const* const Cobj = Obj->cobject();
+    if (Cobj == nullptr)
+        return;
+    if ((static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
+        return;
+    unsigned int const GroupId = static_cast<CShip const*>(Cobj)->GroupId;
+    g_pClientInterface->SendServerMiscObjUpdateObjectGroup(PlayerId, ObjId, GroupId);
+}
+
+// FUN_06cf7140 -- the only producer the tracked-object list has in retail.
+SystemTrackedObject* Observer::add_tracked_object(GameObject* Obj)
+{
+    // No null test on the view or its list head; every Observer ctor allocates the sentinel.
+
+    // +0x04 is never written (see SystemTrackedObject in server_sysdb.h).
+    SystemTrackedObject* const Record = new SystemTrackedObject;
+    Record->Object = nullptr;
+    Record->bCreatedOnClient = false;
+
+    Record->Object = Obj;
+
+    // Seeded from SinglePlayer(): in single player the client already has everything, so
+    // the record counts as created the moment it exists.
+    Record->bCreatedOnClient = SinglePlayer();
+
+    SystemTrackedNode* const Sentinel = Tracked.Head;
+    SystemTrackedNode* const Node = new SystemTrackedNode;
+    Node->Next = Sentinel;
+    Node->Prev = Sentinel->Prev;
+    Node->Data = Record;
+    Sentinel->Prev->Next = Node;
+    Sentinel->Prev = Node;
+
+    ++Tracked.Size;
+
+    // Outside single player, prime the simulation with the object's current state.
+    // SinglePlayer() is called a SECOND time, not reused from the flag above. The math
+    // engine (DAT_06d8d7f8, shared with the observer update) is never null-checked.
+    if (!SinglePlayer())
+    {
+        Vector const& Position = Obj->get_position();          // slot 0
+        Transform const& Xform = Obj->get_transform();         // slot 3
+        Quaternion Orientation;
+        Server_MatrixToQuat(Orientation, Xform.Rotation);
+        Record->Simulation.RemoteUpdate(Position, Orientation, ElapsedTime);
+    }
+
+    return Record;
+}
+
+// ===========================================================================
+// The per-player object tracker that hangs off StarSystem+0x0C. Structures are in
+// server_sysdb.h.
+// ===========================================================================
+
+// FUN_06cf7260's squared view radii: 2500^2, 5000^2 and 10000^2.
+static float const kViewRadiusSqUnowned = 6.25e6f;    // .rdata:06d66aec
+
+static float const kViewRadiusSqStranger = 2.5e7f;    // .rdata:06d66af0
+
+static float const kViewRadiusSqGroupMate = 1.0e8f;   // .rdata:06d66af4
+
+// FUN_06cf7260.
+bool Observer::should_be_visible(GameObject* Obj)
+{
+    // A null object and single player are always "visible"; the tracker is a
+    // multiplayer-only filter. No test on the view.
+    if (Obj == nullptr)
+        return true;
+    if (SinglePlayer())
+        return true;
+
+    // OwnerPlayer is read through the (& 3) narrowing with no test; every tracked object
+    // is a CSimple.
+    unsigned int const OwnerPlayer = Obj->csimple()->OwnerPlayer;
+
+    // Your own ship is never filtered.
+    if (OwnerPlayer == PlayerId)
+        return true;
+
+    Vector const& ObjPos = Obj->get_position();
+
+    // x87: retail keeps the squared distance on the FPU stack across the group test.
+    float const Dx = ObjPos.x - Position.x;
+    float const Dy = ObjPos.y - Position.y;
+    float const Dz = ObjPos.z - Position.z;
+    float const DistSq = Dx * Dx + Dy * Dy + Dz * Dz;
+
+    // An object nobody owns gets the tightest radius. Each compare is "visible when
+    // DistSq <= radius"; a NaN is not visible.
+    if (OwnerPlayer == 0)
+        return DistSq <= kViewRadiusSqUnowned;
+
+    // Group mates see each other further. Both slots are indexed raw (no is_valid). A group
+    // mate outside 10000 falls through to the stranger test, which it then fails as well.
+    void const* const MyGroup = Players[PlayerId].group_ptr;
+    if (MyGroup != nullptr && MyGroup == Players[OwnerPlayer].group_ptr) {
+        if (DistSq <= kViewRadiusSqGroupMate)
+            return true;
+    }
+    return DistSq <= kViewRadiusSqStranger;
+}
+
+// FUN_06cf7370. FUN_06d006c0 is Server_LookupGameObject here; its null on a miss is
+// exactly what retail's miss path hands on.
+bool Observer::is_object_id_visible(unsigned int ObjId)
+{
+    if (SinglePlayer())
+        return true;
+    GameObject* const Obj = Server_LookupGameObject(ObjId);
+    return is_object_visible(Obj);
+}
+
+SystemTrackedNode* Observer::find_by_id(unsigned int ObjId)
+{
+    SystemTrackedNode* const Sentinel = Tracked.Head;
+    for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
+        if (Node->Data->Object->get_id() == ObjId)
+            return Node;
+    }
+    return nullptr;
+}
+
+// Retail's inner-list search, inlined in FUN_06cf73d0 (by object POINTER) and FUN_06cf6820
+// (by get_id()). For a live object those agree; the id form is what survives an object
+// already being torn down, which is why the destroy path uses it. Neither tests the
+// sentinel or the records.
+SystemTrackedNode* Observer::find_by_pointer(GameObject* Obj)
+{
+    SystemTrackedNode* const Sentinel = Tracked.Head;
+    for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
+        if (Node->Data->Object == Obj)
+            return Node;
+    }
+    return nullptr;
+}
+
+// FUN_06cf73d0.
+bool Observer::is_object_visible(GameObject* Obj)
+{
+    if (Obj == nullptr)
+        return true;
+    if (SinglePlayer())
+        return true;
+
+    // Your own ship again; the (& 3) narrowing is read through unguarded.
+    if (Obj->csimple()->OwnerPlayer == PlayerId)
+        return true;
+
+    // Already tracked: the record's "created on the client" byte, verbatim.
+    SystemTrackedNode* const Node = find_by_pointer(Obj);
+    if (Node != nullptr)
+        return Node->Data->bCreatedOnClient;
+
+    return should_be_visible(Obj);
+}
+
+// FUN_06cf7440. Only caller FUN_06d0f190 below (IServerImpl::SubmitChat's local chat).
+void Observer::collect_created_owners(std::set<unsigned int>* Owners)
+{
+    for (SystemTrackedNode* Node = Tracked.Head->Next; Node != Tracked.Head;
+         Node = Node->Next) {
+        SystemTrackedObject* const Record = Node->Data;
+        GameObject* const Obj = Record->Object;
+        if (Obj == nullptr)
+            continue;
+        // OwnerPlayer read with NO null check on the (& 3) narrowing, as in retail.
+        unsigned int const Owner = Obj->csimple()->OwnerPlayer;
+        if (Owner == 0)
+            continue;
+        if (!Record->bCreatedOnClient)
+            continue;
+        Owners->insert(Owner);
     }
 }

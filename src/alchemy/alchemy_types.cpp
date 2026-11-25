@@ -46,7 +46,7 @@ namespace AlchemyImpl
         Handle = static_cast<unsigned long>(Result);
         if (Result == -1)
         {
-            FDUMP(0x100001, "%s(%d) : ERROR:General:%s", "alchemy.cpp", 0x1E,
+            FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", "alchemy.cpp", 0x1E,
                   "Couldn't create write chunk\n");
             return false;
         }

@@ -30,13 +30,6 @@ void FlmVisibleCounterCopy(unsigned long* Out3)
     Out3[2] = G_VisibleCounterC;
 }
 
-bool FlmIidEqual(const char* Left, const char* Right)
-{
-    if (Left == nullptr || Right == nullptr)
-        return false;
-    return std::strcmp(Left, Right) == 0;
-}
-
 bool FlmNameEqual(const char* Left, const char* Right)
 {
     if (Left == nullptr || Right == nullptr)
@@ -71,7 +64,7 @@ namespace
         {
             // 066f44c0: the output pointer is mandatory.
             *Out = nullptr;
-            if (!FlmIidEqual(Iid, Iids::ComponentFactory))
+            if (!Iids::Equal(Iid, Iids::ComponentFactory))
                 return GR_INTERFACE_UNSUPPORTED;
             *Out = (IComponentFactory*)this;
             AddRef();

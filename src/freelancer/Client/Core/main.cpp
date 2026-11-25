@@ -123,10 +123,10 @@ namespace
     // it. Returns EXCEPTION_EXECUTE_HANDLER unless dw15 says the process may continue.
     LONG WINAPI ClientCrashFilter(EXCEPTION_POINTERS* Info)
     {
-        LONG Result = 1;
+        LONG Result = EXCEPTION_EXECUTE_HANDLER;
         const DWORD Code = Info->ExceptionRecord->ExceptionCode;
-        if (Code == 0x80000003 || Code == 0x80000004)
-            return 0;
+        if (Code == EXCEPTION_BREAKPOINT || Code == EXCEPTION_SINGLE_STEP)
+            return EXCEPTION_CONTINUE_SEARCH;
 
         // Guarded by its own __try with a filter that returns 1.
         __try
@@ -225,10 +225,11 @@ namespace
                             char Arguments[0x104];
                             wsprintfA(Arguments, " -x -s %u", reinterpret_cast<UINT_PTR>(Mapping));
                             if (CreateProcessA("dw15.exe", Arguments, nullptr, nullptr, TRUE,
-                                               0x4000020, nullptr, nullptr, &StartupInfo,
+                                               CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
+                                               nullptr, nullptr, &StartupInfo,
                                                &ProcessInfo) == 0)
                             {
-                                Result = 0;
+                                Result = EXCEPTION_CONTINUE_SEARCH;
                             }
                             else
                             {
@@ -241,7 +242,7 @@ namespace
                                         {
                                             bWaiting = false;
                                             if (Words[0x2c / 4] == 0x10)
-                                                Result = 0;
+                                                Result = EXCEPTION_CONTINUE_SEARCH;
                                         }
                                     }
                                     else
@@ -548,7 +549,7 @@ namespace
         // registry is the static G_Options table (perf_options.cpp), so there is nothing to free.
         if (Reputation::Vibe::Count() != 0)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %d REP_INSTANCE(s) orphaned\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %d REP_INSTANCE(s) orphaned\n",
                   "E:\\FL\\Scratch\\Source\\Client\\main.cpp", 0x4be, Reputation::Vibe::Count());
         }
         Archetype::FlushMaterialCache(); // FUN_0041b150, result discarded
@@ -637,11 +638,11 @@ void SetFpuExceptionTrap(bool Enable)
     {
         _clearfp();
         const unsigned int Prev = _controlfp(0, 0);
-        _control87(Prev & 0xffffffe3u, 0x8001f);
+        _control87(Prev & ~static_cast<unsigned>(_EM_INVALID | _EM_ZERODIVIDE | _EM_OVERFLOW), _MCW_EM);
     }
     else
     {
-        _control87(0x9001f, 0x8001f);
+        _control87(0x9001f, _MCW_EM);
     }
 }
 

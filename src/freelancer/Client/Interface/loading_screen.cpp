@@ -91,7 +91,7 @@ bool LoadingProgressBar::Create(Win3D* NewParent, void* Data)
 
     GetIdsStringWWithRawFallback(0x7c, Caption, 0x20);
     if (Text != nullptr)
-        Text->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Caption), 0);
+        Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Caption), 0);
 
     return Win3D::Create(NewParent, Data);
 }
@@ -249,7 +249,7 @@ void LoadingScreen::Update(float DeltaSeconds)
         {
             // Property 0x33 takes a copy of the idle colour DAT_00679bb0.
             unsigned long Color = NnUiPulseIdleArgb();
-            Bar->Text->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
+            Bar->Text->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
             Bar->Text->Draw();
         }
         Win3DEndDraw();

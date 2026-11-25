@@ -60,18 +60,18 @@ namespace
         // collapse to -1.
         switch (LightType)
         {
-        case 1:
-        case 2:
-        case 3:
+        case kLightPoint:
+        case kLightSpot:
+        case kLightDirectional:
             if (bAlsoD3dType)
                 Light->D3d.Type = static_cast<unsigned long>(LightType);
             Light->Type = LightType;
             break;
-        case -2:
+        case kLightAmbient:
             Light->Type = LightType;
             break;
         default:
-            Light->Type = -1;
+            Light->Type = kLightNone;
             break;
         }
     }
@@ -103,7 +103,7 @@ namespace
         // FUN_004104e0's soft arm (DAT_00610588 != 0). Nothing is tested but the type; each arm
         // fetches the view transform and then DAT_006164ec.
         // Not directional -> the D3D position is the light position in camera space, z negated.
-        if (Light->Type != 3)
+        if (Light->Type != kLightDirectional)
         {
             FTransform const* const View =
                 reinterpret_cast<FTransform const*>(Camera->GetViewTransform());
@@ -118,7 +118,7 @@ namespace
 
         // Not a point light -> the D3D direction is the world direction rotated into camera
         // space, z negated.
-        if (Light->Type != 1)
+        if (Light->Type != kLightPoint)
         {
             FTransform const* const View =
                 reinterpret_cast<FTransform const*>(Camera->GetViewTransform());
@@ -255,12 +255,12 @@ void EngineLightSetLight(FEngineLight* Light, FD3dLight8 const* Source)
     Light->Color[0] = Light->D3d.Diffuse[0];
     Light->Color[1] = Light->D3d.Diffuse[1];
 
-    if (Light->D3d.Type != 3)
+    if (Light->D3d.Type != kLightDirectional)
     {
         // Unordered does not warn.
         if (Light->D3d.Phi > kPi)
         {
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kEngineLightCpp, 0x23b,
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kEngineLightCpp, 0x23b,
                   "invalid light detected: phi > pi");
             Light->D3d.Phi = kPi;
         }
@@ -269,7 +269,7 @@ void EngineLightSetLight(FEngineLight* Light, FD3dLight8 const* Source)
         if (Light->D3d.Attenuation0 <= 0.f && Light->D3d.Attenuation1 <= 0.f &&
             Light->D3d.Attenuation2 <= 0.f)
         {
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kEngineLightCpp, 0x241,
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kEngineLightCpp, 0x241,
                   "invalid light detected: atten all zero");
             Light->D3d.Attenuation0 = 0.1f;
         }
@@ -286,7 +286,7 @@ void EngineLightSetPosition(FEngineLight* Light, float const* Pos3)
     Light->Position[2] = Pos3[2];
 
     // A directional light has no position; everything else gets it with Z negated.
-    if (Light->Type != 3)
+    if (Light->Type != kLightDirectional)
     {
         Light->D3d.Position[0] = Light->Position[0];
         Light->D3d.Position[1] = Light->Position[1];
@@ -302,7 +302,7 @@ void EngineLightSetOrientation(FEngineLight* Light, float const* Orient9)
     // from FUN_00411370, z negated. No null tests.
     memcpy(Light->Orient, Orient9, sizeof(float) * 9);
 
-    if (Light->Type != 1)
+    if (Light->Type != kLightPoint)
     {
         float Dir[3];
         EngineLightComputeDirection(Light, Dir, nullptr, nullptr);
@@ -335,11 +335,11 @@ FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
     // The light part of FUN_00556fd0. The ctor always gets -1, never the source type. No test
     // of any argument anywhere below.
     FEngineLight* Light = static_cast<FEngineLight*>(::operator new(sizeof(FEngineLight)));
-    EngineLightInit(Light, -1);
+    EngineLightInit(Light, kLightNone);
 
     // A local copy; a point light has theta and phi forced to pi before FUN_00411120 sees them.
     FD3dLight8 Local = *Source;
-    if (Local.Type == 1)
+    if (Local.Type == kLightPoint)
     {
         Local.Theta = kPi;
         Local.Phi = kPi;
@@ -446,7 +446,7 @@ void EngineLightSetRadius(FEngineLight* Light, float Radius)
 void EngineLightSetDirection(FEngineLight* Light, float const* Dir3)
 {
     // FUN_00411470 (thiscall, RET 4). No null test.
-    if (Light->Type != 1)
+    if (Light->Type != kLightPoint)
     {
         Light->D3d.Direction[0] = Dir3[0];
         Light->D3d.Direction[1] = Dir3[1];
@@ -550,17 +550,17 @@ int EngineLightParseType(char const* Text)
 {
     // FUN_00411cd0.
     if (_stricmp(Text, "AMBIENT") == 0)
-        return -2;
+        return kLightAmbient;
     if (_stricmp(Text, "POINT") == 0)
-        return 1;
+        return kLightPoint;
     if (_stricmp(Text, "CONE") == 0)
-        return 2;
+        return kLightSpot;
     if (_stricmp(Text, "DIRECTIONAL") == 0)
-        return 3;
+        return kLightDirectional;
 
-    FDUMP(0x100001, "%s(%d) : *** ERROR: invalid [LightSource] type = '%s'", kEngineLightCpp, 0x2ec,
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: invalid [LightSource] type = '%s'", kEngineLightCpp, 0x2ec,
           Text);
-    return -1;
+    return kLightNone;
 }
 
 void MatrixSetColumn2(float* Matrix9, float const* Vec3)
@@ -594,7 +594,7 @@ FLightCurveName* LightCurveNameInit(FLightCurveName* Name, char const* Source)
 void EngineLightSetAttenCurve(FEngineLight* Light, char const* GraphName)
 {
     // FUN_00411d90 — __thiscall, RET 4.
-    if (Light->Type == -2)
+    if (Light->Type == kLightAmbient)
     {
         // An ambient light takes the graph as its ambient curve instead.
         if (Light->AmbientCurve != nullptr)
@@ -624,9 +624,9 @@ void EngineLightSetAttenCurve(FEngineLight* Light, char const* GraphName)
         MessageBoxA(nullptr, GraphName, "Error: unknown graph name", 0);
         return;
     }
-    if (Light->Type != 1 && Light->Type != 2 && Light->Type != 3)
+    if (Light->Type != kLightPoint && Light->Type != kLightSpot && Light->Type != kLightDirectional)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid dynamic light type (%s)", kEngineLightCpp,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid dynamic light type (%s)", kEngineLightCpp,
               0x360, GraphName);
     }
     Light->ZoneCurve = Graph;
@@ -665,7 +665,7 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
         Light->Position[0] = Pos[0];
         Light->Position[1] = Pos[1];
         Light->Position[2] = Pos[2];
-        if (Light->Type != 3)
+        if (Light->Type != kLightDirectional)
         {
             Light->D3d.Position[0] = Light->Position[0];
             Light->D3d.Position[1] = Light->Position[1];
@@ -735,7 +735,7 @@ bool EngineLightReadValue(FEngineLight* Light, char const* Name, char const* Val
         Dir[0] = static_cast<float>(Dir[0] * InvLength);
         Dir[1] = static_cast<float>(Dir[1] * InvLength);
         Dir[2] = static_cast<float>(Dir[2] * InvLength);
-        if (Light->Type != 1)
+        if (Light->Type != kLightPoint)
         {
             Light->D3d.Direction[0] = Dir[0];
             Light->D3d.Direction[1] = Dir[1];
@@ -794,7 +794,7 @@ bool EngineLightAffectsPoint(FEngineLight const* Light, float const* Point3, flo
     if ((Light->Flags & 8u) == 0)
         return false;
 
-    if (Light->Type == 3 && (Light->Flags & 2u) == 0)
+    if (Light->Type == kLightDirectional && (Light->Flags & 2u) == 0)
         return true;
 
     // Kept on the x87 stack (double here); true only when strictly greater (ordered).
@@ -855,7 +855,8 @@ float* EngineLightComputeDirection(FEngineLight* Light, float* OutDir3, float co
     // FUN_00411370 (thiscall, RET 0xc). No null tests.
     int const Type = Light->Type;
     bool const bTowardPoint =
-        (Type == 1) || (((Light->Flags & 2u) != 0) && (Type == 3 || Type == 2));
+        (Type == kLightPoint) ||
+        (((Light->Flags & 2u) != 0) && (Type == kLightDirectional || Type == kLightSpot));
 
     if (Point != nullptr && (bTowardPoint || OutDist != nullptr))
     {
@@ -902,7 +903,7 @@ bool EngineLightSample(FEngineLight* Light, float const* Point, float* OutDir3,
     // The return value is not read.
     EngineLightGetEffectiveColor(Light, Dist, OutColor3);
 
-    if (Light->Type == -2)
+    if (Light->Type == kLightAmbient)
     {
         // The unrounded curve result is kept on the x87 stack.
         double Scale = 1.0;
@@ -976,9 +977,9 @@ bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* P
             float Dist = -1.0f;
             EngineLightComputeDirection(Light, Dir, Pos3, &Dist);
 
-            if ((Light->Flags & 2u) != 0 && (Light->Type == 3 || Light->Type == 2))
+            if ((Light->Flags & 2u) != 0 && (Light->Type == kLightDirectional || Light->Type == kLightSpot))
             {
-                if (Light->Type != 1)
+                if (Light->Type != kLightPoint)
                 {
                     Light->D3d.Direction[0] = Dir[0];
                     Light->D3d.Direction[1] = Dir[1];
@@ -1006,7 +1007,7 @@ bool EngineLightApplyNearby(FEngineLight* Light, ICamera* Camera, float const* P
 
             // An ambient light adds its colour, scaled by its ambient curve at Dist when it has
             // one, to the accumulator.
-            if (Light->Type == -2)
+            if (Light->Type == kLightAmbient)
             {
                 float Scale = 1.0f;
                 if (Light->AmbientCurve != nullptr)
@@ -1239,7 +1240,7 @@ FGameLight* GameLightConstruct(FGameLight* Light)
     return ::new (Light) FGameLight;
 }
 
-FGameLight::FGameLight() : FEngineLight(-1)
+FGameLight::FGameLight() : FEngineLight(kLightNone)
 {
     // FUN_005374e0 (thiscall). No null test; the list links +0xc8 / +0xcc are not written
     // (GameLightEnable sets them).
@@ -1266,7 +1267,7 @@ FGameLight* GameLightCreatePoint(float const* Pos3, unsigned char const Rgb[3], 
     FGameLight* Light = nullptr;
     if (Mem != nullptr)
         Light = GameLightConstruct(static_cast<FGameLight*>(Mem));
-    EngineLightSetType((FEngineLight*)Light, 1, true);           // FUN_004110c0(1, 1)
+    EngineLightSetType((FEngineLight*)Light, kLightPoint, true);           // FUN_004110c0(1, 1)
     EngineLightSetPosition((FEngineLight*)Light, Pos3);          // FUN_00410ef0
     EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb);      // FUN_004115b0
     EngineLightSetRadius((FEngineLight*)Light, Range);           // FUN_00411300
@@ -1279,7 +1280,7 @@ FGameLight* GameLightCreatePoint(float const* Pos3, unsigned char const Rgb[3], 
         delete Light;
     }
     // Retail bug, kept: the float range goes as a double to a %d field.
-    FDUMP(0x100002, "%s(%d) : *** WARNING: Could not load light of range %d",
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Could not load light of range %d",
           "E:\\FL\\Scratch\\Source\\Client\\space\\gamelit.cpp", 0x203,
           static_cast<double>(Range));
     return nullptr;

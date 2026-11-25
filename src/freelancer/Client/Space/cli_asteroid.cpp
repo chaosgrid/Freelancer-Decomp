@@ -508,7 +508,7 @@ namespace
         if (Bb->RockCount <= 0)
         {
             // An error, not a return -- the allocation still happens.
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\SpaceTerrainRenderComp.cpp", 0x297,
                   "Billboard rock count is not > 0  If we have no rocks to draw, this instance "
                   "should not exist");
@@ -707,7 +707,7 @@ namespace
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x11e,
                   "NO cmn field created for client asteroid field");
         }
@@ -843,7 +843,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     // A field with no zone is reported and loading goes on.
     if (This->Zone == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Asteroid field (%s) must be hooked up to a zone",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Asteroid field (%s) must be hooked up to a zone",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x187, FieldIniRel);
     }
 
@@ -853,7 +853,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
     // An open failure is reported and still runs the band/billboard/mesh tail.
     if (!Reader.open(FieldIniPath, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: asteroid field ini file (%s) could not be opened",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: asteroid field ini file (%s) could not be opened",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x247, FieldIniRel);
     }
     else
@@ -921,7 +921,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                         Universe::get_zone(StarSysGetActiveSystemId(), Nick);
                     if (Z == nullptr)
                     {
-                        FDUMP(0x100001,
+                        FDUMP(kFdumpError,
                               "%s(%d) : *** ERROR: Exband (exclusion zone band) linked to "
                               "missing Zone (%s)",
                               "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x1ea,
@@ -975,7 +975,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
                                 Universe::get_zone(StarSysGetActiveSystemId(), Nick));
                             if (Z == nullptr)
                             {
-                                FDUMP(0x100001,
+                                FDUMP(kFdumpError,
                                       "%s(%d) : *** ERROR: DynamicAsteroids, linked to missing "
                                       "Zone (%s)",
                                       "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp",
@@ -1009,7 +1009,7 @@ void CliAsteroidLoadFieldIni(FCliAsteroid* This, char const* FieldIniRel)
         }
         else
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: client asteroid field (%s) must be connected to common "
                   "asteroid field before calling load",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x22f, FieldIniRel);
@@ -1112,7 +1112,7 @@ bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
     Universe::IZone* Zone = Universe::get_non_const_zone(StarSysGetActiveSystemId(), ZoneNickname);
     if (Zone == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: AsteroidField (%s) linked to missing Zone (%s)",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: AsteroidField (%s) linked to missing Zone (%s)",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0xc8, FieldIniRel,
               ZoneNickname);
         return false;
@@ -1122,7 +1122,7 @@ bool CliAsteroidCreateAndLoad(char const* FieldIniRel, char const* ZoneNickname)
     unsigned const Shape = Zone->GetShape();
     if (Shape != Universe::ZoneShapeSphere && Shape != Universe::ZoneShapeEllipsoid)
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: Asteroid field (%s) hooked up to zone (%s) which is not a "
               "valid shape",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0xd1, FieldIniRel,
@@ -1335,7 +1335,7 @@ namespace
         for (int I = 0; I < LightCount && DirCount < 4; ++I)
         {
             FEngineLight* const Light = static_cast<FEngineLight*>(LightSlots[I]);
-            if (Light->Type != 3)
+            if (Light->Type != kLightDirectional)
                 continue;
             float* const Dir = Lights[DirCount];
             EngineLightSample(Light, ZonePos, Dir, Ambient, Dir + 3);
@@ -1698,7 +1698,7 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
                 }
                 else
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                           "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x31d,
                           "no cmn cube found");
                 }
@@ -1763,7 +1763,7 @@ float* CliAsteroidGetPiecePos(FCliAsteroid* Field, int PieceIndex, float* OutXYZ
             return BandGetPiecePos(Band, PieceIndex, OutXYZ);
     }
 
-    FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
           "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x699,
           "bad piece number supplied to get_piece_pos in asteroid field");
     OutXYZ[0] = 0.0f;
@@ -1787,7 +1787,7 @@ float CliAsteroidGetPieceRadius(FCliAsteroid* Field, int PieceIndex)
             return BandGetPieceRadius(Band, PieceIndex);
     }
 
-    FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
           "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x6ad,
           "bad piece number supplied to get_piece_radius in asteroid field");
     return 1.0f; // DAT_005c75dc
@@ -2075,7 +2075,7 @@ namespace
                 if (DALib::Engine->QueryEngineComponent(EngineIndex, const_cast<char*>(Iids::Mesh),
                                                         reinterpret_cast<void**>(&Mesh)) < 0)
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: IMesh query failed, on asteroid arch (%s)",
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: IMesh query failed, on asteroid arch (%s)",
                           "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x28e,
                           Arch->Nickname.get_string());
                 }
@@ -2104,7 +2104,7 @@ namespace
                             EngineIndex, const_cast<char*>(Iids::RenderableMesh),
                             reinterpret_cast<void**>(&RMesh)) < 0)
                     {
-                        FDUMP(0x100001,
+                        FDUMP(kFdumpError,
                               "%s(%d) : *** ERROR: IRenderableMesh query failed, on asteroid arch "
                               "(%s)",
                               "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x2a7,
@@ -2165,7 +2165,7 @@ namespace
 
         if (Field->Material == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: no material found for asteroids in field (%s)",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: no material found for asteroids in field (%s)",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", 0x2ca, FieldIniRel);
         }
 
@@ -2286,7 +2286,7 @@ namespace
         IVertexBufferManager* const VbMgr = DALib::VertexBuffer;
         if (VbMgr->LockVertexMemory(Field->MeshDesc.SrcFvf, Field->MeshDesc.SrcCount, Desc) < 0)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliAsteroid.cpp", Line,
                   "Vertex buffer copy in asteroid field failed");
             return false;

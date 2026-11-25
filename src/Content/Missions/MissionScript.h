@@ -217,12 +217,15 @@ struct FMissionScript : FMissionObject
     IStoryMissionEvents* StoryEvents;                         // +0x2a4 = CreateParms +8
     int PreviousMissionState;                                 // +0x2a8 (ctor 2)
     int MissionState;                                         // +0x2ac desired (ctor 2)
-    // +0x2b0 (ctor 0): when 1, SetDesiredMissionState drops FAIL requests.
+    // +0x2b0: when 1, SetDesiredMissionState drops FAIL requests (06eb9730). The ctor's 0
+    // (06eb7793) is the only write in content.dll.
     unsigned char Field_0x2b0;
     int CampaignSlotCurrent;                                  // +0x2b4 (mission ctor)
     int CampaignSlotSucceed;                                  // +0x2b8 (mission ctor)
     int StoryCue;                                             // +0x2bc "story_cue" (ctor 0)
-    unsigned int Field_0x2c0;                                 // +0x2c0 TODO: meaning (mission ctor)
+    // +0x2c0: 0x5528 + 0xc8 per story mission, written by each mission ctor (SetChapter,
+    // 06ea18ec ..); no reader in content.dll.
+    unsigned int Field_0x2c0;
     unsigned int AcceptedObjectiveIds;                                 // +0x2c4 objective ids of the accepted offer
     // +0x2c8 (ctor 0): set with the cutscene clamps by Act_CallThorn / Act_StaticCam, cleared
     // by RevertStaticCam. No reader in TU21.

@@ -62,7 +62,7 @@ public:
     unsigned char bHorizontal;        // +0x348
     unsigned char bHovered;           // +0x349
     unsigned char bToolTip;           // +0x34a
-    unsigned char Field34b;           // +0x34b
+    unsigned char Field34b;           // +0x34b ctor 0; property 0x2c 1, 0x2d 0; not read by the class
     unsigned char bBorder;            // +0x34c
     unsigned char bShow;              // +0x34d
     unsigned char Pad34e[2];          // +0x34e

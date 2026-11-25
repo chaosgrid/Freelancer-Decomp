@@ -507,22 +507,22 @@ public:
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
     {
-        if (RendCompIidEqual(Iid, Iids::Mesh))
+        if (Iids::Equal(Iid, Iids::Mesh))
         {
             *Out = (IMesh*)this;
             return GR_OK;
         }
-        if (RendCompIidEqual(Iid, Iids::MatHookUp))
+        if (Iids::Equal(Iid, Iids::MatHookUp))
         {
             *Out = (IMatHookUp*)(&HookFacet);
             return GR_OK;
         }
-        if (RendCompIidEqual(Iid, Iids::DAComponent))
+        if (Iids::Equal(Iid, Iids::DAComponent))
         {
             *Out = (IMesh*)this;
             return GR_OK;
         }
-        if (RendCompIidEqual(Iid, Iids::TriMeshAnim))
+        if (Iids::Equal(Iid, Iids::TriMeshAnim))
         {
             *Out = (ITriMeshAnim*)(&AnimFacet);
             return GR_OK;
@@ -1157,7 +1157,7 @@ public:
     // FUN_06c2b020: no AddRef; *Out is left untouched on a miss.
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
     {
-        if (RendCompIidEqual(Iid, Iids::MatHookUp))
+        if (Iids::Equal(Iid, Iids::MatHookUp))
         {
             *Out = (IMatHookUp*)this;
             return GR_OK;
@@ -2074,12 +2074,12 @@ public:
     // FUN_06c2c230: no AddRef; *Out is left untouched on a miss.
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
     {
-        if (RendCompIidEqual(Iid, Iids::SphereMesh))
+        if (Iids::Equal(Iid, Iids::SphereMesh))
         {
             *Out = (ISphereMesh*)this;
             return GR_OK;
         }
-        if (RendCompIidEqual(Iid, Iids::MatHookUp))
+        if (Iids::Equal(Iid, Iids::MatHookUp))
         {
             *Out = (IMatHookUp*)(&Hook);
             return GR_OK;

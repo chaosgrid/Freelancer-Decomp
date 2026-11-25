@@ -233,6 +233,14 @@ unsigned HudObjectKindIds(unsigned TypeBits);
 // chain, a missing name or text that would not fit in Capacity. Caller: HudBuildObjectCaption.
 bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity);
 
+// HudBuildObjectCaption's Mode.
+enum EHudCaptionMode : int
+{
+    kCaptionName = 0,
+    kCaptionLocation = 1,
+    kCaptionNameAndLocation = 2,  // the two lines, separated by a newline
+};
+
 // FUN_004e8100 (cdecl) -- the caption of an object into Out. Mode 0: the name line; 1: the
 // location line; 2: both, separated by "\n". The name comes from the faction (Reputation::Vibe
 // GetAffiliation / GetName: the two FmtStr names, a player's display name, the faction short
@@ -399,6 +407,16 @@ struct FHudSubTargetFlash
     void DrawBracket(float const* ScreenPos, float HalfSize) const;
 };
 
+// HudTarget::Mode -- the view the expanded panel shows, one per switch button; GetMode(false)
+// answers kTargetPanelNotShown while the panel is collapsed or animating.
+enum ETargetPanelMode : int
+{
+    kTargetPanelContactList = 0,  // "SwitchToContactList"
+    kTargetPanelTarget = 1,       // "SwitchToTarget"
+    kTargetPanelFormation = 2,    // "FormationList"
+    kTargetPanelNotShown = 3,
+};
+
 // -------------------------------------------------------------------------------------------
 // HudTarget -- retail HUD_Target (Client\Space\HUD_Target.cpp), the [Target] section of hud.ini.
 //
@@ -518,7 +536,7 @@ public:
     WinControl* TargetButton;              // +0x63c "SwitchToTarget"
     WinControl* NextEnemyButton;           // +0x640 "NextEnemyButton"
     WinControl* FormationButton;           // +0x644 "FormationList"
-    int Mode;                              // +0x648 0 contact list, 1 target, 2 formation
+    int Mode;                              // +0x648 ETargetPanelMode
     int ShownMode;                         // +0x64c
     unsigned char bFormationAvailable;     // +0x650
     WinControl* RankText;                  // +0x654 "TargetRankText"

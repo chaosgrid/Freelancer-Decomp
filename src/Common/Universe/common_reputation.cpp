@@ -233,7 +233,7 @@ void __cdecl Reputation::LoadFeelings(INI_Reader& Reader)
             // The name printed is the found record's nickname, which differs from Name when two
             // nicknames share a 16-bit MakeId. Name.Data only stands in for the UB case above.
             char const* GroupNick = (Group != nullptr) ? Group->Nickname.Data : Name.Data;
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: FACTION: save game has corrupted reputation data for group "
                   "%s, please re-create the savegame",
                   kReputationSource, 0x10e, GroupNick);

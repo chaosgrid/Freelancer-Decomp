@@ -92,8 +92,9 @@ public:
     float LifetimeMax;                   // retail +0xb0  FDebrisArch +0x04
     Archetype::Explosion* Explosion;     // retail +0xb4  GetExplosion(record +0x0c)
     float Remaining;                     // retail +0xb8  rand between min and max, counts down
-    unsigned char Field_0xbc;            // retail +0xbc  ctor 1; FUN_005300f0 clears it. TODO:
-                                         //  meaning (the LOD's low word < 3 or high word >= 2)
+    unsigned char Field_0xbc;            // retail +0xbc  ctor 1; FUN_005300f0 clears it when the
+                                         //  picked LOD's low word < 3 or high word >= 2; update
+                                         //  (DeathMethod 1) ends the piece early while clear
     unsigned char Padbd[3];
 };
 

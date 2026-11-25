@@ -357,7 +357,7 @@ void GoodInfoList::read_Good_block(INI_Reader* Reader, GoodInfo* Info)
             }
             if (!bFound)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: unknown value: category = %s",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: unknown value: category = %s",
                       kGoodListSource, 0xab, Reader->get_value_string());
             }
         }
@@ -528,7 +528,7 @@ void GoodInfoList::load(char const* RelPath)
     INI_Reader Reader;
     if (!Reader.open(FullPath, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot open goods file %s\n", kGoodListSource,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot open goods file %s\n", kGoodListSource,
               0x1c2, FullPath);
         return;
     }
@@ -545,7 +545,7 @@ void GoodInfoList::load(char const* RelPath)
             {
                 ID_String Name;
                 Name.Id = Info->Id;
-                FDUMP(0x100002, "%s(%d) : *** WARNING: Good (%s) nickname different from equipment",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Good (%s) nickname different from equipment",
                       kGoodListSource, 0x1b0, Name.get_string());
             }
             // No zero-key test: a later good with the same key overwrites the earlier one.
@@ -557,7 +557,7 @@ void GoodInfoList::load(char const* RelPath)
         else if (Reader.is_header("GoodType"))
         {
             // The argument is the caller's relative path, not the reader's name.
-            FDUMP(0x100002, "%s(%d) : *** WARNING: [GoodType] is obsolete in ini file %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [GoodType] is obsolete in ini file %s\n",
                   kGoodListSource, 0x1ba, RelPath);
         }
     }

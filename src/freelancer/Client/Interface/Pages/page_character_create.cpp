@@ -25,6 +25,7 @@
 #include "Interface/ui_win_object.h"
 #include "Interface/win3d.h"                // Win3DGetCamera (FUN_0059da60), Win3DGetMouseRay (FUN_0059da70)
 #include "Interface/win3d_immediate.h"      // Win3DVec3Add (FUN_00423b30)
+#include "Interface/menu_enter_state.h"
 
 #include "common_id.h"            // CreateID, ID_String
 #include "common_newchar.h"       // NewChar::TheDB, FNewCharPackage, FNewCharPilot
@@ -97,7 +98,7 @@ namespace
 
     void SetButtonOffset(UiTextMsgButton* Button, float const* Offset)
     {
-        Button->SetProperty(6, reinterpret_cast<uintptr_t>(Offset), 0);
+        Button->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
     }
 }
 
@@ -156,7 +157,7 @@ bool PageCharacterCreate::HasResult() const
 void PageCharacterCreate::Destroy()
 {
     // FUN_005602f0.
-    UnregisterEvent(0xf);
+    UnregisterEvent(USER_CANCEL);
     UIPage::MasterWin::Destroy();
 }
 
@@ -176,7 +177,7 @@ bool PageCharacterCreate::Create(Win3D* NewParent, void* /*Payload*/)
     Title = static_cast<UiRichTextWin*>(FindWidget("Title"));
     NameLabel = static_cast<UiRichTextWin*>(FindWidget("NameLabel"));
 
-    RegisterEvent(0xf);
+    RegisterEvent(USER_CANCEL);
 
     CharacterName->GetToolTipHoverInfo()->IdsAlt = 0xad8;
     Back->GetToolTipHoverInfo()->IdsAlt = 0xadc;
@@ -342,7 +343,7 @@ void PageCharacterCreate::ShowSelection(bool bWithCostume)
     FNewCharPilot const* const Pilot = NewChar::TheDB->FindPilot(Selection->PilotId);
     if (Pilot == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kCharCreateCpp, 0x19d,
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kCharCreateCpp, 0x19d,
               "Failed to retrieve pilot information.\n");
         return;
     }
@@ -423,7 +424,7 @@ bool PageCharacterCreate::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*
     // LAB_00561630 (RET 0xc).
     bool bBack = false;
     bool bConfirm = false;
-    if (Msg == 0x3004)
+    if (Msg == kWinMsgCommand)
     {
         // A button click; the name is read back whichever button it was.
         PlayOrRewindUiSoundSlot(0);
@@ -433,8 +434,8 @@ bool PageCharacterCreate::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*
     }
     else
     {
-        bBack = (Msg == 0xf003);
-        bConfirm = (Msg == 0xf004);
+        bBack = (Msg == kWinMsgEscape);
+        bConfirm = (Msg == kWinMsgEnter);
     }
 
     if (bBack)
@@ -454,7 +455,7 @@ bool PageCharacterCreate::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*
 bool PageCharacterCreate::OnEvent(unsigned MsgId)
 {
     // LAB_00561700 (RET 4, this = the +0x80 face).
-    if (MsgId == 0xf)
+    if (MsgId == USER_CANCEL)
     {
         LeaveDirection = -1;
         BeginLeave();
@@ -591,7 +592,7 @@ void PageCharacterCreate::Update()
             }
             else if (Direction == 2)
             {
-                Result = 5;
+                Result = kMenuStateServerSelect;
             }
             bLeaving = 0;
         }

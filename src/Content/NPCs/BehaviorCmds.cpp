@@ -14,6 +14,7 @@
 #include "Core/ContentPlayerState.h"
 #include "RandomMissions/RandomMissionDB.h"   // FindShipClass (TU51 FUN_06f58080)
 #include "Core/ContentStaticIds.h"  // TU50's 16 static-init thunks 06f56f50-06f57130
+#include "Core/ContentInternal.h"     // GIdValueMask
 #include "common_server.h"
 
 // FUN_06f571a0. Retail does not write +0x164 (see BehaviorCmds.h).
@@ -108,7 +109,7 @@ unsigned int FContentShipBase::GetCargoSpaceOccupied() const
 void FContentShipBase::AddDamage(unsigned int const* AttackerId, float Amount)
 {
     unsigned int Id = *AttackerId;
-    if ((Id & 0x3fffffff) == 0)
+    if ((Id & GIdValueMask) == 0)
         return;
     for (std::vector<std::pair<unsigned int, float>>::iterator It = Damage.begin(); It != Damage.end(); ++It)
     {
@@ -174,7 +175,7 @@ bool FContentShipBase::IsInShipClass(unsigned int const* ShipClassId) const
 // test.
 FContentShipBase* FContentShipBase::GetFormationLeader()
 {
-    if (FormationSlot == 0 || FormationId == 0xffffffffu)
+    if (FormationSlot == 0 || FormationId == GNoFormationId)
         return this;
     std::vector<FContentShipBase*> Members;
     CollectFormationMembers(&Members, FormationId);
@@ -326,7 +327,7 @@ void FContentShipBase::FollowDirectivesOf(FContentShipBase* Leader)
     for (std::list<FObjListDirective*>::iterator It = Items.begin(); It != Items.end(); ++It)
         (*It)->AddRef();
 
-    if (!Items.empty() && Items.front()->GetType() == 0x13)
+    if (!Items.empty() && Items.front()->GetType() == OBJLIST_DOCK)
     {
         unsigned int OwnId = SpaceObjId;
         int DockIndex = 0;

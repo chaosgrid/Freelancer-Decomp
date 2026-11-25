@@ -601,22 +601,22 @@ bool ChatTextInputDisplay::OnKeyDown(FHudCmdRecord const* Record)
 void ChatTextInputDisplay::OnActivated()
 {
     // LAB_0045f6a0 (on the +0x498 face).
-    RegisterEvent(0x14);
+    RegisterEvent(USER_PAUSE);
 }
 
 void ChatTextInputDisplay::OnDeactivating()
 {
     // LAB_0045f6b0.
-    UnregisterEvent(0x14);
+    UnregisterEvent(USER_PAUSE);
 }
 
 bool ChatTextInputDisplay::OnEvent(unsigned MsgId)
 {
     // FUN_0045f6c0 (this = the face): 0x14 clears and closes the line and posts 0x14 on.
-    if (MsgId != 0x14)
+    if (MsgId != USER_PAUSE)
         return RichTextEditWin::OnEvent(MsgId);
     ClearText();
     ChatSetInputOpen(false);
-    HudPostCommand(0x14, 0);
+    HudPostCommand(USER_PAUSE, 0);
     return true;
 }

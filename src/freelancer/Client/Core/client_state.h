@@ -16,6 +16,16 @@
 // (state kept), 6 IntroFocus Init(0), 7 reconnect on DAT_0067ea78 then GF Init(1) or space
 // Init(0), 8 MissionBriefing Init(0) (mission_briefing.cpp). The callers store the answer in
 // DAT_0067ecac (g_client.current_state).
+enum EClientState : int
+{
+    kClientStateStay = 0,             // an Update answer: keep the current state
+    kClientStateQuit = 1,
+    kClientStateSpace = 2,
+    kClientStateBase = 3,
+    kClientStateMenu = 6,             // IntroFocus
+    kClientStateLoadGame = 7,
+    kClientStateMissionBriefing = 8,
+};
 IEnvironment* EnterClientState(int StateId, IEnvironment* PreviousState = nullptr);
 
 // DAT_0067ea78 -- the character state 7 reconnects with (written by FUN_005b2c70).

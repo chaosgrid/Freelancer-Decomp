@@ -6,8 +6,7 @@
 
 // Server.dll Loot wrapper -- retail Loot.cpp ("E:\FL\Scratch\Source\Server\Space\Loot.cpp",
 // .rdata:06d65f9c), .text:06cf24c0-06cf2c03. The class is declared in
-// src/include/server_gameobject.h; its constructor, find, get_type_bits and cloot live in
-// server_gameobject.cpp.
+// src/include/server_gameobject.h.
 
 #include "../include/server_gameobject.h"
 #include "../include/server_sysdb.h"   // StarSystem::explode / find_object, StarSystem::damage_object
@@ -55,6 +54,34 @@ bool Loot::create(Archetype::Root* Arch)
     DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Object->EngineInstanceId), 0, nullptr);
 
     return get_index() != -1;
+}
+
+Loot::~Loot()
+{
+}
+
+// ---------------------------------------------------------------------------
+// Loot -- create .text:06cf2440
+// ---------------------------------------------------------------------------
+
+Loot::Loot()
+    : CheckTimer(0.0f)
+    , UnseenLife(0.0f)
+    , DecayAccum(0.0f)
+{
+    // Retail has no Loot constructor of its own: the spawner FUN_06d08a40 runs
+    // GameObject's (FUN_06cee360), zeroes +0x60/+0x64/+0x68 and stores the
+    // three Loot vtables.
+}
+
+// Loot::create (.text:06cf2440) lives in server_loot.cpp.
+
+bool Loot::find(unsigned int const& Id)
+{
+    // .text:06d02cb0, the shared "return false" ICF body: a Loot is never found
+    // by id, it is only ever created.
+    (void)Id;
+    return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +192,7 @@ void Loot::apply_damage_list(DamageList& Damage)
         char const* const CauseName = DamageList::DmgCauseToString(Damage.Cause);
         char const* const ArchName = cloot()->get_archetype()->Nickname.get_string();
         unsigned int const Id = get_id();
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: ID(0x%X) Arch(%s): Tried to apply damage of type %s within "
               "another damage callback.",
               kLootCppPath, 0xa1, Id, ArchName, CauseName);
@@ -398,4 +425,20 @@ void Loot::split_stack()
         int const Count = static_cast<int>(Records.size());
         OwnerSystem->create_loot(get_id(), 2, &Records[0], Count);
     }
+}
+
+// .text:06d08eb0.
+unsigned int Loot::get_type_bits() const
+{
+    return 0x10000000u;
+}
+
+CLoot* Loot::cloot() const
+{
+    CObject* Obj = cobj();
+    if (Obj == nullptr)
+        return nullptr;
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassLoot) != CObject::ClassLoot)
+        return nullptr;
+    return static_cast<CLoot*>(Obj);
 }

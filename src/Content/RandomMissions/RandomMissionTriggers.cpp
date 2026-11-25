@@ -85,15 +85,15 @@ bool FRmTrigger::OnStateEvent(SMEventData const* Event, int const& State)
 {
     if (State < 0)
         return false;
-    if (State == 0)
+    if (State == RmTriggerIdle)
         OnIdle(Event, State);
-    else if (State == 1)
+    else if (State == RmTriggerArmed)
         OnArmed(Event, State);
-    else if (State == 2)
+    else if (State == RmTriggerFired)
         OnFired(Event, State);
-    else if (State == 3)
+    else if (State == RmTriggerRearmWait)
         OnRearmWait(Event, State);
-    else if (State == 4)
+    else if (State == RmTriggerDone)
         OnDone(Event, State);
     return false;
 }
@@ -107,9 +107,10 @@ void FRmTrigger::SetActivator(unsigned int InActivator)
 // LAB_06f71100.
 bool FRmTrigger::OnIdle(SMEventData const* Event, int const& State)
 {
-    if (State == 0 && Event->get_event_type() < 4 && Event->get_event_type() == 1)
+    if (State == RmTriggerIdle && Event->get_event_type() < SMET_Controller &&
+        Event->get_event_type() == SMET_Enter)
     {
-        set_state(1);
+        set_state(RmTriggerArmed);
         return true;
     }
     return false;
@@ -118,18 +119,19 @@ bool FRmTrigger::OnIdle(SMEventData const* Event, int const& State)
 // LAB_06f71140. An unordered RearmDelay re-arms at once.
 bool FRmTrigger::OnFired(SMEventData const* Event, int const& State)
 {
-    if (State != 2 || Event->get_event_type() >= 4 || Event->get_event_type() != 1)
+    if (State != RmTriggerFired || Event->get_event_type() >= SMET_Controller ||
+        Event->get_event_type() != SMET_Enter)
         return false;
     Fire();
     if (bOneShot)
     {
-        set_state(4);
+        set_state(RmTriggerDone);
         return true;
     }
     if (RearmDelay > 0.0f)
-        set_state(3);
+        set_state(RmTriggerRearmWait);
     else
-        set_state(1);
+        set_state(RmTriggerArmed);
     return true;
 }
 
@@ -138,7 +140,7 @@ bool FRmTrigger::OnFired(SMEventData const* Event, int const& State)
 bool FRmTrigger::OnRearmWait(SMEventData const* Event, int const& State)
 {
     // A type 4 event's int +0x08 is the controller message id, cast back after the type test.
-    if (State != 3 || Event->get_event_type() != 4 ||
+    if (State != RmTriggerRearmWait || Event->get_event_type() != SMET_Controller ||
         static_cast<pub::Controller::EMessage>(
             static_cast<SMControllerEvent const*>(Event)->ControllerId) !=
             pub::Controller::EMessage::Heartbeat)
@@ -146,7 +148,7 @@ bool FRmTrigger::OnRearmWait(SMEventData const* Event, int const& State)
     double const Now = GetContentGameTime();
     double const Delay = static_cast<double>(RearmDelay);
     if (GetContentTimeDistance(&Now, &LastFireTime) > Delay)
-        set_state(1);
+        set_state(RmTriggerArmed);
     return true;
 }
 
@@ -189,7 +191,7 @@ FRmProximityTrigger::FRmProximityTrigger(unsigned int InCookie, unsigned int InO
 bool FRmProximityTrigger::OnArmed(SMEventData const* Event, int const& State)
 {
     // A type 4 event's int +0x08 is the controller message id, cast back after the type test.
-    if (State != 1 || Event->get_event_type() != 4 ||
+    if (State != RmTriggerArmed || Event->get_event_type() != SMET_Controller ||
         static_cast<pub::Controller::EMessage>(
             static_cast<SMControllerEvent const*>(Event)->ControllerId) !=
             pub::Controller::EMessage::Heartbeat)
@@ -203,7 +205,7 @@ bool FRmProximityTrigger::OnArmed(SMEventData const* Event, int const& State)
         if (RmTriggerDistanceSq(Player, Center) <= static_cast<double>(RadiusSq))
         {
             SetActivator(Player->GetShipId());
-            set_state(2);
+            set_state(RmTriggerFired);
             return true;
         }
     }
@@ -224,20 +226,20 @@ FRmTimerTrigger::FRmTimerTrigger(unsigned int InCookie, unsigned int InOwnerId, 
 // LAB_06f71560.
 bool FRmTimerTrigger::OnArmed(SMEventData const* Event, int const& State)
 {
-    if (State != 1)
+    if (State != RmTriggerArmed)
         return false;
-    if (Event->get_event_type() < 4 && Event->get_event_type() == 1)
+    if (Event->get_event_type() < SMET_Controller && Event->get_event_type() == SMET_Enter)
     {
         StateMachineMessage Timeout(SMM_TIMEOUT);
         send_delayed_message_to_me(&Timeout, Delay, SMMS_Self, 0);
         return true;
     }
-    if (Event->get_event_type() != 3)
+    if (Event->get_event_type() != SMET_Message)
         return false;
     StateMachineMessage const* Message = static_cast<SMMessage const*>(Event)->Message;
     if (RmTriggerIsForCurrentState(this, Message) && Message->MessageType == SMM_TIMEOUT)
     {
-        set_state(2);
+        set_state(RmTriggerFired);
         return true;
     }
     return false;
@@ -263,7 +265,7 @@ FRmProximityLeaveTrigger::FRmProximityLeaveTrigger(
 bool FRmProximityLeaveTrigger::OnArmed(SMEventData const* Event, int const& State)
 {
     // A type 4 event's int +0x08 is the controller message id, cast back after the type test.
-    if (State != 1 || Event->get_event_type() != 4 ||
+    if (State != RmTriggerArmed || Event->get_event_type() != SMET_Controller ||
         static_cast<pub::Controller::EMessage>(
             static_cast<SMControllerEvent const*>(Event)->ControllerId) !=
             pub::Controller::EMessage::Heartbeat)
@@ -283,7 +285,7 @@ bool FRmProximityLeaveTrigger::OnArmed(SMEventData const* Event, int const& Stat
     }
     if (Last != nullptr)
         SetActivator(Last->GetShipId());
-    set_state(2);
+    set_state(RmTriggerFired);
     return true;
 }
 
@@ -347,7 +349,7 @@ void FRmMachineGroup::handle_state_change()
 {
     while (bPendingChange)
     {
-        SMEventData Exit(static_cast<STATE_MACHINE_EVENT_TYPE>(2));
+        SMEventData Exit(SMET_Exit);
         OnStateEvent(&Exit, CurrentState);
         while (!StateMachines.empty())
         {
@@ -356,7 +358,7 @@ void FRmMachineGroup::handle_state_change()
         }
         CurrentState = PendingState;
         bPendingChange = 0;
-        SMEventData Enter(static_cast<STATE_MACHINE_EVENT_TYPE>(1));
+        SMEventData Enter(SMET_Enter);
         OnStateEvent(&Enter, CurrentState);
     }
 }

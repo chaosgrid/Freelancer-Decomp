@@ -45,7 +45,8 @@
 // IServerImpl -- retail .data:Server (06d8facc), TWELVE bytes: IServer vptr at +0x00
 // (??_7IServerImpl@@6BIServer@@@, .rdata:06d65bcc, 93 entries -- IServer's 92 plus
 // PushToServer), IChatServer vptr at +0x04 (??_7IServerImpl@@6BIChatServer@@@, one entry,
-// SubmitChat), one dword at +0x08. Bodies: src/Server/IServerImpl.cpp.
+// SubmitChat), one dword at +0x08. Bodies: src/Server/IServerImpl.cpp, server_iservers.cpp
+// and server_chat.cpp (SubmitChat).
 // ===========================================================================
 struct SERVER_ISERVERIMPL_API IServerImpl : public IServer, public IChatServer {
 public:
@@ -167,8 +168,8 @@ public:
 
 private:
     // The sole data member: default/global construction writes zero; the copy
-    // constructor and assignment preserve its DWORD without interpreting it.
-    // TODO: identify its game meaning; the special members do not establish it.
+    // constructor and assignment preserve its DWORD without interpreting it. No other
+    // function in server.dll is known to read or write it.
     unsigned int Field_0x8;
 };
 

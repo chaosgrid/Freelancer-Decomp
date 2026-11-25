@@ -481,7 +481,7 @@ long CExternalEquip::GetParentConnector(bool bSearch) const
     long HitInst = -1;
     if (!FindHardpoint(Owner->EngineInstanceId, HardpointName.Value, HitInst))
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: CExternalEquip: Object (%s) missing hardpoint (%s) for item (%s)\n",
               kCExternalEquipSource, 0x8e, Owner->Archetype->Nickname.get_string(),
               HardpointName.Value, Arch->Nickname.get_string());

@@ -111,8 +111,8 @@ namespace
         uintptr_t const Red = reinterpret_cast<uintptr_t>(&G_NnPaletteRed);
         Alert->SetProperty(0x18, Red, Red);
         if (Ids != 0)
-            Alert->SetProperty(3, Ids, 0);
-        Alert->SetProperty(1, 1, 0);
+            Alert->SetProperty(kWinPropToolTip, Ids, 0);
+        Alert->SetProperty(kWinPropHide, 1, 0);
         return Alert;
     }
 }
@@ -182,9 +182,9 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     ReticleRangeText = CreateTextControl("ReticleRangeText", "HudSmall", RangePos, nullptr,
                                          0.171f /* DAT_005d8f0c */, 0.03f,
                                          1.0f, 0x453, 1, 0, 0);
-    ReticleRangeText->SetProperty(1, 1, 0);
+    ReticleRangeText->SetProperty(kWinPropHide, 1, 0);
     unsigned char const White[4] = {0xff, 0xff, 0xff, 0xff};
-    ReticleRangeText->SetProperty(0x33, reinterpret_cast<uintptr_t>(White), 1);
+    ReticleRangeText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(White), 1);
 
     // The four alert icons.
     float const MissilePos[3] = {0.126f, 0.213f, -0.6f};
@@ -761,10 +761,10 @@ void HudTargetableObjects::RebuildContacts()
     CObject* const RayTarget = RayHit.Object;
     if (RayTarget == nullptr)
         return;
-    if ((static_cast<unsigned>(RayTarget->ObjectClass) & 3u) != 3u)
+    if ((static_cast<unsigned>(RayTarget->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         return;
     CSimple* Pick = static_cast<CSimple*>(RayTarget);
-    if ((Pick->TypeBits & 0x20004000u) != 0)
+    if ((Pick->TypeBits & (OBJ_NON_TARGETABLE | OBJ_ASTEROID)) != 0)
         return;
     Vector RayCenter;
     float const RayRadius = RayTarget->get_physical_radius_r(RayCenter);
@@ -1088,7 +1088,7 @@ bool HudTargetableObjects::PickUnderCursor(bool bQuiet)
         if (Dz * Dz + Dy * Dy + Dx * Dx < static_cast<double>(HostileLimit))
         {
             PickId = Hostile->get_id();
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\HUD_Targetable_Objects.cpp", 0x9ae,
                   "Used Hostile Pick Assistance!");
         }
@@ -1115,7 +1115,7 @@ void HudTargetableObjects::PickRayTarget(FCameraRayHit const* Hit, unsigned* Out
     CObject* const Object = Hit->Object;
     if (Object == nullptr)
         return;
-    if ((static_cast<unsigned>(Object->ObjectClass) & 3u) != 3u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         return;
     CSimple const* const Simple = static_cast<CSimple const*>(Object);
 
@@ -1217,9 +1217,9 @@ FClientGameobj* HudTargetableObjects::FindPickableNearCursor()
         CObject const* const Target = Object->cobject();
         if (Target == nullptr)
             continue;
-        if ((static_cast<unsigned>(Target->ObjectClass) & 3u) != 3u)
+        if ((static_cast<unsigned>(Target->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
             continue;
-        if ((static_cast<CSimple const*>(Target)->TypeBits & 0x80u) == 0)
+        if ((static_cast<CSimple const*>(Target)->TypeBits & OBJ_TRADELANE_RING) == 0)
             continue;
 
         Vector const Center = Object->get_center_of_mass();
@@ -1364,7 +1364,7 @@ namespace
             NnToolTipFeedHover(Info);   // FUN_004be370
             return;
         }
-        int const Mode = (Object->OwnerPlayer == 0) ? 2 : 1;
+        int const Mode = (Object->OwnerPlayer == 0) ? kCaptionNameAndLocation : kCaptionLocation;
         if (!HudBuildObjectCaption(Object, reinterpret_cast<FHudWideText*>(&Info->CaptionW), Mode,
                                    true))   // FUN_004e8100
         {
@@ -1447,7 +1447,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
         bRadiationBlinkOn = (bRadiationBlinkOn == 0) ? 1 : 0;
         uintptr_t const bHide =
             (IsHudRadiationZoneWarningOn() && bRadiationBlinkOn == 0) ? 0u : 1u;
-        RadiationAlert->SetProperty(1, bHide, 0);
+        RadiationAlert->SetProperty(kWinPropHide, bHide, 0);
     }
 
     UpdateLagAlert();
@@ -1489,7 +1489,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
                 // FUN_0045a490: the object's attitude towards the player, the player passed only
                 // when its gameobj sits in ObjDB bucket 1.
                 IObjRW* const PlayerOrNull =
-                    (static_cast<FClientGameobj*>(Player)->ManagerKind == 1) ? Player : nullptr;
+                    (static_cast<FClientGameobj*>(Player)->ManagerKind == EClientGameobjKind::Ship) ? Player : nullptr;
                 Attitude = GetAttitudeClass(PlayerOrNull, RayGameobj);
                 bNoAttitude = false;
             }
@@ -1539,7 +1539,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
             }
             // As above, the player only from ObjDB bucket 1.
             IObjRW* const PlayerOrNull =
-                (static_cast<FClientGameobj*>(Player)->ManagerKind == 1) ? Player : nullptr;
+                (static_cast<FClientGameobj*>(Player)->ManagerKind == EClientGameobjKind::Ship) ? Player : nullptr;
             Attitude = GetAttitudeClass(PlayerOrNull, Contact);   // FUN_0045a490
             CObject const* const Target = Contact->cobject();
             bool const bFullyCloaked =
@@ -1654,7 +1654,7 @@ void HudTargetableObjects::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
         IObjRW* const Contact =
             ObjRwFromWatchable(const_cast<Watchable*>(ScanEntries->Entries[HotIndex].target()));
         CObject const* Target = (Contact != nullptr) ? Contact->cobject() : nullptr;
-        bool bShow = Target != nullptr && (static_cast<unsigned>(Target->ObjectClass) & 3u) == 3u;
+        bool bShow = Target != nullptr && (static_cast<unsigned>(Target->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple;
         if (bShow && (static_cast<unsigned>(Target->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
         {
             CSolar const* const Solar = static_cast<CSolar const*>(Target);
@@ -1936,7 +1936,7 @@ void HudTargetableObjects::DrawContactMarkers()
         // and whether the contact is hostile (FUN_0045a490 == -1).
         unsigned long Color = G_NnPaletteCyan;
         bool bHostile = false;
-        if (static_cast<FClientGameobj*>(Player)->ManagerKind == 1)
+        if (static_cast<FClientGameobj*>(Player)->ManagerKind == EClientGameobjKind::Ship)
         {
             unsigned long Reputation = 0;
             HudReputationColor(&Reputation, Player, Contact);
@@ -2062,7 +2062,7 @@ namespace
         NnTextControl* const Text = static_cast<NnTextControl*>(TextControl);
         FFontString* const Saved = Text->FontString;
         Text->FontString = Label;
-        Text->SetProperty(5, reinterpret_cast<uintptr_t>(&Point), 0);
+        Text->SetProperty(kWinPropPosition, reinterpret_cast<uintptr_t>(&Point), 0);
         Text->Draw();
         Text->FontString = Saved;
     }
@@ -2102,7 +2102,7 @@ void HudTargetableObjects::DrawTargetReticle()
 {
     // FUN_004ee260. The range text shown for the draws below, the forced pick cleared, the Win3D
     // camera applied (FUN_00422950).
-    ReticleRangeText->SetProperty(1, 0, 0);
+    ReticleRangeText->SetProperty(kWinPropHide, 0, 0);
     G_HudPickOverrideId = 0;
     Win3DApplyCamera(AsCamera(Win3DGetCamera()));
     bool bTargetIsBestPath = false;
@@ -2114,7 +2114,7 @@ void HudTargetableObjects::DrawTargetReticle()
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());   // FUN_0054baf0
     if (Scanner == nullptr || Player == nullptr)
     {
-        ReticleRangeText->SetProperty(1, 1, 0);
+        ReticleRangeText->SetProperty(kWinPropHide, 1, 0);
         return;
     }
     CShip* const PlayerShip = static_cast<CShip*>(PlayerObjectOfClass(Player, CObject::ClassShip));
@@ -2281,7 +2281,7 @@ void HudTargetableObjects::DrawTargetReticle()
     // The target is drawn here unless the scan already drew it (seen and not a waypoint).
     if (bTargetSeen && !bTargetIsWaypoint)
     {
-        ReticleRangeText->SetProperty(1, 1, 0);
+        ReticleRangeText->SetProperty(kWinPropHide, 1, 0);
         return;
     }
 
@@ -2289,7 +2289,7 @@ void HudTargetableObjects::DrawTargetReticle()
     IObjRW* const ShipTarget = PlayerShip->get_target();
     if (ShipTarget == nullptr)
     {
-        ReticleRangeText->SetProperty(1, 1, 0);
+        ReticleRangeText->SetProperty(kWinPropHide, 1, 0);
         return;
     }
     FHudContactRecord TargetRecord;
@@ -2340,7 +2340,7 @@ void HudTargetableObjects::DrawTargetReticle()
     else
         DrawOffScreenContact(ShipTarget, &TargetRecord, true);
 
-    ReticleRangeText->SetProperty(1, 1, 0);
+    ReticleRangeText->SetProperty(kWinPropHide, 1, 0);
 }
 
 void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
@@ -2526,7 +2526,7 @@ void HudTargetableObjects::DrawRangeLabel(void const* /*Unused1*/, float Radius,
     // FUN_0058a580: Text goes through a Font::NumberString as a printf format.
     static_cast<NnTextControl*>(ReticleRangeText)->SetNumberText(Text);
 
-    ReticleRangeText->SetProperty(5, reinterpret_cast<uintptr_t>(Point), 0);
+    ReticleRangeText->SetProperty(kWinPropPosition, reinterpret_cast<uintptr_t>(Point), 0);
     ReticleRangeText->Draw();
 }
 
@@ -2535,7 +2535,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     // FUN_004ef030. A ship-typed record (0x7f0000) needs a ship CObject whose vibe has an
     // affiliation.
     unsigned TypeBits = Record->TypeFlags;
-    if ((TypeBits & 0x7f0000u) != 0)
+    if ((TypeBits & OBJ_SHIP_MASK) != 0)
     {
         CObject const* const ShipObject = Object->cobject();
         if (ShipObject == nullptr)
@@ -2552,7 +2552,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     bool bWaypointObject = false;
     if (HudIsWaypointObjectId(Object->get_id()))   // FUN_004d4220
     {
-        TypeBits = 0x200;
+        TypeBits = OBJ_WAYPOINT;
         bWaypointObject = true;
     }
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
@@ -2618,7 +2618,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
 
     // Violet for a waypoint or the best-path object, else the marker colour; the HUD_Comm
     // speaker amber over either.
-    bool const bWaypoint = (TypeBits & 0x200u) != 0;
+    bool const bWaypoint = (TypeBits & OBJ_WAYPOINT) != 0;
     unsigned long Color;
     if (bWaypoint || Record->bIsBestPath != 0)
     {
@@ -2687,7 +2687,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     // TypeBits have 1 / 2.
     CObject const* const BarObject = Object->cobject();
     bool bHealthBar = false;
-    if (BarObject != nullptr && (static_cast<unsigned>(BarObject->ObjectClass) & 3u) == 3u)
+    if (BarObject != nullptr && (static_cast<unsigned>(BarObject->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
     {
         unsigned const Class = static_cast<unsigned>(BarObject->ObjectClass);
         bool bIndestructible = false;
@@ -2696,7 +2696,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         {
             bIndestructible = true;
         }
-        if (!bIndestructible && (static_cast<CSimple const*>(BarObject)->TypeBits & 3u) == 0)
+        if (!bIndestructible && (static_cast<CSimple const*>(BarObject)->TypeBits & (OBJ_MOON | OBJ_PLANET)) == 0)
             bHealthBar = true;
     }
 
@@ -2704,7 +2704,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     // positive maximum (ordered).
     bool bShieldActive = false;
     CSimple const* Simple = static_cast<CSimple const*>(Object->cobject());
-    if (Simple != nullptr && (static_cast<unsigned>(Simple->ObjectClass) & 3u) != 3u)
+    if (Simple != nullptr && (static_cast<unsigned>(Simple->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         Simple = nullptr;
     float Health = 0.0f;
     float ShieldFraction = 0.0f;
@@ -2837,8 +2837,8 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         int Visited = 1;
         if (HudIsUnvisitedSolar(Simple))
             Visited = 0;
-        bool const bType80 = (Simple->TypeBits & 0x80u) != 0;
-        bool const bType40 = (Simple->TypeBits & 0x40u) != 0;
+        bool const bType80 = (Simple->TypeBits & OBJ_TRADELANE_RING) != 0;
+        bool const bType40 = (Simple->TypeBits & OBJ_JUMP_GATE) != 0;
 
         // Rebuild the caption unless the cache matches.
         if (!(NameCacheSimpleId == Simple->Id && NameCacheLootUnits == LootUnits &&
@@ -2848,7 +2848,8 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
             // 0x40; FUN_004e8100 without the short name.
             bool const bDocked = (static_cast<unsigned>(Simple->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj &&
                                  static_cast<CEqObj const*>(Simple)->DockingBaseId != 0;
-            int const Mode = (Ship != nullptr || bDocked || bType80 || bType40) ? 1 : 0;
+            int const Mode =
+                (Ship != nullptr || bDocked || bType80 || bType40) ? kCaptionLocation : kCaptionName;
             if (HudBuildObjectCaption(Simple, &Caption, Mode, false))
             {
                 // An unvisited non-ship shows its type caption (FUN_004d4d50); a visited one its
@@ -3030,7 +3031,7 @@ unsigned long* HudTargetMarkerColor(unsigned long* OutArgb, IObjRW* Object)
         {
             // The player in ObjDB bucket 1 -- its reputation colour of Object (FUN_0045a4e0).
             void* const Player = GetPlayerObjRW();
-            if (Player != nullptr && static_cast<FClientGameobj*>(Player)->ManagerKind == 1)
+            if (Player != nullptr && static_cast<FClientGameobj*>(Player)->ManagerKind == EClientGameobjKind::Ship)
             {
                 unsigned long Reputation = 0;
                 HudReputationColor(&Reputation, static_cast<IObjRW*>(Player), Object);
@@ -3394,7 +3395,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         // The health bars, under the same rule as DrawOnScreenTarget's.
         CObject const* const BarObject = Object->cobject();
         bool bHealthBar = false;
-        if (BarObject != nullptr && (static_cast<unsigned>(BarObject->ObjectClass) & 3u) == 3u)
+        if (BarObject != nullptr && (static_cast<unsigned>(BarObject->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
         {
             unsigned const Class = static_cast<unsigned>(BarObject->ObjectClass);
             bool bIndestructible = false;
@@ -3404,7 +3405,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
                 bIndestructible = true;
             }
             if (!bIndestructible &&
-                (static_cast<CSimple const*>(BarObject)->TypeBits & 3u) == 0)
+                (static_cast<CSimple const*>(BarObject)->TypeBits & (OBJ_MOON | OBJ_PLANET)) == 0)
             {
                 bHealthBar = true;
             }
@@ -3414,7 +3415,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         // positive maximum (ordered).
         bool bShieldActive = false;
         CObject const* HealthObject = Object->cobject();
-        if (HealthObject != nullptr && (static_cast<unsigned>(HealthObject->ObjectClass) & 3u) != 3u)
+        if (HealthObject != nullptr && (static_cast<unsigned>(HealthObject->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
             HealthObject = nullptr;
         float Health = 0.0f;
         float ShieldFraction = 0.0f;
@@ -3525,7 +3526,7 @@ void HudTargetableObjects::CollectLeadMarkers()
             continue;
         CObject* const Object = CObjectOfGameobj(Gameobj);
         CObject const* const Engine =
-            (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 1u) == 1u) ? Object
+            (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassObject) == CObject::ClassObject) ? Object
                                                                                            : nullptr;
         if (!PhySys::GetCollisionState(Engine))
             continue;
@@ -3657,14 +3658,14 @@ void HudTargetableObjects::UpdateAimPoint()
     // player becomes the fire attitude.
     bool bRayUsed = false;
     CObject* const RayTarget = RayHit.Object;
-    if (RayTarget != nullptr && (static_cast<unsigned>(RayTarget->ObjectClass) & 3u) == 3u)
+    if (RayTarget != nullptr && (static_cast<unsigned>(RayTarget->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
     {
         Vector const Velocity = RayTarget->get_velocity();
         double const SpeedSq = static_cast<double>(Velocity.x) * Velocity.x +
                                static_cast<double>(Velocity.y) * Velocity.y +
                                static_cast<double>(Velocity.z) * Velocity.z;
         CSimple const* const Simple = static_cast<CSimple const*>(RayTarget);
-        if (SpeedSq < 25.0 && (Simple->TypeBits & 0x107ffdffu) != 0)
+        if (SpeedSq < 25.0 && (Simple->TypeBits & (OBJ_SHIP_MASK | OBJ_SOLAR_NO_WAYPOINT_MASK | OBJ_LOOT)) != 0)
         {
             bRayUsed = true;
             FClientGameobj* const Gameobj = ClientObjDb_FindObject(Simple->Id, 0);   // FUN_005416c0
@@ -3873,7 +3874,7 @@ void HudTargetableObjects::UpdateMissileAlert()
     // ("ui_incoming_missile") and the period becomes sqrt(nearest) * 0.001 (DAT_005c75f8), at
     // least 0.1; the unrounded double is compared.
     uintptr_t const bHide = (bAny && bMissileBlinkOn == 0) ? 0u : 1u;
-    MissileAlert->SetProperty(1, bHide, 0);
+    MissileAlert->SetProperty(kWinPropHide, bHide, 0);
     bMissileWarned = bAny ? 1 : 0;
     if (!bAny)
     {
@@ -3918,7 +3919,7 @@ void HudTargetableObjects::UpdateTrailAlert()
             bHide = 0;
         }
     }
-    TrailAlert->SetProperty(1, bHide, 0);
+    TrailAlert->SetProperty(kWinPropHide, bHide, 0);
 }
 
 void HudTargetableObjects::UpdateLagAlert()
@@ -3949,7 +3950,7 @@ void HudTargetableObjects::UpdateLagAlert()
         LagAlert->SetProperty(0x18, Amber, Amber);
     }
     uintptr_t const bHide = (bSlow && bLagBlinkOn == 0) ? 0u : 1u;
-    LagAlert->SetProperty(1, bHide, 0);
+    LagAlert->SetProperty(kWinPropHide, bHide, 0);
 }
 
 namespace

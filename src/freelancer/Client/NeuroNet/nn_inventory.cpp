@@ -147,7 +147,7 @@ void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bN
     }
 
     if (NameText != nullptr)
-        NameText->SetProperty(0x1e, static_cast<uintptr_t>(ShipArch->IdsName), 0);
+        NameText->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(ShipArch->IdsName), 0);
 
     // The x87 product of two floats is exact in double, as it is in extended precision.
     if (DamageBar != nullptr)
@@ -155,7 +155,7 @@ void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bN
         int const Health = static_cast<int>(static_cast<double>(GetPlayerHealthScaleRetail()) *
                                             100.0); // FUN_004c4f70, DAT_005ca230
         DamageBar->SetProperty(0x40, 100, static_cast<uintptr_t>(Health));
-        DamageBar->SetProperty(3, 0x408, 0);
+        DamageBar->SetProperty(kWinPropToolTip, 0x408, 0);
     }
 }
 
@@ -988,7 +988,7 @@ void NnInventory::Update()
     RefreshItemList(&Ship.Loadout, 0, 1);
 
     if (GetPlayerShipArchetypeIdRetail() == 0 && InventoryScroll != nullptr)
-        InventoryScroll->SetProperty(0x37, 0, 0);
+        InventoryScroll->SetProperty(kScrollPropSetRange, 0, 0);
 
     if (JettisonCooldown > 0.0f)
     {
@@ -1005,8 +1005,8 @@ void NnInventory::Close()
     if (Dealer != nullptr && (Dealer->Flags & kWin3DVisible) != 0)
     {
         Dealer->Flags = static_cast<unsigned char>(Dealer->Flags & 0xfc);
-        if (Dealer->TradeMode != 0)
-            Dealer->TradeMode = 0;
+        if (Dealer->TradeMode != kTradeModeNone)
+            Dealer->TradeMode = kTradeModeNone;
     }
 
     Ship.LoadShip(&GetPlayerEquipDescListRetail(), 1);
@@ -1025,23 +1025,23 @@ void NnInventory::Close()
 bool NnInventory::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_0047ade0 (RET 0xc).
-    if (Msg == 0xef02)
+    if (Msg == kWinMsgHide)
     {
         // Retail inlines FUN_0047ad20's body.
         Close();
         return true;
     }
 
-    if (Msg == 0xef01)
+    if (Msg == kWinMsgShow)
     {
-        WinControl::ProcessMessage(0xef01, A, B);
+        WinControl::ProcessMessage(kWinMsgShow, A, B);
         if (Dealer != nullptr)
             Dealer->Flags = static_cast<unsigned char>(Dealer->Flags | 3);
         Update();
         if (Dealer != nullptr)
         {
             Dealer->Update();
-            if (Dealer->TradeMode == 2)
+            if (Dealer->TradeMode == kTradeModeShip)
             {
                 Dealer->RestorePlayerShipView();
                 Update();
@@ -1125,14 +1125,14 @@ void NnInventory::SetMode(int NewMode, bool bPropagate)
     UpdateFilterButtons();
     ShowQuantityControls(false);
     if (InventoryScroll != nullptr)
-        InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
+        InventoryScroll->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(FirstRow), 0);
 
     ClearSelection();
 
     if (InventoryScroll != nullptr)
-        InventoryScroll->SetProperty(0x38, 0, 0);
+        InventoryScroll->SetProperty(kScrollPropSetValue, 0, 0);
 
-    if (Dealer != nullptr && bPropagate && Dealer->TradeMode != 1)
+    if (Dealer != nullptr && bPropagate && Dealer->TradeMode != kTradeModeCommodity)
     {
         Dealer->SetMode(Mode, true);
         Dealer->ClearSelection();
@@ -1359,7 +1359,7 @@ void NnInventory::BuyFromDealer(int Count)
             ClearInfoCard(); // FUN_0047e9e0
 
         bool bInHold = true;
-        if (Dealer->TradeMode == 3)
+        if (Dealer->TradeMode == kTradeModeEquipment)
         {
             if (PendingMountHardpoint.Value[0] != '\0')
             {
@@ -1469,7 +1469,7 @@ void NnInventory::BuyFromDealer(int Count)
     }
 
     // Remember the good for the next list refresh (not for ships).
-    if (Dealer->TradeMode == 2)
+    if (Dealer->TradeMode == kTradeModeShip)
         return;
     PendingBuyGoodId = GoodId; // +0x3bc
     if (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment)
@@ -1626,13 +1626,13 @@ void NnInventory::CreateControls()
         HitOffset[0] = 0.64f;    // +0xc0
         HitOffset[1] = -0.398f;
         HitOffset[2] = 0.0f;
-        if (Dealer->TradeMode == 1) // +0x978
+        if (Dealer->TradeMode == kTradeModeCommodity) // +0x978
         {
             bShowFilters = 0;
             bShowCommodity = 0;
             PriceColumn = 0.0f;
         }
-        else if (Dealer->TradeMode == 3)
+        else if (Dealer->TradeMode == kTradeModeEquipment)
         {
             bShowCommodity = 0;
         }
@@ -1797,7 +1797,7 @@ void NnInventory::CreateControls()
                               2, 0xbd4, 0); // FUN_005a0e30
         }
 
-        if (Dealer != nullptr && Dealer->TradeMode == 1)
+        if (Dealer != nullptr && Dealer->TradeMode == kTradeModeCommodity)
         {
             sprintf(Name, "ItemGoodDeal0%d", Number);
             float const DealPosition[3] = {Base[0] + 0.365f, QuantityRowY + Base[1], // DAT_005d1400
@@ -1893,12 +1893,12 @@ void NnInventory::CreateControls()
                                        "Interface\\NeuroNet\\Inventory\\cargoempty.3db",
                                        BarPosition, nullptr, ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
                                        0, ZeroVector); // +0x4cc
-        EmptyCargoBar->SetProperty(1, 1, 0);
+        EmptyCargoBar->SetProperty(kWinPropHide, 1, 0);
         SelectedCargoBar = CreateStaticControl("SelectedCargobar",
                                        "Interface\\NeuroNet\\Inventory\\cargoselected.3db",
                                        BarPosition, nullptr, ZeroVector, 0, 0, 0, 1, 0, 0, 1, 0, 0,
                                        0, ZeroVector); // +0x4d4
-        SelectedCargoBar->SetProperty(1, 1, 0);
+        SelectedCargoBar->SetProperty(kWinPropHide, 1, 0);
         float const LabelPosition[3] = {FilterBase[0] + 0.166f, FilterBase[1] - 0.489f,
                                         FilterBase[2]};
         CargoLabel = CreateTextControl("CargoLabel", "Normal", LabelPosition, nullptr, 0.26f,
@@ -1926,7 +1926,7 @@ void NnInventory::CreateControls()
             InfoCardTitle = CreateTextControl("Infocard_Title", "SubHeader", TitlePosition, nullptr,
                                          0.364f, 0.016f, 1.4f, 0x387, 1, 0, 1); // +0x944
         }
-        else if (Dealer != nullptr && Dealer->TradeMode != 1)
+        else if (Dealer != nullptr && Dealer->TradeMode != kTradeModeCommodity)
         {
             float const InfoPosition[3] = {0.478f, -0.424f, 0.388f};
             float const InfoHalfExtents[3] = {0.012f, 0.012f, 0.0f};
@@ -2189,7 +2189,7 @@ void NnInventory::Draw()
 // 0x0047f945): true unless the window sits next to a dealer in trade mode 1.
 static bool NnInventoryShowFlag(NnDealer const* Dealer)
 {
-    return Dealer == nullptr || Dealer->TradeMode == 2 || Dealer->TradeMode == 3;
+    return Dealer == nullptr || Dealer->TradeMode == kTradeModeShip || Dealer->TradeMode == kTradeModeEquipment;
 }
 
 intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -2199,7 +2199,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // dealer block after the switch (caseD_14, 0x0047abce), which returns 0.
     switch (Msg)
     {
-    case 0x4f:
+    case kWinNotifyToolTip:
     {
         // A child asks for its tooltip.
         WinControl* const Control = reinterpret_cast<WinControl*>(A);
@@ -2274,8 +2274,8 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 1; // ~FToolTipHoverInfo
     }
 
-    case 0x2c:
-    case 0x2d:
+    case kWinNotifyHighlight:
+    case kWinNotifyUnhighlight:
     {
         // The mouse enters (0x2c) or leaves (0x2d) a control of a row; the row's button and view
         // (other than the sender) get the same message.
@@ -2290,7 +2290,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Row == kNnInventoryRows)
             break;
-        if (Msg == 0x2d)
+        if (Msg == kWinNotifyUnhighlight)
         {
             if (HoverIndex == FirstRow + Row)
                 HoverIndex = -1;
@@ -2362,7 +2362,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (!Ship.ShipView->HasHpTypeGroup(Group)) // FUN_00586800
             break;
         Ship.SetItemHardpoint(Item, Hardpoint.Value); // FUN_004c6910
-        if (!(Dealer != nullptr && Dealer->TradeMode == 2) && IsPlayerDockedRetail())
+        if (!(Dealer != nullptr && Dealer->TradeMode == kTradeModeShip) && IsPlayerDockedRetail())
         {
             ReqPlayerEquipmentRetail(&Ship.Loadout); // FUN_004c4040
             FObjectShip* const GfShip = GfObjectShip();
@@ -2392,19 +2392,19 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x48:
     {
         // Open the window: A / B are the result callback's argument and function.
-        int const TradeMode = (Dealer != nullptr) ? Dealer->TradeMode : 0;
+        int const TradeMode = (Dealer != nullptr) ? Dealer->TradeMode : kTradeModeNone;
         if (Dealer != nullptr)
         {
             Field4e4 = 1;
             Dealer->TradeMode = TradeMode;
-            Dealer->ProcessMessage(0xef01, 0, 0);
+            Dealer->ProcessMessage(kWinMsgShow, 0, 0);
         }
         bNoTransaction = 1;
         ResultArg = reinterpret_cast<void*>(A);
         ResultFn = reinterpret_cast<FNnInventoryResultFn>(B);
-        if (TradeMode == 1)
+        if (TradeMode == kTradeModeCommodity)
             SetMode(kNnFilterCommodity, true);
-        else if (TradeMode == 2 || TradeMode == 3)
+        else if (TradeMode == kTradeModeShip || TradeMode == kTradeModeEquipment)
             SetMode(kNnFilterWeapons, true);
 
         SavedLoadout.Items.clear();
@@ -2429,7 +2429,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         RefreshItemList(&Ship.Loadout, 0, 1); // FUN_0047d2f0
         if (GetParent() != nullptr)
-            HudPostCommand(0x66, 0); // FUN_005763b0
+            HudPostCommand(USER_INVENTORY, 0); // FUN_005763b0
         break;
     }
 
@@ -2439,7 +2439,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         wchar_t const* const Text = reinterpret_cast<wchar_t const*>(A);
         if (Text == nullptr)
         {
-            QuantityControl[1]->SetProperty(0x38, 1, 0);
+            QuantityControl[1]->SetProperty(kScrollPropSetValue, 1, 0);
             break;
         }
         int Value = 0;
@@ -2452,12 +2452,12 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             JettisonQuantity = Value;
         swprintf(ToolTipText, 0xff, L"%d", JettisonQuantity); // PTR_DAT_005d0ec4
         if (_wcsicmp(Text, ToolTipText) != 0)
-            QuantityControl[3]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
-        QuantityControl[1]->SetProperty(0x38, static_cast<uintptr_t>(JettisonQuantity), 0);
+            QuantityControl[3]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        QuantityControl[1]->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(JettisonQuantity), 0);
         break;
     }
 
-    case 0x3e:
+    case kWinNotifyScrollValue:
         // A slider moved: the list scroll or the quantity slider.
         if (reinterpret_cast<WinControl*>(A) == InventoryScroll)
         {
@@ -2470,12 +2470,12 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             if (JettisonQuantity < 0)
                 JettisonQuantity = 0;
             swprintf(ToolTipText, 0xff, L"%d", JettisonQuantity);
-            QuantityControl[3]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+            QuantityControl[3]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         }
         break;
 
     case 0x1a:
-    case 0x26:
+    case kWinNotifyClick:
     {
         // A click.
         WinControl* const Control = reinterpret_cast<WinControl*>(A);
@@ -2575,7 +2575,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     // The shared tail (0x0047abce): a ship dealer (trade mode 2) with a ship view shows this
     // window's selected item on its own ship too.
-    if (Dealer != nullptr && Dealer->TradeMode == 2 && Dealer->Ship.ShipView != nullptr &&
+    if (Dealer != nullptr && Dealer->TradeMode == kTradeModeShip && Dealer->Ship.ShipView != nullptr &&
         GetSelectedItem() != nullptr)
     {
         EquipDesc* const Item = GetSelectedItem();
@@ -2596,7 +2596,7 @@ void NnInventory::SelectRow(int Row, int Unused)
     {
         FirstRow = 0;
         if (InventoryScroll != nullptr)
-            InventoryScroll->SetProperty(0x38, 0, 0);
+            InventoryScroll->SetProperty(kScrollPropSetValue, 0, 0);
     }
     bool const bFlag = NnInventoryShowFlag(Dealer);
     SelectedItem = nullptr;
@@ -2610,11 +2610,11 @@ void NnInventory::SelectRow(int Row, int Unused)
             Count = Selected->Count;
         NnDealer* const Partner = Dealer;
         if (Count > 1)
-            Partner->QuantitySlider->SetProperty(0x37, 1, static_cast<uintptr_t>(Count));
+            Partner->QuantitySlider->SetProperty(kScrollPropSetRange, 1, static_cast<uintptr_t>(Count));
         Partner->Quantity = Count;
-        Partner->QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(Count), 0);
+        Partner->QuantitySlider->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(Count), 0);
         swprintf(Partner->ToolTipText, 0xff, L"%d", Partner->Quantity); // PTR_DAT_005d0ec4
-        Partner->QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Partner->ToolTipText), 0);
+        Partner->QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Partner->ToolTipText), 0);
     }
 
     EquipDesc* const Item = GetSelectedItem();
@@ -2634,7 +2634,7 @@ void NnInventory::SelectHardpoint(char const* Name)
     // FUN_0047e270 (RET 4).
     if (Name == nullptr)
         return;
-    if (Dealer != nullptr && Dealer->TradeMode == 1)
+    if (Dealer != nullptr && Dealer->TradeMode == kTradeModeCommodity)
         return;
 
     SelectedIndex = 0;
@@ -2672,7 +2672,7 @@ void NnInventory::SelectHardpoint(char const* Name)
             if (Found != nullptr && _stricmp(Found->Hardpoint, Name) == 0)
             {
                 if (InventoryScroll != nullptr)
-                    InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
+                    InventoryScroll->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(FirstRow), 0);
                 return;
             }
         }
@@ -2700,10 +2700,10 @@ void NnInventory::JettisonSelected()
     if (JettisonMaxQuantity != 1)
     {
         ShowQuantityControls(true);
-        QuantityControl[1]->SetProperty(0x37, 1, static_cast<uintptr_t>(JettisonMaxQuantity));
-        QuantityControl[1]->SetProperty(0x38, static_cast<uintptr_t>(JettisonQuantity), 0);
+        QuantityControl[1]->SetProperty(kScrollPropSetRange, 1, static_cast<uintptr_t>(JettisonMaxQuantity));
+        QuantityControl[1]->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(JettisonQuantity), 0);
         swprintf(ToolTipText, 0xff, L"%d", JettisonQuantity); // PTR_DAT_005d0ec4
-        QuantityControl[3]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        QuantityControl[3]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         return;
     }
 
@@ -2740,7 +2740,7 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
     {
         // An item without a hardpoint (Item is not null-tested here). In a dealer's trade mode 3
         // every change goes through the server (FUN_004c4540).
-        bool const bThroughServer = Dealer != nullptr && Dealer->TradeMode == 3;
+        bool const bThroughServer = Dealer != nullptr && Dealer->TradeMode == kTradeModeEquipment;
         if (State != 0)
         {
             if (bThroughServer)
@@ -2769,14 +2769,14 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
                     continue;
                 if (OtherArch->get_class_type() != Class)
                     continue;
-                if (Dealer != nullptr && Dealer->TradeMode == 3)
+                if (Dealer != nullptr && Dealer->TradeMode == kTradeModeEquipment)
                     ReqModifyPlayerEquipRetail(Other->Id, &Other->get_hardpoint(), Other->Count,
                                                Other->Health, false);
                 else
                     Other->set_equipped(false);
             }
         }
-        if (Dealer != nullptr && Dealer->TradeMode == 3)
+        if (Dealer != nullptr && Dealer->TradeMode == kTradeModeEquipment)
         {
             ReqModifyPlayerEquipRetail(Item->Id, &Item->get_hardpoint(), Item->Count, Item->Health,
                                        true);
@@ -2828,13 +2828,13 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         {
             if (bDealerMode != 0)
             {
-                if (static_cast<NnDealer*>(this)->TradeMode != 2)
+                if (static_cast<NnDealer*>(this)->TradeMode != kTradeModeShip)
                     return;
                 Ship.RefreshView(); // FUN_004c6e70
                 return;
             }
         }
-        else if (Dealer->TradeMode != 3)
+        else if (Dealer->TradeMode != kTradeModeEquipment)
         {
             Ship.RefreshView(); // FUN_004c6e70
             return;
@@ -2873,7 +2873,7 @@ void NnInventory::ToggleEquip(EquipDesc* Item, int State)
         }
 
         Ship.ShowItem(Item, NnInventoryShowFlag(Dealer), NnItemFilterMode(Item->ArchId));
-        if (Dealer != nullptr && Dealer->TradeMode != 3)
+        if (Dealer != nullptr && Dealer->TradeMode != kTradeModeEquipment)
         {
             Ship.RefreshView(); // FUN_004c6e70
             return;
@@ -2988,14 +2988,14 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             if (ArchId == 0)
             {
                 if (EmptyIds != 0)
-                    NameText->SetProperty(0x1e, 0x38a, 0);
+                    NameText->SetProperty(kTextPropSetIds, 0x38a, 0);
             }
             else
             {
                 Archetype::Equipment* const Arch = Archetype::GetEquipment(ArchId);
                 if (Arch == nullptr)
                 {
-                    NameText->SetProperty(0x1e, 0, 0);
+                    NameText->SetProperty(kTextPropSetIds, 0, 0);
                 }
                 else
                 {
@@ -3025,15 +3025,15 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                         wcscat(G_NnTextScratchB, G_NnTextScratchA);
                         GetIdsStringWWithRawFallback(0x3e0, G_NnTextScratchA, G_NnTextScratchCapacity);
                         wcscat(G_NnTextScratchB, G_NnTextScratchA);
-                        NameText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+                        NameText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
                         if (bTransfer != 0)
-                            TransferItemName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+                            TransferItemName->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
                     }
                     else
                     {
-                        NameText->SetProperty(0x1e, static_cast<uintptr_t>(Arch->IdsName), 0);
+                        NameText->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(Arch->IdsName), 0);
                         if (bTransfer != 0)
-                            TransferItemName->SetProperty(0x1e, static_cast<uintptr_t>(Arch->IdsName), 0);
+                            TransferItemName->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(Arch->IdsName), 0);
                     }
                 }
             }
@@ -3049,7 +3049,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             bool bForceZero = false;
             if (bDealerMode != 0)
             {
-                if (static_cast<NnDealer*>(this)->TradeMode != 2)
+                if (static_cast<NnDealer*>(this)->TradeMode != kTradeModeShip)
                     bForceZero = true;
                 else if (Good != nullptr && !Good->bCombinable) // +0x70
                     bForceZero = true;
@@ -3067,30 +3067,30 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             if (bShowCount)
             {
                 swprintf(ToolTipText, 0xff, L"%d", Shown); // PTR_DAT_005d0ec4
-                QuantityText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+                QuantityText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
                 QuantityText->SetProperty(0xc, bSelected, 0);
-                QuantityText->SetProperty(1, 0, 0);
+                QuantityText->SetProperty(kWinPropHide, 0, 0);
             }
             else
             {
-                QuantityText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(L""), 0); // DAT_005c8ce0
+                QuantityText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(L""), 0); // DAT_005c8ce0
             }
             if (Mode == kNnFilterCargoBay)
             {
                 unsigned char bOn = 1;
                 if (ArchId == G_NanobotArchId || ArchId == G_ShieldBatteryArchId || bDealerMode != 0)
                     bOn = 0;
-                QuantityText->SetProperty(1, bOn, 0);
+                QuantityText->SetProperty(kWinPropHide, bOn, 0);
             }
             if (EmptyIds != 0)
             {
-                QuantityText->SetProperty(0x1e, static_cast<uintptr_t>(EmptyIds), 0);
-                QuantityText->SetProperty(1, 0, 0);
+                QuantityText->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(EmptyIds), 0);
+                QuantityText->SetProperty(kWinPropHide, 0, 0);
                 QuantityText->SetProperty(0xc, bSelected, 0);
             }
             else if (bDealerMode == 0 && (Mode == kNnFilterWeapons || Mode == kNnFilterEquipment))
             {
-                QuantityText->SetProperty(1, 1, 0);
+                QuantityText->SetProperty(kWinPropHide, 1, 0);
             }
         }
 
@@ -3100,34 +3100,34 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
             if (Price > 0 && bMission == 0)
             {
                 FormatGroupedNumber(ToolTipText, Price, -1); // FUN_004779a0
-                PriceText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+                PriceText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
                 PriceText->SetProperty(0xc, bSelected, 0);
                 if (bTransfer != 0)
                 {
-                    TransferItemPrice->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+                    TransferItemPrice->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
                     TransferItemGoodDeal->Flags = static_cast<unsigned char>(TransferItemGoodDeal->Flags | 3);
                     bool bShowDeal = true;
                     if (bDealerMode != 0)
-                        bShowDeal = static_cast<NnDealer*>(this)->TradeMode == 1;
+                        bShowDeal = static_cast<NnDealer*>(this)->TradeMode == kTradeModeCommodity;
                     else if (Dealer != nullptr)
-                        bShowDeal = Dealer->TradeMode == 1;
+                        bShowDeal = Dealer->TradeMode == kTradeModeCommodity;
                     if (bShowDeal)
                         TransferItemGoodDeal->Flags = static_cast<unsigned char>(TransferItemGoodDeal->Flags | 3);
                     else
                         TransferItemGoodDeal->Flags = static_cast<unsigned char>(TransferItemGoodDeal->Flags & 0xfc);
                 }
                 if (ItemGoodDeal[Row] != nullptr)
-                    ItemGoodDeal[Row]->SetProperty(2, 0, 0);
+                    ItemGoodDeal[Row]->SetProperty(kWinPropDisable, 0, 0);
             }
             else
             {
-                PriceText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(L""), 0); // DAT_005c8ce0
+                PriceText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(L""), 0); // DAT_005c8ce0
                 if (ItemGoodDeal[Row] != nullptr)
-                    ItemGoodDeal[Row]->SetProperty(2, 1, 0);
+                    ItemGoodDeal[Row]->SetProperty(kWinPropDisable, 1, 0);
                 if (bTransfer != 0)
                 {
-                    TransferItemPrice->SetProperty(0x1d, reinterpret_cast<uintptr_t>(L""), 0);
-                    TransferItemGoodDeal->SetProperty(2, 1, 0);
+                    TransferItemPrice->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(L""), 0);
+                    TransferItemGoodDeal->SetProperty(kWinPropDisable, 1, 0);
                 }
             }
         }
@@ -3135,9 +3135,9 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
         if (CargoMissionText[Row] != nullptr)
         {
             if (bMission != 0)
-                CargoMissionText[Row]->SetProperty(0x1e, 0x576, 0);
+                CargoMissionText[Row]->SetProperty(kTextPropSetIds, 0x576, 0);
             else
-                CargoMissionText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(L""), 0);
+                CargoMissionText[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(L""), 0);
         }
 
         if (ItemDamage[Row] != nullptr)
@@ -3171,7 +3171,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                 else if (Ship.ShipView->FindHardpointForGood(Good->Id, false) == nullptr) // FUN_00585f20
                     bToggle = 0;
             }
-            EquipToggle[Row]->SetProperty(1, bToggle == 0 ? 1 : 0, 0);
+            EquipToggle[Row]->SetProperty(kWinPropHide, bToggle == 0 ? 1 : 0, 0);
             if (bToggle != 0)
                 EquipToggle[Row]->SetProperty(0x30, bEquipped != 0 ? 0 : 1, 0);
         }
@@ -3230,12 +3230,12 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                     }
                 }
             }
-            ItemGoodDeal[Row]->SetProperty(4, reinterpret_cast<uintptr_t>(G_NnGoodDealIcons[IconIndex]), 0);
-            ItemGoodDeal[Row]->SetProperty(3, Ids, 0);
+            ItemGoodDeal[Row]->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(G_NnGoodDealIcons[IconIndex]), 0);
+            ItemGoodDeal[Row]->SetProperty(kWinPropToolTip, Ids, 0);
             if (bTransfer != 0)
             {
-                TransferItemGoodDeal->SetProperty(3, Ids, 0);
-                TransferItemGoodDeal->SetProperty(4, reinterpret_cast<uintptr_t>(G_NnGoodDealIcons[IconIndex]), 0);
+                TransferItemGoodDeal->SetProperty(kWinPropToolTip, Ids, 0);
+                TransferItemGoodDeal->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(G_NnGoodDealIcons[IconIndex]), 0);
             }
         }
 
@@ -3252,9 +3252,9 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                 char const* const Icon = Good->ItemIcon.Value; // +0x78
                 if (Icon != nullptr)
                 {
-                    Mesh->SetProperty(4, reinterpret_cast<uintptr_t>(Icon), 0);
+                    Mesh->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Icon), 0);
                     if (bTransfer != 0)
-                        TransferItemMesh->SetProperty(4, reinterpret_cast<uintptr_t>(Icon), 0);
+                        TransferItemMesh->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Icon), 0);
                 }
                 NameIds = Good->IdsName; // +0x88
             }
@@ -3268,7 +3268,7 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
                 InfoCardView->SetProperty(0x19, 0, 0);
             Mesh->SetProperty(0xc, bSelected, 0);
             ItemButton[Row]->SetProperty(0xc, bSelected, 0);
-            ItemButton[Row]->SetProperty(3, static_cast<uintptr_t>(NameIds), 0);
+            ItemButton[Row]->SetProperty(kWinPropToolTip, static_cast<uintptr_t>(NameIds), 0);
         }
 
         // Grey an unusable, unselected row.
@@ -3277,16 +3277,16 @@ bool NnInventory::FillItemRow(int* Counter, unsigned ArchId, int FilterMode, int
         {
             unsigned char bGrey = (bUsable == 0 && bSelected == 0) ? 1 : 0;
             unsigned char Dark[4] = {0x80, 0x80, 0x80, 0xff};
-            ItemButton[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(Dark), bGrey);
-            ItemView[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(Dark), bGrey);
+            ItemButton[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(Dark), bGrey);
+            ItemView[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(Dark), bGrey);
             unsigned char Light[4] = {0xc0, 0xc0, 0xc0, 0xff};
-            ItemPrice[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(Light), bGrey);
+            ItemPrice[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(Light), bGrey);
             if (ArchId == 0)
                 bGrey = 1;
-            ItemName[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(Light), bGrey);
+            ItemName[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(Light), bGrey);
             if (EmptyIds != 0)
                 bGrey = 1;
-            ItemQuantity[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(Light), bGrey);
+            ItemQuantity[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(Light), bGrey);
         }
     }
 
@@ -3509,7 +3509,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
         }
         else if (InfoCardTitle != nullptr)
         {
-            InfoCardTitle->SetProperty(0x1e, 0x388, 0);
+            InfoCardTitle->SetProperty(kTextPropSetIds, 0x388, 0);
         }
 
         // The card is not null-tested here.
@@ -3617,7 +3617,7 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
     }
 
     if (InfoCardName != nullptr)
-        InfoCardName->SetProperty(0x1e, static_cast<uintptr_t>(IdsName), 0);
+        InfoCardName->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(IdsName), 0);
 
     if (InfoCardInfo == nullptr)
         return;
@@ -3713,11 +3713,11 @@ void NnInventory::ShowInfoCard(unsigned ArchId, unsigned Ids)
     }
     else if (bShowShipInfoCard != 0)
     {
-        InfoCardTitle->SetProperty(0x1e, 0x387, 0);
+        InfoCardTitle->SetProperty(kTextPropSetIds, 0x387, 0);
     }
     else
     {
-        InfoCardTitle->SetProperty(0x1e, 0x388, 0);
+        InfoCardTitle->SetProperty(kTextPropSetIds, 0x388, 0);
     }
 
     if (bTradeText && (bDealerMode != 0 || Dealer != nullptr))
@@ -3759,17 +3759,17 @@ void NnInventory::UpdateRowVisibility(int Count)
         if (Dealer != nullptr)
         {
             int const TradeMode = Dealer->TradeMode;
-            if (TradeMode == 3)
+            if (TradeMode == kTradeModeEquipment)
             {
                 if (Mode != kNnFilterCommodity)
                     bNoPrice = false;
             }
-            else if (TradeMode == 1)
+            else if (TradeMode == kTradeModeCommodity)
             {
                 if (Mode == kNnFilterCommodity)
                     bNoPrice = false;
             }
-            if (TradeMode == 2)
+            if (TradeMode == kTradeModeShip)
                 bNoPrice = false;
         }
         if (bDealerMode != 0)
@@ -3778,45 +3778,45 @@ void NnInventory::UpdateRowVisibility(int Count)
         uintptr_t const HidePriceValue = (bHidePrice || bNoPrice) ? 1 : 0;
 
         if (ItemName[Row] != nullptr)
-            ItemName[Row]->SetProperty(1, bHide ? 1 : 0, 0);
+            ItemName[Row]->SetProperty(kWinPropHide, bHide ? 1 : 0, 0);
         if (ItemPrice[Row] != nullptr)
-            ItemPrice[Row]->SetProperty(1, HidePriceValue, 0);
+            ItemPrice[Row]->SetProperty(kWinPropHide, HidePriceValue, 0);
         if (ItemQuantity[Row] != nullptr && bHide)
-            ItemQuantity[Row]->SetProperty(1, 1, 0);
+            ItemQuantity[Row]->SetProperty(kWinPropHide, 1, 0);
         if (ItemGoodDeal[Row] != nullptr)
-            ItemGoodDeal[Row]->SetProperty(1, HidePriceValue, 0);
+            ItemGoodDeal[Row]->SetProperty(kWinPropHide, HidePriceValue, 0);
         if (ItemDamage[Row] != nullptr)
-            ItemDamage[Row]->SetProperty(1, bHide ? 1 : 0, 0);
+            ItemDamage[Row]->SetProperty(kWinPropHide, bHide ? 1 : 0, 0);
         if (CargoMissionText[Row] != nullptr)
-            CargoMissionText[Row]->SetProperty(1, bHide ? 1 : 0, 0);
+            CargoMissionText[Row]->SetProperty(kWinPropHide, bHide ? 1 : 0, 0);
 
         if (EquipToggle[Row] != nullptr)
         {
             if (bHide || Mode == kNnFilterCommodity || Mode == kNnFilterAmmo)
-                EquipToggle[Row]->SetProperty(1, 1, 0);
+                EquipToggle[Row]->SetProperty(kWinPropHide, 1, 0);
             if (bDealerMode != 0)
             {
-                if (static_cast<NnDealer*>(this)->TradeMode != 2)
-                    EquipToggle[Row]->SetProperty(2, 1, 0);
+                if (static_cast<NnDealer*>(this)->TradeMode != kTradeModeShip)
+                    EquipToggle[Row]->SetProperty(kWinPropDisable, 1, 0);
             }
             else if (!IsPlayerDockedRetail()) // FUN_004c4810
             {
-                EquipToggle[Row]->SetProperty(2, 1, 0);
+                EquipToggle[Row]->SetProperty(kWinPropDisable, 1, 0);
             }
         }
 
         if (ItemView[Row] != nullptr && ItemButton[Row] != nullptr && ItemMesh[Row] != nullptr)
         {
             uintptr_t const HideValue = bHide ? 1 : 0;
-            ItemButton[Row]->SetProperty(1, 0, 0);
-            ItemMesh[Row]->SetProperty(1, HideValue, 0);
-            ItemView[Row]->SetProperty(1, 0, 0);
-            ItemView[Row]->SetProperty(2, HideValue, 0);
-            ItemButton[Row]->SetProperty(2, HideValue, 0);
+            ItemButton[Row]->SetProperty(kWinPropHide, 0, 0);
+            ItemMesh[Row]->SetProperty(kWinPropHide, HideValue, 0);
+            ItemView[Row]->SetProperty(kWinPropHide, 0, 0);
+            ItemView[Row]->SetProperty(kWinPropDisable, HideValue, 0);
+            ItemButton[Row]->SetProperty(kWinPropDisable, HideValue, 0);
             if (bHide)
             {
-                ItemView[Row]->SetProperty(3, 0, 0);
-                ItemButton[Row]->SetProperty(3, 0, 0);
+                ItemView[Row]->SetProperty(kWinPropToolTip, 0, 0);
+                ItemButton[Row]->SetProperty(kWinPropToolTip, 0, 0);
             }
         }
     }
@@ -3851,7 +3851,7 @@ static unsigned const G_NnHpClassInfoIds[10] = {
 void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned char bResync)
 {
     // FUN_0047d2f0 (RET 0xc). Arg2 is only handed on to the recursive call.
-    int const DealerTradeMode = (Dealer != nullptr) ? Dealer->TradeMode : 0;
+    int const DealerTradeMode = (Dealer != nullptr) ? Dealer->TradeMode : kTradeModeNone;
 
     // Resync with the player's loadout.
     if (bResync != 0 && GetPlayerShipArchetypeIdRetail() != 0) // FUN_004c3e10
@@ -3868,7 +3868,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             // Next to an equipment dealer, the partner's +0x394 names the hardpoint the dealer's
             // selected good would go on (weapons / equipment filters).
             NnDealer* const Partner = Dealer;
-            if (Partner != nullptr && Partner->TradeMode == 3 && Partner->Inventory != nullptr)
+            if (Partner != nullptr && Partner->TradeMode == kTradeModeEquipment && Partner->Inventory != nullptr)
             {
                 Partner->Inventory->PendingMountHardpoint.clear();
                 unsigned const GoodId = Partner->GetSelectedMarketGood(); // FUN_00483580
@@ -3915,7 +3915,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                 Ship.ShipView->LoadEquipment(&GetPlayerEquipDescListRetail());
             Ship.SortFrom(&GetPlayerEquipDescListRetail());
 
-            if (DealerTradeMode == 3)
+            if (DealerTradeMode == kTradeModeEquipment)
             {
                 FObjectShip* const GfShip = GfObjectShip();
                 if (GfShip != nullptr)
@@ -3930,7 +3930,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
     if (PlayerCash != nullptr)
     {
         FormatGroupedNumber(ToolTipText, static_cast<int>(GetPlayerCreditsRetail()), 0x476); // FUN_004779a0(,FUN_004c4ce0(),)
-        PlayerCash->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        PlayerCash->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
     }
 
     // Every use of the market below tests it for null.
@@ -3947,7 +3947,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
 
     // A ship dealer lists every filter at once.
     bool bAllModes = false;
-    if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == 2)
+    if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == kTradeModeShip)
         bAllModes = true;
     int FocusCounter = -1;
     int SelectedHpClass = -1;
@@ -4052,7 +4052,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
                 if (Type == 0 && Filter != kNnFilterCommodity && !Good->bCombinable &&
                     SavedLoadout.find_equipment_item(Item->Id) != nullptr)
                     bUsed = true;
-                else if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == 2 &&
+                else if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == kTradeModeShip &&
                          Filter != kNnFilterCommodity && !Good->bCombinable)
                 {
                     NnInventory* const Partner = static_cast<NnDealer*>(this)->Inventory;
@@ -4206,7 +4206,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         if (SelectedIndex != -1 && bEquipped == 0 && !(JettisonCooldown > 0.0f) && bMission == 0 &&
             bLootable != 0 && FirstSelected != &EmptyAmmoStandIn)
             bDisabled = false;
-        JettisonButton->SetProperty(2, bDisabled ? 1 : 0, 0);
+        JettisonButton->SetProperty(kWinPropDisable, bDisabled ? 1 : 0, 0);
     }
 
     if (Ship.DamageBar != nullptr)
@@ -4224,7 +4224,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
         if (FocusCounter != -1)
             SelectedIndex = FocusCounter;
         if (InventoryScroll != nullptr)
-            InventoryScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Counter - 1));
+            InventoryScroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Counter - 1));
 
         // Unsigned compares.
         if (FocusCounter != -1)
@@ -4234,7 +4234,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             if (static_cast<unsigned>(FirstRow) > static_cast<unsigned>(FocusCounter))
                 FirstRow = FocusCounter;
             if (InventoryScroll != nullptr)
-                InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
+                InventoryScroll->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(FirstRow), 0);
         }
 
         // No gap below the last row.
@@ -4246,7 +4246,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             else
                 FirstRow = 0;
             if (InventoryScroll != nullptr)
-                InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
+                InventoryScroll->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(FirstRow), 0);
         }
 
         LastRowCount = Counter;
@@ -4281,7 +4281,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
     }
     else if (SelectedIndex == -1 && Dealer != nullptr && Dealer->SelectedIndex == -1)
     {
-        if (Dealer->TradeMode == 2)
+        if (Dealer->TradeMode == kTradeModeShip)
             ShowInfoCard(0, 0x487);
         else
             ClearInfoCard(); // FUN_0047e9e0
@@ -4323,7 +4323,7 @@ EquipDesc* NnInventory::GetSelectedItem()
 
     // A dealer (+0x35c) in trade mode 2 (+0x978) lists every mode.
     unsigned char bAllModes = 0;
-    if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == 2)
+    if (bDealerMode != 0 && static_cast<NnDealer*>(this)->TradeMode == kTradeModeShip)
         bAllModes = 1;
 
     int Counter = 0;
@@ -4453,5 +4453,5 @@ void NnInventoryOpenShipDealer(int Index, FNnInventoryResultFn ResultFn, void* R
         ++Position;
     }
 
-    NnInventoryOpenDealer(2, ResultFn, ResultArg, Good->Info.GoodId);
+    NnInventoryOpenDealer(kTradeModeShip, ResultFn, ResultArg, Good->Info.GoodId);
 }

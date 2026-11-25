@@ -139,6 +139,16 @@ protected:
 // 9, 12, 22, 23, 35, 36 and adds 45), StateMachine side 06fb7638 (slot 2 = LAB_06eef740),
 // MessageHandler side 06fb7624.
 // ---------------------------------------------------------------------------------------
+// FDestroyMission's states (LAB_06eef740).
+enum EDestroyMissionState
+{
+    DmStateBrief = 0,       // the title, then a 1.1 s timeout -> DmStateLaunch
+    DmStateLaunch = 1,      // enter: create the runtime machines, start the first
+    DmStateRunning = 2,     // the machines run one after another
+    DmStateSucceeded = 3,   // enter: OnMissionSucceed
+    DmStateFailed = 4,      // enter: FailMission(FailReason)
+};
+
 class FDestroyMission : public FRandomMissionObject
 {
 public:
@@ -180,8 +190,9 @@ protected:
     // +0x248: the owned objective list (FUN_06f1ca70, derived vptr 06fb478c); its Owner
     // (+0x258) starts 0.
     FMissionOwnedObjectiveList Objectives;
-    // +0x25c: set by message DAT_06fd3bac. Retail's ctor leaves it as heap
-    // garbage; the port starts it at 0. TODO: meaning from its readers.
+    // +0x25c: set to 1 by message DAT_06fd3bac (LAB_06eef740, 06eef8af: StateMachine
+    // subobject +0xac). Retail's ctor leaves it as heap garbage; the port starts it at 0.
+    // No reader in TU27 (06eee000-06ef2100, the only code that knows this layout).
     unsigned char Field_0x25c = 0;
     std::vector<unsigned int> PendingMachines;          // +0x26c ids not started yet
     std::vector<unsigned int> StartingMachines;         // +0x27c ids sent DAT_06fd3bbc

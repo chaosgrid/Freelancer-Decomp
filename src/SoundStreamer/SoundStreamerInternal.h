@@ -18,9 +18,6 @@ static const unsigned long kRegisterPriority = 0x40000000;
 
 static const char kComponentName[] = "SoundStreamer";
 
-static const unsigned int kFdumpError = 0x100001;
-static const unsigned int kFdumpWarning = 0x100002;
-static const unsigned int kFdumpNotice = 0x100003;
 
 // .data:06efe070: __FILE__ of the StreamingSound handle code.
 static const char kRetailSource[] =

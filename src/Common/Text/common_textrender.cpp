@@ -475,7 +475,7 @@ static void RebuildRichTextStyleFonts(DeviceTRC::WinFont* StyleFonts,
         }
         if (Entry.FontHandle == nullptr)
         {
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+            FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
                   "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0x48e,
                   "Failed to create font.\n");
         }
@@ -802,7 +802,7 @@ public:
             // Retail formats through FUN_06306fe0.
             char Buffer[0x2000];
             _snprintf(Buffer, 0x2000, "Failed to load image from \"%s\"\n", LoadPath);
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+            FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
                   "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0x43e, Buffer);
             return;
         }
@@ -877,7 +877,7 @@ void DeviceTRC::set_clip_rect(const RECT& NewClip)
             {
                 if (SelectClipRgn(MHdc, Hrgn) == 0)
                 {
-                    FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+                    FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
                           "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0x592,
                           "Failed to select clipping region into DC\n");
                 }

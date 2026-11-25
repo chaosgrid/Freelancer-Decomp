@@ -160,7 +160,7 @@ void NeuroNetNavMap::PlaceGridLabels()
     if (bTransition != 0)
     {
         Ease = TransitionEase;
-        if (ViewMode == 2)
+        if (ViewMode == kNavMapViewSystemZoomed)
         {
             // Zooming out of view 2.
             FromX = static_cast<float>(static_cast<double>(kNavMapGridOffsetX) -
@@ -183,7 +183,7 @@ void NeuroNetNavMap::PlaceGridLabels()
                                      static_cast<double>(kNavMapGridOffsetY));
         }
     }
-    else if (ViewMode == 2)
+    else if (ViewMode == kNavMapViewSystemZoomed)
     {
         // Zoomed in, following the pan.
         ScaleTo = kNavMapZoomedScale;
@@ -209,12 +209,12 @@ void NeuroNetNavMap::PlaceGridLabels()
         WinControl* const Label = GridLetters[Index];
         if (X > kNavMapGridLetterMax || X < kNavMapGridLetterMin)
         {
-            Label->SetProperty(1, 1, 0);
+            Label->SetProperty(kWinPropHide, 1, 0);
             continue;
         }
-        Label->SetProperty(1, 0, 0);
+        Label->SetProperty(kWinPropHide, 0, 0);
         float const Pos[3] = {X, kNavMapGridLetterRow, 0.0f};
-        Label->SetProperty(6, reinterpret_cast<uintptr_t>(Pos), 0);
+        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
     }
 
     // The numbers 1..8 down the left side.
@@ -228,12 +228,12 @@ void NeuroNetNavMap::PlaceGridLabels()
         WinControl* const Label = GridNumbers[Index];
         if (Y > kNavMapGridNumberMax || Y < kNavMapGridNumberMin)
         {
-            Label->SetProperty(1, 1, 0);
+            Label->SetProperty(kWinPropHide, 1, 0);
             continue;
         }
-        Label->SetProperty(1, 0, 0);
+        Label->SetProperty(kWinPropHide, 0, 0);
         float const Pos[3] = {kNavMapGridNumberColumn, Y, 0.0f};
-        Label->SetProperty(6, reinterpret_cast<uintptr_t>(Pos), 0);
+        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
     }
 }
 
@@ -263,7 +263,7 @@ void NeuroNetNavMap::ZoomToClick()
     TransitionStart[0] = PanOffset[0];
     TransitionStart[1] = PanOffset[1];
     bTransition = 1;
-    TransitionView = 2;
+    TransitionView = kNavMapViewSystemZoomed;
     TransitionDuration = kNavMapZoomSeconds;
     TransitionStart[2] = PanOffset[2];
     double const Distance = static_cast<double>(MapExtentX) / static_cast<double>(ZoomScale);
@@ -283,7 +283,7 @@ void NeuroNetNavMap::EnterSystemView()
     // FUN_0049e1d0.
     if (G_NavMapFilterMode == 6)
         SetFilterMode(FilterModeBeforeInfoCard);
-    ViewMode = 1;
+    ViewMode = kNavMapViewSystem;
     CachedObjectId = 0xffffffffu;
 
     // The jump links, their records freed (FUN_0053e430 / FUN_00516f70).
@@ -310,7 +310,7 @@ void NeuroNetNavMap::EnterSystemView()
 
     BuildSystemItems(); // FUN_004917c0
     AddPlayerMarker();  // FUN_00491410
-    UniverseButton->SetProperty(1, 0, 0);
+    UniverseButton->SetProperty(kWinPropHide, 0, 0);
 
     // The row hides with no system or one of the four hidden ones.
     unsigned char bHidden = 1;
@@ -328,36 +328,36 @@ void NeuroNetNavMap::EnterSystemView()
         }
     }
 
-    LabelButton->SetProperty(1, bHidden, 0);
-    PhysicalFilter->SetProperty(1, bHidden, 0);
-    PoliticalFilter->SetProperty(1, bHidden, 0);
-    PatrolFilter->SetProperty(1, bHidden, 0);
-    MineableFilter->SetProperty(1, bHidden, 0);
+    LabelButton->SetProperty(kWinPropHide, bHidden, 0);
+    PhysicalFilter->SetProperty(kWinPropHide, bHidden, 0);
+    PoliticalFilter->SetProperty(kWinPropHide, bHidden, 0);
+    PatrolFilter->SetProperty(kWinPropHide, bHidden, 0);
+    MineableFilter->SetProperty(kWinPropHide, bHidden, 0);
 
     // The mission filter needs mission zones (a null vector counts as
     // none).
     unsigned const bNoMission = (MissionZoneIds.empty() || bHidden != 0) ? 1u : 0u;
-    MissionFilter->SetProperty(1, bNoMission, 0);
+    MissionFilter->SetProperty(kWinPropHide, bNoMission, 0);
 
     // The political sub-filters only in modes 1 / 2.
     if (G_NavMapFilterMode == 1 || G_NavMapFilterMode == 2)
     {
-        AllFilter->SetProperty(1, bHidden, 0);
-        HostileFilter->SetProperty(1, bHidden, 0);
-        FriendlyFilter->SetProperty(1, bHidden, 0);
+        AllFilter->SetProperty(kWinPropHide, bHidden, 0);
+        HostileFilter->SetProperty(kWinPropHide, bHidden, 0);
+        FriendlyFilter->SetProperty(kWinPropHide, bHidden, 0);
     }
     else
     {
-        AllFilter->SetProperty(1, 1, 0);
-        HostileFilter->SetProperty(1, 1, 0);
-        FriendlyFilter->SetProperty(1, 1, 0);
+        AllFilter->SetProperty(kWinPropHide, 1, 0);
+        HostileFilter->SetProperty(kWinPropHide, 1, 0);
+        FriendlyFilter->SetProperty(kWinPropHide, 1, 0);
     }
 
-    FilterTitle->SetProperty(1, bHidden, 0);
-    LegendFilter->SetProperty(1, bHidden, 0);
-    BaseListFilter->SetProperty(1, bHidden, 0);
+    FilterTitle->SetProperty(kWinPropHide, bHidden, 0);
+    LegendFilter->SetProperty(kWinPropHide, bHidden, 0);
+    BaseListFilter->SetProperty(kWinPropHide, bHidden, 0);
     for (int Index = 0; Index < 4; ++Index)
-        FactionLabels[Index]->SetProperty(1, 1, 0);
+        FactionLabels[Index]->SetProperty(kWinPropHide, 1, 0);
 
     // No pan, the flat mesh at full alpha, the items and the grid placed,
     // then every grid label shown.
@@ -368,15 +368,15 @@ void NeuroNetNavMap::EnterSystemView()
     PlaceItems();                        // FUN_00496600
     PlaceGridLabels();                   // FUN_0049fbf0
     for (int Index = 0; Index < 8; ++Index)
-        GridLetters[Index]->SetProperty(1, 0, 0);
+        GridLetters[Index]->SetProperty(kWinPropHide, 0, 0);
     for (int Index = 0; Index < 8; ++Index)
-        GridNumbers[Index]->SetProperty(1, 0, 0);
+        GridNumbers[Index]->SetProperty(kWinPropHide, 0, 0);
 }
 
 void NeuroNetNavMap::EnterUniverseView()
 {
     // FUN_0049e550.
-    ViewMode = 0;
+    ViewMode = kNavMapViewUniverse;
     if (G_NavMapFilterMode == 4 || G_NavMapFilterMode == 7)
         SetFilterMode(0);
     else if (G_NavMapFilterMode == 6)
@@ -421,21 +421,21 @@ void NeuroNetNavMap::EnterUniverseView()
     }
 
     // The filter row hidden, the faction labels shown.
-    LabelButton->SetProperty(1, 1, 0);
-    UniverseButton->SetProperty(1, 1, 0);
-    PhysicalFilter->SetProperty(1, 1, 0);
-    PoliticalFilter->SetProperty(1, 1, 0);
-    PatrolFilter->SetProperty(1, 1, 0);
-    MissionFilter->SetProperty(1, 1, 0);
-    MineableFilter->SetProperty(1, 1, 0);
-    LegendFilter->SetProperty(1, 1, 0);
-    BaseListFilter->SetProperty(1, 1, 0);
-    AllFilter->SetProperty(1, 1, 0);
-    HostileFilter->SetProperty(1, 1, 0);
-    FriendlyFilter->SetProperty(1, 1, 0);
-    FilterTitle->SetProperty(1, 1, 0);
+    LabelButton->SetProperty(kWinPropHide, 1, 0);
+    UniverseButton->SetProperty(kWinPropHide, 1, 0);
+    PhysicalFilter->SetProperty(kWinPropHide, 1, 0);
+    PoliticalFilter->SetProperty(kWinPropHide, 1, 0);
+    PatrolFilter->SetProperty(kWinPropHide, 1, 0);
+    MissionFilter->SetProperty(kWinPropHide, 1, 0);
+    MineableFilter->SetProperty(kWinPropHide, 1, 0);
+    LegendFilter->SetProperty(kWinPropHide, 1, 0);
+    BaseListFilter->SetProperty(kWinPropHide, 1, 0);
+    AllFilter->SetProperty(kWinPropHide, 1, 0);
+    HostileFilter->SetProperty(kWinPropHide, 1, 0);
+    FriendlyFilter->SetProperty(kWinPropHide, 1, 0);
+    FilterTitle->SetProperty(kWinPropHide, 1, 0);
     for (int Index = 0; Index < 4; ++Index)
-        FactionLabels[Index]->SetProperty(1, 0, 0);
+        FactionLabels[Index]->SetProperty(kWinPropHide, 0, 0);
 
     // No pan, the items placed, the grid hidden, the title "Universe"
     // (ids 0x505).
@@ -444,10 +444,10 @@ void NeuroNetNavMap::EnterUniverseView()
     PanOffset[2] = 0.0f;
     PlaceItems(); // FUN_00496600
     for (int Index = 0; Index < 8; ++Index)
-        GridLetters[Index]->SetProperty(1, 1, 0);
+        GridLetters[Index]->SetProperty(kWinPropHide, 1, 0);
     for (int Index = 0; Index < 8; ++Index)
-        GridNumbers[Index]->SetProperty(1, 1, 0);
-    SystemNameText->SetProperty(0x1e, 0x505, 0);
+        GridNumbers[Index]->SetProperty(kWinPropHide, 1, 0);
+    SystemNameText->SetProperty(kTextPropSetIds, 0x505, 0);
 }
 
 // ----------------------------------------------------------------------------------------

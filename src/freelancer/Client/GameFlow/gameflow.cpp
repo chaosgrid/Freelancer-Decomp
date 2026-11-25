@@ -14,6 +14,7 @@
 #include "Interface/Pages/character_select_equip.h" // GetPlayerBaseIdRetail / SetPlayerBaseIdRetail / ...
 #include "Common/client_cliobj.h"          // Archetype::ReleaseMaterialEntrySlot (FUN_0041b030)
 #include "Core/client_frame_tick.h"      // FUN_00424f30 / FUN_00425080 / FUN_00425140, FUN_0041b2e0
+#include "Core/client_state.h"
 #include "Core/event_handler.h"
 #include "Common/Graphics/fade_to_black.h"
 #include "Space/Effects/flash_light.h"            // LoadFlashlightTextures / ReleaseFlashlightTextures
@@ -102,13 +103,13 @@ namespace
         if (G_HoveredHotspot != nullptr)
         {
             G_HoveredHotspot->bHovered = 0;
-            G_HoveredHotspot->SendEvent(2, Point);
+            G_HoveredHotspot->SendEvent(kHotspotEventLeave, Point);
         }
         G_HoveredHotspot = Hit;
         if (Hit != nullptr)
         {
             Hit->bHovered = 1;
-            G_HoveredHotspot->SendEvent(1, Point);
+            G_HoveredHotspot->SendEvent(kHotspotEventEnter, Point);
         }
     }
 
@@ -145,8 +146,8 @@ namespace
         G_HotspotLastCursor[1] = Point[1];
         MoveHotspotHover(Point);
         int Event = -1;
-        if (Message == 0x201)
-            Event = 3;
+        if (Message == WM_LBUTTONDOWN)
+            Event = kHotspotEventClick;
         if (G_HoveredHotspot == nullptr)
             return false;
         G_HoveredHotspot->SendEvent(Event, Point);
@@ -174,7 +175,7 @@ namespace
         FGameflowHotspotHandler()
         {
             // FUN_00559050.
-            static unsigned const kIds[2] = {5, 6};
+            static unsigned const kIds[2] = {USER_MOVE, USER_BUTTON0};
             for (unsigned Index = 0; Index < 2; ++Index)
                 RegisterEvent(kIds[Index]);
         }
@@ -186,9 +187,9 @@ namespace
             int Wheel = 0;
             GetClientSoftwareCursor(&Point[0], &Point[1], &Wheel);
 
-            if (MsgId == 5)
+            if (MsgId == USER_MOVE)
                 return OnMove(Point);
-            if (MsgId == 6)
+            if (MsgId == USER_BUTTON0)
                 return OnButton(Point);
             return false;
         }
@@ -214,7 +215,7 @@ namespace
             {
                 int const Zero[2] = {0, 0};
                 G_HoveredHotspot->bHovered = 0;
-                G_HoveredHotspot->SendEvent(2, Zero);
+                G_HoveredHotspot->SendEvent(kHotspotEventLeave, Zero);
             }
             G_HoveredHotspot = nullptr;
             return bHovering;
@@ -238,17 +239,17 @@ namespace
                 if (G_HoveredHotspot != nullptr)
                 {
                     G_HoveredHotspot->bHovered = 0;
-                    G_HoveredHotspot->SendEvent(2, Point);
+                    G_HoveredHotspot->SendEvent(kHotspotEventLeave, Point);
                 }
                 G_HoveredHotspot = Hit;
                 if (Hit == nullptr)
                     return false;
                 Hit->bHovered = 1;
-                G_HoveredHotspot->SendEvent(1, Point);
+                G_HoveredHotspot->SendEvent(kHotspotEventEnter, Point);
             }
             if (G_HoveredHotspot == nullptr)
                 return false;
-            G_HoveredHotspot->SendEvent(3, Point);
+            G_HoveredHotspot->SendEvent(kHotspotEventClick, Point);
             return true;
         }
     };
@@ -344,14 +345,14 @@ namespace
 
         LoadingScreenReset(); // FUN_00579190
 
-        SetClientAudioMode(3); // FUN_00428030
+        SetClientAudioMode(kClientAudioModeRtc); // FUN_00428030
         TickClientSoundMixer(GetClientRoomCamera(), static_cast<float>(Dt)); // FUN_00428040
 
         int Result = 0;
         if (G_bGameflowMissionBriefing)
-            Result = 8;
+            Result = kClientStateMissionBriefing;
         else
-            Result = G_bGameflowQuit ? 1 : 0;
+            Result = G_bGameflowQuit ? kClientStateQuit : kClientStateStay;
         if (G_bGameflowStateFive)
         {
             G_bGameflowStateFive = false;
@@ -463,7 +464,7 @@ namespace
     // (IntroFocus answers 2).
     int GF::GetEnvironmentType()
     {
-        return 1;
+        return kEnvironmentGameflow;
     }
 
     void GF::PreInit()
@@ -529,7 +530,7 @@ namespace
             unsigned Location = GetPlayerLocationIdRetail();  // FUN_004c4a00
             if (!SinglePlayer() && Location != 0)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid non-empty location %d in multiplayer\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid non-empty location %d in multiplayer\n",
                       kGameflowCpp, 0xa7, Location);
                 Location = 0;
             }
@@ -657,7 +658,7 @@ bool EnterGameflowBase(unsigned BaseId, unsigned LocationId, bool bFromIntro)
     LoadFlashlightTextures();                 // FUN_00557550
     PreloadClientSoundArchesByCategory(2);    // FUN_0042acb0
     RefreshLoadingProgress();
-    SetClientAudioMode(3);                    // FUN_00428030(3)
+    SetClientAudioMode(kClientAudioModeRtc);                    // FUN_00428030(3)
     RefreshLoadingProgress();
     SetFadeImmediate(1.0f);                   // FUN_00412070(1.0f)
     // FUN_00412050(0, (float)(1.0 / DAT_0061650c)).
@@ -816,7 +817,7 @@ void ReleaseHoveredHotspot()
     {
         int const Zero[2] = {0, 0};
         G_HoveredHotspot->bHovered = 0;
-        G_HoveredHotspot->SendEvent(2, Zero);
+        G_HoveredHotspot->SendEvent(kHotspotEventLeave, Zero);
     }
     G_HoveredHotspot = nullptr;
 }

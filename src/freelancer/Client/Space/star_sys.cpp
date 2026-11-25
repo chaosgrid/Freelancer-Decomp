@@ -156,7 +156,7 @@ namespace
             if ((Id & 0x3fffffffu) != 0)
                 Arch = Archetype::GetSolar(Id);
             else
-                FDUMP(0x100001, "%s(%d) : *** ERROR: unknown Solar archetype (%s)\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: unknown Solar archetype (%s)\n",
                       kStarSysFile, 0x8a, Name);
         }
         else if (Kind == 4)
@@ -167,7 +167,7 @@ namespace
             if ((Id & 0x3fffffffu) != 0)
                 Arch = Archetype::GetAsteroid(Id);
             else
-                FDUMP(0x100001, "%s(%d) : *** ERROR: unknown Asteroid archetype (%s)\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: unknown Asteroid archetype (%s)\n",
                       kStarSysFile, 0x9b, Name);
         }
 
@@ -182,14 +182,14 @@ namespace
         FVoiceProfile* const Voice = LookupClientVoice(VoiceId);
         if (Voice == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Voice %u is invalid\n", kStarSysFile, 0x2d1,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Voice %u is invalid\n", kStarSysFile, 0x2d1,
                   VoiceId);
             return;
         }
         FVoiceMsg* const Msg = Voice->FindMessage(MsgId); // slot 5 (+0x14)
         if (Msg == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Voice message %u is invalid for voice %u\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Voice message %u is invalid for voice %u\n",
                   kStarSysFile, 0x2cc, MsgId, VoiceId);
             return;
         }
@@ -257,7 +257,7 @@ namespace
         INI_Reader Reader;
         if (!Reader.open(Path, false))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: unknown system (%s)\n", kStarSysFile, 0x446,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown system (%s)\n", kStarSysFile, 0x446,
                   Path);
             ClientObjDb_RebuildSpatial(); // no close on this path
             return;
@@ -292,7 +292,7 @@ namespace
                     else if (Reader.is_value("battle"))
                         G_MusicSystemBattle = CreateID(Reader.get_value_string());
                     else if (Reader.is_value("explore"))
-                        FDUMP(0x100002,
+                        FDUMP(kFdumpWarning,
                               "%s(%d) : *** WARNING: explore music is obsolete in system file "
                               "%s, valid types are space, danger and battle",
                               kStarSysFile, 0x3c1, Path);
@@ -332,7 +332,7 @@ namespace
                     else if (Reader.is_value("asteroid"))
                         Arch = Archetype::GetAsteroidByName(Nick);
                     else
-                        FDUMP(0x100002,
+                        FDUMP(kFdumpWarning,
                               "%s(%d) : *** WARNING: unknown (or old-style) preload archetype\n"
                               "  (%s)",
                               kStarSysFile, 0x315, Reader.get_line_ptr());
@@ -346,7 +346,7 @@ namespace
                     }
                     else
                     {
-                        FDUMP(0x100002, "%s(%d) : *** WARNING: Failed to preload archetype\n  %s",
+                        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Failed to preload archetype\n  %s",
                               kStarSysFile, 0x321, Reader.get_line_ptr());
                     }
                 }
@@ -494,7 +494,7 @@ namespace
             FVoiceProfile* const Voice = LookupClientVoice(It->VoiceId);
             if (Voice == nullptr)
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: Voice %u is invalid\n", kStarSysFile,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Voice %u is invalid\n", kStarSysFile,
                       0x354, It->VoiceId);
                 continue;
             }
@@ -502,7 +502,7 @@ namespace
             if (Msg != nullptr)
                 Msg->Release(); // slot 4 (+0x10)
             else
-                FDUMP(0x100002,
+                FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: Voice message %u is invalid for voice %u\n",
                       kStarSysFile, 0x34f, It->MsgId, It->VoiceId);
         }
@@ -539,14 +539,14 @@ namespace
         CObject* ObjA = (CObject*)A->client_data;
         CObject* ObjB = (CObject*)B->client_data;
 
-        if (ObjA != nullptr && (static_cast<unsigned>(ObjA->ObjectClass) & 0x67u) == 0x67u)
+        if (ObjA != nullptr && (static_cast<unsigned>(ObjA->ObjectClass) & CObject::ClassBeam) == CObject::ClassBeam)
             return IVP_TRUE;
-        if (ObjB != nullptr && (static_cast<unsigned>(ObjB->ObjectClass) & 0x67u) == 0x67u)
+        if (ObjB != nullptr && (static_cast<unsigned>(ObjB->ObjectClass) & CObject::ClassBeam) == CObject::ClassBeam)
             return IVP_TRUE;
 
-        if (ObjA != nullptr && (static_cast<unsigned>(ObjA->ObjectClass) & 3u) != 3u)
+        if (ObjA != nullptr && (static_cast<unsigned>(ObjA->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
             ObjA = nullptr;
-        if (ObjB != nullptr && (static_cast<unsigned>(ObjB->ObjectClass) & 3u) != 3u)
+        if (ObjB != nullptr && (static_cast<unsigned>(ObjB->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
             ObjB = nullptr;
 
         unsigned const OwnerA = ObjA != nullptr ? static_cast<CSimple*>(ObjA)->OwnerPlayer : 0;
@@ -571,11 +571,11 @@ namespace
         CObject* const Obj = PlayerCObject(Player);
         if (Obj == nullptr)
             return false;
-        if ((static_cast<unsigned>(Obj->ObjectClass) & 0x503u) != 0x503u)
+        if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
             return false;
 
         CEScanner* const Scanner =
-            static_cast<CEScanner*>(static_cast<CEqObj*>(Obj)->EquipManager.FindFirst(0x80000));
+            static_cast<CEScanner*>(static_cast<CEqObj*>(Obj)->EquipManager.FindFirst(EquipTypeScanner));
         if (Scanner == nullptr)
             return false;
 
@@ -612,7 +612,7 @@ namespace
                 ClientMeshHolderUpdate(&Layer->Holder);              // FUN_00421070
             }
             if (!ClientMeshHolderHasInstance(&Layer->Holder))
-                FDUMP(0x100001, "%s(%d) : *** ERROR: couldnt create starsphere %s",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: couldnt create starsphere %s",
                       kStarSphereFile, 0x35, Layer->Name.Value);
         }
         (void)ClientMeshHolderHasInstance(&Layer->Holder); // the return value is unused
@@ -820,7 +820,7 @@ void StarSysEnter(unsigned SystemId)
     RefreshLoadingProgress();
     G_System = Universe::get_system(SystemId);
     if (G_System == nullptr)
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kStarSysFile, 0x48b,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kStarSysFile, 0x48b,
               "Player trying to ENTER invalid system");
 
     // Retail continues without a test: a null system faults on the next line.
@@ -864,7 +864,7 @@ void StarSysEnter(unsigned SystemId)
     if (Player != nullptr)
     {
         CObject* const Obj = PlayerCObject(Player);
-        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x103u) == 0x103u)
+        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             static_cast<CSimple*>(Obj)->connect(GetClientObjDb()); // vt+0x90
     }
 
@@ -948,7 +948,7 @@ void StarSysUpdate(float Dt)
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kStarSysFile, 0x513,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kStarSysFile, 0x513,
               "No active camera available upon StarSys update");
     }
 
@@ -1187,7 +1187,7 @@ void StarSysNoteTargetChange(unsigned ShipId)
     CObject* const Obj = PlayerCObject(Go);
     if (Obj == nullptr)
         return;
-    if ((static_cast<unsigned>(Obj->ObjectClass) & 0x503u) != 0x503u)
+    if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
     IObjRW* const Target = static_cast<CShip*>(Obj)->get_target();
     if (Target == nullptr)

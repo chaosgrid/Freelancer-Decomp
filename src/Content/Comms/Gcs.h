@@ -1383,7 +1383,8 @@ struct FGcsRecentComm
     Vector Position;                    // +0x08 GetLocation of the speaker (else listener)
     unsigned int Speaker;               // +0x14
     unsigned int Listener;              // +0x18
-    int Field_0x1c;                     // +0x1c -1. TODO: no reader found yet.
+    int Field_0x1c;                     // +0x1c -1 from FUN_06eeb920; not read by the other
+                                        // user of DAT_06fcf158, FUN_06eebd10
 };
 
 // FUN_06eeba30 (cdecl): DAT_06fce360, the interval of a category without its own.

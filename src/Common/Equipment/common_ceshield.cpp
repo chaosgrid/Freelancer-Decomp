@@ -270,7 +270,7 @@ bool CEShield::Activate_Internal(bool bOn)
             Notify(INotify::ShieldOfflineStateChanged, &bOnline);
             return bOnline != 0;
         }
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCEShieldSource, 0x195,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCEShieldSource, 0x195,
               "Tried to change change activation state on non-connected shield.");
     }
     return bOnline != 0;
@@ -454,7 +454,7 @@ void CEShieldIntruderChecker::Attach(CEShield* Shield)
         IntruderCount = 0;
         return;
     }
-    FDUMP(0x100001,
+    FDUMP(kFdumpError,
           "%s(%d) : *** ERROR: Couldn't find shield geometry for shield intruder-checker: %s.",
           kCEShieldSource, 0x1e9, Body->Archetype->Nickname.get_string());
 }

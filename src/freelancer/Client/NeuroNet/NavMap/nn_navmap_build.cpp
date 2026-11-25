@@ -168,7 +168,7 @@ void NeuroNetNavMap::AddPlayerMarker()
                          0x219a, 0, Heading, 0, 0);
     // No null test, as in retail.
     PlayerItem->PulsePhase = -1.0f;
-    if (ViewMode != 0 && CurrentSystem->GetId() != GetPlayerStarSystemIdRetail())
+    if (ViewMode != kNavMapViewUniverse && CurrentSystem->GetId() != GetPlayerStarSystemIdRetail())
         PlayerItem->bShown = 0;
 
     // The ten waypoint markers, tinted with the pulse palette

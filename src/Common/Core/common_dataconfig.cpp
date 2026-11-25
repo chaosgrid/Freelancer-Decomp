@@ -63,7 +63,7 @@ namespace
             GetFileSysPath(FullPath, Reader.get_value_string(), nullptr);
             if (Archetype::LoadEquipment(FullPath, false, Factory) == 0)
             {
-                FDUMP(0x100002, kFmtEquipmentEmpty, kDataConfigSource, 0x5c, FullPath);
+                FDUMP(kFdumpWarning, kFmtEquipmentEmpty, kDataConfigSource, 0x5c, FullPath);
             }
         }
         else if (Reader.is_value("solar"))
@@ -71,7 +71,7 @@ namespace
             GetFileSysPath(FullPath, Reader.get_value_string(), nullptr);
             if (Archetype::LoadSolar(FullPath, false, Factory) == 0)
             {
-                FDUMP(0x100002, kFmtSolarEmpty, kDataConfigSource, 0x68, FullPath);
+                FDUMP(kFdumpWarning, kFmtSolarEmpty, kDataConfigSource, 0x68, FullPath);
             }
         }
         else if (Reader.is_value("ships"))
@@ -79,7 +79,7 @@ namespace
             GetFileSysPath(FullPath, Reader.get_value_string(), nullptr);
             if (Archetype::LoadShips(FullPath, false, Factory) == 0)
             {
-                FDUMP(0x100002, kFmtShipsEmpty, kDataConfigSource, 0x75, FullPath);
+                FDUMP(kFdumpWarning, kFmtShipsEmpty, kDataConfigSource, 0x75, FullPath);
             }
         }
         else if (Reader.is_value("asteroids"))
@@ -87,7 +87,7 @@ namespace
             GetFileSysPath(FullPath, Reader.get_value_string(), nullptr);
             if (Archetype::LoadAsteroids(FullPath, Factory) == 0)
             {
-                FDUMP(0x100002, kFmtAsteroidsEmpty, kDataConfigSource, 0x82, FullPath);
+                FDUMP(kFdumpWarning, kFmtAsteroidsEmpty, kDataConfigSource, 0x82, FullPath);
             }
         }
         else if (Reader.is_value("loadouts"))
@@ -96,7 +96,7 @@ namespace
             if (Loadout::Load(FullPath, false) == 0)
             {
                 // Called through the FDUMP pointer with no test.
-                FDUMP(0x100002, kFmtLoadoutsEmpty, kDataConfigSource, 0x8e, FullPath);
+                FDUMP(kFdumpWarning, kFmtLoadoutsEmpty, kDataConfigSource, 0x8e, FullPath);
             }
         }
         else if (Reader.is_value("bodyparts"))
@@ -135,7 +135,7 @@ namespace
             GetFileSysPath(FullPath, Reader.get_value_string(), nullptr);
             if (Archetype::LoadSimples(FullPath, false, Factory) == 0)
             {
-                FDUMP(0x100002, kFmtExplosionsEmpty, kDataConfigSource, 0xd3, FullPath);
+                FDUMP(kFdumpWarning, kFmtExplosionsEmpty, kDataConfigSource, 0xd3, FullPath);
             }
         }
         else if (Reader.is_value("fuses"))

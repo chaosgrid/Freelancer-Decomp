@@ -60,6 +60,61 @@ enum EWinControlProperty
     kWinPropGetMeshPath = 11,    // strncpy(A, MeshPath, B)
 };
 
+// The text property ids only NnTextControl's SetProperty (FUN_0058b360, nn_text_control.cpp) and
+// NnEditControl's handle; every other control passes them to WinControl, which ignores them.
+enum EWinTextProperty
+{
+    kTextPropSetText = 0x1d,      // A = the wide text
+    kTextPropSetIds = 0x1e,       // A = an IDS string id
+    kTextPropGetText = 0x1f,      // returns the text pointer
+    kTextPropGetLength = 0x20,    // returns wcslen of the text (0 without one)
+    kTextPropGetLineCount = 0x21,
+    kTextPropClickable = 0x24,    // A != 0
+    kTextPropTypewriter = 0x50,   // A == 1: on, B milliseconds per character; else off
+};
+
+// The scroll bar property ids (ScrollControl FUN_005831b0 and UiScroll LAB_00597350, the only
+// handlers).
+enum EWinScrollProperty
+{
+    kScrollPropSetRange = 0x37,   // A = minimum, B = maximum
+    kScrollPropSetValue = 0x38,   // A
+    kScrollPropGetMax = 0x39,     // ScrollControl only
+    kScrollPropGetMin = 0x3a,     // ScrollControl only
+    kScrollPropGetValue = 0x3b,
+    kScrollPropSetPage = 0x3c,    // A = page size, B = button step (0 = 1); ScrollControl only
+    kScrollPropGetPage = 0x3d,    // ScrollControl only
+};
+
+// Property ids NnTextControl, NnButtonControl and WireStaticControl handle alike.
+enum EWinSharedProperty
+{
+    kWinPropColour = 0x33,        // A -> the colour dword; B == 1 turns the colour override on
+    kWinPropBlink = 0x51,         // A != 0 blinks
+    // The NeuroNet dialogs (NN_Confirm, NN_Error, NN_Exit, NN_LoadSave, NN_Pause, NN_Prompt,
+    // NN_News, NN_Repair, ...): SetOffset(*A) and SetPosition(Position).
+    kWinPropPlaceAtOffset = 0x42,
+};
+
+// The ids a control sends to its parent's SetProperty about itself (A = the sending control).
+enum EWinControlNotify
+{
+    kWinNotifyHover = 0x25,          // WinControl::HitTest (FUN_005a0340) / UiScroll: a hit
+    kWinNotifyClick = 0x26,          // a button's Activate, NnTextControl's release on it
+    kWinNotifyDoubleClick = 0x27,    // a double click (WireButtonControl: non-zero answer
+                                     // suppresses the 0x26 that follows)
+    kWinNotifyPress = 0x28,          // a left press on a button
+    kWinNotifyRelease = 0x29,        // a release that is no click (NnButtonControl: off the
+                                     // button; UiScroll: every release)
+    kWinNotifyCapturedLeave = 0x2a,  // a pressed button: the cursor moved off it
+    kWinNotifyCapturedEnter = 0x2b,  // a pressed button: the cursor came back
+    kWinNotifyHighlight = 0x2c,      // MouseEnter, a press, the captured cursor back on
+    kWinNotifyUnhighlight = 0x2d,    // MouseLeave, the captured cursor off
+    kWinNotifyScrollValue = 0x3e,    // ScrollControl / UiScroll: B = the new value
+    kWinNotifyToolTip = 0x4f,        // HitTest asks before the child's tooltip; non-zero
+                                     // suppresses it
+};
+
 // RTTI .?AUIDataViewOwner@@. The base vftable 0x005e5efc holds two _purecall entries; every
 // derived face (WinControl 0x005e5e38 and its subclasses) fills them with LAB_0053aaa0 (RET 8)
 // and FUN_0053e4a0 (RET 4), and nothing in the exe registers the face: names unknown.
@@ -274,7 +329,8 @@ public:
     char HardpointName[0x100];      // +0x1d0
     unsigned char bCaptured;        // +0x2d0
     unsigned char bNoZEnable;       // +0x2d1
-    unsigned char Field2d2;         // +0x2d2 -- property 9
+    unsigned char Field2d2;         // +0x2d2 -- property 9 (FUN_005a13c0), also set 1 by some
+                                    //  subclasses (FUN_00599f60); no reader found
     unsigned char bIdentityHitOrientation; // +0x2d3
     // +0x2d4 -- not written by the ctor and never read by WinControl itself: the HUD panels park
     // a child's rest Offset here (HUD_Target 0x004e0ee0.., HUD_ContactList 0x004d38e7) and hand

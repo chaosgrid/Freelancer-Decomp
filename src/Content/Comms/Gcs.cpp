@@ -292,7 +292,7 @@ TString<0x40> __cdecl MakeObjectLocationName(unsigned int SpaceObjId)
         // A jump gate / hole: its target system's prefix.
         unsigned int Type = 0;
         pub::SpaceObj::GetType(SpaceObjId, Type);
-        if ((Type & 0xc40) == 0)
+        if ((Type & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
             return Result;
         unsigned int TargetSystem = 0;
         unsigned int TargetGate = 0;
@@ -359,15 +359,15 @@ TString<0x40> __cdecl MakeDockApproachName(unsigned int DockType, char const* Su
     Result.Data[0] = '\0';
     switch (DockType)
     {
-    case 1:
+    case TERM_BERTH:
         FormatTString64(&Result, "gcs_dockrequest_todock%s", Suffix);
         break;
-    case 3:
-    case 4:
-    case 5:
+    case TERM_MOOR_SMALL:
+    case TERM_MOOR_MEDIUM:
+    case TERM_MOOR_LARGE:
         FormatTString64(&Result, "gcs_dockrequest_tomoor%s", Suffix);
         break;
-    case 6:
+    case TERM_RING:
         FormatTString64(&Result, "gcs_dockrequest_toland%s", Suffix);
         break;
     default:
@@ -710,15 +710,15 @@ FGcsLineLaunchClearance::FGcsLineLaunchClearance(FSystemInfo* InSystem, unsigned
     char const* Clearance = "";
     switch (TerminalType)
     {
-    case 1:
+    case TERM_BERTH:
         Clearance = "gcs_docklaunch_clear_berth";
         break;
-    case 3:
-    case 4:
-    case 5:
+    case TERM_MOOR_SMALL:
+    case TERM_MOOR_MEDIUM:
+    case TERM_MOOR_LARGE:
         Clearance = "gcs_docklaunch_clear_moor";
         break;
-    case 6:
+    case TERM_RING:
         Clearance = "gcs_docklaunch_clear_ring";
         break;
     default:
@@ -794,7 +794,7 @@ FGcsLineDockGranted::FGcsLineDockGranted(FSystemInfo* InSystem, unsigned int InS
     if (!HasVoiceRoles(VOICE_ROLE_DOCKREQUEST_DOCK))
         return;
     System->FindShip(Listener);
-    if (DockType == 6)
+    if (DockType == TERM_RING)
     {
         // Landing.
         PermutationIds = IDS_COMM_ORDER_6;
@@ -1284,7 +1284,7 @@ namespace
         FVoiceProperties* const Voice = FindVoiceProperties(&Line->VoiceId);
         unsigned int Type = 0;
         pub::SpaceObj::GetType(Line->Speaker, Type);
-        unsigned int const Roles = (Type & 0x7f0000) != 0 ? VOICE_ROLE_COMBAT_LEV_1
+        unsigned int const Roles = (Type & OBJ_SHIP_MASK) != 0 ? VOICE_ROLE_COMBAT_LEV_1
                                                              : VOICE_ROLE_COMBAT_DOCK;
         if (Voice == nullptr || !Voice->SupportsRoles(Roles))
         {
@@ -2114,7 +2114,7 @@ FGcsPlayerHailConversation::FGcsPlayerHailConversation(FGcsPlayerObjectEvent con
 
     // The leader is not null-tested.
     FContentShipBase* Leader = static_cast<FContentShipBase*>(Object);
-    if (Leader->FormationId != 0xffffffffu)
+    if (Leader->FormationId != GNoFormationId)
         Leader = FindFormationLeader(Leader->FormationId);
 
     // DAT_06fb6214 (-0.6f): below, or unordered, -> no line.
@@ -2226,7 +2226,7 @@ namespace
     // The inline wingman test (e.g. 06ee30d6); FormationSlot is +0x14c.
     bool IsFormationWingman(FContentShipBase* Ship)
     {
-        return Ship->FormationSlot != 0 && Ship->FormationId != 0xffffffffu;
+        return Ship->FormationSlot != 0 && Ship->FormationId != GNoFormationId;
     }
 }
 
@@ -2249,10 +2249,10 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
         if (pub::SpaceObj::GetType(ObjectA, TypeA) != 0)
             TypeA = 0;
         FGcsLine* Line = nullptr;
-        if ((TypeA & 0x7f0000) != 0)
+        if ((TypeA & OBJ_SHIP_MASK) != 0)
         {
             // A ship hit a ship: the rand pick decides who speaks.
-            if ((TypeB & 0x7f0000) == 0)
+            if ((TypeB & OBJ_SHIP_MASK) == 0)
                 return;
             if ((rand() * 2) / 32768 != 0)
                 Line = new FGcsLineCombatInflictingDamage(System, ObjectA, 0, Health);
@@ -2264,7 +2264,7 @@ FGcsCombatConversation::FGcsCombatConversation(FGcsCombatEvent const* Event)
             // The attacker is no ship: type & 0xfdff and a ship victim.
             if ((TypeA & 0xfdff) == 0)
                 return;
-            if ((TypeB & 0x7f0000) == 0)
+            if ((TypeB & OBJ_SHIP_MASK) == 0)
                 return;
             Line = new FGcsLineCombatTakingDamage(System, ObjectB, 0, Health);
         }
@@ -2699,7 +2699,7 @@ namespace
     void CollectSystemFormationMembers(std::vector<FContentShipBase*>* Out,
                                        unsigned int FormationId)
     {
-        if (FormationId == 0xffffffffu)
+        if (FormationId == GNoFormationId)
             return;
 
         std::map<unsigned int, FSystemInfo>* Systems = GetSystemInfos();
@@ -2892,10 +2892,11 @@ FGcsDockConversation::FGcsDockConversation(FGcsDockGrantedEvent const* Event)
     unsigned int TargetType = 0;
     pub::SpaceObj::GetType(Speaker, TargetType);
 
-    if (TargetType == 0x400)
+    if (TargetType == OBJ_AIRLOCK_GATE)
         return;
 
-    if (TargetType == 0x40 || TargetType == 0x80 || TargetType == 0x800)
+    if (TargetType == OBJ_JUMP_GATE || TargetType == OBJ_TRADELANE_RING ||
+        TargetType == OBJ_JUMP_HOLE)
     {
         // Only the leader (slot +0x14c 0, or no group) of a SpacePop formation with wingmen
         // speaks.
@@ -2908,11 +2909,11 @@ FGcsDockConversation::FGcsDockConversation(FGcsDockGrantedEvent const* Event)
         // FUN_06eeb870 inlined: the vector is freed before any line is built.
         if (!HasFormationWingmen(Object))
             return;
-        if (Ship->FormationSlot != 0 && Ship->FormationId != 0xffffffffu)
+        if (Ship->FormationSlot != 0 && Ship->FormationId != GNoFormationId)
             return;
 
         FGcsLine* Line = nullptr;
-        if (TargetType == 0x80)
+        if (TargetType == OBJ_TRADELANE_RING)
         {
             Line = new FGcsLineTradeLaneStart(System, Listener, 0);
         }
@@ -2923,7 +2924,7 @@ FGcsDockConversation::FGcsDockConversation(FGcsDockGrantedEvent const* Event)
             unsigned int TargetSystem = 0;
             unsigned int TargetObject = 0;
             pub::SpaceObj::GetJumpTarget(Speaker, TargetSystem, TargetObject);
-            if (Response == 4)
+            if (Response == DOCK_HOST_RESPONSE_PROCEED)
             {
                 if (bWaitedInQueue)
                 {
@@ -2959,7 +2960,7 @@ FGcsDockConversation::FGcsDockConversation(FGcsDockGrantedEvent const* Event)
         // A SpacePop ship asks; a formation leader with wingmen first thanks its escort.
         FContentNpcShip* const Ship = static_cast<FContentNpcShip*>(Object);
         bool const bWingmen = HasFormationWingmen(Object);
-        if (bWingmen &&(Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu))
+        if (bWingmen &&(Ship->FormationSlot == 0 || Ship->FormationId == GNoFormationId))
         {
             if (!AddLine(new FGcsLineThisOurStop(System, Listener, 0)))
             {
@@ -3509,7 +3510,7 @@ void FGcsDockHailHandler::HandleMessage(pub::Controller::EMessage MessageId, voi
     if (Object == nullptr)
         return;
     FContentNpcShip* const Ship = static_cast<FContentNpcShip*>(Object);
-    if (Ship->FormationSlot != 0 && Ship->FormationId != 0xffffffffu)
+    if (Ship->FormationSlot != 0 && Ship->FormationId != GNoFormationId)
         return;
     if (!Ship->IsSpacePopShip())
         return;
@@ -3528,7 +3529,7 @@ void FGcsDockHailHandler::OnSystemLoaded(unsigned int const* SystemId)
     Center.x = 0.0f;
     Center.y = 0.0f;
     Center.z = 0.0f;
-    pub::System::ScanObjects(*SystemId, Objects, 0x40, Center, -1.0f, 0x200100, Count);
+    pub::System::ScanObjects(*SystemId, Objects, 0x40, Center, -1.0f, OBJ_STATION | OBJ_CAPITAL, Count);
     FindSystemInfo(SystemId);   // result unused
 
     for (unsigned int Index = 0; Index < Count; ++Index)
@@ -3536,7 +3537,7 @@ void FGcsDockHailHandler::OnSystemLoaded(unsigned int const* SystemId)
         // The docking target's base record must have voice data (CommReferrable slot 0).
         unsigned int Type = 0;
         pub::SpaceObj::GetType(Objects[Index], Type);
-        if ((Type & 0x200100) == 0 || (Type & 2) != 0)
+        if ((Type & (OBJ_STATION | OBJ_CAPITAL)) == 0 || (Type & OBJ_PLANET) != 0)
             continue;
         unsigned int BaseId = 0;
         pub::SpaceObj::GetDockingTarget(Objects[Index], BaseId);
@@ -3720,7 +3721,7 @@ void FGcsCombatHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
                 return;
             unsigned int Type = ParmsBits;
             pub::SpaceObj::GetType(Words[1], Type);
-            if ((Type & 0x7f0000) == 0)
+            if ((Type & OBJ_SHIP_MASK) == 0)
                 return;
             RecordGcsComm(GCS_EVENT_NO_ENGAGE, System, Words[1], Words[2]);
             FGcsCombatNoEngageEvent Event;
@@ -3914,7 +3915,7 @@ void FGcsFidgetHandler::HandleMessage(pub::Controller::EMessage MessageId, void 
             if (!static_cast<FContentNpcShip*>(*ObjIt)->IsSpacePopShip())
                 continue;
             FContentShipBase* const Candidate = static_cast<FContentShipBase*>(*ObjIt);
-            if (Candidate->FormationSlot != 0 && Candidate->FormationId != 0xffffffffu)
+            if (Candidate->FormationSlot != 0 && Candidate->FormationId != GNoFormationId)
                 continue;
             if (Candidate->IsInCombat())
                 continue;

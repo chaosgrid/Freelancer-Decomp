@@ -486,8 +486,8 @@ bool __cdecl IsSegmentClear(Vector const* From, Vector const* To, FSystemInfo* S
 
     unsigned int Objects[0x20];
     unsigned int Count = 0;
-    pub::System::ScanObjects(Center.SystemId, Objects, 0x20, Center.Position, ScanRadius, 0xfdff,
-                             Count);
+    pub::System::ScanObjects(Center.SystemId, Objects, 0x20, Center.Position, ScanRadius,
+                             OBJ_SOLAR_NO_WAYPOINT_MASK, Count);
     for (unsigned int Index = 0; Index < Count; ++Index)
     {
         float Radius = 0.0f;
@@ -496,7 +496,7 @@ bool __cdecl IsSegmentClear(Vector const* From, Vector const* To, FSystemInfo* S
         unsigned int Type = 0;
         pub::SpaceObj::GetType(Objects[Index], Type);
         double Reach = Radius;
-        if ((Type & 3) != 0)
+        if ((Type & (OBJ_MOON | OBJ_PLANET)) != 0)
             Reach = (200.0 + 400.0) + Radius;
         float const ReachSquared = static_cast<float>(Reach * Reach);
         Vector Closest;
@@ -514,7 +514,7 @@ bool __cdecl FindObstacleCenter(unsigned int SystemId, Vector Center, float Rang
     unsigned int Objects[0x20];
     unsigned int Count = 0;
     float const ScanRadius = static_cast<float>(((400.0 + 600.0) + Range) * 0.5);
-    pub::System::ScanObjects(SystemId, Objects, 0x20, Center, ScanRadius, 0xfdff, Count);
+    pub::System::ScanObjects(SystemId, Objects, 0x20, Center, ScanRadius, OBJ_SOLAR_NO_WAYPOINT_MASK, Count);
 
     Vector Obstacles[0x20];
     int ObstacleCount = 0;
@@ -527,7 +527,7 @@ bool __cdecl FindObstacleCenter(unsigned int SystemId, Vector Center, float Rang
         unsigned int Type = 0;
         pub::SpaceObj::GetType(Objects[Index], Type);
         double Reach = Radius;
-        if ((Type & 3) != 0)
+        if ((Type & (OBJ_MOON | OBJ_PLANET)) != 0)
             Reach = 400.0 + Radius;
         float const Limit = static_cast<float>(HalfRange + Reach);
 
@@ -650,7 +650,7 @@ void __cdecl FindEntryRing(FTradeLaneRing* Out, Vector const* Position,
 
     // The crossing ring replaces the nearest one when a target was given
     // and its id is set.
-    if (Target != nullptr && (Crossing.ObjectId & 0x3fffffffu) != 0)
+    if (Target != nullptr && (Crossing.ObjectId & GIdValueMask) != 0)
         Nearest = Crossing;
     *Out = Nearest;
 }
@@ -892,7 +892,7 @@ bool __cdecl IsSameShipOrFormation(FContentShipBase* Ship, unsigned int OtherId)
         static_cast<FContentShipBase*>(Ship->GetSystem()->FindShip(OtherId));    // FUN_06f73930
     if (Other == nullptr)
         return false;
-    if (Other->FormationId != 0xffffffffu && Other->FormationId == Ship->FormationId)
+    if (Other->FormationId != GNoFormationId && Other->FormationId == Ship->FormationId)
         return true;
     return Ship->SpaceObjId == Other->SpaceObjId;
 }
@@ -903,7 +903,7 @@ namespace
     // room for 5 is reserved), or Object alone when it flies in no group (+0x154 == -1).
     void CollectAttitudeMembers(std::vector<FContentShipBase*>* Out, FContentShipBase* Object)
     {
-        if (Object->FormationId == 0xffffffffu)
+        if (Object->FormationId == GNoFormationId)
         {
             Out->push_back(Object);
             return;
@@ -943,7 +943,7 @@ void __cdecl SetFormationAttitudes(FSystemInfo* System, unsigned int ShipId, uns
     // (the type stays unset on a failure); the port starts it at 0.
     unsigned int OtherType = 0;
     pub::SpaceObj::GetType(OtherId, OtherType);
-    if ((OtherType & 0x7f0000u) == 0)
+    if ((OtherType & OBJ_SHIP_MASK) == 0)
     {
         // Every member of the ship's group and the object's reputation.
         int OtherRep;

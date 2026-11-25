@@ -189,8 +189,8 @@ namespace AlchemyImpl
     {
         // LAB_06204260: resolve against the owner, then AddRef the selected
         // delegating interface before publishing it.
-        if (IidEqual(Iid, Iids::Alchemy) || IidEqual(Iid, Iids::FxNodeLibrary) ||
-            IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::Alchemy) || Iids::EqualNoNullTest(Iid, Iids::FxNodeLibrary) ||
+            Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             IAlchemy* const Interface = static_cast<IAlchemy*>(Owner_);
             Interface->AddRef();

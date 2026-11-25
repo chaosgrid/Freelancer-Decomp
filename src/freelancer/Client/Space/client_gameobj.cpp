@@ -253,7 +253,7 @@ FClientGameobj::FClientGameobj(EClientGameobjKind Kind)
     // bWatchListed (+0xa8) are not written: the ObjDB link, FUN_0053a960 and the derived
     // constructors set them.
     unsigned char const KindByte = static_cast<unsigned char>(static_cast<int>(Kind));
-    ManagerKind = static_cast<int>(Kind);
+    ManagerKind = Kind;
 
     // Only the low nibble of the flag byte is cleared; the rest keeps whatever the allocation
     // held.
@@ -327,7 +327,7 @@ FClientGameobj::~FClientGameobj()
 unsigned int const FClientGameobj::get_id() const
 {
     // LAB_00524e70
-    CObject* const Obj = NarrowObject(this, 0x3u);
+    CObject* const Obj = NarrowObject(this, CObject::ClassSimple);
     if (Obj == nullptr)
         return 0;
     return static_cast<CSimple const*>(Obj)->Id;
@@ -389,7 +389,7 @@ void FClientGameobj::PostCreateInit()
             // The id's string is fetched first.
             char const* const ExplName = ExplosionId->get_string();
             char const* const ArchName = Object->get_archetype()->Nickname.get_string();
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Archtype(%s) explosion_arch(%s) not found.",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Archtype(%s) explosion_arch(%s) not found.",
                   kGameobjSourceFile, 0x85, ArchName, ExplName);
         }
     }
@@ -481,7 +481,7 @@ void FClientGameobj::Destroy(int DestroyType)
         Explode(nullptr);
         return;
     }
-    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kGameobjSourceFile, 0x2a4, "Invalid DestroyType!");
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kGameobjSourceFile, 0x2a4, "Invalid DestroyType!");
 }
 
 void FClientGameobj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
@@ -519,7 +519,7 @@ void FClientGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj*
     // FUN_00408a70: a random live effect of the munition's companion.
     FEffectArch* const LiveEffect = Archetype::CliMunitionPickLiveEffect(
         NarrowObject(Munition, 0x7u)->Archetype->Companion);
-    Vector const Velocity = NarrowObject(Munition, 0x1u)->get_velocity();
+    Vector const Velocity = NarrowObject(Munition, CObject::ClassObject)->get_velocity();
     SpawnSplashHitEffect(LiveEffect, Hit, Hit + 1, &Velocity, nullptr);
 }
 
@@ -541,7 +541,7 @@ void FClientGameobj::ReportCollisionToServer(void const* A, void const* B, FClie
     // compares the player's own connection id (DAT_00673344) and so passes.
     if (!SinglePlayer())
     {
-        CObject* const OtherObj = NarrowObject(Other, 0x3u);
+        CObject* const OtherObj = NarrowObject(Other, CObject::ClassSimple);
         unsigned const Owner = (OtherObj != nullptr)
                                    ? static_cast<CSimple const*>(OtherObj)->OwnerPlayer
                                    : GetPlayerConnectionId();
@@ -903,21 +903,21 @@ void FClientSimpleGameobj::ApplyDamageList(DamageList const& Damage)
     {
         if (It->SubObjId != SUBOBJ_ID_ROOT)
             continue;
-        static_cast<CSimple*>(NarrowObject(this, 3u))->set_hit_pts(It->HitPts);
+        static_cast<CSimple*>(NarrowObject(this, CObject::ClassSimple))->set_hit_pts(It->HitPts);
     }
 }
 
 void FClientSimpleGameobj::Destroy(int DestroyType)
 {
     // FUN_00547500: no null test on the narrowed object.
-    static_cast<CSimple*>(NarrowObject(this, 3u))->set_hit_pts(0.0f);
+    static_cast<CSimple*>(NarrowObject(this, CObject::ClassSimple))->set_hit_pts(0.0f);
     FClientGameobj::Destroy(DestroyType);
 }
 
 unsigned FClientSimpleGameobj::GetTypeBits() const
 {
     // LAB_00547530: the CSimple's +0xe0, no null test.
-    return static_cast<CSimple const*>(NarrowObject(this, 3u))->TypeBits;
+    return static_cast<CSimple const*>(NarrowObject(this, CObject::ClassSimple))->TypeBits;
 }
 
 void FClientSimpleGameobj::SetWatchListed(int Unused, int bWatch)
@@ -1032,7 +1032,7 @@ FClientEquippedObj::~FClientEquippedObj()
     EquippedObjClearEquipFx(this);
 
     // No null test on the narrowed object.
-    CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+    CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
     // Every fuse of the archetype's fuse list (arch +0x78; the port's Archetype::EqObj keeps a
     // vector* there, null for an empty list) found in the fuse DB is UnLoad'ed.
     Archetype::EqObj const* const EqArch = static_cast<Archetype::EqObj const*>(EqObj->Archetype);
@@ -1138,7 +1138,7 @@ void FClientEquippedObj::SpawnPartDebris(CObject* PartObject, ID_String const* D
     {
         char const* const ArchName = PartObject->get_archetype()->Nickname.get_string();
         char const* const TypeName = DebrisType->get_string();
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: ID(0x%X) Exploding: Couldn't find debris_type[%s] with "
               "archetype[%s], using default.",
               kEquippedObjSourceFile, 0x1e8, get_id(), TypeName, ArchName);
@@ -1159,7 +1159,7 @@ void FClientEquippedObj::SpawnPartDebris(CObject* PartObject, ID_String const* D
         Debris->Actions.add(Action_Explode::Create(Expl, Debris, &get_position()));
         return;
     }
-    FDUMP(0x100002, "%s(%d) : *** WARNING: Couldn't find separation_explosion[%s], skipping.",
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Couldn't find separation_explosion[%s], skipping.",
           kEquippedObjSourceFile, 0x202, Explosion->get_string());
 }
 
@@ -1203,7 +1203,7 @@ unsigned* FClientEquippedObj::PickLod(unsigned* OutLod, void* Camera, unsigned c
 {
     // FUN_00533710. The narrowed CEqObj is read with no null test. A fully cloaked object
     // (>= 1.0f; below and unordered draw) gets LOD {1, 0xffff}, i.e. not drawn.
-    CEqObj const* const EqObj = static_cast<CEqObj const*>(NarrowObject(this, 0x103u));
+    CEqObj const* const EqObj = static_cast<CEqObj const*>(NarrowObject(this, CObject::ClassEqObj));
     if (EqObj->CloakPercent >= 1.0f)
     {
         *OutLod = 0xffff0001u;
@@ -1236,17 +1236,17 @@ void FClientEquippedObj::ApplyDamageList(DamageList const& Damage)
             DamageEntry const& Entry = *It;
             if (Entry.SubObjId == SUBOBJ_ID_ROOT)
             {
-                static_cast<CEqObj*>(NarrowObject(this, 0x103u))->set_hit_pts(Entry.HitPts);
+                static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->set_hit_pts(Entry.HitPts);
             }
             else if (Entry.SubObjId == SUBOBJ_ID_POWER)
             {
                 // Written directly (+0x198).
-                static_cast<CEqObj*>(NarrowObject(this, 0x103u))->Power = Entry.HitPts;
+                static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->Power = Entry.HitPts;
             }
             else if (SubObjectID::IsEquipID(Entry.SubObjId))
             {
                 // No equipment with that id -> the next entry.
-                CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+                CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
                 CEquip* const Equip = EqObj->EquipManager.FindByID(Entry.SubObjId);
                 if (Equip == nullptr)
                     continue;
@@ -1255,7 +1255,7 @@ void FClientEquippedObj::ApplyDamageList(DamageList const& Damage)
                     // Cause 0x13: no type test before the shield cast.
                     static_cast<CEShield*>(Equip)->ShieldBatteryBoost(Entry.HitPts);
                 }
-                else if (Equip->Type == 0x10000u &&
+                else if (Equip->Type == EquipTypeCargo &&
                          static_cast<CECargo*>(Equip)->Count > 1u && Entry.HitPts == 0.0f)
                 {
                     // Stacked cargo whose entry is exactly 0 loses one unit.
@@ -1269,15 +1269,15 @@ void FClientEquippedObj::ApplyDamageList(DamageList const& Damage)
             else
             {
                 // A collision group.
-                static_cast<CEqObj*>(NarrowObject(this, 0x103u))
+                static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))
                     ->set_sub_obj_hit_pts(Entry.SubObjId, Entry.HitPts);
             }
         }
     }
 
     // In single player too.
-    static_cast<CEqObj*>(NarrowObject(this, 0x103u))->destroy_sub_objs(Damage, true);
-    static_cast<CEqObj*>(NarrowObject(this, 0x103u))->EquipManager.CleanUp();
+    static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->destroy_sub_objs(Damage, true);
+    static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->EquipManager.CleanUp();
 }
 
 void FClientEquippedObj::OnSurfaceCollisionHit(void const* Contact, void const* B, FClientGameobj* Other,
@@ -1290,7 +1290,7 @@ void FClientEquippedObj::OnSurfaceCollisionHit(void const* Contact, void const* 
         // FUN_00533100 inlined.
         FClientEquip* const Wrapper = EquippedObjFindEquipFx(this, SubObj);
         // A shield wrapper (equipment type 0x100; the equipment is not null-tested).
-        if (Wrapper != nullptr && Wrapper->Equip->Type == 0x100u)
+        if (Wrapper != nullptr && Wrapper->Equip->Type == EquipTypeShield)
         {
             // Fetched and dropped -- leftovers of the inlined body.
             (void)get_velocity();
@@ -1311,7 +1311,7 @@ void FClientEquippedObj::OnMunitionHit(void const* A, void const* B, FClientGame
     {
         // FUN_00533100 inlined, as in slot 104.
         FClientEquip* const Wrapper = EquippedObjFindEquipFx(this, SubObj);
-        if (Wrapper != nullptr && Wrapper->Equip->Type == 0x100u)
+        if (Wrapper != nullptr && Wrapper->Equip->Type == EquipTypeShield)
         {
             CliShieldEquipFxMunitionHit(Wrapper, A, Munition);
             return;
@@ -1360,7 +1360,7 @@ void FClientEquippedObj::ApplySubTarget(unsigned short SubObj)
     {
         // The gun at SubObj (no null test on the narrowed object); unchanged when it already
         // targets the Gameobj's object on the same sub-object.
-        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
         CEquip* const Equip = EqObj->EquipManager.FindByID(SubObj);
         if (Equip == nullptr)
             return;
@@ -1391,12 +1391,12 @@ void FClientEquippedObj::Explode(Vector const* Pos)
     CEquipTraverser Walk;
     for (;;)
     {
-        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
         CEquip* const Equip = EqObj->EquipManager.Traverse(Walk);
         if (Equip == nullptr)
             break;
         CAttachedEquip* const Attached = CAttachedEquip::cast(Equip);
-        if (Attached != nullptr && Equip->Type != 0x100u)
+        if (Attached != nullptr && Equip->Type != EquipTypeShield)
             Attached->SetFate(DamageEntry::SubObjFate::Separated);
         Equip->Destroy();
     }
@@ -1405,7 +1405,7 @@ void FClientEquippedObj::Explode(Vector const* Pos)
     CArchGrpTraverser Groups;
     for (;;)
     {
-        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
         CArchGroup* const Group = EqObj->ArchGroups.Traverse(Groups);
         if (Group == nullptr)
             break;
@@ -1414,7 +1414,7 @@ void FClientEquippedObj::Explode(Vector const* Pos)
         Group->Kill(DamageEntry::SubObjFate::Destroyed);
     }
 
-    static_cast<CEqObj*>(NarrowObject(this, 0x103u))->ArchGroups.DestroyDeadGroups();
+    static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->ArchGroups.DestroyDeadGroups();
     FClientGameobj::Explode(Pos);
 }
 
@@ -1496,7 +1496,7 @@ namespace
     CLoot* TractorLootOf(IObjRW* Target)
     {
         CObject* const Obj = const_cast<CObject*>(Target->cobject());
-        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x803u) != 0x803u)
+        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassLoot) != CObject::ClassLoot)
             return nullptr;
         return static_cast<CLoot*>(Obj);
     }
@@ -1519,7 +1519,7 @@ int FClientEquippedObj::tractor_all(unsigned short const* EquipId,
         return -5;
 
     // No null test on the narrowed object.
-    CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+    CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
     CEquip* const Equip = EqObj->EquipManager.FindByID(*EquipId);
     if (Equip == nullptr)
         return -2;
@@ -1561,7 +1561,7 @@ int FClientEquippedObj::tractor_single(unsigned short const* EquipId, IObjRW* Ta
     if (Target == nullptr)
         return -4;
 
-    CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+    CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
     CEquip* const Equip = EqObj->EquipManager.FindByID(*EquipId);
     if (Equip == nullptr)
         return -2;
@@ -1605,11 +1605,11 @@ int FClientEquippedObj::use_item(unsigned short EquipId, unsigned Count, int Sou
         return -5;
 
     // No null test on the narrowed object.
-    CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+    CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
     CECargo* const Cargo = CECargo::cast(EqObj->EquipManager.FindByID(EquipId));
     if (Cargo == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\EquippedObj.cpp", 0x540,
               "EqObj::use_item() couldn't find target item on Client request.");
         return -2;
@@ -1621,7 +1621,7 @@ int FClientEquippedObj::use_item(unsigned short EquipId, unsigned Count, int Sou
     if (ClassType == Archetype::AClassRepairKit)
     {
         // Only while the hull is below full (equal, above or unordered skip).
-        CEqObj* const Hull = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+        CEqObj* const Hull = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
         if (!(Hull->get_relative_health() < 1.0f))
             return 0;
     }
@@ -1632,7 +1632,7 @@ int FClientEquippedObj::use_item(unsigned short EquipId, unsigned Count, int Sou
         CEquipTraverser Walk(static_cast<int>(EquipTypeShield));
         for (;;)
         {
-            CEqObj* const Owner = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+            CEqObj* const Owner = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
             CEquip* const Shield = Owner->EquipManager.Traverse(Walk);
             if (Shield == nullptr)
                 return 0;
@@ -1684,9 +1684,9 @@ FClientSolarGameobj::~FClientSolarGameobj()
     // narrowed object.
     if (Object != nullptr)
     {
-        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
         EqObj->disconnect(GetClientObjDb());
-        static_cast<CEqObj*>(NarrowObject(this, 0x103u))->disconnect(static_cast<INotify*>(this));
+        static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->disconnect(static_cast<INotify*>(this));
     }
 }
 
@@ -1719,7 +1719,7 @@ void FClientSolarGameobj::update(float Dt)
 {
     // FUN_00547880. In multiplayer the CSolar (no null test) runs the dumb update.
     if (!SinglePlayer())
-        NarrowObject(this, 0x303u)->update(Dt, CObject::UPDATE_DUMB);
+        NarrowObject(this, CObject::ClassSolar)->update(Dt, CObject::UPDATE_DUMB);
 
     FClientEquippedObj::update(Dt);
 
@@ -1753,8 +1753,8 @@ float FClientSolarGameobj::GetPhysicalRadius(Vector& Center)
 
     // A planet / star / moon type (TypeBits & 7; no null test on the narrowed object) -> the
     // engine instance's extent, Center taken to world space.
-    CSimple* const Simple = static_cast<CSimple*>(NarrowObject(this, 0x303u));
-    if ((Simple->TypeBits & 7u) != 0)
+    CSimple* const Simple = static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar));
+    if ((Simple->TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0)
     {
         float Radius = 0.0f;
         long const Inst = get_index();
@@ -1777,7 +1777,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
 {
     // LAB_00548220 -- the solar draw. Every path that draws nothing returns LOD {0, 0xffff}.
     unsigned Lod = 0xffff0000u;
-    CSimple* const Simple = static_cast<CSimple*>(NarrowObject(this, 0x303u));
+    CSimple* const Simple = static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar));
 
     // A star is drawn only with option 0x24 on, and gives {4, 0xffff}.
     if (StarSphere != nullptr)
@@ -1794,7 +1794,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
 
     unsigned const TypeBits = Simple->TypeBits;
     bool bSubmit = false;
-    if ((TypeBits & 7u) != 0)
+    if ((TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0)
     {
         // Planet / star / moon -> drawn only with option 0x23 on.
         if (GetGameOption(0x23) == 0)
@@ -1815,7 +1815,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
         }
 #endif
     }
-    else if ((TypeBits & 8u) != 0)
+    else if ((TypeBits & OBJ_BLACKHOLE) != 0)
     {
         *OutLod = Lod;
         return OutLod;
@@ -1892,7 +1892,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
 
     // Bit 9 is re-read.
     if (static_cast<unsigned short>(Answer) < 3 ||
-        ((static_cast<CSimple*>(NarrowObject(this, 0x303u))->TypeBits >> 9) & 1u) == 0)
+        ((static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar))->TypeBits >> 9) & 1u) == 0)
     {
         *OutLod = Lod;
         return OutLod;
@@ -1917,7 +1917,7 @@ void FClientSolarGameobj::OnSurfaceCollisionHit(void const* Contact, void const*
 {
     // LAB_00548520: a solar of type bits 0..3 ignores the hit (no null test on the narrowed
     // object).
-    if ((static_cast<CSimple*>(NarrowObject(this, 0x303u))->TypeBits & 0xfu) != 0)
+    if ((static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar))->TypeBits & 0xfu) != 0)
         return;
     FClientEquippedObj::OnSurfaceCollisionHit(Contact, B, Other, D);
 }
@@ -1925,7 +1925,7 @@ void FClientSolarGameobj::OnSurfaceCollisionHit(void const* Contact, void const*
 void FClientSolarGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
 {
     // LAB_00548570: the same test.
-    if ((static_cast<CSimple*>(NarrowObject(this, 0x303u))->TypeBits & 0xfu) != 0)
+    if ((static_cast<CSimple*>(NarrowObject(this, CObject::ClassSolar))->TypeBits & 0xfu) != 0)
         return;
     FClientEquippedObj::OnMunitionHit(A, B, Munition);
 }
@@ -1974,7 +1974,7 @@ void FClientSolarGameobj::ReadIni(INI_Reader& Reader)
         {
             // No null test on the narrowed object.
             char const* const Voice = Reader.get_value_string();
-            CSolar* const Solar = static_cast<CSolar*>(NarrowObject(this, 0x303u));
+            CSolar* const Solar = static_cast<CSolar*>(NarrowObject(this, CObject::ClassSolar));
             Solar->VoiceId = CreateID(Voice);
         }
         else if (Reader.is_value("jump_effect"))
@@ -2038,7 +2038,7 @@ FClientShipGameobj::FClientShipGameobj()
     Pad18d[0] = 0;
     Pad18d[1] = 0;
     Pad18d[2] = 0;
-    JumpState = 0;
+    JumpState = kJumpStateNone;
     // 1/32768 is DAT_005caeec.
     NebulaUpdateTimer = static_cast<float>(static_cast<double>(rand()) * 3.0517578125e-05);
 }
@@ -2084,15 +2084,15 @@ FClientShipGameobj::~FClientShipGameobj()
         bool bDisconnectDb = true;
         if (SinglePlayer())
         {
-            CObject* const Owned = NarrowObject(this, 0x3u);
+            CObject* const Owned = NarrowObject(this, CObject::ClassSimple);
             unsigned const Owner = (Owned != nullptr)
                                        ? static_cast<CSimple const*>(Owned)->OwnerPlayer
                                        : GetPlayerConnectionId();
             bDisconnectDb = Owner == GetPlayerConnectionId();
         }
         if (bDisconnectDb)
-            static_cast<CEqObj*>(NarrowObject(this, 0x103u))->disconnect(GetClientObjDb());
-        static_cast<CEqObj*>(NarrowObject(this, 0x103u))->disconnect(static_cast<INotify*>(this));
+            static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->disconnect(GetClientObjDb());
+        static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj))->disconnect(static_cast<INotify*>(this));
     }
     // The +0x160 member's destructor (FUN_00544710, inlined): +0x174 first, then +0x164.
     CliEffectCompanionClear(TradeLaneTunnelCompanion);
@@ -2179,14 +2179,14 @@ namespace
         FGameLight* const Light = static_cast<FGameLight*>(Companion[3]);
         if (Light != nullptr)
         {
-            EngineLightSetType((FEngineLight*)Light, 1, true);
+            EngineLightSetType((FEngineLight*)Light, kLightPoint, true);
             EngineLightSetColorBytesAlt((FEngineLight*)Light, &Arch->LgtColorR);
             EngineLightSetRadius((FEngineLight*)Light, Arch->LgtRadius);
             if (!GameLightEnable((FEngineLight*)Light))
             {
                 ID_String Name;
                 Name.Id = Arch->NicknameId;
-                FDUMP(0x100002, "%s(%d) : *** WARNING: couldnt open light",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: couldnt open light",
                       kCreateEffectSourceFile, 0xce, Name.get_string());
                 GameLightRelease(Light);
                 Companion[3] = nullptr;
@@ -2256,7 +2256,7 @@ namespace
         // The CShip narrowing (class & 0x503) is not null-tested before +0x88 is read.
         CObject* const Obj = Go->Object;
         CShip* const Ship = (Obj != nullptr &&
-                             (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+                             (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                                 ? static_cast<CShip*>(Obj)
                                 : nullptr;
         Archetype::Ship const* const ShipArch =
@@ -2318,7 +2318,7 @@ void FClientShipGameobj::PlayCargoJettisonSound()
     // The narrowed CShip is not null-tested.
     CObject* const Obj = Object;
     CShip* const Ship =
-        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             ? static_cast<CShip*>(Obj)
             : nullptr;
     Archetype::Ship const* const ShipArch = static_cast<Archetype::Ship const*>(Ship->Archetype);
@@ -2421,7 +2421,7 @@ namespace
         // The archetype is read through the 0x303 narrowing without a null test.
         CObject* const Obj = Go->Object;
         CObject* const Solar = (Obj != nullptr &&
-                                (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+                                (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                                    ? Obj
                                    : nullptr;
         FScopedEffectArch Scoped; // FUN_0040e250; FUN_0040e2a0 at scope exit
@@ -2446,7 +2446,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
         // The archetype is read through the narrowing without a null test.
         CObject* const Obj = Object;
         CObject* const Solar = (Obj != nullptr &&
-                                (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+                                (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                                    ? Obj
                                    : nullptr;
         Archetype::EqObj const* const SolarArch =
@@ -2463,7 +2463,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
         {
             // operator new(0xe0) + FUN_00502ba0; a failed allocation stores null.
             SolarDoorSound(this, true);
-            if ((GetTypeBits() & 0x40u) != 0u || (GetTypeBits() & 0x800u) != 0u)
+            if ((GetTypeBits() & OBJ_JUMP_GATE) != 0u || (GetTypeBits() & OBJ_JUMP_HOLE) != 0u)
             {
                 if (JumpGateEffect == nullptr)
                     JumpGateEffect = new (std::nothrow) FJumpGateEffect(this);
@@ -2473,7 +2473,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
         {
             // FUN_00503380 sets the effect's +0x18 fire flag.
             SolarDoorSound(this, false);
-            if ((GetTypeBits() & 0x40u) != 0u || (GetTypeBits() & 0x800u) != 0u)
+            if ((GetTypeBits() & OBJ_JUMP_GATE) != 0u || (GetTypeBits() & OBJ_JUMP_HOLE) != 0u)
             {
                 if (JumpGateEffect != nullptr)
                     JumpGateEffectFire(static_cast<FJumpGateEffect*>(JumpGateEffect));
@@ -2481,7 +2481,7 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
         }
         else if (Sub == 3)
         {
-            if ((GetTypeBits() & 0x40u) != 0u || (GetTypeBits() & 0x800u) != 0u)
+            if ((GetTypeBits() & OBJ_JUMP_GATE) != 0u || (GetTypeBits() & OBJ_JUMP_HOLE) != 0u)
             {
                 if (JumpGateEffect != nullptr)
                     delete static_cast<FJumpGateEffect*>(JumpGateEffect);
@@ -2495,10 +2495,10 @@ void FClientSolarGameobj::notify(Event Code, void* Param)
         // the narrowed object.
         CObject* const Obj = Object;
         CSimple const* const Simple =
-            (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+            (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                 ? static_cast<CSimple const*>(Obj)
                 : nullptr;
-        if ((Simple->TypeBits & 0x80u) != 0u)
+        if ((Simple->TypeBits & OBJ_TRADELANE_RING) != 0u)
             bTradeLaneIdle =
                 TradeLaneSolarLaneSwitch(this, *static_cast<unsigned char const*>(Param));
     }
@@ -2522,7 +2522,7 @@ void FClientShipGameobj::PostCreateInit()
     // FUN_005447b0
     FClientEquippedObj::PostCreateInit();
     ShipFlags = static_cast<unsigned char>(ShipFlags & 0xfcu);
-    SetJumpState(0);
+    SetJumpState(kJumpStateNone);
 
     // The ship companion's pilot_mesh (+0x64). No null test on the narrowed CShip.
     CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
@@ -2584,11 +2584,11 @@ IObjRW* FClientShipGameobj::PickNextTarget(int ConnectionId)
 
     // No null test on the narrowed CShip.
     CObject* Obj = const_cast<CObject*>(cobject());
-    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) != 0x503u)
+    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         Obj = nullptr;
     CShip* const Ship = static_cast<CShip*>(Obj);
 
-    CEScanner* const Scanner = static_cast<CEScanner*>(Ship->EquipManager.FindFirst(0x80000u));
+    CEScanner* const Scanner = static_cast<CEScanner*>(Ship->EquipManager.FindFirst(EquipTypeScanner));
     if (Scanner == nullptr)
         return Nearest;
 
@@ -2606,12 +2606,12 @@ IObjRW* FClientShipGameobj::PickNextTarget(int ConnectionId)
             continue;
         // A CSimple counts only with TypeBits & 0x7f0000 or when its gameobj is watch-listed.
         CObject const* const OtherObj = Other->cobject();
-        if (OtherObj != nullptr && (static_cast<unsigned>(OtherObj->ObjectClass) & 3u) == 3u)
+        if (OtherObj != nullptr && (static_cast<unsigned>(OtherObj->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
         {
             FClientGameobj* const OtherGo = ClientObjDb_FindObject(Other->get_id(), 0);
             if (OtherGo != nullptr)
                 bListed = OtherGo->bWatchListed != 0;
-            if ((static_cast<CSimple const*>(OtherObj)->TypeBits & 0x7f0000u) == 0 && !bListed)
+            if ((static_cast<CSimple const*>(OtherObj)->TypeBits & OBJ_SHIP_MASK) == 0 && !bListed)
                 continue;
         }
         Vector const& Mine = get_position();
@@ -2646,7 +2646,7 @@ void FClientShipGameobj::SetTargetWithGuns(IObjRW* Target, unsigned short SubTar
 
     // The CShip is narrowed again on each pass and used with no null test. FUN_005351d0 is a
     // direct (non-virtual) call.
-    CEquipTraverser Walk(0x80);
+    CEquipTraverser Walk(EquipTypeGun);
     for (;;)
     {
         CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
@@ -2663,7 +2663,7 @@ bool FClientShipGameobj::RequestTractor(IObjRW* Target)
 {
     // FUN_00544c30
     CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
-    CEquip* const Tractor = Ship->EquipManager.FindFirst(0x100000u);
+    CEquip* const Tractor = Ship->EquipManager.FindFirst(EquipTypeTractor);
     if (Tractor == nullptr)
         return false;
 
@@ -2674,7 +2674,7 @@ bool FClientShipGameobj::RequestTractor(IObjRW* Target)
     {
         CObject const* const TargetObj = Target->cobject();
         if (TargetObj != nullptr &&
-            (static_cast<unsigned>(TargetObj->ObjectClass) & 0x803u) == 0x803u)
+            (static_cast<unsigned>(TargetObj->ObjectClass) & CObject::ClassLoot) == CObject::ClassLoot)
         {
             Affect->tractor_single(&TractorId, Target, static_cast<int>(GetPlayerConnectionId()));
         }
@@ -2718,7 +2718,7 @@ void FClientShipGameobj::update(float Dt)
 
     // The local player's objects run the full CObject::update; others, in multiplayer only,
     // the dumb one; in single player a foreign object is not updated here at all.
-    CObject* const OwnerObject = NarrowObject(this, 0x3u);
+    CObject* const OwnerObject = NarrowObject(this, CObject::ClassSimple);
     unsigned const Owner = (OwnerObject != nullptr)
                                ? static_cast<CSimple const*>(OwnerObject)->OwnerPlayer
                                : GetPlayerConnectionId();
@@ -2747,7 +2747,7 @@ void FClientShipGameobj::update(float Dt)
     }
 
     // The jump.
-    if (JumpState != 0 && JumpEffect != nullptr)
+    if (JumpState != kJumpStateNone && JumpEffect != nullptr)
     {
         FJumpShipEffect* const JumpFx = static_cast<FJumpShipEffect*>(JumpEffect);
         // The step is clamped to 0.1f (DAT_005d3ee0); a NaN Dt is kept.
@@ -2758,7 +2758,7 @@ void FClientShipGameobj::update(float Dt)
 
         // In the tunnel, once, when no more than 1.5 s of JumpOutTunnelTime remain (greater
         // and NaN skip), the screen fades out to white (FUN_004122a0).
-        if (G_bJumpTunnelFadeOutPending != 0 && JumpState == 2 &&
+        if (G_bJumpTunnelFadeOutPending != 0 && JumpState == kJumpStateJumpOutTunnel &&
             static_cast<double>(JumpFx->JumpOutTunnelTime) -
                     static_cast<double>(JumpFx->Clock) <=
                 static_cast<double>(G_JumpTunnelFadeOutTime))
@@ -2771,32 +2771,32 @@ void FClientShipGameobj::update(float Dt)
         // Each state moves on once its time is below the clock (ordered "less" only).
         switch (JumpState)
         {
-        case 1:
+        case kJumpStateJumpOut:
             if (JumpFx->JumpOutTime < JumpFx->Clock)
-                SetJumpState(2);
+                SetJumpState(kJumpStateJumpOutTunnel);
             break;
-        case 2:
+        case kJumpStateJumpOutTunnel:
             // The screen fades back in from white (FUN_004121d0, starting opaque).
             if (JumpFx->JumpOutTunnelTime < JumpFx->Clock)
             {
                 G_bJumpTunnelFadeOutPending = 1;
-                SetJumpState(3);
+                SetJumpState(kJumpStateJumpInTunnel);
                 float const White[3] = {1.0f, 1.0f, 1.0f};
                 FadeInColoured(White, G_JumpTunnelFadeInTime, true);
             }
             break;
-        case 3:
+        case kJumpStateJumpInTunnel:
             // Only once the jump in was ordered.
             if (JumpFx->JumpInTunnelTime < JumpFx->Clock && bJumpInReady != 0)
-                SetJumpState(4);
+                SetJumpState(kJumpStateJumpIn);
             break;
-        case 4:
+        case kJumpStateJumpIn:
             if (JumpFx->JumpInTime < JumpFx->Clock)
-                SetJumpState(5);
+                SetJumpState(kJumpStateArrived);
             break;
-        case 5:
+        case kJumpStateArrived:
             if (JumpFx->Clock > 1.0f)
-                SetJumpState(0);
+                SetJumpState(kJumpStateNone);
             break;
         default:
             break;
@@ -2843,12 +2843,12 @@ void FClientShipGameobj::update(float Dt)
         if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
         {
             unsigned const TypeBits = Atmosphere->TypeBits;
-            if ((TypeBits & 0x4u) != 0)
+            if ((TypeBits & OBJ_SUN) != 0)
             {
                 NnVoiceEnqueue(G_ShipVoiceDangerId, 0);
                 NnVoiceEnqueue(G_ShipVoiceEnteringSunCoronaId, 0);
             }
-            else if ((TypeBits & 0x2u) != 0)
+            else if ((TypeBits & OBJ_PLANET) != 0)
             {
                 NnVoiceEnqueue(G_ShipVoiceDangerId, 0);
                 NnVoiceEnqueue(G_ShipVoiceEnteringAtmosphereId, 0);
@@ -2870,7 +2870,8 @@ void FClientShipGameobj::update(float Dt)
 void FClientShipGameobj::UpdateDrawLighting(void* Camera)
 {
     // LAB_00546480. Only the player's ship in the tunnel (jump states 2 / 3) lights itself.
-    if ((JumpState == 2 || JumpState == 3) && this == GetPlayerObjRW())
+    if ((JumpState == kJumpStateJumpOutTunnel || JumpState == kJumpStateJumpInTunnel) &&
+        this == GetPlayerObjRW())
     {
         EngineLightClearRegisteredList(); // FUN_004101e0
         FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
@@ -2952,7 +2953,7 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
     {
         // A cloaking ship passes its appearance value on to the pilot. No null test on the
         // narrowed object.
-        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, 0x103u));
+        CEqObj* const EqObj = static_cast<CEqObj*>(NarrowObject(this, CObject::ClassEqObj));
         if (EqObj->CloakPercent > 0.0f)
         {
             GetAppearanceOverrideMaterial(3u, &Extra);
@@ -3010,7 +3011,7 @@ void FClientShipGameobj::ApplyDamageList(DamageList const& Damage)
         static_cast<IObjAffect*>(this)->toggle_cruise(false, true,
                                                 static_cast<int>(GetPlayerConnectionId()));
         IBehaviorManager* const Behavior =
-            static_cast<CEqObj*>(NarrowObject(this, 0x503u))->get_behavior_interface();
+            static_cast<CEqObj*>(NarrowObject(this, CObject::ClassShip))->get_behavior_interface();
         if (Behavior != nullptr)
             Behavior->update_current_behavior_cruise(false);
     }
@@ -3021,7 +3022,7 @@ void FClientShipGameobj::ApplyDamageList(DamageList const& Damage)
     // unless the list is a destroyed one; at or above it the latch clears.
     if (this == GetPlayerObjRW())
     {
-        CSimple* const Simple = static_cast<CSimple*>(NarrowObject(this, 0x503u));
+        CSimple* const Simple = static_cast<CSimple*>(NarrowObject(this, CObject::ClassShip));
         if (!(Simple->get_relative_health() < 0.2f))
         {
             bHullBreachWarned = 0;
@@ -3085,7 +3086,7 @@ void FClientShipGameobj::UpdateNebula(float Dt)
     NebulaUpdateTimer += Dt;
 
     // In the tunnel: no nebula, no factor.
-    if (JumpState == 2 || JumpState == 3)
+    if (JumpState == kJumpStateJumpOutTunnel || JumpState == kJumpStateJumpInTunnel)
     {
         CurrentNebula = nullptr;
         NebulaFogFactor = 0.0f;
@@ -3135,7 +3136,7 @@ bool FClientShipGameobj::LightFuse(unsigned SourceId, ID_String const* FuseId,
         return bLit;
 
     // No null test on the narrowed ship.
-    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, 0x503u));
+    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
 
     // The formation followers (+0x1d4): a follower that is the player's ship hears event 7
     // with this ship's id. Its narrowed object is used without a null test.
@@ -3148,7 +3149,7 @@ bool FClientShipGameobj::LightFuse(unsigned SourceId, ID_String const* FuseId,
         CObject* const FollowerObj = const_cast<CObject*>(Follower->cobject());
         CEqObj* const FollowerShip =
             (FollowerObj != nullptr &&
-             (static_cast<unsigned>(FollowerObj->ObjectClass) & 0x503u) == 0x503u)
+             (static_cast<unsigned>(FollowerObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CEqObj*>(FollowerObj)
                 : nullptr;
         IBehaviorManager* const Behavior = FollowerShip->get_behavior_interface();
@@ -3171,7 +3172,7 @@ bool FClientShipGameobj::LightFuse(unsigned SourceId, ID_String const* FuseId,
         CObject* const FollowerObj = const_cast<CObject*>(Follower->cobject());
         CEqObj* const FollowerShip =
             (FollowerObj != nullptr &&
-             (static_cast<unsigned>(FollowerObj->ObjectClass) & 0x503u) == 0x503u)
+             (static_cast<unsigned>(FollowerObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CEqObj*>(FollowerObj)
                 : nullptr;
         IBehaviorManager* const Behavior = FollowerShip->get_behavior_interface();
@@ -3190,7 +3191,7 @@ bool FClientShipGameobj::LightFuse(unsigned SourceId, ID_String const* FuseId,
         return bLit;
     CObject* const PlayerObj = Player->Object;
     if (PlayerObj == nullptr ||
-        (static_cast<unsigned>(PlayerObj->ObjectClass) & 0x503u) != 0x503u)
+        (static_cast<unsigned>(PlayerObj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return bLit;
     IObjRW* const Target = static_cast<CShip*>(PlayerObj)->get_target();
     if (Target == nullptr)
@@ -3247,33 +3248,33 @@ void FClientShipGameobj::PlayFireFailedSound()
 int FClientShipGameobj::set_throttle(float Throttle)
 {
     // LAB_00546640: CShip::set_throttle on the object narrowed by 0x503, no null test.
-    static_cast<CShip*>(NarrowObject(this, 0x503u))->set_throttle(Throttle);
+    static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->set_throttle(Throttle);
     return 0;
 }
 
 int FClientShipGameobj::set_axis_throttle(Vector const& AxisThrottle)
 {
     // LAB_00546680: the CShip's steering (+0x230).
-    static_cast<CShip*>(NarrowObject(this, 0x503u))->Steering.SetAxisThrottle(AxisThrottle);
+    static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->Steering.SetAxisThrottle(AxisThrottle);
     return 0;
 }
 
 int FClientShipGameobj::set_nudge_vec(Vector const& NudgeVec)
 {
     // LAB_005466c0
-    static_cast<CShip*>(NarrowObject(this, 0x503u))->set_nudge_vec(NudgeVec);
+    static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->set_nudge_vec(NudgeVec);
     return 0;
 }
 
 int FClientShipGameobj::set_strafe_dir(StrafeDir Dir)
 {
     // LAB_00546700 (IObjAffect slot 3). No null test on the narrowed object.
-    if (static_cast<CShip*>(NarrowObject(this, 0x503u))->get_strafe_dir() == Dir)
+    if (static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->get_strafe_dir() == Dir)
         return 0;
 
     // An inactive engine is switched on first.
     CEquip* const Engine =
-        static_cast<CEqObj*>(NarrowObject(this, 0x503u))->EquipManager.FindFirst(0x20000u);
+        static_cast<CEqObj*>(NarrowObject(this, CObject::ClassShip))->EquipManager.FindFirst(EquipTypeEngine);
     if (Engine != nullptr && !Engine->IsActive())
     {
         unsigned short EngineId = Engine->Id;
@@ -3281,7 +3282,7 @@ int FClientShipGameobj::set_strafe_dir(StrafeDir Dir)
                                                 static_cast<int>(GetPlayerConnectionId()));
     }
 
-    static_cast<CShip*>(NarrowObject(this, 0x503u))->set_strafe_dir(Dir);
+    static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->set_strafe_dir(Dir);
     return 0;
 }
 
@@ -3289,7 +3290,7 @@ int FClientShipGameobj::set_formation_leader(IObjRW* Leader)
 {
     // LAB_00547140: the CShip's +0x1b8 BaseWatcher (BaseWatcher::set is the inlined compare +
     // set_pointer).
-    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, 0x503u));
+    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
     Watchable const* const Target = (Leader != nullptr) ? static_cast<Watchable const*>(Leader)
                                                         : nullptr;
     Ship->FormationLeader.set(Target);
@@ -3299,7 +3300,7 @@ int FClientShipGameobj::set_formation_leader(IObjRW* Leader)
 int FClientShipGameobj::set_formation_offset(Vector const& Offset)
 {
     // LAB_005470f0
-    static_cast<CShip*>(NarrowObject(this, 0x503u))->FormationOffset = Offset;
+    static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->FormationOffset = Offset;
     return 0;
 }
 
@@ -3307,14 +3308,14 @@ int FClientShipGameobj::add_formation_follower(IObjRW* Follower)
 {
     // LAB_00547190
     return static_cast<int>(
-        static_cast<CShip*>(NarrowObject(this, 0x503u))->add_formation_follower(Follower));
+        static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->add_formation_follower(Follower));
 }
 
 int FClientShipGameobj::remove_formation_follower(IObjRW* Follower)
 {
     // LAB_005471c0
     return static_cast<int>(
-        static_cast<CShip*>(NarrowObject(this, 0x503u))->remove_formation_follower(Follower));
+        static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->remove_formation_follower(Follower));
 }
 
 int FClientShipGameobj::jettison_cargo(unsigned short EquipId, int Count, int SourceClient)
@@ -3334,12 +3335,12 @@ int FClientShipGameobj::jettison_cargo(unsigned short EquipId, int Count, int So
     // From the server: remove the cargo, open the bay and schedule one more close (FADD order
     // kept).
     CEquip* const Equip =
-        static_cast<CEqObj*>(NarrowObject(this, 0x503u))->EquipManager.FindByID(EquipId);
+        static_cast<CEqObj*>(NarrowObject(this, CObject::ClassShip))->EquipManager.FindByID(EquipId);
     CECargo* const Cargo = CECargo::cast(Equip);
     if (Cargo == nullptr)
         return 0;
     Cargo->RemoveFromStack(static_cast<unsigned>(Count));
-    float const BayTime = static_cast<CShip*>(NarrowObject(this, 0x503u))->open_bay();
+    float const BayTime = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->open_bay();
     ++BayCloseCount;
     BayCloseTimer = static_cast<float>(
         (static_cast<double>(BayTime) + CShip::JETTISON_CLEARANCE_TIME) + BayCloseTimer);
@@ -3362,7 +3363,7 @@ int FClientShipGameobj::toggle_cruise(bool bEngage, bool bArg2, int SourceClient
         return -5;
 
     CEEngine* const Engine = CEEngine::cast(
-        static_cast<CEqObj*>(NarrowObject(this, 0x503u))->EquipManager.FindFirst(0x20000u));
+        static_cast<CEqObj*>(NarrowObject(this, CObject::ClassShip))->EquipManager.FindFirst(EquipTypeEngine));
     if (Engine == nullptr)
         return -2;
 
@@ -3398,7 +3399,7 @@ int FClientShipGameobj::toggle_thrusters(bool bActivate, int SourceClient)
 
     // The engine is not cast here.
     CEquip* const Engine =
-        static_cast<CEqObj*>(NarrowObject(this, 0x503u))->EquipManager.FindFirst(0x20000u);
+        static_cast<CEqObj*>(NarrowObject(this, CObject::ClassShip))->EquipManager.FindFirst(EquipTypeEngine);
     if (Engine == nullptr)
         return -5;
     unsigned char const bCruise = static_cast<CEEngine*>(Engine)->bCruiseActive;
@@ -3414,11 +3415,11 @@ int FClientShipGameobj::toggle_thrusters(bool bActivate, int SourceClient)
         }
     }
 
-    CEquipTraverser Walk(0x400);
+    CEquipTraverser Walk(EquipTypeThruster);
     for (;;)
     {
         CEquip* const Thruster =
-            static_cast<CEqObj*>(NarrowObject(this, 0x503u))->EquipManager.Traverse(Walk);
+            static_cast<CEqObj*>(NarrowObject(this, CObject::ClassShip))->EquipManager.Traverse(Walk);
         if (Thruster == nullptr)
             break;
         if (Thruster->IsActive() == bActivate)
@@ -3470,7 +3471,7 @@ int FClientShipGameobj::go_tradelane(IObjInspect const* EntranceRing, IObjInspec
 
     // No null test on the narrowed CShip.
     IObjRW* const Self = static_cast<IObjRW*>(this);
-    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, 0x503u));
+    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
     if (Ship->go_tradelane(EntranceRing, ExitRing, Self, bFastExit, Speed) != 0)
         return -5;
 
@@ -3492,7 +3493,7 @@ int FClientShipGameobj::go_tradelane(IObjInspect const* EntranceRing, IObjInspec
 int FClientShipGameobj::stop_tradelane()
 {
     // LAB_00546f80 (IObjAffect slot 26). No null test on the narrowed CShip.
-    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, 0x503u));
+    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
     Ship->stop_tradelane();
 
     // The ship's own behavior manager (not null-tested) hears event 4 -- the same block the
@@ -3555,7 +3556,7 @@ void FClientShipGameobj::RequestReturned(int Result, int Code, int Extra)
     // FUN_00546d00
     if (PendingRequestCB == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kShipSourceFile, 0x863,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kShipSourceFile, 0x863,
               "stale request detected");
         return;
     }
@@ -3644,7 +3645,7 @@ void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* Bas
         CObject* const DockObject = DockGo->Object;
         CEqObj* Dock = nullptr;
         if (DockObject != nullptr &&
-            (static_cast<unsigned>(DockObject->ObjectClass) & 0x303u) == 0x303u)
+            (static_cast<unsigned>(DockObject->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             Dock = static_cast<CEqObj*>(DockObject);
         Actions.add(new Action_Land(this, Dock));
 
@@ -3689,7 +3690,7 @@ void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* Bas
         // to a covered screen.
         if (*BaseId == 0)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kShipSourceFile, 0x2a8,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kShipSourceFile, 0x2a8,
                   "Cannot land on BASE_ID_NONE");
         }
         SetPendingLandBase(BaseId);
@@ -3703,7 +3704,7 @@ void FClientShipGameobj::RequestLand(FClientGameobj* DockGo, unsigned const* Bas
 void FClientGameobj::SetOwnerPlayer(unsigned PlayerId)
 {
     // FUN_005397f0: no null test on the narrowed object.
-    static_cast<CSimple*>(NarrowObject(this, 3u))->SetOwnerPlayer(PlayerId);
+    static_cast<CSimple*>(NarrowObject(this, CObject::ClassSimple))->SetOwnerPlayer(PlayerId);
 }
 
 void FClientShipGameobj::SetJumpState(int State)
@@ -3712,7 +3713,7 @@ void FClientShipGameobj::SetJumpState(int State)
     // on the narrowed CShip anywhere.
     switch (State)
     {
-    case 0:
+    case kJumpStateNone:
     {
         if (JumpEffect != nullptr)
         {
@@ -3720,15 +3721,15 @@ void FClientShipGameobj::SetJumpState(int State)
             JumpEffect = nullptr;
         }
         // Leaving state 5 on the player's ship.
-        if (JumpState == 5 &&
+        if (JumpState == kJumpStateArrived &&
             static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
         {
-            static_cast<CShip*>(NarrowObject(this, 0x503u))->set_control_exclusion(0);
+            static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->set_control_exclusion(0);
             G_bNnScreenUp = false; // DAT_0067dcc8
         }
         break;
     }
-    case 1:
+    case kJumpStateJumpOut:
     {
         if (JumpEffect != nullptr)
             static_cast<FJumpShipEffect*>(JumpEffect)->StartJumpOut(); // FUN_00503ea0
@@ -3737,17 +3738,17 @@ void FClientShipGameobj::SetJumpState(int State)
         // Control exclusion 7 (after a 0 when 7 is already set).
         if (static_cast<void*>(static_cast<IObjRW*>(this)) == GetPlayerObjRW())
         {
-            CShip* const Ship = static_cast<CShip*>(NarrowObject(this, 0x503u));
+            CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
             if (Ship->is_control_excluded(7))
                 Ship->set_control_exclusion(0);
             Ship->set_control_exclusion(7);
             G_bNnScreenUp = true; // DAT_0067dcc8
         }
         // Every ship drops its target.
-        static_cast<CShip*>(NarrowObject(this, 0x503u))->set_target(nullptr);
+        static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->set_target(nullptr);
         break;
     }
-    case 2:
+    case kJumpStateJumpOutTunnel:
     {
         if (JumpEffect != nullptr)
             static_cast<FJumpShipEffect*>(JumpEffect)->EnterTunnel(); // FUN_00504210
@@ -3762,7 +3763,7 @@ void FClientShipGameobj::SetJumpState(int State)
             MarkForRemoval(true);
             if (SinglePlayer())
             {
-                CShip* const Ship = static_cast<CShip*>(NarrowObject(this, 0x503u));
+                CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
                 Ship->bJumpedOut = 1;               // +0x214
                 Ship->AddRef();
                 if (Ship->Release() != 1)
@@ -3774,7 +3775,7 @@ void FClientShipGameobj::SetJumpState(int State)
         }
         break;
     }
-    case 3:
+    case kJumpStateJumpInTunnel:
     {
         // Retail first calls the effect's hook, which the linker folded into an empty function
         // (0x00401e90) -- nothing to do. The destination system (+0xa4) becomes the pending
@@ -3786,7 +3787,7 @@ void FClientShipGameobj::SetJumpState(int State)
         }
         break;
     }
-    case 4:
+    case kJumpStateJumpIn:
     {
         // The player's character jumps in at the effect's exit frame and the effect's jump-in
         // hook runs; any other ship is just beamed there.
@@ -3796,22 +3797,22 @@ void FClientShipGameobj::SetJumpState(int State)
             if (get_id() == GetPlayerCharacterId())
             {
                 float const Speed = Effect->JumpInTime;
-                static_cast<CShip*>(NarrowObject(this, 0x503u))
+                static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))
                     ->jump_in(static_cast<IObjRW*>(this), Effect->JumpInPosition,
                               Effect->JumpInOrientation, Speed);
                 static_cast<FJumpShipEffect*>(JumpEffect)->StartJumpIn();
             }
             else
             {
-                NarrowObject(this, 0x503u)
+                NarrowObject(this, CObject::ClassShip)
                     ->beam_object(Effect->JumpInPosition, Effect->JumpInOrientation, false);
             }
         }
-        static_cast<CShip*>(NarrowObject(this, 0x503u))->set_target(nullptr);
+        static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->set_target(nullptr);
         bJumpInReady = 0;
         break;
     }
-    case 5:
+    case kJumpStateArrived:
     {
         // FUN_00504640 with no null test; the player's character gets the arrival caption
         // (FUN_0045b310).
@@ -3821,7 +3822,7 @@ void FClientShipGameobj::SetJumpState(int State)
         break;
     }
     default:
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kShipSourceFile, 0x272,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kShipSourceFile, 0x272,
               "invalid jump state set in ship");
         break;
     }
@@ -3846,7 +3847,7 @@ void FClientShipGameobj::BeginJumpOut(FClientGameobj* Gate)
     if (Gate != nullptr)
         Gate->get_type(GateType);
 
-    SetJumpState(1);
+    SetJumpState(kJumpStateJumpOut);
 
     // Action_JumpOut (FUN_00542f10); the effect is not null-tested.
     Actions.add(new Action_JumpOut(this, static_cast<FJumpShipEffect*>(JumpEffect)->JumpOutTime,
@@ -3879,13 +3880,13 @@ void FClientShipGameobj::BeginJumpIn(Vector const* Pos, Matrix const* Orient)
     FJumpShipEffect* const Effect = static_cast<FJumpShipEffect*>(JumpEffect);
     Effect->JumpInPosition = *Pos;
     Effect->JumpInOrientation = *Orient;
-    SetJumpState(4);
+    SetJumpState(kJumpStateJumpIn);
 }
 
 void FClientShipGameobj::RequestSystemSwitch(FClientGameobj* Gate)
 {
     // FUN_00543750: no null test on the narrowed gate.
-    CSolar const* const Solar = static_cast<CSolar const*>(NarrowObject(Gate, 0x303u));
+    CSolar const* const Solar = static_cast<CSolar const*>(NarrowObject(Gate, CObject::ClassSolar));
     unsigned const DestSystem = Solar->DestSystem;
     SetPendingJumpSystem(&DestSystem, false);
 }
@@ -3893,7 +3894,7 @@ void FClientShipGameobj::RequestSystemSwitch(FClientGameobj* Gate)
 void FClientShipGameobj::AirlockIn(Vector const& Pos, Matrix const& Orient)
 {
     // FUN_005437a0: no null test on the narrowed object.
-    static_cast<CShip*>(NarrowObject(this, 0x503u))->airlock_in(Pos, Orient);
+    static_cast<CShip*>(NarrowObject(this, CObject::ClassShip))->airlock_in(Pos, Orient);
 }
 
 // The launch camera's Csys: the orientation followed directly by the position --
@@ -3912,12 +3913,12 @@ void FClientShipGameobj::LaunchFromDock(FClientGameobj* DockGo, int LaunchIndex)
     {
         CObject* const DockObj = DockGo->Object;
         if (DockObj != nullptr &&
-            (static_cast<unsigned>(DockObj->ObjectClass) & 0x103u) == 0x103u)
+            (static_cast<unsigned>(DockObj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             DockEqObj = static_cast<CEqObj*>(DockObj);
     }
 
     // No null test on the narrowed CShip.
-    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, 0x503u));
+    CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
     Ship->launch(this, DockEqObj, LaunchIndex);
 
     StarSysSuppressPlayerCollisions(7.0);
@@ -3961,9 +3962,9 @@ void CloseRearAndTurretViewsForDocking()
 {
     // FUN_00549e30. DAT_00674aa0 is read twice with no null test; each byte is compared with 1.
     if (GetHudStatus()->bRearView == 1)
-        HudPostCommand(0x39, 0);
+        HudPostCommand(USER_REARVIEW_CAMERA_MODE_OFF, 0);
     if (GetHudStatus()->bTurretView == 1)
-        HudPostCommand(0xbf, 0);
+        HudPostCommand(USER_AUTO_TURRET, 0);
 }
 
 // ===========================================================================
@@ -4131,7 +4132,7 @@ void FClientBeamGameobj::create(Archetype::Root* Arch)
 {
     // FUN_0053f2f0. No null test on the narrowed object.
     GameobjCreateOfClass(this, CObject::ClassBeam, Arch);
-    NarrowObject(this, 0x67u)->open(Arch);
+    NarrowObject(this, CObject::ClassBeam)->open(Arch);
 }
 
 bool FClientBeamGameobj::find(unsigned const& Id)
@@ -4165,7 +4166,7 @@ void FClientBeamGameobj::OnCollision(void const* A, void const* B, FClientGameob
     ReportCollisionToServer(A, B, Other, D);
     bool const bOtherIsPlayer = static_cast<void*>(static_cast<IObjRW*>(Other)) == GetPlayerObjRW();
     // The CBeam's velocity (+0xf8) zeroed -- no null test.
-    CBeam* const BeamObj = static_cast<CBeam*>(NarrowObject(this, 0x67u));
+    CBeam* const BeamObj = static_cast<CBeam*>(NarrowObject(this, CObject::ClassBeam));
     BeamObj->Velocity.x = 0.0f;
     BeamObj->Velocity.y = 0.0f;
     BeamObj->Velocity.z = 0.0f;
@@ -4239,7 +4240,7 @@ namespace
     // is used with no null test.
     void GameobjOwnerUpdate(FClientGameobj* Self, unsigned Mask, float Dt)
     {
-        CObject* const Owned = NarrowObject(Self, 0x3u);
+        CObject* const Owned = NarrowObject(Self, CObject::ClassSimple);
         unsigned const Owner = (Owned != nullptr) ? static_cast<CSimple const*>(Owned)->OwnerPlayer
                                                   : GetPlayerConnectionId();
         if (Owner == GetPlayerConnectionId())
@@ -4269,7 +4270,7 @@ namespace
     {
         if (Munition == nullptr)
             return false;
-        return NarrowObject(Munition, 0x67u) != nullptr;
+        return NarrowObject(Munition, CObject::ClassBeam) != nullptr;
     }
 }
 
@@ -4304,7 +4305,7 @@ void FClientMineGameobj::create(Archetype::Root* Arch)
 {
     // FUN_0053e930
     GameobjCreateOfClass(this, CObject::ClassMine, Arch);
-    NarrowObject(this, 0xfu)->open(Arch);
+    NarrowObject(this, CObject::ClassMine)->open(Arch);
 }
 
 bool FClientMineGameobj::find(unsigned const& Id)
@@ -4319,7 +4320,7 @@ void FClientMineGameobj::update(float Dt)
 {
     // FUN_0053e9a0
     FClientProjectileGameobj::update(Dt);
-    GameobjOwnerUpdate(this, 0xfu, Dt);
+    GameobjOwnerUpdate(this, CObject::ClassMine, Dt);
 }
 
 void FClientMineGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
@@ -4354,7 +4355,7 @@ void FClientCounterMeasureGameobj::create(Archetype::Root* Arch)
 {
     // FUN_0052ff90
     GameobjCreateOfClass(this, CObject::ClassCounterMeasure, Arch);
-    NarrowObject(this, 0x17u)->open(Arch);
+    NarrowObject(this, CObject::ClassCounterMeasure)->open(Arch);
 }
 
 bool FClientCounterMeasureGameobj::find(unsigned const& Id)
@@ -4369,7 +4370,7 @@ void FClientCounterMeasureGameobj::update(float Dt)
 {
     // FUN_00530000
     FClientProjectileGameobj::update(Dt);
-    GameobjOwnerUpdate(this, 0x17u, Dt);
+    GameobjOwnerUpdate(this, CObject::ClassCounterMeasure, Dt);
 }
 
 void FClientCounterMeasureGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
@@ -4405,7 +4406,7 @@ void FClientGuidedGameobj::create(Archetype::Root* Arch)
 {
     // FUN_0053ec30
     GameobjCreateOfClass(this, CObject::ClassGuided, Arch);
-    NarrowObject(this, 0xa7u)->open(Arch);
+    NarrowObject(this, CObject::ClassGuided)->open(Arch);
 }
 
 bool FClientGuidedGameobj::find(unsigned const& Id)
@@ -4420,7 +4421,7 @@ void FClientGuidedGameobj::update(float Dt)
 {
     // FUN_0053ecb0
     FClientProjectileGameobj::update(Dt);
-    GameobjOwnerUpdate(this, 0xa7u, Dt);
+    GameobjOwnerUpdate(this, CObject::ClassGuided, Dt);
 }
 
 void FClientGuidedGameobj::OnMunitionHit(void const* A, void const* B, FClientGameobj* Munition)
@@ -4439,7 +4440,7 @@ void FClientGuidedGameobj::ReportCollisionToServer(void const* A, void const* B,
     // In multiplayer only a collision with an object this connection owns reports.
     if (!SinglePlayer())
     {
-        CObject* const OtherObj = NarrowObject(Other, 0x3u);
+        CObject* const OtherObj = NarrowObject(Other, CObject::ClassSimple);
         unsigned const Owner = (OtherObj != nullptr)
                                    ? static_cast<CSimple const*>(OtherObj)->OwnerPlayer
                                    : GetPlayerConnectionId();
@@ -4516,7 +4517,7 @@ void FClientGuidedGameobj::GetConstEffectTransform(Transform* Out)
         // The text is read again for the error; then on to the renderer.
         char const* const TrailParentAgain =
             Archetype::CliMunitionHpTrailParent(NarrowObject(this, 0x7u)->Archetype->Companion);
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s: Missing HP_trail_parent(%s).",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s: Missing HP_trail_parent(%s).",
               kMunitionSourceFile, 0xe1, Object->get_archetype()->Nickname.get_string(),
               TrailParentAgain);
     }
@@ -4545,7 +4546,7 @@ int FClientGuidedGameobj::set_target(IObjRW* Target, unsigned short SubTarget, i
 {
     // LAB_0053eed0 (`this` is the IObjAffect sub-object in retail). The narrowed object is
     // used with no null test.
-    CGuided* const Guided = static_cast<CGuided*>(NarrowObject(this, 0xa7u));
+    CGuided* const Guided = static_cast<CGuided*>(NarrowObject(this, CObject::ClassGuided));
     // A munition with no seeker (+0x90) answers -3.
     Archetype::Munition const* const MunArch =
         static_cast<Archetype::Munition const*>(Guided->Archetype);
@@ -4615,7 +4616,7 @@ void FClientLootGameobj::create(Archetype::Root* Arch)
 {
     // LAB_0053e550
     GameobjCreateOfClass(this, CObject::ClassLoot, Arch);
-    NarrowObject(this, 0x803u)->open(Arch);
+    NarrowObject(this, CObject::ClassLoot)->open(Arch);
 }
 
 bool FClientLootGameobj::find(unsigned const& Id)
@@ -4632,7 +4633,7 @@ void FClientLootGameobj::PostCreateInit()
     FClientGameobj::PostCreateInit();
     // The crate's +0x68 tractored_explosion; no null test on the narrowed object.
     Archetype::Equipment const* const Crate =
-        static_cast<Archetype::Equipment const*>(NarrowObject(this, 0x803u)->get_archetype());
+        static_cast<Archetype::Equipment const*>(NarrowObject(this, CObject::ClassLoot)->get_archetype());
     ID_String const* const ExplosionId = &Crate->TractoredExplosion;
     if (!ExplosionId->IsEmpty())
     {
@@ -4646,7 +4647,7 @@ void FClientLootGameobj::PostCreateInit()
             // The id's string is fetched first.
             char const* const ExplName = ExplosionId->get_string();
             char const* const ArchName = Object->get_archetype()->Nickname.get_string();
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: Archtype(%s) tractored_explosion(%s) not found.",
                   kLootSourceFile, 0x47, ArchName, ExplName);
         }
@@ -4661,7 +4662,7 @@ void FClientLootGameobj::update(float Dt)
 {
     // FUN_0053e6a0
     FClientGameobj::update(Dt);
-    GameobjOwnerUpdate(this, 0x803u, Dt);
+    GameobjOwnerUpdate(this, CObject::ClassLoot, Dt);
 }
 
 void FClientLootGameobj::ApplyDamageList(DamageList const& Damage)
@@ -4674,12 +4675,12 @@ void FClientLootGameobj::ApplyDamageList(DamageList const& Damage)
     {
         if (It->SubObjId == SUBOBJ_ID_ROOT)
         {
-            static_cast<CSimple*>(NarrowObject(this, 0x803u))->set_hit_pts(It->HitPts);
+            static_cast<CSimple*>(NarrowObject(this, CObject::ClassLoot))->set_hit_pts(It->HitPts);
             continue;
         }
         // Any other entry: only a value above 0 becomes the contents' hit points; 0, below and
         // NaN cost a unit and refill from the contents archetype's hit_pts.
-        CLoot* const Loot = static_cast<CLoot*>(NarrowObject(this, 0x803u));
+        CLoot* const Loot = static_cast<CLoot*>(NarrowObject(this, CObject::ClassLoot));
         if (It->HitPts > 0.0f)
         {
             Loot->ContentsHitPts = It->HitPts;

@@ -166,10 +166,10 @@ bool WinControl::HitTest(float const* Ray)
         WinControl* const ParentControl = Parent->AsWinControl();
         if (ParentControl != nullptr)
         {
-            ParentControl->SetProperty(0x25, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
+            ParentControl->SetProperty(kWinNotifyHover, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
             if (ToolTipIds == 0)
                 return bHit;
-            if (ParentControl->SetProperty(0x4f, reinterpret_cast<uintptr_t>(AsWinControl()),
+            if (ParentControl->SetProperty(kWinNotifyToolTip, reinterpret_cast<uintptr_t>(AsWinControl()),
                                            0) != 0)
                 return bHit;
         }
@@ -279,7 +279,7 @@ void WinControl::SetHiddenWithChildren(bool bHide)
         WinControl* const AsControl = Child->AsWinControl();
         if (AsControl != nullptr)
         {
-            AsControl->SetProperty(1, bHide ? 1u : 0u, 0);
+            AsControl->SetProperty(kWinPropHide, bHide ? 1u : 0u, 0);
         }
     }
     if (bHide)
@@ -301,14 +301,14 @@ bool WinControl::MouseEvent(FWin3DMouseEvent const* Event)
 bool WinControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
 {
     // FUN_005a0840.
-    if (Msg == 0xef01)
+    if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
             SetPosition(Parent->Position);
         Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         return true;
     }
-    if (Msg == 0xef02)
+    if (Msg == kWinMsgHide)
     {
         Flags = static_cast<unsigned char>(Flags & 0xfc);
         return true;

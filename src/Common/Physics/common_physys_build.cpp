@@ -155,7 +155,7 @@ namespace
     {
         if (Part->Surface == nullptr)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPhySysSource, 0x215,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kPhySysSource, 0x215,
                   "BuildPartIVP_Real(): No surface input for part_arch");
             return;
         }
@@ -189,7 +189,7 @@ namespace
         std::map<unsigned, PhysicalSystem>::iterator SystemIt = G_PhysicalSystems.find(Parms.SystemId);
         if (SystemIt == G_PhysicalSystems.end())
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPhySysSource, 0x211,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kPhySysSource, 0x211,
                   "Tried to create physics before Ipion was initialized.");
             return;
         }
@@ -271,7 +271,7 @@ void __cdecl PhySys::BuildIVP_Real(CObject* Object, CreateParms const& Parms)
     if (Object->BodyPtr == nullptr)
     {
         char const* const PartName = (Name.Text != nullptr) ? Name.Text : "";
-        FDUMP(0x100001, "%s(%d) : *** ERROR: BuildIVP_Real(): failed to create ivp_real for part (%s) in file (%s).",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: BuildIVP_Real(): failed to create ivp_real for part (%s) in file (%s).",
               kPhySysSource, 0x27a, PartName, Object->Archetype->DaArchetype.Value);
         return;
     }

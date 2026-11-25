@@ -7,6 +7,7 @@
 #pragma once
 
 #include "dacom.h"
+#include "dacom_factory.h"   // FDacomComponentFactory
 #include "soundmanager.h"
 #include "luaprofile.h"
 #include "audio/dsound8.h"
@@ -20,9 +21,6 @@ static const unsigned long kRegisterPriority = 0x40000000;
 
 static const char kComponentName[] = "SoundManager";
 
-static const unsigned int kFdumpError = 0x100001;
-static const unsigned int kFdumpWarning = 0x100002;
-static const unsigned int kFdumpNotice = 0x100003;
 
 // s_C:\work\... at .data:06eea070 (21 FDUMP sites in SoundMan.cpp code).
 static const char kRetailSource[] =
@@ -170,18 +168,14 @@ public:
     FSoundManager* Self;
 };
 
-class FSoundManagerFactory final : public IComponentFactory
+// QueryInterface LAB_06ee8290 (no null checks), AddRef and Release are
+// FDacomComponentFactory's.
+class FSoundManagerFactory final : public FDacomComponentFactory
 {
 public:
     FSoundManagerFactory();
 
-    GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
-
-    unsigned long RefCount;
-    const char* Name;
 };
 
 class FSoundManager final : public ISoundManager,

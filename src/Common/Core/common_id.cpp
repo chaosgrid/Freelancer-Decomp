@@ -303,7 +303,7 @@ unsigned int __cdecl CreateID(char const* Name)
     CFLIDMaker* Maker = CFLIDMaker::GetInstance();
     if (Maker == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", FlidMakerSource, 0x88,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", FlidMakerSource, 0x88,
               "Failed to get pointer to global ID maker instance.\n");
         return 0;
     }

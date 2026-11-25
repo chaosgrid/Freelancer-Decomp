@@ -628,8 +628,6 @@ namespace
         return Player->ShipObject->SpaceObjId;
     }
 
-    // Retail tests an ID_String for "set" with TEST id,0x3fffffff.
-    unsigned int const GActIdValueMask = 0x3fffffff;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -882,7 +880,7 @@ bool ActPlayerEnemyClamp::Execute()
 {
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
         return true;
-    if ((GetPlayerShipSpaceObjId(Mission->PlayerState) & GActIdValueMask) == 0)
+    if ((GetPlayerShipSpaceObjId(Mission->PlayerState) & GIdValueMask) == 0)
         return true;
     pub::AI::set_player_enemy_clamp(Mission->PlayerState->ShipObject->SpaceObjId, MinClamp,
                                     MaxClamp);
@@ -1280,8 +1278,6 @@ bool ActSetInitialPlayerPos::Execute()
 
 namespace
 {
-    unsigned int const GNagIdMask = 0x3fffffff;
-
     // The [NPC] record of the speaker: FUN_06f15560 (the [MsnShip] slot), then the mission's
     // +0x184 map at the slot's npc id (+0x38).
     // Deviation: retail Act_NagGreet and Act_NagDistLeaving do not test for end(), so a slot
@@ -1379,11 +1375,11 @@ void FMissionNag::Say(char const* Name)
     FContentPlayerState* const Player = FindContentPlayerState(PlayerId);
     if (Player == nullptr)
         return;
-    // A ship in behavior 7 is not nagged.
+    // A docking ship is not nagged.
     unsigned int const ShipId = Player->GetShipId();
-    if ((ShipId & GNagIdMask) != 0 && pub::AI::get_behavior_id(ShipId) == 7)
+    if ((ShipId & GIdValueMask) != 0 && pub::AI::get_behavior_id(ShipId) == BEHAVIOR_DOCK)
         return;
-    if ((SpeakerId & GNagIdMask) == 0)
+    if ((SpeakerId & GIdValueMask) == 0)
     {
         // No speaker: the NN line "<Name>_01-".
         char Text[0x40];
@@ -1403,12 +1399,12 @@ void FMissionNag::Say(char const* Name)
     FSystemInfo* const System = FindSystemInfo(&SystemId);
     if (System == nullptr || State == nullptr)
         return;
-    if ((State->GetShipId() & GNagIdMask) == 0)
+    if ((State->GetShipId() & GIdValueMask) == 0)
         return;
     // A speaker in the player's system talks itself.
     unsigned int SpeakerSystem = 0;
     pub::SpaceObj::GetSystem(SpeakerId, SpeakerSystem);
-    if ((SpeakerSystem & GNagIdMask) != 0 && SpeakerSystem == State->GetSystemId())
+    if ((SpeakerSystem & GIdValueMask) != 0 && SpeakerSystem == State->GetSystemId())
     {
         System->SendComm(SpeakerId, State->GetShipId(), LineId, 0, 0, nullptr, 0.5f);
         return;
@@ -1429,11 +1425,11 @@ bool FMissionNagGreet::HandleMessage(pub::Controller::EMessage /*MessageId*/, vo
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     FSystemInfo* const System = FindSystemInfo(&SystemId);
     FContentPlayerState* const State = FindContentPlayerState(PlayerId);
-    if ((SpeakerId & GNagIdMask) == 0 || System == nullptr || State == nullptr)
+    if ((SpeakerId & GIdValueMask) == 0 || System == nullptr || State == nullptr)
         return true;
     if (State->GetShipId() != Parms[1])
         return true;
-    if ((State->GetShipId() & GNagIdMask) == 0)
+    if ((State->GetShipId() & GIdValueMask) == 0)
         return true;
     // The speaker taken as a ship; IsInCombat is its slot 2.
     FContentShipBase* const Speaker = static_cast<FContentShipBase*>(System->FindSpaceObj(SpeakerId));
@@ -1489,10 +1485,10 @@ void FMissionNagDist::Say(char const* Name)
 {
     FContentPlayerState* const State = FindContentPlayerState(PlayerId);
     FContentNpcShip* const Npc =
-        (SpeakerId & GNagIdMask) != 0 ? Mission->FindNpcById(&SpeakerId) : nullptr;
+        (SpeakerId & GIdValueMask) != 0 ? Mission->FindNpcById(&SpeakerId) : nullptr;
     FContentPlayerShip* const Ship = State != nullptr ? State->ShipObject : nullptr;
     bool const bSameGroup = Npc != nullptr && Ship != nullptr &&
-                            Npc->FormationId == Ship->FormationId && Npc->FormationId != 0xffffffffu;
+                            Npc->FormationId == Ship->FormationId && Npc->FormationId != GNoFormationId;
     if (!bSameGroup)
     {
         if (bPositionMode != 0)
@@ -1500,7 +1496,7 @@ void FMissionNagDist::Say(char const* Name)
         else
             FMissionNag::Say(Name);
     }
-    if ((SpeakerId & GNagIdMask) == 0)
+    if ((SpeakerId & GIdValueMask) == 0)
         CountDown();
 }
 
@@ -1531,13 +1527,13 @@ bool FMissionNagDist::HandleMessage(pub::Controller::EMessage MessageId, void co
     FContentPlayerState* const State = FindContentPlayerState(PlayerId);
     if (State == nullptr)
         return true;
-    if ((State->GetShipId() & GNagIdMask) == 0)
+    if ((State->GetShipId() & GIdValueMask) == 0)
         return true;
 
     if (MessageId == EMessage::Heartbeat)
     {
         // A target object refreshes the position.
-        if ((TargetId & GNagIdMask) != 0)
+        if ((TargetId & GIdValueMask) != 0)
         {
             Matrix Orientation;
             pub::SpaceObj::GetLocation(TargetId, Position, Orientation);
@@ -1564,7 +1560,7 @@ bool FMissionNagDist::HandleMessage(pub::Controller::EMessage MessageId, void co
     {
         // The speaker's (or an anonymous) comm of the last line finished (parms +0x10 == 0)
         // spends a nag.
-        if (SpeakerId != Parms[2] && (Parms[2] & GNagIdMask) != 0)
+        if (SpeakerId != Parms[2] && (Parms[2] & GIdValueMask) != 0)
             return true;
         if (LineId != Parms[3])
             return true;
@@ -1602,13 +1598,13 @@ bool FMissionNagDist::HandleMessage(pub::Controller::EMessage MessageId, void co
         }
         State->GetPosition(&LastPosition);
         unsigned int Type = 0;
-        if ((TargetId & GNagIdMask) == 0)
+        if ((TargetId & GIdValueMask) == 0)
         {
             Say("nag_pos");
         }
         else if (pub::SpaceObj::GetType(TargetId, Type) == 0)
         {
-            if ((Type & 0x7f0000) != 0)
+            if ((Type & OBJ_SHIP_MASK) != 0)
             {
                 // A ship target, by its combat flag (slot 2).
                 FContentShipBase* const Target =
@@ -1623,19 +1619,19 @@ bool FMissionNagDist::HandleMessage(pub::Controller::EMessage MessageId, void co
                         bArmed = 0;
                 }
             }
-            else if ((Type & 0x100) != 0 || (Type & 0x20) != 0)
+            else if ((Type & OBJ_STATION) != 0 || (Type & OBJ_DOCKING_RING) != 0)
             {
                 Say("nag_dst_base");
             }
-            else if ((Type & 0x800) != 0)
+            else if ((Type & OBJ_JUMP_HOLE) != 0)
             {
                 Say("nag_dst_hole");
             }
-            else if ((Type & 0xc40) != 0)
+            else if ((Type & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != 0)
             {
                 Say("nag_dst_gate");
             }
-            else if ((Type & 0x80) != 0)
+            else if ((Type & OBJ_TRADELANE_RING) != 0)
             {
                 Say("nag_dst_tl");
             }
@@ -1652,7 +1648,7 @@ bool FMissionNagDist::HandleMessage(pub::Controller::EMessage MessageId, void co
         unsigned int Type = 0;
         if (pub::SpaceObj::GetType(TargetId, Type) != 0)
             return true;
-        if ((Type & 0xc40) == 0)
+        if ((Type & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
             return true;
         if (TargetId != Parms[1])
             return true;
@@ -1678,19 +1674,19 @@ bool FMissionNagDist::HandleMessage(pub::Controller::EMessage MessageId, void co
         unsigned int const Docker = Parms[0];
         if (Docker != State->GetShipId())
             return true;
-        if ((Docker & GNagIdMask) == 0)
+        if ((Docker & GIdValueMask) == 0)
             return true;
         unsigned int Type = 0;
         if (pub::SpaceObj::GetType(TargetId, Type) != 0)
             return true;
         unsigned int DockTarget = 0;
         pub::SpaceObj::GetDockingTarget(TargetId, DockTarget);
-        if ((Type & 0x100) != 0 && (Parms[1] & GNagIdMask) != 0 && DockTarget == Parms[1])
+        if ((Type & OBJ_STATION) != 0 && (Parms[1] & GIdValueMask) != 0 && DockTarget == Parms[1])
         {
             bDone = 1;
             return true;
         }
-        if ((Type & 0x20) != 0 && TargetId == Parms[2])
+        if ((Type & OBJ_DOCKING_RING) != 0 && TargetId == Parms[2])
             bDone = 1;
         return true;
     }
@@ -2097,7 +2093,7 @@ void ActCallThorn::Parse(INI_Reader& Reader)
 bool ActCallThorn::Execute()
 {
     unsigned int const TargetId = Mission->GetLabelObjectId(&Target);
-    if ((TargetId & GNagIdMask) == 0)
+    if ((TargetId & GIdValueMask) == 0)
         return false;
     int const ScriptMode = Mode;
     pub::SpaceObj::RequestSpaceScript(TargetId, Position, ScriptMode, Mission->PlayerId,
@@ -2106,7 +2102,7 @@ bool ActCallThorn::Execute()
         return true;
     Mission->bCutsceneActive = 1;
     unsigned int const ShipId = Mission->PlayerState->GetShipId();
-    if ((ShipId & GNagIdMask) != 0)
+    if ((ShipId & GIdValueMask) != 0)
         pub::SpaceObj::SetInvincible(ShipId, true, false, 0.0f);
     Mission->NagClamp = 1;
     std::map<unsigned int, FContentNpcShip*>::iterator It = Mission->NpcObjects.begin();
@@ -2277,7 +2273,7 @@ void ActDestroy::Parse(INI_Reader& Reader)
 bool ActDestroy::Execute()
 {
     unsigned int const ObjectId = Mission->GetLabelObjectId(&Label);
-    if ((ObjectId & GNagIdMask) != 0)
+    if ((ObjectId & GIdValueMask) != 0)
         pub::SpaceObj::Destroy(ObjectId, static_cast<DestroyType>(DestroyMode));
     return true;
 }
@@ -2310,7 +2306,7 @@ void ActLightFuse::Parse(INI_Reader& Reader)
 bool ActLightFuse::Execute()
 {
     unsigned int const ObjectId = Mission->GetLabelObjectId(&Label);
-    if ((ObjectId & GNagIdMask) == 0)
+    if ((ObjectId & GIdValueMask) == 0)
         return false;
     pub::SpaceObj::LightFuse(ObjectId, Fuse.Data, Delay);
     return true;
@@ -2625,7 +2621,7 @@ bool ActSetFlee::Execute()
     if (Mode == 1)
     {
         unsigned int const TargetId = Mission->GetLabelObjectId(&Target);
-        if ((TargetId & GNagIdMask) != 0)
+        if ((TargetId & GIdValueMask) != 0)
             Ship->SetFleeObject(&TargetId, &Distance, bFlag != 0);
         return true;
     }
@@ -2822,7 +2818,7 @@ bool ActInvulnerable::Execute()
         if (System == nullptr)
             return true;
         unsigned int const ObjectId = System->FindObjectIdByName(&Label, Mission->ControllerId);
-        if ((ObjectId & GNagIdMask) != 0)
+        if ((ObjectId & GIdValueMask) != 0)
             pub::SpaceObj::SetInvincible(ObjectId, bInvulnerable != 0, bPlayerCanDamage != 0, MaxHpLoss);
         return true;
     }
@@ -2930,7 +2926,7 @@ bool ActMarkObj::Execute()
                     Name = Loot->Nickname.Data;
             }
         }
-        if ((Member->second & GNagIdMask) != 0)
+        if ((Member->second & GIdValueMask) != 0)
             Mission->MarkMissionObject(Member->second, Mode, Name);
         else
             bResult = false;
@@ -2984,7 +2980,7 @@ bool ActJumper::Execute()
             {
                 FMissionJumper Jumper;
                 Jumper.Npc = Npc;
-                Jumper.State = 0;
+                Jumper.State = JumperInSystem;
                 Mission->Jumpers.push_back(Jumper);
             }
         }
@@ -3075,10 +3071,10 @@ bool ActSendComm::Execute()
     if (_stricmp(Receiver.Data, "anyone") == 0)
         bAnyone = true;
     unsigned int const ReceiverId = Mission->GetLabelObjectId(&Receiver);
-    unsigned int const SenderMasked = SenderId & GNagIdMask;
+    unsigned int const SenderMasked = SenderId & GIdValueMask;
     if (SenderMasked == 0)
         bResult = false;
-    unsigned int const ReceiverMasked = ReceiverId & GNagIdMask;
+    unsigned int const ReceiverMasked = ReceiverId & GIdValueMask;
     if (ReceiverMasked == 0 && !bAnyone)
         bResult = false;
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
@@ -3162,7 +3158,7 @@ bool ActEtherComm::Execute()
         CommDuration = static_cast<float>(Duration);
     }
     else if (FindContentPlayerState(Mission->PlayerId) != nullptr &&
-             ReceiverId == Mission->PlayerState->GetShipId() && (ReceiverId & GNagIdMask) == 0)
+             ReceiverId == Mission->PlayerState->GetShipId() && (ReceiverId & GIdValueMask) == 0)
     {
         CommDuration = 1.0f;
     }
@@ -3200,7 +3196,7 @@ void ActSetOrient::Parse(INI_Reader& Reader)
 bool ActSetOrient::Execute()
 {
     unsigned int const ObjectId = Mission->GetLabelObjectId(&Label);
-    if ((ObjectId & GNagIdMask) == 0)
+    if ((ObjectId & GIdValueMask) == 0)
         return false;
     Vector Position;
     Matrix CurrentOrientation;
@@ -3347,7 +3343,7 @@ void ActRelocateShip::Parse(INI_Reader& Reader)
 bool ActRelocateShip::Execute()
 {
     unsigned int const ObjectId = Mission->GetLabelObjectId(&Label);
-    if ((ObjectId & GNagIdMask) == 0)
+    if ((ObjectId & GIdValueMask) == 0)
         return false;
     if (FindContentPlayerState(Mission->PlayerId) == nullptr)
         return true;
@@ -3416,7 +3412,7 @@ bool ActRemoveCargo::Execute()
     Finder.bFound = 0;
     Finder.SubObjId = SUBOBJ_ID_NONE;
     pub::Player::EnumerateCargo(Mission->PlayerId, Finder);
-    if ((Finder.SubObjId & GNagIdMask) == 0)
+    if ((Finder.SubObjId & GIdValueMask) == 0)
         return true;
     pub::Player::RemoveCargo(Mission->PlayerId, Finder.SubObjId,
                              static_cast<unsigned int>(Count));
@@ -3515,7 +3511,7 @@ bool ActStaticCam::Execute()
         return true;
     Mission->bCutsceneActive = 1;
     unsigned int const ShipId = Mission->PlayerState->GetShipId();
-    if ((ShipId & GNagIdMask) != 0)
+    if ((ShipId & GIdValueMask) != 0)
         pub::SpaceObj::SetInvincible(ShipId, true, false, 0.0f);
     Mission->NagClamp = 1;
     std::map<unsigned int, FContentNpcShip*>::iterator It = Mission->NpcObjects.begin();
@@ -3611,7 +3607,7 @@ bool ActNnPath::Execute()
     Path.Mission = Mission;
     Path.TravelIds = TravelIds;
     Path.TargetIds = TargetIds;
-    Path.SystemId = (SystemId & GNagIdMask) != 0 ? SystemId : System->SystemId;
+    Path.SystemId = (SystemId & GIdValueMask) != 0 ? SystemId : System->SystemId;
     if (Label.Length != 0)
         Path.Label = Label.Data;
     Path.State = 1;
@@ -3690,9 +3686,9 @@ bool ActSetRep::Execute()
 {
     unsigned int const ObjectId = Mission->GetLabelObjectId(&Label);
     bool const bPlayer = strcmp(Label.Data, "Player") == 0;
-    if ((ObjectId & GNagIdMask) == 0 && !bPlayer)
+    if ((ObjectId & GIdValueMask) == 0 && !bPlayer)
         return false;
-    if ((GroupId & GNagIdMask) == 0)
+    if ((GroupId & GIdValueMask) == 0)
         return false;
     int Rep = 0;
     int Result;
@@ -3757,7 +3753,7 @@ namespace
     // +0x174 unless listed. GetType's result is not tested.
     void RecordVibeSolar(FMissionScript* Script, unsigned int ObjId)
     {
-        if ((ObjId & GNagIdMask) == 0)
+        if ((ObjId & GIdValueMask) == 0)
             return;
         unsigned int Type = 0;
         pub::SpaceObj::GetType(ObjId, Type);
@@ -3854,7 +3850,7 @@ bool ActSetVibe::Execute()
 {
     unsigned int const ObjA = Mission->GetLabelObjectId(&LabelA);
     unsigned int const ObjB = Mission->GetLabelObjectId(&LabelB);
-    if ((ObjA & GNagIdMask) != 0 && (ObjB & GNagIdMask) != 0)
+    if ((ObjA & GIdValueMask) != 0 && (ObjB & GIdValueMask) != 0)
         Mission->SetObjectVibe(ObjA, ObjB, Lo, Hi);
     return true;
 }
@@ -3895,7 +3891,7 @@ bool ActSetVibeLbl::Execute()
             FContentNpcShip* const NpcB = BIt->second;
             if (NpcB == nullptr || !NpcHasLabel(NpcB, LabelB))
                 continue;
-            if ((NpcA->SpaceObjId & GNagIdMask) != 0 && (NpcB->SpaceObjId & GNagIdMask) != 0)
+            if ((NpcA->SpaceObjId & GIdValueMask) != 0 && (NpcB->SpaceObjId & GIdValueMask) != 0)
                 Mission->SetObjectVibe(NpcA->SpaceObjId, NpcB->SpaceObjId, Lo, Hi);
         }
         std::list<FMissionSolar>::iterator SIt = Mission->MissionSolars.begin();
@@ -3903,7 +3899,7 @@ bool ActSetVibeLbl::Execute()
         {
             if (!SIt->HasLabel(&LabelB))
                 continue;
-            if ((NpcA->SpaceObjId & GNagIdMask) != 0 && (SIt->SpaceObjId & GNagIdMask) != 0)
+            if ((NpcA->SpaceObjId & GIdValueMask) != 0 && (SIt->SpaceObjId & GIdValueMask) != 0)
                 Mission->SetObjectVibe(NpcA->SpaceObjId, SIt->SpaceObjId, Lo, Hi);
         }
     }
@@ -3918,7 +3914,7 @@ bool ActSetVibeLbl::Execute()
             FContentNpcShip* const NpcB = BIt->second;
             if (!NpcHasLabel(NpcB, LabelB))
                 continue;
-            if ((SIt->SpaceObjId & GNagIdMask) != 0 && (NpcB->SpaceObjId & GNagIdMask) != 0)
+            if ((SIt->SpaceObjId & GIdValueMask) != 0 && (NpcB->SpaceObjId & GIdValueMask) != 0)
                 Mission->SetObjectVibe(SIt->SpaceObjId, NpcB->SpaceObjId, Lo, Hi);
         }
     }
@@ -3953,7 +3949,7 @@ bool ActSetVibeLblToShip::Execute()
         Mission->LabelObjects.lower_bound(FormationId);
     while (Member != Mission->LabelObjects.upper_bound(FormationId))
     {
-        if ((Member->second & GNagIdMask) != 0 && (ShipId & GNagIdMask) != 0)
+        if ((Member->second & GIdValueMask) != 0 && (ShipId & GIdValueMask) != 0)
             Mission->SetObjectVibe(Member->second, ShipId, Lo, Hi);
         ++Member;
     }
@@ -3988,7 +3984,7 @@ bool ActSetVibeShipToLbl::Execute()
         Mission->LabelObjects.lower_bound(FormationId);
     while (Member != Mission->LabelObjects.upper_bound(FormationId))
     {
-        if ((ShipId & GNagIdMask) != 0 && (Member->second & GNagIdMask) != 0)
+        if ((ShipId & GIdValueMask) != 0 && (Member->second & GIdValueMask) != 0)
             Mission->SetObjectVibe(ShipId, Member->second, Lo, Hi);
         ++Member;
     }

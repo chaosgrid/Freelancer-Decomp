@@ -56,6 +56,7 @@
     <ClInclude Include="ThornControlCalls.h" />
     <ClInclude Include="SplineMath.h" />
     <ClInclude Include="..\include\dacom.h" />
+    <ClInclude Include="..\include\dacom_factory.h" />
     <ClInclude Include="lua32\include\lua.h" />
     <ClInclude Include="lua32\include\lualib.h" />
     <ClInclude Include="lua32\include\luadebug.h" />

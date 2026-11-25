@@ -253,7 +253,7 @@ void StoryStarOnMissionMessage(FmtStr const* Text, int Type)
     }
     G_NnMainButton->SetForceMissionLog(true);
     G_bNnScreenUp = false;
-    HudPostCommand(0x67, 0);
+    HudPostCommand(USER_STORY_STAR, 0);
     G_bNnScreenUp = true;
 }
 
@@ -712,7 +712,7 @@ void MissionObjectiveWindow::Update()
     Bytes[3] = NewAlpha;
     memcpy(&Colour, Bytes, sizeof(Colour));
     Alpha = NewAlpha;
-    Text->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
+    Text->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
 }
 
 void MissionObjectiveWindow::Draw()
@@ -755,7 +755,7 @@ void MissionObjectiveWindow::ShowFrontObjective()
     }
     *Out = L'\0';
 
-    Text->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+    Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -992,7 +992,7 @@ bool NeuroNetStoryStar::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     // LAB_004bc090 (RET 0xc). Neither message reaches WinControl's slot 23.
     (void)A;
     (void)B;
-    if (Msg == 0xef01)
+    if (Msg == kWinMsgShow)
     {
         // Onto the parent's position, shown.
         if (Parent != nullptr)
@@ -1000,7 +1000,7 @@ bool NeuroNetStoryStar::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         Flags = static_cast<unsigned char>(Flags | 3);
         return true;
     }
-    if (Msg == 0xef02)
+    if (Msg == kWinMsgHide)
     {
         // Unlinked and deleted with the subtree.
         Win3DReparent(this, nullptr);
@@ -1015,7 +1015,7 @@ intptr_t NeuroNetStoryStar::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_004bc110 (RET 0xc). Only 0x26 (a click, A = the control) is handled; everything else,
     // an unknown control included, returns 0 without reaching WinControl's slot 42.
     (void)B;
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
     WinControl* const Clicked = reinterpret_cast<WinControl*>(A);
 
@@ -1064,7 +1064,7 @@ intptr_t NeuroNetStoryStar::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         NavBarCloseService(true);
         G_bNnStoryStarKeepPending = 1;
         MenuNavSetIntroModeRequest(4); // FUN_00564b10(4)
-        HudPostCommand(0xc5, 0);
+        HudPostCommand(USER_EXIT_GAME, 0);
         return 1;
     }
     if (Clicked == NewPlayerButton)
@@ -1072,7 +1072,7 @@ intptr_t NeuroNetStoryStar::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         NnMainButtonOnModalOpen();
         NavBarCloseService(true);
         MenuNavSetIntroModeRequest(2);
-        HudPostCommand(0xc5, 0);
+        HudPostCommand(USER_EXIT_GAME, 0);
         return 1;
     }
     if (Clicked == NewServerButton)
@@ -1082,7 +1082,7 @@ intptr_t NeuroNetStoryStar::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         NavBarCloseService(true);
         ShutdownServerConnection();
         MenuNavSetIntroModeRequest(3);
-        HudPostCommand(0xc5, 0);
+        HudPostCommand(USER_EXIT_GAME, 0);
         return 1;
     }
     return 0;
@@ -1218,7 +1218,7 @@ void NeuroNetStoryStar::LoadAutosave()
     {
         // Multiplayer: intro mode 4 and USER_EXIT_GAME.
         MenuNavSetIntroModeRequest(4);
-        HudPostCommand(0xc5, 0);
+        HudPostCommand(USER_EXIT_GAME, 0);
         return;
     }
 
@@ -1243,7 +1243,7 @@ void NeuroNetStoryStar::LoadAutosave()
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_StoryStar.cpp",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_StoryStar.cpp",
               0x6d1, "Failed to retrieve available save games\n");
     }
 
@@ -1254,7 +1254,7 @@ void NeuroNetStoryStar::LoadAutosave()
         return;
     }
     // Not found: the load/save screen instead.
-    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_StoryStar.cpp",
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_StoryStar.cpp",
           0x6db, "Failed to find character to reload\n");
     OpenNnLoadSave(3);
 }

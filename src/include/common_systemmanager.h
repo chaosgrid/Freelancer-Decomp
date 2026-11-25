@@ -477,7 +477,7 @@ struct FGunGroupSlot
     float NoBurstTime;              // +0x10 ... then restarts at -NoBurstTime
     float FireInterval;             // +0x14
     float Phase;                    // +0x18 >= 0 inside a burst
-    unsigned char Field_0x1C;       // +0x1C only the ctor's zero store is known. TODO: meaning
+    unsigned char Field_0x1C;       // +0x1C only the ctor's zero store is known
 };
 static_assert(sizeof(FGunGroupSlot) == 0x20, "FGunGroupSlot sizeof 0x20");
 static_assert(offsetof(FGunGroupSlot, bAutoTurret) == 0x02, "FGunGroupSlot+0x02 bAutoTurret");
@@ -551,7 +551,7 @@ struct SystemManagerGunGroupManager
     // +0x08: a BaseWatcher on the current target. Raw bytes because the ctor memsets the whole
     // block; TargetWatcher() is the typed view.
     unsigned char TargetWatcherBytes[8];
-    unsigned Field_0x10;                // +0x10 bits 0x30000000 hold all fire; no writer in Common.dll. TODO: meaning
+    unsigned Field_0x10;                // +0x10 bits 0x30000000 hold all fire; no writer in Common.dll
     Vector AimOffset;                   // +0x14 the aim point in the target's own frame
     float AimRefreshTimer;              // +0x20 aim point recomputed once this is <= 0 (UpdateGunFireState)
     float CruiseHeldTime;               // +0x24 how long the target has been cruising (UpdateTimers)
@@ -580,11 +580,11 @@ struct SystemManagerGunGroupManager
     float MissileLaunchAllowOutOfRange;     // +0x1070 missile_launch_allow_out_of_range, the bool as a float
     float MineLaunchInterval;               // +0x1074 MineParams mine_launch_interval
     float MineLaunchConeAngle;              // +0x1078 mine_launch_cone_angle
-    float Field_0x107C;                     // +0x107C ctor 0.0f; no other access. TODO: meaning
+    float Field_0x107C;                     // +0x107C ctor 0.0f; no other access
     float GunFireAccuracyConeAngle;         // +0x1080 GunParams gun_fire_accuracy_cone_angle
     float GunRange;                         // +0x1084 longest plain-gun range * jittered gun_range_threshold
     int bFireAllGuns;                       // +0x1088 fire_style MULTIPLE -> 1, SINGLE -> 0
-    float Field_0x108C;                     // +0x108C ctor pi/32; no other access. TODO: meaning
+    float Field_0x108C;                     // +0x108C ctor pi/32; no other access
     float WideConeAngle;                    // +0x1090 ctor pi/32; UpdateMissileFireState's wide aim angle
     unsigned char bEnabled;                 // +0x1094 ctor 1; FireAutoTurrets / RunFireControlTick need it
     FLauncherFireCacheSlot LineOfFireCache[16]; // +0x1098
@@ -857,7 +857,7 @@ struct FFormationLeaderState
     // ComputeFormationFollowerEnvelope; ctor 0.1f / 0.2f.
     float FormationNarrowAngle;
     float FormationWideAngle;
-    float Field_0xA4;                     // +0xA4 ctor 200.0f; no reader in Common.dll. TODO: meaning
+    float Field_0xA4;                     // +0xA4 ctor 200.0f; no reader in Common.dll
     // +0xA8..+0xB8, +0xBD, +0xC2: the order SetDirectiveOrder stores and GetDirectiveOrder
     // copies out (BaseFollowerBehavior::Slot7's FollowerDirectiveOrder).
     unsigned OrderObjectId;               // +0xA8 the dock candidate's id
@@ -865,7 +865,7 @@ struct FFormationLeaderState
     unsigned ValueB0;                     // +0xB0 SetValueB0 / TryGetValueB0
     unsigned ValueB4;                     // +0xB4 SetValueB4 / TryGetValueB4
     unsigned OrderLaneParam;              // +0xB8 float bits, go_tradelane's 4th argument
-    unsigned char Field_0xBC;             // +0xBC only ever cleared (with +0xBD..+0xC4). TODO: meaning
+    unsigned char Field_0xBC;             // +0xBC only ever cleared (with +0xBD..+0xC4)
     unsigned char bOrderPending;          // +0xBD; Update clears it once the leader leaves the lane
     unsigned char bValueB0Valid;          // +0xBE
     unsigned char bValueB4Valid;          // +0xBF

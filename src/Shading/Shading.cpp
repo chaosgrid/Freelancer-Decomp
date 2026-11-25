@@ -10,49 +10,15 @@
 #include "MaterialLibrary.h"
 #include "ShadingInternal.h"
 #include "TextureLibrary.h"
+#include "dacom_factory.h"   // FDacomComponentFactory
 
 namespace
 {
     // The part every Shading component factory shares: retail's 0xC-byte object {vtable,
-    // reference count, registered name}. QueryInterface, AddRef and Release are one body for all
-    // 21 factory classes; each class adds only its CreateInstance.
-    class FComponentFactory : public IComponentFactory
-    {
-    public:
-        explicit FComponentFactory(const char* Name) : RefCount(1), Name(Name) {}
-
-        GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
-        {
-            // LAB_06eb1050: mandatory output, exact IID including terminator.
-            *Out = nullptr;
-            if (std::strncmp(Iid, Iids::ComponentFactory, sizeof(Iids::ComponentFactory)) != 0)
-                return GR_INTERFACE_UNSUPPORTED;
-            *Out = (IComponentFactory*)this;
-            AddRef();
-            return GR_OK;
-        }
-
-        unsigned long DACOM_API AddRef() override { return ++RefCount; } // 06ecb930
-
-        unsigned long DACOM_API Release() override
-        {
-            // FUN_06eb1090: saturates at zero. A factory has no destructor; the block is freed
-            // directly.
-            if (RefCount > 0)
-                --RefCount;
-            const unsigned long Next = RefCount;
-            if (Next == 0)
-            {
-                RefCount = 1;
-                ::operator delete(this);
-            }
-            return Next;
-        }
-
-        unsigned long RefCount; // +4
-        const char* Name;       // +8  the registered component name
-    };
-    static_assert(sizeof(FComponentFactory) == 0xC, "a retail factory is 0xC bytes");
+    // reference count, registered name}. QueryInterface (LAB_06eb1050), AddRef (06ecb930) and
+    // Release (FUN_06eb1090) are one body for all 21 factory classes; each class adds only its
+    // CreateInstance.
+    using FComponentFactory = FDacomComponentFactory;
 
     // The sixteen material factory classes, one per material class. Each retail CreateInstance is
     // this body with the class's constructor inlined: Atmosphere 06eb10c0, BtDetailMap 06eb4840,

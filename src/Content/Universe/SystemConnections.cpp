@@ -210,7 +210,7 @@ unsigned int GetNextHopConnectionObject(unsigned int FromSystemId, unsigned int 
 
     unsigned int Result = 0;
     unsigned int SystemId = FromSystemId;
-    if ((SystemId & 0x3fffffff) != 0 && (NextSystemId & 0x3fffffff) != 0)
+    if ((SystemId & GIdValueMask) != 0 && (NextSystemId & GIdValueMask) != 0)
     {
         pub::System::ConnectionEnumerator Enumerator;
         ResetConnectionEnumerator(Enumerator);
@@ -314,7 +314,7 @@ void __cdecl LoadSystemPathSection(INI_Reader* Reader, FSystemPathTable* Table)
         Paths.insert(FSystemPathsFrom::value_type(ToSystemId, Path));
         Path.clear();
     }
-    if ((FromSystemId & 0x3fffffff) != 0)
+    if ((FromSystemId & GIdValueMask) != 0)
         Table->insert(FSystemPathTable::value_type(FromSystemId, Paths));
 }
 

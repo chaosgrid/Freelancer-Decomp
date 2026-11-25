@@ -30,7 +30,6 @@ extern "C"
 
 namespace
 {
-    const int kFdumpError = 0x100001;
     const char* const kLuaParserCpp = "LuaScriptParser.cpp";
 
     lua_State* G_ThornLuaState = nullptr;
@@ -374,11 +373,11 @@ namespace
 
             std::sprintf(Message, "THORN: Unable to query IParamCurve interface for %s.\n",
                          lua_getstring(ClsidObj));
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s", DiagnosticSource, 0x978, Message);
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", DiagnosticSource, 0x978, Message);
         }
         // A failed QI also falls through to the create-failure warning.
         std::sprintf(Message, "THORN: Unable to create param curve %s.\n", lua_getstring(ClsidObj));
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s", DiagnosticSource, 0x97b, Message);
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", DiagnosticSource, 0x97b, Message);
         return -1;
     }
 
@@ -2095,7 +2094,7 @@ namespace
                 std::sprintf(Message,
                              "THORN: Failed to create event of type %d(%s).  Secondary entity not found.\n",
                              Type, ThornEventTypeDebugName(static_cast<unsigned int>(Type)));
-                FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kLuaParserCpp, 0x505, Message);
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kLuaParserCpp, 0x505, Message);
                 Common.Type = 0;
             }
         }

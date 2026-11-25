@@ -651,7 +651,7 @@ namespace
             Cursor->Shape = Shape;
             if (Shape == nullptr)
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: missing cursor shape (%s)\n", kMouseCpp,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: missing cursor shape (%s)\n", kMouseCpp,
                       0x430, Cursor->ShapeName.Data);
             }
         }
@@ -676,7 +676,7 @@ namespace
 #endif
         if (Cursor->Shape == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: missing shape (%s)\n", kMouseCpp, 0x401,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: missing shape (%s)\n", kMouseCpp, 0x401,
                   Cursor->Name.Data);
             return Cursor->Shape != nullptr;
         }
@@ -1021,7 +1021,7 @@ void MouseDispatchEvents()
 
         if (Event.bMove != 0)
         {
-            HudPostCommand(5, 0); // FUN_005763b0(5, 0)
+            HudPostCommand(USER_MOVE, 0); // FUN_005763b0(5, 0)
             continue;
         }
         if (Event.Record.Key == 0)
@@ -1173,7 +1173,7 @@ void MouseSetCursor(char const* Name, bool bSetDefault)
     }
 
     if (Found == nullptr && Name != nullptr && Name[0] != '\0' && _stricmp(Name, "DEFAULT") != 0)
-        FDUMP(0x100002, "%s(%d) : *** WARNING: missing cursor (%s)\n", kMouseCpp, 0x4ad, Name);
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: missing cursor (%s)\n", kMouseCpp, 0x4ad, Name);
 
     if (Found == G_CurrentCursor)
         return;

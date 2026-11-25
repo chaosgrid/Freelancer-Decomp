@@ -67,7 +67,7 @@ void BlockingDialogOpen()
         return;
     BlockingDialog* const Dialog = static_cast<BlockingDialog*>(Created);
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Dialog->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
     Dialog->CaptureMouse();
 }
 

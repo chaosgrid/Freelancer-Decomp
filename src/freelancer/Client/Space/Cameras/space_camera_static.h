@@ -40,11 +40,9 @@ bool StaticCameraActivate(FStaticCamera* Cam, const int* ViewRect4);
 // Slot 0x68 (LAB_0051e980).
 void StaticCameraDeactivate(FStaticCamera* Cam);
 
-// Slot 0x74 (LAB_0051e9d0). Retail's argument is a pointer whose first dword is an event code;
-// the only code this camera reacts to is 15, and it reacts by asking for the "player" mode.
-// Always returns 0.
+// Slot 0x74 (LAB_0051e9d0). Retail's argument is the command record SpaceSendCommand
+// (FUN_0054bcb0) routes, whose first dword is its USER_* id; the only id this camera reacts to
+// is USER_CANCEL (15), and it reacts by asking for the "player" mode. Always returns 0.
 int StaticCameraOnEvent(FStaticCamera* Cam, const int* Event);
-
-enum { kStaticCameraReleaseEvent = 15 };
 
 inline FSpaceCamera* SpaceCameraOf(FStaticCamera* Cam) { return Cam; }

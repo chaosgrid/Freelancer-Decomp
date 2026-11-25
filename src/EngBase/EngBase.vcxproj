@@ -51,6 +51,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EngBase.cpp" />
+    <ClCompile Include="EngBaseAnim.cpp" />
+    <ClCompile Include="EngBaseAnimComponent.cpp" />
+    <ClCompile Include="EngBaseChannelArch.cpp" />
+    <ClCompile Include="EngBaseEngine.cpp" />
+    <ClCompile Include="EngBaseHardPoint.cpp" />
     <ClCompile Include="EngBaseMixer.cpp" />
   </ItemGroup>
   <ItemGroup>

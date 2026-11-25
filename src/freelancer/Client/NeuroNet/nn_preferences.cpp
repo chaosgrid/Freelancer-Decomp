@@ -85,7 +85,7 @@ namespace
     {
         wchar_t Buffer[0x40];
         GetIdsStringWWithRawFallback(Ids, Buffer, 0x40);
-        Text->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Buffer), 0);
+        Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Buffer), 0);
     }
 
     void SetPosition3(Win3D* Control, float X, float Y, float Z)
@@ -342,7 +342,7 @@ void NnPreferences::Update()
         }
         wchar_t Buffer[0x40];
         swprintf(Buffer, 0x40, L"%1.0f", Dt); // 0x005d5048
-        DialogText[2]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Buffer), 0);
+        DialogText[2]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Buffer), 0);
     }
 }
 
@@ -357,8 +357,8 @@ void NnPreferences::SetRowsHidden(bool bHide)
             {
                 HideControl(KeyBtnRows[Index]);
                 HideControl(KeyAltBtnRows[Index]);
-                KeyRows[Index]->SetProperty(0x24, 0, 0);
-                KeyAltRows[Index]->SetProperty(0x24, 0, 0);
+                KeyRows[Index]->SetProperty(kTextPropClickable, 0, 0);
+                KeyAltRows[Index]->SetProperty(kTextPropClickable, 0, 0);
                 HideControl(CommandRows[Index]);
                 HideControl(KeyRows[Index]);
                 HideControl(KeyAltRows[Index]);
@@ -372,8 +372,8 @@ void NnPreferences::SetRowsHidden(bool bHide)
                 ShowControl(KeyRows[Index]);
                 ShowControl(KeyAltRows[Index]);
                 ShowControl(StaticRows[Index]);
-                KeyRows[Index]->SetProperty(0x24, 1, 0);
-                KeyAltRows[Index]->SetProperty(0x24, 1, 0);
+                KeyRows[Index]->SetProperty(kTextPropClickable, 1, 0);
+                KeyAltRows[Index]->SetProperty(kTextPropClickable, 1, 0);
             }
         }
         if (!bHide)
@@ -395,11 +395,11 @@ void NnPreferences::SetRowsHidden(bool bHide)
                 HideControl(OptScroll[Index]);
                 HideControl(SmallButton[Index]);
                 HideControl(SmallButtonText[Index]);
-                OptText[Index]->SetProperty(0x24, 0, 0);
+                OptText[Index]->SetProperty(kTextPropClickable, 0, 0);
             }
             else
             {
-                OptText[Index]->SetProperty(0x24, 1, 0);
+                OptText[Index]->SetProperty(kTextPropClickable, 1, 0);
             }
         }
         if (!bHide)
@@ -462,7 +462,7 @@ void NnPreferences::MarkKeyMapDirtyAndReload()
     CancelButton->bUseColour = 0;
     CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState | kWireButtonEnabled);
     LoadKeyList(kKeyListPath);
-    FillKeyRows(static_cast<int>(KeyScroll->SetProperty(0x3b, 0, 0)));
+    FillKeyRows(static_cast<int>(KeyScroll->SetProperty(kScrollPropGetValue, 0, 0)));
 }
 
 intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -470,7 +470,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // FUN_004ac0a0
     Win3D* const Source = reinterpret_cast<Win3D*>(A);
 
-    if (Msg == 0x46 || Msg == 0x25)
+    if (Msg == 0x46 || Msg == kWinNotifyHover)
     {
         // Row tooltips.
         if (CurPage == 0)
@@ -507,7 +507,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
     }
 
-    if (Msg == 0x4f && Anim < 0.0)
+    if (Msg == kWinNotifyToolTip && Anim < 0.0)
         return 1;
     if (bFlipping != 0)
         return 0;
@@ -515,7 +515,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (bConfirmMode != 0)
     {
         // The "apply changes?" dialog.
-        if (Msg != 0x26)
+        if (Msg != kWinNotifyClick)
             return 0;
         if (Source == OverwriteButton)
         {
@@ -558,7 +558,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (bVideoConfirm != 0)
     {
         // "Keep this video mode?"
-        if (Msg != 0x26)
+        if (Msg != kWinNotifyClick)
             return 0;
         if (Source == OverwriteButton)
         {
@@ -587,7 +587,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (bKeyCapture != 0)
     {
         // The key conflict / capture dialog.
-        if (Msg != 0x26)
+        if (Msg != kWinNotifyClick)
             return 0;
         if (Source == OverwriteButton)
         {
@@ -625,7 +625,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    if (Msg == 0x3e)
+    if (Msg == kWinNotifyScrollValue)
     {
         std::vector<FPrefOption>* Options = nullptr;
         switch (CurPage)
@@ -658,7 +658,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    if (Msg == 0x29)
+    if (Msg == kWinNotifyRelease)
     {
         // A slider released on the audio page stops its preview sound.
         if (CurPage != 3)
@@ -677,7 +677,7 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
 
     // Clicks, per page.
@@ -706,16 +706,16 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             CancelButton->bUseColour = 1;
             CancelButton->ButtonState = static_cast<unsigned char>(CancelButton->ButtonState & ~kWireButtonEnabled);
             LoadKeyList(kKeyListPath);
-            FillKeyRows(static_cast<int>(KeyScroll->SetProperty(0x3b, 0, 0)));
+            FillKeyRows(static_cast<int>(KeyScroll->SetProperty(kScrollPropGetValue, 0, 0)));
         }
         else
         {
             for (int Index = 0; Index < 13; ++Index)
             {
                 if (Source == KeyBtnRows[Index])
-                    BeginKeyCapture(static_cast<int>(KeyScroll->SetProperty(0x3b, 0, 0)) + Index, false);
+                    BeginKeyCapture(static_cast<int>(KeyScroll->SetProperty(kScrollPropGetValue, 0, 0)) + Index, false);
                 else if (Source == KeyAltBtnRows[Index])
-                    BeginKeyCapture(static_cast<int>(KeyScroll->SetProperty(0x3b, 0, 0)) + Index, true);
+                    BeginKeyCapture(static_cast<int>(KeyScroll->SetProperty(kScrollPropGetValue, 0, 0)) + Index, true);
             }
         }
         break;
@@ -786,8 +786,8 @@ intptr_t NnPreferences::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 }
                 if (Row >= 0)
                 {
-                    VideoModeCycle->SetProperty(0x37, 0, static_cast<uintptr_t>(ModeCount - 1));
-                    VideoModeCycle->SetProperty(0x38, static_cast<uintptr_t>(CycleValue), 0);
+                    VideoModeCycle->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(ModeCount - 1));
+                    VideoModeCycle->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(CycleValue), 0);
                     SetSliderOption(0x536, CycleValue, Row);
                 }
             }
@@ -1027,9 +1027,9 @@ void NnPreferences::SelectGroup(int Group)
 {
     // FUN_004ae260
     CurGroup = Group;
-    KeyScroll->SetProperty(0x38, 0, 0);
+    KeyScroll->SetProperty(kScrollPropSetValue, 0, 0);
     int Count = static_cast<int>(GetCurGroupRows().size());
-    KeyScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Count - 1));
+    KeyScroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Count - 1));
     for (int Index = 0; Index < 13; ++Index)
     {
         Count = static_cast<int>(GetCurGroupRows().size());
@@ -1421,7 +1421,7 @@ namespace
         HideControl(Self->SetKeyFrame);
         Self->SetRowsHiddenPublic(false);
         for (int Index = 0; Index < 14; ++Index)
-            Self->OptText[Index]->SetProperty(0x24, 1, 0);
+            Self->OptText[Index]->SetProperty(kTextPropClickable, 1, 0);
     }
 
     // The 0x18-byte record IRenderPipeline slot 10 fills (rp8 FUN_06d084f2 writes +0x00..+0x10).
@@ -1568,7 +1568,7 @@ void NnPreferences::LoadKeyList(char const* Path)
     INI_Reader Reader;
     if (!Reader.open(Path, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not open %s",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not open %s",
               "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_Preferences.cpp", 0x910, Path);
         return;
     }
@@ -1756,7 +1756,7 @@ void NnPreferences::FillKeyRows(int First)
         if (Row.NameIds > 0)
             SetTextIds(CommandRows[Index], static_cast<unsigned>(Row.NameIds));
         else
-            CommandRows[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(L""), 0);
+            CommandRows[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(L""), 0);
     }
 }
 
@@ -1875,7 +1875,7 @@ bool NnPreferences::LoadOptList(char const* Path)
     bool const bOpened = Reader.open(Path, false);
     if (!bOpened)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not open %s",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not open %s",
               "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_Preferences.cpp", 0x9f5, Path);
         return bOpened;
     }
@@ -1917,7 +1917,7 @@ void NnPreferences::TakeSnapshot()
         else if (Row.bSlider != 0)
         {
             UiScroll* const Scroll = Row.Id == 0x536 ? VideoModeCycle : OptScroll[Index];
-            unsigned const Value = static_cast<unsigned>(Scroll->SetProperty(0x3b, 0, 0));
+            unsigned const Value = static_cast<unsigned>(Scroll->SetProperty(kScrollPropGetValue, 0, 0));
             Snapshot[Index] = static_cast<float>(static_cast<long long>(Value));
         }
         else
@@ -1987,7 +1987,7 @@ void NnPreferences::CancelChanges()
         if (LoadUserKeyMapIni(UserPath) < 1)
             LoadUserKeyMapIni(DefaultPath);
         LoadKeyList(kKeyListPath);
-        FillKeyRows(static_cast<int>(KeyScroll->SetProperty(0x3b, 0, 0)));
+        FillKeyRows(static_cast<int>(KeyScroll->SetProperty(kScrollPropGetValue, 0, 0)));
     }
     else
     {
@@ -2159,7 +2159,7 @@ void NnPreferences::SetSliderOption(int Id, int Value, int Row)
             // max_submitted_sounds shows its count.
             swprintf(Text, 0x40, L"%d", Value); // 0x005d0ec4
             if (Row >= 0)
-                SmallText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+                SmallText[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
         }
         else if (Id == 0x767)
         {
@@ -2227,7 +2227,7 @@ void NnPreferences::SetSliderOption(int Id, int Value, int Row)
             // Gamma.
             swprintf(Text, 0x40, L"%3.2f", static_cast<double>(Value) * static_cast<double>(0.01f));
             if (Row >= 0)
-                SmallText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+                SmallText[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
             break;
         }
         case 0x536:
@@ -2254,7 +2254,7 @@ void NnPreferences::SetSliderOption(int Id, int Value, int Row)
             }
             if (Row >= 0)
             {
-                VideoModeText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+                VideoModeText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
                 RefreshRows(0x57e);
             }
             break;
@@ -2295,7 +2295,7 @@ void NnPreferences::SetSliderOption(int Id, int Value, int Row)
                 Text[0] = 0;
                 if (static_cast<unsigned>(Value) <= 3)
                     GetIdsStringWWithRawFallback(0x702u + static_cast<unsigned>(Value), Text, 0x40);
-                SmallText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+                SmallText[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
             }
             break;
         }
@@ -2356,7 +2356,7 @@ void NnPreferences::SetToggleOption(int Id, int Value, int Row)
         {
             wchar_t Text[0x40];
             GetIdsStringWWithRawFallback(bOn != 0 ? 0x65fu : 0x67au, Text, 0x40);
-            ToggleTextSlot(this, Row)->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+            ToggleTextSlot(this, Row)->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
         }
     }
 
@@ -2373,7 +2373,7 @@ void NnPreferences::SetToggleOption(int Id, int Value, int Row)
             DialogText[1]->SetText(Text);
             ShowKeyDialog();
             for (int Index = 0; Index < 14; ++Index)
-                OptText[Index]->SetProperty(0x24, 0, 0);
+                OptText[Index]->SetProperty(kTextPropClickable, 0, 0);
         }
         else
         {
@@ -2408,7 +2408,7 @@ void NnPreferences::UpdateDirty(int Id, float Value)
             if (Row.Id == 0x536)
                 continue;
             // The scroll value is widened as an unsigned qword before ftol.
-            unsigned const ScrollValue = static_cast<unsigned>(OptScroll[Index]->SetProperty(0x3b, 0, 0));
+            unsigned const ScrollValue = static_cast<unsigned>(OptScroll[Index]->SetProperty(kScrollPropGetValue, 0, 0));
             if (static_cast<int>(Snapshot[Index]) != static_cast<int>(static_cast<long long>(ScrollValue)))
                 bFound = true;
             continue;
@@ -2456,7 +2456,7 @@ void NnPreferences::ShowRowTip(int Row)
     // FUN_004b2130 (RET 4): the row's info ids in the rollover.
     if (CurPage == 0)
     {
-        int const First = static_cast<int>(KeyScroll->SetProperty(0x3b, 0, 0));
+        int const First = static_cast<int>(KeyScroll->SetProperty(kScrollPropGetValue, 0, 0));
         // Deviation: retail reads an uninitialised local for a group outside 0..2 (0x004b21cb);
         // SelectGroup only ever stores 0..2.
         int InfoIds = 0;
@@ -2547,7 +2547,7 @@ void NnPreferences::Revert(bool bApply)
                         continue;
                     if (bApply)
                     {
-                        VideoModeCycle->SetProperty(0x38, static_cast<uintptr_t>(CycleIndex[Mode]), 0);
+                        VideoModeCycle->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(CycleIndex[Mode]), 0);
                         SetSliderOption(0x536, CycleIndex[Mode], Index);
                     }
                     else
@@ -2558,13 +2558,13 @@ void NnPreferences::Revert(bool bApply)
                 continue;
             }
             // The scroll value is widened as a qword; equal skips.
-            unsigned const ScrollValue = static_cast<unsigned>(OptScroll[Index]->SetProperty(0x3b, 0, 0));
+            unsigned const ScrollValue = static_cast<unsigned>(OptScroll[Index]->SetProperty(kScrollPropGetValue, 0, 0));
             if (static_cast<double>(static_cast<long long>(ScrollValue)) == static_cast<double>(Snapshot[Index]))
                 continue;
             int const Restored = static_cast<int>(Snapshot[Index]);
             if (bApply)
             {
-                OptScroll[Index]->SetProperty(0x38, static_cast<uintptr_t>(Restored), 0);
+                OptScroll[Index]->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(Restored), 0);
                 SetSliderOption(Row.Id, Restored, Index);
             }
             else
@@ -2678,7 +2678,7 @@ void NnPreferences::RefreshRows(int Id)
         if (Id != -1 && Id != RowId)
             continue;
 
-        OptScroll[Index]->SetProperty(0x37, 0, 100);
+        OptScroll[Index]->SetProperty(kScrollPropSetRange, 0, 100);
         HideControl(OptToggle[Index]);
         HideControl(OptTitleText[Index]);
         HideControl(OptScroll[Index]);
@@ -2700,7 +2700,7 @@ void NnPreferences::RefreshRows(int Id)
             // A header row is its title only.
             HideControl(OptText[Index]);
             GetIdsStringWWithRawFallback(static_cast<unsigned>(RowId), Text, 0x40);
-            OptTitleText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+            OptTitleText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
             ShowControl(OptTitleText[Index]);
             continue;
         }
@@ -2711,7 +2711,7 @@ void NnPreferences::RefreshRows(int Id)
         SetOptionRowGreyed(this, Index, Row.bDisabledInGame != 0 && bInGame != 0);
         ShowControl(OptText[Index]);
         GetIdsStringWWithRawFallback(static_cast<unsigned>(RowId), Text, 0x40);
-        OptText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+        OptText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
 
         FPerfOption* const Option = FindPerfOptionByIds(RowId);
         if (Option != nullptr)
@@ -2729,7 +2729,7 @@ void NnPreferences::RefreshRows(int Id)
                 OptToggle[Index]->SetProperty(0x30, static_cast<uintptr_t>(bOn), 0);
                 ShowControl(OptToggle[Index]);
                 GetIdsStringWWithRawFallback(bOn != 0 ? 0x65fu : 0x67au, Text, 0x40);
-                OptToggleText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+                OptToggleText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
                 ShowControl(OptToggleText[Index]);
             }
         }
@@ -2743,7 +2743,7 @@ void NnPreferences::RefreshRows(int Id)
                 break;
             wchar_t Value[0x40];
             swprintf(Value, 0x40, L"%3.2f", static_cast<double>(Option->Applied)); // 0x005d5164
-            SmallText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Value), 0);
+            SmallText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Value), 0);
             ShowControl(SmallText[Index]);
             break;
         }
@@ -2756,7 +2756,7 @@ void NnPreferences::RefreshRows(int Id)
             SetPosition3(VideoBox, 0.0f, Y2, 0.0f);
             SetPosition3(VideoBox2, 0.0f, Y2, 0.0f);
             SetPosition3(VideoModeText, 0.0f, Y, 0.0f);
-            VideoModeCycle->SetProperty(0x37, 0, static_cast<uintptr_t>(ModeCount - 1));
+            VideoModeCycle->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(ModeCount - 1));
 
             // The current display mode's entry (the last match wins).
             wchar_t ModeText[0x40];
@@ -2771,7 +2771,7 @@ void NnPreferences::RefreshRows(int Id)
                 SelWidth = Modes[Mode].Width;
                 bSel32 = static_cast<unsigned char>(Modes[Mode].Bpp == 0x20);
                 swprintf(ModeText, 0x40, L"%d x %d", Modes[Mode].Width, Modes[Mode].Height); // 0x005d5190
-                VideoModeCycle->SetProperty(0x38, static_cast<uintptr_t>(CycleIndex[Mode]), 0);
+                VideoModeCycle->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(CycleIndex[Mode]), 0);
                 bFound = true;
             }
             if (!bFound)
@@ -2781,7 +2781,7 @@ void NnPreferences::RefreshRows(int Id)
                 SelWidth = g_display.width;
                 bSel32 = static_cast<unsigned char>(g_display.color_bpp == 0x20);
                 swprintf(ModeText, 0x40, L"%d x %d", g_display.width, g_display.height);
-                VideoModeCycle->SetProperty(0x38, 0, 0);
+                VideoModeCycle->SetProperty(kScrollPropSetValue, 0, 0);
             }
             if (bBigVram != 0)
             {
@@ -2790,7 +2790,7 @@ void NnPreferences::RefreshRows(int Id)
                 wcscpy(Size, ModeText);
                 swprintf(ModeText, 0x40, bSel32 != 0 ? L"%ls x 32" : L"%ls x 16", Size);
             }
-            VideoModeText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ModeText), 0);
+            VideoModeText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ModeText), 0);
             ShowControl(VideoModeCycle);
             ShowControl(VideoBox);
             ShowControl(VideoBox2);
@@ -2803,7 +2803,7 @@ void NnPreferences::RefreshRows(int Id)
             ShowControl(SmallButton[Index]);
             ShowControl(SmallButtonText[Index]);
             GetIdsStringWWithRawFallback(0x60b, Text, 0x40);
-            SmallButtonText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+            SmallButtonText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
             if (SelWidth == CurWidth && bSel32 == bCur32)
             {
                 SmallButtonText[Index]->TextColour = G_NnPaletteGrey;
@@ -2822,9 +2822,9 @@ void NnPreferences::RefreshRows(int Id)
         {
             // Difficulty 0..3 from DIFFICULTY_SCALE * 2 (the option is not null-tested here).
             float const Applied = Option->Applied;
-            OptScroll[Index]->SetProperty(0x37, 0, 3);
+            OptScroll[Index]->SetProperty(kScrollPropSetRange, 0, 3);
             int const Level = static_cast<int>(static_cast<double>(Applied) + static_cast<double>(Applied));
-            OptScroll[Index]->SetProperty(0x38, static_cast<uintptr_t>(Level), 0);
+            OptScroll[Index]->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(Level), 0);
             ShowControl(OptScroll[Index]);
             // Jump table 0x004b143c: ids 0x702..0x705. Deviation: retail leaves the buffer as it
             // was for any other level; the port blanks it.
@@ -2832,7 +2832,7 @@ void NnPreferences::RefreshRows(int Id)
             LevelText[0] = 0;
             if (static_cast<unsigned>(Level) <= 3)
                 GetIdsStringWWithRawFallback(0x702u + static_cast<unsigned>(Level), LevelText, 0x40);
-            SmallText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(LevelText), 0);
+            SmallText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(LevelText), 0);
             ShowControl(SmallText[Index]);
             break;
         }
@@ -2841,13 +2841,13 @@ void NnPreferences::RefreshRows(int Id)
             // max_submitted_sounds, 8..32.
             if (Option == nullptr)
                 break;
-            OptScroll[Index]->SetProperty(0x37, 8, 0x20);
+            OptScroll[Index]->SetProperty(kScrollPropSetRange, 8, 0x20);
             float const Count = static_cast<float>(GetMaxSubmittedSounds()); // FUN_005b3860
-            OptScroll[Index]->SetProperty(0x38, static_cast<uintptr_t>(static_cast<int>(Count)), 0);
+            OptScroll[Index]->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(static_cast<int>(Count)), 0);
             ShowControl(OptScroll[Index]);
             wchar_t CountText[0x40];
             swprintf(CountText, 0x40, L"%1.0f", static_cast<double>(Count)); // 0x005d5048
-            SmallText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(CountText), 0);
+            SmallText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(CountText), 0);
             ShowControl(SmallText[Index]);
             break;
         }
@@ -2874,7 +2874,7 @@ void NnPreferences::RefreshRows(int Id)
                 break;
             HideControl(OptText[Index]);
             GetIdsStringWWithRawFallback(static_cast<unsigned>(RowId), Text, 0x40);
-            OptText[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+            OptText[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
             ShowControl(OptText[Index]);
             break;
         }
@@ -3066,25 +3066,25 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         PageTexts[1] = static_cast<NnTextControl*>(
             CreateTextControl("InterfaceText", "ButtonText", Position, nullptr, TextWidth,
                               TextHeight, TextScale, 0x52e, 1, 0, 1));
-        PageTexts[1]->SetProperty(0x24, 1, 0);
+        PageTexts[1]->SetProperty(kTextPropClickable, 1, 0);
 
         Position[1] = static_cast<float>(TextBase - static_cast<double>(Step));
         PageTexts[0] = static_cast<NnTextControl*>(
             CreateTextControl("keymapText", "ButtonText", Position, nullptr, TextWidth, TextHeight,
                               TextScale, 0x52f, 1, 0, 1));
-        PageTexts[0]->SetProperty(0x24, 1, 0);
+        PageTexts[0]->SetProperty(kTextPropClickable, 1, 0);
 
         Position[1] = static_cast<float>(TextBase - static_cast<double>(Step2));
         PageTexts[2] = static_cast<NnTextControl*>(
             CreateTextControl("VideoText", "ButtonText", Position, nullptr, TextWidth, TextHeight,
                               TextScale, 0x5e2, 1, 0, 1));
-        PageTexts[2]->SetProperty(0x24, 1, 0);
+        PageTexts[2]->SetProperty(kTextPropClickable, 1, 0);
 
         Position[1] = static_cast<float>(TextBase - static_cast<double>(Step3));
         PageTexts[3] = static_cast<NnTextControl*>(
             CreateTextControl("AudioText", "ButtonText", Position, nullptr, TextWidth, TextHeight,
                               TextScale, 0x5e3, 1, 0, 1));
-        PageTexts[3]->SetProperty(0x24, 1, 0);
+        PageTexts[3]->SetProperty(kTextPropClickable, 1, 0);
 
         unsigned MainMenuIds = 0x58b;
         if (bInGame == 0)
@@ -3093,7 +3093,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             PageTexts[4] = static_cast<NnTextControl*>(
                 CreateTextControl("CreditsText", "ButtonText", Position, nullptr, TextWidth,
                                   TextHeight, TextScale, 0x532, 1, 0, 1));
-            PageTexts[4]->SetProperty(0x24, 1, 0);
+            PageTexts[4]->SetProperty(kTextPropClickable, 1, 0);
             MainMenuIds = 0x533;
         }
 
@@ -3101,7 +3101,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         PageTexts[5] = static_cast<NnTextControl*>(
             CreateTextControl("mainMenuText", "ButtonText", Position, nullptr, TextWidth,
                               TextHeight, TextScale, MainMenuIds, 1, 0, 1));
-        PageTexts[5]->SetProperty(0x24, 1, 0);
+        PageTexts[5]->SetProperty(kTextPropClickable, 1, 0);
         PageTexts[5]->TextColour = G_NnPaletteCyan;
     }
 
@@ -3135,7 +3135,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         OptText[Index] = static_cast<NnTextControl*>(
             CreateTextControl(Name, "SubHeader", TextRow, nullptr, NnFloatBits(0x3e5c28f6),
                               NnFloatBits(0x3cf5c28f), 1.0f, 0, 0, 0, 0));
-        OptText[Index]->SetProperty(0x24, 1, 0);
+        OptText[Index]->SetProperty(kTextPropClickable, 1, 0);
         OptText[Index]->bHoverPulse = 0;
 
         // {0.415, TY, 0}, half extents {0.015, 0.015, 0}; +0x370 = DAT_00679b94.
@@ -3166,7 +3166,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             -1.0f};
         OptScroll[Index] = CreateUIScroll(Name, ScrollPosition, NnFloatBits(0x3e75c28f),
                                           NnFloatBits(0x3c656042), 0, 100, 1, 1);
-        OptScroll[Index]->SetProperty(0x37, 0, 100);
+        OptScroll[Index]->SetProperty(kScrollPropSetRange, 0, 100);
         OptScroll[Index]->SetStepMode(true);
         OptScroll[Index]->SetPageField(1.0f);
 
@@ -3263,7 +3263,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
                               NnFloatBits(0x3f666666), 0, 1, 0, 0));
         VideoModeCycle->SetStepMode(true);
         VideoModeCycle->SetPageField(1.0f);
-        VideoModeText->SetProperty(0x24, 1, 0);
+        VideoModeText->SetProperty(kTextPropClickable, 1, 0);
     }
 
     bDirty = 0;
@@ -3315,7 +3315,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
             CreateTextControl("IGroup_Txt_Row3", "ItemName", Position, nullptr, TabTextWidth,
                               TabTextHeight, TabTextScale, 0x770, 1, 0, 0));
         for (int Group = 0; Group < 3; ++Group)
-            GroupTexts[Group]->SetProperty(0x24, 1, 0);
+            GroupTexts[Group]->SetProperty(kTextPropClickable, 1, 0);
     }
 
     // Thirteen key rows. BY = float(0.1745 - (k - 1) * 0.059); the captions sit at
@@ -3351,7 +3351,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         CommandRows[Row] = static_cast<NnTextControl*>(
             CreateTextControl(Name, "ItemName", CommandPosition, nullptr, NnFloatBits(0x3e48b439),
                               NnFloatBits(0x3cf5c28f), NnFloatBits(0x3f8ccccd), 0, 0, 0, 0));
-        CommandRows[Row]->SetProperty(0x24, 1, 0);
+        CommandRows[Row]->SetProperty(kTextPropClickable, 1, 0);
         CommandRows[Row]->bHoverPulse = 0;
 
         // {0.17 / 0.316, float(double(0.133f) - offset), 0}, 0.145 x 0.017, scale 1.1.
@@ -3367,8 +3367,8 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
         KeyAltRows[Row] = static_cast<NnTextControl*>(
             CreateTextControl(Name, "ItemName", KeyAltPosition, nullptr, NnFloatBits(0x3e147ae1),
                               NnFloatBits(0x3c8b4396), NnFloatBits(0x3f8ccccd), 0, 1, 0, 0));
-        KeyRows[Row]->SetProperty(0x24, 1, 0);
-        KeyAltRows[Row]->SetProperty(0x24, 1, 0);
+        KeyRows[Row]->SetProperty(kTextPropClickable, 1, 0);
+        KeyAltRows[Row]->SetProperty(kTextPropClickable, 1, 0);
     }
 
     // The two column headers.

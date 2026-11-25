@@ -33,7 +33,9 @@ struct FMissionDialogLine
     // +0x68: the first line of the section (the id before it, masked with 0x3fffffff, is 0);
     // StartMissionDialog sends this line at once.
     unsigned char bFirst;
-    unsigned char Field_0x69;                     // +0x69 TODO: meaning (loader 0, no reader found)
+    // +0x69: 0 from the loader (FUN_06ef2380); otherwise only copied with the element
+    // (06ef35df); no other access in TU28.
+    unsigned char Field_0x69;
     // +0x6c: the pending comm the speaker gets: Key = the id of the line before this one in the
     // section (0 for the first), TextId = pub::GetNicknameId of value 2, TargetId = the target's
     // SpaceObj id (written by StartMissionDialog), Field_0x0c = 0.

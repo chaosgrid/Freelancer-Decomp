@@ -70,7 +70,10 @@ namespace
     struct FSystemMessage
     {
         unsigned int SystemId;
-        unsigned int Field_0x4;                               // TODO: not read by GameSupport
+        // +0x04 the system on the other side of the jump: the destination for SystemExit
+        // (Cnd_SystemExit FUN_06ec1f00 matches it against its s1), the system left for
+        // SystemEnter (Cnd_SystemEnter FUN_06ec1e30). Not read by GameSupport.
+        unsigned int OtherSystemId;
         unsigned int PlayerId;
     };
 
@@ -424,9 +427,9 @@ namespace
         unsigned int Type;
         pub::SpaceObj::GetType(Params.ShipId, Type);
         unsigned int const* ClassId = nullptr;
-        if ((Type & 0x10000) != 0)
+        if ((Type & OBJ_FIGHTER) != 0)
             ClassId = &GIdFighter;                                              // DAT_06fcf400
-        else if ((Type & 0x20000) != 0)
+        else if ((Type & OBJ_FREIGHTER) != 0)
             ClassId = &GIdFreighter;                                            // DAT_06fcf3fc
         if (ClassId != nullptr &&
             std::find(Params.ClassIds.begin(), Params.ClassIds.end(), *ClassId) == Params.ClassIds.end())

@@ -25,6 +25,7 @@
 // 4 proceed, 5 the target has no terminal (or, from FUN_06f6d820, the ship is unknown).
 
 #include "Comms/Gcs.h"               // FGcsObjectEvent
+#include "common_server.h"           // DOCK_HOST_RESPONSE
 
 #include <list>
 #include <map>
@@ -75,7 +76,7 @@ public:
     int DockIndex = -1;                  // +0x10
     // +0x14: the terminal's TerminalInfo::Value, or with index -1 GetDockTypeForClasses.
     unsigned int DockType = 0;
-    int Response = 5;                    // +0x18 DOCK_HOST_RESPONSE, 4 when sent
+    int Response = DOCK_HOST_RESPONSE_NO_TERMINAL;                    // +0x18 DOCK_HOST_RESPONSE, 4 when sent
     // +0x1c: 1 when the grant comes out of the wait queue; TU25 then only says
     // "gcs_dockrequest_nowcleared" / JumpGateOpenAfterDelay.
     bool bWaitedInQueue = false;

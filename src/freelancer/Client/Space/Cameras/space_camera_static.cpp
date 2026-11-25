@@ -11,6 +11,7 @@
 
 #include "Space/Cameras/space_camera.h"
 #include "Space/space_letterbox.h"
+#include "Space/HUD/hud_command_dispatch.h" // EUserCmd
 
 namespace
 {
@@ -56,7 +57,7 @@ int StaticCameraOnEvent(FStaticCamera* Cam, const int* Event)
     (void)Cam;
 
     // No null test on Event.
-    if (*Event == kStaticCameraReleaseEvent)
+    if (*Event == USER_CANCEL)
         RequestSpaceCameraMode("player");
 
     // Always zero, whether or not the event matched.

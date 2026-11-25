@@ -77,7 +77,7 @@ public:
     // scroll (0x3e), a move (0x42), close (0x4e); returns 0.
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
-    // Event::Handler face LAB_004b47c0 (RET 4) -- USER_CANCEL (0x10) closes the window.
+    // Event::Handler face LAB_004b47c0 (RET 4) -- USER_STACKABLE_CANCEL (0x10) closes the window.
     bool OnEvent(unsigned MsgId) override;
 
     // FUN_004b4510 (cdecl) -- whether anything of the player's ship is damaged: the hull, a

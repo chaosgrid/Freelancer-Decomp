@@ -111,7 +111,7 @@ void CECargo::Init(float HealthFrac, unsigned StackCount, CacheString const& Har
 
     if (CargoPod == nullptr)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: %s cannot find a cargo pod attached to hardpoint %s for %s.",
               kCECargoSource, 0x39, IdentifyEquipment(), Hp,
               Owner->Archetype->Nickname.get_string());

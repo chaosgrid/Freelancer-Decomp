@@ -72,7 +72,7 @@ public:
     // close (0x4e); returns 0.
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
-    // Event::Handler face LAB_0048d540 (RET 4) -- USER_CANCEL (0x10) closes the window.
+    // Event::Handler face LAB_0048d540 (RET 4) -- USER_STACKABLE_CANCEL (0x10) closes the window.
     bool OnEvent(unsigned MsgId) override;
 
     // FUN_0048c720 (thiscall) -- NavBar FUN_004424f0(0), then (for a non-null window) every

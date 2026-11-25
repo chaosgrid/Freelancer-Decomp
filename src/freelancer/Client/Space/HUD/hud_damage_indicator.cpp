@@ -212,7 +212,7 @@ FHudDamageIndicatorPart::FHudDamageIndicatorPart(char const* Path, float Degrees
     ClientMeshLoadFromPath(&Holder, Path, 0, true); // FUN_0059ec80
     if (!ClientMeshHolderHasInstance(&Holder))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: HUD_DamageIndicator is missing: %s.",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: HUD_DamageIndicator is missing: %s.",
               kDamageIndicatorCpp, 0xf7, Path);
     }
 

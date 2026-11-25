@@ -48,6 +48,7 @@
     <ClInclude Include="..\include\soundmanager.h" />
     <ClInclude Include="..\include\audio\dsound8.h" />
     <ClInclude Include="..\include\dacom.h" />
+    <ClInclude Include="..\include\dacom_factory.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SoundManager.cpp" />

@@ -9,6 +9,7 @@
 #include "Interface/menu_ui_init.h"
 #include "Interface/win_factory.h"
 #include "Interface/wincontrol_base.h"
+#include "Interface/menu_enter_state.h"
 
 namespace
 {
@@ -46,15 +47,15 @@ bool PageOptions::Create(Win3D* NewParent, void* /*Payload*/)
 bool PageOptions::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
 {
     // FUN_005736a0.
-    if (Msg == 0x3004)
+    if (Msg == kWinMsgCommand)
     {
         PlayOrRewindUiSoundSlot(0);
         if (A != 0x300c)
             return false;
-        Result = 1;
+        Result = kMenuStateMainMenu;
         return true;
     }
-    return Msg == 0xf002;
+    return Msg == kWinMsgDoubleClick;
 }
 
 PageOptions& GetPageOptions()

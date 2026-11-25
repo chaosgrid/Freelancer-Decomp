@@ -116,7 +116,7 @@ bool FontImp::Realize(int Height)
     Font = CreateFontIndirectA(&LogFont);
     if (Font == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: failed to create font %s height=%d\n", kFontCpp, 0x9ae,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: failed to create font %s height=%d\n", kFontCpp, 0x9ae,
               Name.Data, Height);
         return false;
     }
@@ -618,7 +618,7 @@ int LoadFonts(char const* Path, IFileSystem* Filesys)
                 }
                 else
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: failed to create FONT font %s", kFontCpp,
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: failed to create FONT font %s", kFontCpp,
                           0xae4, Nickname.Data);
                 }
             }

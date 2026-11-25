@@ -14,7 +14,7 @@
 // CharacterSelect copies that record onto the slot later.
 //
 // FUN_06d4a5d0's head and MP-only front (.text:06d4a652 .. .text:06d4aa85) are
-// PlayerData::select_character (server_classes.cpp); its tail is
+// PlayerData::select_character (server_playerdb.cpp); its tail is
 // PlayerData::load_selected_character below.
 
 #include "../include/common_pub.h"
@@ -107,7 +107,7 @@ unsigned int FCostumeTarget::find_part_id(int TypeId, char const* Name, char con
     if (Part != nullptr)
         Id = Part->Id;
     if (Id == 0) {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: invalid costume part (%s) in (%s)\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: invalid costume part (%s) in (%s)\n",
               PlayerDbSource, 0x25a, Name, File);
     }
     return Id;
@@ -122,7 +122,7 @@ unsigned int FCostumeTarget::find_accessory_id(char const* Name, char const* Fil
     if (Accessory != nullptr)
         Id = Accessory->Id;
     if (Id == 0) {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: invalid accessory (%s) in character (%s)\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: invalid accessory (%s) in character (%s)\n",
               PlayerDbSource, 0x263, Name, File);
     }
     return Id;
@@ -214,7 +214,7 @@ bool LoadCostumeKey(INI_Reader& Reader, FCostumeTarget const& Holder, char const
         return true;
     }
     if (strcmp(Suffix, "hair") == 0) {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: hair is no longer a valid bodypart in character (%s)\n",
               PlayerDbSource, 0x286, File);
         return true;
@@ -252,7 +252,7 @@ void LoadCollisionGroupKey(INI_Reader& Reader, PlayerData::FSavedCharacter& Reco
     CacheString Name;
     Name.Value = StringAlloc(Reader.get_value_string(0), false);
     if (Record.ShipArchetype == 0) {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: collision_group %s specified BEFORE ship. Skipping.",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: collision_group %s specified BEFORE ship. Skipping.",
               PlayerDbSource, LineBeforeShip, Name.Value);
         return;
     }
@@ -260,7 +260,7 @@ void LoadCollisionGroupKey(INI_Reader& Reader, PlayerData::FSavedCharacter& Reco
     Archetype::Ship const* Ship = Archetype::GetShip(Record.ShipArchetype);
     Archetype::CollisionGroup const* Group = Ship->get_group_by_name(Name);
     if (Group == nullptr) {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: collision_group(%s) not found on ship(%s). Skipping.",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: collision_group(%s) not found on ship(%s). Skipping.",
               PlayerDbSource, LineNotFound, Name.Value, Ship->Nickname.get_string());
         return;
     }
@@ -410,7 +410,7 @@ bool PlayerData::load_save_record(char const* Path, PlayerData::FSavedCharacter&
             if (Reader.is_value("system")) {
                 Record.SystemId = Universe::get_system_id(Reader.get_value_string());
                 if (Record.SystemId == 0) {
-                    FDUMP(0x100001,
+                    FDUMP(kFdumpError,
                           "%s(%d) : *** ERROR: game (%s) has invalid system name (%s) in player file (%s)\n",
                           PlayerDbSource, 0x376, Reader.get_file_name(),
                           Reader.get_value_string(), Path);
@@ -420,7 +420,7 @@ bool PlayerData::load_save_record(char const* Path, PlayerData::FSavedCharacter&
             if (Reader.is_value("base")) {
                 Record.BaseId = Universe::get_base_id(Reader.get_value_string());
                 if (Record.BaseId == 0) {
-                    FDUMP(0x100001,
+                    FDUMP(kFdumpError,
                           "%s(%d) : *** ERROR: game (%s) has invalid base name (%s) in player file (%s)\n",
                           PlayerDbSource, 0x37e, Reader.get_file_name(),
                           Reader.get_value_string(), Path);
@@ -430,7 +430,7 @@ bool PlayerData::load_save_record(char const* Path, PlayerData::FSavedCharacter&
             if (Reader.is_value("last_base")) {
                 Record.LastBaseId = Universe::get_base_id(Reader.get_value_string());
                 if (Record.LastBaseId == 0) {
-                    FDUMP(0x100001,
+                    FDUMP(kFdumpError,
                           "%s(%d) : *** ERROR: game (%s) has invalid last_base name (%s) in player file (%s)\n",
                           PlayerDbSource, 0x386, Reader.get_file_name(),
                           Reader.get_value_string(), Path);
@@ -582,7 +582,7 @@ bool PlayerData::load_saved_character(char const* Dir, char const* FileName) {
         safe_strcpy(Record.FileName, 0x200, FileName);
         return true;
     }
-    FDUMP(0x100002, "%s(%d) : *** WARNING: Failed to load saved game %s",
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Failed to load saved game %s",
           PlayerDbSource, 0x4a8, Path);
     std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::iterator It =
         saved_characters.find(Key);                               // FUN_06d5a180
@@ -1150,7 +1150,7 @@ bool PlayerData::create_new_character(SCreateCharacterInfo const& Info) {
         if (bResult) {
             reload_saved_character(FileName.c_str());
             if (!SinglePlayer()) {
-                FDUMP(0x100003, "LOG: Create character on account %S (\"%s\")\n",
+                FDUMP(kFdumpNotice, "LOG: Create character on account %S (\"%s\")\n",
                       AccountName, Path);
             }
         }

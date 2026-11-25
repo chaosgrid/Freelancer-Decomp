@@ -613,7 +613,7 @@ void __cdecl SpacePopClampBlockAttitudes(FContentPlayerShip* PlayerShip,
     Origin.x = 0.0f;
     Origin.y = 0.0f;
     Origin.z = 0.0f;
-    pub::System::ScanObjects(SystemId, Objects, 0x40, Origin, -1.0f, 0x7f0000, ObjectCount);
+    pub::System::ScanObjects(SystemId, Objects, 0x40, Origin, -1.0f, OBJ_SHIP_MASK, ObjectCount);
     int const BlockRep = Params->ReputationHandle->GetReputation();          // FUN_06f33f80
 
     for (unsigned int Index = 0; Index < ObjectCount; ++Index)

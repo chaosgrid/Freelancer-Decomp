@@ -917,7 +917,7 @@ namespace Archetype
         Equipment* Found = GEquipmentDb.Get(ProjectileArchetype.Id);
         if (Found == nullptr)
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: Gun::get_munition_range() failed: Couldn't find [Munition] %s for [Gun] %s",
                   ArchetypeSource, 0xd2d, ProjectileArchetype.get_string(), Nickname.get_string());
             return CachedMunitionRange;
@@ -934,7 +934,7 @@ namespace Archetype
         MotorData const* Motor = GMotorDb.Get(Muni->Motor.Id);
         if (Motor == nullptr)
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: Gun::get_munition_range() failed: Couldn't find [Motor] %s for [Munition] %s for [Gun] %s",
                   ArchetypeSource, 0xd25, Muni->Motor.get_string(), ProjectileArchetype.get_string(),
                   Nickname.get_string());

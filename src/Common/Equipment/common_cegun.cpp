@@ -165,7 +165,7 @@ void CEGun::JointChannel::Bind(CEGun* NewOwner, long Instance)
     if (DALib::Engine->GetJointParams((void*)(EngineIndex), 0, &Current) == 0)
     {
         // No null guards on the owner chain.
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: ID(0x%X) Failed to get_joint_state() for gun.  Get Scott. ARCH(%s) FILE(%s)",
               kCEGunSource, 0x336, Owner->Owner->Id, Owner->Arch->Nickname.get_string(),
               Owner->Arch->DaArchetype.Value);

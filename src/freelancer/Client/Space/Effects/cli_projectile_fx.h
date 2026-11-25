@@ -187,7 +187,9 @@ class FClientEquippedObj; // client_gameobj.h
 // Client equip-update packet (10 dwords) — FUN_00534460 / FUN_00544d70 / FUN_00544e70.
 struct FCliEquipFirePacket
 {
-    int Op;                      // +0x00  0x18 fire / 0x19 activate / 0x1a|0x1b→0x19 / 0x1c / 0xbb
+    int Op;                      // +0x00  the command record's USER_* id (FSpaceCommand::Id): use
+                                 //        item / activate / next|prev item -> activate / set
+                                 //        target / fire forward
     unsigned char Opaque04[0xc];
     unsigned short HardpointId;  // +0x10  0 → null ids / count 0
     unsigned short Pad12;

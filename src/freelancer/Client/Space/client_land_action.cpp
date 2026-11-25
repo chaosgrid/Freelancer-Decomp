@@ -59,7 +59,7 @@ Action_Land::Action_Land(FClientShipGameobj* InShip, CEqObj* Dock)
     // None of the calls below tests the narrowed CShip.
     CObject* const Object = Gameobj->Object;
     CShip* Ship = nullptr;
-    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 0x503u) == 0x503u)
+    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
         Ship = static_cast<CShip*>(Object);
 
     // Control exclusion 7 -- with a set_control_exclusion(0) first when 7 is already excluded.
@@ -172,7 +172,7 @@ Action_JumpOut::Action_JumpOut(FClientShipGameobj* InShip, float InDuration, uns
     if (Ship == nullptr)
         return;
     CObject* const Object = Ship->GetObject();
-    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         return;
 
     Object->enable_collisions_r(false);
@@ -273,7 +273,7 @@ void Action_JumpOut::do_simulation_controller(IVP_Event_Sim* EventSim,
     if (Ship == nullptr)
         return;
     CObject* const Object = Ship->GetObject();
-    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 0x503u) != 0x503u)
+    if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
     Matrix Orientation;
     ShipMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Orientation), Rotation);

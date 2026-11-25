@@ -232,7 +232,7 @@ void PathfindManager::Update(float Dt)
 {
     // FUN_062dd760. Clock sums stay on the x87 stack for the compare (double here); the
     // stored timers are floats.
-    if ((OwnerType & 0x7f0000) == 0)
+    if ((OwnerType & OBJ_SHIP_MASK) == 0)
     {
         return;
     }
@@ -364,7 +364,7 @@ void PathfindManager::RefreshAvoidance()
     }
 
     // Only owner types in 0x130000 look for an obstacle to nudge around.
-    if ((OwnerType & 0x130000) == 0)
+    if ((OwnerType & (OBJ_FIGHTER | OBJ_FREIGHTER | OBJ_TRANSPORT)) == 0)
     {
         return;
     }
@@ -390,7 +390,7 @@ void PathfindManager::RefreshAvoidance()
 
     // Without blending the direction goes straight to the ThrustManager (FUN_062e8ce0).
     SystemManager* const Sys = Owner->Sys;
-    bool const bBlend = (!bCruise || (ObstacleType & 0x7f0000) != 0);
+    bool const bBlend = (!bCruise || (ObstacleType & OBJ_SHIP_MASK) != 0);
     bBlendAvoidNudge = bBlend;
     if (!bBlend)
     {

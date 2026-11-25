@@ -78,7 +78,7 @@ namespace
     // Port-only helpers for the "%d" line every statistic of FUN_004a8820 spells out.
     void SetScratchText(WinControl* Control)
     {
-        Control->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        Control->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     }
 
     void SetIntText(WinControl* Control, int Value)
@@ -338,7 +338,7 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
         Ids = kHeadingIds[TableIndex];
     }
 
-    Scroll->SetProperty(0x37, 0, static_cast<uintptr_t>(-1));
+    Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(-1));
     FactionCount = 0;
     SetOffset(0.0f, 0.0f, 0.0f); // slot 31
     SetPosition(Position);       // slot 5
@@ -349,14 +349,14 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
 intptr_t NnPlayerInfo::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_004a80e0 (RET 0xc).
-    if (Msg == 0x3e)
+    if (Msg == kWinNotifyScrollValue)
     {
         if (A != reinterpret_cast<uintptr_t>(Scroll))
             return 0;
         FirstRow = static_cast<int>(B);
         return 1;
     }
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
 
     if (A == reinterpret_cast<uintptr_t>(CloseButton))
@@ -381,7 +381,7 @@ intptr_t NnPlayerInfo::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                     static_cast<unsigned char>(StatHeadings[Stat]->Flags | 3);
             }
         }
-        PlayerStatsTitle->SetProperty(0x1e, 0x640, 0);
+        PlayerStatsTitle->SetProperty(kTextPropSetIds, 0x640, 0);
         return 1;
     }
 
@@ -399,7 +399,7 @@ intptr_t NnPlayerInfo::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool NnPlayerInfo::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00475430 (RET 0xc) -- the body NN_Help's slot 23 (nn_help.cpp) is folded with.
-    if (Msg != 0xef02)
+    if (Msg != kWinMsgHide)
         return WinControl::ProcessMessage(Msg, A, B); // FUN_005a0840
 
     // No parent test.
@@ -436,7 +436,7 @@ void NnPlayerInfo::Draw()
 
         FNnPlayerInfoFaction const& Faction = Factions.data()[Index];
 
-        FactionNames[Row]->SetProperty(0x1e, Reputation::get_name(Faction.GroupId), 0);
+        FactionNames[Row]->SetProperty(kTextPropSetIds, Reputation::get_name(Faction.GroupId), 0);
 
         // The colour by attitude, pulsed for the player's own group.
         unsigned long Colour = 0;
@@ -447,7 +447,7 @@ void NnPlayerInfo::Draw()
             NnUiPulseBlendFromArgb(&Pulsed, Colour); // FUN_00561f20
             Colour = Pulsed;
         }
-        FactionNames[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
+        FactionNames[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
 
         // The frame's caption: 0x634 "FRIENDLY", 0x636 "HOSTILE", 0x635 "NEUTRAL".
         int const Band = HudReputationBand(Faction.Attitude); // FUN_0045a6e0
@@ -456,7 +456,7 @@ void NnPlayerInfo::Draw()
             CaptionIds = 0x634;
         else if (Band == 0)
             CaptionIds = 0x636;
-        FactionFrames[Row]->SetProperty(3, CaptionIds, 0);
+        FactionFrames[Row]->SetProperty(kWinPropToolTip, CaptionIds, 0);
     }
 
     WireControlsJoinColumn(FactionFrames, 6); // FUN_005a4b50
@@ -648,7 +648,7 @@ void NnPlayerInfo::OnPlayerStats(FNnPlayerStatsBlock const* Stats,
     }
 
     SortFactions();
-    Scroll->SetProperty(0x37, 0, static_cast<uintptr_t>(FactionCount - 1));
+    Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(FactionCount - 1));
 }
 
 void NnPlayerInfo::ShowFactionInfocard(int Row)
@@ -662,7 +662,7 @@ void NnPlayerInfo::ShowFactionInfocard(int Row)
     if (InfoCard == 0)
         return;
 
-    PlayerStatsTitle->SetProperty(0x1e, Reputation::get_name(GroupId), 0);
+    PlayerStatsTitle->SetProperty(kTextPropSetIds, Reputation::get_name(GroupId), 0);
 
     for (int Stat = 0; Stat < 13; ++Stat)
     {

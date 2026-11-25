@@ -139,7 +139,7 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectObject::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, Iids::FxEffect) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::FxEffect) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IFxEffect*>(this);
@@ -195,7 +195,7 @@ namespace AlchemyImpl
                 continue;
             if (Fx->SetNodeTransform(SlotIndex, Source12) == GR_OK)
                 continue;
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                   "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxEffect.cpp",
                   0x19e, "Failed to set node transform. Continuing.");
         }
@@ -646,7 +646,7 @@ namespace AlchemyImpl
                     G_EffectNodeLibrary->CreateNodeByHash(Rec.B, &Node);
                 if (Lookup < 0)
                 {
-                    FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+                    FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
                           "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxEffect.cpp",
                           0x113, "couldn't create instace of node\n");
                     return GR_GENERIC;
@@ -659,7 +659,7 @@ namespace AlchemyImpl
                 Desc.interface_name = kFxNodeFactory;
                 if (DACOM_Acquire()->CreateInstance(&Desc, reinterpret_cast<void**>(&Node)) < 0)
                 {
-                    FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+                    FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
                           "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxEffect.cpp",
                           0x11d, "couldn't create instace of folder\n");
                     return GR_GENERIC;
@@ -781,7 +781,7 @@ namespace AlchemyImpl
                 continue;
             }
 
-            FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+            FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
                   "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxEffect.cpp",
                   0x17b, "Unknown associate combination\n");
         }

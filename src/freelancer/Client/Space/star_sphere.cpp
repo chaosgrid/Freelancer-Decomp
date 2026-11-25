@@ -416,7 +416,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         CObject* ExcludeOwn = nullptr;
         {
             CObject* const Own = SunRayOwnerObject(Sphere->Owner);
-            if (Own != nullptr && (static_cast<unsigned>(Own->ObjectClass) & 0x303u) == 0x303u)
+            if (Own != nullptr && (static_cast<unsigned>(Own->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                 ExcludeOwn = Own;
         }
 
@@ -426,7 +426,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         if (IsFirstPersonCameraCurrent())
         {
             CObject* const Player = SunRayOwnerObject(GetPlayerObjRW());
-            if (Player != nullptr && (static_cast<unsigned>(Player->ObjectClass) & 1u) == 1u)
+            if (Player != nullptr && (static_cast<unsigned>(Player->ObjectClass) & CObject::ClassObject) == CObject::ClassObject)
                 ExcludePlayer = Player;
         }
 

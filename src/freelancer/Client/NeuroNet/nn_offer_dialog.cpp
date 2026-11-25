@@ -140,7 +140,7 @@ bool NnOfferDialog::Create(Win3D* NewParent, void* Data)
     float const WindowPosition[3] = {0.0f, 0.0f, NnFloatBits(0xbfa4dd2f)};
     SetPosition(WindowPosition);
 
-    RegisterEvent(0xf);
+    RegisterEvent(USER_CANCEL);
 
     // FUN_004b5060 with the window's own +0x04 parent.
     return Win3D::Create(Parent, Data);
@@ -150,7 +150,7 @@ intptr_t NnOfferDialog::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_004a6590 (RET 0xc). Nothing reaches WinControl's switch.
     (void)B;
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
     if (A == reinterpret_cast<uintptr_t>(CloseButton) ||
         A == reinterpret_cast<uintptr_t>(DeclineButton) ||
@@ -170,7 +170,7 @@ intptr_t NnOfferDialog::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool NnOfferDialog::OnEvent(unsigned MsgId)
 {
     // LAB_004a6600 (RET 4).
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return false;
     if (bSingleButton != 0)
         return false;
@@ -206,7 +206,7 @@ void NnOfferDialog::Open(int Type, FmtStr const* Text, bool bInSingleButton,
 
     // A stack table; Type is not range-checked.
     unsigned const TitleIds[5] = {0x546, 0x650, 0x547, 0x651, 0x651};
-    Title->SetProperty(0x1e, TitleIds[Type], 0);
+    Title->SetProperty(kTextPropSetIds, TitleIds[Type], 0);
 
     // Any other type leaves the buttons alone.
     if (Type == 0 || Type == 3 || Type == 1)
@@ -238,16 +238,16 @@ void NnOfferDialog::Open(int Type, FmtStr const* Text, bool bInSingleButton,
         bSingleButton = 1;
 
         float AcceptOld[3];
-        AcceptButton->SetProperty(7, reinterpret_cast<uintptr_t>(AcceptOld), 0);
+        AcceptButton->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(AcceptOld), 0);
         float const AcceptNew[3] = {0.0f, NnFloatBits(0xbe570a3d), 0.0f};
-        AcceptButton->SetProperty(6, reinterpret_cast<uintptr_t>(AcceptNew), 0);
+        AcceptButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(AcceptNew), 0);
         float const DeltaZ = AcceptNew[2] - AcceptOld[2];
         float const DeltaY = AcceptNew[1] - AcceptOld[1];
         float const DeltaX = AcceptNew[0] - AcceptOld[0];
 
         float TextOld[3];
-        AcceptText->SetProperty(7, reinterpret_cast<uintptr_t>(TextOld), 0);
+        AcceptText->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(TextOld), 0);
         float const TextNew[3] = {DeltaX + TextOld[0], TextOld[1] + DeltaY, TextOld[2] + DeltaZ};
-        AcceptText->SetProperty(6, reinterpret_cast<uintptr_t>(TextNew), 0);
+        AcceptText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(TextNew), 0);
     }
 }

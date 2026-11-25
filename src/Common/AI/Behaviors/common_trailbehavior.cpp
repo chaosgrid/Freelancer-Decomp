@@ -239,7 +239,7 @@ int TrailBehavior::OnEvaluateReadiness(float Unused)
                 // A 0x380000 leader type gives up at once.
                 unsigned LeaderType = 0;                            // not pre-set in retail
                 Leader->get_type(LeaderType);
-                if ((LeaderType & 0x380000u) != 0)
+                if ((LeaderType & (OBJ_CRUISER | OBJ_TRANSPORT | OBJ_CAPITAL)) != 0)
                 {
                     Readiness = Flag29 ? 3 : Result;
                     return Readiness;
@@ -286,7 +286,7 @@ EvaluateResult TrailBehavior::evaluate(unsigned int Context)
     unsigned TargetType = 0;                                        // not pre-set in retail
     if (Target->get_type(TargetType) != 0)
         return EvalSkip;
-    if ((TargetType & 0x7f0000u) == 0 || (TargetType & 0x200000u) != 0)
+    if ((TargetType & OBJ_SHIP_MASK) == 0 || (TargetType & OBJ_CAPITAL) != 0)
         return EvalSkip;
 
     // Behaviors 0xe, 0x11 and 8 cannot be trailed.

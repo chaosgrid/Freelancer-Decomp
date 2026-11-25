@@ -407,7 +407,7 @@ void AppendIdsStringOrWarn(wchar_t** pCursor, wchar_t* pEnd, unsigned int Ids)
     unsigned int Copied = GetIdsStringWWithRawFallback(Ids, Cursor, static_cast<int>(RemainingChars));
     if (Copied == 0)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Failed to load ids: %u",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Failed to load ids: %u",
               "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_StoryStar.cpp", 0x2b3, Ids);
     }
     Cursor += Copied;

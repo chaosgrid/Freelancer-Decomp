@@ -65,20 +65,20 @@ bool NnScanner::Create(Win3D* NewParent, void* Data)
         BindControls();
 
         if (PlayerTitle != nullptr)
-            PlayerTitle->SetProperty(0x1e, 0xbcb, 0);
+            PlayerTitle->SetProperty(kTextPropSetIds, 0xbcb, 0);
 
         // Hide the controls a scan does not use; the full cargo bar pointer is dropped.
         if (JettisonButton != nullptr)
-            JettisonButton->SetProperty(1, 1, 0);
+            JettisonButton->SetProperty(kWinPropHide, 1, 0);
         if (PlayerCash != nullptr)
-            PlayerCash->SetProperty(1, 1, 0);
+            PlayerCash->SetProperty(kWinPropHide, 1, 0);
         if (Ship.Toggle != nullptr)
-            Ship.Toggle->SetProperty(1, 1, 0);
+            Ship.Toggle->SetProperty(kWinPropHide, 1, 0);
         if (CargoLabel != nullptr)
-            CargoLabel->SetProperty(1, 1, 0);
+            CargoLabel->SetProperty(kWinPropHide, 1, 0);
         if (FullCargoBar != nullptr)
         {
-            FullCargoBar->SetProperty(1, 1, 0);
+            FullCargoBar->SetProperty(kWinPropHide, 1, 0);
             FullCargoBar = nullptr;
         }
 
@@ -86,7 +86,7 @@ bool NnScanner::Create(Win3D* NewParent, void* Data)
     }
 
     // FUN_005760d0 on the +0x974 face, whatever Create returned.
-    RegisterEvent(0xf);
+    RegisterEvent(USER_CANCEL);
     return bOk;
 }
 
@@ -95,7 +95,7 @@ void NnScanner::Update()
     // LAB_004b6e30. ProcessMessage(0xef02) deletes this.
     if (!NnScannerMayStand())
     {
-        ProcessMessage(0xef02, 0, 0);
+        ProcessMessage(kWinMsgHide, 0, 0);
         return;
     }
 
@@ -140,7 +140,7 @@ void NnScanner::Update()
     {
         SelectedIndex = -1;
         if (InventoryScroll != nullptr)
-            InventoryScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Counter - 1));
+            InventoryScroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Counter - 1));
 
         // Pull the first row back so the page ends at the list's end (unsigned compares).
         if (FirstRow != 0
@@ -151,7 +151,7 @@ void NnScanner::Update()
             else
                 FirstRow = 0;
             if (InventoryScroll != nullptr)
-                InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow * 10), 0);
+                InventoryScroll->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(FirstRow * 10), 0);
         }
 
         LastRowCount = Counter;
@@ -169,7 +169,7 @@ void NnScanner::Update()
 bool NnScanner::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_004b7180 (RET 0xc).
-    if (Msg == 0xef02)
+    if (Msg == kWinMsgHide)
     {
         PlayOrRewindUiSoundSlot(0xe);
         Close();
@@ -181,11 +181,11 @@ bool NnScanner::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 intptr_t NnScanner::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_004b7050 (RET 0xc).
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         if (A == reinterpret_cast<uintptr_t>(CloseButton))
         {
-            ProcessMessage(0xef02, 0, 0);
+            ProcessMessage(kWinMsgHide, 0, 0);
             return 1;
         }
     }
@@ -218,7 +218,7 @@ bool NnScanner::OnEvent(unsigned MsgId)
     // FUN_004b71c0 (RET 4).
     if (HudIsMousePickBlocked())
         return false;
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return false;
     PlayOrRewindUiSoundSlot(0xe);
     Close(); // FUN_0047ad20

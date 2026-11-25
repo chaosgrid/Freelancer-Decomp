@@ -70,7 +70,7 @@ struct FTriMeshGroup
     FRpVertexStream* ExtraStreams;     // +0x38 new(0x50): four streams, IMesh channels 0x4000..
     unsigned long Bucket;              // +0x3C hook-up sort key 0..4 (IMaterial flags)
 
-    // FUN_06c25e30. Defined in TriMesh.cpp.
+    // FUN_06c25e30. Defined in TriMeshArchetype.cpp.
     const unsigned long** ChannelIndexArray(unsigned long Channel);
 };
 

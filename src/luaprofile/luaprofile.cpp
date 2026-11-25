@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "LuaProfileInternal.h"
+#include "dacom_factory.h"   // FDacomComponentFactory
 
 #include <new>
 #include <stddef.h>
@@ -75,18 +76,14 @@ static_assert(offsetof(FInnerUnknown, RefCount) == 4, "inner refcount @ object+0
 static_assert(offsetof(FInnerUnknown, Owner) == 8, "inner back-ptr @ object+0x24");
 static_assert(offsetof(FLuaTaggedValue, Payload) == 8, "FUN_06801690 payload @ +8");
 
-class FLuaFactory final : public IComponentFactory
+// QueryInterface LAB_068018e0 (*Out = 0, compare 0x17 bytes, then *Out = this and AddRef via
+// vt+4), AddRef and Release are FDacomComponentFactory's.
+class FLuaFactory final : public FDacomComponentFactory
 {
 public:
     FLuaFactory();
 
-    GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
-
-    unsigned long RefCount;
-    const char* Name;
 };
 
 static_assert(sizeof(FLuaFactory) == kFactorySize, "factory operator_new(0xC)");
@@ -111,7 +108,6 @@ static const char kFdumpPath[] =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\LuaProfile\\LuaProfile.cpp";
 static const char kFdumpFmt[] = "%s(%d) : ERROR:General:%s";
 static const int kFdumpLine = 0x167;
-static const int kFdumpError = 0x100001;
 
 // LAB_06801120: FDUMP is called through the import with no null test.
 extern "C" static void LuaErrorMessage(void)
@@ -121,17 +117,6 @@ extern "C" static void LuaErrorMessage(void)
         return;
     char* Message = lua_getstring(Param);
     FDUMP(kFdumpError, kFdumpFmt, kFdumpPath, kFdumpLine, Message);
-}
-
-// Factory QI (LAB_068018e0): compares 0x17 bytes, stopping at the first mismatch.
-static bool BytesMatch(const char* Left, const char* Right, unsigned int Count)
-{
-    for (unsigned int Index = 0; Index < Count; ++Index)
-    {
-        if (Left[Index] != Right[Index])
-            return false;
-    }
-    return true;
 }
 
 // Inlined strcmp (06801970, 06801a45): no null tests.
@@ -607,38 +592,7 @@ GENRESULT DACOM_API FLuaObject::Initialize()
     return GR_OK;
 }
 
-FLuaFactory::FLuaFactory() : RefCount(1), Name(kComponentName) {}
-
-// LAB_068018e0: *Out = 0, compare 0x17 bytes, then *Out = this and AddRef via vt+4.
-GENRESULT DACOM_API FLuaFactory::QueryInterface(const char* Iid, void** Out)
-{
-    *Out = nullptr;
-    if (!BytesMatch(Iid, Iids::ComponentFactory, kIidComponentFactoryBytes))
-        return GR_INTERFACE_UNSUPPORTED;
-    *Out = (IComponentFactory*)(this);
-    AddRef();
-    return GR_OK;
-}
-
-unsigned long DACOM_API FLuaFactory::AddRef()
-{
-    ++RefCount;
-    return RefCount;
-}
-
-unsigned long DACOM_API FLuaFactory::Release()
-{
-    if (RefCount > 0)
-        --RefCount;
-    unsigned long Remaining = RefCount;
-    if (Remaining == 0)
-    {
-        RefCount = 1;
-        delete this;
-        Remaining = 0;
-    }
-    return Remaining;
-}
+FLuaFactory::FLuaFactory() : FDacomComponentFactory(kComponentName) {}
 
 GENRESULT DACOM_API FLuaFactory::CreateInstance(AGGDESC* Desc, void** Instance)
 {

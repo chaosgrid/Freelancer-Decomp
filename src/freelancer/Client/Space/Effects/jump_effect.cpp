@@ -60,7 +60,7 @@ namespace
     // The inline CSolar fetch: the object when its class has all of 0x303, else null.
     CSolar const* AsSolar(CObject const* Obj)
     {
-        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) != 0x303u)
+        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
             return nullptr;
         return static_cast<CSolar const*>(Obj);
     }
@@ -88,7 +88,7 @@ FJumpGateEffect::FJumpGateEffect(FClientSolarGameobj* InSolar)
     Solar = InSolar;
     if (InSolar == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0xe3,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0xe3,
               "null solar passed to JumpGateEffect constructor");
     }
 
@@ -108,7 +108,7 @@ FJumpGateEffect::FJumpGateEffect(FClientSolarGameobj* InSolar)
     }
     if (Desc == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Missing jump effect: %s\n", kJumpEffectCpp, 0xf8,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Missing jump effect: %s\n", kJumpEffectCpp, 0xf8,
               Wanted.get_string());
     }
 
@@ -181,7 +181,7 @@ void FJumpGateEffect::Update(float Dt)
             continue;
 
         // An empty name or a failed start warns.
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: jump gate effect number (%d) named (%s) did not create.",
               kJumpEffectCpp, 0x12c, Ring, Effect.get_string());
     }
@@ -199,7 +199,7 @@ JumpShipEffectDesc* JumpShipEffectDescGet()
     // inlined); a failed new stores and returns null.
     if (G_JumpShipEffectDesc == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0xd5,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0xd5,
               "no JumpShipEffectDesc was loaded, creating a default");
         G_JumpShipEffectDesc = new (std::nothrow) JumpShipEffectDesc();
     }
@@ -334,7 +334,7 @@ void JumpEffectIniLoad()
                 }
                 else
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0x84,
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0x84,
                           "UNKNOWN jumpeffect parameter");
                 }
             }
@@ -379,7 +379,7 @@ void JumpEffectIniLoad()
                 }
                 else
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0xb1,
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kJumpEffectCpp, 0xb1,
                           "UNKNOWN jump ship effect parameter");
                 }
             }
@@ -409,7 +409,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip)
     Desc = JumpShipEffectDescGet();
     if (Desc == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0x1d5,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0x1d5,
               "no JumpShipEffect descriptor found");
     }
 
@@ -442,7 +442,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
     Desc = JumpShipEffectDescGet();
     if (Desc == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0x1d5,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0x1d5,
               "no JumpShipEffect descriptor found");
     }
 
@@ -494,7 +494,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0x181,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kJumpEffectCpp, 0x181,
                   "no jump descriptor in JumpGateEffect");
         }
     }
@@ -515,7 +515,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Hardpoint (%s) not found on jumpgate",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Hardpoint (%s) not found on jumpgate",
               kJumpEffectCpp, 0x196, Arch->JumpOutHp.Value);
         SetIdentityTransform(GateHardpointFrame);
     }
@@ -530,7 +530,7 @@ FJumpShipEffect::FJumpShipEffect(FClientShipGameobj* InShip, FClientSolarGameobj
             Found = GateTunnelFind(&GateDesc->JumpTunnel);
             if (Found == nullptr)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: gate tunnel '%s' not found.",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: gate tunnel '%s' not found.",
                       kJumpEffectCpp, 0x1a5, GateDesc->JumpTunnel.Id);
             }
         }
@@ -563,15 +563,15 @@ double FJumpShipEffect::ShakeAmplitude() const
     // FUN_00503e20: on the ship's +0x158 jump state.
     switch (Ship->JumpState)
     {
-    case 1:
+    case kJumpStateJumpOut:
         // A JumpOutTime not above 0 (NaN included) returns the amplitude itself.
         if (JumpOutTime > 0.0f)
             return static_cast<double>(kJumpShakeAmplitude) / JumpOutTime * Clock;
         return kJumpShakeAmplitude;
-    case 2:
-    case 3:
+    case kJumpStateJumpOutTunnel:
+    case kJumpStateJumpInTunnel:
         return kJumpShakeAmplitude;
-    case 4:
+    case kJumpStateJumpIn:
         // A JumpInTime not above 0 (NaN included) gives 0.
         if (JumpInTime > 0.0f)
             return (1.0 - static_cast<double>(Clock) / JumpInTime) * kJumpShakeAmplitude;
@@ -631,7 +631,7 @@ void FJumpShipEffect::StartJumpOut()
     }
     if (!bStarted)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: jump out effect (%s) did not create.",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: jump out effect (%s) did not create.",
               kJumpEffectCpp, 0x246, TunnelEffect.get_string());
     }
 
@@ -666,7 +666,7 @@ void FJumpShipEffect::EnterTunnel()
     }
 
     // Retail quirk kept: the warning names the TUNNEL effect, not the one that failed.
-    FDUMP(0x100002, "%s(%d) : *** WARNING: jump out effect (%s) did not create.",
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: jump out effect (%s) did not create.",
           kJumpEffectCpp, 0x25e, TunnelEffect.get_string());
 }
 
@@ -691,7 +691,7 @@ void FJumpShipEffect::StartJumpIn()
     }
     else
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: jump in effect (%s) did not create.",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: jump in effect (%s) did not create.",
               kJumpEffectCpp, 0x277, JumpInEffect.get_string());
     }
 
@@ -722,12 +722,12 @@ void FJumpShipEffect::FinishJump()
 
     if (bPlayer)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: player jump done effect (%s) did not create.",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: player jump done effect (%s) did not create.",
               kJumpEffectCpp, 0x293, DoneEffect.get_string());
     }
     else
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: non-player jump done effect (%s) did not create.",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: non-player jump done effect (%s) did not create.",
               kJumpEffectCpp, 0x28b, DoneEffect.get_string());
     }
 }
@@ -736,11 +736,11 @@ void FJumpShipEffect::Update(float Dt)
 {
     // FUN_00503cd0. The effect's clock (+0x70) is not advanced here.
     int const State = Ship->JumpState;
-    if ((State == 2 || State == 3) && Tunnel != nullptr)
+    if ((State == kJumpStateJumpOutTunnel || State == kJumpStateJumpInTunnel) && Tunnel != nullptr)
         Tunnel->Update(Dt);
 
     // Everything else only in state 4 (jump in), re-read from the ship.
-    if (Ship->JumpState != 4)
+    if (Ship->JumpState != kJumpStateJumpIn)
         return;
 
     // The first update after StartJumpIn only clears the flag.

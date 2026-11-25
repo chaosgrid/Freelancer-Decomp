@@ -185,7 +185,7 @@ namespace
 
     void ChatNotice(int Line, char const* Message)
     {
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kNnChatCpp, Line, Message);
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kNnChatCpp, Line, Message);
     }
 
     // FUN_004690c0's prefix idiom (four times): StyleNode 0x3ea8, then the IDS text with its

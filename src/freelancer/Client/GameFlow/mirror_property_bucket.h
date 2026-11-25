@@ -94,7 +94,7 @@ struct TMirrorPropertyBucket
         }
         if (Found == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                   "E:\\FL\\Scratch\\Source\\Client\\Gf\\MirrorDatabase.h", 0xf6,
                   "Cannot find record to remove\n");
             return;

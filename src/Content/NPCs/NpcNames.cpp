@@ -11,6 +11,7 @@
 #include "NPCs/NpcNames.h"
 
 #include "NPCs/FactionProps.h"
+#include "Core/ContentInternal.h"     // EObjectType
 #include "NPCs/NpcShips.h"            // FMsnNpc, the name value readers
 #include "common_server.h"       // pub::Reputation, pub::GetType, pub::GetShipArchSTRID
 
@@ -137,7 +138,7 @@ bool __cdecl BuildNpcName(unsigned int Affiliation, FNpcNameRequest const* Reque
         // 0x30000 = FIGHTER 0x10000 | FREIGHTER 0x20000.
         unsigned int ShipType;
         pub::GetType(Request->ShipArchId, ShipType);
-        bool const bFighterOrFreighter = (ShipType & 0x30000) != 0;
+        bool const bFighterOrFreighter = (ShipType & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0;
 
         // The first name's pattern.
         unsigned int FirstId;

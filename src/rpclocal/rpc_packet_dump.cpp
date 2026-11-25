@@ -68,9 +68,8 @@ static const char* const kRpcDumpEol = "\n";
 // ch2 0x01 FLPACKET_SERVER_CONNECTRESPONSE -- LAB_06da8240.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_SERVER_CONNECTRESPONSE::Dump(std::ostream& Out) const {
-    const unsigned int* Fields = PayloadDwords();
     Out << "   Client ID: ";
-    Out << Fields[0];                                         // packet+0x20
+    Out << Wire.ClientId;                                     // packet+0x20
     Out << kRpcDumpEol;
 }
 
@@ -80,7 +79,7 @@ void FPacket_FLPACKET_SERVER_CONNECTRESPONSE::Dump(std::ostream& Out) const {
 // prints as a character, not as a number. Reproduced.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_SERVER_LOGINRESPONSE::Dump(std::ostream& Out) const {
-    const unsigned char Result = Payload()[0];         // packet+0x20
+    const unsigned char Result = Wire.Field_0x00;      // packet+0x20
     Out << "   Result   : ";
     Out << Result;
     Out << kRpcDumpEol;
@@ -91,7 +90,7 @@ void FPacket_FLPACKET_SERVER_LOGINRESPONSE::Dump(std::ostream& Out) const {
 // nothing at all when the count is zero.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_SERVER_CHARACTERINFO::Dump(std::ostream& Out) const {
-    const unsigned int Count = PayloadDwords()[3];     // packet+0x2c
+    const unsigned int Count = Wire.Records.Size;      // packet+0x2c
     if (Count == 0) {
         return;
     }
@@ -105,16 +104,14 @@ void FPacket_FLPACKET_SERVER_CHARACTERINFO::Dump(std::ostream& Out) const {
 // packet+0x2c..+0x37 is FPayloadServerLaunch::Position.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_SERVER_LAUNCH::Dump(std::ostream& Out) const {
-    const FPayloadServerLaunch* Wire =
-        reinterpret_cast<const FPayloadServerLaunch*>(Payload());
     Out << "   X: ";
-    Out << Wire->Position.x;
+    Out << Wire.Position.x;
     Out << kRpcDumpEol;
     Out << "   Y: ";
-    Out << Wire->Position.y;
+    Out << Wire.Position.y;
     Out << kRpcDumpEol;
     Out << "   Z: ";
-    Out << Wire->Position.z;
+    Out << Wire.Position.z;
     Out << kRpcDumpEol;
 }
 
@@ -127,12 +124,10 @@ void FPacket_FLPACKET_SERVER_LAUNCH::Dump(std::ostream& Out) const {
 // one scalar.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_SERVER_CHARSELECTVERIFIED::Dump(std::ostream& Out) const {
-    const FPayloadServerCharSelectVerified* Wire =
-        reinterpret_cast<const FPayloadServerCharSelectVerified*>(Payload());
     double Time = 0.0;
-    ::memcpy(&Time, &Wire->ServerTimeLo, sizeof(Time));
+    ::memcpy(&Time, &Wire.ServerTimeLo, sizeof(Time));
     Out << "   RepInstance: ";
-    Out << Wire->VibeHandle;                                  // packet+0x20
+    Out << Wire.VibeHandle;                                   // packet+0x20
     Out << " time: ";
     Out << Time;
     Out << kRpcDumpEol;
@@ -143,13 +138,11 @@ void FPacket_FLPACKET_SERVER_CHARSELECTVERIFIED::Dump(std::ostream& Out) const {
 // packet+0x58 / +0x5c are payload+0x38 / +0x3c of FPayloadServerSetReputation.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_SERVER_SETREPUTATION::Dump(std::ostream& Out) const {
-    const FPayloadServerSetReputation* Wire =
-        reinterpret_cast<const FPayloadServerSetReputation*>(Payload());
     Out << "   Target     : ";
-    Out << Wire->VibeHandle;                                  // packet+0x58
+    Out << Wire.VibeHandle;                                   // packet+0x58
     Out << kRpcDumpEol;
     Out << "   Affiliation: ";
-    Out << Wire->Affiliation;                                  // packet+0x5c
+    Out << Wire.Affiliation;                                   // packet+0x5c
     Out << kRpcDumpEol;
 }
 
@@ -158,15 +151,14 @@ void FPacket_FLPACKET_SERVER_SETREPUTATION::Dump(std::ostream& Out) const {
 // operator<<(int), so it is SIGNED where the first two are unsigned. Reproduced.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_SERVER_REPAIROBJECT::Dump(std::ostream& Out) const {
-    const unsigned int* Fields = PayloadDwords();
     Out << "   Object ID  : ";
-    Out << Fields[0];                                         // packet+0x20
+    Out << Wire.ObjectId;                                     // packet+0x20
     Out << kRpcDumpEol;
     Out << "   Equip ID   : ";
-    Out << Fields[1];                                         // packet+0x24
+    Out << Wire.EquipId;                                      // packet+0x24
     Out << kRpcDumpEol;
     Out << "   Points     : ";
-    Out << (int)Fields[2];                                    // packet+0x28, signed
+    Out << (int)Wire.Points;                                  // packet+0x28, signed
     Out << kRpcDumpEol;
 }
 
@@ -175,7 +167,7 @@ void FPacket_FLPACKET_SERVER_REPAIROBJECT::Dump(std::ostream& Out) const {
 // account name at payload+0x000.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_CLIENT_LOGIN::Dump(std::ostream& Out) const {
-    const void* Account = static_cast<const void*>(Payload());
+    const void* Account = static_cast<const void*>(Wire.AccountName);
     Out << "   Account: ";
     Out << Account;
     Out << kRpcDumpEol;
@@ -185,9 +177,8 @@ void FPacket_FLPACKET_CLIENT_LOGIN::Dump(std::ostream& Out) const {
 // ch3 0x04 FLPACKET_CLIENT_REQUESTLAUNCH -- LAB_06daf370.
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_CLIENT_REQUESTLAUNCH::Dump(std::ostream& Out) const {
-    const unsigned int* Fields = PayloadDwords();
     Out << "   Object ID: ";
-    Out << Fields[0];                                         // packet+0x20
+    Out << Wire.Field_0x00;                                   // packet+0x20
     Out << kRpcDumpEol;
 }
 
@@ -195,8 +186,8 @@ void FPacket_FLPACKET_CLIENT_REQUESTLAUNCH::Dump(std::ostream& Out) const {
 // ch3 0x06 SELECTCHARACTER and ch3 0x3a DESTROYCHAR -- LAB_06dafab0, ONE body in two
 // vtables (.rdata:06db5c98 and .rdata:06db5c88).
 // ---------------------------------------------------------------------------
-void RpcDumpWireCharacterIdDump(const FPacketBase& Packet, std::ostream& Out) {
-    const void* Character = static_cast<const void*>(Packet.Payload());
+void FRpcCharacterIdPacket::Dump(std::ostream& Out) const {
+    const void* Character = static_cast<const void*>(CharacterId);
     Out << "   Character: ";
     Out << Character;                                         // the ADDRESS
     Out << kRpcDumpEol;
@@ -208,17 +199,15 @@ void RpcDumpWireCharacterIdDump(const FPacketBase& Packet, std::ostream& Out) {
 // through operator<<(void const*), the four dwords through operator<<(unsigned int).
 // ---------------------------------------------------------------------------
 void FPacket_FLPACKET_CLIENT_CREATENEWCHAR::Dump(std::ostream& Out) const {
-    const FPayloadClientCreateNewChar* Wire =
-        reinterpret_cast<const FPayloadClientCreateNewChar*>(Payload());
     Out << "   Name: ";
-    Out << static_cast<const void*>(Wire->Name);              // the ADDRESS
+    Out << static_cast<const void*>(Wire.Name);               // the ADDRESS
     Out << "   Fac: ";
-    Out << Wire->FactionId;                                  // packet+0xa0
+    Out << Wire.FactionId;                                   // packet+0xa0
     Out << "   Base: ";
-    Out << Wire->BaseId;                                  // packet+0xa4
+    Out << Wire.BaseId;                                   // packet+0xa4
     Out << "   Pkg: ";
-    Out << Wire->PackageId;                                  // packet+0xa8
+    Out << Wire.PackageId;                                   // packet+0xa8
     Out << "   Pilot: ";
-    Out << Wire->PilotId;                                  // packet+0xac
+    Out << Wire.PilotId;                                   // packet+0xac
     Out << kRpcDumpEol;
 }

@@ -223,24 +223,17 @@ namespace AlchemyImpl
     // DefaultFdump (dacom.cpp), so the port calls it unconditionally too.
     void FdumpAlchemyError(int Line, const char* Message)
     {
-        FDUMP(0x100001, kFdumpErrorFmt, kAlchemyCppPath, Line, Message);
+        FDUMP(kFdumpError, kFdumpErrorFmt, kAlchemyCppPath, Line, Message);
     }
 
     void FdumpAlchemyWarning(int Line, const char* Message)
     {
-        FDUMP(0x100002, kFdumpWarningFmt, kAlchemyCppPath, Line, Message);
+        FDUMP(kFdumpWarning, kFdumpWarningFmt, kAlchemyCppPath, Line, Message);
     }
 
     void FdumpDrawContextError(int Line, const char* Message)
     {
-        FDUMP(0x100001, kFdumpErrorFmt, kDrawContextCpp, Line, Message);
-    }
-
-    // The QI table walks (0620ab50 and every twin) compare the requested IID byte by byte
-    // with no null test.
-    bool IidEqual(const char* Left, const char* Right)
-    {
-        return std::strcmp(Left, Right) == 0;
+        FDUMP(kFdumpError, kFdumpErrorFmt, kDrawContextCpp, Line, Message);
     }
 
     // Callers pass G_Specs[] names and string literals only, so there is no null case.
@@ -1761,7 +1754,7 @@ namespace AlchemyImpl
 
     static void DumpUnknownRampVersion(int Line)
     {
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxNodeLibrary.cpp",
               Line, "Unknown version");
     }
@@ -1796,7 +1789,7 @@ namespace AlchemyImpl
         }
         if (Target->SetLoopType(LoopType) != GR_OK && LoopType != 0)
         {
-            FDUMP(0x100002, kFdumpWarningFmt,
+            FDUMP(kFdumpWarning, kFdumpWarningFmt,
                   "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxNodeLibrary.cpp",
                   0x150, "Failed to set non-zero loop type for animated single on load.\n");
             return -1;
@@ -2170,7 +2163,7 @@ namespace AlchemyImpl
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kFxNodeLibraryCppPath, 0x345,
+            FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kFxNodeLibraryCppPath, 0x345,
                   "Unknown type of property");
         }
     }
@@ -2487,7 +2480,7 @@ namespace AlchemyImpl
             else
             {
                 // 0x062289a7.
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kFxNodeLibraryCppPath, 0x257,
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kFxNodeLibraryCppPath, 0x257,
                       "Unknown type of property");
             }
             return 0;

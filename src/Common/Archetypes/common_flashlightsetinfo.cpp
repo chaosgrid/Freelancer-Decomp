@@ -111,7 +111,7 @@ void FlashLightSetInfo::fixup(long Instance, HardpointSummary const* HpSum, Room
             }
             else
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot find hardpoint %s in the ONE room object\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot find hardpoint %s in the ONE room object\n",
                       kRoomDataFile, 0x187, HardpointName);
             }
         }
@@ -136,10 +136,10 @@ void FlashLightSetInfo::fixup(long Instance, HardpointSummary const* HpSum, Room
             else
             {
                 // Two errors, the first with an empty script name (.rdata:063997b0).
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: script %s calls for setpoint %s which does not exist in room .ini = %s\n",
                       kRoomDataFile, 0x5a8, "", SetpointName, Room->File);
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot find setpoint %s\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot find setpoint %s\n",
                       kRoomDataFile, 0x194, SetpointName);
             }
         }

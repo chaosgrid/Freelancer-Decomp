@@ -160,7 +160,7 @@ namespace
     // (class & 3) == 3, else null.
     CSimple const* AsSimple(CObject const* Object)
     {
-        if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 3u) != 3u)
+        if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         {
             return nullptr;
         }
@@ -207,10 +207,10 @@ namespace
             IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW()); // FUN_0054baf0
             if (Player != nullptr && ShipGroupId(PlayerShipForGroup(Player)) == Group)
             {
-                return 0xf;
+                return kContactGroupMember;
             }
         }
-        return 0xe;
+        return kContactOtherPlayer;
     }
 
     bool IsShortNameShown(unsigned ShortName)
@@ -238,7 +238,7 @@ namespace
         {
             return true;
         }
-        if (Entry->Kind == 4)
+        if (Entry->Kind == kContactPlayerWaypoint)
         {
             int const Index = Entry->Index;
             if (Index >= GetPlayerWaypointCountRetail())          // FUN_004c4690, JGE
@@ -252,7 +252,7 @@ namespace
             }
             return bByObject && Record->ObjectId != 0 && Record->ObjectId == TargetId;
         }
-        if (Entry->Kind == 3)
+        if (Entry->Kind == kContactBestPathWaypoint)
         {
             int const Index = Entry->Index;
             if (Index >= BestPathGetWaypointCount())              // FUN_004c4fb0, JGE
@@ -432,7 +432,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
             }
         }
     }
-    else if (Kind == 4)
+    else if (Kind == kContactPlayerWaypoint)
     {
         // A player waypoint.
         if (Index >= GetPlayerWaypointCountRetail())
@@ -465,7 +465,7 @@ FHudContactEntry::FHudContactEntry(int InKind, IObjRW* Obj, float InDistance, un
             G_bContactTargetListed = 1;
         }
     }
-    else if (Kind == 3)
+    else if (Kind == kContactBestPathWaypoint)
     {
         // A best-path waypoint; the latch first.
         if (G_bContactTargetListed == 0 && IsEntryTarget(this, G_ContactTargetId, true))
@@ -556,7 +556,7 @@ HUD_ContactList::HUD_ContactList(INI_Reader& /*Reader*/)
 
     ScrollPos = 0;
     RebuildTimer = kRebuildSeconds;
-    FilterMode = 0;
+    FilterMode = kContactFilterImportant;
     bDirty = 0;
     LastPanelMode = -1;
     Scanner = nullptr;
@@ -567,7 +567,7 @@ HUD_ContactList::HUD_ContactList(INI_Reader& /*Reader*/)
     if (Player != nullptr)
     {
         CShip const* const Ship = AsShip(Player->cobject());       // slot +0x150
-        Scanner = const_cast<CEquip*>(Ship->EquipManager.FindFirst(0x80000));
+        Scanner = const_cast<CEquip*>(Ship->EquipManager.FindFirst(EquipTypeScanner));
     }
 
     HudSmallFont = FindMenuFontImp("HudSmall");
@@ -607,7 +607,7 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
         float const RangePos[3] = {-0.126f, static_cast<float>(RowTop + kRangeRowOffset), 0.0f};
         RangeTexts[Index] = CreateTextControl(ControlName, "HudSmall", RangePos, nullptr, 0.043f,
                                               0.015f, 0.9f, 0, 1, 0, 0);
-        RangeTexts[Index]->SetProperty(0x24, 1, 0);
+        RangeTexts[Index]->SetProperty(kTextPropClickable, 1, 0);
 
         _snprintf(ControlName, 0x100, "ContactListNameText%d", Index);
         float const NamePos[3] = {-0.107f,
@@ -618,7 +618,7 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
         NameTexts[Index]->HomeOffset[0] = NamePos[0];
         NameTexts[Index]->HomeOffset[1] = NamePos[1];
         NameTexts[Index]->HomeOffset[2] = NamePos[2];
-        NameTexts[Index]->SetProperty(0x24, 1, 0);
+        NameTexts[Index]->SetProperty(kTextPropClickable, 1, 0);
         static_cast<NnTextControl*>(NameTexts[Index])->SetMaxLines(1); // FUN_0058b770
     }
 
@@ -662,7 +662,7 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
                                     FilterHalf, 0, 1, 0, 0, 0x624, 0, 0);
 
     // The "all" button is hidden in single player.
-    AllButton->SetProperty(1, SinglePlayer() ? 1u : 0u, 0);
+    AllButton->SetProperty(kWinPropHide, SinglePlayer() ? 1u : 0u, 0);
 
     // The scroll bar (range 0..5, page 8, vertical).
     float const ScrollPos3[3] = {-0.267f, -0.234f, -1.0f};
@@ -689,7 +689,7 @@ void HUD_ContactList::Render(FSpaceCamera* /*Camera*/, float /*DeltaSeconds*/)
 {
     // FUN_004d0170 (this = the HUDItem face).
     int const Mode = static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false); // FUN_004e5470
-    if (Mode != 0 && Mode != 2)
+    if (Mode != kTargetPanelContactList && Mode != kTargetPanelFormation)
     {
         LastPanelMode = -1;
         Flags = static_cast<unsigned char>(Flags & 0xfc);
@@ -702,7 +702,7 @@ void HUD_ContactList::Render(FSpaceCamera* /*Camera*/, float /*DeltaSeconds*/)
     }
     LastPanelMode = Mode;
     bDirty = 1;
-    if (Mode == 2)
+    if (Mode == kTargetPanelFormation)
     {
         // The formation list -- no filter buttons, the title shown.
         ImportantButton->Flags = static_cast<unsigned char>(ImportantButton->Flags & 0xfc);
@@ -734,7 +734,7 @@ void HUD_ContactList::UpdateInactive()
 {
     // LAB_004d3dd0 (this = the WinControl face).
     int const Mode = static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false);
-    if ((Mode == 0 || Mode == 2) && GetClientMouseCursorDrawFlag() != 0 &&
+    if ((Mode == kTargetPanelContactList || Mode == kTargetPanelFormation) && GetClientMouseCursorDrawFlag() != 0 &&
         GetPlayerObjRW() != nullptr && !IsLetterboxVisible())
     {
         SetHiddenWithChildren(false);
@@ -745,7 +745,7 @@ void HUD_ContactList::UpdateInactive()
 intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_004cfdf0 (this = the WinControl face). Nothing goes on to WinControl's handler.
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         // A click -- a filter button, or a row.
         if (HudIsMousePickBlocked())
@@ -754,31 +754,31 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (A == reinterpret_cast<uintptr_t>(ImportantButton))
         {
-            FilterMode = 0;
+            FilterMode = kContactFilterImportant;
             bDirty = 1;
             return 1;
         }
         if (A == reinterpret_cast<uintptr_t>(ShipsButton))
         {
-            FilterMode = 1;
+            FilterMode = kContactFilterShips;
             bDirty = 1;
             return 1;
         }
         if (A == reinterpret_cast<uintptr_t>(SolarButton))
         {
-            FilterMode = 2;
+            FilterMode = kContactFilterSolars;
             bDirty = 1;
             return 1;
         }
         if (A == reinterpret_cast<uintptr_t>(AllButton))
         {
-            FilterMode = 4;
+            FilterMode = kContactFilterAll;
             bDirty = 1;
             return 1;
         }
         if (A == reinterpret_cast<uintptr_t>(LootButton))
         {
-            FilterMode = 3;
+            FilterMode = kContactFilterLoot;
             bDirty = 1;
             return 1;
         }
@@ -795,7 +795,7 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         return 0;
     }
-    if (Msg == 0x27)
+    if (Msg == kWinNotifyDoubleClick)
     {
         // A double click on a row -- select it and open the target view (HUD_Target mode 1).
         // No pick test here.
@@ -806,14 +806,14 @@ intptr_t HUD_ContactList::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 A == reinterpret_cast<uintptr_t>(NameTexts[Row]))
             {
                 SelectEntry(static_cast<int>(ScrollPos) + Row);
-                static_cast<HudTarget*>(G_HudTargetPanel)->SetMode(1); // FUN_004e5460
+                static_cast<HudTarget*>(G_HudTargetPanel)->SetMode(kTargetPanelTarget); // FUN_004e5460
                 PlayOrRewindUiSoundSlot(0);
                 return 1;
             }
         }
         return 0;
     }
-    if (Msg == 0x3e)
+    if (Msg == kWinNotifyScrollValue)
     {
         if (!HudIsMousePickBlocked() && A == reinterpret_cast<uintptr_t>(Scroll))
         {
@@ -843,13 +843,13 @@ void HUD_ContactList::SelectEntry(int Index)
         }
     }
     FHudContactEntry& Entry = *It;
-    if (Entry.Kind == 4)
+    if (Entry.Kind == kContactPlayerWaypoint)
     {
         // FUN_004ceeb0 inlined.
         HudWaypointSelectPlayerWaypoint(Entry.Index);
         return;
     }
-    if (Entry.Kind == 3)
+    if (Entry.Kind == kContactBestPathWaypoint)
     {
         // FUN_004cef30 inlined.
         HudWaypointSelectBestPath(Entry.Index);
@@ -872,7 +872,7 @@ bool HUD_ContactList::OnEvent(unsigned MsgId)
         return false;
     }
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
-    if (Player == nullptr || static_cast<FClientGameobj*>(Player)->ManagerKind != 1)
+    if (Player == nullptr || static_cast<FClientGameobj*>(Player)->ManagerKind != EClientGameobjKind::Ship)
     {
         return false;
     }
@@ -976,45 +976,45 @@ int HUD_ContactList::ClassifyContact(CSimple const* Object)
         {
             return OtherPlayerKind(Ship);
         }
-        if ((TypeBits & 0x420000u) != 0)
+        if ((TypeBits & (OBJ_FREIGHTER | OBJ_MINING)) != 0)
         {
-            return 8;
+            return kContactFreighter;
         }
         if (IsNomadEqObj(Object))
         {
-            return 0xa;
+            return kContactNomad;
         }
-        if ((TypeBits & 0x100000u) != 0)
+        if ((TypeBits & OBJ_TRANSPORT) != 0)
         {
-            return 9;
+            return kContactTransport;
         }
-        return (TypeBits & 0x200000u) != 0 ? 5 : 0;
+        return (TypeBits & OBJ_CAPITAL) != 0 ? kContactBattleship : kContactShip;
     }
-    if ((TypeBits & 0x80u) != 0)
+    if ((TypeBits & OBJ_TRADELANE_RING) != 0)
     {
-        return 7;
+        return kContactTradeLane;
     }
-    if ((TypeBits & 3u) != 0)
+    if ((TypeBits & (OBJ_MOON | OBJ_PLANET)) != 0)
     {
-        return 1;
+        return kContactPlanet;
     }
-    if ((TypeBits & 0xc40u) != 0)
+    if ((TypeBits & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != 0)
     {
-        return 6;
+        return kContactJumpGate;
     }
     if ((TypeBits & 0x600de0u) != 0)
     {
-        return 2;
+        return kContactStation;
     }
-    if ((TypeBits & 0x9010u) != 0)
+    if ((TypeBits & (OBJ_SATELLITE | OBJ_WEAPONS_PLATFORM | OBJ_MISSION_SATELLITE)) != 0)
     {
-        return 0xc;
+        return kContactWeaponPlatform;
     }
-    if ((TypeBits & 0x2000u) != 0)
+    if ((TypeBits & OBJ_DESTROYABLE_DEPOT) != 0)
     {
-        return 0xd;
+        return kContactLootableDepot;
     }
-    return (TypeBits & 0x10000000u) != 0 ? 0xb : -1;
+    return (TypeBits & OBJ_LOOT) != 0 ? 0xb : -1;
 }
 
 void HUD_ContactList::AddShipEntry(CShip const* Ship, FClientGameobj* Gameobj)
@@ -1025,26 +1025,26 @@ void HUD_ContactList::AddShipEntry(CShip const* Ship, FClientGameobj* Gameobj)
     {
         return;
     }
-    int Kind = 0;
+    int Kind = kContactShip;
     if (Ship->bIsPlayer != 0)
     {
         Kind = OtherPlayerKind(Ship);
     }
-    else if ((TypeBits & 0x420000u) != 0)
+    else if ((TypeBits & (OBJ_FREIGHTER | OBJ_MINING)) != 0)
     {
-        Kind = 8;
+        Kind = kContactFreighter;
     }
     else if (IsNomadEqObj(Ship))
     {
-        Kind = 0xa;
+        Kind = kContactNomad;
     }
-    else if ((TypeBits & 0x100000u) != 0)
+    else if ((TypeBits & OBJ_TRANSPORT) != 0)
     {
-        Kind = 9;
+        Kind = kContactTransport;
     }
-    else if ((TypeBits & 0x200000u) != 0)
+    else if ((TypeBits & OBJ_CAPITAL) != 0)
     {
-        Kind = 5;
+        Kind = kContactBattleship;
     }
     Contacts.push_back(FHudContactEntry(Kind, Gameobj, 0.0f, 0, 0));
 }
@@ -1077,7 +1077,7 @@ void HUD_ContactList::RebuildContacts()
 
     // With the "important" / "all" filter, the target's id and the id of the first best-path
     // point's object (which is left out of the list).
-    if (FilterMode == 0 || FilterMode == 4)
+    if (FilterMode == kContactFilterImportant || FilterMode == kContactFilterAll)
     {
         IObjRW* const Target = PlayerShip->get_target();
         if (Target != nullptr)
@@ -1115,7 +1115,7 @@ void HUD_ContactList::RebuildContacts()
     float const RangeSq = static_cast<float>(static_cast<double>(Range) * Range);
 
     int const PanelMode = static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false);
-    if (PanelMode == 2)
+    if (PanelMode == kTargetPanelFormation)
     {
         // The formation list.
         if (SinglePlayer())
@@ -1190,9 +1190,10 @@ void HUD_ContactList::RebuildContacts()
     else
     {
         // Ships (filters important, ships, all).
-        if (FilterMode == 0 || FilterMode == 1 || FilterMode == 4)
+        if (FilterMode == kContactFilterImportant || FilterMode == kContactFilterShips ||
+            FilterMode == kContactFilterAll)
         {
-            int const ShipKind = 1;
+            int const ShipKind = static_cast<int>(EClientGameobjKind::Ship);
             for (FClientGameobj* Gameobj = ClientObjDb_GetKindHead(&ShipKind); Gameobj != nullptr;
                  Gameobj = Gameobj->ListNext)
             {
@@ -1244,32 +1245,32 @@ void HUD_ContactList::RebuildContacts()
                 if (Ship->bIsPlayer != 0)
                 {
                     // Other players, with "important" / "all" only.
-                    if (FilterMode != 0 && FilterMode != 4)
+                    if (FilterMode != kContactFilterImportant && FilterMode != kContactFilterAll)
                     {
                         continue;
                     }
                     Contacts.push_back(FHudContactEntry(OtherPlayerKind(Ship), GameobjRw, 0.0f, 0, 0));
                     continue;
                 }
-                int Kind = 0;
-                if ((TypeBits & 0x420000u) != 0)
+                int Kind = kContactShip;
+                if ((TypeBits & (OBJ_FREIGHTER | OBJ_MINING)) != 0)
                 {
-                    Kind = 8;
+                    Kind = kContactFreighter;
                 }
-                else if ((TypeBits & 0x100000u) != 0)
+                else if ((TypeBits & OBJ_TRANSPORT) != 0)
                 {
-                    Kind = 9;
+                    Kind = kContactTransport;
                 }
-                else if ((TypeBits & 0x200000u) != 0)
+                else if ((TypeBits & OBJ_CAPITAL) != 0)
                 {
-                    Kind = 5;
+                    Kind = kContactBattleship;
                 }
                 else if (IsNomadEqObj(Ship))
                 {
-                    Kind = 0xa;
+                    Kind = kContactNomad;
                 }
                 // A hostile always, any other attitude with the "ships" or "all" filter.
-                if (Attitude == -1 || FilterMode == 1 || FilterMode == 4)
+                if (Attitude == -1 || FilterMode == kContactFilterShips || FilterMode == kContactFilterAll)
                 {
                     Contacts.push_back(FHudContactEntry(Kind, GameobjRw, 0.0f, 0, 0));
                 }
@@ -1277,9 +1278,9 @@ void HUD_ContactList::RebuildContacts()
         }
 
         // Loot (filters loot, all).
-        if (FilterMode == 3 || FilterMode == 4)
+        if (FilterMode == kContactFilterLoot || FilterMode == kContactFilterAll)
         {
-            int const LootKind = 7;
+            int const LootKind = static_cast<int>(EClientGameobjKind::Loot);
             for (FClientGameobj* Gameobj = ClientObjDb_GetKindHead(&LootKind); Gameobj != nullptr;
                  Gameobj = Gameobj->ListNext)
             {
@@ -1315,14 +1316,15 @@ void HUD_ContactList::RebuildContacts()
                         continue;
                     }
                 }
-                Contacts.push_back(FHudContactEntry(0xb, Gameobj, 0.0f, 0, 0));
+                Contacts.push_back(FHudContactEntry(kContactLoot, Gameobj, 0.0f, 0, 0));
             }
         }
 
         // Solars and everything else near (every filter but "ships").
-        if (FilterMode == 0 || FilterMode == 2 || FilterMode == 4 || FilterMode == 3)
+        if (FilterMode == kContactFilterImportant || FilterMode == kContactFilterSolars ||
+            FilterMode == kContactFilterAll || FilterMode == kContactFilterLoot)
         {
-            bool const bSolarsShown = FilterMode == 2 || FilterMode == 4;
+            bool const bSolarsShown = FilterMode == kContactFilterSolars || FilterMode == kContactFilterAll;
 
             // The large solars.
             size_t LargeIt = 0;
@@ -1376,7 +1378,7 @@ void HUD_ContactList::RebuildContacts()
                 double const DistSq = static_cast<double>(Dx) * Dx + static_cast<double>(Dy) * Dy +
                                       static_cast<double>(Dz) * Dz;
                 // A hostile close by is shown under "important".
-                if (Attitude == -1 && FilterMode == 0 && DistSq < kNearRangeSq)
+                if (Attitude == -1 && FilterMode == kContactFilterImportant && DistSq < kNearRangeSq)
                 {
                     bNear = 1;
                 }
@@ -1388,35 +1390,35 @@ void HUD_ContactList::RebuildContacts()
                     {
                         continue;
                     }
-                    if ((TypeBits & 0x80u) != 0)
+                    if ((TypeBits & OBJ_TRADELANE_RING) != 0)
                     {
                         if (!(DistSq < kNearRangeSq) || !bShown)
                         {
                             continue;
                         }
-                        Contacts.push_back(FHudContactEntry(7, Gameobj, 0.0f, 0, 0));
+                        Contacts.push_back(FHudContactEntry(kContactTradeLane, Gameobj, 0.0f, 0, 0));
                     }
-                    else if ((TypeBits & 3u) != 0)
+                    else if ((TypeBits & (OBJ_MOON | OBJ_PLANET)) != 0)
                     {
                         if (bShown)
                         {
-                            Contacts.push_back(FHudContactEntry(1, Gameobj, 0.0f, 0, 0));
+                            Contacts.push_back(FHudContactEntry(kContactPlanet, Gameobj, 0.0f, 0, 0));
                         }
                     }
-                    else if ((TypeBits & 0x200000u) != 0)
+                    else if ((TypeBits & OBJ_CAPITAL) != 0)
                     {
                         continue;
                     }
-                    else if ((TypeBits & 0xc40u) != 0)
+                    else if ((TypeBits & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != 0)
                     {
                         if (bShown)
                         {
-                            Contacts.push_back(FHudContactEntry(6, Gameobj, 0.0f, 0, 0));
+                            Contacts.push_back(FHudContactEntry(kContactJumpGate, Gameobj, 0.0f, 0, 0));
                         }
                     }
                     else if (bShown)
                     {
-                        Contacts.push_back(FHudContactEntry(2, Gameobj, 0.0f, 0, 0));
+                        Contacts.push_back(FHudContactEntry(kContactStation, Gameobj, 0.0f, 0, 0));
                     }
                     continue;
                 }
@@ -1424,27 +1426,27 @@ void HUD_ContactList::RebuildContacts()
                 {
                     continue;
                 }
-                if (IsNomadEqObj(EqObj) && FilterMode != 3)
+                if (IsNomadEqObj(EqObj) && FilterMode != kContactFilterLoot)
                 {
                     if (Attitude == -1 || bSolarsShown)
                     {
-                        Contacts.push_back(FHudContactEntry(0xa, Gameobj, 0.0f, 0, 0));
+                        Contacts.push_back(FHudContactEntry(kContactNomad, Gameobj, 0.0f, 0, 0));
                     }
                     continue;
                 }
-                if ((TypeBits & 0x9010u) != 0)
+                if ((TypeBits & (OBJ_SATELLITE | OBJ_WEAPONS_PLATFORM | OBJ_MISSION_SATELLITE)) != 0)
                 {
                     if (!HudIsUnvisitedSolar(EqObj) && bShown)
                     {
-                        Contacts.push_back(FHudContactEntry(0xc, Gameobj, 0.0f, 0, 0));
+                        Contacts.push_back(FHudContactEntry(kContactWeaponPlatform, Gameobj, 0.0f, 0, 0));
                     }
                     continue;
                 }
-                if ((TypeBits & 0x2000u) != 0)
+                if ((TypeBits & OBJ_DESTROYABLE_DEPOT) != 0)
                 {
                     if (!HudIsUnvisitedSolar(EqObj) && bShown)
                     {
-                        Contacts.push_back(FHudContactEntry(0xd, Gameobj, 0.0f, 0, 0));
+                        Contacts.push_back(FHudContactEntry(kContactLootableDepot, Gameobj, 0.0f, 0, 0));
                     }
                 }
             }
@@ -1512,7 +1514,7 @@ void HUD_ContactList::RebuildContacts()
                     double const Dz = static_cast<double>(Simple->WorldPosition.z) - PlayerPos.z;
                     double const DistSq = Dx * Dx + Dy * Dy + Dz * Dz;
                     unsigned char bNear = 0;
-                    if (Attitude == -1 && FilterMode == 0 && DistSq < kNearRangeSq)
+                    if (Attitude == -1 && FilterMode == kContactFilterImportant && DistSq < kNearRangeSq)
                     {
                         bNear = 1;
                     }
@@ -1524,35 +1526,35 @@ void HUD_ContactList::RebuildContacts()
                         {
                             continue;
                         }
-                        if ((TypeBits & 0x80u) != 0)
+                        if ((TypeBits & OBJ_TRADELANE_RING) != 0)
                         {
                             if (!(DistSq < kNearRangeSq) || !bShown)
                             {
                                 continue;
                             }
-                            Contacts.push_back(FHudContactEntry(7, Gameobj, 0.0f, 0, 0));
+                            Contacts.push_back(FHudContactEntry(kContactTradeLane, Gameobj, 0.0f, 0, 0));
                         }
-                        else if ((TypeBits & 3u) != 0)
+                        else if ((TypeBits & (OBJ_MOON | OBJ_PLANET)) != 0)
                         {
                             if (bShown)
                             {
-                                Contacts.push_back(FHudContactEntry(1, Gameobj, 0.0f, 0, 0));
+                                Contacts.push_back(FHudContactEntry(kContactPlanet, Gameobj, 0.0f, 0, 0));
                             }
                         }
-                        else if ((TypeBits & 0x200000u) != 0)
+                        else if ((TypeBits & OBJ_CAPITAL) != 0)
                         {
                             continue;
                         }
-                        else if ((TypeBits & 0xc40u) != 0)
+                        else if ((TypeBits & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != 0)
                         {
                             if (bShown)
                             {
-                                Contacts.push_back(FHudContactEntry(6, Gameobj, 0.0f, 0, 0));
+                                Contacts.push_back(FHudContactEntry(kContactJumpGate, Gameobj, 0.0f, 0, 0));
                             }
                         }
                         else if (bShown)
                         {
-                            Contacts.push_back(FHudContactEntry(2, Gameobj, 0.0f, 0, 0));
+                            Contacts.push_back(FHudContactEntry(kContactStation, Gameobj, 0.0f, 0, 0));
                         }
                         continue;
                     }
@@ -1560,30 +1562,30 @@ void HUD_ContactList::RebuildContacts()
                     {
                         continue;
                     }
-                    if (IsNomadEqObj(Simple) && FilterMode != 3)
+                    if (IsNomadEqObj(Simple) && FilterMode != kContactFilterLoot)
                     {
                         if (Attitude == -1 || bSolarsShown)
                         {
-                            Contacts.push_back(FHudContactEntry(0xa, Gameobj, 0.0f, 0, 0));
+                            Contacts.push_back(FHudContactEntry(kContactNomad, Gameobj, 0.0f, 0, 0));
                         }
                         continue;
                     }
-                    if ((TypeBits & 0x9010u) != 0)
+                    if ((TypeBits & (OBJ_SATELLITE | OBJ_WEAPONS_PLATFORM | OBJ_MISSION_SATELLITE)) != 0)
                     {
                         if (!HudIsUnvisitedSolar(Simple) && bShown)
                         {
-                            Contacts.push_back(FHudContactEntry(0xc, Gameobj, 0.0f, 0, 0));
+                            Contacts.push_back(FHudContactEntry(kContactWeaponPlatform, Gameobj, 0.0f, 0, 0));
                         }
                         continue;
                     }
-                    if ((TypeBits & 0x2000u) != 0)
+                    if ((TypeBits & OBJ_DESTROYABLE_DEPOT) != 0)
                     {
                         // Here the loot and "all" filters show it (the large-solar pass above
                         // uses solars / all).
                         if (!HudIsUnvisitedSolar(Simple) &&
-                            (FilterMode == 3 || FilterMode == 4 || bNear != 0))
+                            (FilterMode == kContactFilterLoot || FilterMode == kContactFilterAll || bNear != 0))
                         {
-                            Contacts.push_back(FHudContactEntry(0xd, Gameobj, 0.0f, 0, 0));
+                            Contacts.push_back(FHudContactEntry(kContactLootableDepot, Gameobj, 0.0f, 0, 0));
                         }
                     }
                 }
@@ -1591,7 +1593,7 @@ void HUD_ContactList::RebuildContacts()
         }
 
         // The waypoints (filters important, all).
-        if (FilterMode == 0 || FilterMode == 4)
+        if (FilterMode == kContactFilterImportant || FilterMode == kContactFilterAll)
         {
             // The first player waypoint in the current system.
             int const WaypointCount = GetPlayerWaypointCountRetail();
@@ -1600,7 +1602,7 @@ void HUD_ContactList::RebuildContacts()
                 FPlayerWaypointRecord* const Record = GetPlayerWaypointRetail(Waypoint);
                 if (Record != nullptr && Record->SystemId == GetPlayerStarSystemIdRetail())
                 {
-                    Contacts.push_back(FHudContactEntry(4, nullptr, 0.0f, 0, Waypoint));
+                    Contacts.push_back(FHudContactEntry(kContactPlayerWaypoint, nullptr, 0.0f, 0, Waypoint));
                     break;
                 }
             }
@@ -1617,7 +1619,7 @@ void HUD_ContactList::RebuildContacts()
                 FBestPathWaypoint* const Waypoint = BestPathGetWaypoint(Point);
                 if (BestPathWaypointResolveObject(Waypoint) != nullptr)
                 {
-                    Contacts.push_back(FHudContactEntry(3, nullptr, 0.0f, 0, Point));
+                    Contacts.push_back(FHudContactEntry(kContactBestPathWaypoint, nullptr, 0.0f, 0, Point));
                     continue;
                 }
                 Vector Pos;
@@ -1625,7 +1627,7 @@ void HUD_ContactList::RebuildContacts()
                 if (BestPathWaypointResolvePosition(Waypoint, &Pos, &PointSystem) &&
                     PointSystem == System->GetId())
                 {
-                    Contacts.push_back(FHudContactEntry(3, nullptr, 0.0f, 0, Point));
+                    Contacts.push_back(FHudContactEntry(kContactBestPathWaypoint, nullptr, 0.0f, 0, Point));
                 }
             }
         }
@@ -1655,18 +1657,21 @@ void HUD_ContactList::RebuildContacts()
             continue;
         }
         bool bAllowed = true;
-        if (FilterMode == 3)
+        if (FilterMode == kContactFilterLoot)
         {
-            bAllowed = Kind == 0xb;
+            bAllowed = Kind == kContactLoot;
         }
-        else if (FilterMode == 1)
+        else if (FilterMode == kContactFilterShips)
         {
-            bAllowed = Kind == 0 || Kind == 5 || Kind == 8 || Kind == 9 || Kind == 0xa;
+            bAllowed = Kind == kContactShip || Kind == kContactBattleship ||
+                       Kind == kContactFreighter || Kind == kContactTransport ||
+                       Kind == kContactNomad;
         }
-        else if (FilterMode == 2)
+        else if (FilterMode == kContactFilterSolars)
         {
-            bAllowed = Kind == 1 || Kind == 2 || Kind == 6 || Kind == 7 || Kind == 0xc ||
-                       Kind == 0xd;
+            bAllowed = Kind == kContactPlanet || Kind == kContactStation ||
+                       Kind == kContactJumpGate || Kind == kContactTradeLane ||
+                       Kind == kContactWeaponPlatform || Kind == kContactLootableDepot;
         }
         if (!bAllowed)
         {
@@ -1694,8 +1699,8 @@ void HUD_ContactList::RebuildContacts()
     }
 
     // The player's target when nothing above listed it.
-    if (static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false) != 2 &&
-        (FilterMode == 0 || FilterMode == 4))
+    if (static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false) != kTargetPanelFormation &&
+        (FilterMode == kContactFilterImportant || FilterMode == kContactFilterAll))
     {
         IObjRW* const Target = PlayerShip->get_target();
         if (Target != nullptr && G_bContactTargetListed == 0)
@@ -1715,7 +1720,7 @@ void HUD_ContactList::RebuildContacts()
 
     // Outside the formation list, nearest first. FUN_004d4340 is VC6 list::sort: stable
     // ascending, as std::list::sort is.
-    if (static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false) != 2)
+    if (static_cast<HudTarget*>(G_HudTargetPanel)->GetMode(false) != kTargetPanelFormation)
     {
         Contacts.sort([](FHudContactEntry const& Left, FHudContactEntry const& Right)
                       { return Left.Distance < Right.Distance; });
@@ -1743,11 +1748,11 @@ void HUD_ContactList::Draw()
     }
 
     // The selected filter button is highlighted.
-    ImportantButton->SetProperty(0xc, FilterMode == 0 ? 1 : 0, 0);
-    ShipsButton->SetProperty(0xc, FilterMode == 1 ? 1 : 0, 0);
-    SolarButton->SetProperty(0xc, FilterMode == 2 ? 1 : 0, 0);
-    AllButton->SetProperty(0xc, FilterMode == 4 ? 1 : 0, 0);
-    LootButton->SetProperty(0xc, FilterMode == 3 ? 1 : 0, 0);
+    ImportantButton->SetProperty(0xc, FilterMode == kContactFilterImportant ? 1 : 0, 0);
+    ShipsButton->SetProperty(0xc, FilterMode == kContactFilterShips ? 1 : 0, 0);
+    SolarButton->SetProperty(0xc, FilterMode == kContactFilterSolars ? 1 : 0, 0);
+    AllButton->SetProperty(0xc, FilterMode == kContactFilterAll ? 1 : 0, 0);
+    LootButton->SetProperty(0xc, FilterMode == kContactFilterLoot ? 1 : 0, 0);
 
     // Rebuild every 3 s, or when dirty. The sum stays unrounded for the compare and the
     // subtraction; a NaN falls to the dirty test.
@@ -1813,7 +1818,7 @@ void HUD_ContactList::Draw()
             IObjRW* const Obj = Entry.Object();
             if (Obj == nullptr)
             {
-                if (Entry.Kind != 4 && Entry.Kind != 3)
+                if (Entry.Kind != kContactPlayerWaypoint && Entry.Kind != kContactBestPathWaypoint)
                 {
                     bDirty = 1;
                     ++It;
@@ -1830,7 +1835,7 @@ void HUD_ContactList::Draw()
             }
 
             unsigned char const bTarget =
-                IsEntryTarget(&Entry, PlayerTargetId, FilterMode != 4) ? 1 : 0;
+                IsEntryTarget(&Entry, PlayerTargetId, FilterMode != kContactFilterAll) ? 1 : 0;
             char const* Path = kContactIconPaths[Entry.Kind];
             FButtonMontageTile* Tile = Tiles[Entry.Kind];
             if (Obj != nullptr && HudCommIsWatchedObjectId(Obj->get_id()))
@@ -1839,17 +1844,17 @@ void HUD_ContactList::Draw()
                 Path = kContactChatIconPath;
             }
             char MeshPath[0x100];
-            Icons[Row]->SetProperty(0xb, reinterpret_cast<uintptr_t>(MeshPath), 0x100);
+            Icons[Row]->SetProperty(kWinPropGetMeshPath, reinterpret_cast<uintptr_t>(MeshPath), 0x100);
             if (strcmp(MeshPath, Path) != 0)
             {
-                Icons[Row]->SetProperty(4, reinterpret_cast<uintptr_t>(Path), 0);
+                Icons[Row]->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Path), 0);
                 static_cast<NnButtonControl*>(Icons[Row])->MontageTile = Tile;
             }
 
             // Waypoints violet, the rest by reputation; a white NPC ship with no faction marks
             // the list dirty and is not shown.
             unsigned long Colour = G_NnPaletteCyan;
-            if (Entry.Kind == 4 || Entry.Kind == 3)
+            if (Entry.Kind == kContactPlayerWaypoint || Entry.Kind == kContactBestPathWaypoint)
             {
                 Colour = G_NnPaletteViolet;
             }
@@ -1892,9 +1897,9 @@ void HUD_ContactList::Draw()
                     Colour = Pulsed;
                 }
             }
-            Icons[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
-            RangeTexts[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
-            NameTexts[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
+            Icons[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
+            RangeTexts[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
+            NameTexts[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
             ++Row;
             if (Row >= 8)
             {
@@ -1928,7 +1933,8 @@ void HUD_ContactList::Draw()
 
         FHudContactEntry& Entry = *It;
         IObjRW* const Obj = Entry.Object();
-        if (Obj == nullptr && Entry.Kind != 4 && Entry.Kind != 3)
+        if (Obj == nullptr && Entry.Kind != kContactPlayerWaypoint &&
+            Entry.Kind != kContactBestPathWaypoint)
         {
             bDirty = 1;
             ++It;
@@ -1958,7 +1964,7 @@ void HUD_ContactList::Draw()
         }
         else
         {
-            RangeTexts[Row]->SetProperty(0x1e, 0x3ce, 0);
+            RangeTexts[Row]->SetProperty(kTextPropSetIds, 0x3ce, 0);
         }
 
         // The name.
@@ -1970,7 +1976,7 @@ void HUD_ContactList::Draw()
         bool bSimpleLabel = false;         // the HudSmall label path
         if (Obj == nullptr)
         {
-            if (Entry.Kind == 4)
+            if (Entry.Kind == kContactPlayerWaypoint)
             {
                 // "waypoint N" (ids 0x444 as the format), or ids 0x442.
                 if (Entry.Index < GetPlayerWaypointCountRetail())
@@ -1985,7 +1991,7 @@ void HUD_ContactList::Draw()
                     GetIdsStringWWithRawFallback(0x442, Name, 0xff);
                 }
             }
-            else if (Entry.Kind == 3)
+            else if (Entry.Kind == kContactBestPathWaypoint)
             {
                 GetIdsStringWWithRawFallback(0x443, Name, 0xff);
             }
@@ -1994,7 +2000,8 @@ void HUD_ContactList::Draw()
                 wcscat(Name, L"???");                    // DAT_005d0214
             }
         }
-        else if (Gameobj->GetFlag3IfSurfaceWidthUnchanged() && !(bRefreshNames && Entry.Kind == 7))
+        else if (Gameobj->GetFlag3IfSurfaceWidthUnchanged() &&
+                 !(bRefreshNames && Entry.Kind == kContactTradeLane))
         {
             // The object's label is still good (retail still appends "???").
             RowLabels[Row] = Gameobj->GetFontString48();
@@ -2119,7 +2126,7 @@ void HUD_ContactList::Draw()
             {
                 // Not a ship, or a ship without a name.
                 int const Kind = Entry.Kind;
-                if (Kind == 0 || Kind == 8 || Kind == 9)
+                if (Kind == kContactShip || Kind == kContactFreighter || Kind == kContactTransport)
                 {
                     bSkipRow = true;
                 }
@@ -2133,7 +2140,7 @@ void HUD_ContactList::Draw()
                             wcscat(Name, L"???");
                         }
                     }
-                    else if (Kind == 0xa && (Simple->TypeBits & 0x7f0000u) != 0)
+                    else if (Kind == kContactNomad && (Simple->TypeBits & OBJ_SHIP_MASK) != 0)
                     {
                         bSkipRow = true;
                     }
@@ -2146,13 +2153,13 @@ void HUD_ContactList::Draw()
                     }
                     else
                     {
-                        if ((Simple->TypeBits & 0x80u) != 0)
+                        if ((Simple->TypeBits & OBJ_TRADELANE_RING) != 0)
                         {
                             // A trade lane ring -- the location caption.
                             FHudWideText Caption;
                             Caption.Text = nullptr;
                             Caption.Capacity = 0;
-                            if (HudBuildObjectCaption(Simple, &Caption, 1, false)) // FUN_004e8100
+                            if (HudBuildObjectCaption(Simple, &Caption, kCaptionLocation, false)) // FUN_004e8100
                             {
                                 wcscpy(Name, Caption.Text);
                             }
@@ -2199,7 +2206,7 @@ void HUD_ContactList::Draw()
         // The name text -- other players' names in PlayerName, dropped a little; everything
         // else in HudSmall at the rest offset.
         NnTextControl* const NameText = static_cast<NnTextControl*>(NameTexts[Row]);
-        if (Entry.Kind == 0xe || Entry.Kind == 0xf)
+        if (Entry.Kind == kContactOtherPlayer || Entry.Kind == kContactGroupMember)
         {
             if (RowLabels[Row] == nullptr)
             {
@@ -2221,13 +2228,13 @@ void HUD_ContactList::Draw()
             NameText->Offset[1] = NameText->HomeOffset[1];
             NameText->Offset[2] = NameText->HomeOffset[2];
         }
-        NameText->SetProperty(6, reinterpret_cast<uintptr_t>(NameText->Offset), 0);
+        NameText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(NameText->Offset), 0);
         if (RowLabels[Row] == nullptr)
         {
-            NameTexts[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Name), 0);
+            NameTexts[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Name), 0);
         }
 
-        unsigned char const bTarget = IsEntryTarget(&Entry, PlayerTargetId, FilterMode != 4) ? 1 : 0;
+        unsigned char const bTarget = IsEntryTarget(&Entry, PlayerTargetId, FilterMode != kContactFilterAll) ? 1 : 0;
         FButtonMontageTile* Tile = Tiles[Entry.Kind];
         char const* Path = kContactIconPaths[Entry.Kind];
         if (Obj != nullptr && HudCommIsWatchedObjectId(Obj->get_id()))
@@ -2236,16 +2243,16 @@ void HUD_ContactList::Draw()
             Path = kContactChatIconPath;
         }
         char MeshPath[0x100];
-        Icons[Row]->SetProperty(0xb, reinterpret_cast<uintptr_t>(MeshPath), 0x100);
+        Icons[Row]->SetProperty(kWinPropGetMeshPath, reinterpret_cast<uintptr_t>(MeshPath), 0x100);
         if (strcmp(MeshPath, Path) != 0)
         {
-            Icons[Row]->SetProperty(4, reinterpret_cast<uintptr_t>(Path), 0);
+            Icons[Row]->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Path), 0);
             static_cast<NnButtonControl*>(Icons[Row])->MontageTile = Tile;
         }
 
         // The colour (no faction test in this pass).
         unsigned long Colour = G_NnPaletteCyan;
-        if (Entry.Kind == 4 || Entry.Kind == 3)
+        if (Entry.Kind == kContactPlayerWaypoint || Entry.Kind == kContactBestPathWaypoint)
         {
             Colour = G_NnPaletteViolet;
         }
@@ -2272,10 +2279,10 @@ void HUD_ContactList::Draw()
                 Colour = Pulsed;
             }
         }
-        Icons[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
-        RangeTexts[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
-        NameTexts[Row]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
-        Icons[Row]->SetProperty(3, kContactTooltipIds[Entry.Kind], 0);
+        Icons[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
+        RangeTexts[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
+        NameTexts[Row]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
+        Icons[Row]->SetProperty(kWinPropToolTip, kContactTooltipIds[Entry.Kind], 0);
         ++Row;
         if (Row >= 8)
         {
@@ -2292,7 +2299,7 @@ void HUD_ContactList::Draw()
         Icons[Hidden]->Flags = static_cast<unsigned char>(Icons[Hidden]->Flags & 0xfc);
     }
 
-    Scroll->SetProperty(0x37, 0, static_cast<uintptr_t>(static_cast<int>(Contacts.size()) - 1));
+    Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(static_cast<int>(Contacts.size()) - 1));
 
     SwapRowLabels(this);
     WinControl::Draw();

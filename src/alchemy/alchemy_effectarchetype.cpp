@@ -17,7 +17,7 @@ namespace AlchemyImpl
 {
     GENRESULT DACOM_API FFxEffectArchetype::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, Iids::FxEffectArchetype) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::FxEffectArchetype) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IFxEffectArchetype*>(this);

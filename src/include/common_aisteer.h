@@ -248,8 +248,8 @@ struct COMMON_API ICRSplineSegment
     float ArcLength;        // +0x30  running accumulated length; written by calculate_arclength()
     unsigned SampleCount;    // +0x34  numerical-integration sample count; ctor sets it to 20
 
-    // +0x38 .. +0x3F: implied by the operator= fold, never touched by the six methods.
-    // Meaning unknown (possibly list linkage).
+    // +0x38 .. +0x3F: implied by the operator= fold (which copies them), never touched by
+    // the six methods.
     unsigned char Reserved38[0x08];
 
     // 0x063327e0. Retail only sets SampleCount; P0..P3/ArcLength/Reserved38 stay

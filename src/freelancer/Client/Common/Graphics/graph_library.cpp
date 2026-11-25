@@ -329,7 +329,7 @@ IGraph* GraphLibraryFind(char const* Name)
         }
     }
 
-    FDUMP(0x100002, "%s(%d) : *** WARNING: GraphLib - failed to find '%s'\n", kGraphLibraryCpp,
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: GraphLib - failed to find '%s'\n", kGraphLibraryCpp,
           0x1b3, Name);
     return nullptr;
 }

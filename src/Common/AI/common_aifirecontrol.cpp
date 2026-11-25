@@ -155,7 +155,7 @@ int SystemManagerGunGroupManager::CanFireLauncherAtTarget(unsigned short Hardpoi
         // Retail does not test the CEqObj before using its EquipManager (+0xe4): the
         // own ship is always one here.
         CObject* Obj = (CObject*)OwnShip()->cobject();
-        if (Obj == nullptr || (Obj->ObjectClass & 0x103) != 0x103)
+        if (Obj == nullptr || (Obj->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
             Obj = nullptr;
         CEqObj* const EqObj = (CEqObj*)Obj;
         CELauncher* const Launcher = CELauncher::cast(EqObj->EquipManager.FindByID(HardpointId));
@@ -250,7 +250,7 @@ bool SystemManagerGunGroupManager::IsLineOfFireBlocked(IObjRW* Target, unsigned 
 
     // No null test before the EquipManager access: the own ship is a CEqObj.
     CObject* Own = (CObject*)OwnShip()->cobject();
-    if (Own == nullptr || ((unsigned)Own->ObjectClass & 0x103) != 0x103)
+    if (Own == nullptr || ((unsigned)Own->ObjectClass & CObject::ClassEqObj) != CObject::ClassEqObj)
         Own = nullptr;
     CELauncher* const Launcher = CELauncher::cast(((CEqObj*)Own)->EquipManager.FindByID(HardpointId));
     if (Launcher == nullptr)
@@ -342,7 +342,7 @@ void SystemManagerGunGroupManager::ComputeLeadFirePosition(Vector* OutPos, IObjR
             // or a false answer falls back to the target's position.
             CObject const* const Obj = OwnShip()->cobject();
             bool bGot = false;
-            if (Obj != nullptr && ((unsigned)Obj->ObjectClass & 0x503) == 0x503)
+            if (Obj != nullptr && ((unsigned)Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
                 bGot = ((CShip const*)Obj)->get_tgt_lead_fire_pos(LeadPos);
             if (!bGot)
                 LeadPos = Target->get_position();
@@ -516,7 +516,7 @@ int SystemManagerGunGroupManager::UpdateGunFireState()
     Vector TargetPos;
     CObject const* const Obj = OwnShip()->cobject();
     bool bGot = false;
-    if (Obj != nullptr && ((unsigned)Obj->ObjectClass & 0x503) == 0x503)
+    if (Obj != nullptr && ((unsigned)Obj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
         bGot = ((CShip const*)Obj)->get_tgt_lead_fire_pos(TargetPos);
     if (!bGot)
         TargetPos = PositionSource->get_position();
@@ -848,7 +848,7 @@ bool SystemManagerGunGroupManager::RefreshFromPersonality()
         if (Leader != nullptr)
         {
             CObject const* const Obj = Leader->cobject();
-            if (Obj != nullptr && ((unsigned)Obj->ObjectClass & 0x103) == 0x103)
+            if (Obj != nullptr && ((unsigned)Obj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
             {
                 // The leader's SystemManager becomes the config source and the owner's
                 // +0x14 latch is set.

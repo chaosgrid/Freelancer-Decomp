@@ -1661,7 +1661,7 @@ GENRESULT DACOM_API FAtmosphereMaterial::ApplyVerify(void* /*Context*/, void* /*
     {
         char Message[0x2000];
         std::sprintf(Message, "failed to verify %s", InstanceName);
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
             "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\AtmosphereMaterial.cpp",
             0x97, Message);
     }
@@ -2879,7 +2879,7 @@ GENRESULT __thiscall FMaterial::Setup()
         if (PreviousId != -1)
             Library->DecRefById(PreviousId);
         if (!bSuppressNotice)
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:texture verify failed: %s: %s",
+            FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:texture verify failed: %s: %s",
                   __FILE__, __LINE__, InstanceName, TexBlocks[Index].Name);
     }
     // Only an ordered Opacity < 1 blends; NaN does not.
@@ -3487,7 +3487,7 @@ GENRESULT DACOM_API FBatchedFace::CreateInnerMaterial(void* Name)
         char Message[8192];
         std::sprintf(Message, "Batched material references invalid super type (%s)\n",
                      (const char*)Name);
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\BatchedMaterial.cpp", 0x159,
               Message);
     }
@@ -3657,7 +3657,7 @@ GENRESULT DACOM_API FBatchedMaterial::Initialize(IDAComponent* Component)
     // FUN_06eb3ea0: direct out-parameter writes persist even on failed QI.
     if (Component->QueryInterface(Iids::MaterialBatcher, &Batcher) < 0)
     {
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\BatchedMaterial.cpp", 0x77,
               "BatchedMaterial: initialize: unable to acquire IID_IMaterialBatcher");
         return GR_GENERIC;

@@ -98,9 +98,6 @@ namespace
     // ---------------------------------------------------------------------------------------
     // FDUMP helpers
 
-    const int DumpError = 0x100001;
-    const int DumpWarning = 0x100002;
-    const int DumpNotice = 0x100003;
 
     const char GDacomSourceFile[] = "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\DACOM\\Dacom.cpp";
     const char GErrorFormat[] = "%s(%d) : ERROR:General:%s";
@@ -1303,7 +1300,7 @@ namespace
         char Message[0x2000];
         if (SearchPathA(DllPath, DllName, nullptr, 0x104, FoundPath, nullptr) == 0)
         {
-            FDUMP(DumpError, GErrorFormat, GDacomSourceFile, 0x25a,
+            FDUMP(kFdumpError, GErrorFormat, GDacomSourceFile, 0x25a,
                   FormatDumpText(Message, "DACOM: AddLibrary: unable to find dll '%s' in path\n", DllName));
             return GR_GENERIC;
         }
@@ -1315,7 +1312,7 @@ namespace
         HMODULE Module = LoadLibraryA(FoundPath);
         if (Module == nullptr)
         {
-            FDUMP(DumpError, GErrorFormat, GDacomSourceFile, 0x264,
+            FDUMP(kFdumpError, GErrorFormat, GDacomSourceFile, 0x264,
                   FormatDumpText(Message, "DACOM: AddLibrary: unable to load dll '%s', ignoring...\n", DllName));
             return GR_INVALID_PARMS;
         }
@@ -1324,7 +1321,7 @@ namespace
         unsigned int Minor;
         unsigned int Build;
         DACOM_GetDllVersion(FoundPath, &Major, &Minor, &Build);
-        FDUMP(DumpNotice, GNoticeFormat, GDacomSourceFile, 0x26a,
+        FDUMP(kFdumpNotice, GNoticeFormat, GDacomSourceFile, 0x26a,
               FormatDumpText(Message, "DACOM: AddLibrary: DLL '%s' [%d.%d.%d]\n", FoundPath, Major, Minor, Build));
 
         FLibraryRecord Record;
@@ -1458,7 +1455,7 @@ namespace
             LoadConfiguration();
             return Result;
         }
-        FDUMP(DumpWarning, GWarningFormat, GDacomSourceFile, 0x2e6, "DACOM: SetINIConfig: unable to initialize parser");
+        FDUMP(kFdumpWarning, GWarningFormat, GDacomSourceFile, 0x2e6, "DACOM: SetINIConfig: unable to initialize parser");
         return Result;
     }
 
@@ -1521,7 +1518,7 @@ namespace
                                 {
                                     // Retail keeps this branch although Tail always
                                     // points into BasePath.
-                                    FDUMP(DumpError, GErrorFormat, GDacomSourceFile, 0x328,
+                                    FDUMP(kFdumpError, GErrorFormat, GDacomSourceFile, 0x328,
                                           "DllPath key in ini file specifies invalid path");
                                     std::strcpy(BasePath, "\\");
                                     Tail = BasePath;
@@ -1565,11 +1562,11 @@ namespace
             }
         }
 
-        FDUMP(DumpNotice, GNoticeFormat, GDacomSourceFile, 0x354,
+        FDUMP(kFdumpNotice, GNoticeFormat, GDacomSourceFile, 0x354,
               FormatDumpText(Message, "DACOM: initialize: dllpath: '%s'\n", DllPath));
         if (!LoadLibraries())
         {
-            FDUMP(DumpWarning, GWarningFormat, GDacomSourceFile, 0x357,
+            FDUMP(kFdumpWarning, GWarningFormat, GDacomSourceFile, 0x357,
                   "DACOM: initialize: unable to load libraries from [Libraries]");
             return false;
         }
@@ -1584,11 +1581,11 @@ namespace
         void* Section = Parser->OpenSection("Libraries", 3);
         if (Section == nullptr)
         {
-            FDUMP(DumpError, GErrorFormat, GDacomSourceFile, 0x369,
+            FDUMP(kFdumpError, GErrorFormat, GDacomSourceFile, 0x369,
                   "DACOM: load_libraries: [Libraries] group not found in INI\n");
             return bLoaded;
         }
-        FDUMP(DumpNotice, GNoticeFormat, GDacomSourceFile, 0x370,
+        FDUMP(kFdumpNotice, GNoticeFormat, GDacomSourceFile, 0x370,
               "DACOM: initialize: Loading DLL's from [Libraries] group.\n");
 
         char Line[0x104];
@@ -2832,9 +2829,9 @@ extern "C" GENRESULT __cdecl DACOM_GetVersion(unsigned int* Major, unsigned int*
     const GENRESULT Result = DACOM_GetDllVersion("DACOM.DLL", Major, Minor, Build);
     if (Result >= 0)
     {
-        FDUMP(DumpNotice, GNoticeFormat, GDacomSourceFile, 0x457,
+        FDUMP(kFdumpNotice, GNoticeFormat, GDacomSourceFile, 0x457,
               FormatDumpText(Message, "Current DACOM.DLL version: %d.%d.%d\n", *Major, *Minor, *Build));
-        FDUMP(DumpNotice, GNoticeFormat, GDacomSourceFile, 0x458,
+        FDUMP(kFdumpNotice, GNoticeFormat, GDacomSourceFile, 0x458,
               FormatDumpText(Message, " Compiled against version: %d.%d.%d\n", 1, 0xb, 0xad));
     }
     return Result;

@@ -127,22 +127,25 @@ unsigned GetPlayerWaypointTailTagRetail()
     return G_PlayerWaypointTailTag;
 }
 
-void RequestBestPathRetail(Vector const& From, Vector const& To, unsigned Tag, unsigned Field30)
+void RequestBestPathRetail(Vector const& From, Vector const& To, unsigned Tag, unsigned ToSystemId)
 {
     // FUN_004c4eb0: the 0x34-byte request through IServer slot 72. Port deviation: the
     // untouched bytes (+0x09..+0x0b) are stack garbage in retail; the port zeroes them.
+    // Server's RequestBestPath forwards +0x00, +0x1c, +0x0c, +0x20 and +0x30 as Content's
+    // FBestPathRequest {+0x04 cookie, FromSystemId, FromPosition, ToPosition, ToSystemId}; the
+    // cookie comes back in the reply header +0x00. +0x04 is not forwarded.
     G_PlayerWaypointTailTag = Tag;
     unsigned char Request[0x34];
     memset(Request, 0, sizeof(Request));
-    unsigned const Field00 = static_cast<unsigned>(GetPlayerRepVibeRetail()); // DAT_0061226c
+    unsigned const ClientCookie = static_cast<unsigned>(GetPlayerRepVibeRetail()); // DAT_0061226c
     unsigned const Field04 = 2;
-    unsigned const Field1c = GetPlayerStarSystemIdRetail(); // DAT_00673354
-    memcpy(Request + 0x00, &Field00, 4);
+    unsigned const FromSystemId = GetPlayerStarSystemIdRetail(); // DAT_00673354
+    memcpy(Request + 0x00, &ClientCookie, 4);
     memcpy(Request + 0x04, &Field04, 4);
     memcpy(Request + 0x0c, &From, 0xc);
-    memcpy(Request + 0x1c, &Field1c, 4);
+    memcpy(Request + 0x1c, &FromSystemId, 4);
     memcpy(Request + 0x20, &To, 0xc);
-    memcpy(Request + 0x30, &Field30, 4);
+    memcpy(Request + 0x30, &ToSystemId, 4);
     G_Server->RequestBestPath(GetPlayerConnectionId(), Request, 0x34);
 }
 

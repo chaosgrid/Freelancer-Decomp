@@ -1136,7 +1136,7 @@ namespace
                     {
                         ID_String ArchName;
                         ArchName.Id = Arch->NicknameId;
-                        FDUMP(0x100001,
+                        FDUMP(kFdumpError,
                               "%s(%d) : *** ERROR: [Sound] %s. Specified 'lod%d = %s' not found."
                               "  Sound won't play.",
                               kSoundArchCpp, 0x3cb, ArchName.get_string(), Lod,
@@ -1296,7 +1296,7 @@ namespace
                 bDuck = true;
                 break;
             case 1:
-                if (GetClientAudioMode() == 1)
+                if (GetClientAudioMode() == kClientAudioModeSpace)
                     ModeDb = -1e10f;
                 else
                     Base = G_AudioInterfaceDb;
@@ -1749,7 +1749,7 @@ namespace
             }
             // Different archetype: stop (vt+0x60, slot 24), warn, then start the new one.
             Source->Stop();
-            FDUMP(0x100002, "%s(%d) : *** WARNING: attempted to re-play active sound (%s)",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: attempted to re-play active sound (%s)",
                   kSoundCpp, 0x557, Arch->GetFileName());
         }
         if (Arch == nullptr)
@@ -1865,7 +1865,7 @@ namespace
                 DALib::Streamer->StartStream(Source->StreamHandle);
                 if (DALib::Streamer->QueryStatus(Source->StreamHandle) == 0)
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: Bad streamer status upon starting sound %s",
                           kSoundCpp, 0x905, Arch->GetFileName());
                 }
@@ -1894,7 +1894,7 @@ namespace
         StreamHandle = DALib::Streamer->CreateStream(Name, DALib::Data, Mode);
         if (!IsStreamHandle(StreamHandle))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Failed to start streamer sound %s", kSoundCpp,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Failed to start streamer sound %s", kSoundCpp,
                   0x8e5, SoundArch->GetFileName());
             return 0;
         }
@@ -1920,7 +1920,7 @@ namespace
     // LAB_00428880 -- slot 25 (RET 4): a streamed source cannot be moved.
     void __thiscall FStreamedSource::SetStartOffset(int /*Offset*/)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kSoundH, 0x13f,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kSoundH, 0x13f,
               "Tried to restart streaming sound");
     }
 
@@ -2008,7 +2008,7 @@ namespace
             return;
         if (IsActive() != 0 && bLooping != 0)
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: streamed source %s attributes changing _after_ the stream "
                   "was started",
                   kSoundCpp, 0x8bf, Arch->GetFileName());
@@ -2177,11 +2177,11 @@ namespace
                 ExistingId.Id = Existing->NicknameId;
                 if (_stricmp(ExistingId.get_string(), Id.get_string()) != 0)
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: Sound nickname collision (%s) and (%s)\n",
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Sound nickname collision (%s) and (%s)\n",
                           kSoundArchCpp, 0x182, ExistingId.get_string(), Id.get_string());
                     return nullptr;
                 }
-                FDUMP(0x100002, "%s(%d) : *** WARNING: Redefining sound '%s'.\n", kSoundArchCpp,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Redefining sound '%s'.\n", kSoundArchCpp,
                       0x17a, Id.get_string());
                 SoundArchRedefine(Existing, Arch, bForce);
                 return Existing;
@@ -2254,7 +2254,7 @@ namespace
             else if (_stricmp("gameflow", Value) == 0)
                 Arch->Flags = (Arch->Flags & 0xff2fffffu) | 0x200000u;
             else
-                FDUMP(0x100002, "%s(%d) : *** WARNING: unknown 'persistent' value %s.\n",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown 'persistent' value %s.\n",
                       kSoundArchCpp, 0x2fd, Value);
             return true;
         }
@@ -2264,7 +2264,7 @@ namespace
             char const* Value = Reader.get_value_string();
             if (!ParseSoundType(Arch, Value))
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: unknown 'type' value %s.\n",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown 'type' value %s.\n",
                       kSoundArchCpp, 0x30a, Value);
             }
             return true;
@@ -2305,7 +2305,7 @@ namespace
             LodIndex = 1;
         else
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: unknown [Sound] parameter %s.\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown [Sound] parameter %s.\n",
                   kSoundArchCpp, 0x329,
                   Reader.get_name_ptr());
             Reader.log_link("");
@@ -2554,7 +2554,7 @@ ISoundSource* CreateClientThrusterSound(FClientEquippedObj* Ship)
     // FUN_0054bb00) against DAT_00673344.
     CObject* const Obj = Ship->Object;
     unsigned const Owner =
-        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x3u) == 0x3u)
+        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
             ? static_cast<CSimple const*>(Obj)->OwnerPlayer
             : GetPlayerConnectionId();
     if (Owner == GetPlayerConnectionId())
@@ -2588,7 +2588,7 @@ void TickClientThrusterSound(ISoundSource* Sound, float /*Dt*/)
     for (FEquipFxListNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
         CEquip* const Equip = Node->Wrapper->Equip;
-        if (Equip->Type != 0x400u)
+        if (Equip->Type != EquipTypeThruster)
             continue;
         if (!Equip->IsFunctioning())
             continue;
@@ -2696,7 +2696,7 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
             if (Id.IsEmpty())
             {
                 Reader.log_link("Sound has no nickname!");
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: Sound has no nickname.  Skipping. Filename(%s) "
                       "IniFile(%s).",
                       kSoundArchCpp, 0x1bb, Scratch.File != nullptr ? Scratch.File : "",
@@ -2717,7 +2717,7 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
                     Clamped = static_cast<float>(Atten);
                 if (!(static_cast<double>(Clamped) == Atten))
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: sound \"%s\" has attenuation out of valid range "
                           "(0, -96)\n",
                           kSoundArchCpp, 0x1c9, Scratch.File != nullptr ? Scratch.File : "");
@@ -2735,7 +2735,7 @@ int LoadClientSoundArchIni(char const* FullPath, bool bForce)
                 else if (!(Scratch.RangeMin < Scratch.RangeMax) &&
                          !_isnan(Scratch.RangeMin) && !_isnan(Scratch.RangeMax))
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: Sound archetype '%s' has invalid range.\n",
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Sound archetype '%s' has invalid range.\n",
                           kSoundArchCpp, 0x1d5, Id.get_string());
                 }
                 RegisterSoundArch(&Scratch, bForce);
@@ -2759,7 +2759,7 @@ void* LookupClientSoundArch(ID_String const* Id)
         if (Found != G_SoundArchs.end())
             return static_cast<Archetype::ISound*>(Found->second);
     }
-    FDUMP(0x100002, "%s(%d) : *** WARNING: unknown Sound archetype '%s'", kSoundArchCpp, 0x168,
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown Sound archetype '%s'", kSoundArchCpp, 0x168,
           Id->get_string());
     return nullptr;
 }
@@ -3163,7 +3163,7 @@ void StopAllClientSounds()
     StopAllClientSoundsExceptArch(nullptr);
     if (G_AliveSoundSourceCount != 0)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: sound reference count leaks detected: %d sounds",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: sound reference count leaks detected: %d sounds",
               kSoundCpp, 0x4da, G_AliveSoundSourceCount);
     }
     // Retail shrink order.
@@ -3327,7 +3327,7 @@ int CreateSoundArchWav(Archetype::ISound* Arch, void* ParentFs)
     if (OpenWavFileSystem(RelPath, ParentFs, &ChildFs) != 0)
     {
         // Falls through to the "failed to create" dump below too.
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Sound filename \"%s\" not found.\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Sound filename \"%s\" not found.\n",
               kSoundArchCpp, 0x227, RelPath);
     }
     else
@@ -3348,7 +3348,7 @@ int CreateSoundArchWav(Archetype::ISound* Arch, void* ParentFs)
 
     if (SmId == -1)
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: Failed to create archetype for sound filename \"%s\"\n",
               kSoundArchCpp, 0x22b, RelPath);
     }

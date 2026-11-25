@@ -131,7 +131,7 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FComponentFactory::QueryInterface(const char* Iid, void** Out)
     {
         *Out = nullptr;
-        if (!IidEqual(Iid, Iids::ComponentFactory))
+        if (!Iids::EqualNoNullTest(Iid, Iids::ComponentFactory))
             return GR_INTERFACE_UNSUPPORTED;
         *Out = static_cast<IComponentFactory*>(this);
         AddRef();

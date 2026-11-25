@@ -1064,7 +1064,7 @@ namespace
         if (DistSqRaw >= RangeSq)
         {
             // Far -- only a ManagerKind 2 object (a solar), and only outside a field's core.
-            if (Go->ManagerKind != 2)
+            if (Go->ManagerKind != EClientGameobjKind::Solar)
                 return;
             if (G_FieldEnclosure == 2)
                 return;
@@ -1092,11 +1092,11 @@ namespace
 
         // A solar whose narrowed CSolar (null read unchecked) has any of TypeBits 0..2 and no
         // star sphere: DistSq -= r * r, stored float.
-        if (Go->ManagerKind == 2)
+        if (Go->ManagerKind == EClientGameobjKind::Solar)
         {
             CObject* const Obj = Go->Object;
             CSolar* Solar = nullptr;
-            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                 Solar = static_cast<CSolar*>(Obj);
             if ((static_cast<unsigned char>(Solar->TypeBits) & 7u) != 0 &&
                 static_cast<FClientSolarGameobj*>(Go)->StarSphere == 0)
@@ -1166,7 +1166,7 @@ namespace
 
         // A CEqObj whose archetype has the nomad byte (+0x80) set goes three buckets up.
         CObject* const Obj = Go->Object;
-        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x103u) == 0x103u)
+        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
         {
             Archetype::EqObj const* const Arch =
                 static_cast<Archetype::EqObj const*>(Obj->Archetype);
@@ -1179,9 +1179,10 @@ namespace
 
     // FUN_0051f7d0: the ObjDB bucket head for ManagerKind (FUN_00540fc0), then every Gameobj
     // down the +0x14 chain to FUN_0051f2c0. No other test.
-    void EnqueueByManagerKind(int ManagerKind, FSpaceCamera* Cam)
+    void EnqueueByManagerKind(EClientGameobjKind ManagerKind, FSpaceCamera* Cam)
     {
-        FClientGameobj* Go = ClientObjDb_GetKindHead(&ManagerKind);
+        int Kind = static_cast<int>(ManagerKind);
+        FClientGameobj* Go = ClientObjDb_GetKindHead(&Kind);
         for (; Go != nullptr; Go = Go->ListNext)
             EnqueueObject(Go, Cam);
     }
@@ -1594,10 +1595,11 @@ namespace
 
     int FZItemGameObject::GetCategory()
     {
-        int const ManagerKind = static_cast<FClientGameobj*>(static_cast<IObjInspect*>(Object))->ManagerKind;
-        if (ManagerKind == 1)
+        EClientGameobjKind const ManagerKind =
+            static_cast<FClientGameobj*>(static_cast<IObjInspect*>(Object))->ManagerKind;
+        if (ManagerKind == EClientGameobjKind::Ship)
             return 0;
-        return (ManagerKind != 2) ? 2 : 1;
+        return (ManagerKind != EClientGameobjKind::Solar) ? 2 : 1;
     }
 
     void FZItemNebula::Draw(FSpaceCamera* Cam)
@@ -1968,7 +1970,7 @@ namespace
                 float const* const Center = Panels->GetPiece(Piece);
                 if (Center == nullptr)
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kGamecamCppPath, 0x1ca,
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kGamecamCppPath, 0x1ca,
                           "ring piece returned null position pointer");
                 }
 
@@ -2214,7 +2216,7 @@ namespace
     CEqObj* EquippedObjEqObj(FClientEquippedObj* Self)
     {
         CObject* const Obj = Self->Object;
-        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x103u) != 0x103u)
+        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
             return nullptr;
         return static_cast<CEqObj*>(Obj);
     }
@@ -2296,7 +2298,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
     {
         FClientShipGameobj* const Ship =
             static_cast<FClientShipGameobj*>(static_cast<IObjRW*>(PlayerRW));
-        if (Ship->JumpState == 2 || Ship->JumpState == 3)
+        if (Ship->JumpState == kJumpStateJumpOutTunnel || Ship->JumpState == kJumpStateJumpInTunnel)
         {
             G_FieldController = nullptr;
             CameraSetNearFar(Cam, Camera->GetZNear(), G_SpaceDrawFar);
@@ -2446,7 +2448,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
             {
                 CObject* const Obj = Go->Object;
                 CSolar* Solar = nullptr;
-                if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+                if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                     Solar = static_cast<CSolar*>(Obj);
                 if ((static_cast<unsigned char>(Solar->TypeBits) & 7u) != 0)
                     continue;
@@ -2461,21 +2463,21 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
     if (GetGameOption(kGameOptObjectsGroup) != 0)
     {
         if ((LayerFlags & 0x20u) != 0 && GetGameOption(kGameOptShips) != 0)
-            EnqueueByManagerKind(1, Cam);
+            EnqueueByManagerKind(EClientGameobjKind::Ship, Cam);
         const unsigned ProjectileLayer = LayerFlags & 0x80u; // kept across the calls
         if (ProjectileLayer != 0 && GetGameOption(kGameOptProjectiles) != 0)
-            EnqueueByManagerKind(4, Cam);
+            EnqueueByManagerKind(EClientGameobjKind::Guided, Cam);
         if (ProjectileLayer != 0)
         {
             if (GetGameOption(kGameOptProjectiles) != 0)
-                EnqueueByManagerKind(5, Cam);
+                EnqueueByManagerKind(EClientGameobjKind::Mine, Cam);
             if (GetGameOption(kGameOptProjectiles) != 0)
-                EnqueueByManagerKind(6, Cam);
+                EnqueueByManagerKind(EClientGameobjKind::CounterMeasure, Cam);
         }
         if ((LayerFlags & 0x800u) != 0 && GetGameOption(kGameOptDebris) != 0)
-            EnqueueByManagerKind(7, Cam);
+            EnqueueByManagerKind(EClientGameobjKind::Loot, Cam);
         if ((LayerFlags & 0x400u) != 0 && GetGameOption(kGameOptDebris) != 0)
-            EnqueueByManagerKind(10, Cam);
+            EnqueueByManagerKind(EClientGameobjKind::Debris, Cam);
     }
 
     SortBuckets(); // FUN_0051eda0

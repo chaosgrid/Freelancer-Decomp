@@ -690,7 +690,7 @@ void FMissionScript::StartRtcScript(FMissionRtc* Rtc)
         if (Base != nullptr && Script->Load(Rtc->Path) && Base->BaseId == Script->BaseId)
         {
             // A mission text without a live mission takes the loaded text id.
-            if (Script->MissionTextId != 0 && (PlayerState->GetLiveMission() & 0x3fffffff) == 0)
+            if (Script->MissionTextId != 0 && (PlayerState->GetLiveMission() & GIdValueMask) == 0)
                 Script->MissionTextId = Script->LoadedMissionTextId;
             // AllocateFormationId = FUN_06efeb00, CreateBarScene = FUN_06ea9640.
             Script->SequenceId = AllocateFormationId();
@@ -778,7 +778,7 @@ void FMissionScript::ApplyDesiredMissionState()
         return;
     OnMissionSucceed();
     if (StoryEvents != nullptr)
-        StoryEvents->OnMissionEvent(3, static_cast<unsigned int>(CampaignSlotSucceed), ControllerId);
+        StoryEvents->OnMissionEvent(STORY_MISSION_EVENT_SUCCEEDED, static_cast<unsigned int>(CampaignSlotSucceed), ControllerId);
 }
 
 // FUN_06eb9760: the default mad lib 1 becomes 0x4cf.
@@ -829,7 +829,7 @@ void FMissionScript::EndMission()
     Timers.clear();
     // Retail quirk: only a player without a ship gets lock_maneuvers(false), with that (unset)
     // ship id. The player state is not null-tested.
-    if ((PlayerState->GetShipId() & 0x3fffffff) == 0)
+    if ((PlayerState->GetShipId() & GIdValueMask) == 0)
         pub::AI::lock_maneuvers(PlayerState->GetShipId(), false);
     std::list<FTriggerMap::iterator>::iterator ActiveIt = ActiveTriggers.begin();
     for (; ActiveIt != ActiveTriggers.end(); ++ActiveIt)
@@ -1161,7 +1161,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     {
         if (bNeedsObjectiveRenumber == 0 && NnPath.bActive != 0
             && (PlayerState->GetLiveMission() == ControllerId
-                || (PlayerState->GetLiveMission() & 0x3fffffff) == 0))
+                || (PlayerState->GetLiveMission() & GIdValueMask) == 0))
             NnPath.HandleMessage(MessageId, MessageParms);
         DispatchNagMessage(MessageId, MessageParms);
     }
@@ -1336,10 +1336,10 @@ void FMissionScript::OnOfferResponse(void const* MessageParms)
     }
     DispatchTriggerEvent(&EventId, MessageParms);
     if (StoryEvents != nullptr)
-        StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed), ControllerId);
+        StoryEvents->OnMissionEvent(STORY_MISSION_EVENT_JOINED, static_cast<unsigned int>(CampaignSlotSucceed), ControllerId);
     // Another live mission of the player is destroyed and left.
     unsigned int const LiveMission = PlayerState->GetLiveMission();
-    if ((LiveMission & 0x3fffffff) != 0 && LiveMission != ControllerId)
+    if ((LiveMission & GIdValueMask) != 0 && LiveMission != ControllerId)
     {
         pub::Controller::Destroy(LiveMission);
         PlayerState->EndLiveMission(LiveMission, VNPC_MISSION_ABORTED, true);
@@ -1428,7 +1428,7 @@ void FMissionScript::OnSystemEnter(void const* MessageParms)
     unsigned int NpcEnterParms[3];
     NpcEnterParms[0] = Ship->SpaceObjId;
     NpcEnterParms[1] = Parms[0];
-    NpcEnterParms[2] = (Parms[1] & 0x3fffffff) != 0 ? Parms[3] : 0;
+    NpcEnterParms[2] = (Parms[1] & GIdValueMask) != 0 ? Parms[3] : 0;
     EventId = EMessage::NpcSystemEnter;
     DispatchTriggerEvent(&EventId, NpcEnterParms);
 }
@@ -1671,7 +1671,7 @@ void FMissionScript::LoadMissionState(INI_Reader* Reader)
                     ObjectiveIds.clear();
                     PlayerState->JoinMissionAsGroup(ControllerId, 0, &ObjectiveIds, false, 0);
                     if (StoryEvents != nullptr)
-                        StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed),
+                        StoryEvents->OnMissionEvent(STORY_MISSION_EVENT_JOINED, static_cast<unsigned int>(CampaignSlotSucceed),
                                                     ControllerId);
                     continue;
                 }
@@ -1796,7 +1796,7 @@ void FMissionScript::SubmitNpcPersonality(FContentNpcShip* Npc, int Mode)
         return;
     if (Mode == 0)
     {
-        LocalPersonality.JobParams.Field_00 = 0;
+        LocalPersonality.JobParams.RangeThreshold = 0;
         LocalPersonality.JobParams.SceneToughnessThreshold = 4;
         LocalPersonality.JobParams.LootPreference = 0;
         LocalPersonality.JobParams.FleeSceneThreatStyle = 4;
@@ -1828,7 +1828,7 @@ void FMissionScript::SubmitNpcPersonality(FContentNpcShip* Npc, int Mode)
             LocalPersonality.JobParams.bFleeWhenLeaderFleesStyle = PilotPersonality.JobParams.bFleeWhenLeaderFleesStyle;
             LocalPersonality.JobParams.bFleeNoWeaponsStyle = PilotPersonality.JobParams.bFleeNoWeaponsStyle;
             LocalPersonality.JobParams.SceneToughnessThreshold = PilotPersonality.JobParams.SceneToughnessThreshold;
-            LocalPersonality.JobParams.Field_00 = PilotPersonality.JobParams.Field_00;
+            LocalPersonality.JobParams.RangeThreshold = PilotPersonality.JobParams.RangeThreshold;
             LocalPersonality.JobParams.LootPreference = PilotPersonality.JobParams.LootPreference;
         }
     }

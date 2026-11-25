@@ -69,11 +69,11 @@ void FHotspot::SendEvent(int Event, int const* Point)
     // FUN_00555f00.
     if (Owner == nullptr)
         return;
-    if (Event == 1)
+    if (Event == kHotspotEventEnter)
         Owner->OnHotspotEnter(Cookie, Point);
-    else if (Event == 2)
+    else if (Event == kHotspotEventLeave)
         Owner->OnHotspotLeave(Cookie, Point);
-    else if (Event == 3)
+    else if (Event == kHotspotEventClick)
         Owner->OnHotspotClick(Cookie, Point);
 }
 
@@ -133,7 +133,7 @@ bool ReportLeakedHotspots()
     for (std::list<FHotspot*>::iterator It = G_Hotspots.begin(); It != G_Hotspots.end(); ++It)
     {
         FHotspot* const Hotspot = *It;
-        FDUMP(0x100002, "%s(%d) : *** WARNING: hotspot = %p id = %d not freed\n", kHotspotCpp,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: hotspot = %p id = %d not freed\n", kHotspotCpp,
               0x161, Hotspot, Hotspot->Cookie);
     }
     return G_Hotspots.size() == 0;

@@ -81,13 +81,13 @@ namespace AlchemyImpl
     {
         // LAB_06203350: a 2-entry IID table walk ("1.11_IBatchedMaterial" -> offset 4,
         // "1.11_IMaterial" -> offset 0).
-        if (IidEqual(Iid, Iids::BatchedMaterial))
+        if (Iids::EqualNoNullTest(Iid, Iids::BatchedMaterial))
         {
             Facet_.AddRef();
             *Out = static_cast<IALBatchedMaterial*>(&Facet_);
             return GR_OK;
         }
-        if (IidEqual(Iid, Iids::Material))
+        if (Iids::EqualNoNullTest(Iid, Iids::Material))
         {
             AddRef();
             *Out = static_cast<IALMaterial*>(this);

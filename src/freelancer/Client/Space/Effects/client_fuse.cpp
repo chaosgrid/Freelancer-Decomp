@@ -729,7 +729,7 @@ void ClientImpulseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                     // Null unless its class has bit 0 set -- and read without a null test
                     // (retail).
                     CObject* Obj = Go->Object;
-                    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 1u) != 1u)
+                    if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassObject) != CObject::ClassObject)
                         Obj = nullptr;
 
                     // The offset from the impulse point in floats; its length summed in double,

@@ -174,7 +174,7 @@ bool __cdecl PhyArch::LoadSurfaces(char const* SurPath, std::map<unsigned int, P
     // Only an exact 2.0f continues (NaN fails).
     if (!(Version == kSurVersion))
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s uses old format, must be rebuilt to version %f.  Non-ignorable.",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s uses old format, must be rebuilt to version %f.  Non-ignorable.",
               kPhyArchSource, 0xb1, SurPath, (double)kSurVersion);
         PhyArch_Release(Filesys);
         return false;
@@ -204,7 +204,7 @@ bool __cdecl PhyArch::LoadSurfaces(char const* SurPath, std::map<unsigned int, P
         if (!Inserted.second)
         {
             // A duplicate id is reported and the existing part cleared.
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Error reading %s. Duplicate part ids: %u. Second used.",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Error reading %s. Duplicate part ids: %u. Second used.",
                   kPhyArchSource, 0xc6, SurPath, PartId);
             Current.clear();
         }
@@ -256,7 +256,7 @@ bool __cdecl PhyArch::LoadSurfaces(char const* SurPath, std::map<unsigned int, P
             else
             {
                 // An unknown chunk aborts the file.
-                FDUMP(0x100001, "%s(%d) : *** ERROR: File(%s) Part(%u) contains unrecognized info type. Aborting.",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: File(%s) Part(%u) contains unrecognized info type. Aborting.",
                       kPhyArchSource, 0xfe, SurPath, PartId);
                 PhyArch_Release(Filesys);
                 return false;

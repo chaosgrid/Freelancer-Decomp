@@ -17,6 +17,7 @@
 #include "GameFlow/mirror_property_bucket.h"
 #include "Common/misc_util.h"         // MiscUtilLoadEngineInstance, MiscUtilLoadIdsCopy, MiscUtilSphereInView
 #include "GameFlow/nav_bar.h"           // NavBarCharacterClicked (FUN_00442810), NavBarOpenButton (FUN_00442200)
+#include "GameFlow/room_control_hotspot.h" // EHotspotBehavior
 #include "NeuroNet/nn_tooltip.h"        // NnToolTipHideGlobal (FUN_004be390)
 #include "Space/player_spawn.h"      // GetPlayerConnectionId (DAT_00673344)
 #include "Network/server_connect.h"    // GetLocalServerInterface (DAT_0067ecd0)
@@ -181,14 +182,14 @@ namespace
     // nothing.
     void OpenRoleDealer(int Role)
     {
-        if (Role == 1)
+        if (Role == kCharacterRoleBartender)
             return;
-        if (Role == 2)
-            NavBarOpenButton(5);
-        else if (Role == 3)
-            NavBarOpenButton(7);
-        else if (Role == 4)
-            NavBarOpenButton(8);
+        if (Role == kCharacterRoleTrader)
+            NavBarOpenButton(kHotspotStartDealer);
+        else if (Role == kCharacterRoleShipDealer)
+            NavBarOpenButton(kHotspotStartShipDealer);
+        else if (Role == kCharacterRoleEquipmentDealer)
+            NavBarOpenButton(kHotspotStartEquipDealer);
     }
 
     // LAB_00445d30 (cdecl) -- the stop callback of a click's behaviour script: A is the
@@ -324,7 +325,7 @@ FCharacterObject::FCharacterObject(FRoomRuntime* InOwner, FCharacterDesc const& 
         Lod.Tables[Index] = nullptr;
     }
     Hotspot = nullptr;
-    Role = 0;
+    Role = kCharacterRoleNone;
     Placement = nullptr;
     for (Index = 0; Index < 4; ++Index)
         LodIds[Index] = -1;
@@ -340,7 +341,7 @@ FCharacterObject::FCharacterObject(FRoomRuntime* InOwner, FCharacterDesc const& 
     OwnScript = nullptr;
     OwnScriptName = nullptr;
     bOwnScriptPlaying = 0;
-    ScriptState = 0;
+    ScriptState = kCharacterScriptOwn;
     ActiveMotions = 0;
     ActiveAims = 0;
     bPoseDirty = 0;
@@ -351,9 +352,9 @@ FCharacterObject::FCharacterObject(FRoomRuntime* InOwner, FCharacterDesc const& 
 FCharacterObject::~FCharacterObject()
 {
     // FUN_004440c0.
-    if (ScriptState == 1)
+    if (ScriptState == kCharacterScriptTakenOver)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kObjectDeformableCpp, 0x175,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kObjectDeformableCpp, 0x175,
               "Character is being destroyed while still scripted, GAME IS ABOUT TO CRASH!!!\n");
     }
     // The own script is forgotten, not destroyed.
@@ -405,7 +406,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     Placement = Desc.Placement;
     PlacementIndex = Desc.PlacementIndex;
     bSharedDeform = (Props.CharType == 1) ? 1 : 0;
-    Role = 0;
+    Role = kCharacterRoleNone;
 
     // The role from the placement's setpoint segment.
     if (Placement != nullptr)
@@ -413,13 +414,13 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
         SetpointProperties Setpoint;
         Setpoint.extract_from_name(Placement->Name);
         if (_stricmp(Setpoint.Segment, "bartender") == 0) // DACOM stricmp
-            Role = 1;
+            Role = kCharacterRoleBartender;
         else if (_stricmp(Setpoint.Segment, "trader") == 0)
-            Role = 2;
+            Role = kCharacterRoleTrader;
         else if (_stricmp(Setpoint.Segment, "shipdealer") == 0)
-            Role = 3;
+            Role = kCharacterRoleShipDealer;
         else if (_stricmp(Setpoint.Segment, "equipment") == 0)
-            Role = 4;
+            Role = kCharacterRoleEquipmentDealer;
     }
 
     // The head is costume part 0, the body part 1.
@@ -559,7 +560,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
         }
         malloc_strcpy(&OwnScriptName, IdleScript);
         OwnScript = CreateOwnScript(IdleScript, bSpatial);
-        if (ScriptState == 0 && OwnScript != nullptr)
+        if (ScriptState == kCharacterScriptOwn && OwnScript != nullptr)
         {
             OwnScript->Play();
             bOwnScriptPlaying = 1;
@@ -604,9 +605,9 @@ void FCharacterObject::Update(double DeltaSeconds)
 
     // A script let go of the character -- its own script again, and
     // no self-update.
-    if (ScriptState == 2)
+    if (ScriptState == kCharacterScriptReleased)
     {
-        ScriptState = 0;
+        ScriptState = kCharacterScriptOwn;
         RestartOwnScript();
         bNoUpdate = 1;
     }
@@ -824,7 +825,7 @@ void FCharacterObject::RestartOwnScript()
     }
     malloc_strcpy(&OwnScriptName, IdleScript);
     OwnScript = CreateOwnScript(IdleScript, 0);
-    if (ScriptState != 0)
+    if (ScriptState != kCharacterScriptOwn)
         return;
     if (OwnScript == nullptr)
         return;
@@ -841,7 +842,7 @@ FGfScriptSequence* FCharacterObject::CreateOwnScript(char const* ScriptName, uns
     FGfScriptSequence* const Sequence = G_GfScriptManager.CreateSequence(Owner, 0);
     if (Sequence == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kObjectDeformableCpp, 0x453,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kObjectDeformableCpp, 0x453,
               "Cannot allocate thorn script\n");
         return Sequence;
     }
@@ -901,7 +902,7 @@ void FCharacterObject::SetOwnScript(char const* ScriptName, unsigned char bSpati
     }
     malloc_strcpy(&OwnScriptName, ScriptName);
     OwnScript = CreateOwnScript(ScriptName, bSpatial);
-    if (ScriptState != 0)
+    if (ScriptState != kCharacterScriptOwn)
         return;
     if (OwnScript == nullptr)
         return;
@@ -912,7 +913,7 @@ void FCharacterObject::SetOwnScript(char const* ScriptName, unsigned char bSpati
 void FCharacterObject::UpdateHotspotEnabled()
 {
     // FUN_00445a60: no behaviour (+0x1b0 == -1) and no role -> disabled.
-    if (Props.BehaviorId == 0xffffffffu && Role == 0)
+    if (Props.BehaviorId == 0xffffffffu && Role == kCharacterRoleNone)
     {
         Hotspot->bEnabled = 0;
         return;
@@ -927,11 +928,11 @@ void FCharacterObject::OnHotspotEnter(unsigned long /*Cookie*/, int const* /*Poi
         return;
     bHovered = 1;
     char const* Cursor = "talk_blowoff";
-    if (Role == 2)
+    if (Role == kCharacterRoleTrader)
         Cursor = "talk_commodity_dealer";
-    else if (Role == 3)
+    else if (Role == kCharacterRoleShipDealer)
         Cursor = "talk_ship_dealer";
-    else if (Role == 4)
+    else if (Role == kCharacterRoleEquipmentDealer)
         Cursor = "talk_equip_dealer";
 
     // With a behaviour the room knows, the cursor by its kind; an unknown kind keeps the role's
@@ -1001,7 +1002,7 @@ void FCharacterObject::OnHotspotClick(unsigned long Cookie, int const* Point)
     // The NavBar may take the click; a character under a script's control does nothing.
     if (NavBarCharacterClicked(this, Role))
         return;
-    if (ScriptState != 0)
+    if (ScriptState != kCharacterScriptOwn)
         return;
 
     // With a behaviour, its script (FUN_00435dd0, the dealer opened when it stops) and the
@@ -1029,7 +1030,7 @@ void FCharacterObject::TakeOverForScript(unsigned char bKeepOwnScript)
             bOwnScriptPlaying = 0;
             malloc_strfree(&OwnScriptName);
         }
-        ScriptState = 1;
+        ScriptState = kCharacterScriptTakenOver;
     }
     bNoUpdate = 1;
 }
@@ -1040,7 +1041,7 @@ void FCharacterObject::ResetScriptState(unsigned char bRelease)
     bNoUpdate = 0;
     if (bRelease == 0)
     {
-        ScriptState = 2;
+        ScriptState = kCharacterScriptReleased;
         return;
     }
     OwnScript = nullptr;
@@ -1126,7 +1127,7 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
     else
     {
         G_BgcsContextBuffer[0] = '\0';
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kObjectDeformableCpp, 0x51f,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kObjectDeformableCpp, 0x51f,
               "Invalid gender for character, cannot find GCS voice profile message name\n");
     }
 
@@ -1155,7 +1156,7 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
         strcat(G_BgcsContextBuffer, RunBy);
         if (RunBy[0] != '\0')
             return G_BgcsContextBuffer;
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: No BGCS_base_run_by specified for base %s, cannot resolve "
               "voice profile message %s\n",
               kObjectDeformableCpp, 0x54a, Universe::get_base(BaseId)->Nickname, TemplateName);
@@ -1176,7 +1177,7 @@ char const* FCharacterObject::ResolveBgcsContextToken(char const* TemplateName) 
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Unknown GCS generic voice profile message %s\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Unknown GCS generic voice profile message %s\n",
               kObjectDeformableCpp, 0x571, TemplateName);
         return G_BgcsContextBuffer;
     }
@@ -1286,7 +1287,7 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
         }
     }
 
-    // Field_0x16 marks a dealer role.
+    // A dealer role's script (trader, ship dealer, equipment dealer) counts as a transition.
     Sequence->BindMode = BindMode;
     Sequence->bLetterbox = 1;
     Sequence->bApplySpatial = Behavior->bApplySpatial;
@@ -1298,10 +1299,13 @@ void StartCharacterBehaviorScript(FCharacterObject* Character, FRoomRuntime* Roo
     Sequence->bDuckMusic = 1;
     Sequence->CallbackA = CallbackA;
     Sequence->Location = Behavior->RelocateLocationId;
-    Sequence->Field_0x15 = Behavior->bGenericScript;
+    Sequence->bSkippable = Behavior->bGenericScript;
     Sequence->RtcId = Behavior->RtcId;
     int const Role = Character->Role;
-    Sequence->Field_0x16 = (Role == 2 || Role == 3 || Role == 4) ? 1 : 0;
+    Sequence->bTransition = (Role == kCharacterRoleTrader || Role == kCharacterRoleShipDealer ||
+                             Role == kCharacterRoleEquipmentDealer)
+                                ? 1
+                                : 0;
     Sequence->Play();
 }
 

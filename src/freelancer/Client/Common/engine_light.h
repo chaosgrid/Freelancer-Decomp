@@ -25,6 +25,17 @@
 
 struct ICamera;
 
+// The light types: 1..3 are the D3DLIGHTTYPE values (FD3dLight8::Type as well); the names are
+// the [LightSource] type strings EngineLightParseType (FUN_00411cd0) maps.
+enum EEngineLightType : int
+{
+    kLightAmbient = -2,      // "AMBIENT"
+    kLightNone = -1,         // an unknown type
+    kLightPoint = 1,         // "POINT"
+    kLightSpot = 2,          // "CONE"
+    kLightDirectional = 3,   // "DIRECTIONAL"
+};
+
 // D3DLIGHT8 as the exe lays it out: 0x68 bytes at light +0x0C.
 struct FD3dLight8
 {
@@ -45,7 +56,7 @@ struct FD3dLight8
 
 struct FEngineLight
 {
-    explicit FEngineLight(int LightType = -1);
+    explicit FEngineLight(int LightType = kLightNone);
     virtual ~FEngineLight();
     virtual bool Enable();
     virtual void Disable();

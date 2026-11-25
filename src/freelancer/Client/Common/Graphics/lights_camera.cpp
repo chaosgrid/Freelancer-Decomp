@@ -46,7 +46,7 @@ bool FLightsCameraParticles::Create(FVisEffectArch* InVis)
     }
     if (bFailed)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: ParticleEffect could not create Alchemy effect (%s)\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: ParticleEffect could not create Alchemy effect (%s)\n",
               GLightsCameraFile, 0x215, Vis->Nickname);
         VisEffectArchRelease(Vis);
         Vis = nullptr;

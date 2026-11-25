@@ -102,7 +102,7 @@ void ButtonMover::Update()
         if (!OnMoveStep(Entry.Control, Position))
         {
             // Property 6 sets the control's position.
-            Entry.Control->SetProperty(6, reinterpret_cast<uintptr_t>(Position), 0);
+            Entry.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Position), 0);
         }
     }
 
@@ -131,7 +131,7 @@ void ButtonMover::Finish()
         Position[2] = Entry.End[2];
         if (!OnMoveStep(Entry.Control, Position))
         {
-            Entry.Control->SetProperty(6, reinterpret_cast<uintptr_t>(Position), 0);
+            Entry.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Position), 0);
         }
     }
 

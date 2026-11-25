@@ -84,9 +84,9 @@ namespace
         if (G_FpuPrecisionFound != G_FpuPrecisionWanted)
         {
             if (G_FpuPrecisionFound == 0x18)
-                _control87(0x20000, 0x30000);
+                _control87(_PC_24, _MCW_PC);
             else if (G_FpuPrecisionFound == 0x35)
-                _control87(0x10000, 0x30000);
+                _control87(_PC_53, _MCW_PC);
             else
                 _control87(0, 0);
         }
@@ -147,9 +147,9 @@ namespace
         if (G_FpuPrecisionFound != G_FpuPrecisionWanted)
         {
             if (G_FpuPrecisionWanted == 0x18)
-                _control87(0x20000, 0x30000);
+                _control87(_PC_24, _MCW_PC);
             else if (G_FpuPrecisionWanted == 0x35)
-                _control87(0x10000, 0x30000);
+                _control87(_PC_53, _MCW_PC);
             else
                 _control87(0, 0);
         }
@@ -254,7 +254,7 @@ void TickClientFrame(double DeltaSeconds)
     // State 6 is IntroFocus.
     if (bForceIntro)
     {
-        NextState = 6;
+        NextState = kClientStateMenu;
         SetClientQuitRequested(false);
     }
 

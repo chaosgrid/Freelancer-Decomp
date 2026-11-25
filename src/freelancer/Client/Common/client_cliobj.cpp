@@ -85,7 +85,8 @@ namespace Archetype
             float Ranges[8];
             float Terminator;
             unsigned ObjCrc;
-            unsigned char Unk28;
+            unsigned char Unk28;    // 0 at creation (FUN_00402310 / FUN_004023f0); 1 on the head and
+                                    // the matched node once applied (.text:00401fbe); no reader found
             unsigned char Pad29[3];
             int MinSpecLod;
             FLodNode* Next;
@@ -915,7 +916,7 @@ namespace Archetype
                 {
                     // Retail quirk: the error and NOTHING else -- the empty entry stays in the
                     // cache and is still returned below.
-                    FDUMP(0x100001,
+                    FDUMP(kFdumpError,
                           "%s(%d) : *** ERROR: DATA: MaterialLib::Load(%s) couldn't load file.",
                           "E:\\FL\\Scratch\\Source\\Client\\cmn\\MaterialLib.cpp", 0x10a, Path);
                 }
@@ -1021,7 +1022,7 @@ namespace Archetype
         if (Paths->Begin != nullptr && static_cast<unsigned>(Paths->End - Paths->Begin) >
                                            static_cast<unsigned>(Max))
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s\n",
                   "E:\\FL\\Scratch\\Source\\Client\\cmn\\MaterialLib.cpp", 0x14a,
                   "too many material files passed to the material loader");
         }
@@ -1225,7 +1226,7 @@ namespace Archetype
                 if (GArchLodWarned == 0)
                 {
                     GArchLodWarned = 1;
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                           "E:\\FL\\Scratch\\Source\\Client\\cmn\\ArchLod.cpp", 0x6a, Message);
                 }
             }
@@ -1272,7 +1273,7 @@ namespace Archetype
                 {
                     if (static_cast<double>(Raw[Index + 1]) < 0.0)
                     {
-                        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+                        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                               "E:\\FL\\Scratch\\Source\\Client\\cmn\\ArchLod.cpp", 0xa0,
                               "top lod specified more than the number of lods in the file???");
                         break;
@@ -4085,33 +4086,33 @@ namespace Archetype
             char const* const File = "E:\\FL\\Scratch\\Source\\Client\\cmn\\CliArch.cpp";
             if (!(Src->SpinMax == SpinMax))
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %f: 'spin_max' changed to %f.", File,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %f: 'spin_max' changed to %f.", File,
                       0x747, static_cast<double>(SpinMax), static_cast<double>(Src->SpinMax));
                 SpinMax = Src->SpinMax;
             }
             if (!(Src->SpinAccel == SpinAccel))
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %f: 'spin_accel' changed to %f.", File,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %f: 'spin_accel' changed to %f.", File,
                       0x748, static_cast<double>(SpinAccel), static_cast<double>(Src->SpinAccel));
                 SpinAccel = Src->SpinAccel;
             }
             if (!(Src->SecsBeforeEnter == SecsBeforeEnter))
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %f: 'secs_before_enter' changed to %f.",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %f: 'secs_before_enter' changed to %f.",
                       File, 0x74a, static_cast<double>(SecsBeforeEnter),
                       static_cast<double>(Src->SecsBeforeEnter));
                 SecsBeforeEnter = Src->SecsBeforeEnter;
             }
             if (!(Src->SecsBeforeSplash == SecsBeforeSplash))
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %f: 'secs_before_splash' changed to %f.",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %f: 'secs_before_splash' changed to %f.",
                       File, 0x74b, static_cast<double>(SecsBeforeSplash),
                       static_cast<double>(Src->SecsBeforeSplash));
                 SecsBeforeSplash = Src->SecsBeforeSplash;
             }
             if (!(Src->SecsBeforeExit == SecsBeforeExit))
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %f: 'secs_before_exit' changed to %f.",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %f: 'secs_before_exit' changed to %f.",
                       File, 0x74c, static_cast<double>(SecsBeforeExit),
                       static_cast<double>(Src->SecsBeforeExit));
                 SecsBeforeExit = Src->SecsBeforeExit;

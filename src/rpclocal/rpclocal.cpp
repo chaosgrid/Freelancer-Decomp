@@ -21,6 +21,7 @@
 #include "common_server.h"
 #include "rpc_transport.h"      // FPacketBase, the registry and the queues
 #include "rpc_payloads.h"       // GRealServer / GRealChatServer, read by RpcDispatchToServer
+#include "rpc_packet_classes.h" // the channel-1 classes the IServer-direction marshallers fill
 #include "rpc_iclient.h"        // the real 126-slot IClient / IChatClient
 #include "rpc_iserver.h"        // IServerImpl, Server, Get*Interface -- the exported ABI
 #include "common_misc.h"       // GiveServerRunPermission / WaitForClientRunPermission
@@ -84,8 +85,8 @@ static unsigned int RpcFloatBits(float Value) {
 //   +0x20 double, FLD/FSTP to float  -> payload+0x24
 //   +0x28 dword                      -> payload+0x28
 // ---------------------------------------------------------------------------
-static bool MarshalServerObjUpdate(FPacketBase* Packet, const unsigned int* Args,
-                                   unsigned int ArgCount) {
+static bool MarshalServerObjUpdate(FPacket_FLPACKET_COMMON_UPDATEOBJECT& Packet,
+                                   const unsigned int* Args, unsigned int ArgCount) {
     // The argument is dereferenced untested.
     const SSPObjUpdateInfo* Info = reinterpret_cast<const SSPObjUpdateInfo*>(Args[1]);
     FPayloadCommonUpdateObject Wire;
@@ -98,11 +99,12 @@ static bool MarshalServerObjUpdate(FPacketBase* Packet, const unsigned int* Args
     Wire.Orientation = Info->Orientation;
     Wire.Timestamp = (float)Info->Timestamp;
     Wire.Throttle = 0.0f;
-    RpcPayloadWrite(Packet, 0, Wire);
+    RpcPayloadWrite(Packet.Wire, Wire);
     // payload+0x28 is a plain dword copy in retail; the wire field is typed float only
     // because the other direction's receiver reads it with FLD.
     const unsigned int ThrottleBits = Info->ThrottleBits;
-    return RpcPayloadWrite(Packet, 0x28, ThrottleBits);
+    std::memcpy(&Packet.Wire.Throttle, &ThrottleBits, sizeof(ThrottleBits));
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +121,7 @@ static bool MarshalServerObjUpdate(FPacketBase* Packet, const unsigned int* Args
 // receiver rebuilds them from the session id and -1.
 // Args: { sender, length, body, target, system }.
 // ---------------------------------------------------------------------------
-static bool MarshalServerChatMsg(FPacketBase* Packet, const unsigned int* Args,
+static bool MarshalServerChatMsg(FPacket_FLPACKET_COMMON_CHATMSG& Packet, const unsigned int* Args,
                                  unsigned int ArgCount) {
     FPayloadCommonChatMsg Wire;
     Wire.TargetId = Args[3];
@@ -130,7 +132,7 @@ static bool MarshalServerChatMsg(FPacketBase* Packet, const unsigned int* Args,
         Wire.Size = Args[1];
         Wire.Buffer = RpcCopyBlock(reinterpret_cast<const void*>(Args[2]), Args[1]);
     }
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,13 +158,13 @@ static bool MarshalServerBufferCopy(FPacketBase* Packet, const unsigned int* Arg
 
 // IServerImpl::StopTradelane 06d8e770 writes ship, entrance and exit; IClient's mirror
 // 06d8bd10 only writes the ship id.
-static bool MarshalServerStopTradelane(FPacketBase* Packet, const unsigned int* Args,
-                                      unsigned int ArgCount) {
+static bool MarshalServerStopTradelane(FPacket_FLPACKET_COMMON_STOPTRADELANE& Packet,
+                                       const unsigned int* Args, unsigned int ArgCount) {
     FPayloadCommonStopTradelane Wire;
     Wire.ShipId = Args[1];
     Wire.TradelaneRing1 = Args[2];
     Wire.TradelaneRing2 = Args[3];
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,10 +174,10 @@ static bool MarshalServerStopTradelane(FPacketBase* Packet, const unsigned int* 
 // (?PopUpDialog@IServerImpl@@UAEXII@Z); the FmtStr blocks belong to the other direction,
 // so payload+0x00..+0x0f stay zero.
 // ---------------------------------------------------------------------------
-static bool MarshalServerPopUpDialog(FPacketBase* Packet, const unsigned int* Args,
-                                     unsigned int ArgCount) {
-    const unsigned int Value = Args[1];
-    return RpcPayloadWrite(Packet, 0x10, Value);
+static bool MarshalServerPopUpDialog(FPacket_FLPACKET_COMMON_POP_UP_DIALOG& Packet,
+                                     const unsigned int* Args, unsigned int ArgCount) {
+    Packet.Wire.Buttons = Args[1];
+    return true;
 }
 
 // ============================================================================
@@ -280,7 +282,7 @@ void IServerImpl::GoTradelane(unsigned int player_id, const XGoTradelane& info) 
 void IServerImpl::StopTradelane(unsigned int session_id, unsigned int ship_id, unsigned int entrance_ring_id, unsigned int exit_ring_id) {
     // retail 0x06d8e770: ch1 op 0x10. Serializes the three arguments after the session id.
     const unsigned int Args[4] = { session_id, ship_id, entrance_ring_id, exit_ring_id };
-    RpcSendToServer(this, 1u, 0x10u, Args, 4u, MarshalServerStopTradelane);
+    RpcSendToServer(this, 1u, 0x10u, Args, 4u, RpcMarshalAs<MarshalServerStopTradelane>);
 }
 void IServerImpl::JettisonCargo(unsigned int player_id, const XJettisonCargo& info) {
     // retail 0x06d8ea90: ch1 op 0x14 FLPACKET_COMMON_JETTISONCARGO
@@ -310,7 +312,7 @@ bool IServerImpl::Startup(const SStartupInfo& info) {
         g_pChatServerInterface = GetChat();
     } else {
         // DACOM FDUMP (.rdata:06db311c), format .rdata:06db3bb4, file .rdata:06db3bf0.
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Connect - failed to LoadLibrary(%s)\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Connect - failed to LoadLibrary(%s)\n",
               "E:\\FL\\Scratch\\Source\\RPCLocal\\RPCServer.cpp", 0x3e, "server.dll");
     }
 
@@ -652,7 +654,7 @@ void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& info, unsigned int session
     // retail 0x06d8dc30: ch1 op 0x01 FLPACKET_COMMON_UPDATEOBJECT. The argument struct
     // is NOT the one the IClient sender reads, so this type marshals its own way.
     const unsigned int Args[2] = { session_id, reinterpret_cast<unsigned int>(&info) };
-    RpcSendToServer(this, 1u, 0x01u, Args, 2u, MarshalServerObjUpdate);
+    RpcSendToServer(this, 1u, 0x01u, Args, 2u, RpcMarshalAs<MarshalServerObjUpdate>);
 }
 void IServerImpl::SPMunitionCollision(const SSPMunitionCollisionInfo& info, unsigned int session_id) {
     // retail 0x06d8d6e0: ch3 op 0x03
@@ -806,7 +808,7 @@ void IServerImpl::RequestPlayerStats(unsigned int session_id, unsigned char* dat
 void IServerImpl::PopUpDialog(unsigned int session_id, unsigned int button) {
     // retail 0x06d8e180: ch1 op 0x1b -- one dword at payload+0x10 and nothing else
     const unsigned int Args[2] = { session_id, button };
-    RpcSendToServer(this, 1u, 0x1bu, Args, 2u, MarshalServerPopUpDialog);
+    RpcSendToServer(this, 1u, 0x1bu, Args, 2u, RpcMarshalAs<MarshalServerPopUpDialog>);
 }
 void IServerImpl::RequestGroupPositions(unsigned int session_id, unsigned char* data, int size) {
     // retail 0x06d8e1c0: ch1 op 0x17, operator_new + REP MOVS
@@ -928,7 +930,7 @@ void IServerImpl::SubmitChat(CHAT_ID sender_id, unsigned long size, const void* 
         sender_id.Id, (unsigned int)size, reinterpret_cast<unsigned int>(msg_data),
         target_id.Id, (unsigned int)system_id
     };
-    RpcSendToServer(this, 1u, 0x05u, Args, 5u, MarshalServerChatMsg);
+    RpcSendToServer(this, 1u, 0x05u, Args, 5u, RpcMarshalAs<MarshalServerChatMsg>);
 }
 
 // === Internal packet handling ===

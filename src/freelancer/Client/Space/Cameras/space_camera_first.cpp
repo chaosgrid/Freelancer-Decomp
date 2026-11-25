@@ -477,7 +477,8 @@ void FirstPersonCameraSceneDraw(FFirstPersonCamera* Cam, unsigned LayerFlags, un
         // lights cleared, then the jump effect's ambient when both are set.
         FClientShipGameobj* const Ship =
             static_cast<FClientShipGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
-        if (Ship != nullptr && (Ship->JumpState == 2 || Ship->JumpState == 3))
+        if (Ship != nullptr && (Ship->JumpState == kJumpStateJumpOutTunnel ||
+                                Ship->JumpState == kJumpStateJumpInTunnel))
         {
             EngineLightClearRegisteredList();
             FJumpShipEffect* const JumpFx = static_cast<FJumpShipEffect*>(Ship->JumpEffect);
@@ -529,7 +530,7 @@ void FirstPersonCameraLoad(FFirstPersonCamera* Cam, const char* CockpitIniPath)
     if (!Reader.open(CockpitIniPath, false))
     {
         // Client\space\Cockpit.cpp:0xe4 -- a warning only; the rest of the loader still runs.
-        FDUMP(0x100002, "%s(%d) : *** WARNING: cockpit file not found '%s'\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: cockpit file not found '%s'\n",
               kCockpitCpp, 0xe4, CockpitIniPath);
     }
 
@@ -580,7 +581,7 @@ void FirstPersonCameraLoad(FFirstPersonCamera* Cam, const char* CockpitIniPath)
         if (Reader.is_header("Camera"))
         {
             // Client\space\Cockpit.cpp:0xf9
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: header [Camera] is no longer supported, found in file (%s)\n",
                   kCockpitCpp, 0xf9, CockpitIniPath);
         }
@@ -626,7 +627,7 @@ void FirstPersonCameraLoad(FFirstPersonCamera* Cam, const char* CockpitIniPath)
     if (fabs(Aspect - kExpectedAspect) >= kAspectTolerance)
     {
         // Client\space\Cockpit.cpp:0x113
-        FDUMP(0x100002, "%s(%d) : *** WARNING: cockpit aspect (%f) is not PC-compatible?\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: cockpit aspect (%f) is not PC-compatible?\n",
               kCockpitCpp, 0x113, Aspect);
     }
 }

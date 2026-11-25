@@ -391,13 +391,13 @@ intptr_t WireStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x0c:
         WireState = static_cast<unsigned char>((WireState & ~kWireLit) | ((A != 0) ? kWireLit : 0));
         return 0;
-    case 0x2c:
+    case kWinNotifyHighlight:
         WireState = static_cast<unsigned char>(WireState | kWireFocused);
         return 0;
-    case 0x2d:
+    case kWinNotifyUnhighlight:
         WireState = static_cast<unsigned char>(WireState & ~kWireFocused);
         return 0;
-    case 0x33:
+    case kWinPropColour:
         memcpy(Colour, reinterpret_cast<void const*>(A), sizeof(Colour));
         bUseColour = (B == 1) ? 1 : 0;
         return 0;
@@ -406,7 +406,7 @@ intptr_t WireStaticControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (A != 0)
             WireState = static_cast<unsigned char>(WireState | kWireDrawInactive);
         return 0;
-    case 0x51:
+    case kWinPropBlink:
         bBlink = 0;
         if (A != 0)
             bBlink = 1;
@@ -499,18 +499,18 @@ void WireButtonControl::Update()
         if ((WireState & kWirePressed) != 0)
             return;
         WireState = static_cast<unsigned char>(WireState | kWirePressed);
-        TellParent(this, 0x2b);
+        TellParent(this, kWinNotifyCapturedEnter);
         if (Parent == nullptr)
             return;
         NnUiPulseReset(); // FUN_0059d580
-        TellParent(this, 0x2c);
+        TellParent(this, kWinNotifyHighlight);
         return;
     }
     if ((WireState & kWirePressed) == 0)
         return;
     WireState = static_cast<unsigned char>(WireState & ~kWirePressed);
-    TellParent(this, 0x2a);
-    TellParent(this, 0x2d);
+    TellParent(this, kWinNotifyCapturedLeave);
+    TellParent(this, kWinNotifyUnhighlight);
 }
 
 void WireButtonControl::MouseEnter(float const* /*Ray*/)
@@ -519,7 +519,7 @@ void WireButtonControl::MouseEnter(float const* /*Ray*/)
     if (Parent != nullptr)
     {
         NnUiPulseReset(); // FUN_0059d580
-        TellParent(this, 0x2c);
+        TellParent(this, kWinNotifyHighlight);
     }
     WireState = static_cast<unsigned char>(WireState | kWireHovered);
     if ((ButtonState & kWireButtonEnabled) != 0)
@@ -531,7 +531,7 @@ void WireButtonControl::MouseLeave(float const* /*Ray*/)
     // FUN_005a4330.
     if (ToolTipIds != 0)
         NnToolTipHideGlobal(); // FUN_004be390
-    TellParent(this, 0x2d);
+    TellParent(this, kWinNotifyUnhighlight);
     WireState = static_cast<unsigned char>(WireState & ~kWireHovered);
 }
 
@@ -582,7 +582,7 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         if (!HitTest(Ray)) // slot 4
         {
             // Released off the button.
-            TellParent(this, 0x29);
+            TellParent(this, kWinNotifyRelease);
             WireState = static_cast<unsigned char>(WireState & ~kWireHovered);
             return true;
         }
@@ -608,10 +608,10 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
             WinControl* const ParentControl = Parent->AsWinControl();
             if (ParentControl == nullptr)
                 return true;
-            if (ParentControl->SetProperty(0x27, reinterpret_cast<uintptr_t>(AsWinControl()),
+            if (ParentControl->SetProperty(kWinNotifyDoubleClick, reinterpret_cast<uintptr_t>(AsWinControl()),
                                            0) != 0)
                 return true;
-            ParentControl->SetProperty(0x26, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
+            ParentControl->SetProperty(kWinNotifyClick, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
             return true;
         }
         Activate(); // slot 45
@@ -627,13 +627,13 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         ButtonState = static_cast<unsigned char>(ButtonState | kWireButtonDoubleClick);
     else
         ButtonState = static_cast<unsigned char>(ButtonState & ~kWireButtonDoubleClick);
-    TellParent(this, 0x28);
+    TellParent(this, kWinNotifyPress);
     WireState = static_cast<unsigned char>(WireState | kWirePressed);
     ButtonState = static_cast<unsigned char>(ButtonState | kWireButtonCaptured);
     if (Parent != nullptr)
     {
         NnUiPulseReset(); // FUN_0059d580
-        TellParent(this, 0x2c);
+        TellParent(this, kWinNotifyHighlight);
     }
     Win3DPushCapture(this); // FUN_0059d8d0
     return true;
@@ -664,7 +664,7 @@ void WireButtonControl::Activate()
         HudPostCommand(static_cast<unsigned>(CommandId), 0); // FUN_005763b0
         return;
     }
-    TellParent(this, 0x26);
+    TellParent(this, kWinNotifyClick);
 }
 
 void WireButtonControl::Init(char const* NewSoundName, float const* NewOffset,

@@ -636,7 +636,7 @@ CArchGroupManager::~CArchGroupManager()
     Clear();
     if (OldCount != 0)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
               kCArchGroupSource, 0x12, "CArchGroupList: Destructing with ArchGroups still present");
     }
     delete Groups;
@@ -686,7 +686,7 @@ bool CArchGroupManager::AddNewArchGroup(CArchGroup* Group)
     unsigned short const GroupId = Group->GetID();
     if (Groups->find(GroupId) != Groups->end())
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: CArchGroupList: Insertion failed: Group SUBOBJ_ID[%d] already on list",
               kCArchGroupSource, 0xce, (unsigned)GroupId);
         return false;
@@ -731,7 +731,7 @@ bool CArchGroupManager::DeleteArchGroup(unsigned short GroupId)
     std::map<unsigned short, CArchGroup*>::iterator It = Groups->find(GroupId);
     if (It == Groups->end())
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: CArchGroupList: Removal failed: Group SUBOBJ_ID[%d] not on list",
               kCArchGroupSource, 0xe7, (unsigned)GroupId);
         return false;
@@ -821,12 +821,12 @@ void CArchGroupManager::DestroyLowerGroups(CArchGroup const& DeadGroup)
             {
                 char const* const EntryName = Entry->Name().Value;
                 char const* const DeadName = DeadGroup.Name().Value;
-                FDUMP(0x100002,
+                FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: DestroyLowerGroups(%s): Deleting UnDead lower group[%s].",
                       kCArchGroupSource, 0x146, DeadName, EntryName);
                 unsigned const EntryId = Entry->GetID();
                 long const EntryRoot = Entry->GetRootIndex();
-                FDUMP(0x100002, "%s(%d) : *** WARNING: Dead DUMP: Inst:%d\t ID:%d",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Dead DUMP: Inst:%d\t ID:%d",
                       kCArchGroupSource, 0x148, EntryRoot, EntryId);
 
                 // Retail decrements the iterator (_Dec), deletes and erases, then the loop's

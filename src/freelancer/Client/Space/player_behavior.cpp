@@ -80,7 +80,7 @@ namespace
         if (EqObj == nullptr)
             return nullptr;
 
-        if ((static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) != 0x503u)
+        if ((static_cast<unsigned>(EqObj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
             return nullptr;
 
         return EqObj;
@@ -93,7 +93,7 @@ namespace
         if (Ship == nullptr)
             return nullptr;
 
-        CEquip* const Eq = const_cast<CEquip*>(Ship->EquipManager.FindFirst(0x20000));
+        CEquip* const Eq = const_cast<CEquip*>(Ship->EquipManager.FindFirst(EquipTypeEngine));
         return CEEngine::cast(Eq);
     }
 }

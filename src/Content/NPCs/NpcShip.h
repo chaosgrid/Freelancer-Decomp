@@ -55,7 +55,8 @@ struct FContentNpcShipParams : public FContentShipParams
     ID_String Pilot;                                     // +0x100 cleared
     float Longevity = -1.0f;                             // +0x104 DAT_06fb956c -> ship +0x1bc
     float InitialLifeTime = 24.0f;                       // +0x108 -> ship +0x1c8
-    float Field_0x10c = 500.0f;                          // +0x10c -> ship +0x1c0
+    float Field_0x10c = 500.0f;                          // +0x10c 500 (ctor FUN_06f33500), copied;
+                                                         // the ship ctor reads it into +0x1c0
     int DockIndex = -1;                                // +0x110 TODO: no reader in TU43
     // +0x114: an object id; when set, the guide starts only if the object's type has a bit
     // of 0xc40.
@@ -84,7 +85,8 @@ bool __cdecl ApplyNpcShipArchById(FContentNpcShipParams* Params, unsigned int co
                                   ID_String* Pilot, ID_String const* Job);
 // FUN_06f34a80 (cdecl): costume and voice of FactionId's faction properties (TU48).
 // Gender goes to the costume pick as is and to the voice pick as (Gender != 1) + 1.
-// TODO: confirm the meaning of Gender (TU48 FUN_06f4f430 / FUN_06f4f620).
+// Gender is a costume skeleton gender: FUN_06f4f430 matches it against
+// pub::GF::GetCostumeSkeletonGender, and 1 is male (FUN_06f51520 takes the male first names).
 bool __cdecl ApplyNpcShipFaction(unsigned int FactionId, int Gender, FContentNpcShipParams* Params);
 
 // Retail vtables: primary 06fb95a0 {sdd 06f33d00, 06ea1460, 06f33cf0, 06f57c30, 06f57c40,
@@ -181,7 +183,8 @@ public:
     // +0x1bc params +0x104: the life LifeTime is refilled to while a player is near or the
     // ship flies in a formation; -1 = never expires (FSystemInfo::UpdateNpcShipLives).
     float Longevity;
-    float Field_0x1c0;                             // +0x1c0 params +0x10c. TODO: no reader
+    // +0x1c0: params +0x10c (ctor FUN_06f336a0); no reader in the Ghidra C export.
+    float Field_0x1c0;
     unsigned int Loadout;                          // +0x1c4 params +0x7c
     // +0x1c8 params +0x108: the remaining life; run down by UpdateNpcShipLives at
     // GetNpcShipLifeRate, the ship is destroyed when it drops below 0.

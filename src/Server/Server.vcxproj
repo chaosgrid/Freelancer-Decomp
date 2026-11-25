@@ -60,9 +60,11 @@
     <ClInclude Include="..\include\server_savegame.h" />
     <ClInclude Include="..\include\server_savefile.h" />
     <ClInclude Include="..\include\server_fuse.h" />
+    <ClInclude Include="server_internal.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="IServerImpl.cpp" />
+    <ClCompile Include="server_iservers.cpp" />
     <ClCompile Include="server_pub.cpp" />
     <ClCompile Include="server_classes.cpp" />
     <ClCompile Include="server_chat.cpp" />
@@ -77,6 +79,19 @@
     <ClCompile Include="server_guided.cpp" />
     <ClCompile Include="server_countermeasure.cpp" />
     <ClCompile Include="server_basedb.cpp" />
+    <ClCompile Include="server_playerdb.cpp" />
+    <ClCompile Include="server_serverspace.cpp" />
+    <ClCompile Include="server_srvasteroid.cpp" />
+    <ClCompile Include="server_starsys.cpp" />
+    <ClCompile Include="server_eqobj.cpp" />
+    <ClCompile Include="server_gameobj.cpp" />
+    <ClCompile Include="server_ship.cpp" />
+    <ClCompile Include="server_solar.cpp" />
+    <ClCompile Include="server_pubmisc.cpp" />
+    <ClCompile Include="server_dlls.cpp" />
+    <ClCompile Include="server_srvmisc.cpp" />
+    <ClCompile Include="server_pubspace.cpp" />
+    <ClCompile Include="server_pubgf.cpp" />
   </ItemGroup>
   <ItemGroup>
     <!-- Retail Server.dll imports DACOM.DLL::FDUMP at 97 call sites

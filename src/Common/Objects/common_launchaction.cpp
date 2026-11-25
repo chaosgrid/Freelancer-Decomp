@@ -52,7 +52,7 @@ namespace
     // through the possibly-null result with no test.
     CEqObj* EqObjOrNull(CObject* Obj)
     {
-        return (Obj != nullptr && (Obj->ObjectClass & 0x103) == 0x103) ? (CEqObj*)Obj : nullptr;
+        return (Obj != nullptr && (Obj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj) ? (CEqObj*)Obj : nullptr;
     }
 }
 
@@ -80,7 +80,7 @@ LaunchAction::LaunchAction(IObjRW* DockObj, CEqObj* InBaseObj, int InDockPortInd
     LaunchDir.z = 0.0f;
 
     LaunchFlags = BaseObj->TypeBits;
-    if ((LaunchFlags & 0x20) != 0)
+    if ((LaunchFlags & OBJ_DOCKING_RING) != 0)
     {
         DockPortIndex = 1;
     }
@@ -140,15 +140,15 @@ void LaunchAction::Start()
 
     CObject* Docked = (CObject*)Dock->cobject();   // slot 84 (+0x150)
 
-    if ((LaunchFlags & 0x20) == 0)
+    if ((LaunchFlags & OBJ_DOCKING_RING) == 0)
     {
         // An AI directive launch: the ship flies itself out.
-        if ((LaunchFlags & 0x200100) != 0)
+        if ((LaunchFlags & (OBJ_STATION | OBJ_CAPITAL)) != 0)
         {
             pub::AI::DirectiveLaunchOp Op;
             Op.LaunchObjectId = BaseObj->Id; // CSimple::Id, +0xb0
             Op.DockPortIndex = DockPortIndex;
-            Op.TerminalType = 1;
+            Op.TerminalType = TERM_BERTH;
 
             IBehaviorManager* BM = GetBehaviorManager(Dock);
             if (BM != nullptr)
@@ -216,7 +216,7 @@ bool LaunchAction::update(float /*Dt*/)
         return !bUpdateComplete;
     }
 
-    if ((LaunchFlags & 0x20) == 0)
+    if ((LaunchFlags & OBJ_DOCKING_RING) == 0)
     {
         // AI-directive launch: done once OnDirectiveComplete fires.
         return !bUpdateComplete;
@@ -333,7 +333,7 @@ void LaunchAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
 {
     (void)CoreList;
     float const Dt = EventSim->delta_time;
-    if (LaunchFlags == 0x20)
+    if (LaunchFlags == OBJ_DOCKING_RING)
     {
         CoastElapsed += Dt;
     }
@@ -401,7 +401,7 @@ JumpInAction::JumpInAction(IObjRW* JumpObj, Vector const& Pos, Matrix const& Ori
     // No null test on the watched object (a null JumpObj faults, as in retail).
     IObjRW* const Watched = ObjRwFromWatchable(WatchedTarget(JumpObjWatcher));
     CObject* Target = (CObject*)Watched->cobject();                     // slot 84 (+0x150)
-    if (Target == nullptr || (Target->ObjectClass & 0x503) != 0x503)
+    if (Target == nullptr || (Target->ObjectClass & CObject::ClassShip) != CObject::ClassShip)
     {
         Target = nullptr;
     }
@@ -477,7 +477,7 @@ void JumpInAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
     }
 
     CObject* Target = (CObject*)Watched->cobject();   // slot 84 (+0x150)
-    CShip* TargetShip = (Target != nullptr && (Target->ObjectClass & 0x503) == 0x503)
+    CShip* TargetShip = (Target != nullptr && (Target->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
         ? (CShip*)Target : nullptr;
 
     // FST: the float is stored, the unrounded sum feeds the compare and the ease.

@@ -121,10 +121,10 @@ EvaluateResult FormationBehavior::evaluate(unsigned int Context)
     unsigned int TypeBits = 0;
     if (Target->get_type(TypeBits) != 0)
         return EvalSkip;
-    if ((TypeBits & 0x7f0000u) == 0 || (TypeBits & 0x200000u) != 0)
+    if ((TypeBits & OBJ_SHIP_MASK) == 0 || (TypeBits & OBJ_CAPITAL) != 0)
         return EvalSkip;
     int const BehaviorId = Target->get_behavior_id();
-    if (BehaviorId == 0x11 || BehaviorId == 8)
+    if (BehaviorId == BEHAVIOR_FOLLOW || BehaviorId == BEHAVIOR_LAUNCH)
         return EvalSkip;
 
     // The leader chain must not come back to the owner. The out-param is zeroed once,

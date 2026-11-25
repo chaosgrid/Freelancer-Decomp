@@ -62,6 +62,16 @@ typedef HRESULT (WINAPI* PFNDPNMESSAGEHANDLER)(PVOID pvUserContext, DWORD dwMess
 #define DPNSUCCESS_PENDING ((HRESULT)0x0015800EL)
 #endif
 
+// The two connect failures freelancer.exe tells apart (connect_handshake.cpp): the SDK's
+// MAKE_DPNHRESULT(0x410) / (0x610). Freelancer reports them with resources.dll 0x73f ("the
+// password you entered is not correct") and 0x73e ("that server is currently full").
+#ifndef DPNERR_INVALIDPASSWORD
+#define DPNERR_INVALIDPASSWORD ((HRESULT)0x80158410L)
+#endif
+#ifndef DPNERR_SESSIONFULL
+#define DPNERR_SESSIONFULL ((HRESULT)0x80158610L)
+#endif
+
 #ifndef DPNA_DATATYPE_STRING
 #define DPNA_DATATYPE_STRING 0x00000001UL
 #define DPNA_DATATYPE_DWORD  0x00000002UL

@@ -1141,14 +1141,14 @@ int IObjInspectImpl::get_dock_hardpoints(int Index, TERMINAL_TYPE* Type, Transfo
     char const* const MountName = Sphere.HardpointName.c_str();
     if (get_hardpoint(MountName, &XformA->Translation, &XformA->Rotation) != 0)
     {
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\Common\\IObjImpl.cpp", 0x4f4,
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\Common\\IObjImpl.cpp", 0x4f4,
               "station hardpoint in file must be misnamed");
         return -5;
     }
 
     if (std::strstr(MountName, "hpdockmount") == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\Common\\IObjImpl.cpp", 0x4fc,
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\Common\\IObjImpl.cpp", 0x4fc,
               "station hardpoint in file must be misnamed");
         return -5;
     }

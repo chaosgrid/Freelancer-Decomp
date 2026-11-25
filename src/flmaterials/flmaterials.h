@@ -18,9 +18,6 @@
 // Registration uses this opaque token; callers remove const explicitly.
 static const void* kRegisterPriority = (void*)0x80000000;
 
-static const int kFdumpError = 0x100001;
-static const int kFdumpNotice = 0x100003; // "%s(%d) : NOTICE:General:%s" (Slot24's own use)
-static const int kFdumpTrace1 = 0x100004;
 
 
 static const char* const G_NameGlassMaterial = "GlassMaterial";
@@ -44,7 +41,6 @@ static const char* const G_NameVisibleCounterMaterial = "VisibleCounterMaterial"
 static const char* const G_NamePlanetWaterMaterial = "PlanetWaterMaterial";
 static const char* const G_NameFlAppearance = "FLAppearance";
 
-bool FlmIidEqual(const char* Left, const char* Right);
 bool FlmNameEqual(const char* Left, const char* Right);
 void FlmFdump(int Flags, const char* File, int Line, const char* Kind, const char* Message);
 

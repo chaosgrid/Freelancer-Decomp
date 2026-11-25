@@ -7,6 +7,7 @@
 #include "common_newchar.h"
 
 #include "common_ini.h"
+#include "fdump_severity.h"
 
 #include <map>
 
@@ -66,7 +67,7 @@ void __cdecl RtcSlider::load(char const* Path)
     INI_Reader Reader;
     if (!Reader.open(Path, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot open rtc performance slider ini file %s\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot open rtc performance slider ini file %s\n",
               kRtcSliderSource, 0xba, Path);
         return;
     }
@@ -75,7 +76,7 @@ void __cdecl RtcSlider::load(char const* Path)
     {
         if (!Reader.is_header("RtcSlider"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: Invalid header %s in rtc performance slider ini file %s\n",
                   kRtcSliderSource, 0xb4, Reader.get_header_ptr(), Path);
             continue;
@@ -87,7 +88,7 @@ void __cdecl RtcSlider::load(char const* Path)
             {
                 if (Reader.is_value_empty(0) || Reader.is_value_empty(1))
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: Invalid syntax %s in rtc performance slider ini file %s\n",
                           kRtcSliderSource, 0x8d, Reader.get_line_ptr(), Path);
                     continue;
@@ -99,7 +100,7 @@ void __cdecl RtcSlider::load(char const* Path)
             {
                 if (Reader.is_value_empty(0) || Reader.is_value_empty(1))
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: Invalid syntax %s in rtc performance slider ini file %s\n",
                           kRtcSliderSource, 0xa7, Reader.get_line_ptr(), Path);
                     continue;
@@ -110,7 +111,7 @@ void __cdecl RtcSlider::load(char const* Path)
             else
             {
                 // The whole value string.
-                FDUMP(0x100002,
+                FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: Invalid value %s in rtc performance slider ini file %s\n",
                       kRtcSliderSource, 0xad, Reader.get_value_string(), Path);
             }
@@ -124,7 +125,7 @@ bool __cdecl RtcSlider::is_enabled(char const* Name)
     FRtcSliderSetting const* Setting = FindSliderSetting(CreateID(Name));
     if (Setting == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Cannot find performance slider setting for name %s\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Cannot find performance slider setting for name %s\n",
               kRtcSliderSource, 0xe1, Name);
         return true;
     }
@@ -139,7 +140,7 @@ bool __cdecl RtcSlider::is_enabled(unsigned long NameCrc)
     FRtcSliderSetting const* Setting = FindSliderSetting(NameCrc);
     if (Setting == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Cannot find performance slider setting for name_crc %u\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Cannot find performance slider setting for name_crc %u\n",
               kRtcSliderSource, 0xd4, NameCrc);
         return true;
     }
@@ -163,7 +164,7 @@ float __cdecl RtcSlider::get_fps_cap()
     FRtcSliderSetting const* Fps20 = FindSliderSetting(CreateID("fps_20_cap"));
     if (Fps20 == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Cannot find performance slider setting for name %s\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Cannot find performance slider setting for name %s\n",
               kRtcSliderSource, 0xe1, "fps_20_cap");
         return kFpsCap20;
     }
@@ -173,7 +174,7 @@ float __cdecl RtcSlider::get_fps_cap()
     FRtcSliderSetting const* Fps30 = FindSliderSetting(CreateID("fps_30_cap"));
     if (Fps30 == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Cannot find performance slider setting for name %s\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Cannot find performance slider setting for name %s\n",
               kRtcSliderSource, 0xe1, "fps_30_cap");
         return kFpsCap30;
     }

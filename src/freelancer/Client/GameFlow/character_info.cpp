@@ -89,7 +89,7 @@ void* FCharacterInfoDb::AcquireScript(unsigned Id)
         }
         else
         {
-            FDUMP(0x100002, kFailedToOpen, kCharacterInfoCpp, 0x92, Path);
+            FDUMP(kFdumpWarning, kFailedToOpen, kCharacterInfoCpp, 0x92, Path);
         }
     }
     // Counted on both paths.
@@ -186,7 +186,7 @@ void FCharacterInfoDb::Load(CostumeDescriptions const* Descs)
         }
         else
         {
-            FDUMP(0x100002, kFailedToOpen, kCharacterInfoCpp, 0x149, FileName);
+            FDUMP(kFdumpWarning, kFailedToOpen, kCharacterInfoCpp, 0x149, FileName);
         }
     }
 }
@@ -261,7 +261,7 @@ void FCharacterInfoDb::FlushQueuedScripts()
         }
         else
         {
-            FDUMP(0x100002, kFailedToOpen, kCharacterInfoCpp, 0x1c2, Path);
+            FDUMP(kFdumpWarning, kFailedToOpen, kCharacterInfoCpp, 0x1c2, Path);
         }
     }
 }

@@ -150,7 +150,7 @@ struct FJumpShipEffect
     FJumpFxCompanion FxC;              // +0x48
     FJumpFxCompanion FxD;              // +0x58  also linked into the ship's +0x28 effect list
     FClientShipGameobj* Ship;          // +0x68
-    unsigned char Field_0x6c;          // +0x6c  ctor 0
+    unsigned char Field_0x6c;          // +0x6c  0 by FUN_005038c0 / FUN_00503440; no reader found
     unsigned char bTunnelEffectKilled;          // +0x6d  ctor 0; FUN_00503cd0 sets 1, FUN_00503ea0 0
     unsigned char Pad6e[2];
     float Clock;                  // +0x70  ctor 0; the effect's clock (FUN_00503e20)

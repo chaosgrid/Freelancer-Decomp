@@ -65,7 +65,7 @@ namespace
 
     void GroupNotice(int Line, char const* Message)
     {
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kNnChatCpp, Line, Message);
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kNnChatCpp, Line, Message);
     }
 
     // One text of FUN_00460550's table: an optional StyleNode clone pushed first, then the
@@ -300,14 +300,14 @@ bool NnGroupControl::Create(Win3D* NewParent, void* Data)
 bool NnGroupControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_00462a40
-    if (Msg == 0xef01)
+    if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
             SetPosition(Parent->Position);
         RefreshRequestDisplay();
         return true;
     }
-    if (Msg == 0xef02)
+    if (Msg == kWinMsgHide)
     {
         if (Parent != nullptr)
             Win3DReparent(this, nullptr);
@@ -358,7 +358,7 @@ void NnGroupControl::Update()
 intptr_t NnGroupControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_00462bd0
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return WinControl::SetProperty(Msg, A, B);
 
     WinControl* const Clicked = reinterpret_cast<WinControl*>(A);
@@ -388,10 +388,10 @@ intptr_t NnGroupControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             {
                 // The ship bucket's gameobj (null otherwise, used
                 // anyway), its object via IObjInspect slot 84 (+0x150), narrowed by 0x503.
-                FClientGameobj* const ShipGo = (Self->ManagerKind == 1) ? Self : nullptr;
+                FClientGameobj* const ShipGo = (Self->ManagerKind == EClientGameobjKind::Ship) ? Self : nullptr;
                 CObject* const Obj = const_cast<CObject*>(ShipGo->cobject());
                 CShip* const Ship =
-                    (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+                    (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                         ? static_cast<CShip*>(Obj)
                         : nullptr;
                 Ship->set_target(static_cast<IObjRW*>(Trader));
@@ -562,7 +562,7 @@ void NnGroupControl::AddTradeRequest(unsigned ShipId)
     {
         CObject* const Obj = Go->GetObject();
         unsigned Owner;
-        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x3u) == 0x3u)
+        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
             Owner = static_cast<CSimple*>(Obj)->OwnerPlayer;
         else
             Owner = GetPlayerConnectionId();
@@ -723,7 +723,7 @@ void NnGroupControl::HandleInviteMessage(void const* Buffer, unsigned SizeBytes)
                     static_cast<FClientGameobj*>(static_cast<IObjRW*>(PlayerRw));
                 CObject* const Obj = PlayerGo->GetObject();
                 if (Obj != nullptr &&
-                    (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+                    (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 {
                     IBehaviorManager* const Behavior =
                         static_cast<CEqObj*>(Obj)->get_behavior_interface();

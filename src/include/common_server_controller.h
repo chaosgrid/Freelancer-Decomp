@@ -142,7 +142,7 @@ SERVER_API int __cdecl SetTimer(const unsigned int& Flid, const Controller::Time
 
 } // namespace pub
 
-// Server.dll-internal: pub::Controller::_SendMessage's dispatch core (IServerImpl.cpp,
+// Server.dll-internal: pub::Controller::_SendMessage's dispatch core (server_dlls.cpp,
 // 0x06d44080). Retail FUN_06d43650 is only _SendMessage(&0u, MsgId, MsgData), so Server.dll
 // calls Server_ControllerDispatch(0, ...) for it.
 extern "C" int __cdecl Server_ControllerDispatch(unsigned int Flid, pub::Controller::EMessage MsgId,

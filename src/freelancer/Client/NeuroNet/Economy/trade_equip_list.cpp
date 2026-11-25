@@ -191,7 +191,7 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
         InfoCard->OwnerData = PointerField(this);
         WinControlHalfExtentsFromMesh(InfoCard->HalfExtents, &InfoCard->MeshHolder);
         InfoCard->HitPriority = 1000;
-        InfoCard->SetProperty(1, 1, 0);
+        InfoCard->SetProperty(kWinPropHide, 1, 0);
     }
     else
     {
@@ -283,29 +283,29 @@ void CTradeEquipListLine::Init(WinControl* Parent, float const* Position)
 void CTradeEquipListLine::Hide()
 {
     // FUN_004bed40.
-    IconFrame->SetProperty(1, 1, 0);
-    IconMesh->SetProperty(1, 1, 0);
-    InfoFrame->SetProperty(1, 1, 0);
-    HealthBar->SetProperty(1, 1, 0);
-    ItemName->SetProperty(1, 1, 0);
-    ItemCount->SetProperty(1, 1, 0);
+    IconFrame->SetProperty(kWinPropHide, 1, 0);
+    IconMesh->SetProperty(kWinPropHide, 1, 0);
+    InfoFrame->SetProperty(kWinPropHide, 1, 0);
+    HealthBar->SetProperty(kWinPropHide, 1, 0);
+    ItemName->SetProperty(kWinPropHide, 1, 0);
+    ItemCount->SetProperty(kWinPropHide, 1, 0);
     if (InfoCard != nullptr)
-        InfoCard->SetProperty(1, 1, 0);
+        InfoCard->SetProperty(kWinPropHide, 1, 0);
 }
 
 void CTradeEquipListLine::Show()
 {
     // FUN_004bedc0. The info card is hidden, not shown.
-    IconFrame->SetProperty(1, 0, 0);
-    IconFrame->SetProperty(2, 0, 0);
-    IconMesh->SetProperty(1, 0, 0);
-    IconMesh->SetProperty(2, 0, 0);
-    InfoFrame->SetProperty(1, 0, 0);
-    HealthBar->SetProperty(1, 0, 0);
-    ItemName->SetProperty(1, 0, 0);
-    ItemCount->SetProperty(1, 0, 0);
+    IconFrame->SetProperty(kWinPropHide, 0, 0);
+    IconFrame->SetProperty(kWinPropDisable, 0, 0);
+    IconMesh->SetProperty(kWinPropHide, 0, 0);
+    IconMesh->SetProperty(kWinPropDisable, 0, 0);
+    InfoFrame->SetProperty(kWinPropHide, 0, 0);
+    HealthBar->SetProperty(kWinPropHide, 0, 0);
+    ItemName->SetProperty(kWinPropHide, 0, 0);
+    ItemCount->SetProperty(kWinPropHide, 0, 0);
     if (InfoCard != nullptr)
-        InfoCard->SetProperty(1, 1, 0);
+        InfoCard->SetProperty(kWinPropHide, 1, 0);
 }
 
 void CTradeEquipListLine::SetHighlight(unsigned char bOn)
@@ -327,10 +327,10 @@ void CTradeEquipListLine::SetItem(EquipDesc* NewItem)
     if (NewItem->ArchId == 0)
     {
         // Credits.
-        IconMesh->SetProperty(4, PointerArg(kCreditsIconMesh), 0);
-        ItemName->SetProperty(0x1e, 0x476, 0);
+        IconMesh->SetProperty(kWinPropMesh, PointerArg(kCreditsIconMesh), 0);
+        ItemName->SetProperty(kTextPropSetIds, 0x476, 0);
         if (InfoCard != nullptr)
-            InfoCard->SetProperty(1, 1, 0);
+            InfoCard->SetProperty(kWinPropHide, 1, 0);
         HealthBar->Used = 0.0f;
     }
     else
@@ -343,8 +343,8 @@ void CTradeEquipListLine::SetItem(EquipDesc* NewItem)
         int IdsInfo;
         GetTradeItemVisuals(NewItem, &Mesh, &Material, &IdsName, &IdsInfo, false);
         if (Mesh.Value != nullptr)
-            IconMesh->SetProperty(4, PointerArg(Mesh.Value), PointerArg(Material.Value));
-        ItemName->SetProperty(0x1e, static_cast<uintptr_t>(IdsName), 0);
+            IconMesh->SetProperty(kWinPropMesh, PointerArg(Mesh.Value), PointerArg(Material.Value));
+        ItemName->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(IdsName), 0);
         // Truncated to an int percentage (100.0 is the double DAT_005ca320).
         HealthBar->Used = static_cast<float>(
             static_cast<int>(static_cast<double>(NewItem->Health) * 100.0));
@@ -352,7 +352,7 @@ void CTradeEquipListLine::SetItem(EquipDesc* NewItem)
 
     wchar_t CountText[58];
     swprintf(CountText, 58, kCountFormat, NewItem->Count);
-    ItemCount->SetProperty(0x1d, PointerArg(CountText), 0);
+    ItemCount->SetProperty(kTextPropSetText, PointerArg(CountText), 0);
 
     // Byte +0 of the entry is the trade selection: its bit 0 becomes
     // bit 6 of +0x330 on both frames; any non-zero value lifts the row to draw layer 2, else a
@@ -535,7 +535,7 @@ void CTradeEquipList::Rebuild()
     int Range = static_cast<int>(Items.Items.size()) - VisibleRows;
     if (Range < 0)
         Range = 0;
-    ScrollBar->SetProperty(0x37, 0, static_cast<uintptr_t>(Range));
+    ScrollBar->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Range));
 }
 
 void CTradeEquipList::Refresh(int Index)
@@ -558,13 +558,13 @@ void CTradeEquipList::Refresh(int Index)
             {
                 // Only the frame, icon and bar; credits greyed out.
                 Line->Hide();
-                Line->IconFrame->SetProperty(1, 0, 0);
-                Line->IconMesh->SetProperty(1, 0, 0);
-                Line->HealthBar->SetProperty(1, 0, 0);
+                Line->IconFrame->SetProperty(kWinPropHide, 0, 0);
+                Line->IconMesh->SetProperty(kWinPropHide, 0, 0);
+                Line->HealthBar->SetProperty(kWinPropHide, 0, 0);
                 if (Line->Item != nullptr && Line->Item->ArchId == 0)
                 {
-                    Line->IconFrame->SetProperty(2, 1, 0);
-                    Line->IconMesh->SetProperty(2, 1, 0);
+                    Line->IconFrame->SetProperty(kWinPropDisable, 1, 0);
+                    Line->IconMesh->SetProperty(kWinPropDisable, 1, 0);
                 }
                 Line->SetHighlight(1);
             }
@@ -583,9 +583,9 @@ void CTradeEquipList::Refresh(int Index)
         for (; Row < Lines.size(); ++Row)
         {
             CTradeEquipListLine* const Line = Lines[Row];
-            Line->IconMesh->SetProperty(4, PointerArg(kItemViewMesh), 0);
-            Line->ItemName->SetProperty(0x1e, 0, 0);
-            Line->ItemCount->SetProperty(0x1e, 0, 0);
+            Line->IconMesh->SetProperty(kWinPropMesh, PointerArg(kItemViewMesh), 0);
+            Line->ItemName->SetProperty(kTextPropSetIds, 0, 0);
+            Line->ItemCount->SetProperty(kTextPropSetIds, 0, 0);
             Line->bInUse = 0;
             Line->Hide();
         }
@@ -605,13 +605,13 @@ void CTradeEquipList::Refresh(int Index)
     {
         CTradeEquipListLine* const Line = Lines.at(static_cast<size_t>(Row));
         Line->Hide();
-        Line->IconFrame->SetProperty(1, 0, 0);
-        Line->IconMesh->SetProperty(1, 0, 0);
-        Line->HealthBar->SetProperty(1, 0, 0);
+        Line->IconFrame->SetProperty(kWinPropHide, 0, 0);
+        Line->IconMesh->SetProperty(kWinPropHide, 0, 0);
+        Line->HealthBar->SetProperty(kWinPropHide, 0, 0);
         if (Line->Item != nullptr && Line->Item->ArchId == 0)
         {
-            Line->IconFrame->SetProperty(2, 1, 0);
-            Line->IconMesh->SetProperty(2, 1, 0);
+            Line->IconFrame->SetProperty(kWinPropDisable, 1, 0);
+            Line->IconMesh->SetProperty(kWinPropDisable, 1, 0);
         }
         Line->SetHighlight(1);
         return;

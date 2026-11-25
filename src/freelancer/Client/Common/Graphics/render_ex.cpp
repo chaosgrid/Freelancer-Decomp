@@ -116,7 +116,7 @@ namespace
         INI_Reader Reader;
         if (!Reader.open(Path, false))
         {
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s not found, Ex defaults used",
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s not found, Ex defaults used",
                   kRenderExSource, __LINE__, kVolumetricIni);
             NebulaVolume::LoadSettings(nullptr);
             return;
@@ -209,7 +209,7 @@ namespace
         {
             GIniStamp = IniStamp;
             LoadSettings();
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:hot reload: %s re-read (scene_depth_view %d)",
+            FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:hot reload: %s re-read (scene_depth_view %d)",
                   kRenderExSource, __LINE__, kVolumetricIni, GSettings.bSceneDepthView ? 1 : 0);
         }
 
@@ -219,7 +219,7 @@ namespace
             GShaderStamp = ShaderStamp;
             const GENRESULT Result = GPipelineEx->ReloadExPrograms();
             NebulaVolume::OnProgramsReloaded();
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:hot reload: SHADERS changed, Ex programs "
+            FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:hot reload: SHADERS changed, Ex programs "
                   "recompiled (%s)", kRenderExSource, __LINE__,
                   Result == GR_OK ? "all compiled" : "errors above, old code kept");
         }
@@ -227,7 +227,7 @@ namespace
 
     void LogCaps(FRPExCaps const& Caps)
     {
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:Ex caps: adapter \"%s\", vs %lu.%lu (%lu slots), "
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:Ex caps: adapter \"%s\", vs %lu.%lu (%lu slots), "
               "ps %lu.%lu (%lu slots, %lu executed), INTZ scene depth %d, volume textures %d "
               "(max %lu), FP16 target %d, FP16 blending %d, R32F target %d",
               kRenderExSource, __LINE__, Caps.AdapterDescription, Caps.VertexShaderVersion >> 8,
@@ -261,7 +261,7 @@ namespace
             if (!GbNoSceneDepthReported)
             {
                 GbNoSceneDepthReported = true;
-                FDUMP(0x100002, "%s(%d) : WARNING:General:scene_depth_view: the device has no "
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:scene_depth_view: the device has no "
                       "INTZ scene depth", kRenderExSource, __LINE__);
             }
             return;
@@ -321,7 +321,7 @@ void RenderEx::Startup()
         PipelineEx == nullptr)
     {
         // DirectX8 (RP8.dll): the retail rendering path, nothing else to do.
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:render pipeline has no Direct3D 9 extensions",
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:render pipeline has no Direct3D 9 extensions",
               kRenderExSource, __LINE__);
         return;
     }
@@ -330,7 +330,7 @@ void RenderEx::Startup()
         DrawEx == nullptr)
     {
         PipelineEx->Release();
-        FDUMP(0x100002, "%s(%d) : WARNING:General:IRenderPipelineEx without IRPDrawEx",
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:IRenderPipelineEx without IRPDrawEx",
               kRenderExSource, __LINE__);
         return;
     }
@@ -348,7 +348,7 @@ void RenderEx::Startup()
     {
         DrawEx->Release();
         PipelineEx->Release();
-        FDUMP(0x100001, "%s(%d) : *** ERROR: could not find the %s directory (%s); Direct3D 9 "
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: could not find the %s directory (%s); Direct3D 9 "
               "extensions off", kRenderExSource, __LINE__, kExtraDataDir, ExtraPath);
         return;
     }
@@ -360,7 +360,7 @@ void RenderEx::Startup()
     GLastPollTick = GetTickCount();
     GIniStamp = ComputeIniStamp();
     GShaderStamp = ComputeShaderStamp();
-    FDUMP(0x100003, "%s(%d) : NOTICE:General:Direct3D 9 extensions available "
+    FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:Direct3D 9 extensions available "
           "(scene_depth_view %d)", kRenderExSource, __LINE__, GSettings.bSceneDepthView ? 1 : 0);
     // Usually there is no device yet; then the caps are logged by the first GetCaps that
     // finds one (AfterSpaceScene, NebulaVolume::BeginFrame).

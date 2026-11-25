@@ -30,6 +30,7 @@
 #include "NeuroNet/nn_repair.h"              // NnRepair::PlayerNeedsRepair (FUN_004b4510)
 #include "NeuroNet/nn_tooltip.h"             // NnToolTipHideGlobal (FUN_004be390)
 #include "GameFlow/room_control.h"
+#include "GameFlow/room_control_hotspot.h"  // EHotspotBehavior
 #include "Interface/win3d.h"                  // Win3DFindByName (FUN_0059da10), Win3DDeleteTree (FUN_0043d2a0)
 #include "Interface/win_factory.h"            // WINFACTORY, WinFactoryCreate (FUN_0059db20)
 
@@ -241,7 +242,8 @@ namespace
     // and 0xc to the close, everything else past it).
     bool IsServiceType(unsigned Type)
     {
-        return Type == 2 || Type == 3 || Type == 7 || Type == 0xc;
+        return Type == kHotspotNewsVendor || Type == kHotspotMissionVendor ||
+               Type == kHotspotStartShipDealer || Type == kHotspotRepair;
     }
 }
 
@@ -320,7 +322,7 @@ bool NavBar::Create(Win3D* NewParent, void* Data)
     ManeuverTab = CreateStaticControl("ManeuverTab", "Interface\\Baseside\\CITY_maneuvertab3.cmp",
                                       TabPosition, nullptr, HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0,
                                       0, 0, Zero338);
-    ManeuverTab->SetProperty(1, 1, 0);
+    ManeuverTab->SetProperty(kWinPropHide, 1, 0);
 
     // Win3D::Create (FUN_004b5060); on failure both children deleted
     // (their pointers are not cleared) and false.
@@ -401,20 +403,20 @@ void NavBar::Refresh()
             {
                 Button.Control->SetProperty(0xc, Button.Type == Location ? 1 : 0, 0);
             }
-            else if (Button.Type == 6)
+            else if (Button.Type == kHotspotFrontDesk)
             {
                 Button.bDisabled = 1;
-                Button.Control->SetProperty(2, 1, 0);
+                Button.Control->SetProperty(kWinPropDisable, 1, 0);
             }
-            else if (Button.Type == 0xc)
+            else if (Button.Type == kHotspotRepair)
             {
                 bool const bNeedsRepair = NnRepair::PlayerNeedsRepair();
-                Button.Control->SetProperty(2, bNeedsRepair ? 0 : 1, 0);
+                Button.Control->SetProperty(kWinPropDisable, bNeedsRepair ? 0 : 1, 0);
                 Button.bDisabled = bNeedsRepair ? 0 : 1;
             }
             else
             {
-                Button.Control->SetProperty(2, 0, 0);
+                Button.Control->SetProperty(kWinPropDisable, 0, 0);
             }
         }
     }
@@ -431,20 +433,20 @@ void NavBar::Refresh()
                 bool const bHere = Switch != nullptr && strcmp(VirtualRoom.c_str(), Switch) == 0;
                 Button.Control->SetProperty(0xc, bHere ? 1 : 0, 0);
             }
-            else if (Button.Type == 6)
+            else if (Button.Type == kHotspotFrontDesk)
             {
                 Button.bDisabled = 1;
-                Button.Control->SetProperty(2, 1, 0);
+                Button.Control->SetProperty(kWinPropDisable, 1, 0);
             }
-            else if (Button.Type == 0xc)
+            else if (Button.Type == kHotspotRepair)
             {
                 bool const bNeedsRepair = NnRepair::PlayerNeedsRepair();
-                Button.Control->SetProperty(2, bNeedsRepair ? 0 : 1, 0);
+                Button.Control->SetProperty(kWinPropDisable, bNeedsRepair ? 0 : 1, 0);
                 Button.bDisabled = bNeedsRepair ? 0 : 1;
             }
             else
             {
-                Button.Control->SetProperty(2, 0, 0);
+                Button.Control->SetProperty(kWinPropDisable, 0, 0);
             }
         }
     }
@@ -490,7 +492,7 @@ void NavBar::LayoutTabs(bool bAnimate)
 
     // Its offset (property 7).
     float Base[3] = {0.0f, 0.0f, 0.0f};
-    Selected->Control->SetProperty(7, reinterpret_cast<uintptr_t>(Base), 0);
+    Selected->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Base), 0);
 
     // The enabled service tabs; 1..3 of them, else return.
     int Count = 0;
@@ -506,9 +508,9 @@ void NavBar::LayoutTabs(bool bAnimate)
         Base[0] = Base[0] + Step;
 
     // The tab mesh and its offset (x, 0.295, -1.0).
-    ManeuverTab->SetProperty(4, reinterpret_cast<uintptr_t>(kTabMeshes[TabIndex]), 0);
+    ManeuverTab->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(kTabMeshes[TabIndex]), 0);
     float const TabPosition[3] = {Base[0], NnFloatBits(0x3e970a3d), NnFloatBits(0xbf800000)};
-    ManeuverTab->SetProperty(6, reinterpret_cast<uintptr_t>(TabPosition), 0);
+    ManeuverTab->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(TabPosition), 0);
 
     float const* Offset = kTabOffsets[TabIndex];
     ButtonMover::Start(kAnimSeconds);
@@ -529,7 +531,7 @@ void NavBar::LayoutTabs(bool bAnimate)
             float End[3];
             if (bAnimate)
             {
-                Button.Control->SetProperty(6, reinterpret_cast<uintptr_t>(Base), 0);
+                Button.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Base), 0);
                 End[0] = *Offset + Base[0];
                 End[1] = Base[1] - NnFloatBits(0x3d851eb8);
                 End[2] = Base[2];
@@ -542,21 +544,22 @@ void NavBar::LayoutTabs(bool bAnimate)
                 End[1] = Base[1] - NnFloatBits(0x3d851eb8);
                 End[2] = Base[2];
                 ++Offset;
-                Button.Control->SetProperty(6, reinterpret_cast<uintptr_t>(End), 0);
+                Button.Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(End), 0);
             }
             Button.Position[0] = End[0];
             Button.Position[1] = End[1];
             Button.Position[2] = End[2];
         }
-        if (Button.Type == 6)
+        if (Button.Type == kHotspotFrontDesk)
             DeskTab = &Button;
-        if (Button.Type == 5 || Button.Type == 7 || Button.Type == 8)
+        if (Button.Type == kHotspotStartDealer || Button.Type == kHotspotStartShipDealer ||
+            Button.Type == kHotspotStartEquipDealer)
             DealerTab = &Button;
     }
 
     // While sliding, the desk tab starts where the dealer tab sits.
     if (bAnimate && DeskTab != nullptr && DealerTab != nullptr)
-        DeskTab->Control->SetProperty(6, reinterpret_cast<uintptr_t>(DealerTab->Position), 0);
+        DeskTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(DealerTab->Position), 0);
 }
 
 void NavBar::LayoutRoomButtons()
@@ -579,7 +582,7 @@ void NavBar::LayoutRoomButtons()
         if (It->bRoomSwitch == 0)
             continue;
         float const Position[3] = {*Offset, NnFloatBits(0x3be56042), 0.0f};
-        It->Control->SetProperty(6, reinterpret_cast<uintptr_t>(Position), 0);
+        It->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Position), 0);
         ++Offset;
     }
 
@@ -588,7 +591,7 @@ void NavBar::LayoutRoomButtons()
     // (a retail defect, reproduced).
     char const* const Mesh =
         Count > 0 ? kBoxMeshes[Count - 1] : reinterpret_cast<char const*>(&kRowOffsetData[9]);
-    ManeuverFrame->SetProperty(4, reinterpret_cast<uintptr_t>(Mesh), 0);
+    ManeuverFrame->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Mesh), 0);
 }
 
 void NavBar::RefreshRepairTab(bool bForce)
@@ -599,11 +602,11 @@ void NavBar::RefreshRepairTab(bool bForce)
     for (It = Buttons.begin(); It != Buttons.end(); ++It)
     {
         FNavBarButton& Button = *It;
-        if (Button.bRoomSwitch != 0 || Button.Type != 0xc)
+        if (Button.bRoomSwitch != 0 || Button.Type != kHotspotRepair)
             continue;
         bool const bNeedsRepair = NnRepair::PlayerNeedsRepair();
         unsigned char const bDisable = (bNeedsRepair && !bForce) ? 0 : 1;
-        Button.Control->SetProperty(2, bDisable, 0);
+        Button.Control->SetProperty(kWinPropDisable, bDisable, 0);
         unsigned char const bOld = Button.bDisabled;
         Button.bDisabled = bDisable;
         if (bOld != bDisable)
@@ -644,7 +647,7 @@ void NavBar::Update()
     bool const bShow = GetClientMouseCursorDrawFlag() != 0 && bFadingOut == 0 &&
                        bFadingIn == 0 && !G_bNnScreenUp;
     uintptr_t const Hide = bShow ? 0 : 1;
-    ManeuverFrame->SetProperty(1, Hide, 0);
+    ManeuverFrame->SetProperty(kWinPropHide, Hide, 0);
     int EnabledTabs = 0;
     std::list<FNavBarButton>::iterator It;
     for (It = Buttons.begin(); It != Buttons.end(); ++It)
@@ -652,12 +655,12 @@ void NavBar::Update()
         if (It->bRoomSwitch == 0 && It->bDisabled == 0)
             ++EnabledTabs;
     }
-    ManeuverTab->SetProperty(1, (bShow && EnabledTabs != 0) ? 0 : 1, 0);
+    ManeuverTab->SetProperty(kWinPropHide, (bShow && EnabledTabs != 0) ? 0 : 1, 0);
     for (It = Buttons.begin(); It != Buttons.end(); ++It)
     {
-        It->Control->SetProperty(1, Hide, 0);
+        It->Control->SetProperty(kWinPropHide, Hide, 0);
         if (It->bDisabled != 0)
-            It->Control->SetProperty(2, 1, 0);
+            It->Control->SetProperty(kWinPropDisable, 1, 0);
     }
 
     // With the bar up, the return to the desk tab and the animations.
@@ -670,7 +673,7 @@ void NavBar::Update()
             bool bRepairOpen = false;
             for (It = Buttons.begin(); It != Buttons.end(); ++It)
             {
-                if (It->bRoomSwitch == 0 && It->bOpen != 0 && It->Type == 0xc)
+                if (It->bRoomSwitch == 0 && It->bOpen != 0 && It->Type == kHotspotRepair)
                     bRepairOpen = true;
             }
             if (bRepairOpen || !IsAnimating())
@@ -682,7 +685,7 @@ void NavBar::Update()
                     bReturnToDesk = 0;
                     for (It = Buttons.begin(); It != Buttons.end(); ++It)
                     {
-                        if (It->bRoomSwitch == 0 && It->Type == 6)
+                        if (It->bRoomSwitch == 0 && It->Type == kHotspotFrontDesk)
                         {
                             ActivateButton(Current, &*It);
                             break;
@@ -770,7 +773,7 @@ void NavBar::Update()
             bRepairRedirect = 0;
             for (It = Buttons.begin(); It != Buttons.end(); ++It)
             {
-                if (It->bRoomSwitch == 0 && It->Type == 0xc)
+                if (It->bRoomSwitch == 0 && It->Type == kHotspotRepair)
                 {
                     OpenService(&*It);
                     break;
@@ -829,7 +832,7 @@ intptr_t NavBar::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
 {
     // LAB_0043ee80. Retail answers every other Msg with 0 and does not forward to
     // WinControl::SetProperty.
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
     if (G_bNnScreenUp)
         return 0;
@@ -857,14 +860,14 @@ intptr_t NavBar::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
     // A dealer tab clicks its dealer character when the room has one.
     if (Button->bRoomSwitch == 0)
     {
-        int Role = 0;
-        if (Button->Type == 5)
-            Role = 2;
-        else if (Button->Type == 7)
-            Role = 3;
-        else if (Button->Type == 8)
-            Role = 4;
-        if (Role != 0)
+        int Role = kCharacterRoleNone;
+        if (Button->Type == kHotspotStartDealer)
+            Role = kCharacterRoleTrader;
+        else if (Button->Type == kHotspotStartShipDealer)
+            Role = kCharacterRoleShipDealer;
+        else if (Button->Type == kHotspotStartEquipDealer)
+            Role = kCharacterRoleEquipmentDealer;
+        if (Role != kCharacterRoleNone)
         {
             FCharacterObject* const Character =
                 RoomControlFindCharacterByRole(CurrentRoomRuntime(), Role);
@@ -944,7 +947,7 @@ void NavBar::Rebuild()
         }
 
         // A news hotspot (behaviour 2) only with news at this base.
-        if (Hotspot->Behavior == 2)
+        if (Hotspot->Behavior == kHotspotNewsVendor)
         {
             TMirrorPropertyBucket<NewsBroadcastProperties>* const News =
                 GetClientLocationBaseNews(GetRoomRuntimeBaseId(CurrentRoomRuntime()));
@@ -1005,10 +1008,10 @@ void NavBar::Rebuild()
         WinControl* const Control = FindChild(Name->c_str());
         if (Control == nullptr)
             continue;
-        Control->SetProperty(4, reinterpret_cast<uintptr_t>(DefaultMesh), 0);
-        Control->SetProperty(3, 0, 0);
-        Control->SetProperty(1, 1, 0);
-        Control->SetProperty(2, 1, 0);
+        Control->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(DefaultMesh), 0);
+        Control->SetProperty(kWinPropToolTip, 0, 0);
+        Control->SetProperty(kWinPropHide, 1, 0);
+        Control->SetProperty(kWinPropDisable, 1, 0);
     }
     ButtonControlNames.clear();
     for (Name = RoomControlNames.begin(); Name != RoomControlNames.end(); ++Name)
@@ -1016,10 +1019,10 @@ void NavBar::Rebuild()
         WinControl* const Control = FindChild(Name->c_str());
         if (Control == nullptr)
             continue;
-        Control->SetProperty(4, reinterpret_cast<uintptr_t>(DefaultMesh), 0);
-        Control->SetProperty(3, 0, 0);
-        Control->SetProperty(1, 1, 0);
-        Control->SetProperty(2, 1, 0);
+        Control->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(DefaultMesh), 0);
+        Control->SetProperty(kWinPropToolTip, 0, 0);
+        Control->SetProperty(kWinPropHide, 1, 0);
+        Control->SetProperty(kWinPropDisable, 1, 0);
     }
     RoomControlNames.clear();
 }
@@ -1069,16 +1072,16 @@ FNavBarButton* NavBar::AddButton(unsigned Type, int /*Unused*/, unsigned char bR
     int Ids = 0;
     if (!HudLookupNamedValue(kHotspotIds, Button->IdsName, &Ids, 0x13))
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: unknown HotspotName = '%s'\n", kNavBarCpp,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown HotspotName = '%s'\n", kNavBarCpp,
               0x530, Button->IdsName);
     }
 
     // Shown, the tooltip (a ship dealer's tab of type 8 says
     // "equipment dealer"), the ids kept in +0x2ec, tabs flagged 0x36.
-    Button->Control->SetProperty(1, 0, 0);
-    Button->Control->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
-    if (Ids == 0x196b && Type == 8)
-        Button->Control->SetProperty(3, 0x1968, 0);
+    Button->Control->SetProperty(kWinPropHide, 0, 0);
+    Button->Control->SetProperty(kWinPropToolTip, static_cast<uintptr_t>(Ids), 0);
+    if (Ids == 0x196b && Type == kHotspotStartEquipDealer)
+        Button->Control->SetProperty(kWinPropToolTip, 0x1968, 0);
     Button->Control->UserData = Ids;
     if (bRoomSwitch == 0)
         Button->Control->SetProperty(0x36, 1, 0);
@@ -1088,13 +1091,13 @@ FNavBarButton* NavBar::AddButton(unsigned Type, int /*Unused*/, unsigned char bR
     std::map<std::string, char*>::iterator Found = IniValues.find(Button->Name);
     if (Found != IniValues.end())
     {
-        Button->Control->SetProperty(4, reinterpret_cast<uintptr_t>(Found->second), 0);
+        Button->Control->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Found->second), 0);
     }
     else
     {
-        Button->Control->SetProperty(4, reinterpret_cast<uintptr_t>(DefaultMesh), 0);
+        Button->Control->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(DefaultMesh), 0);
         char MeshPath[0x100];
-        Button->Control->SetProperty(0xb, reinterpret_cast<uintptr_t>(MeshPath), 0x100);
+        Button->Control->SetProperty(kWinPropGetMeshPath, reinterpret_cast<uintptr_t>(MeshPath), 0x100);
         SetIniValue(Button->Name.c_str(), MeshPath);
     }
     return Button;
@@ -1197,24 +1200,24 @@ void NavBar::OpenService(FNavBarButton* Button)
     float const* Target = nullptr;
     switch (Button->Type)
     {
-    case 0xc:
+    case kHotspotRepair:
         Target = G_NavBarRepairTarget;
         break;
-    case 7:
+    case kHotspotStartShipDealer:
         Target = G_NavBarShipTarget;
         break;
-    case 3:
+    case kHotspotMissionVendor:
         Target = G_NavBarMissionTarget;
         break;
-    case 2:
+    case kHotspotNewsVendor:
         Target = G_NavBarNewsTarget;
         break;
     default:
         return;
     }
     Button->bOpen = 1;
-    Button->Control->SetProperty(7, reinterpret_cast<uintptr_t>(Button->Position), 0);
-    if (Button->Type == 0xc)
+    Button->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Button->Position), 0);
+    if (Button->Type == kHotspotRepair)
         bReturnToDesk = 1;
     ButtonMover::Start(kAnimSeconds);
     ButtonMover::AddButton(Button->Control, Button->Position, Target);
@@ -1243,11 +1246,11 @@ float NavBar::ServiceScale(unsigned Type)
     // anything else 1.0 (DAT_005c75dc).
     switch (Type)
     {
-    case 2:
-    case 3:
-    case 0xc:
+    case kHotspotNewsVendor:
+    case kHotspotMissionVendor:
+    case kHotspotRepair:
         return NnFloatBits(0x3da3d70a);
-    case 7:
+    case kHotspotStartShipDealer:
         return NnFloatBits(0x3d4ccccd);
     default:
         return 1.0f;
@@ -1259,22 +1262,22 @@ void NavBar::MakeServiceBackground(unsigned Type, float Scale)
     // FUN_00440460: the type's background mesh and position; other types none.
     switch (Type)
     {
-    case 0xc:
+    case kHotspotRepair:
     {
         float const Position[3] = {0.0f, 0.0f, NnFloatBits(0xbf8ccccd)};
         MakeScaledBackground(Scale, "Interface\\NeuroNet\\Inventory\\repair_bakgrnd.cmp",
                              Position);
         return;
     }
-    case 7:
+    case kHotspotStartShipDealer:
     {
         float const Position[3] = {0.0f, NnFloatBits(0xbdb020c5), NnFloatBits(0xbfa4dd2f)};
         MakeScaledBackground(Scale, "Interface\\NeuroNet\\Inventory\\INV_biginforcard_center.cmp",
                              Position);
         return;
     }
-    case 2:
-    case 3:
+    case kHotspotNewsVendor:
+    case kHotspotMissionVendor:
     {
         float const Position[3] = {0.0f, NnFloatBits(0xbdcccccd), NnFloatBits(0xbfbfbe77)};
         MakeScaledBackground(Scale, "Interface\\NeuroNet\\NewsVendor\\NEWS_background.cmp",
@@ -1301,27 +1304,27 @@ void NavBar::OnScaleFinished()
         // again; other types do nothing.
         switch (ClosingButton->Type)
         {
-        case 0xc:
+        case kHotspotRepair:
             ButtonMover::Start(kAnimSeconds);
             ButtonMover::AddButton(ClosingButton->Control, G_NavBarRepairTarget,
                                    ClosingButton->Position);
             ClosingButton->bDisabled = 0;
-            ClosingButton->Control->SetProperty(2, 0, 0);
+            ClosingButton->Control->SetProperty(kWinPropDisable, 0, 0);
             ClosingButton->bOpen = 0;
             return;
-        case 7:
-        case 2:
-        case 3:
+        case kHotspotStartShipDealer:
+        case kHotspotNewsVendor:
+        case kHotspotMissionVendor:
         {
-            float const* const Target = ClosingButton->Type == 7
+            float const* const Target = ClosingButton->Type == kHotspotStartShipDealer
                                             ? G_NavBarShipTarget
-                                            : (ClosingButton->Type == 2 ? G_NavBarNewsTarget
+                                            : (ClosingButton->Type == kHotspotNewsVendor ? G_NavBarNewsTarget
                                                                         : G_NavBarMissionTarget);
             ButtonMover::Start(kAnimSeconds);
             ClosingButton->bOpen = 0;
             ButtonMover::AddButton(ClosingButton->Control, Target, ClosingButton->Position);
             ClosingButton->bDisabled = 0;
-            ClosingButton->Control->SetProperty(2, 0, 0);
+            ClosingButton->Control->SetProperty(kWinPropDisable, 0, 0);
             return;
         }
         default:
@@ -1345,8 +1348,8 @@ void NavBar::OnScaleFinished()
             continue;
         switch (Button.Type)
         {
-        case 2:
-        case 3:
+        case kHotspotNewsVendor:
+        case kHotspotMissionVendor:
         {
             // The room's controllers for the news / mission vendor.
             NnMainButtonOnModalOpen();
@@ -1355,7 +1358,7 @@ void NavBar::OnScaleFinished()
                 RoomControlNotifyControllers(Room, -1, 3, static_cast<int>(Button.Type));
             return;
         }
-        case 0xc:
+        case kHotspotRepair:
         {
             // NN_Repair, placed (property 0x42) at (0, 0, -1.1).
             Win3D* const Repair = WinFactoryCreate("NN_Repair", "NN_Repair", nullptr, nullptr);
@@ -1366,7 +1369,7 @@ void NavBar::OnScaleFinished()
                 0x42, reinterpret_cast<uintptr_t>(Position), 0);
             return;
         }
-        case 7:
+        case kHotspotStartShipDealer:
         {
             // The base's solar marked visited for the ship dealer
             // (flag 0x10, the server told), NN_ShipTrader, the desk tab back.
@@ -1394,7 +1397,7 @@ void NavBar::OnMoveFinished()
     // the dealer tab swapped back for the ship dealer, the repair tab refreshed.
     if (ClosingButton != nullptr)
     {
-        if (ClosingButton->Type == 7)
+        if (ClosingButton->Type == kHotspotStartShipDealer)
             ToggleDealerTabs(false);
         ClosingButton = nullptr;
         RefreshRepairTab(false);
@@ -1420,7 +1423,7 @@ void NavBar::OnMoveFinished()
         ButtonScaler::Start(kAnimSeconds);
         ButtonScaler::AddButton(ScaledBackground, Scale, 1.0f);
         Button.bDisabled = 1;
-        Button.Control->SetProperty(2, 1, 0);
+        Button.Control->SetProperty(kWinPropDisable, 1, 0);
         return;
     }
 }
@@ -1433,7 +1436,7 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
     RoomButtonInfo const* const Hotspot = Button->Hotspot;
 
     // Behaviour 0xb hotspots switch rooms.
-    if (Hotspot != nullptr && Hotspot->Behavior == 0xb)
+    if (Hotspot != nullptr && Hotspot->Behavior == kHotspotVirtualRoom)
     {
         SelectRoomButton(Button);
         return;
@@ -1469,8 +1472,8 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
     // Outside 2..0xc retail takes the 0xb case.
     switch (Type)
     {
-    case 2:
-    case 3:
+    case kHotspotNewsVendor:
+    case kHotspotMissionVendor:
     {
         // News / missions: open -- the other open service closed
         // first; open already -- its window told and closed.
@@ -1490,11 +1493,11 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
             OpenService(Button);
             return;
         }
-        NotifyServiceWindow(Type == 2 ? "NN_News" : "NN_MissionVendor");
+        NotifyServiceWindow(Type == kHotspotNewsVendor ? "NN_News" : "NN_MissionVendor");
         CloseService(Button);
         return;
     }
-    case 4:
+    case kHotspotLaunch:
     {
         // Launch -- the equipment checked, the ship's launch script
         // (or straight to the mission briefing), then the bar and its controls destroyed.
@@ -1521,8 +1524,8 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
         delete Bar; // usually this -- nothing after it touches a member
         return;
     }
-    case 5:
-    case 8:
+    case kHotspotStartDealer:
+    case kHotspotStartEquipDealer:
     {
         // Commodity dealer (visit flag 4) / equipment dealer (8):
         // the base's solar marked, the dealer screen opened.
@@ -1531,18 +1534,19 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
         {
             unsigned char Flags = 0;
             GetPlayerVisitFlagsRetail(Solar, &Flags, 0, 0);
-            Flags |= Type == 5 ? 4 : 8;
+            Flags |= Type == kHotspotStartDealer ? 4 : 8;
             SetPlayerVisitFlagsRetail(Solar, Flags, true);
         }
         // FUN_00477ab0(1 or 3, 0, 0, 0).
-        NnInventoryOpenDealer(Type == 5 ? 1 : 3, nullptr, nullptr, 0);
+        NnInventoryOpenDealer(Type == kHotspotStartDealer ? kTradeModeCommodity : kTradeModeEquipment,
+                              nullptr, nullptr, 0);
         return;
     }
-    case 6:
-    case 9:
-    case 0xa:
+    case kHotspotFrontDesk:
+    case kHotspotMoveRight:
+    case kHotspotMoveLeft:
         return;
-    case 7:
+    case kHotspotStartShipDealer:
     {
         // The ship dealer tab.
         if (Button->bOpen == 0)
@@ -1554,7 +1558,7 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
         CloseService(Button);
         return;
     }
-    case 0xc:
+    case kHotspotRepair:
     {
         // The repair tab. Open -- NN_Repair told and closed.
         if (Button->bOpen != 0)
@@ -1632,7 +1636,7 @@ void NavBar::OnButtonClicked(FNavBarButton* Button)
         // 0xb and every type outside 2..0xc: a shown NN_Inventory is
         // closed (command 0x6b), then the room's controllers told.
         if (IsShownWindow(Win3DFindByName("NN_Inventory")))
-            HudPostCommand(0x6b, 0);
+            HudPostCommand(USER_INVENTORY_CLOSE, 0);
         RoomControlNotifyControllers(Room, -1, 3, static_cast<int>(Button->Type));
         return;
     }
@@ -1671,7 +1675,7 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
     int const Behavior = To->Hotspot->Behavior;
     switch (Behavior)
     {
-    case 8:
+    case kHotspotStartEquipDealer:
     {
         // The bar camera.
         NnMainButtonOnModalOpen();
@@ -1689,14 +1693,14 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
         OnButtonClicked(Current);
         return;
     }
-    case 5:
-    case 7:
+    case kHotspotStartDealer:
+    case kHotspotStartShipDealer:
     {
         // The wide camera (the trader's inside a virtual room, for behaviour 5).
-        if (Behavior != 7)
+        if (Behavior != kHotspotStartShipDealer)
             NnMainButtonOnModalOpen();
         char const* Camera = "Camera_Wide";
-        if (VirtualRoom.size() != 0 && To->Hotspot->Behavior == 5)
+        if (VirtualRoom.size() != 0 && To->Hotspot->Behavior == kHotspotStartDealer)
             Camera = "Camera_Trader_Wide";
         RoomControlSetCameraMoveSkippable(Room, 1);
         if (!RoomControlTrackCamera(Room, Camera, &NavBar::ScriptDone, this, nullptr))
@@ -1706,11 +1710,11 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
         }
         SetClientMouseCursorDrawFlag(0);
         bReturnToDesk = 1;
-        if (To->Hotspot->Behavior != 7)
+        if (To->Hotspot->Behavior != kHotspotStartShipDealer)
             ToggleDealerTabs(true);
         return;
     }
-    case 6:
+    case kHotspotFrontDesk:
     {
         // The desk camera of the virtual room; a shown dealer with a shown
         // inventory closes it (command 0x6b); NN_ShipTrader told; the room camera released.
@@ -1726,7 +1730,7 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
         }
         if (IsShownWindow(Win3DFindByName("NN_Dealer")) &&
             IsShownWindow(Win3DFindByName("NN_Inventory")))
-            HudPostCommand(0x6b, 0);
+            HudPostCommand(USER_INVENTORY_CLOSE, 0);
         NotifyServiceWindow("NN_ShipTrader");
         RoomControlSetCameraMoveSkippable(Room, 1);
         RoomControlClearCameraMoving(Room);
@@ -1740,8 +1744,8 @@ void NavBar::ActivateButton(FNavBarButton* From, FNavBarButton* To)
         bReturnToDesk = 0;
         return;
     }
-    case 9:
-    case 0xa:
+    case kHotspotMoveRight:
+    case kHotspotMoveLeft:
     {
         // The scripted camera track.
         RoomControlSetCameraMoveSkippable(Room, 0);
@@ -1767,9 +1771,10 @@ void NavBar::ToggleDealerTabs(bool bShowDesk)
     {
         if (It->bRoomSwitch != 0)
             continue;
-        if (It->Type == 6)
+        if (It->Type == kHotspotFrontDesk)
             DeskTab = &*It;
-        else if (It->Type == 5 || It->Type == 7 || It->Type == 8)
+        else if (It->Type == kHotspotStartDealer || It->Type == kHotspotStartShipDealer ||
+                 It->Type == kHotspotStartEquipDealer)
             DealerTab = &*It;
     }
     if (DeskTab == nullptr || DealerTab == nullptr)
@@ -1783,23 +1788,23 @@ void NavBar::ToggleDealerTabs(bool bShowDesk)
         if (DealerTab->bOpen != 0)
         {
             DealerTab->bOpen = 0;
-            DealerTab->Control->SetProperty(6, reinterpret_cast<uintptr_t>(DealerTab->Position), 0);
+            DealerTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(DealerTab->Position), 0);
         }
         DeskTab->bDisabled = 0;
-        DeskTab->Control->SetProperty(2, 0, 0);
-        DealerTab->Control->SetProperty(7, reinterpret_cast<uintptr_t>(Offset), 0);
-        DeskTab->Control->SetProperty(6, reinterpret_cast<uintptr_t>(Offset), 0);
+        DeskTab->Control->SetProperty(kWinPropDisable, 0, 0);
+        DealerTab->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Offset), 0);
+        DeskTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
         DealerTab->bDisabled = 1;
-        DealerTab->Control->SetProperty(2, 1, 0);
+        DealerTab->Control->SetProperty(kWinPropDisable, 1, 0);
         return;
     }
     // The mirror image.
     DealerTab->bDisabled = 0;
-    DealerTab->Control->SetProperty(2, 0, 0);
-    DeskTab->Control->SetProperty(7, reinterpret_cast<uintptr_t>(Offset), 0);
-    DealerTab->Control->SetProperty(6, reinterpret_cast<uintptr_t>(Offset), 0);
+    DealerTab->Control->SetProperty(kWinPropDisable, 0, 0);
+    DeskTab->Control->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Offset), 0);
+    DealerTab->Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
     DeskTab->bDisabled = 1;
-    DeskTab->Control->SetProperty(2, 1, 0);
+    DeskTab->Control->SetProperty(kWinPropDisable, 1, 0);
 }
 
 void NavBar::StartScript(char const* Name, unsigned char bFade, unsigned char bLetterbox)
@@ -1846,11 +1851,11 @@ bool NavBar::CharacterClicked(FCharacterObject* Character, int Role)
 
     // The dealer's room -- not when already in it; its room button.
     char const* RoomName = nullptr;
-    if (Role == 4)
+    if (Role == kCharacterRoleEquipmentDealer)
         RoomName = "Equipment";
-    else if (Role == 2)
+    else if (Role == kCharacterRoleTrader)
         RoomName = "Trader";
-    else if (Role == 3)
+    else if (Role == kCharacterRoleShipDealer)
         RoomName = "ShipDealer";
     else
         return false;

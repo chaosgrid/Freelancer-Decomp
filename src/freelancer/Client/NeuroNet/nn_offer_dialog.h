@@ -75,7 +75,7 @@ public:
     WinControl* CloseButton;         // +0x344
     WinControl* Title;               // +0x348
     RichTextWin* OfferText;          // +0x34c
-    unsigned Field_0x350;            // +0x350 never written by the class; meaning unknown
+    unsigned Field_0x350;            // +0x350 no access in the class's code (004a6140..004a69d0)
     WinControl* DeclineButton;       // +0x354
     WinControl* DeclineText;         // +0x358
     WinControl* Close2Button;        // +0x35c

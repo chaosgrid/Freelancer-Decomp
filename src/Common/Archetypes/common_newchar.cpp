@@ -7,6 +7,7 @@
 #include "common_newchar.h"
 
 #include "common_ini.h"
+#include "fdump_severity.h"
 
 extern "C"
 {
@@ -39,7 +40,7 @@ bool NewChar::Database::Load(char const* Path)
     INI_Reader Reader;
     if (!Reader.open(Path, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: failed to open configuration file (%s)\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: failed to open configuration file (%s)\n",
               kNewCharSource, 0x1cd, Path);
         return false;
     }

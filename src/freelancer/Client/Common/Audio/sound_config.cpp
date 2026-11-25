@@ -124,8 +124,8 @@ int GetClientAudioMode()
 void GetClientDuckingConfig(float* OutDownBy, float* OutDownTime, float* OutMusicFadeTime)
 {
     // FUN_00428be0.
-    float const DownBy = GAudioMode == 3 ? GDuckingRtcDownBy : GDuckingSpaceDownBy;
-    float const DownTime = GAudioMode == 3 ? GDuckingRtcDownTime : GDuckingSpaceDownTime;
+    float const DownBy = GAudioMode == kClientAudioModeRtc ? GDuckingRtcDownBy : GDuckingSpaceDownBy;
+    float const DownTime = GAudioMode == kClientAudioModeRtc ? GDuckingRtcDownTime : GDuckingSpaceDownTime;
     if (OutDownBy != nullptr)
         *OutDownBy = DownBy;
     if (OutDownTime != nullptr)

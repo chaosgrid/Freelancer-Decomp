@@ -85,7 +85,7 @@ bool SpawnWorldSolarFromObjectSection(INI_Reader& Reader)
     // Narrowed to a CSolar, then CSolar::init with no null test.
     CObject* const Obj = Go->Object;
     CSolar* const Solar =
-        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             ? static_cast<CSolar*>(Obj)
             : nullptr;
     Solar->init(Parms);
@@ -128,14 +128,14 @@ void SolarSpheresApplyDetail(float Detail)
         // Solar buckets only hold solars, so the null is never read.
         CObject* const Obj = Go->Object;
         CSolar* Solar = nullptr;
-        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             Solar = static_cast<CSolar*>(Obj);
         if ((static_cast<unsigned char>(Solar->TypeBits) & 7u) == 0u)
             continue;
 
         // The engine instance queried for "1.11_ISphereMesh" through IEngine +0x78.
         CObject* Simple = nullptr;
-        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 3u) == 3u)
+        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
             Simple = Obj;
         ISphereMesh* Sphere = nullptr;
         GENRESULT const Result = DALib::Engine->QueryInstance(

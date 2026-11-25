@@ -53,11 +53,13 @@ struct FZonePopulation
     bool bHasPopulationKeys = false;                    // +0x09 set by every key FUN_06ef9000 takes
     float TradelaneAttack = 0.0f;                       // +0x0c "tradelane_attack" * 0.01
     std::list<FDensityRestriction> DensityRestrictions; // +0x10 "density_restriction"
-    float Field_0x1c = 3.0f;                            // +0x1c TODO: no reader in the port
+    // +0x1c / +0x30 (3.0f / -1.0f): written only by the ctor FUN_06ef8f90; the TU30 population
+    // functions (FUN_06ef9000, FUN_06ef95d0, FUN_06ef9dd0) do not read them.
+    float Field_0x1c = 3.0f;
     // +0x20 "encounter" (EncounterParams.h); element dtor FUN_06ef93c0 / its twin
     // FUN_06ef94e0, insert FUN_06efa050.
     std::vector<FZoneEncounter> Encounters;
-    float Field_0x30 = -1.0f;                           // +0x30 TODO: no reader in the port
+    float Field_0x30 = -1.0f;                           // +0x30 see +0x1c
     bool bPopulationAdditive = true;                    // +0x34 "population_additive"
     int MaxBattleSize = 0;                              // +0x38 "max_battle_size"
     float ReliefTime = 15.0f;                           // +0x3c "relief_time"

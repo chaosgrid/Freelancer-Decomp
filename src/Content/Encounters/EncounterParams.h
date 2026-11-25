@@ -87,7 +87,8 @@ struct FEncounterFormation
     int bFeelingToFormation;
     int RerollFrequency;                // +0x04 once 0, synch 1, every 2 (default 2)
     unsigned int FeelingMask;           // +0x08 friendly 1, hostile 4, same 8, any 7 (default 7)
-    int Field_0x0c;                     // +0x0c -1; TODO: reader not ported
+    int Field_0x0c;                     // +0x0c -1 from the ctor FUN_06ef5b50, then only copied;
+                                        // no retail function of this TU (06ef3830-06ef7bd0) reads it
     int FeelingValue;                   // +0x10 feeling_to_formation value 1 (-1 default)
     // +0x14: the faction choices of the formation (FUN_06ef4180 builds them, FUN_06ef44b0
     // picks from them).

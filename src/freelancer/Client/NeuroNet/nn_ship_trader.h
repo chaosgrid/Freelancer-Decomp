@@ -53,7 +53,7 @@ public:
     // slot 42 LAB_004b85f0 (RET 0xc) -- clicks (0x26 / 0x27), hover (0x2c / 0x2d), close (0x4e).
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
-    // Event::Handler face LAB_004b9370 (RET 4) -- USER_CANCEL (0x10) closes the window.
+    // Event::Handler face LAB_004b9370 (RET 4) -- USER_STACKABLE_CANCEL (0x10) closes the window.
     bool OnEvent(unsigned MsgId) override;
 
     // FUN_004b8a00 (RET 4) -- select a row (0..RowCount-1), -2 for the current ship.

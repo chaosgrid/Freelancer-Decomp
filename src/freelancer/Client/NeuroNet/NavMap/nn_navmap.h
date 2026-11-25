@@ -167,11 +167,20 @@ struct FNavMapJumpLink
 {
     FNavMapItem* From;          // +0x00
     FNavMapItem* To;            // +0x04
-    unsigned char Field_0x08;   // +0x08 1 at creation. TODO: meaning
+    unsigned char Field_0x08;   // +0x08 1 at creation (FUN_004976e0); not read by the draw
+                                //       (FUN_00497360, which reads only Kind)
     unsigned char bBothWays;    // +0x09 set when the reverse pair is added
     unsigned char Pad0a[2];
     int Kind;                   // +0x0c 0; 1 = both ends on the waypoint route, 2 = both on
                                 //       the best path (or the player's system)
+};
+
+// NeuroNetNavMap::ViewMode / TransitionView.
+enum ENavMapView : int
+{
+    kNavMapViewUniverse = 0,
+    kNavMapViewSystem = 1,
+    kNavMapViewSystemZoomed = 2,  // a system zoomed in (FUN_0049f1a0)
 };
 
 class NeuroNetNavMap : public WinControl, public EventHandler, public ButtonMover
@@ -481,7 +490,7 @@ public:
                                         //        exe; FUN_0049aa30 draws only with it set
     unsigned char Pad899[3];
     FClientMeshHolder GroupMarkerMesh;  // +0x89c NAV_playership.3db, loaded by FUN_004a1ce0
-    unsigned char Field_0x8c4;          // +0x8c4 ctor 0. TODO
+    unsigned char Field_0x8c4;          // +0x8c4 ctor 0 (FUN_0048de20); no other access found
     unsigned char Pad8c5[3];
     WinControl* SystemNameText;         // +0x8c8 "NavMapSystemName"
     WinControl* DebugText;              // +0x8cc "NavMapDebugText"
@@ -497,7 +506,7 @@ public:
     WinControl* ClearWaypointButton;    // +0x8ec "NavMapClearWaypointButton"
     WinControl* InfoTitle;              // +0x8f0 "NavMapInfoTitle"
     RichTextWin* InfoText;              // +0x8f4 "NavMapInfoText"
-    int Field_0x8f8;                    // +0x8f8 TODO
+    int Field_0x8f8;                    // +0x8f8 no access found
     WinControl* ClearAllWaypointsButton; // +0x8fc "NavMapClearAllWaypointsButton"
     WinControl* ClearAllWaypointsText;  // +0x900 "NavMapClearAllWaypointsText"
     WinControl* AbortMissionButton;     // +0x904 "NavMapAbortMissionButton"

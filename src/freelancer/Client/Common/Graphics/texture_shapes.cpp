@@ -105,7 +105,7 @@ bool TextureRefLoad(FTextureRef* Ref, char const* Name)
     Query.Crc = DACOM_CRC::GetCRC32(Name);
     if (DALib::TextureLib->FindTextureByCrc(&Query, &Ref->Texture) != GR_OK)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: texture (%s) is not defined", kShapeDbCpp, 0x24,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: texture (%s) is not defined", kShapeDbCpp, 0x24,
               Name);
     }
     return Ref->Texture != nullptr;
@@ -272,7 +272,7 @@ FTexShape* FShapeDB::Find(char const* Name, char const* SourceFile)
 
     if (Hit == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: ShapeDB: unable to find shape '%s'", SourceFile,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: ShapeDB: unable to find shape '%s'", SourceFile,
               0xf2, Name);
         return nullptr;
     }
@@ -325,7 +325,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
 
     if (!Reader.open(FullPath, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: unable to load ShapeDB file '%s'", kShapeDbCpp,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: unable to load ShapeDB file '%s'", kShapeDbCpp,
               0x1eb, Path);
     }
     else
@@ -386,7 +386,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         else
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100001, "%s(%d) : *** ERROR: %s\nfile not found (%s)",
+                            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s\nfile not found (%s)",
                                   kShapeDbCpp, 0x14c, kEmpty, CurrentFile.Data);
                         }
                         if (Archive != nullptr)
@@ -400,7 +400,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         if (!bExpectTexture)
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100001,
+                            FDUMP(kFdumpError,
                                   "%s(%d) : *** ERROR: %s\nshape definition never followed texture",
                                   kShapeDbCpp, 0x155, kEmpty);
                         }
@@ -421,7 +421,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         if (Library->FindTextureByCrc(&Query, &Texture) != GR_OK)
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100002, "%s(%d) : *** WARNING: '%s'\n\nmissing texture (%s)",
+                            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: '%s'\n\nmissing texture (%s)",
                                   kShapeDbCpp, 0x110, kEmpty, Name.Data);
                         }
                         else
@@ -437,7 +437,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         if (CurrentTexture == nullptr)
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100001,
+                            FDUMP(kFdumpError,
                                   "%s(%d) : *** ERROR: %s\n'shape_name' field must be preceeded by "
                                   "valid 'texture_name' field",
                                   kShapeDbCpp, 0x164, kEmpty);
@@ -457,7 +457,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         {
                             CurrentShape = nullptr;
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100001, "%s(%d) : *** ERROR: %s\nshape name (%s) already found",
+                            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s\nshape name (%s) already found",
                                   kShapeDbCpp, 0x16b, kEmpty, ShapeName.Data);
                         }
                         else
@@ -475,7 +475,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         if (!bExpectTexture)
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100001,
+                            FDUMP(kFdumpError,
                                   "%s(%d) : *** ERROR: %s\nshape definition never followed texture",
                                   kShapeDbCpp, 0x175, kEmpty);
                         }
@@ -488,7 +488,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         if (Library->FindTextureByCrc(&Query, &Texture) != GR_OK)
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100002, "%s(%d) : *** WARNING: '%s'\n\nmissing texture (%s)",
+                            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: '%s'\n\nmissing texture (%s)",
                                   kShapeDbCpp, 0x110, kEmpty, Value);
                         }
                         else
@@ -510,7 +510,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         else
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100001, "%s(%d) : *** ERROR: %s\nshape name (%s) already found",
+                            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s\nshape name (%s) already found",
                                   kShapeDbCpp, 0x17f, kEmpty, Value);
                         }
                     }
@@ -519,7 +519,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         if (CurrentTexture == nullptr)
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100001,
+                            FDUMP(kFdumpError,
                                   "%s(%d) : *** ERROR: %s\n'dim' field must be preceeded by "
                                   "'texture_name' field",
                                   kShapeDbCpp, 0x186, kEmpty);
@@ -527,7 +527,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         else if (CurrentShape == nullptr)
                         {
                             Reader.log_link(kEmpty);
-                            FDUMP(0x100001,
+                            FDUMP(kFdumpError,
                                   "%s(%d) : *** ERROR: %s\n'dim' field must be preceeded by "
                                   "'shape_name' field",
                                   kShapeDbCpp, 0x18b, kEmpty);
@@ -554,7 +554,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                         char Message[0x200];
                         sprintf(Message, "unknown [Shape] parameter %s", Reader.get_name_ptr());
                         Reader.log_link(Message);
-                        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kShapeDbCpp, 0x1a2, Message);
+                        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kShapeDbCpp, 0x1a2, Message);
                     }
                 }
             }
@@ -629,7 +629,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                     else
                     {
                         Reader.log_link(kEmpty);
-                        FDUMP(0x100002, "%s(%d) : *** WARNING: %s\nunknown shape parameter",
+                        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s\nunknown shape parameter",
                               kShapeDbCpp, 0x1cf, kEmpty);
                     }
                 }
@@ -637,13 +637,13 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                 if (ShapeName.Data[0] == '\0')
                 {
                     Reader.log_link(kEmpty);
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: %s\nno shape name was specified",
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s\nno shape name was specified",
                           kShapeDbCpp, 0x1d4, kEmpty);
                 }
                 else if (CurrentTexture == nullptr)
                 {
                     Reader.log_link(kEmpty);
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kShapeDbCpp, 0x1da, "bad texture id");
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kShapeDbCpp, 0x1da, "bad texture id");
                 }
                 else
                 {
@@ -654,7 +654,7 @@ int FShapeDB::Load(char const* Path, IFileSystem* BaseDir)
                     if (Shape->Texture != nullptr)
                     {
                         Reader.log_link(kEmpty);
-                        FDUMP(0x100001, "%s(%d) : *** ERROR: %s\nshape name (%s) already found",
+                        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s\nshape name (%s) already found",
                               kShapeDbCpp, 0x1e0, kEmpty, ShapeName.Data);
                     }
                     else

@@ -334,7 +334,7 @@ namespace
             G_LocationBaseById.find(BaseId);
         if (It != G_LocationBaseById.end())
             return It->second;
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find base id %d\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find base id %d\n",
               kLocationControllerCpp, 0x100, BaseId);
         return nullptr;
     }
@@ -346,7 +346,7 @@ namespace
             G_LocationRooms.find(LocationId);
         if (It != G_LocationRooms.end())
             return It->second;
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find location id %d\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find location id %d\n",
               kLocationControllerCpp, 0x110, LocationId);
         return nullptr;
     }
@@ -386,7 +386,7 @@ namespace
                 unsigned char* const Flag = SyncFlags[SyncIndex];
                 if (WaitForServerResponse(Flag, 5.0f, 60.0f) != 1)
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kLocationControllerCpp, 0x108,
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kLocationControllerCpp, 0x108,
                           "Synchronization failed\n");
                     *Flag = 0;
                 }
@@ -441,7 +441,7 @@ namespace
             unsigned char* const Flag = SyncFlags[SyncIndex];
             if (WaitForServerResponse(Flag, 5.0f, 60.0f) != 1)
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kLocationControllerCpp, 0x108,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kLocationControllerCpp, 0x108,
                       "Synchronization failed\n");
                 *Flag = 0;
             }
@@ -890,7 +890,7 @@ namespace
         RoomData* const Room = BaseDataList_get()->get_unloaded_room_data(Location);
         if (Room == nullptr)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find location %d\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find location %d\n",
                   kLocationControllerCpp, 0x120, Location);
             return 0;
         }
@@ -966,7 +966,7 @@ void EnterClientLocationBase(unsigned BaseId)
     {
         if (static_cast<IServer*>(GetLocalServerInterface()) != nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kLocationControllerCpp, 0x405,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kLocationControllerCpp, 0x405,
                   "Failed to get start location\n");
         }
         StartLocation = FindLocationBaseEntry(BaseId)->Base->StartRoomId;
@@ -1050,7 +1050,7 @@ void ChangeClientLocation(unsigned Location)
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find location %d\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find location %d\n",
                   kLocationControllerCpp, 0x120, Location);
             G_LocationCurrentBaseEntry = nullptr;
         }

@@ -80,22 +80,19 @@
 unsigned int FPacket_FLPACKET_SERVER_CREATELOOT::Encode(unsigned char** BufferHolder,
                                                         unsigned int Capacity,
                                                         unsigned int* OutLength) {
-    const FPayloadServerCreateLoot* Wire =
-        reinterpret_cast<const FPayloadServerCreateLoot*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    Stream.PutDword(Wire->OwnerId);                         // payload+0x00
-    Stream.PutByte(Wire->Kind);                          // payload+0x04
+    Stream.PutDword(Wire.OwnerId);                          // payload+0x00
+    Stream.PutByte(Wire.Kind);                           // payload+0x04
 
     // Only the low byte of the list's Size travels; zero skips the loop.
-    const unsigned char Count = (unsigned char)(Wire->Items.Size & 0xffu);
+    const unsigned char Count = (unsigned char)(Wire.Items.Size & 0xffu);
     Stream.PutByte(Count);
     if (Count != 0) {
         // 06d929bd dereferences the dummy node with no null check. A non-zero count
-        // means RpcPacketLootPushBack has built it.
-        for (const FRpcLootWireNode* Node = Wire->Items.Head->Next;
-             Node != Wire->Items.Head && !Stream.Failed(); Node = Node->Next) {
+        // means PushBackLoot has built it.
+        for (const FRpcLootWireNode* Node = Wire.Items.Head->Next;
+             Node != Wire.Items.Head && !Stream.Failed(); Node = Node->Next) {
             const FRpcLootWireRecord& Record = Node->Value;
             Stream.PutDword(Record.LootId);
             Stream.PutWord(Archetype::LargeIDToSmallID(Record.ContentsNickname));
@@ -124,9 +121,6 @@ unsigned int FPacket_FLPACKET_SERVER_CREATELOOT::Encode(unsigned char** BufferHo
 
 unsigned int FPacket_FLPACKET_SERVER_CREATELOOT::Decode(const unsigned char* Buffer,
                                                         unsigned int Size, unsigned int* OutLength) {
-    FPayloadServerCreateLoot* Wire =
-        reinterpret_cast<FPayloadServerCreateLoot*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // The dispatcher already consumed the two header bytes; the decoder's length excludes
     // them.
@@ -135,12 +129,12 @@ unsigned int FPacket_FLPACKET_SERVER_CREATELOOT::Decode(const unsigned char* Buf
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();
     }
-    Wire->OwnerId = Scratch;
+    Wire.OwnerId = Scratch;
     unsigned char Small8 = 0;
     if (!Stream.GetByte(Small8)) {
         return Stream.GetError();
     }
-    Wire->Kind = Small8;
+    Wire.Kind = Small8;
     unsigned char Count = 0;
     if (!Stream.GetByte(Count)) {                              // 06d92dd7
         return Stream.GetError();
@@ -158,8 +152,8 @@ unsigned int FPacket_FLPACKET_SERVER_CREATELOOT::Decode(const unsigned char* Buf
 
         // FUN_06d931f0 == std::list::insert(end(), record): the element is linked first
         // and filled in place, so a short buffer leaves a partially decoded element.
-        RpcPacketLootPushBack(this, Fresh);
-        FRpcLootWireList* List = RpcPacketLootList(this);
+        PushBackLoot(Fresh);
+        FRpcLootWireList* List = &Wire.Items;
         FRpcLootWireRecord& Record = List->Head->Prev->Value;
 
         unsigned short Small = 0;
@@ -242,34 +236,32 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Encode(unsigned char** Buffe
                                                            unsigned int Capacity,
                                                            unsigned int* OutLength) {
     // Not const: the mask is written back into payload+0x34.
-    FPayloadServerSetReputation* Wire =
-        reinterpret_cast<FPayloadServerSetReputation*>(Payload());
 
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
 
-    const unsigned char Flag1 = (unsigned char)(Wire->MaskAffiliation & 0xffu);
-    const unsigned char Flag2 = (unsigned char)(Wire->MaskNames & 0xffu);
-    const unsigned char Flag4 = (unsigned char)(Wire->MaskDisplayName & 0xffu);
-    const unsigned char Flag8 = (unsigned char)(Wire->MaskRelationsByte & 0xffu);
-    const unsigned char Flag10 = (unsigned char)(Wire->MaskRelationsWord & 0xffu);
+    const unsigned char Flag1 = (unsigned char)(Wire.MaskAffiliation & 0xffu);
+    const unsigned char Flag2 = (unsigned char)(Wire.MaskNames & 0xffu);
+    const unsigned char Flag4 = (unsigned char)(Wire.MaskDisplayName & 0xffu);
+    const unsigned char Flag8 = (unsigned char)(Wire.MaskRelationsByte & 0xffu);
+    const unsigned char Flag10 = (unsigned char)(Wire.MaskRelationsWord & 0xffu);
 
     unsigned char Mask = 0;
-    if (Wire->Affiliation != 0xffffffffu) {                     // 06d91f14 CMP ...,-1
+    if (Wire.Affiliation != 0xffffffffu) {                      // 06d91f14 CMP ...,-1
         Mask = Flag1;
     }
     unsigned int RelCount = 0;
     if (SinglePlayer()) {                                      // 06d91f28 / 06d91f30
-        if (Wire->DisplayNameLength != 0) {                    // 06d91f35
+        if (Wire.DisplayNameLength != 0) {                     // 06d91f35
             Mask = (unsigned char)(Mask | Flag4);
         }
         // Both buffers dereferenced untested; the marshaller always fills them.
-        const unsigned int* NameAFirst = static_cast<const unsigned int*>(Wire->NameABuffer);
-        const unsigned int* NameBFirst = static_cast<const unsigned int*>(Wire->NameBBuffer);
+        const unsigned int* NameAFirst = static_cast<const unsigned int*>(Wire.NameABuffer);
+        const unsigned int* NameBFirst = static_cast<const unsigned int*>(Wire.NameBBuffer);
         if (*NameAFirst != 0 || *NameBFirst != 0) {
             Mask = (unsigned char)(Mask | Flag2);
         }
-        RelCount = Wire->Relations.Size;
+        RelCount = Wire.Relations.Size;
         if (RelCount != 0) {                                   // 06d91f68
             // Retail compares signed on an unsigned count. Kept signed.
             if ((int)RelCount > 0xff) {
@@ -279,23 +271,23 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Encode(unsigned char** Buffe
             }
         }
     }
-    Wire->Flags = Mask;
+    Wire.Flags = Mask;
 
     Stream.PutByte(Mask);
-    Stream.PutDword(Wire->VibeHandle);                         // payload+0x38
+    Stream.PutDword(Wire.VibeHandle);                          // payload+0x38
     if ((Flag1 & Mask) != 0) {                                 // 06d91fef
-        Stream.PutDword(Wire->Affiliation);
+        Stream.PutDword(Wire.Affiliation);
     }
     if ((Flag4 & Mask) != 0) {                                 // 06d92028
-        Stream.PutByte((unsigned char)(Wire->DisplayNameLength & 0xffu));
-        Stream.PutBytes(Wire->DisplayName, Wire->DisplayNameLength * 2u);
+        Stream.PutByte((unsigned char)(Wire.DisplayNameLength & 0xffu));
+        Stream.PutBytes(Wire.DisplayName, Wire.DisplayNameLength * 2u);
     }
     if ((Flag2 & Mask) != 0) {                                 // 06d920b4
-        RpcPutSizedBlock(Stream, Wire->NameASize, Wire->NameABuffer);
-        RpcPutSizedBlock(Stream, Wire->NameBSize, Wire->NameBBuffer);
+        RpcPutSizedBlock(Stream, Wire.NameASize, Wire.NameABuffer);
+        RpcPutSizedBlock(Stream, Wire.NameBSize, Wire.NameBBuffer);
     }
     if (IsMPServer()) {                                        // 06d921d0 / 06d921d8
-        Stream.PutFloat(Wire->Attitude);                       // FLD/FSTP
+        Stream.PutFloat(Wire.Attitude);                        // FLD/FSTP
     } else if (RelCount != 0) {                                // 06d92216
         if ((Flag10 & Mask) != 0) {                            // 06d92227
             Stream.PutWord((unsigned short)(RelCount & 0xffffu));
@@ -303,8 +295,8 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Encode(unsigned char** Buffe
             Stream.PutByte((unsigned char)(RelCount & 0xffu));
         }
         // The dummy is dereferenced untested; a non-zero count means it was built.
-        for (const FRpcRelationNode* Node = Wire->Relations.Head->Next;
-             Node != Wire->Relations.Head && !Stream.Failed(); Node = Node->Next) {
+        for (const FRpcRelationNode* Node = Wire.Relations.Head->Next;
+             Node != Wire.Relations.Head && !Stream.Failed(); Node = Node->Next) {
             // The value is used untested; the pair travels second field first.
             const FRpcRelation* Relation = Node->Value;
             Stream.PutDword(Relation->FeelingBits);
@@ -323,34 +315,31 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Encode(unsigned char** Buffe
 unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Decode(const unsigned char* Buffer,
                                                            unsigned int Size,
                                                            unsigned int* OutLength) {
-    FPayloadServerSetReputation* Wire =
-        reinterpret_cast<FPayloadServerSetReputation*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
-    const unsigned char Flag1 = (unsigned char)(Wire->MaskAffiliation & 0xffu);
-    const unsigned char Flag2 = (unsigned char)(Wire->MaskNames & 0xffu);
-    const unsigned char Flag4 = (unsigned char)(Wire->MaskDisplayName & 0xffu);
-    const unsigned char Flag8 = (unsigned char)(Wire->MaskRelationsByte & 0xffu);
-    const unsigned char Flag10 = (unsigned char)(Wire->MaskRelationsWord & 0xffu);
+    const unsigned char Flag1 = (unsigned char)(Wire.MaskAffiliation & 0xffu);
+    const unsigned char Flag2 = (unsigned char)(Wire.MaskNames & 0xffu);
+    const unsigned char Flag4 = (unsigned char)(Wire.MaskDisplayName & 0xffu);
+    const unsigned char Flag8 = (unsigned char)(Wire.MaskRelationsByte & 0xffu);
+    const unsigned char Flag10 = (unsigned char)(Wire.MaskRelationsWord & 0xffu);
 
     unsigned char Mask = 0;
     if (!Stream.GetByte(Mask)) {                               // 06d923bd
         return Stream.GetError();
     }
-    Wire->Flags = Mask;
+    Wire.Flags = Mask;
     unsigned int Scratch = 0;
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();
     }
-    Wire->VibeHandle = Scratch;
+    Wire.VibeHandle = Scratch;
     if ((Flag1 & Mask) != 0) {                                 // 06d923ef
         if (!Stream.GetDword(Scratch)) {
             return Stream.GetError();
         }
-        Wire->Affiliation = Scratch;
+        Wire.Affiliation = Scratch;
     } else {
-        Wire->Affiliation = 0xffffffffu;
+        Wire.Affiliation = 0xffffffffu;
     }
 
     if (SinglePlayer()) {                                      // 06d9242a / 06d92432
@@ -361,27 +350,27 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Decode(const unsigned char* 
             }
             // Sign-extended into the dword length.
             const int Signed = (int)(signed char)Raw;
-            Wire->DisplayNameLength = (unsigned int)Signed;
+            Wire.DisplayNameLength = (unsigned int)Signed;
             // Retail quirk: a negative length is not refused; it reaches operator new and
             // the cursor check wrapped.
             const unsigned int Chars = (unsigned int)Signed;
             // Four bytes per character plus four, for a buffer used two bytes per
             // character. Bare new in retail.
             void* Block = ::operator new(Chars * 4u + 4u, std::nothrow);
-            Wire->DisplayName = static_cast<wchar_t*>(Block);
+            Wire.DisplayName = static_cast<wchar_t*>(Block);
             if (!Stream.GetBytes(Block, Chars * 2u)) {
                 return Stream.GetError();
             }
             static_cast<unsigned short*>(Block)[Chars] = 0;
         } else {
-            Wire->DisplayNameLength = 0;
+            Wire.DisplayNameLength = 0;
         }
         if ((Flag2 & Mask) != 0) {                             // 06d924e9
             // FUN_06da1620 on payload+0x00 and payload+0x08, each a {size, buffer} pair.
-            if (!RpcGetSizedBlock(Stream, Wire->NameASize, Wire->NameABuffer)) {
+            if (!RpcGetSizedBlock(Stream, Wire.NameASize, Wire.NameABuffer)) {
                 return Stream.GetError();
             }
-            if (!RpcGetSizedBlock(Stream, Wire->NameBSize, Wire->NameBBuffer)) {
+            if (!RpcGetSizedBlock(Stream, Wire.NameBSize, Wire.NameBBuffer)) {
                 return Stream.GetError();
             }
         }
@@ -419,11 +408,11 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Decode(const unsigned char* 
                 }
                 Relation->GroupId = Scratch;
                 // operator new(0xc) node; bumps the list size.
-                RpcRelationListLink(&Wire->Relations, Relation);
+                RpcRelationListLink(&Wire.Relations, Relation);
             }
         }
     } else {
-        if (!Stream.GetFloat(Wire->Attitude)) {                             // 06d92689
+        if (!Stream.GetFloat(Wire.Attitude)) {                              // 06d92689
             return Stream.GetError();                                       // LAB_06d92668
         }
     }
@@ -466,48 +455,45 @@ unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Decode(const unsigned char* 
 unsigned int FPacket_FLPACKET_SERVER_MISCOBJUPDATE::Encode(unsigned char** BufferHolder,
                                                            unsigned int Capacity,
                                                            unsigned int* OutLength) {
-    const FPayloadServerMiscObjUpdate* Wire =
-        reinterpret_cast<const FPayloadServerMiscObjUpdate*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    const unsigned short Flags = Wire->Flags;
+    const unsigned short Flags = Wire.Flags;
     Stream.PutWord(Flags);
     if ((Flags & kMiscObjUpdateFlagObjectId) != 0) {         // 06d98daf TEST ...,0x8
-        Stream.PutDword(Wire->ObjectId);
+        Stream.PutDword(Wire.ObjectId);
     }
     if ((Flags & kMiscObjUpdateFlagPlayerId) != 0) {         // 06d98de4
-        Stream.PutDword(Wire->PlayerId);
+        Stream.PutDword(Wire.PlayerId);
     }
     if ((Flags & kMiscObjUpdateFlagGroupId) != 0) {         // 06d98e19
-        Stream.PutDword(Wire->GroupId);
+        Stream.PutDword(Wire.GroupId);
     }
     if ((Flags & kMiscObjUpdateFlagMission) != 0) {               // 06d98e4e
-        Stream.PutDword(Wire->MissionId);
-        Stream.PutDword(Wire->MissionSetBy);
+        Stream.PutDword(Wire.MissionId);
+        Stream.PutDword(Wire.MissionSetBy);
     }
     if ((Flags & kMiscObjUpdateFlagText) != 0) {               // 06d98eb2
         // Only the low word of the character count travels, and the same word doubled is
         // the byte run.
-        const unsigned short Chars = (unsigned short)(Wire->Text.size() & 0xffffu);
+        const unsigned short Chars = (unsigned short)(Wire.Text.size() & 0xffffu);
         Stream.PutWord(Chars);
         // Retail's buffer pointer, or _Nullstr when never allocated: c_str().
-        Stream.PutBytes(Wire->Text.c_str(), (unsigned int)Chars * 2u);
+        Stream.PutBytes(Wire.Text.c_str(), (unsigned int)Chars * 2u);
     }
     if ((Flags & kMiscObjUpdateFlagAffiliation) != 0) {         // 06d98f45
-        Stream.PutDword(Wire->Affiliation);
+        Stream.PutDword(Wire.Affiliation);
     }
     if ((Flags & kMiscObjUpdateFlagRank) != 0) {         // 06d98f7c
-        Stream.PutWord(Wire->Rank);
+        Stream.PutWord(Wire.Rank);
     }
     if ((Flags & kMiscObjUpdateFlagSystemId) != 0) {         // 06d98fb5 TEST AL,AL / JNS
-        Stream.PutDword(Wire->SystemId);
+        Stream.PutDword(Wire.SystemId);
     }
     if ((Flags & kMiscObjUpdateFlagIds) != 0) {                // 06d98fed TEST [+0x21],1
-        Stream.PutByte(Wire->IdCount);
+        Stream.PutByte(Wire.IdCount);
         // Walks Begin..End and ships every element whether or not the count byte agrees.
-        for (std::vector<unsigned int>::const_iterator Id = Wire->Ids.begin();
-             Id != Wire->Ids.end() && !Stream.Failed(); ++Id) {
+        for (std::vector<unsigned int>::const_iterator Id = Wire.Ids.begin();
+             Id != Wire.Ids.end() && !Stream.Failed(); ++Id) {
             Stream.PutDword(*Id);
         }
     }
@@ -523,34 +509,31 @@ unsigned int FPacket_FLPACKET_SERVER_MISCOBJUPDATE::Encode(unsigned char** Buffe
 unsigned int FPacket_FLPACKET_SERVER_MISCOBJUPDATE::Decode(const unsigned char* Buffer,
                                                            unsigned int Size,
                                                            unsigned int* OutLength) {
-    FPayloadServerMiscObjUpdate* Wire =
-        reinterpret_cast<FPayloadServerMiscObjUpdate*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     unsigned short Flags = 0;
     if (!Stream.GetWord(Flags)) {                              // 06d9913f
         return Stream.GetError();
     }
-    Wire->Flags = Flags;
+    Wire.Flags = Flags;
     unsigned int Scratch = 0;
     if ((Flags & kMiscObjUpdateFlagObjectId) != 0) {         // 06d99149 TEST AL,0x8
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->ObjectId = Scratch;
+        Wire.ObjectId = Scratch;
     }
     if ((Flags & kMiscObjUpdateFlagPlayerId) != 0) {         // 06d9917b
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->PlayerId = Scratch;
+        Wire.PlayerId = Scratch;
     }
     if ((Flags & kMiscObjUpdateFlagGroupId) != 0) {         // 06d991ab
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->GroupId = Scratch;
+        Wire.GroupId = Scratch;
     }
     if ((Flags & kMiscObjUpdateFlagMission) != 0) {               // 06d991db
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->MissionId = Scratch;
+        Wire.MissionId = Scratch;
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->MissionSetBy = Scratch;
+        Wire.MissionSetBy = Scratch;
     }
     if ((Flags & kMiscObjUpdateFlagText) != 0) {               // 06d99235
         unsigned short WireChars = 0;
@@ -571,34 +554,34 @@ unsigned int FPacket_FLPACKET_SERVER_MISCOBJUPDATE::Decode(const unsigned char* 
             ++Chars;
         }
         // Inlined basic_string::assign(Temp, Chars).
-        Wire->Text.assign(Temp, (size_t)Chars);
+        Wire.Text.assign(Temp, (size_t)Chars);
         free(Temp);
     }
     if ((Flags & kMiscObjUpdateFlagAffiliation) != 0) {         // 06d9932e
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Affiliation = Scratch;
+        Wire.Affiliation = Scratch;
     }
     if ((Flags & kMiscObjUpdateFlagRank) != 0) {         // 06d99362
         unsigned short Word = 0;
         if (!Stream.GetWord(Word)) { return Stream.GetError(); }
-        Wire->Rank = Word;
+        Wire.Rank = Word;
     }
     if ((Flags & kMiscObjUpdateFlagSystemId) != 0) {         // 06d99398 TEST AL,AL / JNS
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->SystemId = Scratch;
+        Wire.SystemId = Scratch;
     }
     if ((Flags & kMiscObjUpdateFlagIds) != 0) {                // 06d993cd TEST [+0x21],1
         unsigned char Count = 0;
         if (!Stream.GetByte(Count)) {                          // 06d993f8
             return Stream.GetError();
         }
-        Wire->IdCount = Count;
+        Wire.IdCount = Count;
         for (unsigned int Index = 0; Index < (unsigned int)Count; ++Index) {
             if (!Stream.GetDword(Scratch)) {                   // 06d9943a
                 return Stream.GetError();
             }
             // Inlined vector::insert(End, 1, value).
-            Wire->Ids.push_back(Scratch);
+            Wire.Ids.push_back(Scratch);
         }
     }
     if (Stream.Failed()) {
@@ -673,41 +656,38 @@ static void RpcSendCommMoveFloatBits(void* Dest, const void* Source) {
 unsigned int FPacket_FLPACKET_SERVER_SENDCOMM::Encode(unsigned char** BufferHolder,
                                                       unsigned int Capacity,
                                                       unsigned int* OutLength) {
-    const FPayloadServerSendComm* Wire =
-        reinterpret_cast<const FPayloadServerSendComm*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
 
-    Stream.PutDword(Wire->SenderId);
-    Stream.PutDword(Wire->ReceiverId);
-    Stream.PutDword(Wire->VoiceId);
-    Stream.PutByte(Wire->bReceiverIsOwnShip);
-    if (Wire->bReceiverIsOwnShip != 0) {                               // 06dad0ea / 06dad0ef JZ
-        Stream.PutDword(Wire->Body.Head);
-        Stream.PutDword(Wire->Body.Body);
+    Stream.PutDword(Wire.SenderId);
+    Stream.PutDword(Wire.ReceiverId);
+    Stream.PutDword(Wire.VoiceId);
+    Stream.PutByte(Wire.bReceiverIsOwnShip);
+    if (Wire.bReceiverIsOwnShip != 0) {                                // 06dad0ea / 06dad0ef JZ
+        Stream.PutDword(Wire.Body.Head);
+        Stream.PutDword(Wire.Body.Body);
         // The low byte of the dword count travels; the loop bound is the whole dword,
         // signed.
-        Stream.PutByte((unsigned char)((unsigned int)Wire->Body.Count & 0xffu));
-        const unsigned int* const IdSlots = Wire->Body.Ids;
-        for (int Index = 0; Index < Wire->Body.Count && !Stream.Failed(); ++Index) {
+        Stream.PutByte((unsigned char)((unsigned int)Wire.Body.Count & 0xffu));
+        const unsigned int* const IdSlots = Wire.Body.Ids;
+        for (int Index = 0; Index < Wire.Body.Count && !Stream.Failed(); ++Index) {
             Stream.PutDword(IdSlots[Index]);
         }
     }
-    Stream.PutDword(Wire->CaptionIds);
-    Stream.PutByte(Wire->BufferCount);
+    Stream.PutDword(Wire.CaptionIds);
+    Stream.PutByte(Wire.BufferCount);
     // The loop bound is the byte, signed.
-    const int SignedBufferCount = (int)(signed char)Wire->BufferCount;
+    const int SignedBufferCount = (int)(signed char)Wire.BufferCount;
     if (SignedBufferCount > 0) {
         // payload+0x44 dereferenced untested.
         for (int Index = 0; Index < SignedBufferCount && !Stream.Failed(); ++Index) {
-            Stream.PutDword(Wire->Buffer[Index]);
+            Stream.PutDword(Wire.Buffer[Index]);
         }
     }
     // The dword's low half only.
-    Stream.PutWord((unsigned short)(Wire->PermutationIds & 0xffffu));
+    Stream.PutWord((unsigned short)(Wire.PermutationIds & 0xffffu));
     float Scaled = 0.0f;
-    RpcSendCommMoveFloatBits(&Scaled, &Wire->DurationBits);
+    RpcSendCommMoveFloatBits(&Scaled, &Wire.DurationBits);
     Stream.PutQuantizedTwoStage(Scaled, FRpcMarshalStream::kTenthScale,
                                 FRpcMarshalStream::kPercentScale);
 
@@ -721,9 +701,6 @@ unsigned int FPacket_FLPACKET_SERVER_SENDCOMM::Encode(unsigned char** BufferHold
 
 unsigned int FPacket_FLPACKET_SERVER_SENDCOMM::Decode(const unsigned char* Buffer,
                                                       unsigned int Size, unsigned int* OutLength) {
-    FPayloadServerSendComm* Wire =
-        reinterpret_cast<FPayloadServerSendComm*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -733,66 +710,66 @@ unsigned int FPacket_FLPACKET_SERVER_SENDCOMM::Decode(const unsigned char* Buffe
     unsigned short Small16 = 0;
     unsigned char Small8 = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->SenderId = Scratch;
+    Wire.SenderId = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->ReceiverId = Scratch;
+    Wire.ReceiverId = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->VoiceId = Scratch;
+    Wire.VoiceId = Scratch;
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-    Wire->bReceiverIsOwnShip = Small8;
+    Wire.bReceiverIsOwnShip = Small8;
     if (Small8 != 0) {                                         // 06dad40d JZ
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Body.Head = Scratch;
+        Wire.Body.Head = Scratch;
         if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-        Wire->Body.Body = Scratch;
+        Wire.Body.Body = Scratch;
         // Not on the wire; the decoder clears them.
-        Wire->Body.LeftHand = 0;
-        Wire->Body.RightHand = 0;
+        Wire.Body.LeftHand = 0;
+        Wire.Body.RightHand = 0;
         if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
         // Zero-extended into the dword.
-        Wire->Body.Count = (int)(unsigned int)Small8;
-        unsigned int* const IdSlots = Wire->Body.Ids;
-        for (int Index = 0; Index < Wire->Body.Count; ++Index) {
+        Wire.Body.Count = (int)(unsigned int)Small8;
+        unsigned int* const IdSlots = Wire.Body.Ids;
+        for (int Index = 0; Index < Wire.Body.Count; ++Index) {
             if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
             IdSlots[Index] = Scratch;
         }
     } else {
         // LAB_06dad4dd clears the whole id block except its Ids array.
-        Wire->Body.Head = 0;
-        Wire->Body.Body = 0;
-        Wire->Body.LeftHand = 0;
-        Wire->Body.RightHand = 0;
-        Wire->Body.Count = 0;
+        Wire.Body.Head = 0;
+        Wire.Body.Body = 0;
+        Wire.Body.LeftHand = 0;
+        Wire.Body.RightHand = 0;
+        Wire.Body.Count = 0;
     }
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->CaptionIds = Scratch;
+    Wire.CaptionIds = Scratch;
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-    Wire->BufferCount = Small8;
+    Wire.BufferCount = Small8;
 
     // The old pointer is freed first, so a packet decoded twice does not leak.
-    if (Wire->Buffer != nullptr) {
-        ::operator delete(Wire->Buffer);
-        Wire->Buffer = nullptr;
+    if (Wire.Buffer != nullptr) {
+        ::operator delete(Wire.Buffer);
+        Wire.Buffer = nullptr;
     }
-    const int SignedBufferCount = (int)(signed char)Wire->BufferCount;
+    const int SignedBufferCount = (int)(signed char)Wire.BufferCount;
     // Retail quirk: bare operator new(count << 2) with no sign test, so 0x80..0xff reach it
     // as a negative count shifted left; zero allocates zero bytes. Only the loop is gated.
-    Wire->Buffer = static_cast<unsigned int*>(
+    Wire.Buffer = static_cast<unsigned int*>(
         ::operator new((unsigned int)SignedBufferCount << 2, std::nothrow));
     if (SignedBufferCount > 0) {
         for (int Index = 0; Index < SignedBufferCount; ++Index) {
             if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-            Wire->Buffer[Index] = Scratch;
+            Wire.Buffer[Index] = Scratch;
         }
     }
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
     // Zero-extended into the dword.
-    Wire->PermutationIds = (unsigned int)Small16;
+    Wire.PermutationIds = (unsigned int)Small16;
     float Scaled = 0.0f;
     if (!Stream.GetQuantizedUnsigned(Scaled, FRpcMarshalStream::kTenthInvScale)) {
         return Stream.GetError();
     }
-    RpcSendCommMoveFloatBits(&Wire->DurationBits, &Scaled);
+    RpcSendCommMoveFloatBits(&Wire.DurationBits, &Scaled);
 
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -849,25 +826,22 @@ static unsigned int RpcCreateFloatToBits(float Value) {
 unsigned int FPacket_FLPACKET_SERVER_CREATEGUIDED::Encode(unsigned char** BufferHolder,
                                                           unsigned int Capacity,
                                                           unsigned int* OutLength) {
-    const FPayloadServerCreateGuided* Wire =
-        reinterpret_cast<const FPayloadServerCreateGuided*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    Stream.PutWord(Archetype::LargeIDToSmallID(Wire->ArchetypeNickname));    // / 06da8564
-    Stream.PutDword(Wire->OwnerId);
-    Stream.PutWord(Wire->SubObjId);
-    Stream.PutDword(Wire->TargetId);
-    Stream.PutWord(Wire->TargetSubObjId);
-    Stream.PutDword(Wire->ObjId);
-    Stream.PutBytes(&Wire->PosXBits, 12);
-    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->OrientXBits),
+    Stream.PutWord(Archetype::LargeIDToSmallID(Wire.ArchetypeNickname));     // / 06da8564
+    Stream.PutDword(Wire.OwnerId);
+    Stream.PutWord(Wire.SubObjId);
+    Stream.PutDword(Wire.TargetId);
+    Stream.PutWord(Wire.TargetSubObjId);
+    Stream.PutDword(Wire.ObjId);
+    Stream.PutBytes(&Wire.PosXBits, 12);
+    Stream.PutQuantized(RpcCreateBitsToFloat(Wire.OrientXBits),
                         FRpcMarshalStream::kOrientationScale);        // > 06da8709
-    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->OrientYBits),
+    Stream.PutQuantized(RpcCreateBitsToFloat(Wire.OrientYBits),
                         FRpcMarshalStream::kOrientationScale);        // > 06da8738
-    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->OrientZBits),
+    Stream.PutQuantized(RpcCreateBitsToFloat(Wire.OrientZBits),
                         FRpcMarshalStream::kOrientationScale);        // > 06da8767
-    Stream.PutQuantized(RpcCreateBitsToFloat(Wire->OrientWBits),
+    Stream.PutQuantized(RpcCreateBitsToFloat(Wire.OrientWBits),
                         FRpcMarshalStream::kOrientationScale);        // > 06da8792
 
     if (Stream.Failed()) {
@@ -881,28 +855,25 @@ unsigned int FPacket_FLPACKET_SERVER_CREATEGUIDED::Encode(unsigned char** Buffer
 unsigned int FPacket_FLPACKET_SERVER_CREATEGUIDED::Decode(const unsigned char* Buffer,
                                                           unsigned int Size,
                                                           unsigned int* OutLength) {
-    FPayloadServerCreateGuided* Wire =
-        reinterpret_cast<FPayloadServerCreateGuided*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
-    Wire->OwnerPlayer = 0;
+    Wire.OwnerPlayer = 0;
     unsigned short Small16 = 0;
     unsigned int Scratch = 0;
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
     // Zero-extended before the call.
-    Wire->ArchetypeNickname = Archetype::SmallIDToLargeID(Small16);
+    Wire.ArchetypeNickname = Archetype::SmallIDToLargeID(Small16);
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->OwnerId = Scratch;
+    Wire.OwnerId = Scratch;
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->SubObjId = Small16;
+    Wire.SubObjId = Small16;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->TargetId = Scratch;
+    Wire.TargetId = Scratch;
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->TargetSubObjId = Small16;
+    Wire.TargetSubObjId = Small16;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->ObjId = Scratch;
-    if (!Stream.GetBytes(&Wire->PosXBits, 12)) {                    // 06da8983 FUN_06d8f510
+    Wire.ObjId = Scratch;
+    if (!Stream.GetBytes(&Wire.PosXBits, 12)) {                     // 06da8983 FUN_06d8f510
         return Stream.GetError();
     }
 
@@ -911,19 +882,19 @@ unsigned int FPacket_FLPACKET_SERVER_CREATEGUIDED::Decode(const unsigned char* B
     if (!Stream.GetQuantizedSigned(Quantized, FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    Wire->OrientXBits = RpcCreateFloatToBits(Quantized);
+    Wire.OrientXBits = RpcCreateFloatToBits(Quantized);
     if (!Stream.GetQuantizedSigned(Quantized, FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    Wire->OrientYBits = RpcCreateFloatToBits(Quantized);
+    Wire.OrientYBits = RpcCreateFloatToBits(Quantized);
     if (!Stream.GetQuantizedSigned(Quantized, FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    Wire->OrientZBits = RpcCreateFloatToBits(Quantized);
+    Wire.OrientZBits = RpcCreateFloatToBits(Quantized);
     if (!Stream.GetQuantizedSigned(Quantized, FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    Wire->OrientWBits = RpcCreateFloatToBits(Quantized);
+    Wire.OrientWBits = RpcCreateFloatToBits(Quantized);
 
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -958,21 +929,18 @@ unsigned int FPacket_FLPACKET_SERVER_CREATEGUIDED::Decode(const unsigned char* B
 unsigned int FPacket_FLPACKET_SERVER_CREATEMINE::Encode(unsigned char** BufferHolder,
                                                         unsigned int Capacity,
                                                         unsigned int* OutLength) {
-    const FPayloadServerCreateMine* Wire =
-        reinterpret_cast<const FPayloadServerCreateMine*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    Stream.PutDword(Wire->ObjId);
-    Stream.PutWord(Archetype::LargeIDToSmallID(Wire->ArchetypeNickname));    // / 06da9689
-    Stream.PutDword(Wire->OwnerId);
-    Stream.PutWord(Wire->SubObjId);
+    Stream.PutDword(Wire.ObjId);
+    Stream.PutWord(Archetype::LargeIDToSmallID(Wire.ArchetypeNickname));     // / 06da9689
+    Stream.PutDword(Wire.OwnerId);
+    Stream.PutWord(Wire.SubObjId);
     // payload+0x20..+0x2b -- not payload+0x10, which travels later and only in SP.
-    Stream.PutBytes(&Wire->PosXBits, 12);
+    Stream.PutBytes(&Wire.PosXBits, 12);
     if (SinglePlayer()) {                                             // 06da9745 / 06da974d
-        Stream.PutBytes(&Wire->OrientWBits, 16);                       // FUN_06d8f4f0
-        Stream.PutBytes(&Wire->VelXBits, 12);                       // FUN_06d8f510
-        Stream.PutBytes(&Wire->AngVelXBits, 12);                       // FUN_06d8f510
+        Stream.PutBytes(&Wire.OrientWBits, 16);                        // FUN_06d8f4f0
+        Stream.PutBytes(&Wire.VelXBits, 12);                        // FUN_06d8f510
+        Stream.PutBytes(&Wire.AngVelXBits, 12);                        // FUN_06d8f510
     }
 
     if (Stream.Failed()) {
@@ -985,37 +953,34 @@ unsigned int FPacket_FLPACKET_SERVER_CREATEMINE::Encode(unsigned char** BufferHo
 
 unsigned int FPacket_FLPACKET_SERVER_CREATEMINE::Decode(const unsigned char* Buffer,
                                                         unsigned int Size, unsigned int* OutLength) {
-    FPayloadServerCreateMine* Wire =
-        reinterpret_cast<FPayloadServerCreateMine*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // 06da98fc FUN_06da13c0 -- consumes nothing.
 
     unsigned int Scratch = 0;
     unsigned short Small16 = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->ObjId = Scratch;
+    Wire.ObjId = Scratch;
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->ArchetypeNickname = Archetype::SmallIDToLargeID(Small16);          // / 06da9974
+    Wire.ArchetypeNickname = Archetype::SmallIDToLargeID(Small16);           // / 06da9974
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->OwnerId = Scratch;
+    Wire.OwnerId = Scratch;
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->SubObjId = Small16;
-    if (!Stream.GetBytes(&Wire->PosXBits, 12)) {                    // 06da99f4
+    Wire.SubObjId = Small16;
+    if (!Stream.GetBytes(&Wire.PosXBits, 12)) {                     // 06da99f4
         return Stream.GetError();
     }
     if (SinglePlayer()) {                                             // 06da99fe / 06da9a06
-        if (!Stream.GetBytes(&Wire->OrientWBits, 16)) {                // 06da9a34
+        if (!Stream.GetBytes(&Wire.OrientWBits, 16)) {                 // 06da9a34
             return Stream.GetError();
         }
-        if (!Stream.GetBytes(&Wire->VelXBits, 12)) {                // 06da9a66
+        if (!Stream.GetBytes(&Wire.VelXBits, 12)) {                 // 06da9a66
             return Stream.GetError();
         }
-        if (!Stream.GetBytes(&Wire->AngVelXBits, 12)) {                // 06da9a98
+        if (!Stream.GetBytes(&Wire.AngVelXBits, 12)) {                 // 06da9a98
             return Stream.GetError();
         }
     }
-    Wire->OwnerPlayer = 0;
+    Wire.OwnerPlayer = 0;
 
     // 06da9ab2 FUN_06da13c0 -- consumes nothing.
     if (Stream.Failed()) {
@@ -1029,20 +994,17 @@ unsigned int FPacket_FLPACKET_SERVER_CREATEMINE::Decode(const unsigned char* Buf
 unsigned int FPacket_FLPACKET_SERVER_CREATECOUNTER::Encode(unsigned char** BufferHolder,
                                                            unsigned int Capacity,
                                                            unsigned int* OutLength) {
-    const FPayloadServerCreateCounter* Wire =
-        reinterpret_cast<const FPayloadServerCreateCounter*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    Stream.PutDword(Wire->ArchetypeNickname);
-    Stream.PutDword(Wire->ObjId);
-    Stream.PutDword(Wire->OwnerPlayer);
-    Stream.PutDword(Wire->OwnerId);
-    Stream.PutWord(Wire->SubObjId);
-    Stream.PutBytes(&Wire->OrientWBits, 16);                           // FUN_06d8f4f0
-    Stream.PutBytes(&Wire->PosXBits, 12);                           // FUN_06d8f510
-    Stream.PutBytes(&Wire->VelXBits, 12);                           // FUN_06d8f510
-    Stream.PutBytes(&Wire->AngVelXBits, 12);                           // FUN_06d8f510
+    Stream.PutDword(Wire.ArchetypeNickname);
+    Stream.PutDword(Wire.ObjId);
+    Stream.PutDword(Wire.OwnerPlayer);
+    Stream.PutDword(Wire.OwnerId);
+    Stream.PutWord(Wire.SubObjId);
+    Stream.PutBytes(&Wire.OrientWBits, 16);                            // FUN_06d8f4f0
+    Stream.PutBytes(&Wire.PosXBits, 12);                            // FUN_06d8f510
+    Stream.PutBytes(&Wire.VelXBits, 12);                            // FUN_06d8f510
+    Stream.PutBytes(&Wire.AngVelXBits, 12);                            // FUN_06d8f510
 
     // 06da9dce FUN_06da13c0 -- emits nothing.
     if (Stream.Failed()) {
@@ -1056,34 +1018,31 @@ unsigned int FPacket_FLPACKET_SERVER_CREATECOUNTER::Encode(unsigned char** Buffe
 unsigned int FPacket_FLPACKET_SERVER_CREATECOUNTER::Decode(const unsigned char* Buffer,
                                                            unsigned int Size,
                                                            unsigned int* OutLength) {
-    FPayloadServerCreateCounter* Wire =
-        reinterpret_cast<FPayloadServerCreateCounter*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // 06da9e6c FUN_06da13c0 -- consumes nothing.
 
     unsigned int Scratch = 0;
     unsigned short Small16 = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->ArchetypeNickname = Scratch;
+    Wire.ArchetypeNickname = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->ObjId = Scratch;
+    Wire.ObjId = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->OwnerPlayer = Scratch;
+    Wire.OwnerPlayer = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->OwnerId = Scratch;
+    Wire.OwnerId = Scratch;
     if (!Stream.GetWord(Small16)) { return Stream.GetError(); }
-    Wire->SubObjId = Small16;
-    if (!Stream.GetBytes(&Wire->OrientWBits, 16)) {                    // 06da9f81
+    Wire.SubObjId = Small16;
+    if (!Stream.GetBytes(&Wire.OrientWBits, 16)) {                     // 06da9f81
         return Stream.GetError();
     }
-    if (!Stream.GetBytes(&Wire->PosXBits, 12)) {                    // 06da9fb3
+    if (!Stream.GetBytes(&Wire.PosXBits, 12)) {                     // 06da9fb3
         return Stream.GetError();
     }
-    if (!Stream.GetBytes(&Wire->VelXBits, 12)) {                    // 06da9fe5
+    if (!Stream.GetBytes(&Wire.VelXBits, 12)) {                     // 06da9fe5
         return Stream.GetError();
     }
-    if (!Stream.GetBytes(&Wire->AngVelXBits, 12)) {                    // 06daa013
+    if (!Stream.GetBytes(&Wire.AngVelXBits, 12)) {                     // 06daa013
         return Stream.GetError();
     }
 
@@ -1123,21 +1082,18 @@ unsigned int FPacket_FLPACKET_SERVER_CREATECOUNTER::Decode(const unsigned char* 
 unsigned int FPacket_FLPACKET_SERVER_SETADDITEM::Encode(unsigned char** BufferHolder,
                                                         unsigned int Capacity,
                                                         unsigned int* OutLength) {
-    const FPayloadServerSetAddItem* Wire =
-        reinterpret_cast<const FPayloadServerSetAddItem*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    Stream.PutDword(Wire->ArchId);
-    Stream.PutDword(Wire->Id);
-    Stream.PutDword((unsigned int)Wire->Count);
-    Stream.PutFloat(Wire->Health);
-    Stream.PutByte(Wire->bEquipped);
-    Stream.PutByte(Wire->bMission);
-    Stream.PutDword(Wire->AddResult);
-    Stream.PutDword(Wire->HardpointSize);
-    if (Wire->HardpointSize != 0) {                                   // 06d9714f / 06d97154
-        Stream.PutBytes(Wire->Hardpoint, Wire->HardpointSize);
+    Stream.PutDword(Wire.ArchId);
+    Stream.PutDword(Wire.Id);
+    Stream.PutDword((unsigned int)Wire.Count);
+    Stream.PutFloat(Wire.Health);
+    Stream.PutByte(Wire.bEquipped);
+    Stream.PutByte(Wire.bMission);
+    Stream.PutDword(Wire.AddResult);
+    Stream.PutDword(Wire.HardpointSize);
+    if (Wire.HardpointSize != 0) {                                    // 06d9714f / 06d97154
+        Stream.PutBytes(Wire.Hardpoint, Wire.HardpointSize);
     }
 
     // 06d971ad FUN_06da13c0 -- emits nothing.
@@ -1151,36 +1107,33 @@ unsigned int FPacket_FLPACKET_SERVER_SETADDITEM::Encode(unsigned char** BufferHo
 
 unsigned int FPacket_FLPACKET_SERVER_SETADDITEM::Decode(const unsigned char* Buffer,
                                                         unsigned int Size, unsigned int* OutLength) {
-    FPayloadServerSetAddItem* Wire =
-        reinterpret_cast<FPayloadServerSetAddItem*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // 06d9723a FUN_06da13c0 -- consumes nothing.
 
     unsigned int Scratch = 0;
     unsigned char Small8 = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->ArchId = Scratch;
+    Wire.ArchId = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Id = Scratch;
+    Wire.Id = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Count = (int)Scratch;
-    if (!Stream.GetFloat(Wire->Health)) { return Stream.GetError(); } // 06d972f6
+    Wire.Count = (int)Scratch;
+    if (!Stream.GetFloat(Wire.Health)) { return Stream.GetError(); }  // 06d972f6
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-    Wire->bEquipped = Small8;
+    Wire.bEquipped = Small8;
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-    Wire->bMission = Small8;
+    Wire.bMission = Small8;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->AddResult = Scratch;
+    Wire.AddResult = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->HardpointSize = Scratch;
-    if (Wire->HardpointSize != 0) {                                   // 06d97390 / 06d97395
+    Wire.HardpointSize = Scratch;
+    if (Wire.HardpointSize != 0) {                                    // 06d97390 / 06d97395
         // Allocated before the bounds check, exactly as retail does; the pointer is
         // stored whether or not the copy then fits.
         char* Block = static_cast<char*>(
-            ::operator new(Wire->HardpointSize, std::nothrow));       // bare
-        Wire->Hardpoint = Block;
-        if (!Stream.GetBytes(Wire->Hardpoint, Wire->HardpointSize)) { // 06d973c7..06d973e1
+            ::operator new(Wire.HardpointSize, std::nothrow));        // bare
+        Wire.Hardpoint = Block;
+        if (!Stream.GetBytes(Wire.Hardpoint, Wire.HardpointSize)) {   // 06d973c7..06d973e1
             return Stream.GetError();
         }
     }
@@ -1222,21 +1175,18 @@ unsigned int FPacket_FLPACKET_SERVER_SETADDITEM::Decode(const unsigned char* Buf
 unsigned int FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES::Encode(unsigned char** BufferHolder,
                                                                   unsigned int Capacity,
                                                                   unsigned int* OutLength) {
-    const FPayloadServerSetMissionObjectives* Wire =
-        reinterpret_cast<const FPayloadServerSetMissionObjectives*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    Stream.PutDword(Wire->MissionId);
-    Stream.PutDword(Wire->Count);
-    Stream.PutDword(Wire->MissionType);
-    RpcPutSizedBlock(Stream, Wire->TextASize, Wire->TextABuffer);     // / 06d8fdcc
-    RpcPutSizedBlock(Stream, Wire->TextBSize, Wire->TextBBuffer);     // / 06d8fe62
+    Stream.PutDword(Wire.MissionId);
+    Stream.PutDword(Wire.Count);
+    Stream.PutDword(Wire.MissionType);
+    RpcPutSizedBlock(Stream, Wire.TextASize, Wire.TextABuffer);       // / 06d8fdcc
+    RpcPutSizedBlock(Stream, Wire.TextBSize, Wire.TextBBuffer);       // / 06d8fe62
 
     // The sentinel is dereferenced untested: count and list size move together
     // (FUN_06d8fc10), so a non-zero count means the list was built.
-    if (Wire->Count != 0) {
-        const FRpcMissionObjectiveNode* Sentinel = Wire->Objectives.Head;
+    if (Wire.Count != 0) {
+        const FRpcMissionObjectiveNode* Sentinel = Wire.Objectives.Head;
         for (const FRpcMissionObjectiveNode* Node = Sentinel->Next;
              Node != Sentinel && !Stream.Failed(); Node = Node->Next) {
             // The value is used untested.
@@ -1257,27 +1207,24 @@ unsigned int FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES::Encode(unsigned char*
 unsigned int FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES::Decode(const unsigned char* Buffer,
                                                                   unsigned int Size,
                                                                   unsigned int* OutLength) {
-    FPayloadServerSetMissionObjectives* Wire =
-        reinterpret_cast<FPayloadServerSetMissionObjectives*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // 06d8fffb FUN_06da13c0 -- consumes nothing.
 
     unsigned int Scratch = 0;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->MissionId = Scratch;
+    Wire.MissionId = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->Count = Scratch;
+    Wire.Count = Scratch;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->MissionType = Scratch;
-    if (!RpcGetSizedBlock(Stream, Wire->TextASize, Wire->TextABuffer)) {
+    Wire.MissionType = Scratch;
+    if (!RpcGetSizedBlock(Stream, Wire.TextASize, Wire.TextABuffer)) {
         return Stream.GetError();                                     // FUN_06da1620
     }
-    if (!RpcGetSizedBlock(Stream, Wire->TextBSize, Wire->TextBBuffer)) {
+    if (!RpcGetSizedBlock(Stream, Wire.TextBSize, Wire.TextBBuffer)) {
         return Stream.GetError();                                     // FUN_06da1620
     }
 
-    for (unsigned int Index = 0; Index < Wire->Count; ++Index) {      // 06d900a9 / 06d9015f
+    for (unsigned int Index = 0; Index < Wire.Count; ++Index) {       // 06d900a9 / 06d9015f
         FRpcMissionObjectiveRecord* Record =
             static_cast<FRpcMissionObjectiveRecord*>(
                 ::operator new(sizeof(FRpcMissionObjectiveRecord), std::nothrow));
@@ -1304,7 +1251,7 @@ unsigned int FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES::Decode(const unsigned
             return Stream.GetError();
         }
         // Insert before the sentinel, then bump the list's Size.
-        Wire->Objectives.PushBack(Record);
+        Wire.Objectives.PushBack(Record);
     }
 
     if (Stream.Failed()) {
@@ -1342,30 +1289,27 @@ unsigned int FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES::Decode(const unsigned
 unsigned int FPacket_FLPACKET_SERVER_BURNFUSE::Encode(unsigned char** BufferHolder,
                                                       unsigned int Capacity,
                                                       unsigned int* OutLength) {
-    const FPayloadServerBurnFuse* Wire =
-        reinterpret_cast<const FPayloadServerBurnFuse*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    if (!Stream.PutDword(Wire->SourceId)) {
+    if (!Stream.PutDword(Wire.SourceId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutDword(Wire->ObjectId)) {
+    if (!Stream.PutDword(Wire.ObjectId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutDword(Wire->FuseId)) {
+    if (!Stream.PutDword(Wire.FuseId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutWord(Wire->SubObjId)) {
+    if (!Stream.PutWord(Wire.SubObjId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutDword(Wire->AtTBits)) {                      // FLD/FSTP in retail
+    if (!Stream.PutDword(Wire.AtTBits)) {                       // FLD/FSTP in retail
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutDword(Wire->LifetimeBits)) {                      // FLD/FSTP in retail
+    if (!Stream.PutDword(Wire.LifetimeBits)) {                       // FLD/FSTP in retail
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutByte(Wire->bLit)) {
+    if (!Stream.PutByte(Wire.bLit)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
     *OutLength = Stream.Length();
@@ -1375,30 +1319,27 @@ unsigned int FPacket_FLPACKET_SERVER_BURNFUSE::Encode(unsigned char** BufferHold
 
 unsigned int FPacket_FLPACKET_SERVER_BURNFUSE::Decode(const unsigned char* Buffer,
                                                       unsigned int Size, unsigned int* OutLength) {
-    FPayloadServerBurnFuse* Wire =
-        reinterpret_cast<FPayloadServerBurnFuse*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
-    if (!Stream.GetDword(Wire->SourceId)) {
+    if (!Stream.GetDword(Wire.SourceId)) {
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->ObjectId)) {
+    if (!Stream.GetDword(Wire.ObjectId)) {
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->FuseId)) {
+    if (!Stream.GetDword(Wire.FuseId)) {
         return Stream.GetError();
     }
-    if (!Stream.GetWord(Wire->SubObjId)) {
+    if (!Stream.GetWord(Wire.SubObjId)) {
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->AtTBits)) {
+    if (!Stream.GetDword(Wire.AtTBits)) {
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->LifetimeBits)) {
+    if (!Stream.GetDword(Wire.LifetimeBits)) {
         return Stream.GetError();
     }
-    if (!Stream.GetByte(Wire->bLit)) {
+    if (!Stream.GetByte(Wire.bLit)) {
         return Stream.GetError();
     }
     *OutLength = Stream.Length();

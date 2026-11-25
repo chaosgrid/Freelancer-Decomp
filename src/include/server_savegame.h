@@ -17,7 +17,7 @@
 //   FUN_06d4c430  PlayerData::auto_save             the autosave
 //   FUN_06d4c5f0  PlayerData::skip_next_autosave     the one-shot skip latch
 //   FUN_06d4b790  PlayerData::create_new_character   new-character template expansion
-//   FUN_06d4a5d0  PlayerData::select_character      head + MP front (server_classes.cpp)
+//   FUN_06d4a5d0  PlayerData::select_character      head + MP front (server_playerdb.cpp)
 //                 PlayerData::load_selected_character its tail (.text:06d4aa85 ..)
 //                 PlayerData::apply_saved_character  its record -> slot copy
 //   FUN_06d4b520  PlayerData::send_visited_state     IClient +0x170
@@ -25,7 +25,7 @@
 //                 (.text:06d4ac77 .. .text:06d4b089)
 //
 // The implementation is src/Server/server_savegame.cpp; the writer they all
-// end in is PlayerData::serialize_to_file (retail FUN_06d4ccd0, server_pub.cpp).
+// end in is PlayerData::serialize_to_file (retail FUN_06d4ccd0, server_playerdb.cpp).
 
 #include "common_server_playerdb.h"
 

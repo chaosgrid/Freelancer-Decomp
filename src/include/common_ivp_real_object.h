@@ -547,8 +547,8 @@ protected:
 struct IVP_Anchor
 {
     IVP_Anchor* anchor_next_in_object; // +0x00
-    uint32_t    Field_0x04;            // +0x04 TODO (unread here)
-    uint32_t    Field_0x08;            // +0x08 TODO (unread here)
+    uint32_t    Field_0x04;            // +0x04 not read by ApplyLocalCsys or the teardown
+    uint32_t    Field_0x08;            // +0x08 not read by ApplyLocalCsys or the teardown
     IVP_U_Point object_pos;            // +0x0c
     IVP_U_Point core_pos;              // +0x1c
     IIVPAnchorEvents* l_actuator;       // +0x2c

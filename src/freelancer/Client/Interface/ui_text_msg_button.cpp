@@ -229,7 +229,7 @@ bool UiTextMsgButton::MouseEvent(FWin3DMouseEvent const* Event)
     if (bInteractive == 0)
         return false;
     if (Parent != nullptr)
-        Parent->ProcessMessage(0x3004u, static_cast<unsigned>(MessageArg), 0u);
+        Parent->ProcessMessage(kWinMsgCommand, static_cast<unsigned>(MessageArg), 0u);
     return true;
 }
 

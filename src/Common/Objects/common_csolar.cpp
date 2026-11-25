@@ -75,7 +75,7 @@ CSolar::~CSolar()
     CEqObj::flush_animations();
 
     // Waypoints (TypeBits & 0x200) own their vibe (+0x104).
-    if ((TypeBits & 0x200) != 0)
+    if ((TypeBits & OBJ_WAYPOINT) != 0)
     {
         int const Vibe = (int)VibeId;
         Reputation::Vibe::Free(Vibe);
@@ -117,7 +117,7 @@ void CSolar::init(CreateParms const& Parms)
                                                      OpenAnimName, nullptr, nullptr);
             if (GateAnim.Index == -1)
             {
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: failed to find animation (%s) in object (%s)\n",
                       "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0xe3, OpenAnimName,
                       Archetype->Nickname.get_string());
@@ -131,16 +131,16 @@ void CSolar::init(CreateParms const& Parms)
     DockingPointBaseId = DockWithBaseId;                           // +0x164
 
     // Diagnostic only.
-    if ((TypeBits & 0x600d60) != 0 && (TypeBits & 2) == 0 &&
+    if ((TypeBits & 0x600d60) != 0 && (TypeBits & OBJ_PLANET) == 0 &&
         (DockWithBaseId & 0x3fffffff) == 0 && (DestSystem & 0x3fffffff) == 0)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: %s is dockable, but doesn't have a valid base or system to go to ",
               "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x6d,
               Parms.NicknameSrc.get_string());
     }
 
-    if ((TypeBits & 0x84) != 0)
+    if ((TypeBits & (OBJ_SUN | OBJ_TRADELANE_RING)) != 0)
         VisitValue = 1;
 
     init_docking_points(DockWithBaseId);
@@ -168,7 +168,7 @@ void CSolar::init_continual_anim(char const* AnimName)
     if (Front.Index == -1)
     {
         ContinualAnims.pop_front();
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: failed to find animation (%s) in object (%s)\n",
               "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x194, AnimName,
               Archetype->Nickname.get_string());
@@ -205,7 +205,7 @@ void CSolar::cache_physical_props()
         return;
     }
 
-    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 200,
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 200,
           "Missing ivp_real in CSimple::cache_physical_props()");
     CSimple::cache_physical_props();
 }
@@ -235,7 +235,7 @@ Archetype::Solar const* CSolar::solararch() const
 Vector CSolar::get_angular_velocity() const
 {
     // FUN_0629ac70. Only a planetary solar with a body spins; rotated to world as in CObject.
-    if ((TypeBits & 7) != 0 && BodyPtr != nullptr)
+    if ((TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0 && BodyPtr != nullptr)
     {
         Vector const ObjSpace = PhySys::GetAngularVelocityOS(this);
         FVector World;
@@ -249,13 +249,13 @@ Vector CSolar::get_angular_velocity() const
 bool CSolar::is_planetary() const
 {
     // FUN_0629a7f0 (TypeBits +0xe0)
-    return (TypeBits & 7) != 0;
+    return (TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0;
 }
 
 bool CSolar::is_system_gate() const
 {
     // FUN_0629a800. Retail: true for any subset of 0xc40, TypeBits == 0 included.
-    return TypeBits == (TypeBits & 0xc40);
+    return TypeBits == (TypeBits & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE));
 }
 
 bool CSolar::is_waypoint() const
@@ -404,7 +404,7 @@ void CSolar::configure_system_gate(char const* AnimName)
                                              nullptr, nullptr);
     if (GateAnim.Index == -1)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: failed to find animation (%s) in object (%s)\n",
               "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0xe3, AnimName,
               Archetype->Nickname.get_string());
@@ -518,7 +518,7 @@ ObjActivateResult CSolar::activate(bool bOn, unsigned DockIndex)
     {
         if (DockIndex != 0)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp",
                   0x15c, "UHH index not 0");
         }
         unsigned char const OldDirection = GateAnimDirection;
@@ -631,7 +631,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
             {
                 char const* const NickStr = Parms.NicknameSrc.get_string();
                 char const* const ArchStr = ArchName.get_string();
-                FDUMP(0x100002,
+                FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: Archetype \"%s\" not found while reading Solar object \"%s\"\n",
                       "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x1da, ArchStr, NickStr);
                 return false;
@@ -680,7 +680,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
             Parms.DestSystem = SystemId;
             if ((SystemId & 0x3fffffff) == 0)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Jumpgate has invalid destination: %s\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Jumpgate has invalid destination: %s\n",
                       "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x218, Reader.get_value_string(0));
             }
             Parms.DestGateId = CreateID(Reader.get_value_string(1));
@@ -692,7 +692,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
             Parms.DockingBaseId = BaseId;                               // retail +0x5c
             if (BaseId == 0)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find base %s for solar object.",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find base %s for solar object.",
                       "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x224, BaseName);
             }
         }
@@ -703,7 +703,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
             Parms.DockWithBaseId = BaseId;
             if (BaseId == 0)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find docking target %s for solar object.",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find docking target %s for solar object.",
                       "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x22c, BaseName);
             }
         }
@@ -754,7 +754,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
                 }
                 else
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: space costume head %s does not exist\n",
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: space costume head %s does not exist\n",
                           "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x25e, Reader.get_value_string(0));
                 }
             }
@@ -767,7 +767,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
                 }
                 else
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: space costume body %s does not exist\n",
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: space costume body %s does not exist\n",
                           "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x26f, Reader.get_value_string(1));
                 }
             }
@@ -786,7 +786,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
             }
             if (CostumeOut->PartIds[1] == 0)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: space costume malformed %s",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: space costume malformed %s",
                       "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x27c, Reader.get_value_string());
             }
         }
@@ -809,7 +809,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
         char const* const FileName = Reader.get_file_name();
         int const AtmosphereInt = (int)Parms.AtmosphereRange;
         char const* const ArchStr = OutArch->Nickname.get_string();
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Solar with Archetype(%s) is larger than atmosphere %df in INI File(%s)!",
               "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x289, ArchStr, AtmosphereInt, FileName);
     }
@@ -818,7 +818,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
     {
         char const* const FileName = Reader.get_file_name();
         char const* const NickStr = Parms.NicknameSrc.get_string();
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Solar with Nickname(%s) missing archetype in INI File(%s)!",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Solar with Nickname(%s) missing archetype in INI File(%s)!",
               "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x291, NickStr, FileName);
         return false;
     }
@@ -827,7 +827,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
     {
         char const* const FileName = Reader.get_file_name();
         char const* const ArchStr = OutArch->Nickname.get_string();
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Solar with Archetype(%s) missing nickname in INI File(%s)!",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Solar with Archetype(%s) missing nickname in INI File(%s)!",
               "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x296, ArchStr, FileName);
         return false;
     }
@@ -838,7 +838,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
     Parms.VibeId = VibeId;
     if (VibeId == (unsigned)-1)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Failed to read reputation information for solar(%s)!",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Failed to read reputation information for solar(%s)!",
               "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x2a3, Parms.NicknameSrc.get_string());
         return false;
     }
@@ -858,7 +858,7 @@ bool CSolar::ReadObj(INI_Reader& Reader, Archetype::Solar*& OutArch, CreateParms
             // Not fatal.
             char const* const LoadoutStr = LoadoutId.get_string();
             char const* const NickStr = Parms.NicknameSrc.get_string();
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s: Unable to find [Loadout] %s.",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s: Unable to find [Loadout] %s.",
                   "E:\\FL\\Scratch\\Source\\Common\\CSolar.cpp", 0x2c9, NickStr, LoadoutStr);
         }
     }

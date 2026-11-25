@@ -255,7 +255,7 @@ bool GfLightScore(FD3dLight8 const* D3d, float const* LightPos3, float const* Di
     // FUN_005586f0 (cdecl; the fifth argument is never read). The x87 sequence is modelled at
     // the 53-bit precision control MSVC runs with: every float store is a float rounding below,
     // every value left on the stack stays a double.
-    if (D3d->Type == 3)
+    if (D3d->Type == kLightDirectional)
     {
         // Directional: always taken.
         *OutScore = 3.0f;
@@ -281,7 +281,7 @@ bool GfLightScore(FD3dLight8 const* D3d, float const* LightPos3, float const* Di
 
     // 2.0f is DAT_005d55b4; a point light keeps it.
     double Base = 2.0;
-    if (D3d->Type != 1)
+    if (D3d->Type != kLightPoint)
     {
         // The cone test runs unless DistSq < 1e-5 (DAT_005c75f0).
         if (!(DistSq < 1e-5))

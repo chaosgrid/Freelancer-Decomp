@@ -9,6 +9,7 @@
 
 #include "Guides/GuidesInternal.h"
 #include "NPCs/BehaviorCmds.h"         // FContentShipBase
+#include "Core/ContentInternal.h"     // EObjectType
 #include "Core/ContentPlayerState.h"   // FindContentPlayerState(ByShip)
 #include "NPCs/DockQueues.h"           // GetShipDockingTarget, CollectFormationMembers
 #include "NPCs/FactionProps.h"         // GetFactionProps
@@ -140,7 +141,7 @@ int FPatrolRoute::Update(std::list<FObjListDirective*>* Out)
     else if (State == 2)
     {
         FObjListDirective** Active = Ship->GetActiveDirectiveSlot();   // slot 3
-        if ((*Active)->GetType() == 5)
+        if ((*Active)->GetType() == OBJLIST_GOTO_VEC)
         {
             Vector const Destination =
                 static_cast<FObjListGotoVec*>(*Ship->GetActiveDirectiveSlot())->Op.Destination;
@@ -349,9 +350,9 @@ int FCargoScanRoute::GetType()
 // LAB_06f0abe0. Anything but off / idle is busy (1).
 int FCargoScanRoute::GetStatus()
 {
-    if (State == 0)
+    if (State == ScanOff)
         return 2;
-    if (State == 1)
+    if (State == ScanIdle)
         return 0;
     return 1;
 }
@@ -375,8 +376,8 @@ void FCargoScanRoute::Reset()
     LootIds.clear();
     Directives.Clear();                                                 // Release + erase each
     LootTimer = -1.0f;
-    if (State != 0)
-        State = 1;
+    if (State != ScanOff)
+        State = ScanIdle;
 }
 
 // FUN_06f0c3f0. A null ship resets first and switches the scanner off.
@@ -393,7 +394,7 @@ void FCargoScanRoute::SetShip(FContentNpcShip* InShip)
     Ship = InShip;
     if (InShip == nullptr)
     {
-        State = 0;
+        State = ScanOff;
         return;
     }
 
@@ -401,9 +402,9 @@ void FCargoScanRoute::SetShip(FContentNpcShip* InShip)
     FFactionProps* Props = GetFactionProps(&Affiliation);              // FUN_06f50650
     if (Props->ScanForCargo.empty())
     {
-        if (State != 0)
+        if (State != ScanOff)
             Reset();
-        State = 0;
+        State = ScanOff;
         return;
     }
 
@@ -411,9 +412,9 @@ void FCargoScanRoute::SetShip(FContentNpcShip* InShip)
     if (pub::SpaceObj::GetScannerRange(Ship->SpaceObjId, RadarRange, ScanRange) != 0 ||
         ScanRange <= 500)
     {
-        if (State != 0)
+        if (State != ScanOff)
             Reset();
-        State = 0;
+        State = ScanOff;
         return;
     }
     ScanRange = 500;
@@ -423,8 +424,8 @@ void FCargoScanRoute::SetShip(FContentNpcShip* InShip)
         ScanChance = Personality->JobParams.ScanChance;
     else
         ScanChance = Props->ScanChance;                                 // +0x6c
-    if (State == 0)
-        State = 1;
+    if (State == ScanOff)
+        State = ScanIdle;
 }
 
 // FUN_06f0ca10 (RET 8).
@@ -492,7 +493,7 @@ bool FCargoScanRoute::FindScanTarget()
     unsigned int Count = 0;
     unsigned int Objects[16];
     Vector const Position = GetShipPosition(Ship);
-    pub::System::ScanObjects(SystemId, Objects, 0x10, Position, 2500.0f, 0x7f0000, Count);
+    pub::System::ScanObjects(SystemId, Objects, 0x10, Position, 2500.0f, OBJ_SHIP_MASK, Count);
 
     for (unsigned int Index = 0; Index < Count; ++Index)
     {
@@ -588,17 +589,17 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
     {
     case EMessage::CommComplete:
         // 06f0cc0e.
-        if (State == 5)
+        if (State == ScanWaitStandBy)
         {
             if (Words[2] == CommSpeakerId && Words[0] == TargetId)
-                State = 4;
+                State = ScanClosingInAgain;
         }
-        else if (State == 7)
+        else if (State == ScanWaitDemand)
         {
             if (Words[2] == CommSpeakerId && Words[0] == TargetId)
             {
                 pub::AI::get_scan_response(Ship->SpaceObjId, TargetId, CargoGoodId);
-                State = 8;
+                State = ScanWaitAnswer;
             }
         }
         break;
@@ -606,20 +607,20 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
     case EMessage::LootAcquired:
     {
         // 06f0d6c6, 06f0db02.
-        if (State != 0xb && State != 0xc)
+        if (State != ScanTractoring && State != ScanCollecting)
             break;
         if (!ContainsId(LootIds, Words[0]))
             break;
         if (Words[1] == Ship->SpaceObjId)
         {
-            if (State != 0xb)
+            if (State != ScanTractoring)
                 break;
             unsigned int const Occupied = Ship->GetCargoSpaceOccupied();    // FUN_06f57170
             unsigned int const Hold = Ship->GetCargoHoldSize();             // FUN_06f57150
             // Retail divides as integers, so only a full hold passes 0.7f (DAT_06fb8134).
             unsigned int const Ratio = Occupied / Hold;
             if (static_cast<double>(Ratio) > 0.7f)
-                State = 0xc;
+                State = ScanCollecting;
             break;
         }
         if (IsSameShipOrFormation(Ship, Words[1]))                      // FUN_06f68270
@@ -637,7 +638,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
     case EMessage::CargoJettisoned:
     {
         // 06f0d62c.
-        if (State == 1 || State == 0)
+        if (State == ScanIdle || State == ScanOff)
             break;
         FContentShipBase* Target = FindSystemShip(Ship, TargetId);
         if (Target == nullptr || Target->IsInTradeLane())
@@ -655,7 +656,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
             break;
         if (Words[3] != static_cast<unsigned int>(CargoCount))
             break;
-        State = 0xa;
+        State = ScanJettisoned;
         HandleEvent(EMessage::Heartbeat, nullptr);                      // slot 3
         break;
     }
@@ -663,7 +664,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
     case EMessage::LootSpawned:
     {
         // 06f0d7b9.
-        if (State != 0xb && State != 0xc)
+        if (State != ScanTractoring && State != ScanCollecting)
             break;
         if (Words[1] != TargetId)
             break;
@@ -671,7 +672,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
             break;
         if (!ContainsId(LootIds, Words[0]))
             LootIds.push_back(Words[0]);                                // FUN_06f937c0
-        if (State != 0xb)
+        if (State != ScanTractoring)
             break;
         // Here the occupied space is rounded to float first and divided in floating point,
         // unlike LootAcquired.
@@ -679,7 +680,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
         double const Fill = static_cast<double>(Occupied) / static_cast<double>(Ship->GetCargoHoldSize());
         if (Fill > 0.7f)
         {
-            State = 0xc;
+            State = ScanCollecting;
             if (LootTimer < 0.0f)
                 LootTimer = 3.1f;                                       // DAT_06fb8128
             break;
@@ -694,7 +695,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
     case EMessage::ObjectDestroyed:
     {
         // 06f0d987.
-        if (State == 1 || State == 0)
+        if (State == ScanIdle || State == ScanOff)
             break;
         if (Words[0] == TargetId)
         {
@@ -710,7 +711,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
         LootIds.erase(Loot);
         if (!LootIds.empty())
         {
-            if (State == 0xb || State == 0xc)
+            if (State == ScanTractoring || State == ScanCollecting)
             {
                 if (LootTimer < 0.0f)
                     LootTimer = 3.1f;
@@ -735,7 +736,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
     case EMessage::SystemExit:
     {
         // 06f0d931.
-        if (State == 1 || State == 0)
+        if (State == ScanIdle || State == ScanOff)
             break;
         FContentPlayerState* Player = FindContentPlayerState(Words[2]);  // FUN_06f49b00
         if (Player == nullptr)
@@ -754,7 +755,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
             break;
         if (Words[0] != 0)
             break;
-        if (State >= 2 && State <= 7)
+        if (State >= ScanClosingIn && State <= ScanWaitDemand)
             Reset();
         break;
 
@@ -786,7 +787,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
     {
         switch (State)
         {
-        case 1:
+        case ScanIdle:
         {
             // 06f0cca8.
             if (!bScanEnabled)
@@ -799,7 +800,7 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             }
             if (!FindScanTarget())                                      // FUN_06f0c6b0
                 return;
-            State = 2;
+            State = ScanClosingIn;
             bStop = false;
             TRefHandle<FObjListDirective> Directive;
             CreateObjListDirective(OBJLIST_TRAIL, &Directive.Pointer);
@@ -810,8 +811,8 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             Directive->AddRef();
             continue;
         }
-        case 2:
-        case 4:
+        case ScanClosingIn:
+        case ScanClosingInAgain:
         {
             // 06f0ce6f / 06f0cf0e. Retail sums (x*x + z*z) + y*y.
             Vector TargetPosition;
@@ -824,22 +825,22 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             double const Distance = std::sqrt((Dx * Dx + Dz * Dz) + Dy * Dy);
             if (!(static_cast<double>(ScanRange) > Distance))
                 return;
-            State = State == 2 ? 3 : 6;
+            State = State == ScanClosingIn ? ScanInRange : ScanScanning;
             bStop = false;
             continue;
         }
-        case 3:
+        case ScanInRange:
             // 06f0cef2, 06f0d4a2.
             if (bScanAnnounce)
             {
                 QueueScanEvent(GCS_EVENT_SCAN_ANNOUNCE, 0, 0, 1);
-                State = 5;
+                State = ScanWaitStandBy;
                 return;
             }
-            State = 4;
+            State = ScanClosingInAgain;
             bStop = false;
             continue;
-        case 6:
+        case ScanScanning:
         {
             // 06f0cf91.
             FContentShipBase* Target = FindSystemShip(Ship, TargetId);
@@ -903,30 +904,30 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
                 {
                     unsigned short const EquipId = Cargo->Id;           // word +0x02
                     pub::SpaceObj::JettisonEquipment(TargetId, EquipId, CargoCount);
-                    State = 0xa;
+                    State = ScanJettisoned;
                 }
                 else if (Response >= 1 && Response <= 2)
                 {
                     QueueScanEvent(GCS_EVENT_SCAN_RESPONSE, 0, 0, static_cast<unsigned int>(Response));
-                    State = 0xd;
+                    State = ScanHostile;
                 }
             }
             else if (Cargo->bMission)
             {
                 // 06f0d27e: a player's mission cargo -> hostile (bStop unchanged).
-                State = 0xd;
+                State = ScanHostile;
             }
             else
             {
                 // 06f0d28a: a player is asked to jettison it.
                 AnswerTimer = 0.0f;
                 QueueScanEvent(GCS_EVENT_SCAN_CONTRABAND, 0, CargoGoodId, 1);
-                State = 7;
+                State = ScanWaitDemand;
                 bStop = true;
             }
             break;
         }
-        case 8:
+        case ScanWaitAnswer:
         {
             // 06f0d3a1. Retail truncates the unrounded sum (ftol) before the compare.
             double const Sum = static_cast<double>(AnswerTimer) + *DeltaSeconds;
@@ -934,11 +935,11 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             int const Whole = static_cast<int>(Sum);
             if (static_cast<double>(Whole) < 20.0)
                 return;
-            State = 0xd;
+            State = ScanHostile;
             bStop = false;
             continue;
         }
-        case 0xa:
+        case ScanJettisoned:
         {
             // 06f0d4fe.
             FContentShipBase* Target = FindSystemShip(Ship, TargetId);
@@ -948,11 +949,11 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
                 return;
             }
             QueueScanEvent(GCS_EVENT_SCAN_JETTISONED, 0, 0, 1);
-            State = 0xb;
+            State = ScanTractoring;
             return;
         }
-        case 0xb:
-        case 0xc:
+        case ScanTractoring:
+        case ScanCollecting:
         {
             // 06f0d3df / 06f0d43d. The expiry test uses the unrounded difference.
             if (!(LootTimer > 0.0f))
@@ -964,13 +965,13 @@ void FCargoScanRoute::HandleTimer(float const* DeltaSeconds)
             LootTimer = -1.0f;
             if (LootIds.empty())
                 break;
-            if (State == 0xb)
+            if (State == ScanTractoring)
                 AddTractorBeamDirective(LootIds[0], &Directives.Items);  // slot 9
             else
                 AddGotoShipDirective(LootIds[0], &Directives.Items);     // slot 10
             break;
         }
-        case 0xd:
+        case ScanHostile:
         {
             // 06f0d584.
             FContentShipBase* Target = FindSystemShip(Ship, TargetId);

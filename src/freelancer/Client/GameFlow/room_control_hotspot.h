@@ -33,6 +33,8 @@
 // 5 StartDealer / 6 FrontDesk -> a plain RoomButton, 7..12 -> no button, anything else ->
 // FDUMP "Unknown button behavior type".
 
+#include "common_goods.h"   // EHotspotBehavior (RoomButtonInfo::Behavior)
+
 class RoomButton
 {
 public:

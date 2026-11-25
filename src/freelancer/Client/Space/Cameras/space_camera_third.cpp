@@ -212,7 +212,7 @@ bool ThirdPersonCameraOnEvent(FThirdPersonCamera* Cam, unsigned MsgId)
         return true;
 
     // Only 0x3f is this class's own: toggles auto-level.
-    if (MsgId != 0x3f)
+    if (MsgId != USER_TOGGLE_LEVEL_CAMERA)
         return false;
 
     Cam->bCameraLevelEnabled = (Cam->bCameraLevelEnabled == 0) ? 1 : 0;
@@ -408,7 +408,7 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
         reinterpret_cast<const unsigned char*>(Cam->Watched.target());
     if (HeldAgain == nullptr || HeldAgain - kWatchableOffset == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kCockpitCpp, 0x3c9,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kCockpitCpp, 0x3c9,
               "no object linked to third person camera");
         Cam->bInitialised = 1;
         return;
@@ -451,7 +451,7 @@ void ThirdPersonCameraUpdate(FThirdPersonCamera* Cam, float DeltaSeconds)
         }
         else
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCockpitCpp, 0x3e9,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCockpitCpp, 0x3e9,
                   "third person camera unable to calculate viewer transform, missin linked Ship*");
         }
     }
@@ -648,7 +648,7 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                     dynamic_cast<FClientGameobj*>(reinterpret_cast<IObjInspect*>(
                         const_cast<unsigned char*>(Held - kWatchableOffset))));
                 const int State = ShipGo->JumpState;
-                if ((State == 2 || State == 3) &&
+                if ((State == kJumpStateJumpOutTunnel || State == kJumpStateJumpInTunnel) &&
                     (LevelUp[0] != 0.0f || LevelUp[1] != 1.0f || LevelUp[2] != 0.0f))
                 {
                     LevelUp[0] = 0.0f;
@@ -909,7 +909,7 @@ bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath)
     if (!Reader.open(CockpitIniPath, false))
     {
         // Client\space\Cockpit.cpp:0x347
-        FDUMP(0x100002, "%s(%d) : *** WARNING: third person cockpit file not found '%s'\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: third person cockpit file not found '%s'\n",
               kCockpitCpp, 0x347, CockpitIniPath);
         bOk = false;
     }
@@ -921,7 +921,7 @@ bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath)
         if (Reader.is_header("ThirdPerson"))
         {
             // Client\space\Cockpit.cpp:0x34e
-            FDUMP(0x100002, "%s(%d) : *** WARNING: [ThirdPerson] is obsolete in file %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [ThirdPerson] is obsolete in file %s\n",
                   kCockpitCpp, 0x34e, CockpitIniPath);
         }
     }
@@ -936,7 +936,7 @@ bool ThirdPersonCameraLoad(FThirdPersonCamera* Cam, const char* CockpitIniPath)
     if (fabs(Aspect - kExpectedAspect) >= kAspectTolerance)
     {
         // Client\space\Cockpit.cpp:0x35e
-        FDUMP(0x100002, "%s(%d) : *** WARNING: cockpit aspect (%f) is not PC-compatible?\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: cockpit aspect (%f) is not PC-compatible?\n",
               kCockpitCpp, 0x35e, Aspect);
         bOk = false;
     }

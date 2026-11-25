@@ -177,7 +177,7 @@ struct FEngineChildNode
     // +0x38: an inner unknown (component list) or an IEngineComponent facet (engine-component list).
     IDAComponent* Object;
 
-    // FUN_066235d0. Defined in EngBase.cpp.
+    // FUN_066235d0. Defined in EngBaseEngine.cpp.
     void Insert(unsigned long* Count, const char* Name, IDAComponent* Object);
 };
 
@@ -217,13 +217,13 @@ struct FArchetypeHandle
 
     explicit FArchetypeHandle(const FArchetypeName* Source); // FUN_0661ea00
 
-    // FUN_0661eab0. Defined in EngBase.cpp.
+    // FUN_0661eab0. Defined in EngBaseEngine.cpp.
     unsigned long AddRef(FEngineObject* Engine);
 
-    // FUN_0661eaf0. Defined in EngBase.cpp.
+    // FUN_0661eaf0. Defined in EngBaseEngine.cpp.
     unsigned long Release(FEngineObject* Engine);
 
-    // FUN_0661eb30. Defined in EngBase.cpp.
+    // FUN_0661eb30. Defined in EngBaseEngine.cpp.
     FArchetypeChild* FindChildByCrc(unsigned long Crc);
 };
 
@@ -238,13 +238,13 @@ struct FEngBaseFreeList
     long FreeLimit;
     long FreeCount;
 
-    // FUN_06625bd0. Defined in EngBase.cpp.
+    // FUN_06625bd0. Defined in EngBaseEngine.cpp.
     void* Alloc();
 
-    // FUN_06625c00. Defined in EngBase.cpp.
+    // FUN_06625c00. Defined in EngBaseEngine.cpp.
     void Free(void* Element);
 
-    // FUN_06625c40. Defined in EngBase.cpp.
+    // FUN_06625c40. Defined in EngBaseEngine.cpp.
     void Drain();
 };
 
@@ -296,7 +296,7 @@ struct FInstanceTransform : IInstanceTransform
     float ExtraVec[3];       // +0x38
     unsigned long User;      // +0x44
 
-    // FUN_0661f330. Defined in EngBase.cpp.
+    // FUN_0661f330. Defined in EngBaseEngine.cpp.
     void Free();
 };
 
@@ -326,25 +326,25 @@ struct FEngineInstance
     float ExtentVec[3];
     FArchetypeChild* PartChild;
 
-    // FUN_0661ed40. Defined in EngBase.cpp.
+    // FUN_0661ed40. Defined in EngBaseEngine.cpp.
     void TransformExtra(float* OutExtent, float* OutVec);
 
-    // FUN_0661ec90. Defined in EngBase.cpp.
+    // FUN_0661ec90. Defined in EngBaseEngine.cpp.
     unsigned char ConnectChild(FEngineInstance* Child, const unsigned long* Payload);
 
-    // FUN_0661ed60. Defined in EngBase.cpp.
+    // FUN_0661ed60. Defined in EngBaseEngine.cpp.
     unsigned char InvalidateExtentChain(unsigned char bFromThis);
 
-    // FUN_0661ece0. Defined in EngBase.cpp.
+    // FUN_0661ece0. Defined in EngBaseEngine.cpp.
     void SetExtentAndInvalidate(float Extent, const float* Vec, unsigned char bXform);
 
-    // FUN_0661ec30. Defined in EngBase.cpp.
+    // FUN_0661ec30. Defined in EngBaseEngine.cpp.
     unsigned char UnlinkChild(FEngineInstance* Node);
 
-    // FUN_0661f250. Defined in EngBase.cpp.
+    // FUN_0661f250. Defined in EngBaseEngine.cpp.
     unsigned char ComposeWorld();
 
-    // FUN_0661ed90. Defined in EngBase.cpp.
+    // FUN_0661ed90. Defined in EngBaseEngine.cpp.
     void ComputeInstanceExtent(unsigned char bRecursive, float* OutExtent, float* OutVec);
 };
 
@@ -442,16 +442,16 @@ struct FEngineObject : IEngine
     void* DACOM_API FindArchetypeChild(void* Handle, void* ChildHandle) override;
     unsigned long DACOM_API RejectOperation(void* A, void* B) override; // TODO: original operation purpose.
 
-    // FUN_0661f550. Defined in EngBase.cpp.
+    // FUN_0661f550. Defined in EngBaseEngine.cpp.
     void Construct();
 
-    // FUN_0661f750. Defined in EngBase.cpp.
+    // FUN_0661f750. Defined in EngBaseEngine.cpp.
     void Destruct();
 
-    // FUN_0661f8b0. Defined in EngBase.cpp.
+    // FUN_0661f8b0. Defined in EngBaseEngine.cpp.
     FArchetypeHandle* LookupArchetype(FArchetypeName* Name);
 
-    // FUN_06621710. Defined in EngBase.cpp.
+    // FUN_06621710. Defined in EngBaseEngine.cpp.
     void DestroyInstanceBody(FEngineInstance* Instance);
 };
 
@@ -469,7 +469,7 @@ struct FAnimTrack
     ~FAnimTrack();                          // FUN_066131d0
     FAnimTrack& operator=(const FAnimTrack&) = delete;
 
-    // FUN_06611350. Defined in EngBase.cpp.
+    // FUN_06611350. Defined in EngBaseAnim.cpp.
     void LoadChannelNode(void* FileSystem);
 };
 
@@ -488,11 +488,11 @@ struct FAnimNameEntry
     std::vector<FAnimTrack> Tracks;          // retail value +0x10 vector, in file order
 
     FAnimNameEntry() = default;
-    ~FAnimNameEntry();                       // FUN_066113c0 (EngBase.cpp)
+    ~FAnimNameEntry();                       // FUN_066113c0 (EngBaseAnim.cpp)
     FAnimNameEntry(const FAnimNameEntry&) = delete;
     FAnimNameEntry& operator=(const FAnimNameEntry&) = delete;
 
-    // FUN_06611440. Defined in EngBase.cpp.
+    // FUN_06611440. Defined in EngBaseAnim.cpp.
     void LoadScriptMaps(const char* Name, void* FileSystem);
 };
 
@@ -707,6 +707,13 @@ struct FMixerStack
 {
     FMixerNode* Nodes[0x100];
     unsigned long Count;
+
+    // FUN_0661d0b0. Defined in EngBaseMixer.cpp.
+    void Push(FMixerNode* Node);
+    // FUN_0661d0d0. Defined in EngBaseMixer.cpp.
+    FMixerNode* Pop();
+    // FUN_0661d0f0. Defined in EngBaseMixer.cpp.
+    void Evaluate(float* Out, unsigned long Kind);
 };
 
 // The value of the inner map (node +0x1C): head, tail, count, and at +0xC the blend
@@ -815,42 +822,42 @@ struct FAnimPlayback
     void WriteOverlayPos(const float* Pos, FMixerDescMap* Inner);
     void AddOverlayPos(const float* Delta, FMixerDescMap* Inner);
 
-    // FUN_06612a00. Defined in EngBase.cpp.
+    // FUN_06612a00. Defined in EngBaseAnim.cpp.
     void FreeTyped();
 
-    // FUN_06611f90. Defined in EngBase.cpp.
+    // FUN_06611f90. Defined in EngBaseAnim.cpp.
     void CloneTypedChannels(FAnimNameEntry* Entry);
 
-    // FUN_06612250. Defined in EngBase.cpp.
+    // FUN_06612250. Defined in EngBaseAnim.cpp.
     unsigned long FilterTyped(IChannel* Filter);
 
-    // FUN_066122a0. Defined in EngBase.cpp.
+    // FUN_066122a0. Defined in EngBaseAnim.cpp.
     unsigned long HasTyped(void* Object);
 
-    // FUN_066122d0. Defined in EngBase.cpp.
+    // FUN_066122d0. Defined in EngBaseAnim.cpp.
     unsigned long TouchMappedTyped(void* OutPos, void* OutSampledPos);
 
-    // FUN_066128f0. Defined in EngBase.cpp.
+    // FUN_066128f0. Defined in EngBaseAnim.cpp.
     void StopTyped();
 
-    // FUN_06612920. Defined in EngBase.cpp.
+    // FUN_06612920. Defined in EngBaseAnim.cpp.
     void ApplyTyped();
 
-    // FUN_066126e0. Defined in EngBase.cpp.
+    // FUN_066126e0. Defined in EngBaseAnim.cpp.
     unsigned long EvalTyped(unsigned long Flags, float Start, float Speed,
                             unsigned long BlendDurationBits, unsigned long ScaleBits,
                             unsigned long TranslationScaleBits, const float* Transform);
 
-    // FUN_066127e0. Defined in EngBase.cpp.
+    // FUN_066127e0. Defined in EngBaseAnim.cpp.
     unsigned long EvalStoredTyped();
 
-    // FUN_06612940. Defined in EngBase.cpp.
+    // FUN_06612940. Defined in EngBaseAnim.cpp.
     FTypedChannel* FindTypedByHeader(const FAnimBindOut* Header);
 
-    // FUN_066129c0. Defined in EngBase.cpp.
+    // FUN_066129c0. Defined in EngBaseAnim.cpp.
     void SetTypedTime(float Time);
 
-    // FUN_066129f0. Defined in EngBase.cpp.
+    // FUN_066129f0. Defined in EngBaseAnim.cpp.
     float StoredDuration();
 
                                    // FUN_06612a70
@@ -1003,7 +1010,7 @@ struct FHardpointObject : IHardpoint, IEngineComponent
     int DACOM_API QueryInstance(void* Instance, const char* Iid, void** Out) override;
     int DACOM_API Notify(void* Arg) override;
 
-    // FUN_06625c70. Defined in EngBase.cpp.
+    // FUN_06625c70. Defined in EngBaseHardPoint.cpp.
     void Construct();
 };
 
@@ -1035,30 +1042,29 @@ struct FChannelArchetypeObject : IChannelArchetype
     GENRESULT DACOM_API CollectAt(float Time, float* OutKeys, unsigned long Capacity,
                                      unsigned long* Count) override;
 
-    // FUN_0661d730. Defined in EngBase.cpp.
+    // FUN_0661d730. Defined in EngBaseChannelArch.cpp.
     void InnerCtor();
 
-    // FUN_0661d750. Defined in EngBase.cpp.
+    // FUN_0661d750. Defined in EngBaseChannelArch.cpp.
     void Teardown();
 
-    // FUN_0661d7a0. Defined in EngBase.cpp.
+    // FUN_0661d7a0. Defined in EngBaseChannelArch.cpp.
     const unsigned char* FramePayload(unsigned long Index) const;
 
-    // FUN_0661d820. Defined in EngBase.cpp.
+    // FUN_0661d820. Defined in EngBaseChannelArch.cpp.
     double FrameTime(unsigned long Index) const;
 
-    // FUN_0661d820. Defined in EngBase.cpp.
+    // FUN_0661d820. Defined in EngBaseChannelArch.cpp.
     unsigned long FrameIndexAt(float Time) const;
 
-    // FUN_0661db70. Defined in EngBase.cpp.
+    // FUN_0661db70. Defined in EngBaseChannelArch.cpp.
     void DecompressFrames();
 
-    // FUN_0661e3d0. Defined in EngBase.cpp.
+    // FUN_0661e3d0. Defined in EngBaseChannelArch.cpp.
     unsigned long RelocatedKey(unsigned long Index) const;
 };
 
 void EngBaseFdump(int Flags, const char* File, int Line, const char* Kind, const char* Message);
-bool EngBaseIidEqual(const char* Left, const char* Right);
 
 GENRESULT DACOM_API FactoryQueryInterface(FDacomFactory* This, const char* Iid, void** Out);
 unsigned long DACOM_API FactoryAddRef(FDacomFactory* This);
@@ -1072,7 +1078,85 @@ GENRESULT DACOM_API ChannelArchetypeFactoryCreateInstance(FDacomFactory* This, A
 
 void RegisterEngBaseComponents();
 
-// ---- Shared between EngBase.cpp and EngBaseMixer.cpp ------------------------------------------
+// ---- File-scope helpers shared between the EngBase source files ---------------------------
+
+struct IFileSystem;
+
+
+// Local copy of DALib FFileSystemAggDesc (0x34). Do not include DALib.h.
+struct FEngBaseFileSystemDesc
+{
+    unsigned long Size;
+    const char* ComponentName;
+    const char* BackendName;
+    const char* DataPath;
+    unsigned long Access;
+    unsigned long ShareMode;
+    unsigned long Security;
+    unsigned long Creation;
+    unsigned long Flags;
+    unsigned long TemplateFile;
+    unsigned long Parent;
+    unsigned long Extra;
+    unsigned long FindHandle;
+};
+
+static_assert(sizeof(FEngBaseFileSystemDesc) == 0x34, "FileSystem AGGDESC 0x34");
+
+struct FInnerIidEntry
+{
+    const char* Iid;
+    long Offset;
+};
+
+struct FAnimHandleNode
+{
+    FAnimHandleNode* Next;
+    unsigned long Key;
+};
+
+// EngBase.cpp
+GENRESULT MathQuatToMatrix(I3DMathEngine* Math, float* Dst, const float* A);
+char* FormatFdumpMessage(char* Buffer, const char* Format, ...);
+int DACOM_API EngBaseAggregationHook(void* Desc);
+GENRESULT DACOM_API StubRet8(void* This, void* A);
+GENRESULT DACOM_API StubRetC(void* This, void* A, void* B);
+IFileSystem* AsFileSystem(void* FileSystem);
+bool IsTypedChannelType(unsigned long Type);
+FTypedChannel* NewTypedChannelWithOwner(unsigned long Type, IChannelOwner* Owner);
+FTypedChannel* NewTypedChannelWithArchetype(unsigned long Type, FChannelArchetypeObject* Archetype);
+int FileSystemOpenNode(void* FileSystem, const char* Name);
+int FileSystemFindFirst(void* FileSystem, const char* Pattern, WIN32_FIND_DATAA* FindData);
+int FileSystemFindNext(void* FileSystem, int FindHandle, WIN32_FIND_DATAA* FindData);
+void FileSystemFindClose(void* FileSystem, int FindHandle);
+void MathMulMatrix3(I3DMathEngine* Math, float* Out9, const float* Left, const float* Right);
+void MathTransformVec(I3DMathEngine* Math, float* Out3, const float* Matrix, const float* In3);
+
+// EngBaseAnim.cpp
+extern const char* const G_FdumpFileAnim;
+extern FAnimHandleNode* G_AnimHandleHead;
+unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem);
+unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, void* FileSystem,
+                                       const char** Names, int Count);
+FAnimNameEntry* FindAnimName(FAnimScript* Script, unsigned long Crc);
+bool FindAnimHandle(unsigned long Key);
+unsigned long RegisterAnimHandle(unsigned long Key);
+void UnregisterAnimHandle(unsigned long Key);
+void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* Sink,
+                        void* SinkContext);
+
+// EngBaseAnimComponent.cpp
+GENRESULT InnerQueryTable(void* Object, const char* Iid, void** Out,
+                          const FInnerIidEntry* Table);
+
+// EngBaseChannelArch.cpp
+unsigned long DACOM_API ChannelArchetypeAddRef(FChannelArchetypeObject* This);
+
+// EngBaseEngine.cpp
+extern FArchetypeHandle* const G_InvalidArchetype;
+void FillFileSystemDesc(FEngBaseFileSystemDesc* Desc, const char* Path, const char* Backend);
+
+// ---- Shared with EngBaseMixer.cpp -------------------------------------------------------------
 
 // DAT_0662acec: the IEngine the Animation component QIs in LAB_06616d40.
 extern FEngineObject* G_AnimEngine;

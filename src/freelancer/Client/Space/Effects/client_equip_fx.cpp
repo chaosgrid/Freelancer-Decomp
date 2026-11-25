@@ -188,7 +188,7 @@ namespace
         ClientFuse* Proto = ClientFuseDB::Find(FuseId.Id);
         if (Proto == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Fuse(%s) not found in FuseDB. Aborting.",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Fuse(%s) not found in FuseDB. Aborting.",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\EquippedObj.cpp", 0x2b8,
                   FuseId.get_string());
             return false;
@@ -220,7 +220,7 @@ namespace
         if (Host == nullptr || Host->Object == nullptr)
             return nullptr;
         CObject* Obj = Host->Object;
-        if ((static_cast<unsigned>(Obj->ObjectClass) & 0x103u) != 0x103u)
+        if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
             return nullptr;
         return static_cast<CEqObj*>(Obj);
     }
@@ -338,7 +338,7 @@ namespace
             // Only an exact 0.0 rate is quiet.
             if (Self->BlinkRate != 0.0f)
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kFlashLightCpp, 0x8d,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kFlashLightCpp, 0x8d,
                       "CliEquipLight: real light sources so no longer blink");
             }
 
@@ -364,12 +364,12 @@ namespace
                 // A cone below 180 is a spot (type 2), anything else (NaN too) a point.
                 if (View->LightsourceCone < kFullConeDegrees)
                 {
-                    EngineLightSetType((FEngineLight*)Light, 2, true);
+                    EngineLightSetType((FEngineLight*)Light, kLightSpot, true);
                     EngineLightSetConeAngle((FEngineLight*)Light, View->LightsourceCone);
                 }
                 else
                 {
-                    EngineLightSetType((FEngineLight*)Light, 1, true);
+                    EngineLightSetType((FEngineLight*)Light, kLightPoint, true);
                 }
 
                 // A refused enable releases the light.
@@ -1003,7 +1003,7 @@ namespace
                 break;
             CShip* Ship = nullptr;
             if (Owner != nullptr && Owner->Object != nullptr &&
-                (static_cast<unsigned>(Owner->Object->ObjectClass) & 0x503u) == 0x503u)
+                (static_cast<unsigned>(Owner->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
                 Ship = static_cast<CShip*>(Owner->Object);
             }
@@ -1134,7 +1134,7 @@ namespace
             Archetype::CliMunitionPickLiveEffect(Shot7->Archetype->Companion);
         // The class & 1 object's velocity (no test).
         CObject* Shot1 = nullptr;
-        if (MunObject != nullptr && (static_cast<unsigned>(MunObject->ObjectClass) & 1u) == 1u)
+        if (MunObject != nullptr && (static_cast<unsigned>(MunObject->ObjectClass) & CObject::ClassObject) == CObject::ClassObject)
             Shot1 = MunObject;
         Vector const Velocity = Shot1->get_velocity();
         Host->SpawnSplashHitEffect(LiveEffect, Hit, Hit + 1, &Velocity, nullptr);
@@ -2140,7 +2140,7 @@ namespace
         HardpointInfo HpInfo;
         if (!FindHardpoint_PS(Root, HpName, HpHandle, HpInfo))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Thruster hardpoint not found: %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Thruster hardpoint not found: %s\n",
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliThruster.cpp", 0x2c, HpName);
             return Wrapper;
         }
@@ -2193,7 +2193,7 @@ namespace
             // the local player's thrusters are switched off.
             CObject* const Obj = Host->Object;
             unsigned const Owner =
-                (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 3u) == 3u)
+                (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
                     ? static_cast<CSimple const*>(Obj)->OwnerPlayer
                     : GetPlayerConnectionId();
             if (Owner == GetPlayerConnectionId())
@@ -2277,7 +2277,7 @@ namespace
             Archetype::ICliObj* const Comp = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
             if (CompanionAsAttachedFX(Comp)->bUseThrottle && Host != nullptr &&
                 Host->Object != nullptr &&
-                (static_cast<unsigned>(Host->Object->ObjectClass) & 0x503u) == 0x503u)
+                (static_cast<unsigned>(Host->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
                 CShip const* const Ship = static_cast<CShip const*>(Host->Object);
                 FEffectBase* const Effect = static_cast<FEffectBase*>(Companion[2]);
@@ -2348,7 +2348,7 @@ namespace
         // The host's CShip (null otherwise -- get_speed is called on it regardless).
         CShip* Ship = nullptr;
         if (Wrapper->Host != nullptr && Wrapper->Host->Object != nullptr &&
-            (static_cast<unsigned>(Wrapper->Host->Object->ObjectClass) & 0x503u) == 0x503u)
+            (static_cast<unsigned>(Wrapper->Host->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
         {
             Ship = static_cast<CShip*>(Wrapper->Host->Object);
         }
@@ -2358,7 +2358,7 @@ namespace
         {
             CShip* ThrusterShip = nullptr;
             if (Wrapper->Host != nullptr && Wrapper->Host->Object != nullptr &&
-                (static_cast<unsigned>(Wrapper->Host->Object->ObjectClass) & 0x503u) == 0x503u)
+                (static_cast<unsigned>(Wrapper->Host->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
                 ThrusterShip = static_cast<CShip*>(Wrapper->Host->Object);
             }
@@ -2865,7 +2865,7 @@ namespace
         {
             CShip const* Ship = nullptr;
             if (Host != nullptr && Host->Object != nullptr &&
-                (static_cast<unsigned>(Host->Object->ObjectClass) & 0x503u) == 0x503u)
+                (static_cast<unsigned>(Host->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
                 Ship = static_cast<CShip const*>(Host->Object);
             }
@@ -3200,7 +3200,6 @@ void EquippedObjCreateEquipFx(FClientGameobj* Host, unsigned short EquipId)
         return;
     unsigned const Type = Equip->GetType();
     FClientEquip* Wrapper = nullptr;
-    unsigned const EquipTypeTradeLane = 0x800000u;
 
     if (Type == static_cast<unsigned>(EquipTypeLight))
         Wrapper = CliLightEquipFxConstruct(Equip, Host);
@@ -3228,7 +3227,7 @@ void EquippedObjCreateEquipFx(FClientGameobj* Host, unsigned short EquipId)
         Wrapper = CliRepairDroidEquipFxConstruct(Equip, Host);
     else if (Type == static_cast<unsigned>(EquipTypeInternalFX))
         Wrapper = CliInternalFxEquipFxConstruct(Equip, Host);
-    else if (Type == EquipTypeTradeLane)
+    else if (Type == static_cast<unsigned>(EquipTypeTradeLane))
         Wrapper = CliTradeLaneEquipFxConstruct(Equip, Host);
     else
     {

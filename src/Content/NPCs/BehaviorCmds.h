@@ -25,6 +25,10 @@
 
 struct FFormation;         // Encounters.h (TU31 formations.ini record, FUN_06efd1a0)
 
+// FContentShipBase::FormationId (+0x154) of a ship in no formation group; AllocateFormationId
+// (FUN_06efeb00) hands out the others.
+unsigned int const GNoFormationId = 0xffffffffu;
+
 // Parameter block read by FUN_06f571a0 (retail 0x78 bytes). No constructor of its own: the
 // NPC ship's FUN_06f33500 (TU43) and the player ship's FUN_06efff70 (GameSupport) initialise
 // it inline.
@@ -32,7 +36,7 @@ struct FContentShipParams : public FContentSpaceObjParams
 {
     FFormation* Formation = nullptr;       // +0x44 -> ship +0x150
     unsigned int FormationSlot = 0xffffffffu; // +0x48 -> ship +0x14c
-    unsigned int FormationId = 0xffffffffu; // +0x4c -> ship +0x154
+    unsigned int FormationId = GNoFormationId; // +0x4c -> ship +0x154
     std::vector<unsigned int> ClassIds;    // +0x50 -> ship +0x128
     // +0x60: the directives the NPC ship starts with (handed to SetDirectives). Its
     // out-of-line copy ctor is FUN_06ef7e30.

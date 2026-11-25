@@ -121,7 +121,7 @@ namespace
         // test for.
         int GetEnvironmentType() override
         {
-            return 2;
+            return kEnvironmentIntro;
         }
 
         // Slot 8 (0x00401e90).
@@ -163,20 +163,20 @@ namespace
             int const Latch = MenuNavGetIntroModeLatch();
             if (Latch == 2 || Latch == 4)
             {
-                Nav.CurrentState = 0x13; // back from the game: EnterState case 19
+                Nav.CurrentState = kMenuStateReturnFromGame; // back from the game: EnterState case 19
             }
             else if (Latch == 3)
             {
-                Nav.CurrentState = 5; // PageServerSelect
+                Nav.CurrentState = kMenuStateServerSelect; // PageServerSelect
             }
             else
             {
                 // 0 / 1 start at the column; any other latch keeps CurrentState. Both start
                 // the single-player session (FUN_005739c0); failure -> state 13 (quit).
                 if (Latch == 0 || Latch == 1)
-                    Nav.CurrentState = 1;
+                    Nav.CurrentState = kMenuStateMainMenu;
                 if (!MenuNavStartSinglePlayer(&Nav))
-                    Nav.CurrentState = 0xd;
+                    Nav.CurrentState = kMenuStateQuit;
             }
 
             // Image slot 1 on DAT_0067bf4c; the result is not read.
@@ -202,7 +202,7 @@ namespace
                 SetClientMouseCursorDrawFlag(1); // FUN_0041dda0
                 Nav.bLoadingScreenSettled = 0;
                 Nav.ScriptTimeRemainder = 0.0f;
-                SetClientAudioMode(3);           // FUN_00428030
+                SetClientAudioMode(kClientAudioModeRtc);           // FUN_00428030
                 SetFadeImmediate(1.0f);          // FUN_00412070
                 // FUN_00412050(0, (float)(1.0 / DAT_0061650c)).
                 SetFadeTarget(0.0f,
@@ -324,7 +324,7 @@ namespace
         int bFromIntro = 1;
         if (PreviousState != nullptr)
         {
-            if (PreviousState->GetEnvironmentType() != 2)
+            if (PreviousState->GetEnvironmentType() != kEnvironmentIntro)
                 bFromIntro = 0;
             PreviousState->Destroy();
         }
@@ -372,7 +372,7 @@ namespace
         // FUN_005ab1f0; DAT_0067ecbd is the quit flag.
         if (!G_LoginMgr.SelectCharacterById(G_LoadGameCharacterId))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Selection of character id %s failed\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Selection of character id %s failed\n",
                   "E:\\FL\\Scratch\\Source\\Client\\main.cpp", 0x6fd,
                   G_LoadGameCharacterId.Buffer);
             SetClientQuitRequested(true);
@@ -409,7 +409,7 @@ void QueueLoadGameCharacter(CHARACTER_ID const* CharId, bool bSkipAutosave)
     // (+0x60) -- no server test.
     if (CharId->Buffer[0] == 0)
         return;
-    G_PendingClientStateId = 7;
+    G_PendingClientStateId = kClientStateLoadGame;
     G_LoadGameCharacterId = *CharId;
     if (bSkipAutosave)
         G_Server->CharacterSkipAutosave(GetPlayerConnectionId());
@@ -433,15 +433,15 @@ IEnvironment* EnterClientState(int StateId, IEnvironment* PreviousState)
     IEnvironment* Result = PreviousState;
     switch (StateId)
     {
-    case 1:
+    case kClientStateQuit:
         DestroyPreviousState(PreviousState);
         PostQuitMessage(0);
         Result = nullptr;
         break;
-    case 2:
+    case kClientStateSpace:
         Result = EnterInGameState(PreviousState);
         break;
-    case 3:
+    case kClientStateBase:
         Result = EnterBaseState(PreviousState);
         break;
     case 4:
@@ -452,13 +452,13 @@ IEnvironment* EnterClientState(int StateId, IEnvironment* PreviousState)
         // The previous state is returned as is; SpaceApp's slot 10 is 0x00401e90 too.
         GetSpaceState()->Slot10();
         break;
-    case 6:
+    case kClientStateMenu:
         Result = EnterMenuState(PreviousState);
         break;
-    case 7:
+    case kClientStateLoadGame:
         Result = EnterLoadGameState(PreviousState);
         break;
-    case 8:
+    case kClientStateMissionBriefing:
         Result = EnterMissionBriefingState(PreviousState);
         break;
     default:
@@ -475,7 +475,7 @@ bool IsClientIntroEnvironment()
     IEnvironment* const Current = g_client.current_state;
     if (Current == nullptr)
         return false;
-    return Current->GetEnvironmentType() == 2;
+    return Current->GetEnvironmentType() == kEnvironmentIntro;
 }
 
 IEnvironment* GetIntroFocusState()

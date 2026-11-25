@@ -270,7 +270,7 @@ int FleeBehavior::Perform()
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Common\\Ai\\BehaviorClasses.cpp", 0x453,
                   "FleeBehavior::perform() has uninitialized flee type from callback. Come get Joel W");
         }
@@ -415,7 +415,7 @@ void FleeBehavior::OnEvent(void* Event)
             DockDelegate->OnEvent(Event);
         return;
     }
-    FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
           "E:\\FL\\Scratch\\Source\\Common\\Ai\\BehaviorClasses.cpp", 0x504,
           "FleeBehavior::event_handler() has failed because of uninitialized values. Come get Joel W");
 }

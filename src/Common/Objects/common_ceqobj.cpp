@@ -146,7 +146,7 @@ bool CEqObj::add_equipped_item(EquipDesc const& Desc)
     if (Arch == nullptr)
     {
         // The object's archetype is read without a null test.
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: Object(%s) missing equipment archetype(%X)\n",
               kCEqObjSource, 0x127, Archetype->Nickname.get_string(), Desc.ArchId);
         return false;
@@ -166,7 +166,7 @@ bool CEqObj::add_equipped_item(EquipDesc const& Desc)
         }
         else
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: Object(%s) tried to connect internal type(%s) to "
                   "hardpoint(%s). Ignorable.",
                   kCEqObjSource, 0x116, Archetype->Nickname.get_string(),
@@ -183,7 +183,7 @@ bool CEqObj::add_cargo_item(EquipDesc const& Desc)
     Archetype::Equipment* const Arch = Archetype::GetEquipment(Desc.ArchId);
     if (Arch == nullptr)
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: Object(%s) missing equipment archetype(%X)\n",
               kCEqObjSource, 0x158, Archetype->Nickname.get_string(), Desc.ArchId);
         return false;
@@ -273,7 +273,7 @@ CEquip* CEqObj::alloc_equip(unsigned short EquipId, Archetype::Equipment* Arch,
         break;
     }
 
-    FDUMP(0x100002,
+    FDUMP(kFdumpWarning,
           "%s(%d) : *** WARNING: alloc_equip: Archetype[%s] not supported/equippable!",
           kCEqObjSource, 0x1cf, Arch->Nickname.get_string());
     return nullptr;
@@ -300,7 +300,7 @@ void CEqObj::link_shields()
                 if (ShieldArch == nullptr)
                 {
                     // The whole function returns.
-                    FDUMP(0x100001,
+                    FDUMP(kFdumpError,
                           "%s(%d) : *** ERROR: Failed to create shield(%s) on hardpoint(%s). "
                           "(Ignorable)",
                           kCEqObjSource, 0x579, Link.ShieldArch.get_string(), Link.Hardpoint.Value);
@@ -434,7 +434,7 @@ void CEqObj::init_docking_points(unsigned int BaseId)
                                                  Sphere.AnimName.c_str(), nullptr, nullptr);
             if (AnimChannel == -1)
             {
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: failed to find animation (%s) in object (%s)\n",
                       "E:\\FL\\Scratch\\Source\\Common\\CEqObj.cpp",
                       0x359,
@@ -799,7 +799,7 @@ long CEqObj::sub_obj_id_to_inst(unsigned short SubObjId) const
         CAttachedEquip* const Attached = CAttachedEquip::cast(const_cast<CEquip*>(Eq));
         if (Attached == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCEqObjSource, 0x4ee,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCEqObjSource, 0x4ee,
                   "Tried to get inst for non-attached equipment.");
             return -1;
         }

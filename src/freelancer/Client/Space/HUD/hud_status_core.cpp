@@ -210,17 +210,17 @@ bool HUD_Core::Create(Win3D* NewParent, void* Data)
     float const HealthPos[3] = {0.005f, -0.376f, -1.0f};
     HealthBar = CreateStaticControl("HealthBar", "Interface\\hud\\HUD_hullgauge.3db", HealthPos,
                                     nullptr, BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
-    HealthBar->SetProperty(3, 0x470, 0);
+    HealthBar->SetProperty(kWinPropToolTip, 0x470, 0);
 
     float const ShieldPos[3] = {0.005f, -0.366f, -1.0f};
     ShieldBar = CreateStaticControl("ShieldBar", "Interface\\hud\\HUD_shieldgauge.3db", ShieldPos,
                                     nullptr, BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
-    ShieldBar->SetProperty(3, 0x471, 0);
+    ShieldBar->SetProperty(kWinPropToolTip, 0x471, 0);
 
     float const PowerPos[3] = {0.005f, -0.355f, -1.0f};
     PowerBar = CreateStaticControl("PowerBar", "Interface\\hud\\HUD_energygauge.3db", PowerPos,
                                    nullptr, BarHalf, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
-    PowerBar->SetProperty(3, 0x3f2, 0);
+    PowerBar->SetProperty(kWinPropToolTip, 0x3f2, 0);
 
     float const VelocityPos[3] = {0.108f, 0.008f, 0.0f};
     VelocityText = CreateTextControl("VelocityText", "Normal", VelocityPos, nullptr, 0.056f, 0.03f,
@@ -512,7 +512,7 @@ void HUD_Core::Draw()
         LastVelocity = SpeedInt;
         if (SpeedInt > 999)
         {
-            VelocityText->SetProperty(0x1e, 0x526, 0);
+            VelocityText->SetProperty(kTextPropSetIds, 0x526, 0);
         }
         else
         {
@@ -534,11 +534,11 @@ void HUD_Core::Draw()
         LastThrust = Thrust;
         if (Thrust < 25)
         {
-            ThrustText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), 1);
+            ThrustText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), 1);
         }
         else
         {
-            ThrustText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteCyan), 1);
+            ThrustText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteCyan), 1);
         }
         sprintf(Text, "%d%%%%", Thrust);
         // "NN%%" prints as "NN%" through the NumberString's own printf.
@@ -642,14 +642,14 @@ void HUD_Status::HideExpandedControls(bool bHide)
     {
         for (int Index = 0; Index < 10; ++Index)
         {
-            WeaponText[Index]->SetProperty(1, Hide, 0);
-            WeaponNumberText[Index]->SetProperty(1, Hide, 0);
-            AmmoText[Index]->SetProperty(1, Hide, 0);
+            WeaponText[Index]->SetProperty(kWinPropHide, Hide, 0);
+            WeaponNumberText[Index]->SetProperty(kWinPropHide, Hide, 0);
+            AmmoText[Index]->SetProperty(kWinPropHide, Hide, 0);
         }
-        WeaponListScroll->SetProperty(1, Hide, 0);
+        WeaponListScroll->SetProperty(kWinPropHide, Hide, 0);
     }
-    ViewPanel->SetProperty(1, Hide, 0);
-    CloseButton->SetProperty(1, Hide, 0);
+    ViewPanel->SetProperty(kWinPropHide, Hide, 0);
+    CloseButton->SetProperty(kWinPropHide, Hide, 0);
 }
 
 bool HUD_Status::Create(Win3D* NewParent, void* Data)
@@ -695,24 +695,24 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
         WeaponNumberText[Index] = CreateTextControl(ControlName, "HudSmall", NumberPos, nullptr,
                                                     0.02f, 0.016999999f, 1.0f,
                                                     static_cast<unsigned>(0x515 + Index), 1, 0, 1);
-        WeaponNumberText[Index]->SetProperty(0x24, 1, 0);
+        WeaponNumberText[Index]->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(ControlName, "WeaponText%d", Index);
         float const RowY = static_cast<float>(-0.199 - static_cast<double>(Step));
         float const TextPos[3] = {0.288f, RowY, 0.0f};
         WeaponText[Index] = CreateTextControl(ControlName, "HudSmall", TextPos, nullptr, 0.165f,
                                               0.016999999f, 1.0f, 0, 0, 0, 1);
-        WeaponText[Index]->SetProperty(0x24, 1, 0);
+        WeaponText[Index]->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(ControlName, "AmmoText%d", Index);
         float const AmmoPos[3] = {0.458f, RowY, 0.0f};
         AmmoText[Index] = CreateTextControl(ControlName, "HudSmall", AmmoPos, nullptr, 0.04f, 0.017f,
                                             1.0f, 0x514, 0, 0, 1);
-        AmmoText[Index]->SetProperty(0x24, 1, 0);
+        AmmoText[Index]->SetProperty(kTextPropClickable, 1, 0);
 
-        WeaponNumberText[Index]->SetProperty(1, 1, 0);
-        WeaponText[Index]->SetProperty(1, 1, 0);
-        AmmoText[Index]->SetProperty(1, 1, 0);
+        WeaponNumberText[Index]->SetProperty(kWinPropHide, 1, 0);
+        WeaponText[Index]->SetProperty(kWinPropHide, 1, 0);
+        AmmoText[Index]->SetProperty(kWinPropHide, 1, 0);
     }
 
     float const SmallHalf[3] = {0.014f, 0.014f, 0.0f};
@@ -729,7 +729,7 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     float const RepairCountPos[3] = {0.347f, -0.359f, 0.0f};
     RepairCountText = CreateTextControl("RepairCountText", "HudSmall", RepairCountPos, nullptr,
                                         0.034f, 0.03f, 0.8f, 0, 1, 0x4b2, 1);
-    RepairCountText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(kStatusCountPlaceholder),
+    RepairCountText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(kStatusCountPlaceholder),
                                  0x10);
 
     float const BatteryPos[3] = {0.397f, -0.371f, 0.0f};
@@ -740,7 +740,7 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     float const BatteryCountPos[3] = {0.404f, -0.359f, 0.0f};
     BatteryCountText = CreateTextControl("BatteryCountText", "HudSmall", BatteryCountPos, nullptr,
                                          0.034f, 0.03f, 0.8f, 0, 1, 0x4b3, 1);
-    BatteryCountText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(kStatusCountPlaceholder),
+    BatteryCountText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(kStatusCountPlaceholder),
                                   0x10);
 
     // The scroll bar, then HUDItem slot 13 (virtual) with 1.
@@ -1020,9 +1020,9 @@ void HUD_Status::RefreshWeaponRows()
                 Color = Pulsed;
             }
         }
-        WeaponNumberText[Slot]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
-        WeaponText[Slot]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
-        AmmoText[Slot]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
+        WeaponNumberText[Slot]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
+        WeaponText[Slot]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
+        AmmoText[Slot]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
 
         ++Slot;
         if (Slot >= 10)
@@ -1123,11 +1123,11 @@ void HUD_Status::ToggleExpanded()
     ButtonScaler::AddButton(ViewPanel, 1.0f, 0.1f);
     for (int Index = 0; Index < 10; ++Index)
     {
-        WeaponNumberText[Index]->SetProperty(1, 1, 0);
-        WeaponText[Index]->SetProperty(1, 1, 0);
-        AmmoText[Index]->SetProperty(1, 1, 0);
+        WeaponNumberText[Index]->SetProperty(kWinPropHide, 1, 0);
+        WeaponText[Index]->SetProperty(kWinPropHide, 1, 0);
+        AmmoText[Index]->SetProperty(kWinPropHide, 1, 0);
     }
-    WeaponListScroll->SetProperty(1, 1, 0);
+    WeaponListScroll->SetProperty(kWinPropHide, 1, 0);
 }
 
 void HUD_Status::OnMoveFinished()
@@ -1171,24 +1171,24 @@ void HUD_Status::OnScaleFinished()
         SetGameSessionFlags(2, true);
         HideExpandedControls(false);
         float const RepairPos[3] = {0.3f, -0.171f, 0.0f};
-        RepairButton->SetProperty(6, reinterpret_cast<uintptr_t>(RepairPos), 0);
+        RepairButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairPos), 0);
         float const RepairCountPos[3] = {0.306f, -0.16f, 0.0f};
-        RepairCountText->SetProperty(6, reinterpret_cast<uintptr_t>(RepairCountPos), 0);
+        RepairCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairCountPos), 0);
         float const BatteryPos[3] = {0.357f, -0.171f, 0.0f};
-        UseBatteryButton->SetProperty(6, reinterpret_cast<uintptr_t>(BatteryPos), 0);
+        UseBatteryButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BatteryPos), 0);
         float const BatteryCountPos[3] = {0.365f, -0.16f, 0.0f};
-        BatteryCountText->SetProperty(6, reinterpret_cast<uintptr_t>(BatteryCountPos), 0);
+        BatteryCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BatteryCountPos), 0);
         if (bShowWeaponList != 0)
         {
             for (int Index = 0; Index < 10; ++Index)
             {
-                WeaponNumberText[Index]->SetProperty(1, 0, 0);
-                WeaponText[Index]->SetProperty(1, 0, 0);
-                AmmoText[Index]->SetProperty(1, 0, 0);
+                WeaponNumberText[Index]->SetProperty(kWinPropHide, 0, 0);
+                WeaponText[Index]->SetProperty(kWinPropHide, 0, 0);
+                AmmoText[Index]->SetProperty(kWinPropHide, 0, 0);
             }
-            WeaponListScroll->SetProperty(1, 0, 0);
+            WeaponListScroll->SetProperty(kWinPropHide, 0, 0);
         }
-        MinimizedFrame->SetProperty(1, 1, 0);
+        MinimizedFrame->SetProperty(kWinPropHide, 1, 0);
         HalfExtents[0] = 0.131f;
         HalfExtents[1] = 0.117f;
         HalfExtents[2] = 0.0f;
@@ -1201,18 +1201,18 @@ void HUD_Status::OnScaleFinished()
     // Closing, stage 2 -- the minimized frame shown, the repair / battery controls put at -0.4
     // and, with the frame and the toggle button, slid back up over 0.3 s; OnMoveFinished
     // finishes.
-    MinimizedFrame->SetProperty(1, 0, 0);
+    MinimizedFrame->SetProperty(kWinPropHide, 0, 0);
     ButtonMover::Start(0.3f);
     float const ToggleStart[3] = {0.371f, -0.27f, 0.0f};
     ButtonMover::AddButton(ToggleButton, ToggleStart, &HomePosition.X);
     float const RepairLow[3] = {0.341f, -0.4f, 0.0f};
-    RepairButton->SetProperty(6, reinterpret_cast<uintptr_t>(RepairLow), 0);
+    RepairButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairLow), 0);
     float const RepairCountLow[3] = {0.347f, -0.4f, 0.0f};
-    RepairCountText->SetProperty(6, reinterpret_cast<uintptr_t>(RepairCountLow), 0);
+    RepairCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairCountLow), 0);
     float const BatteryLow[3] = {0.397f, -0.4f, 0.0f};
-    UseBatteryButton->SetProperty(6, reinterpret_cast<uintptr_t>(BatteryLow), 0);
+    UseBatteryButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BatteryLow), 0);
     float const BatteryCountLow[3] = {0.404f, -0.4f, 0.0f};
-    BatteryCountText->SetProperty(6, reinterpret_cast<uintptr_t>(BatteryCountLow), 0);
+    BatteryCountText->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BatteryCountLow), 0);
     float const RepairHome[3] = {0.341f, -0.371f, 0.0f};
     ButtonMover::AddButton(RepairButton, RepairLow, RepairHome);
     float const RepairCountHome[3] = {0.347f, -0.359f, 0.0f};
@@ -1258,7 +1258,7 @@ void HUD_Status::ToggleLauncher(unsigned short SubId)
     if (Ship->get_target() != nullptr)
     {
         CObject const* const Object = Ship->get_target()->cobject();
-        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 3u) == 3u)
+        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
         {
             TargetObject = static_cast<CSimple*>(const_cast<CObject*>(Object));
         }
@@ -1292,7 +1292,7 @@ bool HUD_Status::MouseEvent(FWin3DMouseEvent const* Event)
 intptr_t HUD_Status::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // FUN_004db1c0 (this = the WinControl face).
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         // The close button (not forwarded to the base).
         if (A == reinterpret_cast<uintptr_t>(CloseButton))
@@ -1320,7 +1320,7 @@ intptr_t HUD_Status::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             RefreshTimer = 1.0f;
         }
     }
-    else if (Msg == 0x3e)
+    else if (Msg == kWinNotifyScrollValue)
     {
         if (!HudIsMousePickBlocked() && A == reinterpret_cast<uintptr_t>(WeaponListScroll))
         {
@@ -1385,7 +1385,7 @@ void HUD_Status::Update()
             {
                 // Ids 0x63b shown, the cancel caption hidden; with a target whose TypeBits has
                 // bit 7, the cancel caption gets the target's caption.
-                SpecialModeText->SetProperty(0x1e, 0x63b, 0);
+                SpecialModeText->SetProperty(kTextPropSetIds, 0x63b, 0);
                 SpecialModeText->Flags |= 3;
                 SpecialModeTextCancel->Flags &= 0xfc;
                 bDockingOrTradeLaneCaption = 1;
@@ -1394,16 +1394,16 @@ void HUD_Status::Update()
                 {
                     CObject* Object = const_cast<CObject*>(ShipTarget->cobject());
                     if (Object != nullptr &&
-                        (static_cast<unsigned>(Object->ObjectClass) & 3u) != 3u)
+                        (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
                     {
                         Object = nullptr;
                     }
                     // TypeBits is read with no null test (retail faults on a target without a
                     // CSimple).
                     CSimple* const Simple = static_cast<CSimple*>(Object);
-                    if ((Simple->TypeBits & 0x80u) != 0)
+                    if ((Simple->TypeBits & OBJ_TRADELANE_RING) != 0)
                     {
-                        if (HudBuildObjectCaption(Simple, &Caption, 1, false))
+                        if (HudBuildObjectCaption(Simple, &Caption, kCaptionLocation, false))
                         {
                             SpecialModeTextCancel->SetProperty(
                                 0x1d, reinterpret_cast<uintptr_t>(Caption.Text), 0);
@@ -1416,7 +1416,7 @@ void HUD_Status::Update()
             {
                 if (Ship->is_using_tradelane())
                 {
-                    SpecialModeTextCancel->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Caption.Text), 0);
+                    SpecialModeTextCancel->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Caption.Text), 0);
                     SpecialModeTextCancel->Flags |= 3;
                     bDockingOrTradeLaneCaption = 1;
                 }
@@ -1445,22 +1445,22 @@ void HUD_Status::Update()
             {
                 for (int Index = 0; Index < 10; ++Index)
                 {
-                    WeaponNumberText[Index]->SetProperty(1, 1, 0);
-                    WeaponText[Index]->SetProperty(1, 1, 0);
-                    AmmoText[Index]->SetProperty(1, 1, 0);
+                    WeaponNumberText[Index]->SetProperty(kWinPropHide, 1, 0);
+                    WeaponText[Index]->SetProperty(kWinPropHide, 1, 0);
+                    AmmoText[Index]->SetProperty(kWinPropHide, 1, 0);
                 }
-                WeaponListScroll->SetProperty(1, 1, 0);
+                WeaponListScroll->SetProperty(kWinPropHide, 1, 0);
                 RefreshTimer = 1.0f;
             }
             else
             {
                 for (int Index = 0; Index < 10; ++Index)
                 {
-                    WeaponNumberText[Index]->SetProperty(1, 0, 0);
-                    WeaponText[Index]->SetProperty(1, 0, 0);
-                    AmmoText[Index]->SetProperty(1, 0, 0);
+                    WeaponNumberText[Index]->SetProperty(kWinPropHide, 0, 0);
+                    WeaponText[Index]->SetProperty(kWinPropHide, 0, 0);
+                    AmmoText[Index]->SetProperty(kWinPropHide, 0, 0);
                 }
-                WeaponListScroll->SetProperty(1, 0, 0);
+                WeaponListScroll->SetProperty(kWinPropHide, 0, 0);
             }
         }
 
@@ -1571,7 +1571,7 @@ void HUD_Status::Update()
     // Also reached while an animation runs: the toggle button is hidden while the panel is open
     // and the mover is idle.
     uintptr_t const bHideToggle = (bExpanded != 0 && !ButtonMover::IsActive()) ? 1u : 0u;
-    ToggleButton->SetProperty(1, bHideToggle, 0);
+    ToggleButton->SetProperty(kWinPropHide, bHideToggle, 0);
 }
 
 void HUD_Status::UpdateSpecialModeCaptions()
@@ -1620,8 +1620,8 @@ void HUD_Status::UpdateSpecialModeCaptions()
         bHideText = false;
     }
 
-    SpecialModeText->SetProperty(1, bHideText ? 1u : 0u, 0);
-    SpecialModeTextCancel->SetProperty(1, bHideCancel ? 1u : 0u, 0);
+    SpecialModeText->SetProperty(kWinPropHide, bHideText ? 1u : 0u, 0);
+    SpecialModeTextCancel->SetProperty(kWinPropHide, bHideCancel ? 1u : 0u, 0);
     if (bHideText)
     {
         return;
@@ -1629,7 +1629,7 @@ void HUD_Status::UpdateSpecialModeCaptions()
 
     if (bTurretView != 0)
     {
-        SpecialModeText->SetProperty(0x1e, IsMouseFlightUnlocked() ? 0x615u : 0x633u, 0);
+        SpecialModeText->SetProperty(kTextPropSetIds, IsMouseFlightUnlocked() ? 0x615u : 0x633u, 0);
         if (bTradelane)
         {
             return;
@@ -1637,7 +1637,7 @@ void HUD_Status::UpdateSpecialModeCaptions()
     }
     else if (bRearView != 0)
     {
-        SpecialModeText->SetProperty(0x1e, 0x62b, 0);
+        SpecialModeText->SetProperty(kTextPropSetIds, 0x62b, 0);
         if (bTradelane)
         {
             return;
@@ -1650,7 +1650,7 @@ void HUD_Status::UpdateSpecialModeCaptions()
     }
     else
     {
-        SpecialModeText->SetProperty(0x1e, 0x62c, 0);
+        SpecialModeText->SetProperty(kTextPropSetIds, 0x62c, 0);
     }
 
     // The cancel caption -- ids 0x62d as a format around the name of the key bound to the
@@ -1675,7 +1675,7 @@ void HUD_Status::UpdateSpecialModeCaptions()
         KeyMapFormatBindingName(&Binding, KeyName, 0x100); // FUN_00577f50
     }
     swprintf(G_StatusScratchLine, 0x1000, G_StatusScratchFormat, KeyName);
-    SpecialModeTextCancel->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_StatusScratchLine), 0);
+    SpecialModeTextCancel->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_StatusScratchLine), 0);
 }
 
 void HUD_Status::UpdateRepairBatteryCounts()
@@ -1694,7 +1694,7 @@ void HUD_Status::UpdateRepairBatteryCounts()
         }
     }
     swprintf(Text, 0x20, L"%d", RepairCount);
-    RepairCountText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0x10);
+    RepairCountText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0x10);
 
     EquipDesc const* const Battery = FindPlayerNonMissionEquipRetail(G_ShieldBatteryArchId);
     int BatteryCount = 0;
@@ -1707,7 +1707,7 @@ void HUD_Status::UpdateRepairBatteryCounts()
         }
     }
     swprintf(Text, 0x20, L"%d", BatteryCount);
-    BatteryCountText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0x10);
+    BatteryCountText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0x10);
 }
 
 bool HUD_Status::IsLootInReach()
@@ -1804,9 +1804,9 @@ void HUD_Status::ShowWeaponRows()
             G_StatusScratchLine[0] = 0;
             GetIdsStringWWithRawFallback(static_cast<unsigned>(Weapon.IdsName), G_StatusScratchLine,
                                          G_NnTextScratchCapacity);
-            WeaponText[Row]->SetProperty(1, 0, 0);
-            WeaponNumberText[Row]->SetProperty(1, 0, 0);
-            WeaponText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_StatusScratchLine), 0);
+            WeaponText[Row]->SetProperty(kWinPropHide, 0, 0);
+            WeaponNumberText[Row]->SetProperty(kWinPropHide, 0, 0);
+            WeaponText[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_StatusScratchLine), 0);
 
             ++Index;
             char NumberText[0x20];
@@ -1815,14 +1815,14 @@ void HUD_Status::ShowWeaponRows()
 
             if (Weapon.AmmoCount >= 0)
             {
-                AmmoText[Row]->SetProperty(1, 0, 0);
+                AmmoText[Row]->SetProperty(kWinPropHide, 0, 0);
                 char AmmoCountText[0x20];
                 sprintf(AmmoCountText, "%d", Weapon.AmmoCount);
                 static_cast<NnTextControl*>(AmmoText[Row])->SetNumberText(AmmoCountText);
             }
             else
             {
-                AmmoText[Row]->SetProperty(1, 1, 0);
+                AmmoText[Row]->SetProperty(kWinPropHide, 1, 0);
             }
 
             ++Row;
@@ -1837,14 +1837,14 @@ void HUD_Status::ShowWeaponRows()
         }
     }
 
-    WeaponListScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Count - 1));
+    WeaponListScroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Count - 1));
 
     // The rows left over are hidden.
     for (; Row < 10; ++Row)
     {
-        WeaponNumberText[Row]->SetProperty(1, 1, 0);
-        AmmoText[Row]->SetProperty(1, 1, 0);
-        WeaponText[Row]->SetProperty(1, 1, 0);
+        WeaponNumberText[Row]->SetProperty(kWinPropHide, 1, 0);
+        AmmoText[Row]->SetProperty(kWinPropHide, 1, 0);
+        WeaponText[Row]->SetProperty(kWinPropHide, 1, 0);
     }
 }
 
@@ -2099,7 +2099,7 @@ void HUD_Status::TractorInAllLoot()
     // The ship's tractor takes the list when the player is a ship gameobj.
     FClientGameobj* const PlayerObject =
         static_cast<FClientGameobj*>(static_cast<IObjInspectImpl*>(Player));
-    if (PlayerObject->ManagerKind == 1)
+    if (PlayerObject->ManagerKind == EClientGameobjKind::Ship)
     {
         ShipTractorInTargets(Player, Loot);
     }
@@ -2132,7 +2132,7 @@ bool HUD_Status::OnEvent(unsigned MsgId)
     }
     FClientGameobj* const PlayerObject =
         static_cast<FClientGameobj*>(static_cast<IObjInspectImpl*>(Player));
-    if (PlayerObject->ManagerKind != 1)
+    if (PlayerObject->ManagerKind != EClientGameobjKind::Ship)
     {
         return false;
     }

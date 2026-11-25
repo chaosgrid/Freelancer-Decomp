@@ -331,7 +331,7 @@ namespace
         Behavior->DialogType = 3;
         AppendGenericScript(Behavior, GSEG_F01jG, Character, Posture, 0);
         // A player already on a mission.
-        if ((State->GetLiveMission() & 0x3fffffff) != 0)
+        if ((State->GetLiveMission() & GIdValueMask) != 0)
         {
             AppendGenericScript(Behavior, GSEG_F04fG, Character, Posture, 0);
             return;

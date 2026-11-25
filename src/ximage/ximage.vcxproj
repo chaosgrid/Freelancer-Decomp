@@ -53,6 +53,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\include\dacom.h" />
+    <ClInclude Include="..\include\dacom_factory.h" />
     <ClInclude Include="..\include\render\IBigImage2.h" />
     <ClInclude Include="..\include\render\factory_names.h" />
     <ClInclude Include="..\include\render\render.h" />

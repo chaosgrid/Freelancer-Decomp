@@ -221,7 +221,7 @@ namespace Archetype
             {
                 if (!DamageObjUnmatched((*List)[Index]))
                     continue;
-                FDUMP(0x100002, Fmt, ArchetypeSource, Line, Group->ObjName);
+                FDUMP(kFdumpWarning, Fmt, ArchetypeSource, Line, Group->ObjName);
                 List->clear();
                 return;
             }

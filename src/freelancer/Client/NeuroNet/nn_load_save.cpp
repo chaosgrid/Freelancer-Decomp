@@ -141,7 +141,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     float const TitlePosition[3] = {NnFloatBits(0x3e147ae1), NnFloatBits(0x3e800000), ZFar};
     Title = CreateTextControl("LoadSave_Title", "PageHeader", TitlePosition, nullptr,
                               NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f), 1.0f, 0, 1, 0, 0);
-    Title->SetProperty(0x1e, 0x586, 0);
+    Title->SetProperty(kTextPropSetIds, 0x586, 0);
 
     // The five buttons (FUN_005a0c90). Save and Load share {-0.33, 0.27, -1.05}; Delete, Main
     // Menu and Resume step down by 0.0916 / 0.1832 / 0.2748 (one float subtraction each). Half
@@ -192,7 +192,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
                                        NnFloatBits(0x3cf5c28f), 1.0f, 0, 1, 0, 0);
 
     for (int Index = 0; Index < 5; ++Index)
-        ButtonTexts[Index]->SetProperty(0x1e, static_cast<uintptr_t>(0x587 + Index), 0);
+        ButtonTexts[Index]->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(0x587 + Index), 0);
 
     // Each caption's +0x381 = DAT_00679bb4 and +0x385 = DAT_00679ba4 (two unaligned dwords).
     for (int Index = 0; Index < 5; ++Index)
@@ -248,12 +248,12 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
                                           InfoWidth, InfoHeight, 1.0f, 0, 0, 0, 0);
     }
 
-    InfoTitles[0]->SetProperty(0x1e, 0x593, 0);
-    InfoTitles[1]->SetProperty(0x1e, 0x594, 0);
-    InfoTitles[2]->SetProperty(0x1e, 0x5ec, 0);
-    InfoTitles[3]->SetProperty(0x1e, 0x591, 0);
+    InfoTitles[0]->SetProperty(kTextPropSetIds, 0x593, 0);
+    InfoTitles[1]->SetProperty(kTextPropSetIds, 0x594, 0);
+    InfoTitles[2]->SetProperty(kTextPropSetIds, 0x5ec, 0);
+    InfoTitles[3]->SetProperty(kTextPropSetIds, 0x591, 0);
     for (int Index = 0; Index < 4; ++Index)
-        InfoValues[Index]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(kEmptyText), 0);
+        InfoValues[Index]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(kEmptyText), 0);
 
     // Height and text scale are computed in double (DAT_005d1f10 / DAT_005d1f08) and stored as
     // float.
@@ -313,7 +313,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
         DescripText = CreateTextControl("LoadSave_DescripText", "ListText", DescripTextPosition,
                                         nullptr, NnFloatBits(0x3e8a3d71), NnFloatBits(0x3cf5c28f),
                                         1.0f, 0, 0, 0, 0);
-        DescripText->SetProperty(0x1e, 0x592, 0);
+        DescripText->SetProperty(kTextPropSetIds, 0x592, 0);
     }
     else
     {
@@ -345,7 +345,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     wchar_t PrefixText[0x100];
     if (GetIdsStringWWithRawFallback(0x65d, PrefixText, 0x100) == 0)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Failed to find string resource %d\n", kNnLoadSaveCpp,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Failed to find string resource %d\n", kNnLoadSaveCpp,
               0x18e, 0x65d);
     }
     SaveNamePrefix.assign(PrefixText, wcslen(PrefixText));
@@ -354,7 +354,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
 
     if (Mode == kNnLoadSaveModeLoad)
     {
-        Title->SetProperty(0x1e, 0x588, 0);
+        Title->SetProperty(kTextPropSetIds, 0x588, 0);
         HideControl(Buttons[0]);
         ShowControl(Buttons[1]);
         HideControl(ButtonTexts[0]);
@@ -362,7 +362,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     }
     else if (Mode == kNnLoadSaveModeSave)
     {
-        Title->SetProperty(0x1e, 0x587, 0);
+        Title->SetProperty(kTextPropSetIds, 0x587, 0);
         ShowControl(Buttons[0]);
         HideControl(Buttons[1]);
         ShowControl(ButtonTexts[0]);
@@ -370,7 +370,7 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     }
     else if (Mode == kNnLoadSaveModeStoryStar)
     {
-        Title->SetProperty(0x1e, 0x588, 0);
+        Title->SetProperty(kTextPropSetIds, 0x588, 0);
         HideControl(Buttons[0]);
         ShowControl(Buttons[1]);
         HideControl(ButtonTexts[0]);
@@ -383,14 +383,14 @@ bool NnLoadSave::Create(Win3D* NewParent, void* Data)
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid load/save mode %d\n", kNnLoadSaveCpp, 0x1bc,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid load/save mode %d\n", kNnLoadSaveCpp, 0x1bc,
               Mode);
     }
 
     DrawLayer = 0x6e;
     DrawSubLayer = 6;
     bCursorDrawFlag = NnModalPauseGame(); // FUN_004a7670
-    RegisterEvent(0xf); // FUN_005760d0 on the +0x32c face
+    RegisterEvent(USER_CANCEL); // FUN_005760d0 on the +0x32c face
     RefreshSaveList();
     SelectSave(-1);
     return Win3D::Create(NewParent, Data); // FUN_004b5060
@@ -429,7 +429,7 @@ bool NnLoadSave::OnEvent(unsigned MsgId)
 {
     // LAB_00486b80 (RET 4): only USER_CANCEL (0xf), which is consumed either way; mode 3 keeps
     // the window.
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return false;
     if (Mode != kNnLoadSaveModeStoryStar)
         ResumeAndDelete();
@@ -451,7 +451,7 @@ bool NnLoadSave::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00486c50 (RET 0xc): the list clicks (0xf001 / 0xf002), NN_Confirm's answer (0x3006)
     // and USER_CANCEL / USER_ENTER relays (0xf003 / 0xf004) go on to slot 42; always false.
-    if (Msg == 0xf001 || Msg == 0xf002 || Msg == 0x3006 || Msg == 0xf003 || Msg == 0xf004)
+    if (Msg == kWinMsgPress || Msg == kWinMsgDoubleClick || Msg == kWinMsgConfirmAnswer || Msg == kWinMsgEscape || Msg == kWinMsgEnter)
         SetProperty(static_cast<int>(Msg), A, B);
     return false;
 }
@@ -468,7 +468,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         int const Row = static_cast<int>(B);
         switch (static_cast<unsigned>(Msg))
         {
-        case 0xf001:
+        case kWinMsgPress:
         {
             // A list click; the date list follows the name list.
             if (Row >= -1)
@@ -484,7 +484,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             SelectSave(Selected);
             return 0;
         }
-        case 0xf002:
+        case kWinMsgDoubleClick:
         {
             // A double click loads, in modes 1 and 3.
             if (Mode != kNnLoadSaveModeLoad && Mode != kNnLoadSaveModeStoryStar)
@@ -505,11 +505,11 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             LoadSave(Selected);
             return 0;
         }
-        case 0xf003:
+        case kWinMsgEscape:
             // USER_CANCEL through the Event::Handler face's slot 0.
             OnEvent(0xf);
             return 0;
-        case 0xf004:
+        case kWinMsgEnter:
             if (bSaveAllowed != 0 && Mode == kNnLoadSaveModeSave)
                 SaveGame();
             return 0;
@@ -518,7 +518,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
     }
 
-    if (Msg == 0x3006)
+    if (Msg == kWinMsgConfirmAnswer)
     {
         // NN_Confirm answered (A == 1 yes) the question +0x338 names.
         switch (ConfirmMode)
@@ -533,7 +533,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 ClearListsAndSelection();
                 if (G_LoginMgr.DestroyCharacter(Id) != 1)
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x3ab,
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x3ab,
                           "Failed to delete character\n");
                 }
                 RefreshSaveList();
@@ -562,7 +562,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                 }
                 else
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x366,
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x366,
                           "No server, cannot save\n");
                 }
                 RefreshSaveList();
@@ -570,7 +570,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             }
             break;
         default:
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid confirmation mode %d\n", kNnLoadSaveCpp,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid confirmation mode %d\n", kNnLoadSaveCpp,
                   0x2dc, ConfirmMode);
             break;
         }
@@ -584,7 +584,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
     switch (Msg)
     {
-    case 0x42:
+    case kWinPropPlaceAtOffset:
     {
         // Each list goes to the window position plus its offset (float adds).
         float const* const Offset3 = reinterpret_cast<float const*>(A);
@@ -600,7 +600,7 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         TimeList.SetPosition(TimePosition);
         return 0;
     }
-    case 0x26:
+    case kWinNotifyClick:
     {
         // A button was pressed (A = the sender).
         if (A == reinterpret_cast<uintptr_t>(Buttons[0]))
@@ -665,29 +665,29 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             ResumeAndDelete();
             return 0;
         }
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x260, "Unknown button\n");
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x260, "Unknown button\n");
         return 0;
     }
-    case 0x2c:
+    case kWinNotifyHighlight:
     {
         // The pointer entered a button: its caption, when shown, highlights.
         WinControl* const Caption = ButtonTextFor(A);
         if (Caption == nullptr || (Caption->Flags & 1) == 0)
             return 0;
-        Caption->SetProperty(0x51, 1, 0);
+        Caption->SetProperty(kWinPropBlink, 1, 0);
         return 0;
     }
-    case 0x2d:
+    case kWinNotifyUnhighlight:
     {
         // It left: the colour goes back to DAT_00679bb4.
         WinControl* const Caption = ButtonTextFor(A);
         if (Caption == nullptr || (Caption->Flags & 1) == 0)
             return 0;
-        Caption->SetProperty(0x51, 0, 0);
-        Caption->SetProperty(0x33, reinterpret_cast<uintptr_t>(G_HudChromeColorRgba), 0);
+        Caption->SetProperty(kWinPropBlink, 0, 0);
+        Caption->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(G_HudChromeColorRgba), 0);
         return 0;
     }
-    case 0x3e:
+    case kWinNotifyScrollValue:
         // The scroll bar moved: B is the first visible row of both lists.
         NameList.FirstVisible = static_cast<int>(B);
         TimeList.FirstVisible = static_cast<int>(B);
@@ -753,7 +753,7 @@ void NnLoadSave::SaveGame()
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x366,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x366,
               "No server, cannot save\n");
     }
     RefreshSaveList();
@@ -801,7 +801,7 @@ void NnLoadSave::RefreshSaveList()
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x446,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x446,
               "Failed to retrieve available save games\n");
     }
 
@@ -854,18 +854,18 @@ void NnLoadSave::SelectSave(int Index)
     if (Index == -1)
     {
         for (int Value = 0; Value < 4; ++Value)
-            InfoValues[Value]->SetProperty(0x1e, 0x595, 0);
+            InfoValues[Value]->SetProperty(kTextPropSetIds, 0x595, 0);
         if (DescripEdit != nullptr)
             DescripEdit->ClearText();
-        ButtonTexts[0]->SetProperty(2, 0, 0);
+        ButtonTexts[0]->SetProperty(kWinPropDisable, 0, 0);
         bButtonEnabled[0] = 1;
-        ButtonTexts[1]->SetProperty(2, 1, 0);
+        ButtonTexts[1]->SetProperty(kWinPropDisable, 1, 0);
         bButtonEnabled[1] = 0;
-        ButtonTexts[2]->SetProperty(2, 1, 0);
+        ButtonTexts[2]->SetProperty(kWinPropDisable, 1, 0);
         bButtonEnabled[2] = 0;
-        ButtonTexts[3]->SetProperty(2, 0, 0);
+        ButtonTexts[3]->SetProperty(kWinPropDisable, 0, 0);
         bButtonEnabled[3] = 1;
-        ButtonTexts[4]->SetProperty(2, 0, 0);
+        ButtonTexts[4]->SetProperty(kWinPropDisable, 0, 0);
         bButtonEnabled[4] = 1;
         return;
     }
@@ -873,7 +873,7 @@ void NnLoadSave::SelectSave(int Index)
     int const Count = static_cast<int>(Entries.size());
     if (Index < 0 || Index >= Count)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid index %d for savegame\n", kNnLoadSaveCpp,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid index %d for savegame\n", kNnLoadSaveCpp,
               0x4ea, Index);
         return;
     }
@@ -882,26 +882,26 @@ void NnLoadSave::SelectSave(int Index)
 
     Universe::ISystem const* const System = Universe::get_system(Info->SystemId);
     if (System != nullptr)
-        InfoValues[0]->SetProperty(0x1e, (uintptr_t)System->GetStridName(), 0);
+        InfoValues[0]->SetProperty(kTextPropSetIds, (uintptr_t)System->GetStridName(), 0);
     else
-        InfoValues[0]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(kEmptyText), 0);
+        InfoValues[0]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(kEmptyText), 0);
 
     // L"%d" is 005d0ec4.
     wchar_t Number[0x400];
     swprintf(Number, 0x400, L"%d", Info->Money);
-    InfoValues[1]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Number), 0);
+    InfoValues[1]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Number), 0);
     swprintf(Number, 0x400, L"%d", Info->Rank);
-    InfoValues[2]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Number), 0);
+    InfoValues[2]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Number), 0);
 
     // GetShip is not null-tested.
     if (Info->ShipArchetype != 0)
     {
         Archetype::Ship const* const Ship = Archetype::GetShip(Info->ShipArchetype);
-        InfoValues[3]->SetProperty(0x1e, static_cast<uintptr_t>(Ship->IdsName), 0);
+        InfoValues[3]->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(Ship->IdsName), 0);
     }
     else
     {
-        InfoValues[3]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(kEmptyText), 0);
+        InfoValues[3]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(kEmptyText), 0);
     }
 
     // NnLoadSaveEntryText's body, inlined in retail.
@@ -912,7 +912,7 @@ void NnLoadSave::SelectSave(int Index)
         {
             if (GetIdsStringWWithRawFallback(Info->DescripStrId, G_NnLoadSaveText, 0x100) == 0)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Failed to find string resource %d\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Failed to find string resource %d\n",
                       kNnLoadSaveCpp, 0x64d, Info->DescripStrId);
             }
             Description = G_NnLoadSaveText;
@@ -930,20 +930,20 @@ void NnLoadSave::SelectSave(int Index)
     {
         for (int Button = 0; Button < 5; ++Button)
         {
-            ButtonTexts[Button]->SetProperty(2, 0, 0);
+            ButtonTexts[Button]->SetProperty(kWinPropDisable, 0, 0);
             bButtonEnabled[Button] = 1;
         }
         return;
     }
-    ButtonTexts[0]->SetProperty(2, 1, 0);
+    ButtonTexts[0]->SetProperty(kWinPropDisable, 1, 0);
     bButtonEnabled[0] = 0;
-    ButtonTexts[1]->SetProperty(2, 0, 0);
+    ButtonTexts[1]->SetProperty(kWinPropDisable, 0, 0);
     bButtonEnabled[1] = 1;
-    ButtonTexts[2]->SetProperty(2, 1, 0);
+    ButtonTexts[2]->SetProperty(kWinPropDisable, 1, 0);
     bButtonEnabled[2] = 0;
-    ButtonTexts[3]->SetProperty(2, 0, 0);
+    ButtonTexts[3]->SetProperty(kWinPropDisable, 0, 0);
     bButtonEnabled[3] = 1;
-    ButtonTexts[4]->SetProperty(2, 0, 0);
+    ButtonTexts[4]->SetProperty(kWinPropDisable, 0, 0);
     bButtonEnabled[4] = 1;
 }
 
@@ -953,7 +953,7 @@ void NnLoadSave::LoadSave(int Index)
     int const Count = static_cast<int>(Entries.size());
     if (Index < 0 || Index >= Count)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid index %d for savegame\n", kNnLoadSaveCpp,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid index %d for savegame\n", kNnLoadSaveCpp,
               0x502, Index);
         return;
     }
@@ -990,7 +990,7 @@ void NnLoadSave::Update()
     if (bExitToMainMenu == 0)
         return;
     bExitToMainMenu = 0;
-    HudPostCommand(0xc5, 0);
+    HudPostCommand(USER_EXIT_GAME, 0);
     ResumeAndDelete();
 }
 
@@ -1004,7 +1004,7 @@ void OpenNnLoadSave(int Mode)
         return;
     NnLoadSave* const LoadSave = static_cast<NnLoadSave*>(Created);
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    LoadSave->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+    LoadSave->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
     LoadSave->CaptureMouse();
 }
 
@@ -1015,7 +1015,7 @@ wchar_t const* NnLoadSaveEntryText(CCharacterSet::CharacterInfo const* Info)
     {
         if (GetIdsStringWWithRawFallback(Info->DescripStrId, G_NnLoadSaveText, 0x100) == 0)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Failed to find string resource %d\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Failed to find string resource %d\n",
                   kNnLoadSaveCpp, 0x64d, Info->DescripStrId);
         }
         return G_NnLoadSaveText;

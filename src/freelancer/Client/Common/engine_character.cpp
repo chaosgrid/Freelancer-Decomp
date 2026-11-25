@@ -228,7 +228,7 @@ void* FEngineCharacterBodyDesc::CreateDeformable()
     if (DALib::Deform->CreateAlias(&Instance, reinterpret_cast<int*>(this), nullptr, nullptr,
                                    nullptr) != 0)
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: BodyDesc - failed to create deformable with %d parts\n",
               kEngineCharacterH, 0xd5, Count);
         Instance = nullptr;
@@ -288,7 +288,7 @@ void* FEngineCharacterAccessoryLink::Connect(long Bone)
     }
     if (bFailed)
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: Accessory - connection failed! (%s)  acc_hp='%s'  "
               "obj_hp='%s'\n",
               kEngineCharacterH, 0x4e, Mesh.Data, AccessoryHardpoint.Data,
@@ -495,7 +495,7 @@ bool FEngineCharacterBody::PlayAnimation(char const* Name, unsigned Arg2, float 
                                                  DwordArg(-1.0f), nullptr);
     if (Result != 0)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: failed to play character animation '%s'\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: failed to play character animation '%s'\n",
               kEngineCharacterH, 0x1f7, Name);
     }
     return Result == 0;

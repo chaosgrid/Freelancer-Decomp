@@ -62,8 +62,9 @@ namespace
     {
         unsigned int ObjectId1;  // +0x00
         unsigned int ObjectId2;  // +0x04
-        unsigned int Field_0x08; // +0x08 always 0
-        unsigned char Field_0x0c;// +0x0c always 0
+        unsigned int Field_0x08; // +0x08 always 0; Cnd_TetherBroke (LAB_06ec1330) does not read it
+        // +0x0c: always 0 here; Cnd_TetherBroke (LAB_06ec1330) keeps its tether while it is 0.
+        unsigned char bTetherReleased;
     };
 
     // Message 0x1008 (lead_object_event) to the owning controller.
@@ -80,8 +81,12 @@ namespace
     struct FNpcShipCommDoneMsg
     {
         unsigned int ShipId;     // +0x00
-        unsigned int Field_0x04; // +0x04 a field of the first queued directive, or 0
-        unsigned int Field_0x08; // +0x08 always 1
+        // +0x04: a field of the first queued directive, or 0. 0 fails the mission (FUN_06f0f150)
+        // and lets FUN_06eb8f50 take +0x08.
+        unsigned int Field_0x04;
+        // +0x08: always 1; FUN_06eb8f50 maps 1 to the state message 0x5462 and uses any other
+        // value as the message itself.
+        unsigned int Field_0x08;
     };
 
     // Message 0x1004 (request_flee_destination) to SpaceSupport.
@@ -357,7 +362,7 @@ FContentNpcShip::FContentNpcShip(FContentNpcShipParams const* Params)
                 // The out-parameter is the stack slot that held the zero priority.
                 unsigned int TargetType = 0;
                 pub::SpaceObj::GetType(Params->GuideTargetId, TargetType);
-                if ((TargetType & 0xc40) == 0)
+                if ((TargetType & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
                     bStart = false;
             }
             if (Guide != nullptr)
@@ -476,14 +481,14 @@ void FContentNpcShip::tether_object_event(uint ObjectId1, uint ObjectId2, Tether
         break;
     }
 
-    if ((LineId & 0x3fffffff) != 0)
+    if ((LineId & GIdValueMask) != 0)
         Sys->SendComm(SpaceObjId, ObjectId2, LineId, 0, 0, nullptr, 0.5f);
 
     FNpcShipTetherMsg Msg;
     Msg.ObjectId1 = ObjectId1;
     Msg.ObjectId2 = ObjectId2;
     Msg.Field_0x08 = 0;
-    Msg.Field_0x0c = 0;
+    Msg.bTetherReleased = 0;
     unsigned int Controller = ControllerId;
     pub::Controller::_SendMessage(Controller, pub::Controller::EMessage::TetherObject, &Msg);
 }
@@ -551,7 +556,7 @@ void FContentNpcShip::lead_object_event(uint ObjectId1, uint ObjectId2, LeadProg
                 break;
             }
 
-            if (bSendComm && (LineId & 0x3fffffff) != 0)
+            if (bSendComm && (LineId & GIdValueMask) != 0)
                 Sys->SendComm(SpaceObjId, ObjectId2, LineId, 0, 0, nullptr, 0.5f);
         }
     }
@@ -775,11 +780,12 @@ void FContentNpcShip::OnCommLineDone()
     {
         FObjListDirective* First = Directives.Items.front();
         int DirectiveType = First->GetType();
-        if (DirectiveType == 3 || DirectiveType == 4 || DirectiveType == 5)
+        if (DirectiveType == OBJLIST_GOTO_SHIP || DirectiveType == OBJLIST_GOTO_SPLINE ||
+            DirectiveType == OBJLIST_GOTO_VEC)
             Msg.Field_0x04 = ReadDirectiveDword(First, 0x17c);
-        else if (DirectiveType == 7)
+        else if (DirectiveType == OBJLIST_FOLLOW)
             Msg.Field_0x04 = ReadDirectiveDword(First, 0x10c);
-        else if (DirectiveType == 8 || DirectiveType == 9)
+        else if (DirectiveType == OBJLIST_GUIDE || DirectiveType == OBJLIST_GUIDE_SHIP)
             Msg.Field_0x04 = ReadDirectiveDword(First, 0x1c8);
     }
     unsigned int Controller = ControllerId;

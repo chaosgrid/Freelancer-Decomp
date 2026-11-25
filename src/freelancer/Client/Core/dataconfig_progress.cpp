@@ -200,7 +200,7 @@ bool LoadClientIniData(char const* IniPath)
                             {
                                 char const* const Name = Reader.get_value_string();
                                 DWORD const Error = GetLastError();
-                                FDUMP(0x100001,
+                                FDUMP(kFdumpError,
                                       "%s(%d) : *** ERROR: Couldn't load %s! Error code %d\n",
                                       kMainCppPath, 0x22c, Name, Error);
                             }

@@ -19,6 +19,15 @@
 // FUN_00427a70. Defaults stay in place for keys the file omits.
 void LoadClientSoundCfgIni(char const* FullPath);
 
+// The audio mode (DAT_00667cac): the space frame sets its camera's GetSoundMode, every other
+// client state 3.
+enum EClientAudioMode : int
+{
+    kClientAudioModeSpace = 1, // FGameCamera::GetSoundMode
+    kClientAudioModeHud = 2,   // FHudCamera::GetSoundMode
+    kClientAudioModeRtc = 3,   // the RTC ducking pair (ducking_rtc_*)
+};
+
 // FUN_00428030 / DAT_00667cac. Mode 3 selects the RTC ducking pair.
 void SetClientAudioMode(int Mode);
 int GetClientAudioMode();

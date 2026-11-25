@@ -166,7 +166,7 @@ bool NebulaExclusionZone::set_zone(Universe::IZone const* Zone, Universe::IZone 
 
     if (Zone->GetShape() != Universe::ZoneShapeSphere)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
             "%s(%d) : *** ERROR: DATA ERROR: nebula exclusion zones may only be SPHERE shaped\n %u is not a sphere zone",
             "E:\\FL\\Scratch\\Source\\Common\\ExclusionZoneMgr.cpp", 0x1e9, Zone->GetId());
     }
@@ -186,7 +186,7 @@ bool NebulaExclusionZone::set_zone(Universe::IZone const* Zone, Universe::IZone 
         ZoneId.Id = Zone->GetId();
         char const* const ParentText = ParentId.get_string();
         char const* const ZoneText = ZoneId.get_string();
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
             "%s(%d) : *** ERROR: DATA ERROR: nebula exclusion zone (%s) is not fully inside nebula zone (%s)\n",
             "E:\\FL\\Scratch\\Source\\Common\\ExclusionZoneMgr.cpp", 0x1f5, ZoneText, ParentText);
     }
@@ -672,13 +672,13 @@ void NebulaExclusionZoneMgr::push_back(Universe::IZone const* Zone, Universe::IZ
     bool const bInside = back()->set_zone(Zone, Parent);
     if (!(Zone->GetEdgeFraction() > 0.0f))
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
             "%s(%d) : *** ERROR: DATA ERROR: edge fraction must be added to exclusion zone %u inorder for transitions to work",
             "E:\\FL\\Scratch\\Source\\Common\\ExclusionZoneMgr.cpp", 0x170, Zone->GetId());
     }
     if (!bInside)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: DATA ERROR: exclusion zone %u not inside nebula",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: DATA ERROR: exclusion zone %u not inside nebula",
             "E:\\FL\\Scratch\\Source\\Common\\ExclusionZoneMgr.cpp", 0x176, Zone->GetId());
     }
 }

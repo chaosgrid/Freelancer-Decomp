@@ -1663,7 +1663,7 @@ namespace Archetype
         ArchDB& operator=(ArchDB const&) = delete;
 
         // FUN_062fbeb0 / FUN_062fbbe0 (thiscall, RET 0xC: Record, &Nickname, KindName,
-        // 062fbbe0..062fbcbe). Nickname.Id == 0 -> FDUMP(0x100001, "... Loaded '%s' has no
+        // 062fbbe0..062fbcbe). Nickname.Id == 0 -> FDUMP(kFdumpError, "... Loaded '%s' has no
         // nickname ...", line 0x84, KindName), false. Otherwise map insert (FUN_063222f0); only
         // a new key registers its small id (when bIndexIds) and returns true; a duplicate
         // returns false without any dump -- the duplicate handling (warning, redefine, delete)
@@ -1832,5 +1832,45 @@ namespace Archetype
 // OBJECT_TYPE name (e.g. "FIGHTER", "ASTEROID") to its bitmask via a fixed 29-entry name table
 // -- not a CreateID/CRC hash. Unknown name: FDUMP warning, 0.
 COMMON_API unsigned __cdecl DecodeType(char const* Name);
+
+// The OBJECT_TYPE bits DecodeType returns, named as in its table (PTR_DAT_063ec810,
+// Archetype::GObjectTypes; "NONE" is 0). Archetype::Root::ObjectType holds them, CSimple::TypeBits
+// (+0xe0) copies it, and pub::SpaceObj::GetType / pub::GetType / IObjInspect::get_type answer it.
+enum EObjectType : unsigned int
+{
+    OBJ_NONE = 0x0,
+    OBJ_MOON = 0x1,
+    OBJ_PLANET = 0x2,
+    OBJ_SUN = 0x4,
+    OBJ_BLACKHOLE = 0x8,
+    OBJ_SATELLITE = 0x10,
+    OBJ_DOCKING_RING = 0x20,
+    OBJ_JUMP_GATE = 0x40,
+    OBJ_TRADELANE_RING = 0x80,
+    OBJ_STATION = 0x100,
+    OBJ_WAYPOINT = 0x200,
+    OBJ_AIRLOCK_GATE = 0x400,
+    OBJ_JUMP_HOLE = 0x800,
+    OBJ_WEAPONS_PLATFORM = 0x1000,
+    OBJ_DESTROYABLE_DEPOT = 0x2000,
+    OBJ_NON_TARGETABLE = 0x4000,
+    OBJ_MISSION_SATELLITE = 0x8000,
+    OBJ_FIGHTER = 0x10000,
+    OBJ_FREIGHTER = 0x20000,
+    OBJ_GUNBOAT = 0x40000,
+    OBJ_CRUISER = 0x80000,
+    OBJ_TRANSPORT = 0x100000,
+    OBJ_CAPITAL = 0x200000,
+    OBJ_MINING = 0x400000,
+    OBJ_GUIDED = 0x1000000,
+    OBJ_BULLET = 0x2000000,
+    OBJ_MINE = 0x4000000,
+    OBJ_LOOT = 0x10000000,
+    OBJ_ASTEROID = 0x20000000,
+    // The seven ship types, FIGHTER .. MINING.
+    OBJ_SHIP_MASK = 0x7f0000,
+    // Every type below FIGHTER (MOON .. MISSION_SATELLITE) except WAYPOINT.
+    OBJ_SOLAR_NO_WAYPOINT_MASK = 0xfdff,
+};
 
 struct IEngine;

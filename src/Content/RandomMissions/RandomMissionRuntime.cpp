@@ -500,7 +500,7 @@ void FRmVignetteOffer::CountCriticalLoot(std::vector<FRmShipGroup> const* Groups
             for (std::vector<FRmLootSpawn>::const_iterator Loot = Ship->Loot.begin();
                  Loot != Ship->Loot.end(); ++Loot)
             {
-                if (Loot->Kind != 2)
+                if (Loot->Kind != RmLootCritical)
                     continue;
                 *OutLoot = Loot->CriticalLoot;
                 *InOutCount += Loot->Info.Units;
@@ -573,7 +573,7 @@ bool FRmVignetteOffer::GetTextParam(int Param, FmtStr* Out)
                     for (std::vector<FRmLootSpawn>::const_iterator It = Solar->Loot.begin();
                          It != Solar->Loot.end(); ++It)
                     {
-                        if (It->Kind != 2)
+                        if (It->Kind != RmLootCritical)
                             continue;
                         Count += It->Info.Units;
                         Loot = It->CriticalLoot;

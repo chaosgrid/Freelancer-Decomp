@@ -171,7 +171,7 @@ unsigned char FBeamEffect::Start(FEffectArch* EffectArch)
     if (G_BeamEffectTexture != nullptr)
         return 1;
 
-    FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
           "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x5df,
           "texture ( code_beam ) for BeamEffect not found");
 

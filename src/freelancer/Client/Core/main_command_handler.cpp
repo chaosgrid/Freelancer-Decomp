@@ -23,13 +23,6 @@ namespace
     bool G_bClientQuitRequested = false; // DAT_0067ecbd (.bss)
     int G_ScreenShotCounter = 0;         // DAT_006679fc (.bss)
 
-    // Key command ids (index into the PTR_s_USER_NONE_00614dd8 nickname table).
-    unsigned const kUserPause = 0x14;       // USER_PAUSE
-    unsigned const kUserReset = 0x15;       // USER_RESET
-    unsigned const kUserFullscreen = 0x17;  // USER_FULLSCREEN
-    unsigned const kUserExitGame = 0xc5;    // USER_EXIT_GAME
-    unsigned const kUserScreenShot = 0xcb;  // USER_SCREEN_SHOT
-
     // DAT_0067ea60: one vptr (005e6d20, single slot LAB_005b2440) -- the FHudCmdHandler shape
     // FUN_00576410 calls through.
     class FMainCommandHandler : public EventHandler
@@ -46,8 +39,8 @@ namespace
     FMainCommandHandler::FMainCommandHandler()
     {
         // FUN_005b23c0: the ids are registered in this order through FUN_005760d0.
-        static unsigned const kIds[5] = {kUserExitGame, kUserPause, kUserReset, kUserFullscreen,
-                                         kUserScreenShot};
+        static unsigned const kIds[5] = {USER_EXIT_GAME, USER_PAUSE, USER_RESET, USER_FULLSCREEN,
+                                         USER_SCREEN_SHOT};
         for (unsigned Index = 0; Index < 5; ++Index)
             RegisterEvent(kIds[Index]);
     }
@@ -61,16 +54,16 @@ namespace
     {
         switch (MsgId)
         {
-        case kUserPause:
+        case USER_PAUSE:
             NnPauseOpen(); // FUN_004a75c0
             return true;
-        case kUserReset:
+        case USER_RESET:
             // Consumed, nothing else.
             return true;
-        case kUserExitGame:
+        case USER_EXIT_GAME:
             G_bClientQuitRequested = true;
             return true;
-        case kUserScreenShot:
+        case USER_SCREEN_SHOT:
             TakeClientScreenShot(); // FUN_00425170
             return true;
         default:

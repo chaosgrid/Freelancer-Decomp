@@ -177,7 +177,7 @@ namespace
         }
         else
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: [Simple] nickname = %s value is not unique. Aborted second version.",
                   Archetype::ArchetypeSource, 0x364, Record->Nickname.get_string());
         }
@@ -203,7 +203,7 @@ namespace
             } while (Record->EngineIndex != -1);
 
             if (Dangling != 0)
-                FDUMP(0x100002, Format, Archetype::ArchetypeSource, Line, Record->Nickname.get_string(), Dangling);
+                FDUMP(kFdumpWarning, Format, Archetype::ArchetypeSource, Line, Record->Nickname.get_string(), Dangling);
         }
         delete Record;
     }
@@ -294,7 +294,7 @@ namespace
             Archetype::Ship* Donor = Archetype::GShipDb.Get(DonorId.Id);
             if (Donor == nullptr)
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
                       Archetype::ArchetypeSource, 0x649, DonorId.get_string());
                 continue;
             }
@@ -400,7 +400,7 @@ namespace
             Archetype::Asteroid* Donor = Archetype::GAsteroidDb.Get(DonorId.Id);
             if (Donor == nullptr)
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
                       Archetype::ArchetypeSource, 0x125b, DonorId.get_string());
                 continue;
             }
@@ -535,7 +535,7 @@ int __cdecl Archetype::LoadSolar(char const* Path, bool bReload, ICliObjFactory*
             // No SUBOBJ_ID_NONE test on the group id here, unlike Ships.
             if (Current == nullptr)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: %s", Archetype::ArchetypeSource, 0x780,
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", Archetype::ArchetypeSource, 0x780,
                       "Attempt to load a solar group into a solar that wasn't loaded.\n");
             }
             else
@@ -590,7 +590,7 @@ int __cdecl Archetype::LoadShips(char const* Path, bool bReload, ICliObjFactory*
                 if (bReload)
                     RedefineLiveRecord(GShipDb, Record);
                 else
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: [Ship] nickname = %s value is not unique. Aborted second version.",
                           Archetype::ArchetypeSource, 0x66b, Record->Nickname.get_string());
                 delete Record;
@@ -606,7 +606,7 @@ int __cdecl Archetype::LoadShips(char const* Path, bool bReload, ICliObjFactory*
                 unsigned short const GroupId = GroupIds.CreateGroupID();
                 if (GroupId == SUBOBJ_ID_NONE)
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: [Ship] nickname = %s: Exceeds maximum collision group",
                           Archetype::ArchetypeSource, 0x67d, Current->Nickname.get_string());
                 }

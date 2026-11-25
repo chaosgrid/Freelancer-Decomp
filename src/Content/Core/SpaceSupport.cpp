@@ -128,7 +128,8 @@ namespace
         Origin.x = 0.0f;
         Origin.y = 0.0f;
         Origin.z = 0.0f;
-        pub::System::ScanObjects(Msg[0], Objects, 0x3e8, Origin, 3.40282347e+38f, 0xfdff, Count);
+        pub::System::ScanObjects(Msg[0], Objects, 0x3e8, Origin, 3.40282347e+38f,
+                                 OBJ_SOLAR_NO_WAYPOINT_MASK, Count);
 
         int PlayerRep = -1;
         if (pub::SpaceObj::GetRep(ShipId, PlayerRep) != 0)
@@ -224,7 +225,7 @@ namespace
         // No ship, or a wingman -> false.
         if (Ship == nullptr)
             return false;
-        if (Ship->FormationSlot != 0 && Ship->FormationId != 0xffffffffu)
+        if (Ship->FormationSlot != 0 && Ship->FormationId != GNoFormationId)
             return false;
 
         std::vector<FContentShipBase*> Members;
@@ -237,7 +238,7 @@ namespace
              ++It)
         {
             FContentShipBase* Member = *It;
-            if (Member->FormationSlot == 0 || Member->FormationId == 0xffffffffu)
+            if (Member->FormationSlot == 0 || Member->FormationId == GNoFormationId)
                 continue;
             unsigned int MemberId = Member->SpaceObjId;
             if (FindContentPlayerStateByShip(&MemberId) == nullptr)
@@ -255,7 +256,7 @@ namespace
             {
                 FContentShipBase* Wingman =
                     static_cast<FContentShipBase*>((*It)->GetSystem()->FindShip((*It)->SpaceObjId));
-                if (Wingman == nullptr || Wingman->FormationId == 0xffffffffu)
+                if (Wingman == nullptr || Wingman->FormationId == GNoFormationId)
                     continue;
                 CancelDockingBehindLeader(Wingman, Wingman->FormationId);  // FUN_06f6ee40
                 Wingman->SetFormation(0xffffffffu, 0, nullptr);              // FUN_06f576c0
@@ -665,7 +666,7 @@ namespace
             // {ship, ?, system}.
             FSystemInfo* System = FindSystemInfo(&Msg[2]);                    // not null-tested
             FContentShipBase* Ship = static_cast<FContentShipBase*>(System->FindShip(Msg[0]));
-            if (Ship != nullptr && Ship->FormationId != 0xffffffffu)
+            if (Ship != nullptr && Ship->FormationId != GNoFormationId)
             {
                 CancelDockingBehindLeader(Ship, Ship->FormationId);           // FUN_06f6ee40
                 Ship->SetFormation(0xffffffffu, 0, nullptr);                   // FUN_06f576c0
@@ -763,7 +764,7 @@ namespace
             if (GetShipMissionProperties(ShipArchId, &ClassIds))
             {
                 int DockIndex = pub::SinglePlayer() ? 0 : -1;
-                if (ChooseDockTerminal(&ClassIds, &Msg[1], nullptr, &DockIndex) == DOCK_HOST_RESPONSE_4)
+                if (ChooseDockTerminal(&ClassIds, &Msg[1], nullptr, &DockIndex) == DOCK_HOST_RESPONSE_PROCEED)
                     pub::ReportFreeTerminal(Msg[1], DockIndex);
             }
             break;
@@ -776,7 +777,9 @@ namespace
             unsigned int TargetType;
             if (pub::SpaceObj::GetType(Msg[2], TargetType) != 0)
                 break;
-            if ((TargetType & 0x600de0) == 0)
+            if ((TargetType & (OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING |
+                               OBJ_STATION | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_CAPITAL |
+                               OBJ_MINING)) == 0)   // 0x600de0
                 break;
             FDockQueueEntry Entry;                                            // FUN_06f6bbf0
             Entry.SystemId = Msg[0];
@@ -785,7 +788,7 @@ namespace
             pub::Player::GetShip(Msg[1], Entry.ShipId);
             Entry.bFinishOnClear = true;
             GDockingShips.push_back(Entry);
-            if ((TargetType & 0x200100) != 0)
+            if ((TargetType & (OBJ_STATION | OBJ_CAPITAL)) != 0)
             {
                 // The dock hail handler keeps quiet about the ship for 30 s.
                 int const HandlerType = 0;
@@ -809,7 +812,7 @@ namespace
         case EMessage::SpaceExit:
         {
             // {system, player}: no system or an empty one drops every launch queue.
-            if ((Msg[0] & 0x3fffffffu) == 0 || !IsContentSystemOccupied(Msg[0]))
+            if ((Msg[0] & GIdValueMask) == 0 || !IsContentSystemOccupied(Msg[0]))
                 EraseAllDockLaunchQueues();                                   // FUN_06f694b0
             FSystemInfo* System = FindSystemInfo(&Msg[0]);
             if (System != nullptr)
@@ -822,7 +825,7 @@ namespace
         case EMessage::SystemExit:
         {
             // {system, dock target, player}.
-            if ((Msg[0] & 0x3fffffffu) == 0 || !IsContentSystemOccupied(Msg[0]))
+            if ((Msg[0] & GIdValueMask) == 0 || !IsContentSystemOccupied(Msg[0]))
                 EraseAllDockLaunchQueues();
             FSystemInfo* System = FindSystemInfo(&Msg[0]);
             if (System == nullptr)
@@ -859,7 +862,7 @@ namespace
             if (Msg[3] == 0)
                 break;
             unsigned int ArrivalType;
-            if (pub::SpaceObj::GetType(Msg[3], ArrivalType) != 0 || (ArrivalType & 0x400) == 0)
+            if (pub::SpaceObj::GetType(Msg[3], ArrivalType) != 0 || (ArrivalType & OBJ_AIRLOCK_GATE) == 0)
                 break;
             FDockQueueEntry Entry;
             Entry.SystemId = Msg[0];
@@ -1236,7 +1239,7 @@ bool IsGateLockedForShip(unsigned int ShipId, unsigned int GateId)
 
     unsigned int SystemId = 0;
     pub::SpaceObj::GetSystem(GateId, SystemId);
-    if ((SystemId & 0x3fffffffu) == 0)
+    if ((SystemId & GIdValueMask) == 0)
         return false;
     FSystemInfo* System = FindSystemInfo(&SystemId);
     if (System == nullptr)

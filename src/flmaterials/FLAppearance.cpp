@@ -967,7 +967,7 @@ namespace
         const GENRESULT Found = Texture.Library->FindTextureByCrc(Crc, &Texture.Record);
         if (Found < 0)
         {
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                   "E:\\FL\\Scratch\\Source\\FLMaterials\\shadows_inl.h", 0x24,
                   "couldnt find texture 'efxshadow' (from efx.txm?)");
         }

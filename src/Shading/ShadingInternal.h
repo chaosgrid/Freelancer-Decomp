@@ -51,13 +51,6 @@ static const unsigned long kCullFlip[4] = {0, 1, 3, 2};
 // FShadingPropertyValue / FShadingPropertyRecord (FUN_06eb28f0, stride 0x4C) live in
 // render/shading.h because freelancer.exe's SwappedMaterial reads them.
 
-inline bool IidEqual(const char* Left, const char* Right)
-{
-    if (Left == nullptr || Right == nullptr)
-        return false;
-    return std::strcmp(Left, Right) == 0;
-}
-
 inline void PipeSetRs(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State, unsigned long Value)
 {
     if (Pipeline != nullptr)

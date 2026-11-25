@@ -139,7 +139,8 @@ void __cdecl HandleDamageReputation(FSubObjDamageEvent const* InEvent)
     if (Event.ObjId != 0)
     {
         pub::SpaceObj::GetType(Event.ObjId, VictimType);
-        if ((VictimType & 0x7fb110) == 0)
+        if ((VictimType & (OBJ_SHIP_MASK | OBJ_MISSION_SATELLITE | OBJ_DESTROYABLE_DEPOT |
+                           OBJ_WEAPONS_PLATFORM | OBJ_STATION | OBJ_SATELLITE)) == 0)   // 0x7fb110
             return;
     }
 
@@ -154,7 +155,7 @@ void __cdecl HandleDamageReputation(FSubObjDamageEvent const* InEvent)
 
     // Type 0x2000 at no health hit on equipment type 0x800: -0.1 with empathy (x87: unordered
     // skips).
-    if (VictimType == 0x2000 && Event.RelativeHealth <= 0.0f && Event.EquipType == 0x800)
+    if (VictimType == OBJ_DESTROYABLE_DEPOT && Event.RelativeHealth <= 0.0f && Event.EquipType == 0x800)
         ApplyFactionReputationChange(AttackerRep, -0.1f, VictimAffiliation, true);
 
     if (AttackerRep == -1)
@@ -318,7 +319,9 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
             Vector Position;
             PlayerShip->GetPosition(&Position);
             unsigned int const SystemId = System->SystemId;
-            pub::System::ScanObjects(SystemId, Found, 0x20, Position, 5000.0f, 0x7f31e0, Count);
+            pub::System::ScanObjects(SystemId, Found, 0x20, Position, 5000.0f,
+                                     OBJ_SHIP_MASK | OBJ_DESTROYABLE_DEPOT | OBJ_WEAPONS_PLATFORM | OBJ_STATION |
+                                     OBJ_TRADELANE_RING | OBJ_JUMP_GATE | OBJ_DOCKING_RING, Count);   // 0x7f31e0
             std::vector<unsigned int>* MissionObjects = System->GetMissionObjects();
 
             // Fill the table.
@@ -447,11 +450,11 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
                             continue;
                         if (EntryB.Affiliation == 0xffffffffu && EntryC.Affiliation == 0xffffffffu)
                             continue;
-                        if ((EntryA.Type & 0x80) != 0)
+                        if ((EntryA.Type & OBJ_TRADELANE_RING) != 0)
                         {
-                            if ((EntryB.Type & 0x80) != 0)
+                            if ((EntryB.Type & OBJ_TRADELANE_RING) != 0)
                                 continue;
-                            if ((EntryC.Type & 0x80) != 0)
+                            if ((EntryC.Type & OBJ_TRADELANE_RING) != 0)
                                 continue;
                         }
                         if (ScanDistance(EntryB.Position, EntryC.Position) > 5000.0)

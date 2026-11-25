@@ -58,7 +58,7 @@ void FThornPsys::BindVisEffect(char const* EffectName)
         VisEffectArchAddRef(Vis);
         return;
     }
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Thorn_Psys: Failed to find [VisEffect] %s.",
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Thorn_Psys: Failed to find [VisEffect] %s.",
           GScriptPsysFile, 0x4c, EffectName);
 }
 

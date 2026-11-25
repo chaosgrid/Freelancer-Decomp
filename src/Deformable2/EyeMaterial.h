@@ -228,3 +228,5 @@ static_assert(offsetof(FEyeMaterial, Controlling) == 0x68, "EyeMaterial controll
 static_assert(offsetof(FEyeMaterial, Inner) == 0x6C, "EyeMaterial inner +0x6C");
 
 bool RegisterEyeMaterialFactory();
+// FUN_065fdfb0: registers the factory, then maps "^eye*" materials to it.
+void BindEyeMaterials(IMaterialLibrary* MaterialLib);

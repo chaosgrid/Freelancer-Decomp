@@ -98,7 +98,7 @@ char* __cdecl StringAlloc(char const* Text, bool bTemporary)
         unsigned int const Length = (unsigned int)strlen(Text);
         if (Length + 1u > GStringCacheTop - GStringCacheBottom)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: StringCache overflow! (%d KB)", StringCacheSource,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: StringCache overflow! (%d KB)", StringCacheSource,
                   0xb9, 0x600);
             return GStringCachePool;
         }
@@ -117,7 +117,7 @@ char* __cdecl StringAlloc(char const* Text, bool bTemporary)
     unsigned int const Length = (unsigned int)strlen(Text);
     if (Length + 1u > GStringCacheTop - GStringCacheBottom)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: StringCache overflow! (%d KB)", StringCacheSource,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: StringCache overflow! (%d KB)", StringCacheSource,
               0xa9, 0x600);
         return GStringCachePool;
     }

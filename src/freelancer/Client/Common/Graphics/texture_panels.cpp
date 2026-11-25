@@ -581,7 +581,7 @@ float const* FTexturePanels::GetPiece(int Index)
     // Signed compare: a negative index is not caught.
     if (Index < PieceCount)
         return Pieces[Index].Center;
-    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPlanetRingCppPath, 0x279, kPieceOutOfRange);
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kPlanetRingCppPath, 0x279, kPieceOutOfRange);
     return nullptr;
 }
 
@@ -592,7 +592,7 @@ float FTexturePanels::GetPieceFloat(int Index)
     // Same bounds test.
     if (Index < PieceCount)
         return Pieces[Index].Radius;
-    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPlanetRingCppPath, 0x284, kPieceOutOfRange);
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kPlanetRingCppPath, 0x284, kPieceOutOfRange);
     return kZero;
 }
 
@@ -950,7 +950,7 @@ void FTexturePanels::Load(char const* IniPath,
                         // The inlined ShapeDB.h find warns on a miss too.
                         Shape = Shapes.Find(Reader.get_value_string());
                         if (Shape == nullptr)
-                            FDUMP(0x100001, kShapeNotFoundForRings, kPlanetRingCppPath, 0x108,
+                            FDUMP(kFdumpError, kShapeNotFoundForRings, kPlanetRingCppPath, 0x108,
                                   Reader.get_value_string());
                     }
                     else if (Reader.is_value("detail_shape"))
@@ -960,7 +960,7 @@ void FTexturePanels::Load(char const* IniPath,
                         DetailShape =
                             Shapes.Find(Reader.get_value_string());
                         if (DetailShape == nullptr)
-                            FDUMP(0x100001, kShapeNotFoundForRings, kPlanetRingCppPath, 0x10f,
+                            FDUMP(kFdumpError, kShapeNotFoundForRings, kPlanetRingCppPath, 0x10f,
                                   Reader.get_value_string());
                     }
                     else if (Reader.is_value("detail_tile"))
@@ -1002,7 +1002,7 @@ void FTexturePanels::Load(char const* IniPath,
     bLoaded = 1;
     if (Zone == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kPlanetRingCppPath, 0x135,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kPlanetRingCppPath, 0x135,
               "planet ring must have zone");
         return;
     }

@@ -28,6 +28,7 @@
 // bridges").
 
 #include "rpc_payloads.h"
+#include "rpc_packet_classes.h"
 #include "rpc_containers.h"
 #include "common_server.h"
 // EquipDesc and its setters (retail imports .rdata:06db3004, 06db3070..06db308c), used by
@@ -117,7 +118,8 @@ static bool MarshalCh3StructHead(FPacketBase* Packet, const unsigned int* Args, 
 
 static SLoginInfo GStaticLoginInfo;   // retail .data:0x06dbba38
 
-static bool MarshalLogin(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalLogin(FPacket_FLPACKET_CLIENT_LOGIN& Packet, const unsigned int* Args,
+                         unsigned int ArgCount) {
     const SLoginInfo* Info = reinterpret_cast<const SLoginInfo*>(Args[0]);
     // IServerImpl::Login 0x06d8cc70: two unbounded wcscpy calls into a 0x404-byte stack
     // window (to +0x000 and +0x200), the flag byte to +0x400, then 0x402 bytes copied into
@@ -132,13 +134,14 @@ static bool MarshalLogin(FPacketBase* Packet, const unsigned int* Args, unsigned
     // Retail reads the single byte at +0xc0.
     Wire.CreateFlag = *reinterpret_cast<const unsigned char*>(&Info->CreateFlag);
     // Exactly 0x402 bytes; +0x402/+0x403 keep what the constructor left.
-    memcpy(Packet->Payload(), &Wire, 0x402u);
+    memcpy(&Packet.Wire, &Wire, 0x402u);
     return true;
 }
 
-static bool DeliverLogin(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
+static bool DeliverLogin(const FPacket_FLPACKET_CLIENT_LOGIN& Packet, IServer* Server,
+                         unsigned int SessionId) {
     const FPayloadClientLogin* Wire =
-        reinterpret_cast<const FPayloadClientLogin*>(Packet->Payload());
+        &Packet.Wire;
     // wcsncpy pads with NULs up to the count. Retail never clears the static; bytes not
     // overwritten keep their zero .data image.
     wcsncpy(GStaticLoginInfo.AccountName, Wire->AccountName, 0x28);
@@ -157,7 +160,8 @@ static bool DeliverLogin(const FPacketBase* Packet, IServer* Server, unsigned in
 // IServer slot 53 (+0xd4) SPMunitionCollision(SSPMunitionCollisionInfo const&, uint).
 // Identity mapping; the only narrow field is the word at +0x0c on both sides.
 // ===========================================================================
-static bool MarshalMunCollision(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalMunCollision(FPacket_FLPACKET_CLIENT_MUNCOLLISION& Packet,
+                                const unsigned int* Args, unsigned int ArgCount) {
     const SSPMunitionCollisionInfo* Info = reinterpret_cast<const SSPMunitionCollisionInfo*>(Args[0]);
     FPayloadClientMunCollision Wire;
     Wire.ProjectileArchId = Info->ProjectileArchId;
@@ -168,11 +172,12 @@ static bool MarshalMunCollision(FPacketBase* Packet, const unsigned int* Args, u
     Wire.HitPosX = Info->HitPosX;
     Wire.HitPosY = Info->HitPosY;
     Wire.HitPosZ = Info->HitPosZ;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverMunCollision(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientMunCollision Wire = RpcPayloadRead<FPayloadClientMunCollision>(Packet, 0);
+static bool DeliverMunCollision(const FPacket_FLPACKET_CLIENT_MUNCOLLISION& Packet, IServer* Server,
+                                unsigned int SessionId) {
+    const FPayloadClientMunCollision& Wire = Packet.Wire;
     SSPMunitionCollisionInfo Info;
     Info.ProjectileArchId = Wire.ProjectileArchId;
     Info.AttackerId = Wire.AttackerId;
@@ -192,72 +197,88 @@ static bool DeliverMunCollision(const FPacketBase* Packet, IServer* Server, unsi
 // 0x15 REQSHIPARCH -- one dword, the FIRST argument; the session is the second and is
 // dropped. Receivers push (payload+0x00, SessionId) in that order.
 // ===========================================================================
-static bool DeliverPlayerLaunch(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->PlayerLaunch(RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverPlayerLaunch(const FPacket_FLPACKET_CLIENT_REQUESTLAUNCH& Packet,
+                                IServer* Server, unsigned int SessionId) {
+    Server->PlayerLaunch(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverBaseEnter(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->BaseEnter(RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverBaseEnter(const FPacket_FLPACKET_CLIENT_ENTERBASE& Packet, IServer* Server,
+                             unsigned int SessionId) {
+    Server->BaseEnter(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverBaseExit(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->BaseExit(RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverBaseExit(const FPacket_FLPACKET_CLIENT_EXITBASE& Packet, IServer* Server,
+                            unsigned int SessionId) {
+    Server->BaseExit(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverLocationEnter(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->LocationEnter(RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverLocationEnter(const FPacket_FLPACKET_CLIENT_ENTERLOCATION& Packet,
+                                 IServer* Server, unsigned int SessionId) {
+    Server->LocationEnter(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverLocationExit(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->LocationExit(RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverLocationExit(const FPacket_FLPACKET_CLIENT_EXITLOCATION& Packet, IServer* Server,
+                                unsigned int SessionId) {
+    Server->LocationExit(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverSystemSwitchOutComplete(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->SystemSwitchOutComplete(RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverSystemSwitchOutComplete(const FPacket_FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE& Packet,
+                                           IServer* Server, unsigned int SessionId) {
+    Server->SystemSwitchOutComplete(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverGFObjSelect(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->GFObjSelect(RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverGFObjSelect(const FPacket_FLPACKET_CLIENT_GFSELECTOBJECT& Packet,
+                               IServer* Server, unsigned int SessionId) {
+    Server->GFObjSelect(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverReqShipArch(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->ReqShipArch(RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverReqShipArch(const FPacket_FLPACKET_CLIENT_REQSHIPARCH& Packet, IServer* Server,
+                               unsigned int SessionId) {
+    Server->ReqShipArch(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverReqSetCash(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->ReqSetCash((int)RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverReqSetCash(const FPacket_FLPACKET_CLIENT_REQSETCASH& Packet, IServer* Server,
+                              unsigned int SessionId) {
+    Server->ReqSetCash((int)Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverReqChangeCash(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->ReqChangeCash((int)RpcPayloadRead<unsigned int>(Packet, 0), SessionId);
+static bool DeliverReqChangeCash(const FPacket_FLPACKET_CLIENT_REQCHANGECASH& Packet,
+                                 IServer* Server, unsigned int SessionId) {
+    Server->ReqChangeCash((int)Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverReqHullStatus(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->ReqHullStatus(RpcPayloadRead<float>(Packet, 0), SessionId);
+static bool DeliverReqHullStatus(const FPacket_FLPACKET_CLIENT_REQHULLSTATUS& Packet,
+                                 IServer* Server, unsigned int SessionId) {
+    Server->ReqHullStatus(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
-static bool DeliverReqDifficultyScale(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->ReqDifficultyScale(RpcPayloadRead<float>(Packet, 0), SessionId);
+static bool DeliverReqDifficultyScale(const FPacket_FLPACKET_CLIENT_REQDIFFICULTYSCALE& Packet,
+                                      IServer* Server, unsigned int SessionId) {
+    Server->ReqDifficultyScale(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
 
 // ch3 0x35 INTERFACEITEMUSED / 0x41 ABORT_MISSION / 0x45 MISSIONSAVEB / 0x47 RTCDONE --
 // these four take the session FIRST, so retail serializes the SECOND argument and the
 // receiver pushes (SessionId, payload+0x00).
-static bool DeliverInterfaceItemUsed(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->InterfaceItemUsed(SessionId, RpcPayloadRead<unsigned int>(Packet, 0));
+static bool DeliverInterfaceItemUsed(const FPacket_FLPACKET_CLIENT_INTERFACEITEMUSED& Packet,
+                                     IServer* Server, unsigned int SessionId) {
+    Server->InterfaceItemUsed(SessionId, Packet.Wire.Field_0x00);
     return true;
 }
-static bool DeliverAbortMission(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->AbortMission(SessionId, RpcPayloadRead<unsigned int>(Packet, 0));
+static bool DeliverAbortMission(const FPacket_FLPACKET_CLIENT_ABORT_MISSION& Packet,
+                                IServer* Server, unsigned int SessionId) {
+    Server->AbortMission(SessionId, Packet.Wire.Field_0x00);
     return true;
 }
-static bool DeliverMissionSaveB(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->MissionSaveB(SessionId, RpcPayloadRead<unsigned int>(Packet, 0));
+static bool DeliverMissionSaveB(const FPacket_FLPACKET_CLIENT_MISSIONSAVEB& Packet, IServer* Server,
+                                unsigned int SessionId) {
+    Server->MissionSaveB(SessionId, Packet.Wire.Field_0x00);
     return true;
 }
-static bool DeliverRTCDone(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->RTCDone(SessionId, RpcPayloadRead<unsigned int>(Packet, 0));
+static bool DeliverRTCDone(const FPacket_FLPACKET_CLIENT_RTCDONE& Packet, IServer* Server,
+                           unsigned int SessionId) {
+    Server->RTCDone(SessionId, Packet.Wire.Field_0x00);
     return true;
 }
 
@@ -268,19 +289,23 @@ static bool DeliverRTCDone(const FPacketBase* Packet, IServer* Server, unsigned 
 // ch3 0x10 REQUESTCREATESHIP / 0x38 REQUESTNEWCHARINFO / 0x42 SKIP_AUTOSAVE take the
 // session only.
 // ===========================================================================
-static bool DeliverCharacterInfoReq(const FPacketBase*, IServer* Server, unsigned int SessionId) {
+static bool DeliverCharacterInfoReq(const FPacket_FLPACKET_CLIENT_REQUESTCHARINFO&, IServer* Server,
+                                    unsigned int SessionId) {
     Server->CharacterInfoReq(SessionId, false);
     return true;
 }
-static bool DeliverRequestCreateShip(const FPacketBase*, IServer* Server, unsigned int SessionId) {
+static bool DeliverRequestCreateShip(const FPacket_FLPACKET_CLIENT_REQUESTCREATESHIP&,
+                                     IServer* Server, unsigned int SessionId) {
     Server->RequestCreateShip(SessionId);
     return true;
 }
-static bool DeliverNewCharacterInfoReq(const FPacketBase*, IServer* Server, unsigned int SessionId) {
+static bool DeliverNewCharacterInfoReq(const FPacket_FLPACKET_CLIENT_REQUESTNEWCHARINFO&,
+                                       IServer* Server, unsigned int SessionId) {
     Server->NewCharacterInfoReq(SessionId);
     return true;
 }
-static bool DeliverCharacterSkipAutosave(const FPacketBase*, IServer* Server, unsigned int SessionId) {
+static bool DeliverCharacterSkipAutosave(const FPacket_FLPACKET_CLIENT_SKIP_AUTOSAVE&,
+                                         IServer* Server, unsigned int SessionId) {
     Server->CharacterSkipAutosave(SessionId);
     return true;
 }
@@ -292,19 +317,22 @@ static bool DeliverCharacterSkipAutosave(const FPacketBase*, IServer* Server, un
 // Senders 0x06d8cd60 / 0x06d8ce90 (and 0x06d8db10 for SAVEGAME) call the imported
 // COMMON.DLL CHARACTER_ID::operator= into packet+0x20, no size test in front.
 // ===========================================================================
-static bool MarshalCharacterId(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    CHARACTER_ID* Dst = reinterpret_cast<CHARACTER_ID*>(Packet->Payload());
+static bool MarshalCharacterId(FRpcCharacterIdPacket& Packet, const unsigned int* Args,
+                               unsigned int ArgCount) {
+    CHARACTER_ID* Dst = reinterpret_cast<CHARACTER_ID*>(Packet.CharacterId);
     *Dst = *reinterpret_cast<const CHARACTER_ID*>(Args[0]);
     return true;
 }
 
-static bool DeliverCharacterSelect(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->CharacterSelect(*reinterpret_cast<const CHARACTER_ID*>(Packet->Payload()), SessionId);
+static bool DeliverCharacterSelect(const FPacket_FLPACKET_CLIENT_SELECTCHARACTER& Packet,
+                                   IServer* Server, unsigned int SessionId) {
+    Server->CharacterSelect(*reinterpret_cast<const CHARACTER_ID*>(Packet.CharacterId), SessionId);
     return true;
 }
 
-static bool DeliverDestroyCharacter(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->DestroyCharacter(*reinterpret_cast<const CHARACTER_ID*>(Packet->Payload()), SessionId);
+static bool DeliverDestroyCharacter(const FPacket_FLPACKET_CLIENT_DESTROYCHAR& Packet,
+                                    IServer* Server, unsigned int SessionId) {
+    Server->DestroyCharacter(*reinterpret_cast<const CHARACTER_ID*>(Packet.CharacterId), SessionId);
     return true;
 }
 
@@ -322,14 +350,16 @@ static bool MarshalInfoRequest(FPacketBase* Packet, const unsigned int* Args, un
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
-static bool DeliverBaseInfoRequest(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientInfoRequest Wire = RpcPayloadRead<FPayloadClientInfoRequest>(Packet, 0);
+static bool DeliverBaseInfoRequest(const FPacket_FLPACKET_CLIENT_REQUESTBASEINFO& Packet,
+                                   IServer* Server, unsigned int SessionId) {
+    const FPayloadClientInfoRequest& Wire = Packet.Wire;
     Server->BaseInfoRequest(Wire.Id, SessionId, Wire.bFull != 0);
     return true;
 }
 
-static bool DeliverLocationInfoRequest(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientInfoRequest Wire = RpcPayloadRead<FPayloadClientInfoRequest>(Packet, 0);
+static bool DeliverLocationInfoRequest(const FPacket_FLPACKET_CLIENT_REQUESTLOCATIONINFO& Packet,
+                                       IServer* Server, unsigned int SessionId) {
+    const FPayloadClientInfoRequest& Wire = Packet.Wire;
     Server->LocationInfoRequest(Wire.Id, SessionId, Wire.bFull != 0);
     return true;
 }
@@ -338,7 +368,8 @@ static bool DeliverLocationInfoRequest(const FPacketBase* Packet, IServer* Serve
 // ch3 0x0c OBJCOLLISION -- sender 0x06d8d7b0, receiver caseD_c. The halves of
 // SSPObjCollisionInfo are swapped on the wire and swapped back on arrival.
 // ===========================================================================
-static bool MarshalObjCollision(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalObjCollision(FPacket_FLPACKET_CLIENT_OBJCOLLISION& Packet,
+                                const unsigned int* Args, unsigned int ArgCount) {
     const SSPObjCollisionInfo* Info = reinterpret_cast<const SSPObjCollisionInfo*>(Args[0]);
     FPayloadClientObjCollision Wire;
     Wire.ObjectId = Info->ObjectId;
@@ -348,11 +379,12 @@ static bool MarshalObjCollision(FPacketBase* Packet, const unsigned int* Args, u
     Wire.TargetSubObjId = Info->TargetSubObjId;
     Wire.Pad_0x0e = 0;
     Wire.DamageBits = Info->DamageBits;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverObjCollision(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientObjCollision Wire = RpcPayloadRead<FPayloadClientObjCollision>(Packet, 0);
+static bool DeliverObjCollision(const FPacket_FLPACKET_CLIENT_OBJCOLLISION& Packet, IServer* Server,
+                                unsigned int SessionId) {
+    const FPayloadClientObjCollision& Wire = Packet.Wire;
     SSPObjCollisionInfo Info;
     Info.TargetObjectId = Wire.TargetObjectId;
     Info.TargetSubObjId = Wire.TargetSubObjId;
@@ -369,7 +401,8 @@ static bool DeliverObjCollision(const FPacketBase* Packet, IServer* Server, unsi
 // ch3 0x3d BADLANDSOBJCOLLISION -- sender 0x06d8d760, receiver caseD_3d. Same idea,
 // a three-field rotation.
 // ===========================================================================
-static bool MarshalBadLandsObjCollision(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalBadLandsObjCollision(FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION& Packet,
+                                        const unsigned int* Args, unsigned int ArgCount) {
     const SSPBadLandsObjCollisionInfo* Info =
         reinterpret_cast<const SSPBadLandsObjCollisionInfo*>(Args[0]);
     FPayloadClientBadLandsObjCollision Wire;
@@ -377,12 +410,12 @@ static bool MarshalBadLandsObjCollision(FPacketBase* Packet, const unsigned int*
     Wire.SubObjId = Info->SubObjId;
     Wire.Pad_0x06 = 0;
     Wire.BadLandsObjId = Info->BadLandsObjId;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverBadLandsObjCollision(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientBadLandsObjCollision Wire =
-        RpcPayloadRead<FPayloadClientBadLandsObjCollision>(Packet, 0);
+static bool DeliverBadLandsObjCollision(const FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION& Packet,
+                                        IServer* Server, unsigned int SessionId) {
+    const FPayloadClientBadLandsObjCollision& Wire = Packet.Wire;
     SSPBadLandsObjCollisionInfo Info;
     Info.BadLandsObjId = Wire.BadLandsObjId;
     Info.ObjectId = Wire.ObjectId;
@@ -398,8 +431,9 @@ static bool DeliverBadLandsObjCollision(const FPacketBase* Packet, IServer* Serv
 // 42 (+0xa8). Retail never shows the total size of SGFGoodSellInfo / SGFGoodVaporizedInfo
 // (hence no static_assert); only these three dwords travel.
 // ===========================================================================
-static bool DeliverGFGoodSell(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientDwordTriple Wire = RpcPayloadRead<FPayloadClientDwordTriple>(Packet, 0);
+static bool DeliverGFGoodSell(const FPacket_FLPACKET_CLIENT_GFGOODSELL& Packet, IServer* Server,
+                              unsigned int SessionId) {
+    const FPayloadClientDwordTriple& Wire = Packet.Wire;
     SGFGoodSellInfo Info;
     Info.BaseId = Wire.Field_0x00;
     Info.GoodId = Wire.Field_0x04;
@@ -408,8 +442,9 @@ static bool DeliverGFGoodSell(const FPacketBase* Packet, IServer* Server, unsign
     return true;
 }
 
-static bool DeliverGFGoodVaporized(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientDwordTriple Wire = RpcPayloadRead<FPayloadClientDwordTriple>(Packet, 0);
+static bool DeliverGFGoodVaporized(const FPacket_FLPACKET_CLIENT_GFGOODVAPORIZED& Packet,
+                                   IServer* Server, unsigned int SessionId) {
+    const FPayloadClientDwordTriple& Wire = Packet.Wire;
     SGFGoodVaporizedInfo Info;
     Info.Field_0x00 = Wire.Field_0x00;
     Info.Field_0x04 = Wire.Field_0x04;
@@ -418,13 +453,14 @@ static bool DeliverGFGoodVaporized(const FPacketBase* Packet, IServer* Server, u
     return true;
 }
 
-static bool DeliverGFGoodBuy(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientDwordQuad Wire = RpcPayloadRead<FPayloadClientDwordQuad>(Packet, 0);
+static bool DeliverGFGoodBuy(const FPacket_FLPACKET_CLIENT_GFGOODBUY& Packet, IServer* Server,
+                             unsigned int SessionId) {
+    const FPayloadClientGFGoodBuy& Wire = Packet.Wire;
     SGFGoodBuyInfo Info;
-    Info.BaseId = Wire.Field_0x00;
-    Info.Null04 = Wire.Field_0x04;
-    Info.GoodId = Wire.Field_0x08;
-    Info.Count = Wire.Field_0x0c;
+    Info.BaseId = Wire.BaseId;
+    Info.Null04 = Wire.Null04;
+    Info.GoodId = Wire.GoodId;
+    Info.Count = Wire.Count;
     Server->GFGoodBuy(Info, SessionId);
     return true;
 }
@@ -432,7 +468,8 @@ static bool DeliverGFGoodBuy(const FPacketBase* Packet, IServer* Server, unsigne
 // ===========================================================================
 // ch3 0x14 MISSIONRESPONSE -- sender 0x06d8da80, IServer slot 43 (+0xac).
 // ===========================================================================
-static bool MarshalMissionResponse(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalMissionResponse(FPacket_FLPACKET_CLIENT_MISSIONRESPONSE& Packet,
+                                   const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientMissionResponse Wire;
     Wire.OfferId = Args[0];
     Wire.OfferKind = Args[1];
@@ -440,12 +477,12 @@ static bool MarshalMissionResponse(FPacketBase* Packet, const unsigned int* Args
     Wire.Pad_0x09[0] = 0;
     Wire.Pad_0x09[1] = 0;
     Wire.Pad_0x09[2] = 0;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverMissionResponse(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientMissionResponse Wire =
-        RpcPayloadRead<FPayloadClientMissionResponse>(Packet, 0);
+static bool DeliverMissionResponse(const FPacket_FLPACKET_CLIENT_MISSIONRESPONSE& Packet,
+                                   IServer* Server, unsigned int SessionId) {
+    const FPayloadClientMissionResponse& Wire = Packet.Wire;
     Server->MissionResponse(Wire.OfferId, Wire.OfferKind, Wire.bAccepted, SessionId);
     return true;
 }
@@ -455,7 +492,8 @@ static bool DeliverMissionResponse(const FPacketBase* Packet, IServer* Server, u
 // string writers FUN_06d9a160 / FUN_06d9a5f0. IServer slots 30 (+0x78) and 32 (+0x80).
 // The packet owns the hardpoint copy, so both are self-contained and get a destructor.
 // ===========================================================================
-static bool MarshalReqAddItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalReqAddItem(FPacket_FLPACKET_CLIENT_REQADDITEM& Packet, const unsigned int* Args,
+                              unsigned int ArgCount) {
     const char* Hardpoint = reinterpret_cast<const char*>(Args[1]);
     const unsigned int Length = RpcStringLength(Hardpoint) + 1u;
     FPayloadClientReqAddItem Wire;
@@ -473,17 +511,19 @@ static bool MarshalReqAddItem(FPacketBase* Packet, const unsigned int* Args, uns
         Wire.Hardpoint = static_cast<char*>(RpcCopyBlock(Hardpoint, Length));
         Wire.HardpointSize = Length;
     }
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverReqAddItem(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientReqAddItem Wire = RpcPayloadRead<FPayloadClientReqAddItem>(Packet, 0);
+static bool DeliverReqAddItem(const FPacket_FLPACKET_CLIENT_REQADDITEM& Packet, IServer* Server,
+                              unsigned int SessionId) {
+    const FPayloadClientReqAddItem& Wire = Packet.Wire;
     Server->ReqAddItem(Wire.ArchId, Wire.Hardpoint, Wire.Count, Wire.Health,
                        Wire.bMounted, SessionId);
     return true;
 }
 
-static bool MarshalReqModifyItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalReqModifyItem(FPacket_FLPACKET_CLIENT_REQMODIFYITEM& Packet,
+                                 const unsigned int* Args, unsigned int ArgCount) {
     const char* Hardpoint = reinterpret_cast<const char*>(Args[1]);
     const unsigned int Length = RpcStringLength(Hardpoint) + 1u;
     FPayloadClientReqModifyItem Wire;
@@ -501,11 +541,12 @@ static bool MarshalReqModifyItem(FPacketBase* Packet, const unsigned int* Args, 
         Wire.Hardpoint = static_cast<char*>(RpcCopyBlock(Hardpoint, Length));
         Wire.HardpointSize = Length;
     }
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverReqModifyItem(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientReqModifyItem Wire = RpcPayloadRead<FPayloadClientReqModifyItem>(Packet, 0);
+static bool DeliverReqModifyItem(const FPacket_FLPACKET_CLIENT_REQMODIFYITEM& Packet,
+                                 IServer* Server, unsigned int SessionId) {
+    const FPayloadClientReqModifyItem& Wire = Packet.Wire;
     // Retail reads payload+0x08 as a word, not the dword the sender wrote.
     Server->ReqModifyItem((unsigned short)(Wire.EquipId & 0xffffu), Wire.Hardpoint, Wire.Count,
                           Wire.Health, Wire.bMounted, SessionId);
@@ -516,15 +557,17 @@ static bool DeliverReqModifyItem(const FPacketBase* Packet, IServer* Server, uns
 // ch3 0x19 REQREMOVEITEM -- sender 0x06d8d2b0, IServer slot 31 (+0x7c).
 // The sender zero-extends the ushort into a dword; the receiver reads it back as a word.
 // ===========================================================================
-static bool MarshalReqRemoveItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalReqRemoveItem(FPacket_FLPACKET_CLIENT_REQREMOVEITEM& Packet,
+                                 const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientReqRemoveItem Wire;
     Wire.EquipId = Args[0] & 0xffffu;
     Wire.Count = Args[1];
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverReqRemoveItem(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientReqRemoveItem Wire = RpcPayloadRead<FPayloadClientReqRemoveItem>(Packet, 0);
+static bool DeliverReqRemoveItem(const FPacket_FLPACKET_CLIENT_REQREMOVEITEM& Packet,
+                                 IServer* Server, unsigned int SessionId) {
+    const FPayloadClientReqRemoveItem& Wire = Packet.Wire;
     Server->ReqRemoveItem((unsigned short)(Wire.EquipId & 0xffffu), (int)Wire.Count, SessionId);
     return true;
 }
@@ -533,8 +576,11 @@ static bool DeliverReqRemoveItem(const FPacketBase* Packet, IServer* Server, uns
 // ch3 0x1e SAVEGAME -- sender 0x06d8db10 plus the wide-string writer FUN_06d9aab0.
 // IServer slot 58 (+0xe8). The packet owns the description copy.
 // ===========================================================================
-static bool MarshalSaveGame(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    MarshalCharacterId(Packet, Args, ArgCount);
+static bool MarshalSaveGame(FPacket_FLPACKET_CLIENT_SAVEGAME& Packet, const unsigned int* Args,
+                            unsigned int ArgCount) {
+    // CHARACTER_ID::operator= into packet+0x20, as MarshalCharacterId does.
+    CHARACTER_ID* Dst = reinterpret_cast<CHARACTER_ID*>(Packet.Wire.CharId);
+    *Dst = *reinterpret_cast<const CHARACTER_ID*>(Args[0]);
     // wcslen with no pointer test, then FUN_06d9aab0(description, wcslen + 1) with its own
     // guard.
     const wchar_t* Description = reinterpret_cast<const wchar_t*>(Args[1]);
@@ -545,13 +591,15 @@ static bool MarshalSaveGame(FPacketBase* Packet, const unsigned int* Args, unsig
         Block = static_cast<wchar_t*>(RpcCopyBlock(Description, Count * 2u));
         StoredCount = Count;
     }
-    RpcPayloadWrite(Packet, 0x200, Block);
-    return RpcPayloadWrite(Packet, 0x204, StoredCount);
+    Packet.Wire.Description = Block;
+    Packet.Wire.DescriptionCount = StoredCount;
+    return true;
 }
 
-static bool DeliverSaveGame(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const wchar_t* Description = RpcPayloadRead<wchar_t*>(Packet, 0x200);
-    Server->SaveGame(*reinterpret_cast<const CHARACTER_ID*>(Packet->Payload()), Description, SessionId);
+static bool DeliverSaveGame(const FPacket_FLPACKET_CLIENT_SAVEGAME& Packet, IServer* Server,
+                            unsigned int SessionId) {
+    const wchar_t* Description = Packet.Wire.Description;
+    Server->SaveGame(*reinterpret_cast<const CHARACTER_ID*>(Packet.Wire.CharId), Description, SessionId);
     return true;
 }
 
@@ -559,7 +607,8 @@ static bool DeliverSaveGame(const FPacketBase* Packet, IServer* Server, unsigned
 // ch3 0x20 MINEASTEROID -- sender 0x06d8dcf0, IServer slot 62 (+0xf8). The receiver
 // rebuilds the Vector on its own stack between the first and the last three dwords.
 // ===========================================================================
-static bool MarshalMineAsteroid(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalMineAsteroid(FPacket_FLPACKET_CLIENT_MINEASTEROID& Packet,
+                                const unsigned int* Args, unsigned int ArgCount) {
     const Vector* Position = reinterpret_cast<const Vector*>(Args[1]);
     FPayloadClientMineAsteroid Wire;
     Wire.SystemId = Args[0];
@@ -569,11 +618,12 @@ static bool MarshalMineAsteroid(FPacketBase* Packet, const unsigned int* Args, u
     Wire.LootId = Args[2];
     Wire.SecondaryLoot = Args[3];
     Wire.Quantity = Args[4];
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverMineAsteroid(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientMineAsteroid Wire = RpcPayloadRead<FPayloadClientMineAsteroid>(Packet, 0);
+static bool DeliverMineAsteroid(const FPacket_FLPACKET_CLIENT_MINEASTEROID& Packet, IServer* Server,
+                                unsigned int SessionId) {
+    const FPayloadClientMineAsteroid& Wire = Packet.Wire;
     Vector Position;
     Position.x = Wire.PositionX;
     Position.y = Wire.PositionY;
@@ -588,8 +638,9 @@ static bool DeliverMineAsteroid(const FPacketBase* Packet, IServer* Server, unsi
 // IServer slot 91 (+0x16c) Dock(uint const&, uint const&); the receiver passes
 // packet+0x20 for the first and the ADDRESS of its own session local for the second.
 // ===========================================================================
-static bool DeliverDock(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    Server->Dock(*reinterpret_cast<const unsigned int*>(Packet->Payload()), SessionId);
+static bool DeliverDock(const FPacket_FLPACKET_CLIENT_DOCK& Packet, IServer* Server,
+                        unsigned int SessionId) {
+    Server->Dock(Packet.Wire.Field_0x00, SessionId);
     return true;
 }
 
@@ -597,16 +648,18 @@ static bool DeliverDock(const FPacketBase* Packet, IServer* Server, unsigned int
 // ch3 0x27 TRADERESPONSE -- sender 0x06d8dad0 via FUN_06d97b00 (length first, block
 // second). IServer slot 44 (+0xb0) TradeResponse(uchar const*, int, uint).
 // ===========================================================================
-static bool MarshalTradeResponse(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalTradeResponse(FPacket_FLPACKET_CLIENT_TRADERESPONSE& Packet,
+                                 const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientBlob Wire;
     Wire.Size = Args[1];
     // FUN_06d97b00: bare operator new(len) and the copy, no guard at all.
     Wire.Buffer = RpcCopyBlock(reinterpret_cast<const void*>(Args[0]), Args[1]);
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverTradeResponse(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientBlob Wire = RpcPayloadRead<FPayloadClientBlob>(Packet, 0);
+static bool DeliverTradeResponse(const FPacket_FLPACKET_CLIENT_TRADERESPONSE& Packet,
+                                 IServer* Server, unsigned int SessionId) {
+    const FPayloadClientBlob& Wire = Packet.Wire;
     Server->TradeResponse(static_cast<const unsigned char*>(Wire.Buffer), (int)Wire.Size, SessionId);
     return true;
 }
@@ -616,16 +669,18 @@ static bool DeliverTradeResponse(const FPacketBase* Packet, IServer* Server, uns
 // IServer slot 65 (+0x104); the receiver passes packet+0x20 and packet+0x24 as the two
 // references, so the packet's own storage backs them.
 // ===========================================================================
-static bool MarshalSPScanCargo(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalSPScanCargo(FPacket_FLPACKET_CLIENT_CARGOSCAN& Packet, const unsigned int* Args,
+                               unsigned int ArgCount) {
     FPayloadClientScanCargo Wire;
     Wire.ScannerId = *reinterpret_cast<const unsigned int*>(Args[0]);
     Wire.TargetId = *reinterpret_cast<const unsigned int*>(Args[1]);
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverSPScanCargo(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
+static bool DeliverSPScanCargo(const FPacket_FLPACKET_CLIENT_CARGOSCAN& Packet, IServer* Server,
+                               unsigned int SessionId) {
     const FPayloadClientScanCargo* Wire =
-        reinterpret_cast<const FPayloadClientScanCargo*>(Packet->Payload());
+        &Packet.Wire;
     Server->SPScanCargo(Wire->ScannerId, Wire->TargetId, SessionId);
     return true;
 }
@@ -634,17 +689,19 @@ static bool DeliverSPScanCargo(const FPacketBase* Packet, IServer* Server, unsig
 // ch3 0x2f SETMANEUVER -- sender 0x06d8e670, IServer slot 66 (+0x108)
 // SetManeuver(uint Session, XSetManeuver const&): the session comes FIRST.
 // ===========================================================================
-static bool MarshalSetManeuver(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalSetManeuver(FPacket_FLPACKET_CLIENT_SETMANEUVER& Packet,
+                               const unsigned int* Args, unsigned int ArgCount) {
     const XSetManeuver* Info = reinterpret_cast<const XSetManeuver*>(Args[1]);
     FPayloadClientDwordTriple Wire;
     Wire.Field_0x00 = Info->ShipFrom;
     Wire.Field_0x04 = Info->ObjectId;
     Wire.Field_0x08 = Info->Flag;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverSetManeuver(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientDwordTriple Wire = RpcPayloadRead<FPayloadClientDwordTriple>(Packet, 0);
+static bool DeliverSetManeuver(const FPacket_FLPACKET_CLIENT_SETMANEUVER& Packet, IServer* Server,
+                               unsigned int SessionId) {
+    const FPayloadClientDwordTriple& Wire = Packet.Wire;
     XSetManeuver Info;
     Info.ShipFrom = Wire.Field_0x00;
     Info.ObjectId = Wire.Field_0x04;
@@ -658,7 +715,8 @@ static bool DeliverSetManeuver(const FPacketBase* Packet, IServer* Server, unsig
 // IServer slots 60 (+0xf0) and 61 (+0xf4). Retail truncates the int event type and the
 // trailing ulong to one byte each on the way out and extends them back on the way in.
 // ===========================================================================
-static bool MarshalRequestEvent(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalRequestEvent(FPacket_FLPACKET_CLIENT_REQUEST_EVENT& Packet,
+                                const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientRequestEvent Wire;
     Wire.EventType = (unsigned char)(Args[0] & 0xffu);
     Wire.Pad_0x01[0] = 0;
@@ -671,17 +729,19 @@ static bool MarshalRequestEvent(FPacketBase* Packet, const unsigned int* Args, u
     Wire.Pad_0x11[0] = 0;
     Wire.Pad_0x11[1] = 0;
     Wire.Pad_0x11[2] = 0;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverRequestEvent(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientRequestEvent Wire = RpcPayloadRead<FPayloadClientRequestEvent>(Packet, 0);
+static bool DeliverRequestEvent(const FPacket_FLPACKET_CLIENT_REQUEST_EVENT& Packet,
+                                IServer* Server, unsigned int SessionId) {
+    const FPayloadClientRequestEvent& Wire = Packet.Wire;
     Server->RequestEvent((int)Wire.EventType, Wire.ShipId, Wire.TargetId, Wire.SecondId,
                          (unsigned long)Wire.bFlag, SessionId);
     return true;
 }
 
-static bool MarshalRequestCancel(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalRequestCancel(FPacket_FLPACKET_CLIENT_REQUEST_CANCEL& Packet,
+                                 const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientRequestCancel Wire;
     Wire.EventType = (unsigned char)(Args[0] & 0xffu);
     Wire.Pad_0x01[0] = 0;
@@ -693,11 +753,12 @@ static bool MarshalRequestCancel(FPacketBase* Packet, const unsigned int* Args, 
     Wire.Pad_0x0d[0] = 0;
     Wire.Pad_0x0d[1] = 0;
     Wire.Pad_0x0d[2] = 0;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverRequestCancel(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientRequestCancel Wire = RpcPayloadRead<FPayloadClientRequestCancel>(Packet, 0);
+static bool DeliverRequestCancel(const FPacket_FLPACKET_CLIENT_REQUEST_CANCEL& Packet,
+                                 IServer* Server, unsigned int SessionId) {
+    const FPayloadClientRequestCancel& Wire = Packet.Wire;
     Server->RequestCancel((int)Wire.EventType, Wire.ShipId, Wire.TargetId,
                           (unsigned long)Wire.Field_0x0c, SessionId);
     return true;
@@ -707,17 +768,19 @@ static bool DeliverRequestCancel(const FPacketBase* Packet, IServer* Server, uns
 // ch3 0x37 COMMCOMPLETE -- sender 0x06d8dd70, IServer slot 63 (+0xfc). The slot takes four
 // payload values and no session id.
 // ===========================================================================
-static bool MarshalCommComplete(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalCommComplete(FPacket_FLPACKET_CLIENT_COMMCOMPLETE& Packet,
+                                const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientCommComplete Wire;
     Wire.SenderId = Args[0];
     Wire.ReceiverId = Args[1];
     Wire.MsgId = Args[2];
     Wire.Result = Args[3];
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverCommComplete(const FPacketBase* Packet, IServer* Server, unsigned int) {
-    const FPayloadClientCommComplete Wire = RpcPayloadRead<FPayloadClientCommComplete>(Packet, 0);
+static bool DeliverCommComplete(const FPacket_FLPACKET_CLIENT_COMMCOMPLETE& Packet, IServer* Server,
+                                unsigned int) {
+    const FPayloadClientCommComplete& Wire = Packet.Wire;
     Server->CommComplete(Wire.SenderId, Wire.ReceiverId, Wire.MsgId, (CommResult)Wire.Result);
     return true;
 }
@@ -729,7 +792,8 @@ static bool DeliverCommComplete(const FPacketBase* Packet, IServer* Server, unsi
 // ===========================================================================
 static SCreateCharacterInfo GStaticCreateCharacterInfo;   // retail .data:0x06dbbb10
 
-static bool MarshalCreateNewCharacter(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalCreateNewCharacter(FPacket_FLPACKET_CLIENT_CREATENEWCHAR& Packet,
+                                      const unsigned int* Args, unsigned int ArgCount) {
     const SCreateCharacterInfo* Info = reinterpret_cast<const SCreateCharacterInfo*>(Args[0]);
     // wcsncpy of 0x40 wide characters out of the 0x18-character Name, as retail asks (it
     // stops at the first NUL and pads); all 0x90 payload bytes are written.
@@ -740,11 +804,12 @@ static bool MarshalCreateNewCharacter(FPacketBase* Packet, const unsigned int* A
     Wire.PackageId = Info->PackageId;
     Wire.PilotId = Info->PilotId;
     Wire.Name[0x3f] = 0;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverCreateNewCharacter(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientCreateNewChar Wire = RpcPayloadRead<FPayloadClientCreateNewChar>(Packet, 0);
+static bool DeliverCreateNewCharacter(const FPacket_FLPACKET_CLIENT_CREATENEWCHAR& Packet,
+                                      IServer* Server, unsigned int SessionId) {
+    const FPayloadClientCreateNewChar& Wire = Packet.Wire;
     // Retail quirk: unbounded wcscpy into the static's Name, no clearing; the four dwords
     // stored after it overwrite whatever a long name spilled into them.
     wcscpy(GStaticCreateCharacterInfo.Name, Wire.Name);
@@ -767,16 +832,16 @@ static bool MarshalDwordPair(FPacketBase* Packet, const unsigned int* Args, unsi
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
-static bool DeliverLaunchComplete(const FPacketBase* Packet, IServer* Server, unsigned int) {
-    const FPayloadClientLaunchComplete Wire =
-        RpcPayloadRead<FPayloadClientLaunchComplete>(Packet, 0);
+static bool DeliverLaunchComplete(const FPacket_FLPACKET_CLIENT_LAUNCHCOMPLETE& Packet,
+                                  IServer* Server, unsigned int) {
+    const FPayloadClientLaunchComplete& Wire = Packet.Wire;
     Server->LaunchComplete(Wire.BaseObjId, Wire.ShipId);
     return true;
 }
 
-static bool DeliverJumpInComplete(const FPacketBase* Packet, IServer* Server, unsigned int) {
-    const FPayloadClientJumpInComplete Wire =
-        RpcPayloadRead<FPayloadClientJumpInComplete>(Packet, 0);
+static bool DeliverJumpInComplete(const FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE& Packet,
+                                  IServer* Server, unsigned int) {
+    const FPayloadClientJumpInComplete& Wire = Packet.Wire;
     Server->JumpInComplete(Wire.SystemId, Wire.ShipId);
     return true;
 }
@@ -785,16 +850,17 @@ static bool DeliverJumpInComplete(const FPacketBase* Packet, IServer* Server, un
 // ch3 0x3f HAIL -- sender 0x06d8d980, IServer slot 51 (+0xcc). All three arguments
 // travel; no session is appended.
 // ===========================================================================
-static bool MarshalHail(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalHail(FPacket_FLPACKET_CLIENT_HAIL& Packet, const unsigned int* Args,
+                        unsigned int ArgCount) {
     FPayloadClientHail Wire;
     Wire.ShipId = Args[0];
     Wire.TargetId = Args[1];
     Wire.SystemId = Args[2];
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverHail(const FPacketBase* Packet, IServer* Server, unsigned int) {
-    const FPayloadClientHail Wire = RpcPayloadRead<FPayloadClientHail>(Packet, 0);
+static bool DeliverHail(const FPacket_FLPACKET_CLIENT_HAIL& Packet, IServer* Server, unsigned int) {
+    const FPayloadClientHail& Wire = Packet.Wire;
     Server->Hail(Wire.ShipId, Wire.TargetId, Wire.SystemId);
     return true;
 }
@@ -803,17 +869,19 @@ static bool DeliverHail(const FPacketBase* Packet, IServer* Server, unsigned int
 // ch3 0x40 REQUEST_USE_ITEM -- sender 0x06d8ec20, IServer slot 56 (+0xe0). Identity
 // mapping of SSPUseItem.
 // ===========================================================================
-static bool MarshalSPRequestUseItem(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalSPRequestUseItem(FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM& Packet,
+                                    const unsigned int* Args, unsigned int ArgCount) {
     const SSPUseItem* Info = reinterpret_cast<const SSPUseItem*>(Args[0]);
     FPayloadClientUseItem Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.ItemId = Info->ItemId;
     Wire.Count = Info->Count;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverSPRequestUseItem(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientUseItem Wire = RpcPayloadRead<FPayloadClientUseItem>(Packet, 0);
+static bool DeliverSPRequestUseItem(const FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM& Packet,
+                                    IServer* Server, unsigned int SessionId) {
+    const FPayloadClientUseItem& Wire = Packet.Wire;
     SSPUseItem Info;
     Info.ObjectId = Wire.ObjectId;
     Info.ItemId = Wire.ItemId;
@@ -827,18 +895,20 @@ static bool DeliverSPRequestUseItem(const FPacketBase* Packet, IServer* Server, 
 // crosses the two byte arguments (reason at +0x04, bool at +0x05) and the receiver
 // crosses them back, which is what tells the two bytes apart.
 // ===========================================================================
-static bool MarshalSPRequestInvincibility(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalSPRequestInvincibility(FPacket_FLPACKET_CLIENT_REQINVINCIBILITY& Packet,
+                                          const unsigned int* Args, unsigned int ArgCount) {
     FPayloadClientInvincibility Wire;
     Wire.ShipId = Args[0];
     Wire.Reason = (unsigned char)(Args[2] & 0xffu);
     Wire.bInvincible = (unsigned char)(Args[1] & 0xffu);
     Wire.Pad_0x06[0] = 0;
     Wire.Pad_0x06[1] = 0;
-    return RpcPayloadWrite(Packet, 0, Wire);
+    return RpcPayloadWrite(Packet.Wire, Wire);
 }
 
-static bool DeliverSPRequestInvincibility(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const FPayloadClientInvincibility Wire = RpcPayloadRead<FPayloadClientInvincibility>(Packet, 0);
+static bool DeliverSPRequestInvincibility(const FPacket_FLPACKET_CLIENT_REQINVINCIBILITY& Packet,
+                                          IServer* Server, unsigned int SessionId) {
+    const FPayloadClientInvincibility& Wire = Packet.Wire;
     Server->SPRequestInvincibility(Wire.ShipId, Wire.bInvincible,
                                    (InvincibilityReason)Wire.Reason, SessionId);
     return true;
@@ -854,26 +924,31 @@ static const char* const kServerPacketHandlerFile =
 // DACOM FDUMP via import .rdata:06db311c, severity 0x100001, format .rdata:06db389c (no
 // trailing newline), file string .rdata:06db38b4.
 static bool ReportDebugPacket(int Line, const char* Message) {
-    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kServerPacketHandlerFile, Line, Message);
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kServerPacketHandlerFile, Line, Message);
     return false;
 }
 
-static bool DeliverDbgCreateShip(const FPacketBase*, IServer*, unsigned int) {
+static bool DeliverDbgCreateShip(const FPacket_FLPACKET_CLIENT_DBGCREATESHIP&, IServer*,
+                                 unsigned int) {
     return ReportDebugPacket(0x26a, "FLPACKET_CLIENT_DBGCREATESHIP encountered in release mode");
 }
-static bool DeliverDbgLoadSystem(const FPacketBase*, IServer*, unsigned int) {
+static bool DeliverDbgLoadSystem(const FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM&, IServer*,
+                                 unsigned int) {
     return ReportDebugPacket(0x217, "FLPACKET_CLIENT_DBGLOADSYSTEM encountered in release mode");
 }
-static bool DeliverDbgDestroyObject(const FPacketBase*, IServer*, unsigned int) {
+static bool DeliverDbgDestroyObject(const FPacket_FLPACKET_CLIENT_DBGDESTROYOBJECT&, IServer*,
+                                    unsigned int) {
     return ReportDebugPacket(0x1e4, "FLPACKET_CLIENT_DBGDESTROYOBJECT encountered in Final Release mode");
 }
-static bool DeliverDbgConsole(const FPacketBase*, IServer*, unsigned int) {
+static bool DeliverDbgConsole(const FPacket_FLPACKET_CLIENT_DBGCONSOLE&, IServer*, unsigned int) {
     return ReportDebugPacket(0x204, "FLPACKET_CLIENT_DBGCONSOLE encountered in release mode");
 }
-static bool DeliverDbgFreeSystem(const FPacketBase*, IServer*, unsigned int) {
+static bool DeliverDbgFreeSystem(const FPacket_FLPACKET_CLIENT_DBGFREESYSTEM&, IServer*,
+                                 unsigned int) {
     return ReportDebugPacket(0x227, "FLPACKET_CLIENT_DBGFREESYSTEM encountered in release mode");
 }
-static bool DeliverDbgRelocateShip(const FPacketBase*, IServer*, unsigned int) {
+static bool DeliverDbgRelocateShip(const FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP&, IServer*,
+                                   unsigned int) {
     return ReportDebugPacket(0x1f5, "FLPACKET_CLIENT_DBGRELOCATE_SHIP encountered in Final Release mode");
 }
 
@@ -899,7 +974,7 @@ static bool DeliverDbgRelocateShip(const FPacketBase*, IServer*, unsigned int) {
 // ===========================================================================
 
 // Args[0] is the caller's EquipDescList, whose node chain is walked directly.
-static bool MarshalReqEquipmentCommon(FPacketBase* Packet, const unsigned int* Args,
+static bool MarshalReqEquipmentCommon(FRpcEquipListPacket& Packet, const unsigned int* Args,
                                       unsigned int ArgCount) {
     const EquipDescList& Source = *reinterpret_cast<const EquipDescList*>(Args[0]);
 
@@ -907,18 +982,18 @@ static bool MarshalReqEquipmentCommon(FPacketBase* Packet, const unsigned int* A
     // (FUN_06d91340), also on a throw.
     FRpcEquipWireHandle Handle;
     RpcEquipHandleFromList(&Handle, Source);
-    RpcPacketEquipAssign(Packet, &Handle);
+    Packet.AssignEquipHandle(&Handle);
     return true;
 }
 
-static bool DeliverReqEquipmentCommon(const FPacketBase* Packet, IServer* Server,
+static bool DeliverReqEquipmentCommon(const FRpcEquipListPacket& Packet, IServer* Server,
                                       unsigned int SessionId, bool bCargo) {
     // Retail FUN_06d87ec0: an empty EquipDescList, then the handle (FUN_06d95d20 fills
     // it), the list refilled from it, one IServer call, and both destroyed in reverse order
     // (also on a throw).
     EquipDescList List;
     FRpcEquipWireHandle Handle;
-    RpcPacketEquipExtract(Packet, &Handle);
+    Packet.ExtractEquipHandle(&Handle);
     RpcEquipListFromHandle(List, &Handle);
 
     if (bCargo) {
@@ -930,38 +1005,38 @@ static bool DeliverReqEquipmentCommon(const FPacketBase* Packet, IServer* Server
     return true;
 }
 
-static bool DeliverReqEquipment(const FPacketBase* Packet, IServer* Server,
+static bool DeliverReqEquipment(const FPacket_FLPACKET_CLIENT_REQEQUIPMENT& Packet, IServer* Server,
                                 unsigned int SessionId) {
     return DeliverReqEquipmentCommon(Packet, Server, SessionId, false);
 }
 
-static bool DeliverReqCargo(const FPacketBase* Packet, IServer* Server,
+static bool DeliverReqCargo(const FPacket_FLPACKET_CLIENT_REQCARGO& Packet, IServer* Server,
                             unsigned int SessionId) {
     return DeliverReqEquipmentCommon(Packet, Server, SessionId, true);
 }
 
 // 0x36 REQCOLLISIONGROUPS. Retail's sender splices the caller's list into the payload with
 // FUN_06d8f710; its receiver passes packet+0x20, because the payload is the list object.
-static bool MarshalReqCollisionGroups(FPacketBase* Packet, const unsigned int* Args,
-                                      unsigned int ArgCount) {
+static bool MarshalReqCollisionGroups(FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS& Packet,
+                                      const unsigned int* Args, unsigned int ArgCount) {
     const std::list<CollisionGroupDesc>& Source =
         *reinterpret_cast<const std::list<CollisionGroupDesc>*>(Args[0]);
 
     // FUN_06d8f710 walks the caller's list directly into the list the packet constructor
     // built; each value travels as 8 raw bytes. Its self-assignment test cannot fire here
     // (different types).
-    FRpcCollisionGroupList* List = RpcPacketCollisionGroups(Packet);
+    FRpcCollisionGroupList* List = &Packet.Wire;
     RpcCollisionGroupListAssignRange(List, Source.begin(), Source.end());
     return true;
 }
 
-static bool DeliverReqCollisionGroups(const FPacketBase* Packet, IServer* Server,
-                                      unsigned int SessionId) {
+static bool DeliverReqCollisionGroups(const FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS& Packet,
+                                      IServer* Server, unsigned int SessionId) {
     // Retail passes the payload's address as the list reference. The port's std::list is
     // its own toolchain's container, so the node chain is copied into one first (as the
     // create-object header does, retail's inline copy at 06d8505c).
     std::list<CollisionGroupDesc> Groups;
-    RpcCollisionGroupListFromWire(Groups, RpcPacketCollisionGroups(Packet));
+    RpcCollisionGroupListFromWire(Groups, &Packet.Wire);
     Server->ReqCollisionGroups(Groups, SessionId);
     return true;
 }
@@ -971,123 +1046,132 @@ static bool DeliverReqCollisionGroups(const FPacketBase* Packet, IServer* Server
 // ===========================================================================
 const FRpcServerCodec GChannel3Codecs[] = {
     { 3, 0x01, "FLPACKET_CLIENT_LOGIN",                      0x404,
-      MarshalLogin,                   DeliverLogin },
+      RpcMarshalAs<MarshalLogin>,                  RpcDeliverToServerAs<DeliverLogin> },
     { 3, 0x03, "FLPACKET_CLIENT_MUNCOLLISION",               0x1c,
-      MarshalMunCollision,            DeliverMunCollision },
+      RpcMarshalAs<MarshalMunCollision>,           RpcDeliverToServerAs<DeliverMunCollision> },
     { 3, 0x04, "FLPACKET_CLIENT_REQUESTLAUNCH",              0x04,
-      MarshalCh3DwordAt<0>,           DeliverPlayerLaunch },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverPlayerLaunch> },
     { 3, 0x05, "FLPACKET_CLIENT_REQUESTCHARINFO",            0x00,
-      MarshalCh3Empty,                DeliverCharacterInfoReq },
+      MarshalCh3Empty,                             RpcDeliverToServerAs<DeliverCharacterInfoReq> },
     { 3, 0x06, "FLPACKET_CLIENT_SELECTCHARACTER",            0x200,
-      MarshalCharacterId,             DeliverCharacterSelect },
+      RpcMarshalAs<MarshalCharacterId>,            RpcDeliverToServerAs<DeliverCharacterSelect> },
     { 3, 0x07, "FLPACKET_CLIENT_ENTERBASE",                  0x04,
-      MarshalCh3DwordAt<0>,           DeliverBaseEnter },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverBaseEnter> },
     { 3, 0x08, "FLPACKET_CLIENT_REQUESTBASEINFO",            0x08,
-      MarshalInfoRequest,             DeliverBaseInfoRequest },
+      MarshalInfoRequest,                          RpcDeliverToServerAs<DeliverBaseInfoRequest> },
     { 3, 0x09, "FLPACKET_CLIENT_REQUESTLOCATIONINFO",        0x08,
-      MarshalInfoRequest,             DeliverLocationInfoRequest },
+      MarshalInfoRequest,
+      RpcDeliverToServerAs<DeliverLocationInfoRequest> },
     { 3, 0x0b, "FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE", 0x04,
-      MarshalCh3DwordAt<0>,           DeliverSystemSwitchOutComplete },
+      MarshalCh3DwordAt<0>,
+      RpcDeliverToServerAs<DeliverSystemSwitchOutComplete> },
     { 3, 0x0c, "FLPACKET_CLIENT_OBJCOLLISION",               0x14,
-      MarshalObjCollision,            DeliverObjCollision },
+      RpcMarshalAs<MarshalObjCollision>,           RpcDeliverToServerAs<DeliverObjCollision> },
     { 3, 0x0d, "FLPACKET_CLIENT_EXITBASE",                   0x04,
-      MarshalCh3DwordAt<0>,           DeliverBaseExit },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverBaseExit> },
     { 3, 0x0e, "FLPACKET_CLIENT_ENTERLOCATION",              0x04,
-      MarshalCh3DwordAt<0>,           DeliverLocationEnter },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverLocationEnter> },
     { 3, 0x0f, "FLPACKET_CLIENT_EXITLOCATION",               0x04,
-      MarshalCh3DwordAt<0>,           DeliverLocationExit },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverLocationExit> },
     { 3, 0x10, "FLPACKET_CLIENT_REQUESTCREATESHIP",          0x00,
-      MarshalCh3Empty,                DeliverRequestCreateShip },
+      MarshalCh3Empty,                             RpcDeliverToServerAs<DeliverRequestCreateShip> },
     { 3, 0x11, "FLPACKET_CLIENT_GFGOODSELL",                 0x0c,
-      MarshalCh3StructHead<3>,        DeliverGFGoodSell },
+      MarshalCh3StructHead<3>,                     RpcDeliverToServerAs<DeliverGFGoodSell> },
     { 3, 0x12, "FLPACKET_CLIENT_GFGOODBUY",                  0x10,
-      MarshalCh3StructHead<4>,        DeliverGFGoodBuy },
+      MarshalCh3StructHead<4>,                     RpcDeliverToServerAs<DeliverGFGoodBuy> },
     { 3, 0x13, "FLPACKET_CLIENT_GFSELECTOBJECT",             0x04,
-      MarshalCh3DwordAt<0>,           DeliverGFObjSelect },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverGFObjSelect> },
     { 3, 0x14, "FLPACKET_CLIENT_MISSIONRESPONSE",            0x0c,
-      MarshalMissionResponse,         DeliverMissionResponse },
+      RpcMarshalAs<MarshalMissionResponse>,        RpcDeliverToServerAs<DeliverMissionResponse> },
     { 3, 0x15, "FLPACKET_CLIENT_REQSHIPARCH",                0x04,
-      MarshalCh3DwordAt<0>,           DeliverReqShipArch },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverReqShipArch> },
     { 3, 0x16, "FLPACKET_CLIENT_REQEQUIPMENT",               0x04,
-      MarshalReqEquipmentCommon,      DeliverReqEquipment },
+      RpcMarshalAs<MarshalReqEquipmentCommon>,     RpcDeliverToServerAs<DeliverReqEquipment> },
     { 3, 0x17, "FLPACKET_CLIENT_REQCARGO",                   0x04,
-      MarshalReqEquipmentCommon,      DeliverReqCargo },
+      RpcMarshalAs<MarshalReqEquipmentCommon>,     RpcDeliverToServerAs<DeliverReqCargo> },
     { 3, 0x18, "FLPACKET_CLIENT_REQADDITEM",                 0x18,
-      MarshalReqAddItem,              DeliverReqAddItem },
+      RpcMarshalAs<MarshalReqAddItem>,             RpcDeliverToServerAs<DeliverReqAddItem> },
     { 3, 0x19, "FLPACKET_CLIENT_REQREMOVEITEM",              0x08,
-      MarshalReqRemoveItem,           DeliverReqRemoveItem },
+      RpcMarshalAs<MarshalReqRemoveItem>,          RpcDeliverToServerAs<DeliverReqRemoveItem> },
     { 3, 0x1a, "FLPACKET_CLIENT_REQMODIFYITEM",              0x18,
-      MarshalReqModifyItem,           DeliverReqModifyItem },
+      RpcMarshalAs<MarshalReqModifyItem>,          RpcDeliverToServerAs<DeliverReqModifyItem> },
     { 3, 0x1b, "FLPACKET_CLIENT_REQSETCASH",                 0x04,
-      MarshalCh3DwordAt<0>,           DeliverReqSetCash },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverReqSetCash> },
     { 3, 0x1c, "FLPACKET_CLIENT_REQCHANGECASH",              0x04,
-      MarshalCh3DwordAt<0>,           DeliverReqChangeCash },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverReqChangeCash> },
     { 3, 0x1e, "FLPACKET_CLIENT_SAVEGAME",                   0x208,
-      MarshalSaveGame,                DeliverSaveGame },
+      RpcMarshalAs<MarshalSaveGame>,               RpcDeliverToServerAs<DeliverSaveGame> },
     { 3, 0x20, "FLPACKET_CLIENT_MINEASTEROID",               0x1c,
-      MarshalMineAsteroid,            DeliverMineAsteroid },
+      RpcMarshalAs<MarshalMineAsteroid>,           RpcDeliverToServerAs<DeliverMineAsteroid> },
     { 3, 0x22, "FLPACKET_CLIENT_DBGCREATESHIP",              0x70,
-      nullptr,                    DeliverDbgCreateShip },
+      nullptr,                                     RpcDeliverToServerAs<DeliverDbgCreateShip> },
     { 3, 0x23, "FLPACKET_CLIENT_DBGLOADSYSTEM",              0x08,
-      nullptr,                        DeliverDbgLoadSystem },
+      nullptr,                                     RpcDeliverToServerAs<DeliverDbgLoadSystem> },
     { 3, 0x24, "FLPACKET_CLIENT_DOCK",                       0x04,
-      MarshalCh3DwordByRefAt<0>,      DeliverDock },
+      MarshalCh3DwordByRefAt<0>,                   RpcDeliverToServerAs<DeliverDock> },
     { 3, 0x25, "FLPACKET_CLIENT_DBGDESTROYOBJECT",           0x08,
-      nullptr,                        DeliverDbgDestroyObject },
+      nullptr,                                     RpcDeliverToServerAs<DeliverDbgDestroyObject> },
     { 3, 0x27, "FLPACKET_CLIENT_TRADERESPONSE",              0x08,
-      MarshalTradeResponse,           DeliverTradeResponse },
+      RpcMarshalAs<MarshalTradeResponse>,          RpcDeliverToServerAs<DeliverTradeResponse> },
     { 3, 0x2b, "FLPACKET_CLIENT_CARGOSCAN",                  0x08,
-      MarshalSPScanCargo,             DeliverSPScanCargo },
+      RpcMarshalAs<MarshalSPScanCargo>,            RpcDeliverToServerAs<DeliverSPScanCargo> },
     { 3, 0x2d, "FLPACKET_CLIENT_DBGCONSOLE",                 0x84,
-      nullptr,                        DeliverDbgConsole },
+      nullptr,                                     RpcDeliverToServerAs<DeliverDbgConsole> },
     { 3, 0x2e, "FLPACKET_CLIENT_DBGFREESYSTEM",              0x00,
-      nullptr,                        DeliverDbgFreeSystem },
+      nullptr,                                     RpcDeliverToServerAs<DeliverDbgFreeSystem> },
     { 3, 0x2f, "FLPACKET_CLIENT_SETMANEUVER",                0x0c,
-      MarshalSetManeuver,             DeliverSetManeuver },
+      RpcMarshalAs<MarshalSetManeuver>,            RpcDeliverToServerAs<DeliverSetManeuver> },
     { 3, 0x30, "FLPACKET_CLIENT_DBGRELOCATE_SHIP",           0x10,
-      nullptr,                        DeliverDbgRelocateShip },
+      nullptr,                                     RpcDeliverToServerAs<DeliverDbgRelocateShip> },
     { 3, 0x31, "FLPACKET_CLIENT_REQUEST_EVENT",              0x14,
-      MarshalRequestEvent,            DeliverRequestEvent },
+      RpcMarshalAs<MarshalRequestEvent>,           RpcDeliverToServerAs<DeliverRequestEvent> },
     { 3, 0x32, "FLPACKET_CLIENT_REQUEST_CANCEL",             0x10,
-      MarshalRequestCancel,           DeliverRequestCancel },
+      RpcMarshalAs<MarshalRequestCancel>,          RpcDeliverToServerAs<DeliverRequestCancel> },
     { 3, 0x35, "FLPACKET_CLIENT_INTERFACEITEMUSED",          0x04,
-      MarshalCh3DwordAt<1>,           DeliverInterfaceItemUsed },
+      MarshalCh3DwordAt<1>,                        RpcDeliverToServerAs<DeliverInterfaceItemUsed> },
     { 3, 0x36, "FLPACKET_CLIENT_REQCOLLISIONGROUPS",         0x0c,
-      MarshalReqCollisionGroups,      DeliverReqCollisionGroups },
+      RpcMarshalAs<MarshalReqCollisionGroups>,
+      RpcDeliverToServerAs<DeliverReqCollisionGroups> },
     { 3, 0x37, "FLPACKET_CLIENT_COMMCOMPLETE",               0x10,
-      MarshalCommComplete,            DeliverCommComplete },
+      RpcMarshalAs<MarshalCommComplete>,           RpcDeliverToServerAs<DeliverCommComplete> },
     { 3, 0x38, "FLPACKET_CLIENT_REQUESTNEWCHARINFO",         0x00,
-      MarshalCh3Empty,                DeliverNewCharacterInfoReq },
+      MarshalCh3Empty,
+      RpcDeliverToServerAs<DeliverNewCharacterInfoReq> },
     { 3, 0x39, "FLPACKET_CLIENT_CREATENEWCHAR",              0x90,
-      MarshalCreateNewCharacter,      DeliverCreateNewCharacter },
+      RpcMarshalAs<MarshalCreateNewCharacter>,
+      RpcDeliverToServerAs<DeliverCreateNewCharacter> },
     { 3, 0x3a, "FLPACKET_CLIENT_DESTROYCHAR",                0x200,
-      MarshalCharacterId,             DeliverDestroyCharacter },
+      RpcMarshalAs<MarshalCharacterId>,            RpcDeliverToServerAs<DeliverDestroyCharacter> },
     { 3, 0x3b, "FLPACKET_CLIENT_REQHULLSTATUS",              0x04,
-      MarshalCh3DwordAt<0>,           DeliverReqHullStatus },
+      MarshalCh3DwordAt<0>,                        RpcDeliverToServerAs<DeliverReqHullStatus> },
     { 3, 0x3c, "FLPACKET_CLIENT_GFGOODVAPORIZED",            0x0c,
-      MarshalCh3StructHead<3>,        DeliverGFGoodVaporized },
+      MarshalCh3StructHead<3>,                     RpcDeliverToServerAs<DeliverGFGoodVaporized> },
     { 3, 0x3d, "FLPACKET_CLIENT_BADLANDSOBJCOLLISION",       0x0c,
-      MarshalBadLandsObjCollision,    DeliverBadLandsObjCollision },
+      RpcMarshalAs<MarshalBadLandsObjCollision>,
+      RpcDeliverToServerAs<DeliverBadLandsObjCollision> },
     { 3, 0x3e, "FLPACKET_CLIENT_LAUNCHCOMPLETE",             0x08,
-      MarshalDwordPair,               DeliverLaunchComplete },
+      MarshalDwordPair,                            RpcDeliverToServerAs<DeliverLaunchComplete> },
     { 3, 0x3f, "FLPACKET_CLIENT_HAIL",                       0x0c,
-      MarshalHail,             DeliverHail },
+      RpcMarshalAs<MarshalHail>,                   RpcDeliverToServerAs<DeliverHail> },
     { 3, 0x40, "FLPACKET_CLIENT_REQUEST_USE_ITEM",           0x08,
-      MarshalSPRequestUseItem,        DeliverSPRequestUseItem },
+      RpcMarshalAs<MarshalSPRequestUseItem>,       RpcDeliverToServerAs<DeliverSPRequestUseItem> },
     { 3, 0x41, "FLPACKET_CLIENT_ABORT_MISSION",              0x04,
-      MarshalCh3DwordAt<1>,           DeliverAbortMission },
+      MarshalCh3DwordAt<1>,                        RpcDeliverToServerAs<DeliverAbortMission> },
     { 3, 0x42, "FLPACKET_CLIENT_SKIP_AUTOSAVE",              0x00,
-      MarshalCh3Empty,                DeliverCharacterSkipAutosave },
+      MarshalCh3Empty,
+      RpcDeliverToServerAs<DeliverCharacterSkipAutosave> },
     { 3, 0x43, "FLPACKET_CLIENT_JUMPINCOMPLETE",             0x08,
-      MarshalDwordPair,               DeliverJumpInComplete },
+      MarshalDwordPair,                            RpcDeliverToServerAs<DeliverJumpInComplete> },
     { 3, 0x44, "FLPACKET_CLIENT_REQINVINCIBILITY",           0x08,
-      MarshalSPRequestInvincibility,  DeliverSPRequestInvincibility },
+      RpcMarshalAs<MarshalSPRequestInvincibility>,
+      RpcDeliverToServerAs<DeliverSPRequestInvincibility> },
     { 3, 0x45, "FLPACKET_CLIENT_MISSIONSAVEB",               0x04,
-      MarshalCh3DwordAt<1>,           DeliverMissionSaveB },
+      MarshalCh3DwordAt<1>,                        RpcDeliverToServerAs<DeliverMissionSaveB> },
     { 3, 0x46, "FLPACKET_CLIENT_REQDIFFICULTYSCALE",         0x04,
-      MarshalCh3DwordAt<0>,           DeliverReqDifficultyScale },
+      MarshalCh3DwordAt<0>,
+      RpcDeliverToServerAs<DeliverReqDifficultyScale> },
     { 3, 0x47, "FLPACKET_CLIENT_RTCDONE",                    0x04,
-      MarshalCh3DwordAt<1>,           DeliverRTCDone },
+      MarshalCh3DwordAt<1>,                        RpcDeliverToServerAs<DeliverRTCDone> },
 };
 
 const unsigned int GChannel3CodecCount =
@@ -1121,8 +1205,8 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
                                      IChatServer* ChatServer, unsigned int SessionId) {
     switch (Packet->GetOpcode()) {
     case 0x01: {   // UPDATEOBJECT -> slot 52 SPObjUpdate
-        const FPayloadCommonUpdateObject Wire =
-            RpcPayloadRead<FPayloadCommonUpdateObject>(Packet, 0);
+        const FPayloadCommonUpdateObject& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_UPDATEOBJECT*>(Packet)->Wire;
         SSPObjUpdateInfo Info;
         Info.ObjectId = Wire.ObjectId;
         Info.Orientation = Wire.Orientation;
@@ -1139,7 +1223,8 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         return true;
     }
     case 0x02: {   // FIREWEAPON -> slot 0
-        const FPayloadCommonFireWeapon Wire = RpcPayloadRead<FPayloadCommonFireWeapon>(Packet, 0);
+        const FPayloadCommonFireWeapon& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_FIREWEAPON*>(Packet)->Wire;
         // A local XFireWeaponInfo; the hardpoint vector is a copy of the elements (inlined
         // operator=), never the packet's block, freed after the call.
         XFireWeaponInfo Info;
@@ -1153,7 +1238,8 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         return true;
     }
     case 0x04: {   // SETTARGET -> slot 4. The wire packs both ids first, XSetTarget interleaves.
-        const FPayloadCommonSetTarget Wire = RpcPayloadRead<FPayloadCommonSetTarget>(Packet, 0);
+        const FPayloadCommonSetTarget& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_SETTARGET*>(Packet)->Wire;
         XSetTarget Info;
         Info.ObjectId = Wire.ObjectId;
         Info.SubObjId = Wire.SubObjId;
@@ -1169,15 +1255,16 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         if (ChatServer == nullptr) {
             return false;
         }
-        const FPayloadCommonChatMsg Wire = RpcPayloadRead<FPayloadCommonChatMsg>(Packet, 0);
+        const FPayloadCommonChatMsg& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_CHATMSG*>(Packet)->Wire;
         const CHAT_ID Sender(SessionId & 0xffffu);
         const CHAT_ID Target(Wire.TargetId);
         ChatServer->SubmitChat(Sender, Wire.Size, Wire.Buffer, Target, -1);
         return true;
     }
     case 0x08: {   // ACTIVATEEQUIP -> slot 1
-        const FPayloadCommonActivateEquip Wire =
-            RpcPayloadRead<FPayloadCommonActivateEquip>(Packet, 0);
+        const FPayloadCommonActivateEquip& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_ACTIVATEEQUIP*>(Packet)->Wire;
         XActivateEquip Info;
         Info.ObjectId = Wire.ObjectId;
         Info.EquipId = Wire.EquipId;
@@ -1187,8 +1274,8 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         return true;
     }
     case 0x0e: {   // ACTIVATECRUISE -> slot 2
-        const FPayloadCommonActivateCruise Wire =
-            RpcPayloadRead<FPayloadCommonActivateCruise>(Packet, 0);
+        const FPayloadCommonActivateCruise& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_ACTIVATECRUISE*>(Packet)->Wire;
         XActivateCruise Info;
         Info.ObjectId = Wire.ObjectId;
         Info.bActivate = (Wire.bActivate != 0);
@@ -1199,7 +1286,8 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         return true;
     }
     case 0x0f: {   // GOTRADELANE -> slot 6
-        const FPayloadCommonGoTradelane Wire = RpcPayloadRead<FPayloadCommonGoTradelane>(Packet, 0);
+        const FPayloadCommonGoTradelane& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_GOTRADELANE*>(Packet)->Wire;
         XGoTradelane Info;
         Info.ObjectId = Wire.ObjectId;
         Info.TradelaneRing1 = Wire.TradelaneRing1;
@@ -1213,19 +1301,20 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
     }
     case 0x10: {   // STOPTRADELANE -> slot 7: ship, entrance and exit from the
                    // IServerImpl sender 06d8e770; SessionId comes from this dispatcher.
-        const FPayloadCommonStopTradelane Wire =
-            RpcPayloadRead<FPayloadCommonStopTradelane>(Packet, 0);
+        const FPayloadCommonStopTradelane& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_STOPTRADELANE*>(Packet)->Wire;
         Server->StopTradelane(SessionId, Wire.ShipId, Wire.TradelaneRing1, Wire.TradelaneRing2);
         return true;
     }
     case 0x11: {   // SET_WEAPON_GROUP -> slot 70
-        const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
+        const FPayloadCommonBuffer& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP*>(Packet)->Wire;
         Server->SetWeaponGroup(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
     case 0x12: {   // PLAYER_TRADE -> the eight trade slots, picked by the bitmask at +0x00
-        const FPayloadCommonPlayerTrade Wire =
-            RpcPayloadRead<FPayloadCommonPlayerTrade>(Packet, 0);
+        const FPayloadCommonPlayerTrade& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_PLAYER_TRADE*>(Packet)->Wire;
         switch (Wire.SubType) {
         case 0x01:
             Server->InitiateTrade(SessionId, Wire.ShipId);
@@ -1270,13 +1359,14 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         }
     }
     case 0x13: {   // SET_VISITED_STATE -> slot 71
-        const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
+        const FPayloadCommonBuffer& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_SET_VISITED_STATE*>(Packet)->Wire;
         Server->SetVisitedState(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
     case 0x14: {   // JETTISONCARGO -> slot 8
-        const FPayloadCommonJettisonCargo Wire =
-            RpcPayloadRead<FPayloadCommonJettisonCargo>(Packet, 0);
+        const FPayloadCommonJettisonCargo& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_JETTISONCARGO*>(Packet)->Wire;
         XJettisonCargo Info;
         Info.ObjectId = Wire.ObjectId;
         Info.ItemId = Wire.ItemId;
@@ -1286,8 +1376,8 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         return true;
     }
     case 0x15: {   // ACTIVATETHRUSTERS -> slot 3
-        const FPayloadCommonActivateThrusters Wire =
-            RpcPayloadRead<FPayloadCommonActivateThrusters>(Packet, 0);
+        const FPayloadCommonActivateThrusters& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_ACTIVATETHRUSTERS*>(Packet)->Wire;
         XActivateThrusters Info;
         Info.ObjectId = Wire.ObjectId;
         Info.bActivate = (Wire.bActivate != 0);
@@ -1298,45 +1388,51 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
         return true;
     }
     case 0x16: {   // REQUEST_BEST_PATH -> slot 72
-        const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
+        const FPayloadCommonBuffer& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH*>(Packet)->Wire;
         Server->RequestBestPath(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
     case 0x17: {   // REQUEST_GROUP_POSITIONS -> slot 75
-        const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
+        const FPayloadCommonBuffer& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS*>(Packet)->Wire;
         Server->RequestGroupPositions(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
     case 0x18: {   // REQUEST_PLAYER_STATS -> slot 73
-        const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
+        const FPayloadCommonBuffer& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS*>(Packet)->Wire;
         Server->RequestPlayerStats(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
     case 0x19: {   // SET_MISSION_LOG -> slot 76
-        const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
+        const FPayloadCommonBuffer& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_SET_MISSION_LOG*>(Packet)->Wire;
         Server->SetMissionLog(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
     case 0x1a: {   // REQUEST_RANK_LEVEL -> slot 78
-        const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
+        const FPayloadCommonBuffer& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL*>(Packet)->Wire;
         Server->RequestRankLevel(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
     case 0x1b: {   // POP_UP_DIALOG -> slot 74. Retail forwards ONLY payload+0x10; the two
                    // flattened FmtStr blocks are dropped on this side of the wire.
-        const FPayloadCommonPopUpDialog Wire =
-            RpcPayloadRead<FPayloadCommonPopUpDialog>(Packet, 0);
+        const FPayloadCommonPopUpDialog& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_POP_UP_DIALOG*>(Packet)->Wire;
         Server->PopUpDialog(SessionId, Wire.Buttons);
         return true;
     }
     case 0x1c: {   // SET_INTERFACE_STATE -> slot 77
-        const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
+        const FPayloadCommonBuffer& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE*>(Packet)->Wire;
         Server->SetInterfaceState(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
         return true;
     }
     case 0x1d: {   // TRACTOROBJECTS -> slot 5
-        const FPayloadCommonTractorObjects Wire =
-            RpcPayloadRead<FPayloadCommonTractorObjects>(Packet, 0);
+        const FPayloadCommonTractorObjects& Wire =
+            static_cast<const FPacket_FLPACKET_COMMON_TRACTOROBJECTS*>(Packet)->Wire;
         XTractorObjects Info;
         Info.ObjectId = Wire.ObjectId;
         Info.TractorEquipId = Wire.TractorEquipId;

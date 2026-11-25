@@ -7,12 +7,18 @@
 #pragma once
 
 #include "content.h"
+#include "common_archetype.h"   // EObjectType (OBJECT_TYPE bits)
+#include "common_iface.h"       // EBehaviorTypeId, TERMINAL_TYPE (TERM_*)
 #include "x86math.h"
 
 #include <cstdio>
 #include <windows.h>
 
 // Internal Content.dll helpers. Not a DACOM surface.
+
+// The value bits of an id (nickname, system, base, object and ID_String ids): retail tests an
+// id for "set" with TEST id,0x3fffffff and compares the masked values.
+constexpr unsigned int GIdValueMask = 0x3fffffff;
 
 extern HMODULE G_ContentModule;
 

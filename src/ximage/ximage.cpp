@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "dacom.h"
+#include "dacom_factory.h"   // FDacomComponentFactory
 #include "ximage.h"
 #include "render/render.h"
 #include "render/IRenderPipeline.h"
@@ -110,18 +111,18 @@ namespace
     void DumpAllocateFail(int Line, unsigned long Width, unsigned long Height)
     {
         char Message[kFormatScratchSize];
-        FDUMP(0x100002, kWarningFormat, kBigImageCpp, Line,
+        FDUMP(kFdumpWarning, kWarningFormat, kBigImageCpp, Line,
               FormatScratch(Message, kAllocateFailed, Width, Height, 0x10));
     }
 
     void DumpSetLevelWarning(int Line)
     {
-        FDUMP(0x100002, kWarningFormat, kBigImageCpp, Line, kSetLevelFailed);
+        FDUMP(kFdumpWarning, kWarningFormat, kBigImageCpp, Line, kSetLevelFailed);
     }
 
     void DumpSetLevelNotice(int Line)
     {
-        FDUMP(0x100003, kNoticeFormat, kBigImageCpp, Line, kSetLevelFailed);
+        FDUMP(kFdumpNotice, kNoticeFormat, kBigImageCpp, Line, kSetLevelFailed);
     }
 
     // FUN_06f81a10: round up to a power of two (POT input stays, 0 -> 0). SAR, not SHR.
@@ -923,46 +924,18 @@ namespace
 
     static_assert(sizeof(FBigImage) == 0x48, "operator_new(0x48) @06f82445");
 
-    // 0xC-byte factory (operator_new(0xc) @06f8232c): vptr 06f83070, RefCount, Name.
-    class FBigImageFactory : public IComponentFactory
+    // 0xC-byte factory (operator_new(0xc) @06f8232c): vptr 06f83070, RefCount, Name
+    // (s_BigImage_06f840f0). QueryInterface LAB_06f82370 (compares 0x17 bytes), AddRef
+    // LAB_06f823b0 and Release FUN_06f823c0 are FDacomComponentFactory's.
+    class FBigImageFactory : public FDacomComponentFactory
     {
     public:
-        FBigImageFactory() : RefCount_(1), Name_(Render::Factory::BigImage) {}
-
-        // LAB_06f82370: retail compares 0x17 bytes, equivalent to strcmp.
-        GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
-        {
-            *Out = nullptr;
-            if (std::strcmp(Iid, Iids::ComponentFactory) != 0)
-                return GR_INTERFACE_UNSUPPORTED;
-            *Out = (IComponentFactory*)(this);
-            AddRef();
-            return GR_OK;
-        }
-
-        // LAB_06f823b0.
-        unsigned long DACOM_API AddRef() override
-        {
-            RefCount_ = RefCount_ + 1;
-            return RefCount_;
-        }
-
-        // FUN_06f823c0.
-        unsigned long DACOM_API Release() override
-        {
-            if (RefCount_ != 0)
-                RefCount_ = RefCount_ - 1;
-            if (RefCount_ != 0)
-                return RefCount_;
-            RefCount_ = 1;
-            delete this;
-            return 0;
-        }
+        FBigImageFactory() : FDacomComponentFactory(Render::Factory::BigImage) {}
 
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Out) override
         {
             FBigImageDesc* Big = (FBigImageDesc*)(Desc);
-            if (Big->Size != kBigImageDescSize || std::strcmp(Big->Name, Name_) != 0)
+            if (Big->Size != kBigImageDescSize || std::strcmp(Big->Name, Name) != 0)
             {
                 *Out = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
@@ -985,10 +958,6 @@ namespace
             *Out = (IBigImage2*)(Image);
             return Result;
         }
-
-    private:
-        unsigned long RefCount_; // +0x04
-        const char* Name_;       // +0x08 s_BigImage_06f840f0
     };
 
     static_assert(sizeof(FBigImageFactory) == 0x0C, "operator_new(0xc) @06f8232c");

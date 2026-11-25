@@ -108,7 +108,7 @@ int InstantTradeLaneBehavior::UpdateMode()
             // JNS`); get_type's return value is discarded.
             unsigned SubObjectType = 0;
             EntranceRing->get_type(SubObjectType);
-            if ((SubObjectType & 0x80u) != 0)
+            if ((SubObjectType & OBJ_TRADELANE_RING) != 0)
                 Mode = 1;
         }
     }

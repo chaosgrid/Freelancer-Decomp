@@ -2417,7 +2417,7 @@ namespace
                 char Message[0x2000];
                 const char* Path = ArchiveOwner != nullptr ? ArchiveOwner->OwnPath : OwnPath;
                 _snprintf(Message, sizeof(Message), "attempting to close invalid handle (%s)", Path);
-                FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\DOSFile\\ReadFile\\BaseUTF.cpp",
                       0x29B, Message);
                 LastError = 6;

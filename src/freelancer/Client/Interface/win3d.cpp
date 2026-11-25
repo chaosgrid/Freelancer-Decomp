@@ -1427,7 +1427,9 @@ namespace
     FWin3DInputHandler::FWin3DInputHandler()
     {
         // FUN_0059d080: the twelve ids registered in this order.
-        static unsigned const kIds[12] = {5, 4, 6, 7, 8, 9, 10, 11, 12, 13, 1, 2};
+        static unsigned const kIds[12] = {USER_MOVE,    USER_WHEEL,   USER_BUTTON0, USER_BUTTON1,
+                                          USER_BUTTON2, USER_BUTTON3, USER_BUTTON4, USER_BUTTON5,
+                                          USER_BUTTON6, USER_BUTTON7, USER_KEY,     USER_CHAR};
         for (unsigned Index = 0; Index < 12; ++Index)
             RegisterEvent(kIds[Index]);
     }
@@ -1441,15 +1443,15 @@ namespace
     bool FWin3DInputHandler::OnEvent(unsigned MsgId)
     {
         // FUN_0059d140. Ids outside 1..13, and 3, are not handled.
-        if (MsgId - 1 > 12 || MsgId == 3)
+        if (MsgId - 1 > 12 || MsgId == USER_BUTTON)
             return false;
 
-        if (MsgId == 1)
+        if (MsgId == USER_KEY)
         {
             return Win3DDispatchKey(HudCommandRecord());
         }
 
-        if (MsgId == 2)
+        if (MsgId == USER_CHAR)
         {
             // CharEvent to the focus object and its answer returned; without a focus, to every
             // registered object until one returns true.
@@ -1470,7 +1472,7 @@ namespace
             return bHandled;
         }
 
-        if (MsgId == 4)
+        if (MsgId == USER_WHEEL)
         {
             // The wheel (DAT_0061684c): the capture head alone, otherwise the picked object.
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
@@ -1490,7 +1492,7 @@ namespace
 #endif
         }
 
-        if (MsgId == 5)
+        if (MsgId == USER_MOVE)
         {
             // Mouse move: the cursor pixel (DAT_00616840 / DAT_00616844) to the Win3D camera's
             // near plane, into world space through a copy of the camera's orientation, and

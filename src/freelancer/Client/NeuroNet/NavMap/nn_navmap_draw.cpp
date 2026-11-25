@@ -716,15 +716,15 @@ void NeuroNetNavMap::Draw()
     {
         // The map meshes by view -- the flat one on the universe view,
         // the zoomed ones in a system (and while a transition heads for them).
-        if (ViewMode == 0)
+        if (ViewMode == kNavMapViewUniverse)
             DrawHolder(&PrettyMapMesh, &Camera, 0x300);
-        if (ViewMode == 1 || (TransitionView == 1 && ViewMode != 0))
+        if (ViewMode == kNavMapViewSystem || (TransitionView == kNavMapViewSystem && ViewMode != kNavMapViewUniverse))
             DrawHolder(&ZoomedMapMesh, &Camera, 0x300);
-        if (ViewMode == 2 || TransitionView == 2)
+        if (ViewMode == kNavMapViewSystemZoomed || TransitionView == kNavMapViewSystemZoomed)
             DrawHolder(&ZoomedMapMesh2, &Camera, 0x300);
 
         // The lines under the markers.
-        if (ViewMode == 0)
+        if (ViewMode == kNavMapViewUniverse)
         {
             DrawJumpLinks(); // FUN_00497360
         }
@@ -766,14 +766,14 @@ void NeuroNetNavMap::Draw()
                 // ones and the zoomed view the ones away from the pan.
                 if (bTransition == 0)
                 {
-                    if (ViewMode == 1)
+                    if (ViewMode == kNavMapViewSystem)
                     {
                         // DAT_005d3e0c: skipped when less (unordered is drawn).
                         if (static_cast<double>(Item->Size) * static_cast<double>(SystemScale) <
                             static_cast<double>(kNavMapMinDrawSize))
                             continue;
                     }
-                    else if (ViewMode == 2)
+                    else if (ViewMode == kNavMapViewSystemZoomed)
                     {
                         float const* const Pos = Engine->GetInstancePosition(
                             Item->Mesh.EngineInstance); // IEngine slot 36
@@ -938,7 +938,7 @@ void NeuroNetNavMap::Draw()
 
     // The labels (not on the universe view, with the label toggle on),
     // then a flush when the option bridge shows.
-    if (ViewMode != 0 && G_bNavMapShowLabels != 0) // DAT_00611c5c
+    if (ViewMode != kNavMapViewUniverse && G_bNavMapShowLabels != 0) // DAT_00611c5c
         DrawLabels(); // FUN_004999d0
     if (IsShown(OptionBridge))
         Win3DFlushBeforeOverlayDraw(); // FUN_0045a9f0
@@ -1015,8 +1015,8 @@ void NeuroNetNavMap::Draw()
                 NnUiPulseBlendArgb(&Pulsed); // FUN_00561da0
                 Colour = Pulsed;
             }
-            BaseText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
-            SystemText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
+            BaseText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
+            SystemText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
             BaseText->Draw();
             SystemText->Draw();
         }
@@ -1041,7 +1041,7 @@ void NeuroNetNavMap::Draw()
                 NnUiPulseBlendArgb(&Pulsed);
                 Colour = Pulsed;
             }
-            BaseTitleText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
+            BaseTitleText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
             BaseTitleText->Draw();
         }
         if (SystemTitleText != nullptr && IsShown(SystemTitleText))
@@ -1057,7 +1057,7 @@ void NeuroNetNavMap::Draw()
                 NnUiPulseBlendArgb(&Pulsed);
                 Colour = Pulsed;
             }
-            SystemTitleText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
+            SystemTitleText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
             SystemTitleText->Draw();
         }
     }
@@ -1123,7 +1123,7 @@ void NeuroNetNavMap::DrawJumpLinks()
 void NeuroNetNavMap::DrawRouteLines()
 {
     // FUN_0049fe70: only once Draw has run and not on the universe view.
-    if (bDrawnOnce == 0 || ViewMode == 0)
+    if (bDrawnOnce == 0 || ViewMode == kNavMapViewUniverse)
         return;
 
     // The line state, the waypath texture bound, white, one list.
@@ -1258,7 +1258,7 @@ void NeuroNetNavMap::DrawLabels()
     // the universe view) its alpha byte fades out with the ease.
     unsigned char Colour[4];
     memcpy(Colour, &G_NnPaletteCyan, sizeof(Colour));
-    if (bTransition != 0 && (TransitionView == 0 || ViewMode == TransitionView))
+    if (bTransition != 0 && (TransitionView == kNavMapViewUniverse || ViewMode == TransitionView))
     {
         double const Fade = (kNavMapOne - static_cast<double>(TransitionEase)) * kNavMapByteMax;
         Colour[3] = static_cast<unsigned char>(static_cast<int>(Fade)); // ftol, low byte
@@ -1269,7 +1269,7 @@ void NeuroNetNavMap::DrawLabels()
 
     // The zoomed view (or a transition into it) starts every label
     // uncrowded.
-    if ((ViewMode != 1 && ViewMode != 0) || (bTransition != 0 && TransitionView == 2))
+    if ((ViewMode != kNavMapViewSystem && ViewMode != kNavMapViewUniverse) || (bTransition != 0 && TransitionView == kNavMapViewSystemZoomed))
     {
         for (std::list<FNavMapItem*>::iterator It = Items.begin(); It != Items.end(); ++It)
             (*It)->bLabelCrowded = 0;
@@ -1354,8 +1354,8 @@ void NeuroNetNavMap::DrawItemLabel(IFont* Font, FNavMapItem* Item)
     float const Width = static_cast<float>(WidthExt);
     float const Depth = MapLabelOrigin[2];
 
-    bool const bZoomed = (ViewMode != 1 && ViewMode != 0) ||
-                         (bTransition != 0 && TransitionView == 2);
+    bool const bZoomed = (ViewMode != kNavMapViewSystem && ViewMode != kNavMapViewUniverse) ||
+                         (bTransition != 0 && TransitionView == kNavMapViewSystemZoomed);
     float X = 0.0f;
     float Y = 0.0f;
     if (bZoomed)
@@ -1609,7 +1609,7 @@ bool NeuroNetNavMap::LabelRectFits(float X, float Y, float W, float H)
 void NeuroNetNavMap::DrawGroupMarkers()
 {
     // FUN_004a1ce0: not on the universe view, not in single player, not without members.
-    if (ViewMode == 0 || SinglePlayer() || G_NavMapGroupPositions.empty())
+    if (ViewMode == kNavMapViewUniverse || SinglePlayer() || G_NavMapGroupPositions.empty())
         return;
 
     // The marker mesh on first use, tinted with the palette's
@@ -1941,7 +1941,7 @@ bool NeuroNetNavMap::BuildZoneShading()
             // caps as 16-point rings with their centres (38 points). In the zoomed view (or a
             // transition) the radius shrinks with the zoom.
             Size.y = static_cast<float>(static_cast<double>(Size.y) * 0.5);
-            if (bTransition != 0 || ViewMode == 2)
+            if (bTransition != 0 || ViewMode == kNavMapViewSystemZoomed)
             {
                 double const Shrink = (static_cast<double>(ZoomScale) - 1.0) *
                                       static_cast<double>(kNavMapLaneWidthPerZoom);
@@ -2252,7 +2252,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
             Alpha = static_cast<int>(static_cast<double>(kNavMapTerrainAlphaSpan) /
                                          static_cast<double>(ZoomScale) +
                                      static_cast<double>(kNavMapTerrainAlphaBase)); // ftol
-        else if (ViewMode == 2)
+        else if (ViewMode == kNavMapViewSystemZoomed)
             Alpha = 0x56;
 
         // A texture change opens a new patch.

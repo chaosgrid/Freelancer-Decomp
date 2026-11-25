@@ -272,20 +272,20 @@ bool HUD_Maneuvers::Create(Win3D* NewParent, void* Data)
         Button->HomeOffset[0] = Pos[0];
         Button->HomeOffset[1] = Pos[1];
         Button->HomeOffset[2] = Pos[2];
-        Button->SetProperty(1, 1, 0);
+        Button->SetProperty(kWinPropHide, 1, 0);
     }
 
     float const TabPos[3] = {0.0f, 0.292f, -1.0f};             // 0x3e958106, 0xbf800000
     Tab = CreateStaticControl("ManeuverTab", "Interface\\Baseside\\CITY_maneuvertab1.cmp", TabPos,
                               nullptr, Zero, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, Zero);
-    Tab->SetProperty(1, 1, 0);
+    Tab->SetProperty(kWinPropHide, 1, 0);
     WinControlHalfExtentsFromMesh(TabHalfExtents, &Tab->MeshHolder);
 
     float const CruisePos[3] = {0.0f, 0.297f, 0.0f};           // 0x3e981062
     CruiseButton = CreateButtonControl("ManeuverCruiseButton", "interface\\HUD\\hud_mnvrwarp.3db",
                                        nullptr, "ui_select_item", nullptr, CruisePos, nullptr,
                                        ButtonHalf, 0, 1, 0, 0, 0xbf9, 0, 0x45);
-    CruiseButton->SetProperty(1, 1, 0);
+    CruiseButton->SetProperty(kWinPropHide, 1, 0);
 
     // Registered in this order.
     unsigned const Commands[0x18] = {
@@ -617,7 +617,7 @@ intptr_t HUD_Maneuvers::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_004d8da0 (this = the WinControl face). Only 0x26 is handled; nothing is forwarded to
     // WinControl.
     (void)B;
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (Player == nullptr)
@@ -667,7 +667,7 @@ void HUD_Maneuvers::UpdateButtons()
         }
         else if (Behavior->external_player_evaluate(Id) == EvalSkip)
         {
-            if (!(Maneuver->BehaviorId == 7 && IsTargetTradeLaneDisrupted()) &&
+            if (!(Maneuver->BehaviorId == BEHAVIOR_DOCK && IsTargetTradeLaneDisrupted()) &&
                 Current != Maneuver->BehaviorId)
             {
                 bAvailable = false;
@@ -678,9 +678,9 @@ void HUD_Maneuvers::UpdateButtons()
         if (bAvailable)
         {
             ++Shown;
-            Button->SetProperty(1, 0, 0);
+            Button->SetProperty(kWinPropHide, 0, 0);
             LastShown = Maneuver;
-            Button->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteGrey), 0);
+            Button->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteGrey), 0);
             bool const bCurrent = Maneuver->BehaviorId == Current;
             Button->SetProperty(0xc, bCurrent ? 1u : 0u, 0);
 
@@ -693,22 +693,22 @@ void HUD_Maneuvers::UpdateButtons()
             // The montage tile goes straight into the ButtonControl's +0x338.
             if (bGray && Maneuver->GrayMesh.Length != 0)
             {
-                Button->SetProperty(4, reinterpret_cast<uintptr_t>(Maneuver->GrayMesh.Data), 0);
+                Button->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Maneuver->GrayMesh.Data), 0);
                 static_cast<NnButtonControl*>(Button)->MontageTile = Maneuver->GrayMontageTile;
             }
             else
             {
-                Button->SetProperty(4, reinterpret_cast<uintptr_t>(Maneuver->Mesh.Data), 0);
+                Button->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Maneuver->Mesh.Data), 0);
                 static_cast<NnButtonControl*>(Button)->MontageTile = Maneuver->MontageTile;
             }
         }
         else
         {
             // Shown too, gray, and tinted with B = 1.
-            Button->SetProperty(1, 0, 0);
-            Button->SetProperty(4, reinterpret_cast<uintptr_t>(Maneuver->GrayMesh.Data), 0);
+            Button->SetProperty(kWinPropHide, 0, 0);
+            Button->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(Maneuver->GrayMesh.Data), 0);
             static_cast<NnButtonControl*>(Button)->MontageTile = Maneuver->GrayMontageTile;
-            Button->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteGrey), 1);
+            Button->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteGrey), 1);
             ++Shown;
         }
     }
@@ -729,7 +729,7 @@ void HUD_Maneuvers::UpdateButtons()
         if ((Button->Flags & kWin3DVisible) == 0)
             continue;
         float const Pos[3] = {X, 0.1777f, 0.5f};    // 0x3e35f6fd, 0x3f000000
-        Button->SetProperty(6, reinterpret_cast<uintptr_t>(Pos), 0);
+        Button->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
         X = X + 0.04f;
     }
 
@@ -739,47 +739,47 @@ void HUD_Maneuvers::UpdateButtons()
 void HUD_Maneuvers::UpdateTabAndCruise(int BehaviorId)
 {
     // FUN_004d8bf0.
-    if (BehaviorId != 0x13 && BehaviorId != 2 && BehaviorId != 3 && BehaviorId != 5 &&
-        BehaviorId != 7)
+    if (BehaviorId != BEHAVIOR_FREE_FLIGHT && BehaviorId != BEHAVIOR_GOTO && BehaviorId != BEHAVIOR_TRAIL && BehaviorId != BEHAVIOR_EVADE &&
+        BehaviorId != BEHAVIOR_DOCK)
     {
-        Tab->SetProperty(1, 1, 0);
-        CruiseButton->SetProperty(1, 1, 0);
+        Tab->SetProperty(kWinPropHide, 1, 0);
+        CruiseButton->SetProperty(kWinPropHide, 1, 0);
         return;
     }
 
-    Tab->SetProperty(1, 0, 0);
+    Tab->SetProperty(kWinPropHide, 0, 0);
 
     // The offset of the button the tab sits under (Goto: button 1, Dock: button 2, anything
     // else: button 0), read through property 7.
     float Offset[3] = {0.0f, 0.0f, 0.0f};
     WinControl* Anchor = Buttons[0];
-    if (BehaviorId == 2)
+    if (BehaviorId == BEHAVIOR_GOTO)
         Anchor = Buttons[1];
-    else if (BehaviorId == 7)
+    else if (BehaviorId == BEHAVIOR_DOCK)
         Anchor = Buttons[2];
-    Anchor->SetProperty(7, reinterpret_cast<uintptr_t>(Offset), 0);
+    Anchor->SetProperty(kWinPropGetOffset, reinterpret_cast<uintptr_t>(Offset), 0);
 
     if (bTabMeshReset != 1)
     {
         bTabMeshReset = 1;
-        Tab->SetProperty(4, reinterpret_cast<uintptr_t>(kTabMesh), 0);
+        Tab->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(kTabMesh), 0);
         WinControlHalfExtentsFromMesh(TabHalfExtents, &Tab->MeshHolder);
     }
 
     Offset[0] = Offset[0] + Offset[0];
     Offset[1] = 0.294f;                          // 0x3e966cf5
     Offset[2] = -1.0f;
-    Tab->SetProperty(6, reinterpret_cast<uintptr_t>(Offset), 0);
+    Tab->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
 
     // The cruise button is shown either way; away from Goto, FreeFlight and Dock it moves left
     // by 0.032 (DAT_005d69c0).
-    CruiseButton->SetProperty(1, 0, 0);
-    if (BehaviorId != 2 && BehaviorId != 0x13 && BehaviorId != 7)
+    CruiseButton->SetProperty(kWinPropHide, 0, 0);
+    if (BehaviorId != BEHAVIOR_GOTO && BehaviorId != BEHAVIOR_FREE_FLIGHT && BehaviorId != BEHAVIOR_DOCK)
         Offset[0] = Offset[0] - 0.032f;
 
     Offset[1] = 0.297f;                          // 0x3e981062
     Offset[2] = 0.0f;
-    CruiseButton->SetProperty(6, reinterpret_cast<uintptr_t>(Offset), 0);
+    CruiseButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Offset), 0);
     CruiseButton->SetProperty(0xc, GetPlayerEngineCruiseActive() ? 1u : 0u, 0);
 }
 
@@ -1021,7 +1021,7 @@ void HUD_Maneuvers::ActivateManeuver(FHudManeuver* Maneuver)
     {
         NnVoiceEnqueueByName(Maneuver->Name.Data);
         RequestManeuver(Maneuver->BehaviorId, false);
-        if (Maneuver->BehaviorId == 3)
+        if (Maneuver->BehaviorId == BEHAVIOR_TRAIL)
         {
             TrailDistance = 100.0f;              // DAT_005d828c
             TrailField14 = 0.0f;
@@ -1030,7 +1030,7 @@ void HUD_Maneuvers::ActivateManeuver(FHudManeuver* Maneuver)
     }
 
     // Refused -- a dock at a trade-lane ring with its shield down says why.
-    if (Maneuver->BehaviorId == 7 && IsTargetTradeLaneDisrupted())
+    if (Maneuver->BehaviorId == BEHAVIOR_DOCK && IsTargetTradeLaneDisrupted())
         QueueManeuverVoice(G_ManeuverVoiceTradeLaneDisrupted);
 }
 
@@ -1059,7 +1059,7 @@ void HUD_Maneuvers::SetFrameButtonCount(int Count)
     FrameButtonCount = Count;
     if (Count > 9)
         FrameButtonCount = 9;
-    Frame->SetProperty(4, reinterpret_cast<uintptr_t>(kFrameMeshes[FrameButtonCount]), 0);
+    Frame->SetProperty(kWinPropMesh, reinterpret_cast<uintptr_t>(kFrameMeshes[FrameButtonCount]), 0);
     WinControlHalfExtentsFromMesh(FrameHalfExtents, &Frame->MeshHolder);
 
     // The frame box grows (x1.1, y2.5); this window's own box and hit offset are fixed.

@@ -69,7 +69,7 @@ CETractor::CETractor(CShip* OwnerObj, unsigned short EquipId, Archetype::Tractor
     HpXform.Rotation = Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
     HpXform.Translation = Vector{0.0f, 0.0f, 0.0f};
 
-    if (OwnerObj != nullptr && ((unsigned)OwnerObj->ObjectClass & 0x503) == 0x503)
+    if (OwnerObj != nullptr && ((unsigned)OwnerObj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
     {
         Archetype::Ship const* ShipArch = (Archetype::Ship const*)OwnerObj->Archetype;
         long DiscardHandle = 0;
@@ -214,7 +214,7 @@ TractorFailureCode CETractor::VerifyTarget(CLoot const* Target) const
     // Retail calls the accessors below on ShipOwner and reads the contents archetype with no
     // null test.
     CShip* ShipOwner = nullptr;
-    if (Owner != nullptr && ((unsigned)Owner->ObjectClass & 0x503) == 0x503)
+    if (Owner != nullptr && ((unsigned)Owner->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
         ShipOwner = (CShip*)Owner;
 
     Archetype::Equipment const* ContentsArch = Target->contents_arch();   // [Target+0xec]

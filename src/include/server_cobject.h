@@ -63,7 +63,7 @@ struct CargoDesc {
 };
 
 struct ShipInfo {
-    // FUN_06d43820 (Server_ControllerExists, IServerImpl.cpp) is called with &info
+    // FUN_06d43820 (Server_ControllerExists, server_dlls.cpp) is called with &info
     // (.text:06cf7f60) and dereferences it as the controller's FLID; the same
     // dword is stored into the new controller-map entry's +0x10 (.text:06cf7fe1).
     unsigned int ControllerId;       // +0x00
@@ -76,7 +76,9 @@ struct ShipInfo {
     // quaternion -> request +0x58; FUN_06d0a880 turns it back into a matrix
     // (QuaternionToMatrix, .text:06d0aaed) and copies 9 dwords -> Parms +0x1c.
     Matrix Orientation;              // +0x30 .. +0x53
-    unsigned int GroupNameId;         // +0x54  request +0xb0 (.text:06cf7e01) -> Parms +0xec (CShip+0x21c); TODO: semantic name unknown
+    // +0x54  request +0xb0 (.text:06cf7e01) -> Parms +0xec (CShip+0x21c); CShip::get_group_name
+    // (common.dll 062b2640) returns it when nonzero, else the affiliation's name.
+    unsigned int GroupNameId;
     unsigned int LoadoutID;          // +0x58  Loadout::Get (.text:06cf7f29), request +0x6c (.text:06cf7ec3)
     // FUN_06d5f990's third argument is &info+0x5c (.text:06cf7f4c). It reads
     // the dword at +4 and walks `node = *node` until NULL (.text:06d5f9ae ..
@@ -98,10 +100,12 @@ struct ShipInfo {
     // An INTEGER: FUN_06d0a880 FILDs the request copy (.text:06d0aa6d) into
     // Parms +0x0c HitPts.
     int HitPts;                      // +0xb0  request +0x68 (.text:06cf7ed4)
-    unsigned int Field_0xb4;         // +0xb4  not read by Create
-    // request +0xe8 (.text:06cf7ee1); FUN_06d0a880 tests it `& 0x3fffffff` after
-    // the ship is built (.text:06d0ad30 / .text:06d0ad36).
-    unsigned int MarkPlayerId;         // +0xb8  TODO: semantic name unknown
+    // +0xb4  not read by Create; Content's NPC ship spawn (NpcShip.cpp) writes 0.
+    unsigned int Field_0xb4;
+    // +0xb8  request +0xe8 (.text:06cf7ee1); when `& 0x3fffffff` is nonzero, FUN_06d0a880
+    // passes it to FUN_06cef3b0(Id, 1) (.text:06d0ad30 / 06d0ad36), the mark list
+    // pub::Player::MarkObj (06d54970) adds its client id to: the player the ship is marked for.
+    unsigned int MarkPlayerId;
     unsigned int ReputationRank;     // +0xbc  request +0xb4 (.text:06cf7de7)       -> Parms +0xf0 (CShip::CreateParms::Rank)
 };
 
@@ -113,7 +117,10 @@ struct ShipInfo {
 // FUN_06d0a200 into CSolar::CreateParms (FUN_06d0a770 ctor). Retail offsets; the last
 // load is +0xcc.
 struct SolarInfo {
-    unsigned int Field_0x00;         // +0x00  not read by CreateSolar
+    // +0x00  not read by CreateSolar. Both Content writers store the creating mission's
+    // controller id (MissionObject.cpp solar spawn, RandomMissionMachine.cpp), as ShipInfo's
+    // +0x00 holds the controller id pub::SpaceObj::Create checks (.text:06cf7f60).
+    unsigned int ControllerId;
     unsigned int SolarArchID;        // +0x04  request +0x08 (.text:06cf818c), Archetype::GetSolar (.text:06cf8254)
     unsigned int SystemID;           // +0x08  FUN_06d00280 (.text:06cf80f4)
     Vector Position;                 // +0x0c  request +0x4c (.text:06cf8200)       -> Parms +0x10
@@ -138,9 +145,10 @@ struct SolarInfo {
     // empty -> -4) and passes &info+0x88 to CreateID (.text:06cf8179). Nothing
     // in either function bounds it; 0x44 is the gap up to the next read.
     char Nickname[0x44];             // +0x88 .. +0xcb
-    // request +0xbc (.text:06cf828e); FUN_06d0a200 calls FUN_06cef3b0(value, 1)
-    // when `value & 0x3fffffff` (.text:06d0a53d .. 06d0a54f).
-    unsigned int MarkPlayerId;         // +0xcc  TODO: semantic name unknown
+    // +0xcc  request +0xbc (.text:06cf828e); FUN_06d0a200 calls FUN_06cef3b0(value, 1)
+    // when `value & 0x3fffffff` (.text:06d0a53d .. 06d0a54f): the mark list
+    // pub::Player::MarkObj (06d54970) adds its client id to.
+    unsigned int MarkPlayerId;
 };
 
 // LootInfo — passed to pub::SpaceObj::CreateLoot (.text:06cf84a0), which copies it
@@ -185,8 +193,9 @@ struct EQInfo {
     unsigned short EquipId;         // +0x04: low byte is the on/off flag Dock writes
     unsigned short Pad06;           // +0x06: alignment
     unsigned int Count;             // +0x08: case 0 requires this to be exactly 1
-    unsigned int TargetObjId;        // +0x0c: case 1 gate — the branch is taken when != 0
-                                    //        TODO: semantic name unknown
+    // +0x0c: case 1 only: the object whose cargo is scanned. 0 skips the case; otherwise
+    // FUN_06d00670 looks it up (missing -> -5) and IObjInspect::scan_cargo gets it.
+    unsigned int TargetObjId;
     // +0x10: case 1 hands &CargoOut to the object's IObjInspect::scan_cargo (+0x120,
     // `ADD ESI,0x10; PUSH ESI` at .text:06cf9490) as its EquipDescVector& out-parameter,
     // so the field is 0x10 bytes (sizeof(EquipDescVector)). It is raw storage rather than

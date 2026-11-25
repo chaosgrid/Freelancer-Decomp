@@ -191,7 +191,7 @@ void SetpointProperties::extract_from_name(char const* FullName)
     if (PrefixToken == nullptr || CharTypeToken == nullptr || SegmentToken == nullptr ||
         ZoneToken == nullptr || NameToken == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: setpoint name %s does not match naming convention\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: setpoint name %s does not match naming convention\n",
               kSetpointSource, 0x78, FullName);
     }
 
@@ -200,7 +200,7 @@ void SetpointProperties::extract_from_name(char const* FullName)
     else if (strcmp(PrefixToken, "zg") == 0)
         bZoneScript = 0;
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: setpoint name prefix %s (of %s) is not zs/ or zg/\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: setpoint name prefix %s (of %s) is not zs/ or zg/\n",
               kSetpointSource, 0x87, PrefixToken, FullName);
 
     if (strcmp(CharTypeToken, "pc") == 0)
@@ -212,7 +212,7 @@ void SetpointProperties::extract_from_name(char const* FullName)
     else if (strcmp(CharTypeToken, "rpc") == 0)
         CharType = 2;
     else
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: setpoint character type %s (of %s) is not pc, npc, none, or rpc\n",
               kSetpointSource, 0x9e, CharTypeToken, FullName);
 
@@ -222,7 +222,7 @@ void SetpointProperties::extract_from_name(char const* FullName)
     char* ZoneEnd = nullptr;
     Zone = strtol(ZoneToken, &ZoneEnd, 10);
     if (ZoneEnd != nullptr && *ZoneEnd != '\0')
-        FDUMP(0x100001, "%s(%d) : *** ERROR: setpoint zone number %s (of %s) is not a number\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: setpoint zone number %s (of %s) is not a number\n",
               kSetpointSource, 0xac, ZoneToken, FullName);
 
     set_segment(NameToken);
@@ -236,7 +236,7 @@ void SetpointProperties::extract_from_name(char const* FullName)
     else
     {
         if (bZoneScript == 0)
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: invalid posture %s in setpoint marker %s - if this is a special "
                   "relocation marker, mark it with Zs\n",
                   kSetpointSource, 0xc8, PostureToken, FullName);
@@ -262,7 +262,7 @@ char const* SetpointProperties::combine_to_name() const
     else if (CharType == 0)
         strcat(GSetpointNameBuffer, "npc/");
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kSetpointSource, 0xfe,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kSetpointSource, 0xfe,
               "Invalid occupancy value for setpoint\n");
 
     // No null test: a null Segment faults, as retail.
@@ -285,7 +285,7 @@ char const* SetpointProperties::combine_to_name() const
     else if (Posture == 3)
         strcat(GSetpointNameBuffer, "special");
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kSetpointSource, 0x127,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kSetpointSource, 0x127,
               "Invalid posture value for setpoint\n");
 
     return GSetpointNameBuffer;

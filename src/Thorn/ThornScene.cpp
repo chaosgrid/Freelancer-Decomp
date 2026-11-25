@@ -7385,7 +7385,7 @@ void FThornScene::DispatchWindow(int OldTime, int NewTime)
                 char Diagnostic[128];
                 std::sprintf(Diagnostic,
                     "Start attempted on event with unknown event type %d.\n", CurrentType);
-                FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\THORN\\Thorn.cpp",
                     0x5cf, Diagnostic);
             }
@@ -8493,7 +8493,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             const unsigned int UnknownFlags = static_cast<unsigned int>(Entity->Flags) & ~KnownFlags;
             if (UnknownFlags != 0)
             {
-                FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+                FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\THORN\\LuaScriptParser.cpp",
                       0xa91, "Unknown flag value detected on entity\n");
                 if (FlagStarted)

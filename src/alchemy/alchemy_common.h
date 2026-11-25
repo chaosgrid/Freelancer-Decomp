@@ -184,7 +184,6 @@ namespace AlchemyImpl
     void FdumpAlchemyError(int Line, const char* Message);
     void FdumpAlchemyWarning(int Line, const char* Message);
     void FdumpDrawContextError(int Line, const char* Message);
-    bool IidEqual(const char* Left, const char* Right);
     bool NameEqual(const char* Left, const char* Right);
 
     GENRESULT CreateNamedFx(const char* Name, IDAComponent** Out);

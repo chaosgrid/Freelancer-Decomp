@@ -329,7 +329,7 @@ bool ServerFilterDialog::KeyEvent(unsigned Key, unsigned char* Modifiers)
 bool ServerFilterDialog::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_00563630.
-    if (Msg == 0xf004)
+    if (Msg == kWinMsgEnter)
     {
         // The ping box finished.
         RichTextEditWin* const Data = Rows[0].Data;
@@ -341,7 +341,7 @@ bool ServerFilterDialog::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
             return true;
         }
     }
-    else if (Msg == 0xf003)
+    else if (Msg == kWinMsgEscape)
     {
         *Target = Backup;
         Close();
@@ -353,7 +353,7 @@ bool ServerFilterDialog::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 intptr_t ServerFilterDialog::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // FUN_005636d0.
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         if (A == reinterpret_cast<uintptr_t>(OkButton))
         {
@@ -386,7 +386,7 @@ bool ServerFilterDialogRun(Win3D* Parent, ServerFilter* Filter)
         return true;
     ServerFilterDialog* const Dialog = static_cast<ServerFilterDialog*>(Created);
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Dialog->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
     Dialog->CaptureMouse();
 
     int ExitCode = 0;

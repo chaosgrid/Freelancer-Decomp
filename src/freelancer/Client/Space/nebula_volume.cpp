@@ -1106,7 +1106,7 @@ namespace
             if (RaymarchResult != GR_OK || CompositeResult != GR_OK)
             {
                 GbProgramFailed = true;
-                FDUMP(0x100002, "%s(%d) : WARNING:General:nebula volume shaders did not compile "
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:nebula volume shaders did not compile "
                       "(errors above); retail interior fog until a shader reload",
                       kNebulaVolumeSource, __LINE__);
             }
@@ -1124,14 +1124,14 @@ namespace
             const GENRESULT VolumeResult =
                 Ex->CreateExVolumeTexture(kNoiseSize, kNoiseSize, kNoiseSize, RPExFormatA8R8G8B8,
                                           &GNoiseTexels[0], &GNoiseVolume);
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:nebula noise volume %lu^3 generated in %lu ms",
+            FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:nebula noise volume %lu^3 generated in %lu ms",
                   kNebulaVolumeSource, __LINE__, kNoiseSize,
                   (unsigned long)(GetTickCount() - Start));
             if (VolumeResult != GR_OK || GNoiseVolume == nullptr)
             {
                 GbNoiseFailed = true;
                 GNoiseVolume = nullptr;
-                FDUMP(0x100002, "%s(%d) : WARNING:General:nebula noise volume could not be "
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:nebula noise volume could not be "
                       "created", kNebulaVolumeSource, __LINE__);
                 return false;
             }
@@ -1145,7 +1145,7 @@ namespace
             if (!CreateVolumeTarget(Ex, Scale))
             {
                 GbTargetFailed = true;
-                FDUMP(0x100002, "%s(%d) : WARNING:General:nebula volume render target could not "
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:nebula volume render target could not "
                       "be created", kNebulaVolumeSource, __LINE__);
                 return false;
             }
@@ -1175,17 +1175,17 @@ namespace
         const bool bSlots = Caps.MaxPixelShaderSlots >= kRaymarchPsSlotsRequired;
         GbCapsOk = bShaderModel && bSlots && Caps.bVolumeTextures != 0;
         if (GbCapsOk)
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:nebula volume available (ps slots %lu, "
+            FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:nebula volume available (ps slots %lu, "
                   "needs %lu; %s volume target)", kNebulaVolumeSource, __LINE__,
                   Caps.MaxPixelShaderSlots, kRaymarchPsSlotsRequired,
                   GbFloat16Target ? "FP16" : "A8R8G8B8");
         else if (bShaderModel && !bSlots)
-            FDUMP(0x100002, "%s(%d) : WARNING:General:nebula volume disabled: the adapter allows "
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:nebula volume disabled: the adapter allows "
                   "%lu pixel shader instruction slots, the ray march needs %lu",
                   kNebulaVolumeSource, __LINE__, Caps.MaxPixelShaderSlots,
                   kRaymarchPsSlotsRequired);
         else
-            FDUMP(0x100002, "%s(%d) : WARNING:General:nebula volume disabled: needs vs/ps 3.0 and "
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:nebula volume disabled: needs vs/ps 3.0 and "
                   "volume textures (vs %lx, ps %lx, volume textures %d)", kNebulaVolumeSource,
                   __LINE__, Caps.VertexShaderVersion, Caps.PixelShaderVersion,
                   (int)(Caps.bVolumeTextures));
@@ -2966,7 +2966,7 @@ namespace
             return false;
         }
         FGameLight* const Light = GameLightConstruct(static_cast<FGameLight*>(Memory));
-        EngineLightSetType(Light, 3, false);
+        EngineLightSetType(Light, kLightDirectional, false);
         const float Zero[3] = {0.0f, 0.0f, 0.0f};
         EngineLightSetPosition(Light, Zero);
         const unsigned char White[3] = {0xff, 0xff, 0xff};
@@ -3303,11 +3303,11 @@ void NebulaVolume::LoadSettings(char const* IniPath)
         if (Override.File[0] != '\0')
             GOverrides.push_back(Override);
         else
-            FDUMP(0x100002, "%s(%d) : WARNING:General:[NebulaOverride] without file = ignored",
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:[NebulaOverride] without file = ignored",
                   kNebulaVolumeSource, __LINE__);
     }
     Reader.close();
-    FDUMP(0x100003, "%s(%d) : NOTICE:General:nebula volume settings: enabled %d, %u override(s), "
+    FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:nebula volume settings: enabled %d, %u override(s), "
           "view %d", kNebulaVolumeSource, __LINE__, GSettings.Enabled > 0.5f ? 1 : 0,
           (unsigned int)(GOverrides.size()), GNebulaView);
 }

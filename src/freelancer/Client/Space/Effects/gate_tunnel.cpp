@@ -357,7 +357,7 @@ void FGateTunnel::EnterState1()
     Light = Memory != nullptr ? GameLightConstruct(static_cast<FGameLight*>(Memory)) : nullptr;
 
     // Directional, at the origin, white, range 500000.
-    EngineLightSetType(Light, 3, false);
+    EngineLightSetType(Light, kLightDirectional, false);
     float const Origin[3] = {0.0f, 0.0f, 0.0f};
     EngineLightSetPosition(Light, Origin);
     unsigned char const White[3] = {0xff, 0xff, 0xff};
@@ -615,7 +615,7 @@ void FGateTunnel::Update(float Dt)
             if (Ship != nullptr)
             {
                 CObject* Obj = Ship->GetObject();
-                if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) != 0x503u)
+                if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
                     Obj = nullptr;
                 Obj->beam_object(ShipPosition, ShipOrientation, false);
             }
@@ -801,7 +801,7 @@ void FGateTunnel::EmitLayer(float T0, float T1, FGateTunnelLayer* Layer, int Lay
         Win3DSetBlendFunc(kWin3DBlendOne, kWin3DBlendInvSrcAlpha);
     else
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kGateTunnelCpp, 0x21e,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kGateTunnelCpp, 0x21e,
               "Only two render layers in the jumpgate supported");
         return;
     }
@@ -1002,7 +1002,7 @@ FGateTunnel* GateTunnelFind(ID_String const* Id)
         if (Tunnel->Id.Id == Wanted)
             return Tunnel;
     }
-    FDUMP(0x100002, "%s(%d) : *** WARNING: GateTunnel %s not found", kGateTunnelCpp, 0xfc,
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: GateTunnel %s not found", kGateTunnelCpp, 0xfc,
           Id->get_string());
     return nullptr;
 }
@@ -1123,7 +1123,7 @@ void GateTunnelIniLoad(char const* Path)
             // A third layer is refused.
             if (Tunnel->LayerCount >= 2)
             {
-                FDUMP(0x100002,
+                FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: more than two layers specified in gate tunnel %s",
                       kGateTunnelCpp, 0xe9, Tunnel->Id.get_string());
                 continue;
@@ -1183,7 +1183,7 @@ void GateTunnelIniLoad(char const* Path)
                         TexShapeSetTexture(&Layer->Texture, Shape->Texture);
                     else
                     {
-                        FDUMP(0x100002,
+                        FDUMP(kFdumpWarning,
                               "%s(%d) : *** WARNING: Couldn't find Effect shape %s for the Gate Tunnel",
                               kGateTunnelCpp, 0xe3, Reader.get_value_string());
                     }

@@ -151,7 +151,7 @@ namespace
         }
         CBase const* const Base = static_cast<IObjInspectImpl*>(Gameobj);
         CObject* const Object = Base->Object;
-        if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 0x103u) != 0x103u)
+        if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         {
             return nullptr;
         }
@@ -349,7 +349,7 @@ void ClientSendComm(unsigned PlayerId, unsigned Sender, unsigned Receiver, unsig
 
     if (Inbox->Count >= kCommInboxCapacity)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRadioH, 0x7c,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRadioH, 0x7c,
               "inbox overflow - too many comm messages");
         return;
     }
@@ -500,7 +500,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
         wchar_t OrderText[0x100];
         if (GetIdsStringWWithRawFallback(Msg->PermutationIds, OrderText, 0x100) == 0)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Error loading resource string %d\n", kHudCommCpp,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Error loading resource string %d\n", kHudCommCpp,
                   0x2e8, Msg->PermutationIds);
         }
         else
@@ -529,7 +529,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
     {
         if (Msg->TextCount > 1)
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: No permutation for comm, playing %d messages in order\n",
                   kHudCommCpp, 0x2f3, Msg->TextCount);
         }
@@ -546,7 +546,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
     {
         if (Index >= PermutationCount)
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: Comm message index %d is >= permutation size %d, "
                   "skipping message part\n",
                   kHudCommCpp, 0x305, Index, PermutationCount);
@@ -557,7 +557,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
         // below TextIds, as in retail.
         if (Part >= Msg->TextCount)
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: Ignoring comm sequence permutation index %d which is >= "
                   "message count %d\n",
                   kHudCommCpp, 0x30f, Part, Msg->TextCount);
@@ -567,7 +567,7 @@ void FCommVoice::Play(FCommMessage const* Msg, bool bStaticSound, bool bDuck, bo
         FVoiceMsg* const VoiceMsg = Profile->FindMessage(MsgId);
         if (VoiceMsg == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: invalid MSG id (%u) for voice profile (%s)\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: invalid MSG id (%u) for voice profile (%s)\n",
                   kHudCommCpp, 0x318, MsgId, Profile->GetName());
             continue;
         }
@@ -1036,7 +1036,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
             }
             else
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kHudCommCpp, 0x523,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kHudCommCpp, 0x523,
                       "Invalid gender for comm appearance\n");
                 Pose.Translation = MaleOffset;
             }
@@ -1127,7 +1127,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
                                             reinterpret_cast<void*>(static_cast<uintptr_t>(2)),
                                             FloatArg(-1.0f), nullptr) != 0)
                     {
-                        FDUMP(0x100002, "%s(%d) : *** WARNING: failed to play character animation '%s'\n",
+                        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: failed to play character animation '%s'\n",
                               "cmn\\EngineCharacter.h", 0x1f7, ScriptName);
                     }
                 }
@@ -1161,7 +1161,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
         Font->bMultiLine = 1;
         Font->LayoutGen = 0;
     }
-    CommText->SetProperty(0x33, reinterpret_cast<uintptr_t>(G_HudChromeColorRgba), 1);
+    CommText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(G_HudChromeColorRgba), 1);
 
     // Pilot name, group name or object name, then NameIds.
     wchar_t IdsText[0x100];
@@ -1179,7 +1179,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
         }
         CSimple* const Again = SimpleOfWatchable(Speaker.target());
         if (Again != nullptr &&
-            (static_cast<unsigned>(Again->ObjectClass) & 0x503u) == 0x503u)
+            (static_cast<unsigned>(Again->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
         {
             unsigned const GroupIds = static_cast<CShip const*>(ObjectOfSimple(Again))->get_group_name();
             if (GroupIds != 0)
@@ -1603,7 +1603,7 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
         }
         if (Reader.is_value("speaker_offset"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: speaker_offset is obsolete in hud ini file %s, use "
                   "male_speaker_offset or female_speaker_offset instead\n",
                   kHudCommCpp, 0x7e7, Reader.get_file_name());
@@ -1647,8 +1647,8 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
 
     // The portrait key light.
     FEngineLight* const NewLight = static_cast<FEngineLight*>(operator new(sizeof(FEngineLight)));
-    EngineLightInit(NewLight, -1);          // FUN_00410ca0
-    EngineLightSetType(NewLight, 1, false); // FUN_004110c0
+    EngineLightInit(NewLight, kLightNone);          // FUN_00410ca0
+    EngineLightSetType(NewLight, kLightPoint, false); // FUN_004110c0
     float const LightPos[3] = {0.23f, 0.31f, -0.92f};
     EngineLightSetPosition(NewLight, LightPos); // FUN_00410ef0
     unsigned char const LightColour[3] = {0x80, 0x80, 0x80};
@@ -1919,7 +1919,7 @@ void HUD_Receiver::Dispatch(FCommSlot* Slot, FCommMessage* Msg)
     FVoiceProfile* const Profile = LookupClientVoice(Msg->VoiceId);
     if (Profile == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: invalid VOICE id (%u) attempted to speak\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: invalid VOICE id (%u) attempted to speak\n",
               kHudCommCpp, 0x934, Msg->VoiceId);
         return;
     }
@@ -2097,7 +2097,7 @@ void HudCommPreloadCostume(Costume const* SpeakerCostume)
     }
     if (G_EngineCharacterCache.FindOrCreate(*SpeakerCostume) == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Failed to load costume %d/%d\n", kHudCommCpp, 0x119,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Failed to load costume %d/%d\n", kHudCommCpp, 0x119,
               SpeakerCostume->PartIds[1], SpeakerCostume->PartIds[0]);
     }
 }

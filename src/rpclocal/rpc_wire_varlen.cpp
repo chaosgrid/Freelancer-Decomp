@@ -45,12 +45,12 @@
 // no fixed run (unlike ch3 0x2d DBGCONSOLE's 128-byte block). The length is truncated to
 // 16 bits before both the cursor bump and the copy (unreachable for a 0x200-byte field).
 // ===========================================================================
-unsigned int RpcEncodeWireCharacterId(FPacketBase& Packet, unsigned char** BufferHolder,
-                                      unsigned int Capacity, unsigned int* OutLength) {
-    const char* Name = reinterpret_cast<const char*>(Packet.Payload());
+unsigned int FRpcCharacterIdPacket::Encode(unsigned char** BufferHolder, unsigned int Capacity,
+                                           unsigned int* OutLength) {
+    const char* Name = CharacterId;
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
 
     // Unbounded strlen over the payload, as retail's.
     unsigned int Length = 0;
@@ -68,7 +68,7 @@ unsigned int RpcEncodeWireCharacterId(FPacketBase& Packet, unsigned char** Buffe
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -77,11 +77,11 @@ unsigned int RpcEncodeWireCharacterId(FPacketBase& Packet, unsigned char** Buffe
 // Retail bug, reproduced: the wire length is checked only against the input buffer, never
 // against the 0x200-byte payload, so a datagram longer than 0x220 bytes writes past the
 // packet (copy and terminator).
-unsigned int RpcDecodeWireCharacterId(FPacketBase& Packet, const unsigned char* Buffer,
-                                      unsigned int Size, unsigned int* OutLength) {
-    char* Name = reinterpret_cast<char*>(Packet.Payload());
+unsigned int FRpcCharacterIdPacket::Decode(const unsigned char* Buffer, unsigned int Size,
+                                           unsigned int* OutLength) {
+    char* Name = CharacterId;
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -98,7 +98,7 @@ unsigned int RpcDecodeWireCharacterId(FPacketBase& Packet, const unsigned char* 
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -120,12 +120,12 @@ unsigned int RpcDecodeWireCharacterId(FPacketBase& Packet, const unsigned char* 
 //     CREATESHIP/CREATESOLAR header codec which sends the same node type through a
 //     255.0 scale.
 // ===========================================================================
-unsigned int RpcEncodeWireCollisionGroups(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength) {
-    const FRpcCollisionGroupList* List = RpcPacketCollisionGroups(&Packet);
+unsigned int FRpcCollisionGroupPacket::Encode(unsigned char** BufferHolder,
+                                              unsigned int Capacity, unsigned int* OutLength) {
+    const FRpcCollisionGroupList* List = &Wire;   // FUN_06d8f7d0
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
 
     // FUN_06d8f530 begins here.
     const unsigned short Count = (unsigned short)(List->Size & 0xffffu);
@@ -152,7 +152,7 @@ unsigned int RpcEncodeWireCollisionGroups(FPacketBase& Packet, unsigned char** B
     }
 
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -165,11 +165,11 @@ unsigned int RpcEncodeWireCollisionGroups(FPacketBase& Packet, unsigned char** B
 // uninitialised stack bytes, then overwrites +0x04 fully but only the low word of +0x00, so
 // the high half of every decoded CollisionGroupDesc::Id is stack residue. The port zeroes
 // instead (docs/re/deviations.md).
-unsigned int RpcDecodeWireCollisionGroups(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength) {
-    FRpcCollisionGroupList* List = RpcPacketCollisionGroups(&Packet);
+unsigned int FRpcCollisionGroupPacket::Decode(const unsigned char* Buffer, unsigned int Size,
+                                              unsigned int* OutLength) {
+    FRpcCollisionGroupList* List = &Wire;   // FUN_06d8f7d0
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -211,7 +211,7 @@ unsigned int RpcDecodeWireCollisionGroups(FPacketBase& Packet, const unsigned ch
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -229,16 +229,13 @@ unsigned int RpcDecodeWireCollisionGroups(FPacketBase& Packet, const unsigned ch
 unsigned int FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE::Encode(unsigned char** BufferHolder,
                                                                  unsigned int Capacity,
                                                                  unsigned int* OutLength) {
-    const FPayloadServerSetMissionMessage* Wire =
-        reinterpret_cast<const FPayloadServerSetMissionMessage*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    Stream.PutDword(Wire->Type);                                 // / 06dabc21
+    Stream.PutDword(Wire.Type);                                  // / 06dabc21
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    RpcPutSizedBlock(Stream, Wire->TextSize, Wire->TextBuffer);        // / 06dabc5a
+    RpcPutSizedBlock(Stream, Wire.TextSize, Wire.TextBuffer);          // / 06dabc5a
     if (Stream.Failed()) {
         return Stream.GetError();                                      // / 06dabc6a
     }
@@ -250,9 +247,6 @@ unsigned int FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE::Encode(unsigned char**
 unsigned int FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE::Decode(const unsigned char* Buffer,
                                                                  unsigned int Size,
                                                                  unsigned int* OutLength) {
-    FPayloadServerSetMissionMessage* Wire =
-        reinterpret_cast<FPayloadServerSetMissionMessage*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -261,10 +255,10 @@ unsigned int FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE::Decode(const unsigned 
     if (!Stream.GetDword(Scratch)) {                                   // 06dabd47 / 06dabd62
         return Stream.GetError();
     }
-    Wire->Type = Scratch;
+    Wire.Type = Scratch;
     // Retail quirk: the pointer is overwritten without freeing what the payload held (only
     // the destructor FUN_06d9d9e0 frees it), so a second decode leaks.
-    if (!RpcGetSizedBlock(Stream, Wire->TextSize, Wire->TextBuffer)) {
+    if (!RpcGetSizedBlock(Stream, Wire.TextSize, Wire.TextBuffer)) {
         return Stream.GetError();                                      // FUN_06da1620
     }
     *OutLength = Stream.Length();
@@ -289,23 +283,17 @@ unsigned int FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE::Decode(const unsigned 
 unsigned int FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE::Encode(unsigned char** BufferHolder,
                                                                      unsigned int Capacity,
                                                                      unsigned int* OutLength) {
-    const FPayloadServerRemoteObjectCargoUpdate* Wire =
-        reinterpret_cast<const FPayloadServerRemoteObjectCargoUpdate*>(Payload());
-    // payload+0x00 is the operator new(4) handle the list hangs off (declared as a dword).
-    FRpcEquipWireHandle* const* Slot =
-        reinterpret_cast<FRpcEquipWireHandle* const*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    Stream.PutDword(Wire->ObjectId);                                 // / 06d8f8b8
+    Stream.PutDword(ObjectId);                                       // / 06d8f8b8
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.PutByte(Wire->Flag);                                  // / 06d8f8f4
+    Stream.PutByte(Flag);                                            // / 06d8f8f4
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    if (!RpcPutEquipList(Stream, Slot)) {                              // 06d8f902 FUN_06da2240
+    if (!RpcPutEquipList(Stream, &EquipHandle)) {                      // 06d8f902 FUN_06da2240
         return FRpcMarshalStream::kEncodeOverflow;
     }
     *OutLength = Stream.Length();
@@ -316,11 +304,6 @@ unsigned int FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE::Encode(unsigned ch
 unsigned int FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE::Decode(const unsigned char* Buffer,
                                                                      unsigned int Size,
                                                                      unsigned int* OutLength) {
-    FPayloadServerRemoteObjectCargoUpdate* Wire =
-        reinterpret_cast<FPayloadServerRemoteObjectCargoUpdate*>(Payload());
-    FRpcEquipWireHandle** Slot =
-        reinterpret_cast<FRpcEquipWireHandle**>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -329,13 +312,13 @@ unsigned int FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE::Decode(const unsig
     if (!Stream.GetDword(Scratch)) {                                   // 06d8f9b7 / 06d8f9d6
         return Stream.GetError();
     }
-    Wire->ObjectId = Scratch;
-    unsigned char Flag = 0;
-    if (!Stream.GetByte(Flag)) {                                       // 06d8f9e5 / 06d8fa02
+    ObjectId = Scratch;
+    unsigned char ScratchByte = 0;
+    if (!Stream.GetByte(ScratchByte)) {                                       // 06d8f9e5 / 06d8fa02
         return Stream.GetError();
     }
-    Wire->Flag = Flag;
-    if (!RpcGetEquipList(Stream, Slot)) {                              // 06d8fa17 FUN_06da2480
+    Flag = ScratchByte;
+    if (!RpcGetEquipList(Stream, &EquipHandle)) {                      // 06d8fa17 FUN_06da2480
         return Stream.GetError();
     }
     *OutLength = Stream.Length();

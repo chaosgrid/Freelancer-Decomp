@@ -35,25 +35,20 @@ class IChatClient;
 // IServerImpl allocates packets the same way) and live in src/include/rpc_packet.h.
 #include "rpc_packet.h"
 
-// Stores one field of 1, 2 or 4 bytes at a packet-relative Offset, unchecked -- one
-// retail constructor store.
-void RpcPacketStoreField(FPacketBase* Packet, unsigned int Offset, unsigned int Width,
-                         unsigned int Value);
-
 // Builds one MSVCP60 std::list embedded in a packet, as eight constructors do inline (e.g.
 // CHARACTERINFO's): allocator byte, operator new(8 + sizeof(T)) sentinel linked to itself,
 // Size 0, Head = sentinel. CREATESHIP and CREATESOLAR reach the same result through
 // COMMON.DLL's std::list<CollisionGroupDesc>::list and DamageList::DamageList. Nothing is
 // tested. The allocator byte is stored as 0: retail copies an uninitialised stack byte that
 // nothing reads.
-void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
-                                unsigned int NodeSize);
+// ListHeader is the packet's list member (a retail 0x0c std::list header).
+void RpcPacketBuildListSentinel(void* ListHeader, unsigned int NodeSize);
 
 // Tears down one list built by RpcPacketBuildListSentinel, as every retail packet
 // destructor does (e.g. CREATELOOT's FUN_06d9d1f0): unlink and free each node, then the
 // sentinel; Head = 0, Size = 0. Node values are not touched; a destructor that owns them
 // frees them first.
-void RpcPacketDestroyEmbeddedList(FPacketBase* Packet, unsigned int Offset);
+void RpcPacketDestroyEmbeddedList(void* ListHeader);
 
 // ===========================================================================
 // FRpcMarshalStream -- the cursor the packet codec slots run on.

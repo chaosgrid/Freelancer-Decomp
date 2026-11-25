@@ -39,6 +39,46 @@ extern FRmNamedValue const GRmCommTriggerNames[17];
 // Reader: FUN_06f98df0.
 extern FRmNamedValue const GRmCommTargetNames[12];
 
+// The comm sequence triggers (GRmCommTriggerNames, VignetteParams.ini) the vignette machine
+// passes to FRmOfferComponent::SendConversations. Names are the retail strings.
+enum ERmCommTrigger
+{
+    RmCommInSpaceInSystem = 1,                      // IN_SPACE_IN_SYSTEM
+    RmCommInSpaceNotInSystem = 2,                   // IN_SPACE_NOT_IN_SYSTEM
+    RmCommPreBattleSpawnRange = 3,                  // PLAYER_IN_PRE_BATTLE_SPAWN_RANGE
+    RmCommKilledAllGoingToMain = 4,                 // SUCCESS_KILLED_ALL_GOING_TO_MAIN
+    RmCommNotKilledAllGoingToMain = 5,              // SUCCESS_NOT_KILLED_ALL_GOING_TO_MAIN
+    RmCommMainBattleSolarSpawnRange = 6,            // PLAYER_IN_MAIN_BATTLE_SOLAR_SPAWN_RANGE
+    RmCommMainBattleShipSpawnRange = 7,             // PLAYER_IN_MAIN_BATTLE_SHIP_SPAWN_RANGE
+    RmCommFirstFriendlySpawn = 8,                   // FIRST_FRIENDLY_SPAWN
+    RmCommFirstDefensiveShipSpawn = 9,              // FIRST_DEFENSIVE_SHIP_SPAWN
+    RmCommFirstBigShipSpawn = 10,                   // FIRST_BIG_SHIP_SPAWN
+    RmCommLeftCombatArea = 11,                      // LEFT_COMBAT_AREA
+    RmCommReenteredCombatArea = 12,                 // REENTERED_COMBAT_AREA
+    RmCommGlobalSuccess = 13,                       // GLOBAL_SUCCESS
+    RmCommGlobalFailCombatRange = 14,               // GLOBAL_FAIL_COMBAT_RANGE
+    RmCommGlobalFailDestroyedCriticalLoot = 15,     // GLOBAL_FAIL_DESTROYED_CRITICAL_LOOT
+    RmCommGlobalFailOther = 16,                     // GLOBAL_FAIL_OTHER
+};
+
+// The comm sequence speakers / targets (GRmCommTargetNames, PTR_DAT_06fce808): 1..5 speak,
+// 6..11 listen (FRmRuntimeMachine::ResolveLine). Names are the retail strings.
+enum ERmCommTarget
+{
+    RmTargetNone = 0,                               // NONE
+    RmTargetBase = 1,                               // BASE
+    RmTargetBigSolar = 2,                           // BIG_SOLAR
+    RmTargetBigShip = 3,                            // BIG_SHIP
+    RmTargetDefensiveShip = 4,                      // DEFENSIVE_SHIP
+    RmTargetFriendlyShip = 5,                       // FRIENDLY_SHIP
+    RmTargetPlayer = 6,                             // PLAYER
+    RmTargetAllPlayers = 7,                         // ALL_PLAYERS
+    RmTargetPlayersInRange = 8,                     // PLAYERS_IN_RANGE
+    RmTargetPlayersOutOfRange = 9,                  // PLAYERS_OUT_OF_RANGE
+    RmTargetPlayersInSystem = 10,                   // PLAYERS_IN_SYSTEM
+    RmTargetPlayersOutOfSystem = 11,                // PLAYERS_OUT_OF_SYSTEM
+};
+
 // ---------------------------------------------------------------------------------------
 // TU61 state machine message types. The TU61 static initialisers LAB_06f842a0 ...
 // LAB_06f84520 (one per global, in this order) each inline
@@ -103,6 +143,17 @@ public:
 // States: 0 idle, 1 armed (the subclass's condition, slot 6), 2 fired, 3 waiting to re-arm,
 // 4 done. Slot 6 is purecall here: TU57's three subclasses and TU61's (06fbca40, 06fbca84)
 // supply it.
+// FRmTrigger's states (LAB_06f71090 dispatches them to slots 5..9).
+enum ERmTriggerState
+{
+    RmTriggerIdle = 0,        // OnIdle: enter -> RmTriggerArmed
+    RmTriggerArmed = 1,       // OnArmed: the subclass's condition -> RmTriggerFired
+    RmTriggerFired = 2,       // OnFired: Fire, then RmTriggerDone / RmTriggerRearmWait /
+                              // RmTriggerArmed
+    RmTriggerRearmWait = 3,   // OnRearmWait: RearmDelay passed -> RmTriggerArmed
+    RmTriggerDone = 4,        // OnDone
+};
+
 class FRmTrigger : public StateMachineMessageHandler
 {
 public:
@@ -327,7 +378,9 @@ public:
     int ObjectiveType = 0x3a;
     int Key = 0;                    // +0x34 the FRmObjectiveMap key (FUN_06f8ade0 writes it)
     Vector Position = {};           // +0x38 TODO: reader (only the copies touch it)
-    unsigned char Field_0x44 = 0;   // +0x44 TODO: meaning
+    // +0x44: 0 from the ctors (06f85642, 06f85925, 06f90acd), copied by the Clones
+    // (06f85511, 06f85860, 06f85b63); no other byte access at +0x44 in TU61.
+    unsigned char Field_0x44 = 0;
 };
 
 // ---------------------------------------------------------------------------------------

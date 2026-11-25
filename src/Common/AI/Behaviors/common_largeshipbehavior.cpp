@@ -85,7 +85,7 @@ int LargeShipBehavior::OnEvaluateReadiness(float Value)
     // The mask is tested on the out-parameter; get_type's return value is discarded.
     unsigned ObjectType = 0;
     ObjInspectOf(OwnerContext)->get_type(ObjectType);
-    if ((ObjectType & 0x80000) != 0)
+    if ((ObjectType & OBJ_CRUISER) != 0)
     {
         if (SysMgr->Targeting.GetTarget() != nullptr)      // FUN_062ed5a0
             Mode = 1;

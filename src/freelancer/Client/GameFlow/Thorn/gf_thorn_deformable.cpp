@@ -104,7 +104,7 @@ GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
     void* const AnimScript = GetCharacterInfoDb()->AcquireScript(ScriptId);
     if (AnimScript == kDeformNoScript)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Animation (%s) does not exist, skipping\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Animation (%s) does not exist, skipping\n",
               GScriptDeformableFile, 0x14b, Desc->Animation);
         return GR_OK;
     }
@@ -126,7 +126,7 @@ GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
         DALib::Anim->RegisterHandle(static_cast<unsigned long>(Part));
     if (BlockResult != 0)
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: Failed to block bone %s for animation %s, bone may already "
               "be locked\n",
               GScriptDeformableFile, 0x143, LockedBone, Desc->Animation);
@@ -238,7 +238,7 @@ GENRESULT DACOM_API FThornDeformable::GetHardpointXform(int TargetType, char con
         long const Part = Character->FindPart(Name);
         if (Part == -1)
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: Invalid part name %s in get_sub_part_transform()\n",
                   GScriptDeformableFile, 0x255, Name);
             return GR_GENERIC;
@@ -252,7 +252,7 @@ GENRESULT DACOM_API FThornDeformable::GetHardpointXform(int TargetType, char con
         int const Index = Hardpoints.find_name(Name);
         if (Index == -1)
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: Invalid hardpoint name %s in get_sub_part_transform()\n",
                   GScriptDeformableFile, 0x265, Name);
             return GR_GENERIC;
@@ -364,7 +364,7 @@ GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, fl
         Aim.bStarted = 1;
         return GR_OK;
     }
-    FDUMP(0x100004, "%s(%d) : TRACE_1:General:%s", GScriptDeformableFile, 0x213,
+    FDUMP(kFdumpTrace1, "%s(%d) : TRACE_1:General:%s", GScriptDeformableFile, 0x213,
           "Invalid Deform::start_aim() command");
     Aim.bStarted = 0;
     return GR_GENERIC;

@@ -899,9 +899,9 @@ void FDockGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         unsigned int DockingTarget = 0;
         pub::SpaceObj::GetDockingTarget(DockTargetId, DockingTarget);
         bool bArrived = false;
-        if ((Type & 0x100) != 0 && (Ids[1] & 0x3fffffff) != 0 && DockingTarget == Ids[1])
+        if ((Type & OBJ_STATION) != 0 && (Ids[1] & GIdValueMask) != 0 && DockingTarget == Ids[1])
             bArrived = true;
-        else if ((Type & 0x20) != 0 && DockTargetId == Ids[2])
+        else if ((Type & OBJ_DOCKING_RING) != 0 && DockTargetId == Ids[2])
             bArrived = true;
         if (bArrived && State != 13)
         {
@@ -923,7 +923,7 @@ void FDockGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
         unsigned int Type;
         if (pub::SpaceObj::GetType(DockTargetId, Type) != 0)
             break;
-        if ((Type & 0xc40) == 0)
+        if ((Type & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
             break;
         if (DockTargetId != Ids[1])
             break;

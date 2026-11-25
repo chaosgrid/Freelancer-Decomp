@@ -27,6 +27,7 @@
 #include "Space/HUD/hud_target.h"         // HudIsMousePickBlocked (FUN_0045a740)
 #include "Space/HUD/hud_targetable_objects.h" // G_HudTargetableObjects (DAT_00674b70), FUN_004f1da0
 #include "Common/input_manager.h"      // MouseIsArrowCursor (FUN_0041ddb0)
+#include "Common/Audio/sound_config.h" // EClientAudioMode
 #include "Space/Effects/jump_effect.h"        // FJumpShipEffect::ShakeAmplitude (FUN_00503e20)
 #include "Interface/menu_keymap_config.h" // (Un)RegisterAcceleratorGroup, KeyMapIsCommandHeld (FUN_005784a0)
 #include "NeuroNet/nn_modal.h"          // G_bNnScreenUp (DAT_0067dcc8)
@@ -305,7 +306,7 @@ CEqObj* GameCameraShipOf(IObjRW* Object)
     if (Base == nullptr)
         return nullptr;
     CEqObj* const EqObj = static_cast<CEqObj*>(Base->Object);
-    if (EqObj == nullptr || (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) != 0x503u)
+    if (EqObj == nullptr || (static_cast<unsigned>(EqObj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return nullptr;
     return EqObj;
 }
@@ -348,7 +349,7 @@ void HudCameraAttach(FHudCamera* Cam, void* Object)
     if (Target != Watched.target())
         Watched.set(Target);
 
-    // The HUD is retargeted to the IObjRW when it is a client ship (ManagerKind == 1), otherwise
+    // The HUD is retargeted to the IObjRW when it is a client ship (ManagerKind == EClientGameobjKind::Ship), otherwise
     // null. `watched - 8 == 0` also reads as null.
     IObjRW* HudTarget = nullptr;
     const unsigned char* const Held = reinterpret_cast<const unsigned char*>(Watched.target());
@@ -356,7 +357,7 @@ void HudCameraAttach(FHudCamera* Cam, void* Object)
     {
         IObjRW* const Object8 =
             reinterpret_cast<IObjRW*>(const_cast<unsigned char*>(Held - kWatchableOffset));
-        if (Object8 != nullptr && static_cast<FClientGameobj*>(Object8)->ManagerKind == 1)
+        if (Object8 != nullptr && static_cast<FClientGameobj*>(Object8)->ManagerKind == EClientGameobjKind::Ship)
             HudTarget = Object8;
     }
     HudElementListSetTarget(HudTarget);
@@ -450,28 +451,28 @@ bool HudCameraOnEvent(FHudCamera* Cam, unsigned MsgId)
 
     switch (MsgId)
     {
-    case 0x5c:
+    case USER_RADIO:
         Record.Op = static_cast<int>(MsgId);
         break;
-    case 0x2a:
+    case USER_X_ROTATE:
         G_HudKeySteerPosX = (HudCommandRecord()->bKeyDown != 0) ? 1.0f : 0.0f;
         break;
-    case 0x2b:
+    case USER_X_UNROTATE:
         G_HudKeySteerNegX = (HudCommandRecord()->bKeyDown != 0) ? -1.0f : 0.0f;
         break;
-    case 0x2c:
+    case USER_Y_ROTATE:
         G_HudKeySteerPosY = (HudCommandRecord()->bKeyDown != 0) ? 1.0f : 0.0f;
         break;
-    case 0x2d:
+    case USER_Y_UNROTATE:
         G_HudKeySteerNegY = (HudCommandRecord()->bKeyDown != 0) ? -1.0f : 0.0f;
         break;
-    case 0x2e:
+    case USER_Z_ROTATE:
         G_HudKeySteerPosZ = (HudCommandRecord()->bKeyDown != 0) ? 1.0f : 0.0f;
         break;
-    case 0x2f:
+    case USER_Z_UNROTATE:
         G_HudKeySteerNegZ = (HudCommandRecord()->bKeyDown != 0) ? -1.0f : 0.0f;
         break;
-    case 0xc7:
+    case USER_FIRE_WEAPONS:
         // Ignored while the arrow cursor is up.
         if (!MouseIsArrowCursor())
         {
@@ -479,7 +480,7 @@ bool HudCameraOnEvent(FHudCamera* Cam, unsigned MsgId)
             G_HudFireChanged = 1;
         }
         break;
-    case 0xc8:
+    case USER_TURN_SHIP:
         ToggleMouseFlightLock();
         break;
     default:
@@ -499,7 +500,7 @@ bool HudCameraOnEvent(FHudCamera* Cam, unsigned MsgId)
     {
         FClientGameobj* const Object = reinterpret_cast<FClientGameobj*>(
             const_cast<unsigned char*>(Held - kWatchableOffset));
-        if (Object != nullptr && Object->ManagerKind == 1)
+        if (Object != nullptr && Object->ManagerKind == EClientGameobjKind::Ship)
             Ship = Object;
     }
 
@@ -569,7 +570,7 @@ namespace
                     CObject const* const Obj = Entry->cobject();
                     CSolar const* Solar = nullptr;
                     if (Obj != nullptr &&
-                        (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+                        (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                         Solar = static_cast<CSolar const*>(Obj);
                     const unsigned char Visit = Solar->GetVisitValue();
 
@@ -639,7 +640,7 @@ namespace
         // the .data default.
         CEqObj* const PlayerShip = GameCameraShipOf(Player);
         float RadarRange = kDefaultRadarRange;
-        CEquip* const Scanner = PlayerShip->EquipManager.FindFirst(0x80000);
+        CEquip* const Scanner = PlayerShip->EquipManager.FindFirst(EquipTypeScanner);
         if (Scanner != nullptr)
             RadarRange = static_cast<CEScanner*>(Scanner)->GetRadarRange();
 
@@ -968,7 +969,7 @@ void HudCameraUpdateShake(FHudCamera* Cam)
 
     // In a jump with a jump effect: the effect's amplitude unless the current one is strictly
     // greater (NaN takes the effect's).
-    if (Ship->JumpState != 0 && Ship->JumpEffect != nullptr)
+    if (Ship->JumpState != kJumpStateNone && Ship->JumpEffect != nullptr)
     {
         double const Jump = static_cast<FJumpShipEffect*>(Ship->JumpEffect)->ShakeAmplitude();
         if (!(static_cast<double>(G_CameraShakeAmount) > Jump))
@@ -1150,7 +1151,7 @@ void FGameCamera::ScaleEnvironmentEffects()
 
 int FGameCamera::GetSoundMode()
 {
-    return 1;
+    return kClientAudioModeSpace;
 }
 
 char const* FHudCamera::GetName()
@@ -1205,7 +1206,7 @@ void FHudCamera::DrawScene(unsigned LayerFlags, unsigned Param2)
 
 int FHudCamera::GetSoundMode()
 {
-    return 2;
+    return kClientAudioModeHud;
 }
 
 bool FHudCamera::OnEvent(unsigned MsgId)

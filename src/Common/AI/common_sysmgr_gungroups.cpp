@@ -434,7 +434,7 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
             // Retail does not null-test the CEqObj before reading its EquipManager (+0xE4).
             CObject const* const OwnerCObj = OwnShip()->cobject();
             CEqObj* OwnerEq = nullptr;
-            if (OwnerCObj != nullptr && ((unsigned)OwnerCObj->ObjectClass & 0x103) == 0x103)
+            if (OwnerCObj != nullptr && ((unsigned)OwnerCObj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
                 OwnerEq = (CEqObj*)OwnerCObj;
             CELauncher* const Launcher = CELauncher::cast(OwnerEq->EquipManager.FindByID(Slot.HardpointId));
             if (Launcher == nullptr)
@@ -451,7 +451,7 @@ void SystemManagerGunGroupManager::ScanAutoTurretTargets(float Dt)
             // A ship-class candidate whose behavior manager was created with content creation
             // type 2 is skipped unless bSelfMayEngage.
             CObject const* const ElemCObj = Elem->Iface->cobject();
-            if (ElemCObj != nullptr && ((unsigned)ElemCObj->ObjectClass & 0x503) == 0x503)
+            if (ElemCObj != nullptr && ((unsigned)ElemCObj->ObjectClass & CObject::ClassShip) == CObject::ClassShip)
             {
                 IBehaviorManager* const ElemMgr = ((CEqObj*)ElemCObj)->get_behavior_interface();
                 if (ElemMgr != nullptr && ElemMgr->ContentCbCreationType == 2 && !bSelfMayEngage)

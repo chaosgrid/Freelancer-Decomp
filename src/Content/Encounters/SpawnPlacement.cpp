@@ -170,7 +170,7 @@ namespace
         unsigned int const SystemId = System->SystemId;
         unsigned int Ids[0x40];
         unsigned int Count;
-        pub::System::ScanObjects(SystemId, Ids, 0x40, *Position, 300.0f, 0x7f0000, Count);
+        pub::System::ScanObjects(SystemId, Ids, 0x40, *Position, 300.0f, OBJ_SHIP_MASK, Count);
         for (unsigned int Index = 0; Index < Count; ++Index)
         {
             float Radius;
@@ -347,8 +347,8 @@ namespace
                     unsigned int const SystemId = System->SystemId;
                     unsigned int Ids[0x20];
                     unsigned int Count;
-                    pub::System::ScanObjects(SystemId, Ids, 0x20, *OutPosition, 200.0f, 0x7ffdff,
-                                             Count);
+                    pub::System::ScanObjects(SystemId, Ids, 0x20, *OutPosition, 200.0f,
+                                             OBJ_SHIP_MASK | OBJ_SOLAR_NO_WAYPOINT_MASK, Count);
                     if (Count != 0)
                         continue;
                 }
@@ -460,8 +460,8 @@ namespace
                         unsigned int const SystemId = System->SystemId;
                         unsigned int Ids[0x20];
                         unsigned int Count;
-                        pub::System::ScanObjects(SystemId, Ids, 0x20, *OutFrom, 200.0f, 0x7ffdff,
-                                                 Count);
+                        pub::System::ScanObjects(SystemId, Ids, 0x20, *OutFrom, 200.0f,
+                                                 OBJ_SHIP_MASK | OBJ_SOLAR_NO_WAYPOINT_MASK, Count);
                         if (Count != 0)
                             bScanClear = false;
                     }
@@ -894,13 +894,13 @@ namespace
             return false;
 
         unsigned char const* Method = Methods->data();
-        unsigned int Mask = (Method[ARRIVAL_OBJECT_STATION] != 0 ? 0x100u : 0u) |
-                            (Method[ARRIVAL_OBJECT_CAPITAL] != 0 ? 0x200000u : 0u) |
-                            (Method[ARRIVAL_OBJECT_JUMP_GATE] != 0 ? 0x40u : 0u) |
-                            (Method[ARRIVAL_OBJECT_DOCKING_RING] != 0 ? 0x20u : 0u);
+        unsigned int Mask = (Method[ARRIVAL_OBJECT_STATION] != 0 ? OBJ_STATION : 0u) |
+                            (Method[ARRIVAL_OBJECT_CAPITAL] != 0 ? OBJ_CAPITAL : 0u) |
+                            (Method[ARRIVAL_OBJECT_JUMP_GATE] != 0 ? OBJ_JUMP_GATE : 0u) |
+                            (Method[ARRIVAL_OBJECT_DOCKING_RING] != 0 ? OBJ_DOCKING_RING : 0u);
         FContentNpcShipParams const& Block = Blocks->front();
-        if (Request->bArrival)
-            Mask &= 0xfffff39fu;
+        if (Request->bArrival)   // & 0xfffff39f
+            Mask &= ~(OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE);
 
         bool bTry = true;
         bool bNear = false;
@@ -924,7 +924,7 @@ namespace
                 bNear = true;
             }
         }
-        else if (Request->bArrival || (Mask & 0xc40) == 0)
+        else if (Request->bArrival || (Mask & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
         {
             bTry = false;
         }
@@ -945,7 +945,7 @@ namespace
                                                       &Plan->DockTarget,
                                                       &Request->Placement.Position, Range,
                                                       &Mask);                       // FUN_06f724f0
-            if ((Plan->DockTarget & 0x3fffffff) == 0)
+            if ((Plan->DockTarget & GIdValueMask) == 0)
                 continue;
             Vector Position;
             Matrix Orientation;
@@ -1375,7 +1375,8 @@ namespace
                                       unsigned int const* ExcludeId, Vector const* Position,
                                       float Range)
     {
-        unsigned int const Mask = 0x600d60;
+        unsigned int const Mask = OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_STATION | OBJ_AIRLOCK_GATE |
+                                  OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING;     // 0x600d60
         unsigned int const Affiliation = Leader->ReputationHandle->GetAffiliation();
         return System->PickDockTarget(&Leader->ClassIds, &GNoShipRep, &Affiliation, ExcludeId,
                                       Position, Range, &Mask);                  // FUN_06f724f0

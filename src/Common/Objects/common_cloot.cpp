@@ -94,7 +94,7 @@ void CLoot::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     {
         char const* const ContentsName = ContentsArch->Nickname.get_string();
         char const* const ContainerName = container_arch()->Nickname.get_string();
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: CLoot::init_physics() failed for %s (containing %s). Verify 'DA_archeytpe' data! NOT ignorable.",
               "E:\\FL\\Scratch\\Source\\Common\\CLoot.cpp", 0x53, ContainerName, ContentsName);
         return;

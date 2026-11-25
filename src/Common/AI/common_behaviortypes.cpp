@@ -143,27 +143,27 @@ static_assert(sizeof(TBehaviorTypeDesc<NullBehavior>) == sizeof(BehaviorTypeDesc
               "a typed descriptor must stay the same 0x2C object retail's initialisers build");
 
 // Retail id order; each line's comment is its static initialiser.
-static TBehaviorTypeDesc<NullBehavior>             GDescNull(0, "NULL");                      // 062d0bb0
-static TBehaviorTypeDesc<BuzzBehavior>             GDescBuzz(1, "Buzz");                      // 062d0c30
-static TBehaviorTypeDesc<GotoBehavior>             GDescGoto(2, "Goto");                      // 062d0cb0
-static TBehaviorTypeDesc<TrailBehavior>            GDescTrail(3, "Trail");                    // 062d0d30
-static TBehaviorTypeDesc<FleeBehavior>             GDescFlee(4, "Flee");                      // 062d0db0
-static TBehaviorTypeDesc<EvadeBehavior>            GDescEvade(5, "Evade");                    // 062d0e30
-static TBehaviorTypeDesc<IdleBehavior>             GDescIdle(6, "Idle");                      // 062d0eb0
-static TBehaviorTypeDesc<DockBehavior>             GDescDock(7, "Dock");                      // 062d0f30
-static TBehaviorTypeDesc<LaunchBehavior>           GDescLaunch(8, "Launch");                  // 062d0fb0
-static TBehaviorTypeDesc<InstantTradeLaneBehavior> GDescItl(9, "InstantTradeLane");           // 062d1030
-static TBehaviorTypeDesc<FormationBehavior>        GDescFormation(10, "Formation");           // 062d10b0
-static TBehaviorTypeDesc<LargeShipBehavior>        GDescLargeShip(11, "Large Ship (move)");   // 062d1130
-static TBehaviorTypeDesc<CruiseBehavior>           GDescCruise(12, "Cruise");                 // 062d11b0
-static TBehaviorTypeDesc<StrafeBehavior>           GDescStrafe(13, "Strafe");                 // 062d1230
-static TBehaviorTypeDesc<GuideBehavior>            GDescGuide(14, "Guide");                   // 062d12b0
-static TBehaviorTypeDesc<FaceBehavior>             GDescFace(15, "Face");                     // 062d1330
-static TBehaviorTypeDesc<LootBehavior>             GDescLoot(16, "Loot");                     // 062d13b0
-static TBehaviorTypeDesc<FollowBehavior>           GDescFollow(17, "Follow");                 // 062d1430
-static TBehaviorTypeDesc<DrasticEvadeBehavior>     GDescDrasticEvade(18, "DrasticEvade");     // 062d14b0
-static TBehaviorTypeDesc<FreeFlightBehavior>       GDescFreeFlight(19, "FreeFlight");         // 062d1530
-static TBehaviorTypeDesc<DelayBehavior>            GDescDelay(20, "Delay");                   // 062d15b0
+static TBehaviorTypeDesc<NullBehavior>             GDescNull(BEHAVIOR_NULL, "NULL");                          // 062d0bb0
+static TBehaviorTypeDesc<BuzzBehavior>             GDescBuzz(BEHAVIOR_BUZZ, "Buzz");                          // 062d0c30
+static TBehaviorTypeDesc<GotoBehavior>             GDescGoto(BEHAVIOR_GOTO, "Goto");                          // 062d0cb0
+static TBehaviorTypeDesc<TrailBehavior>            GDescTrail(BEHAVIOR_TRAIL, "Trail");                       // 062d0d30
+static TBehaviorTypeDesc<FleeBehavior>             GDescFlee(BEHAVIOR_FLEE, "Flee");                          // 062d0db0
+static TBehaviorTypeDesc<EvadeBehavior>            GDescEvade(BEHAVIOR_EVADE, "Evade");                       // 062d0e30
+static TBehaviorTypeDesc<IdleBehavior>             GDescIdle(BEHAVIOR_IDLE, "Idle");                          // 062d0eb0
+static TBehaviorTypeDesc<DockBehavior>             GDescDock(BEHAVIOR_DOCK, "Dock");                          // 062d0f30
+static TBehaviorTypeDesc<LaunchBehavior>           GDescLaunch(BEHAVIOR_LAUNCH, "Launch");                    // 062d0fb0
+static TBehaviorTypeDesc<InstantTradeLaneBehavior> GDescItl(BEHAVIOR_INSTANT_TRADE_LANE, "InstantTradeLane"); // 062d1030
+static TBehaviorTypeDesc<FormationBehavior>        GDescFormation(BEHAVIOR_FORMATION, "Formation");           // 062d10b0
+static TBehaviorTypeDesc<LargeShipBehavior>        GDescLargeShip(BEHAVIOR_LARGE_SHIP, "Large Ship (move)");  // 062d1130
+static TBehaviorTypeDesc<CruiseBehavior>           GDescCruise(BEHAVIOR_CRUISE, "Cruise");                    // 062d11b0
+static TBehaviorTypeDesc<StrafeBehavior>           GDescStrafe(BEHAVIOR_STRAFE, "Strafe");                    // 062d1230
+static TBehaviorTypeDesc<GuideBehavior>            GDescGuide(BEHAVIOR_GUIDE, "Guide");                       // 062d12b0
+static TBehaviorTypeDesc<FaceBehavior>             GDescFace(BEHAVIOR_FACE, "Face");                          // 062d1330
+static TBehaviorTypeDesc<LootBehavior>             GDescLoot(BEHAVIOR_LOOT, "Loot");                          // 062d13b0
+static TBehaviorTypeDesc<FollowBehavior>           GDescFollow(BEHAVIOR_FOLLOW, "Follow");                    // 062d1430
+static TBehaviorTypeDesc<DrasticEvadeBehavior>     GDescDrasticEvade(BEHAVIOR_DRASTIC_EVADE, "DrasticEvade"); // 062d14b0
+static TBehaviorTypeDesc<FreeFlightBehavior>       GDescFreeFlight(BEHAVIOR_FREE_FLIGHT, "FreeFlight");       // 062d1530
+static TBehaviorTypeDesc<DelayBehavior>            GDescDelay(BEHAVIOR_DELAY, "Delay");                       // 062d15b0
 
 // DACOM.DLL!stricmp (Common IAT 0639902c), common_dacom_stricmp.cpp.
 int CallDacomStricmp(const char* Left, const char* Right);

@@ -223,7 +223,7 @@ namespace
     {
         if (!IdIsValid(Record.NicknameId))
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: Failed to insert system \"%s\" into system DB due to invalid ID.\n",
                   kSystemsSource, 0xb39, Record.Nickname);
         }
@@ -236,7 +236,7 @@ namespace
             }
             if (!bInserted)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kSystemsSource, 0xb34,
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kSystemsSource, 0xb34,
                       "Failed to insert new system into system DB due to ID collision.\n");
             }
         }
@@ -263,7 +263,7 @@ namespace
             }
             if (!bListed)
             {
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: System \"%s\" has no msg_id_prefix information, which it "
                       "will need to be referred to by space GCS - See TAYBRO",
                       kSystemsSource, 0xb49, Name);
@@ -291,7 +291,7 @@ namespace
 
         if (Text == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: invalid ZoneShape \'%s\'\n", kSystemsSource,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: invalid ZoneShape \'%s\'\n", kSystemsSource,
                   0x24c, "");
             return Universe::ZoneShapeInvalid;
         }
@@ -303,7 +303,7 @@ namespace
                 return kShapes[Index].Value;
         }
 
-        FDUMP(0x100002, "%s(%d) : *** WARNING: invalid ZoneShape \'%s\'\n", kSystemsSource, 0x24c,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: invalid ZoneShape \'%s\'\n", kSystemsSource, 0x24c,
               Text);
         return Universe::ZoneShapeInvalid;
     }
@@ -412,7 +412,7 @@ namespace
                     char const* const FileName = Reader.get_file_name();
                     ID_String ZoneId;
                     ZoneId.Id = Record->NicknameId;
-                    FDUMP(0x100001,
+                    FDUMP(kFdumpError,
                           "%s(%d) : *** ERROR: drag modifier should be >= 1.0  in zone (%s) in file (%s)",
                           kSystemsSource, 0x9cd, ZoneId.get_string(), FileName);
                 }
@@ -506,7 +506,7 @@ namespace
         unsigned NicknameId = CreateID(Nickname);
         if (GBases.find(NicknameId) == GBases.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_base(%s) failed.\n", kSystemsSource, 0xbff,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_base(%s) failed.\n", kSystemsSource, 0xbff,
                   Nickname);
             return 0;
         }
@@ -516,11 +516,11 @@ namespace
     unsigned SolarGateTypeFromObjectType(unsigned ObjectType)
     {
         // Inlined at 06338131.
-        if ((ObjectType & 0x40) != 0)
+        if ((ObjectType & OBJ_JUMP_GATE) != 0)
             return Universe::SolarGateJumpGate;
-        if ((ObjectType & 0x800) != 0)
+        if ((ObjectType & OBJ_JUMP_HOLE) != 0)
             return Universe::SolarGateJumpHole;
-        if ((ObjectType & 0x400) != 0)
+        if ((ObjectType & OBJ_AIRLOCK_GATE) != 0)
             return Universe::SolarGateAirlock;
         return Universe::SolarGateNone;
     }
@@ -744,7 +744,7 @@ namespace
         std::map<unsigned, BASE>::iterator Found = GBases.find(BaseId);
         if (Found == GBases.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_base(%#X) failed.\n", kSystemsSource, 0xbf3,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_base(%#X) failed.\n", kSystemsSource, 0xbf3,
                   BaseId);
             return;
         }
@@ -908,7 +908,7 @@ namespace
     {
         if (!IdIsValid(Record.NicknameId))
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: Failed to insert base \"%s\" into system DB due to invalid ID.\n",
                   kSystemsSource, 0xbc0, Record.Nickname);
             return;
@@ -921,7 +921,7 @@ namespace
         }
         if (!bInserted)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kSystemsSource, 0xbbb,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kSystemsSource, 0xbbb,
                   "Failed to insert new base into system DB due to ID collision.\n");
         }
     }
@@ -1036,7 +1036,7 @@ namespace Universe
             unsigned SystemCount = LoadUniverseIni(FullPath);
             if (SystemCount == 0)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: could not create universe '%s'\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: could not create universe '%s'\n",
                       kSystemsSource, 0xc2d, FullPath);
             }
         }
@@ -1067,7 +1067,7 @@ namespace Universe
         unsigned NicknameId = CreateID(Nickname);
         if (GSystems.find(NicknameId) == GSystems.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_system(%s) failed.\n", kSystemsSource, 0xbe4,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_system(%s) failed.\n", kSystemsSource, 0xbe4,
                   Nickname);
             return 0;
         }
@@ -1082,7 +1082,7 @@ namespace Universe
         std::map<unsigned, SYSTEM>::iterator Found = GSystems.find(NicknameId);
         if (Found == GSystems.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_system(%#X) failed.\n", kSystemsSource, 0xbd8,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_system(%#X) failed.\n", kSystemsSource, 0xbd8,
                   NicknameId);
             return nullptr;
         }
@@ -1133,7 +1133,7 @@ namespace Universe
         unsigned NicknameId = CreateID(Nickname);
         if (GBases.find(NicknameId) == GBases.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_base(%s) failed.\n", kSystemsSource, 0xbff,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_base(%s) failed.\n", kSystemsSource, 0xbff,
                   Nickname);
             return 0;
         }
@@ -1148,7 +1148,7 @@ namespace Universe
         std::map<unsigned, BASE>::iterator Found = GBases.find(NicknameId);
         if (Found == GBases.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_base(%#X) failed.\n", kSystemsSource, 0xbf3,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_base(%#X) failed.\n", kSystemsSource, 0xbf3,
                   NicknameId);
             return nullptr;
         }
@@ -1181,7 +1181,7 @@ namespace Universe
         std::map<unsigned, ZONE>::iterator Found = GZones.find(NicknameId);
         if (Found == GZones.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_zone(%d) failed", kSystemsSource, 0xc8e,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_zone(%d) failed", kSystemsSource, 0xc8e,
                   NicknameId);
             return nullptr;
         }
@@ -1197,7 +1197,7 @@ namespace Universe
         std::map<unsigned, ZONE>::iterator Found = GZones.find(NicknameId);
         if (Found == GZones.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_zone(%s) failed", kSystemsSource, 0xc9c,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_zone(%s) failed", kSystemsSource, 0xc9c,
                   Name);
             return nullptr;
         }
@@ -1212,7 +1212,7 @@ namespace Universe
         std::map<unsigned, ZONE>::iterator Found = GZones.find(NicknameId);
         if (Found == GZones.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_non_const_zone(%s) failed", kSystemsSource,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_non_const_zone(%s) failed", kSystemsSource,
                   0xcaa, Name);
             return nullptr;
         }
@@ -1225,7 +1225,7 @@ namespace Universe
         std::map<unsigned, ZONE>::iterator Found = GZones.find(NicknameId);
         if (Found == GZones.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_non_const_zone(%d) failed", kSystemsSource,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_non_const_zone(%d) failed", kSystemsSource,
                   0xcb7, NicknameId);
             return nullptr;
         }
@@ -1276,7 +1276,7 @@ namespace Universe
         std::map<unsigned, unsigned>::iterator Found = GGateSystems.find(NicknameId);
         if (Found == GGateSystems.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: get_gate_system(%d) failed", kSystemsSource,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: get_gate_system(%d) failed", kSystemsSource,
                   0xd15, NicknameId);
             return 0;
         }

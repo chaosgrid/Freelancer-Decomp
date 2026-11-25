@@ -177,9 +177,9 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
 
     // No null test on the title.
     if (SinglePlayer())
-        Title->SetProperty(0x1e, 0x71c, 0);
+        Title->SetProperty(kTextPropSetIds, 0x71c, 0);
     else
-        Title->SetProperty(0x1e, 0x724, 0);
+        Title->SetProperty(kTextPropSetIds, 0x724, 0);
 
     // Each row's caption and tooltip by its action.
     for (int Index = 0; Index < Count; ++Index)
@@ -197,8 +197,8 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
         case 7: CaptionIds = 0x725; ToolTipIds = 0x340; break;
         default: continue;
         }
-        ButtonText[Index]->SetProperty(0x1e, CaptionIds, 0);
-        ButtonBox[Index]->SetProperty(3, ToolTipIds, 0);
+        ButtonText[Index]->SetProperty(kTextPropSetIds, CaptionIds, 0);
+        ButtonBox[Index]->SetProperty(kWinPropToolTip, ToolTipIds, 0);
     }
 
     DrawLayer = 0x64;
@@ -206,9 +206,9 @@ bool NnPause::Create(Win3D* NewParent, void* Data)
     // FUN_004a7670's body, inlined in retail.
     bCursorDrawFlag = NnModalPauseGame();
     HudPushInputFocus(AsHudCmdHandler()); // FUN_00577b40
-    RegisterEvent(0x11);
-    RegisterEvent(0xf);
-    RegisterEvent(0x14);
+    RegisterEvent(USER_ENTER);
+    RegisterEvent(USER_CANCEL);
+    RegisterEvent(USER_PAUSE);
 
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
@@ -234,8 +234,8 @@ void NnPause::Draw()
 bool NnPause::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_004a70a0 (RET 0xc): NN_Confirm's answer (0x3006) goes on to slot 42.
-    if (Msg == 0x3006)
-        SetProperty(0x3006, A, B);
+    if (Msg == kWinMsgConfirmAnswer)
+        SetProperty(kWinMsgConfirmAnswer, A, B);
     return false;
 }
 
@@ -243,7 +243,7 @@ intptr_t NnPause::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_004a7130 (RET 0xc). Nothing reaches WinControl's switch: every path returns 0 here.
     (void)B;
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         int Index = 0;
         while (Index < 5)
@@ -258,17 +258,17 @@ intptr_t NnPause::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         DoAction(ButtonAction[Index]);
         return 0;
     }
-    if (Msg == 0x42)
+    if (Msg == kWinPropPlaceAtOffset)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
         SetPosition(Position);
         return 0;
     }
-    if (Msg == 0x3006 && A == 1)
+    if (Msg == kWinMsgConfirmAnswer && A == 1)
     {
         // NN_Confirm said yes: USER_EXIT_GAME (0xc5); the window goes at the next Update.
-        HudPostCommand(0xc5, 0);
+        HudPostCommand(USER_EXIT_GAME, 0);
         NnModalResumeGame(bCursorDrawFlag);
         ReleaseMouse();
         bClosePending = 1;
@@ -280,7 +280,7 @@ intptr_t NnPause::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool NnPause::OnEvent(unsigned MsgId)
 {
     // LAB_004a7070 (RET 4).
-    if (MsgId == 0xf || MsgId == 0x11 || MsgId == 0x14)
+    if (MsgId == USER_CANCEL || MsgId == USER_ENTER || MsgId == USER_PAUSE)
     {
         DoAction(1);
         return true;
@@ -333,7 +333,7 @@ void NnPause::DoAction(int Action)
         return;
     case 6:
         MenuNavSetIntroModeRequest(2); // DAT_0067c200
-        HudPostCommand(0xc5, 0);
+        HudPostCommand(USER_EXIT_GAME, 0);
         ResumeAndDelete();
         return;
     case 7:
@@ -373,6 +373,6 @@ void NnPauseOpen()
         return;
     NnPause* const Pause = static_cast<NnPause*>(Created);
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Pause->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+    Pause->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
     Pause->CaptureMouse();
 }

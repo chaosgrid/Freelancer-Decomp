@@ -127,7 +127,7 @@ void FContentPlayerShip::OnTargetChanged(unsigned int const* NewTargetId)
     pub::SpaceObj::GetType(*NewTargetId, Type);
 
     FContentPlayerState* Owner = FindContentPlayerStateByShip(&SpaceObjId);
-    if (Owner == nullptr || (Type & 0x80000) == 0)
+    if (Owner == nullptr || (Type & OBJ_CRUISER) == 0)
         return;
 
     // The hole and its jump target, each once, into holes_visited.
@@ -208,7 +208,7 @@ void FContentPlayerState::OnSystemChange(unsigned int SystemId)
         ShipObject->SetSystem(SystemRecord);                                  // FUN_06eb7090
     }
 
-    if ((SystemId & 0x3fffffffu) == 0)
+    if ((SystemId & GIdValueMask) == 0)
         return;
 
     pub::GetSystemID(GFp7SystemId, "FP7_system");
@@ -222,7 +222,7 @@ void FContentPlayerState::OnSystemChange(unsigned int SystemId)
 void FContentPlayerState::OnBaseChange(unsigned int BaseId)
 {
     BaseRecord = FindContentBaseInfo(&BaseId);
-    if ((BaseId & 0x3fffffffu) == 0)
+    if ((BaseId & GIdValueMask) == 0)
         return;
 
     AppendUnique(Stats.BasesVisited, BaseId);

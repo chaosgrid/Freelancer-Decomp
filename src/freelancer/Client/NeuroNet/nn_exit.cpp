@@ -103,18 +103,18 @@ bool NnExit::Create(Win3D* NewParent, void* Data)
     }
 
     // No null test on the three captions.
-    ExitText->SetProperty(0x1e, 0x726, 0);
-    ButtonText[0]->SetProperty(0x1e, 0x727, 0);
-    ButtonText[1]->SetProperty(0x1e, 0x728, 0);
+    ExitText->SetProperty(kTextPropSetIds, 0x726, 0);
+    ButtonText[0]->SetProperty(kTextPropSetIds, 0x727, 0);
+    ButtonText[1]->SetProperty(kTextPropSetIds, 0x728, 0);
 
     DrawLayer = 0x6e;
     DrawSubLayer = 6;
     bCursorDrawFlag = NnModalPauseGame();
     HudPushInputFocus(AsHudCmdHandler());
-    RegisterEvent(0x13);
-    RegisterEvent(0x12);
-    RegisterEvent(0xf);
-    RegisterEvent(0x11);
+    RegisterEvent(USER_YES);
+    RegisterEvent(USER_NO);
+    RegisterEvent(USER_CANCEL);
+    RegisterEvent(USER_ENTER);
 
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
@@ -159,7 +159,7 @@ intptr_t NnExit::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_00471cb0. Nothing reaches WinControl's switch: every path returns 0 here.
     (void)B;
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         int Index = 0;
         while (Index < 2)
@@ -180,7 +180,7 @@ intptr_t NnExit::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Close(1);
         return 0;
     }
-    if (Msg == 0x42)
+    if (Msg == kWinPropPlaceAtOffset)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
@@ -195,12 +195,12 @@ bool NnExit::OnEvent(unsigned MsgId)
     // LAB_00471b90.
     switch (MsgId)
     {
-    case 0xf:
-    case 0x12:
+    case USER_CANCEL:
+    case USER_NO:
         Close(1);
         return true;
-    case 0x11:
-    case 0x13:
+    case USER_ENTER:
+    case USER_YES:
         Close(0);
         DestroyWindow(g_client.window);
         return true;
@@ -228,7 +228,7 @@ void NnExitOpen(bool bImmediate)
         return;
     NnExit* const Exit = static_cast<NnExit*>(Created);
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Exit->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+    Exit->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
     Exit->bImmediate = bImmediate ? 1 : 0;
     Exit->CaptureMouse();
 }

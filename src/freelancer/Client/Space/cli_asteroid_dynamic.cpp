@@ -215,7 +215,7 @@ void FCliDynamicAsteroidGameobj::Explode(Vector const* Pos)
         return;
     if (ExplosionArch->Process != 2)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x84c,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x84c,
               "Explosion process for dynamic asteroid should be set to NONE");
         return;
     }
@@ -336,7 +336,7 @@ FCliDynamicAsteroid* CliDynamicAsteroidConstruct(FCliDynamicAsteroid* This,
     This->Mesh = nullptr;
     if (This->CmnField == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kCliAsteroidSourceFile, 0x8ab,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kCliAsteroidSourceFile, 0x8ab,
               "NULL common field passed to dynamic asteroid manager");
     }
     return This;
@@ -397,7 +397,7 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
                 This->Arch = Archetype::GetDynamicAsteroid(Archetype::GetDynamicAsteroidID(Id));
                 if (This->Arch == nullptr)
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: dynamic asteroid archetype (%s) not found",
                           kCliAsteroidSourceFile, 0x8cb, Name);
                 }
@@ -522,7 +522,7 @@ FCliDynamicAsteroidGameobj* CliDynamicAsteroidSpawn(FCliDynamicAsteroid* This)
     CObject* const Obj = Go->GetObject();
     CDynamicAsteroid* const Dynamic =
         (Obj != nullptr &&
-         (static_cast<unsigned>(Obj->ObjectClass) & 0x4001u) == 0x4001u)
+         (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassDynamicAsteroid) == CObject::ClassDynamicAsteroid)
             ? static_cast<CDynamicAsteroid*>(Obj)
             : nullptr;
     CDynamicAsteroid::CreateParms Parms;
@@ -597,7 +597,7 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
         static_cast<FClientGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
     CObject* const PlayerObj = (PlayerGo != nullptr) ? PlayerGo->GetObject() : nullptr;
     if (PlayerObj != nullptr &&
-        (static_cast<unsigned>(PlayerObj->ObjectClass) & 0x503u) == 0x503u &&
+        (static_cast<unsigned>(PlayerObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip &&
         static_cast<CShip*>(PlayerObj)->is_using_tradelane())
     {
         This->bSpawnAllowed = 0;
@@ -673,12 +673,12 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
             This->SlotPtrs[Index] = CliDynamicAsteroidSpawn(This);
         if (This->SlotPtrs[Index] == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x986,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x986,
                   "dynamic asteroid not created");
         }
         if (This->SlotPtrs[Index]->bPlaced != 0)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x988,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x988,
                   "dynamic asteroid should be flagged as !valid_pos");
         }
 
@@ -713,7 +713,7 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
             bLive = true;
         if (bLive)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x87c,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x87c,
                   "dynamic asteroid effect already created");
             CliEffectListRemove(&Go->EffectList, Go->Companion);
         }
@@ -775,7 +775,7 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
     if (VbMgr->LockVertexMemory(static_cast<unsigned int>(This->MeshDesc.SrcFvf),
                                 static_cast<unsigned int>(This->MeshDesc.SrcCount), &Lock) < 0)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x9bd,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x9bd,
               "could not lock the vertex buffer for dynamic asteroids");
         return;
     }

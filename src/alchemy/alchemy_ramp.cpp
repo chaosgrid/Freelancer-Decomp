@@ -282,7 +282,7 @@ namespace AlchemyImpl
     // {"1.11_IDAComponent", 0}.
     GENRESULT DACOM_API FRampSingle::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, Iids::RampSingle) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::RampSingle) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IRampSingle*>(this);
@@ -499,7 +499,7 @@ namespace AlchemyImpl
     // {"1.11_IDAComponent", 0}.
     GENRESULT DACOM_API FRampColor::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, Iids::RampColor) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::RampColor) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IRampColor*>(this);
@@ -771,7 +771,7 @@ namespace AlchemyImpl
     template <typename TTraits>
     GENRESULT DACOM_API TNestedSingleRamp<TTraits>::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, TTraits::Iid()) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, TTraits::Iid()) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<typename TTraits::FInterface*>(this);
@@ -1061,7 +1061,7 @@ namespace AlchemyImpl
     // 0620ae40: "1.11_IRampColorRamp", then "1.11_IDAComponent".
     GENRESULT DACOM_API FRampColorRamp::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, Iids::RampColorRamp) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::RampColorRamp) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IRampColorRamp*>(this);
@@ -1454,7 +1454,7 @@ namespace AlchemyImpl
     // 0620ab50: {"1.11_IAnimatedSingle", "1.11_IDAComponent"}.
     GENRESULT DACOM_API FFxAnimatedSingle::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, Iids::AnimatedSingle) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::AnimatedSingle) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IFxAnimatedSingle*>(this);
@@ -1976,7 +1976,7 @@ namespace AlchemyImpl
     // 0620b910: the QI table walk over {"1.11_IAnimatedTransform", "1.11_IDAComponent"}.
     GENRESULT DACOM_API FFxAnimatedTransform::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, Iids::AnimatedTransform) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::AnimatedTransform) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IAnimatedTransform*>(this);

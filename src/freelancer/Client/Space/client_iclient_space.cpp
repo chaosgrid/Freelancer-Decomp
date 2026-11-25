@@ -339,7 +339,7 @@ namespace
         Go->create(Arch);
         Arch->Release();
 
-        CSolar* const Solar = static_cast<CSolar*>(NarrowGameobj(Go, 0x303));
+        CSolar* const Solar = static_cast<CSolar*>(NarrowGameobj(Go, CObject::ClassSolar));
 
         // FUN_004f4930 (the CEqObj part), then the CSolar tail.
         CSolar::CreateParms Parms;
@@ -408,7 +408,7 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
     {
         if (!Go->find(Info.ObjId))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: SolarCreate - CObject %d not found.",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: SolarCreate - CObject %d not found.",
                   kIClientSCpp, 0x67, Info.ObjId);
             delete Go;
             return;
@@ -420,7 +420,7 @@ void IClientImpl::SendServerCreateSolar(unsigned int /*ClientId*/, const CSolarC
     }
 
     // No null test on the narrowed object.
-    CObject* const Obj = NarrowGameobj(Go, 0x303);
+    CObject* const Obj = NarrowGameobj(Go, CObject::ClassSolar);
     Obj->get_archetype()->Companion->Load(1);
     Archetype::LoadMountedEquipmentCompanions(&Equipment, 1);
     Archetype::HookUpInstanceTreeMaterials(Obj->EngineInstanceId);
@@ -495,7 +495,7 @@ namespace
         Go->create(Arch);
         Arch->Release();
 
-        CShip* const Ship = static_cast<CShip*>(NarrowGameobj(Go, 0x503));
+        CShip* const Ship = static_cast<CShip*>(NarrowGameobj(Go, CObject::ClassShip));
 
         // FUN_0052e0a0 on the CSimple head, FUN_004cdc10 on the costume. Port deviation:
         // retail leaves +0x74..+0x90 and +0xb8..+0xe7 as they lie; value-initialisation zeroes
@@ -574,7 +574,7 @@ void IClientImpl::SendServerCreateShip(unsigned int /*ClientId*/, const CShipCre
     {
         if (!Go->find(Info.ObjId))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: ShipCreate - CObject %d not found.",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: ShipCreate - CObject %d not found.",
                   kIClientSCpp, 0xff, Info.ObjId);
             delete Go;
             return;
@@ -590,7 +590,7 @@ void IClientImpl::SendServerCreateShip(unsigned int /*ClientId*/, const CShipCre
     }
 
     // No null test on the narrowed object.
-    CObject* const Obj = NarrowGameobj(Go, 0x503);
+    CObject* const Obj = NarrowGameobj(Go, CObject::ClassShip);
     Obj->get_archetype()->Companion->Load(1);
     Archetype::LoadMountedEquipmentCompanions(&Equipment, 1);
     Archetype::HookUpInstanceTreeMaterials(Obj->EngineInstanceId);
@@ -732,7 +732,7 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
             // A miss warns, deletes the gameobj, and the next item follows.
             if (!Go->find(Desc->LootId))
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kIClientSCpp, 0x17c,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kIClientSCpp, 0x17c,
                       "LootCreate - CObject not found.");
                 delete Go;
                 continue;
@@ -745,7 +745,7 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
             Go->create(Arch);
             Arch->Release();
             // No null test on the narrowed CLoot.
-            CLoot* const Loot = static_cast<CLoot*>(NarrowGameobj(Go, 0x803));
+            CLoot* const Loot = static_cast<CLoot*>(NarrowGameobj(Go, CObject::ClassLoot));
             CLoot::CreateParms Parms;
             Parms.Id = Desc->LootId;
             Parms.ObjDb = GetClientObjDb();
@@ -775,7 +775,7 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
         }
 
         // No null test on the narrowed object.
-        CObject* const Obj = NarrowGameobj(Go, 0x803);
+        CObject* const Obj = NarrowGameobj(Go, CObject::ClassLoot);
         Obj->get_archetype()->Companion->Load(1);
         Archetype::HookUpInstanceTreeMaterials(Go->get_index());
         Go->PostCreateInit();
@@ -829,7 +829,7 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
         Go->create(Arch);
         Arch->Release();
         // No null test on the narrowed CGuided; init is the Common export, not virtual.
-        CGuided* const Guided = static_cast<CGuided*>(NarrowGameobj(Go, 0xa7));
+        CGuided* const Guided = static_cast<CGuided*>(NarrowGameobj(Go, CObject::ClassGuided));
         CGuided::CreateParms Parms;
         Parms.SubTarget = SUBOBJ_ID_NONE;
         Parms.OwnerPlayer = Info.OwnerPlayer;
@@ -848,7 +848,7 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
     }
     if (Go != nullptr)
     {
-        CObject* const Obj = NarrowGameobj(Go, 0xa7);
+        CObject* const Obj = NarrowGameobj(Go, CObject::ClassGuided);
         Obj->get_archetype()->Companion->Load(1);
         Archetype::HookUpInstanceTreeMaterials(Go->get_index());
         Go->PostCreateInit();
@@ -899,7 +899,7 @@ void IClientImpl::SendServerExplodeAsteroidMine(unsigned int /*ClientId*/, const
     {
         return;
     }
-    CObject* const Obj = NarrowGameobj(Go, 1);
+    CObject* const Obj = NarrowGameobj(Go, CObject::ClassObject);
     Vector const& Offset = Info.Offset;
     Vector Pos;
     Pos.x = Offset.x + Obj->WorldPosition.x;
@@ -917,9 +917,9 @@ void IClientImpl::SendCommonUpdateObject(unsigned int /*ClientId*/, const FCommo
     {
         return;
     }
-    CSimple* const Simple = static_cast<CSimple*>(NarrowGameobj(Go, 3));
+    CSimple* const Simple = static_cast<CSimple*>(NarrowGameobj(Go, CObject::ClassSimple));
     PhySys::RCSet(Simple, Info.Position, Info.Orientation, static_cast<double>(Info.Timestamp));
-    CShip* const Ship = static_cast<CShip*>(NarrowGameobj(Go, 0x503));
+    CShip* const Ship = static_cast<CShip*>(NarrowGameobj(Go, CObject::ClassShip));
     if (Ship == nullptr)
     {
         return;
@@ -954,7 +954,7 @@ void IClientImpl::SendServerDestroyObject(unsigned int /*ClientId*/, const FServ
     else
     {
         Go->SetOwnerPlayer(GetPlayerConnectionId());
-        CSimple* const Simple = static_cast<CSimple*>(NarrowGameobj(Go, 3));
+        CSimple* const Simple = static_cast<CSimple*>(NarrowGameobj(Go, CObject::ClassSimple));
         Simple->connect(GetClientObjDb());
     }
     Go->Destroy(static_cast<int>(DestroyType));
@@ -988,13 +988,13 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
     FClientGameobj* const Gate = ClientObjDb_FindObject(Info.GateId, 2);
     if (Gate == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kIClientSCpp, 0x54e,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kIClientSCpp, 0x54e,
               "No facilitator found for SystemSwitchOut");
     }
     // A gate gameobj that is not a solar (ManagerKind 2) warns.
-    if (Gate->ManagerKind != 2)
+    if (Gate->ManagerKind != EClientGameobjKind::Solar)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kIClientSCpp, 0x550,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kIClientSCpp, 0x550,
               "SystemSwitchOut, obj is not a Solar?");
     }
 
@@ -1003,7 +1003,7 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
     FClientGameobj* const Player = static_cast<FClientGameobj*>(static_cast<IObjRW*>(GetPlayerObjRW()));
     if (Player != nullptr)
     {
-        CEqObj* const PlayerEq = static_cast<CEqObj*>(NarrowGameobj(Player, 0x103));
+        CEqObj* const PlayerEq = static_cast<CEqObj*>(NarrowGameobj(Player, CObject::ClassEqObj));
         IBehaviorManager* const Behavior = PlayerEq->get_behavior_interface();
         if (Behavior != nullptr)
         {
@@ -1025,7 +1025,7 @@ void IClientImpl::SendServerSystemSwitchOut(unsigned int /*ClientId*/, const FSe
     if (!IsPlayerGameobj(Ship))
     {
         Ship->SetOwnerPlayer(GetPlayerConnectionId());
-        CEqObj* const ShipEq = static_cast<CEqObj*>(NarrowGameobj(Ship, 0x103));
+        CEqObj* const ShipEq = static_cast<CEqObj*>(NarrowGameobj(Ship, CObject::ClassEqObj));
         ShipEq->set_control_exclusion(1);
     }
 
@@ -1059,7 +1059,7 @@ void IClientImpl::SendServerSystemSwitchIn(unsigned int /*ClientId*/, const FPay
                                        reinterpret_cast<FQuaternion const&>(Info.Orientation));
 
     // Jump type bits 0x40 or 0x800 -> the jump in; otherwise the airlock.
-    if ((Info.JumpObjTypeBits & 0x40u) != 0 || (Info.JumpObjTypeBits & 0x800u) != 0)
+    if ((Info.JumpObjTypeBits & OBJ_JUMP_GATE) != 0 || (Info.JumpObjTypeBits & OBJ_JUMP_HOLE) != 0)
     {
         Ship->BeginJumpIn(&Info.Position, &Orient);
     }
@@ -1086,7 +1086,7 @@ void IClientImpl::SendServerLand(unsigned int /*ClientId*/, const FServerLandInf
     {
         if (IsPlayerGameobj(Ship))
         {
-            CEqObj* const DockEq = static_cast<CEqObj*>(NarrowGameobj(Dock, 0x303));
+            CEqObj* const DockEq = static_cast<CEqObj*>(NarrowGameobj(Dock, CObject::ClassSolar));
             EnterBaseFromDock(&DockEq->DockingPointBaseId);
         }
         else
@@ -1099,7 +1099,7 @@ void IClientImpl::SendServerLand(unsigned int /*ClientId*/, const FServerLandInf
     if (!SinglePlayer())
     {
         CObject* const Obj = const_cast<CObject*>(Ship->cobject());
-        PhySys::RCEnd(static_cast<CSimple*>(NarrowObject(Obj, 3)));
+        PhySys::RCEnd(static_cast<CSimple*>(NarrowObject(Obj, CObject::ClassSimple)));
     }
 
     Ship->RequestLand(Dock, &Info.BaseId);
@@ -1112,7 +1112,7 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
         static_cast<FClientShipGameobj*>(ClientObjDb_FindObject(Info.ShipId, 1));
     if (Ship == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Launch (): launching object %d not found.",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Launch (): launching object %d not found.",
               kIClientSCpp, 0x5c4, Info.ShipId);
         return;
     }
@@ -1127,7 +1127,7 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
             IClientSMath()->QuaternionToMatrix(
                 reinterpret_cast<FMatrix&>(Orient),
                 reinterpret_cast<FQuaternion const&>(Info.Orientation));
-            NarrowGameobj(Ship, 1)->beam_object(Info.Position, Orient, false);
+            NarrowGameobj(Ship, CObject::ClassObject)->beam_object(Info.Position, Orient, false);
         }
         Ship->LaunchFromDock(ClientObjDb_FindObject(Info.LaunchObjId, 0),
                              static_cast<int>(Info.LaunchPosIndex));
@@ -1138,7 +1138,7 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
         IClientSMath()->QuaternionToMatrix(
             reinterpret_cast<FMatrix&>(Orient),
             reinterpret_cast<FQuaternion const&>(Info.Orientation));
-        NarrowGameobj(Ship, 1)->beam_object(Info.Position, Orient, false);
+        NarrowGameobj(Ship, CObject::ClassObject)->beam_object(Info.Position, Orient, false);
     }
 
     SetPlayerLaunchAcknowledged(true); // DAT_00678b96
@@ -1205,7 +1205,7 @@ void IClientImpl::SendServerDamageObject(unsigned int /*ClientId*/, unsigned int
     {
         return;
     }
-    CEqObj* const Eq = static_cast<CEqObj*>(NarrowGameobj(Go, 0x103));
+    CEqObj* const Eq = static_cast<CEqObj*>(NarrowGameobj(Go, CObject::ClassEqObj));
     for (std::list<DamageEntry>::const_iterator It = Damage.Entries.begin();
          It != Damage.Entries.end(); ++It)
     {
@@ -1269,7 +1269,7 @@ void IClientImpl::SendServerItemTractored(unsigned int /*ClientId*/, const FPayl
     {
         return;
     }
-    CLoot* const Loot = static_cast<CLoot*>(NarrowGameobj(LootGo, 0x803));
+    CLoot* const Loot = static_cast<CLoot*>(NarrowGameobj(LootGo, CObject::ClassLoot));
     Loot->Units -= Info.UnitsTaken;
 }
 
@@ -1283,7 +1283,7 @@ void IClientImpl::SendServerUseItem(unsigned int /*ClientId*/, const FPayloadSer
         FClientGameobj* const Go = ClientObjDb_FindObject(Info.ObjectId, 0);
         if (Go != nullptr)
         {
-            CEqObj* const Eq = static_cast<CEqObj*>(NarrowGameobj(Go, 0x103));
+            CEqObj* const Eq = static_cast<CEqObj*>(NarrowGameobj(Go, CObject::ClassEqObj));
             CECargo* const Cargo = CECargo::cast(Eq->EquipManager.FindByID(Info.EquipId));
             if (Cargo != nullptr)
             {
@@ -1405,7 +1405,7 @@ void IClientImpl::SendServerObjectCargoUpdate(const unsigned int& /*ClientId*/, 
         FClientGameobj* const Go = ClientObjDb_FindObject(ObjectId, 0);
         if (Go != nullptr)
         {
-            CEqObj* const Eq = static_cast<CEqObj*>(NarrowGameobj(Go, 0x103));
+            CEqObj* const Eq = static_cast<CEqObj*>(NarrowGameobj(Go, CObject::ClassEqObj));
             CEquip* const Equip = Eq->EquipManager.FindByID(Desc->Id);
             if (Equip == nullptr)
             {
@@ -1527,17 +1527,18 @@ void IClientImpl::SendCommonRequestBestPath(unsigned int /*ClientId*/, const uns
         }
         Vector Pos;
         memcpy(&Pos, Record, sizeof(Pos));
-        unsigned Field0c = 0;
-        unsigned Field10 = 0;
-        memcpy(&Field0c, Record + 0xc, sizeof(Field0c));
-        memcpy(&Field10, Record + 0x10, sizeof(Field10));
+        // Content's FBestPathPoint: +0x0c ObjectId, +0x10 SystemId.
+        unsigned ObjectId = 0;
+        unsigned SystemId = 0;
+        memcpy(&ObjectId, Record + 0xc, sizeof(ObjectId));
+        memcpy(&SystemId, Record + 0x10, sizeof(SystemId));
         if (Index == Count - 1)
         {
-            AddPlayerWaypointRetail(Pos, Field10, GetPlayerWaypointTailTagRetail());
+            AddPlayerWaypointRetail(Pos, SystemId, GetPlayerWaypointTailTagRetail());
         }
         else
         {
-            AddPlayerWaypointRetail(Pos, Field10, Field0c);
+            AddPlayerWaypointRetail(Pos, SystemId, ObjectId);
         }
         Record += 0x14;
     }
@@ -1601,7 +1602,7 @@ void IClientImpl::SendServerSetDirective(const unsigned int& /*ClientId*/, const
         return;
     }
     FClientGameobj* const Player = static_cast<FClientGameobj*>(static_cast<IObjRW*>(PlayerObj));
-    CEqObj* const PlayerEq = static_cast<CEqObj*>(NarrowGameobj(Player, 0x503));
+    CEqObj* const PlayerEq = static_cast<CEqObj*>(NarrowGameobj(Player, CObject::ClassShip));
     IBehaviorManager* const Behavior = PlayerEq->get_behavior_interface();
 
     switch (Info.DirectiveKind)

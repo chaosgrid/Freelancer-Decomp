@@ -222,7 +222,7 @@ namespace AlchemyImpl
     // 0x0624f8c0. Both tables have offset 0 in every row, so a hit returns this.
     GENRESULT DACOM_API FFxNodePropertySet::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, PrimaryIid()) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, PrimaryIid()) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IFxNodePropertySet*>(this);
@@ -357,9 +357,9 @@ namespace AlchemyImpl
         // and the field tag (+0x96) in each of the seven field constructors. The port has
         // no appearance or field base class, so the tag follows the primary interface
         // here; the emitter tag (+0x95) is set by FFxEmitterBase.
-        if (IidEqual(PrimaryIid_, Iids::FxAppearance))
+        if (Iids::EqualNoNullTest(PrimaryIid_, Iids::FxAppearance))
             bIsAppearanceNode_ = 1;
-        if (IidEqual(PrimaryIid_, Iids::FxField))
+        if (Iids::EqualNoNullTest(PrimaryIid_, Iids::FxField))
             bIsFieldNode_ = 1;
     }
 
@@ -441,7 +441,7 @@ namespace AlchemyImpl
         if (TexInfoLibrary()->FindTextureByCrc(&Key, &Record) < 0)
         {
             char Message[0x2000];
-            FDUMP(0x100002, kFdumpWarningFmt, kTexInfoCppPath, 0x63,
+            FDUMP(kFdumpWarning, kFdumpWarningFmt, kTexInfoCppPath, 0x63,
                   FormatTexInfoMessage(Message, kTexInfoResolveFailFmt, kTexInfoKeyName));
             return;
         }
@@ -555,7 +555,7 @@ namespace AlchemyImpl
         CreatePropertySet();
         if (Desc == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kImpFxNodeCppPath, 0xb3,
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kImpFxNodeCppPath, 0xb3,
                   "you should set DACOMDESC for create FxNode\n");
         }
         else
@@ -571,8 +571,8 @@ namespace AlchemyImpl
     // Retail does not test Out for null.
     GENRESULT DACOM_API FGenericFxObjectBase::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, PrimaryIid_) || IidEqual(Iid, Iids::DAComponent) ||
-            IidEqual(Iid, Iids::FxNode))
+        if (Iids::EqualNoNullTest(Iid, PrimaryIid_) || Iids::EqualNoNullTest(Iid, Iids::DAComponent) ||
+            Iids::EqualNoNullTest(Iid, Iids::FxNode))
         {
             AddRef();
             *Out = static_cast<IGenericFx*>(this);
@@ -921,7 +921,7 @@ namespace AlchemyImpl
         }
         if (Hash == kNodeClassNameHash)
         {
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kImpFxNodeCppPath, 0x65,
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kImpFxNodeCppPath, 0x65,
                   "You can't set class name!!\n");
             return GR_GENERIC;
         }
@@ -1203,7 +1203,7 @@ namespace AlchemyImpl
     {
         if (static_cast<long>(Index) < 0 || AssociatedFields_ == nullptr || Index >= FieldCount_)
         {
-            FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+            FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
                   "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\ALIL\\ImpFxAppearance.cpp",
                   0x5c, "Index range over.\n");
             return GR_GENERIC;

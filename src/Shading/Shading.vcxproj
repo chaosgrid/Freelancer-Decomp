@@ -47,6 +47,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\include\dacom.h" />
+    <ClInclude Include="..\include\dacom_factory.h" />
     <ClInclude Include="..\include\render\shading.h" />
     <ClInclude Include="ShadingInternal.h" />
     <ClInclude Include="Material.h" />

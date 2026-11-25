@@ -542,12 +542,12 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         }
         case 0x22: // FLPACKET_CLIENT_DBGCREATESHIP
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Network\\FLServerPacketHandler.cpp", 0x26a,
                   "FLPACKET_CLIENT_DBGCREATESHIP encountered in release mode");
             break;
         case 0x23: // FLPACKET_CLIENT_DBGLOADSYSTEM
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Network\\FLServerPacketHandler.cpp", 0x217,
                   "FLPACKET_CLIENT_DBGLOADSYSTEM encountered in release mode");
             break;
@@ -558,7 +558,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         }
         case 0x25: // FLPACKET_CLIENT_DBGDESTROYOBJECT
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Network\\FLServerPacketHandler.cpp", 0x1e4,
                   "FLPACKET_CLIENT_DBGDESTROYOBJECT encountered in Final Release mode");
             break;
@@ -575,12 +575,12 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         }
         case 0x2D: // FLPACKET_CLIENT_DBGCONSOLE
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Network\\FLServerPacketHandler.cpp", 0x204,
                   "FLPACKET_CLIENT_DBGCONSOLE encountered in release mode");
             break;
         case 0x2E: // FLPACKET_CLIENT_DBGFREESYSTEM
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Network\\FLServerPacketHandler.cpp", 0x227,
                   "FLPACKET_CLIENT_DBGFREESYSTEM encountered in release mode");
             break;
@@ -595,7 +595,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             break;
         }
         case 0x30: // FLPACKET_CLIENT_DBGRELOCATE_SHIP
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                   "E:\\FL\\Scratch\\Source\\Network\\FLServerPacketHandler.cpp", 0x1f5,
                   "FLPACKET_CLIENT_DBGRELOCATE_SHIP encountered in Final Release mode");
             break;

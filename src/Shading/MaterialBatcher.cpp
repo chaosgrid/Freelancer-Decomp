@@ -398,7 +398,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
     const GENRESULT ParserResult = Manager->QueryInterface(Iids::ProfileParser, (void**)&Parser);
     if (ParserResult < 0)
     {
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
               0x1AA, "Unable to acquire IID_IProfileParser, cannot continue");
         if (Parser != nullptr)
@@ -412,7 +412,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
                                                           (void**)&Pipeline);
     if (PipelineResult < 0)
     {
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
               0x1AF, "Unable to acquire IID_IRenderPipeline, cannot continue");
         if (Parser != nullptr)
@@ -423,7 +423,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
     const GENRESULT VertexResult = Pipeline->QueryInterface(Iids::RPVertexBuffer,
                                                             (void**)&RpVertexBuffer);
     if (VertexResult < 0)
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
               0x1B5, "Unable to acquire IID_IRPVertexBuffer........");
     else
@@ -431,7 +431,7 @@ GENRESULT FMaterialBatcher::StartupFromOuter()
     const GENRESULT IndexResult = Pipeline->QueryInterface(Iids::RPIndexBuffer,
                                                            (void**)&RpIndexBuffer);
     if (IndexResult < 0)
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
               "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
               0x1BC, "Unable to acquire IID_IRPIndexBuffer........");
     else
@@ -530,14 +530,14 @@ void FMaterialBatcher::ClearBin(FBatchBin* Bin)
 static void WarnUnsupportedBatchSort()
 {
     // FUN_06eca370: the bin is not processed.
-    FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+    FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
         "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp", 0x5d2, "IMB_SO_PRIM_BACK_TO_FRONT/FRONT_TO_BACK sort order unimplemented, contact pbleisch\n");
 }
 
 static void WarnMalformedBatchSort()
 {
     // FUN_06eca3a0: the typo is retail's.
-    FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+    FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
         "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp", 0x5d9, "MaterialBatcher: sort statte not well implemented, contact stravis\n");
 }
 

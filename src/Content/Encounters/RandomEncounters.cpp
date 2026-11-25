@@ -157,15 +157,15 @@ void __cdecl LoadKillableSolars(INI_Reader* Reader)
                 {
                     char const* Value = Reader->get_value_string(Index);
                     if (_stricmp(Value, "rock") == 0)
-                        Entry.ZoneTypeMask |= 0x40;
+                        Entry.ZoneTypeMask |= RM_ZONE_ROCK;
                     else if (_stricmp(Value, "debris") == 0)
-                        Entry.ZoneTypeMask |= 0x80;
+                        Entry.ZoneTypeMask |= RM_ZONE_DEBRIS;
                     else if (_stricmp(Value, "ice") == 0)
-                        Entry.ZoneTypeMask |= 0x100;
+                        Entry.ZoneTypeMask |= RM_ZONE_ICE;
                     else if (_stricmp(Value, "lava") == 0)
-                        Entry.ZoneTypeMask |= 0x200;
+                        Entry.ZoneTypeMask |= RM_ZONE_LAVA;
                     else if (_stricmp(Value, "crystal") == 0)
-                        Entry.ZoneTypeMask |= 0x800;
+                        Entry.ZoneTypeMask |= RM_ZONE_CRYSTAL;
                     // Retail ends with a stricmp against "all" whose result is discarded.
                 }
             }
@@ -314,11 +314,11 @@ void __cdecl LoadVignetteCriticalLoot(INI_Reader* Reader)
                 for (unsigned int Index = 0; !Reader->is_value_empty(Index); ++Index)
                 {
                     if (_stricmp(Reader->get_value_string(Index), "destroy") == 0)
-                        RmInsertUnique(&Record->Types, 1);
+                        RmInsertUnique(&Record->Types, RmCriticalLootDestroy);
                     else if (_stricmp(Reader->get_value_string(Index), "tractor") == 0)
-                        RmInsertUnique(&Record->Types, 2);
+                        RmInsertUnique(&Record->Types, RmCriticalLootTractor);
                     else if (_stricmp(Reader->get_value_string(Index), "return") == 0)
-                        RmInsertUnique(&Record->Types, 3);
+                        RmInsertUnique(&Record->Types, RmCriticalLootReturn);
                 }
             }
         }
@@ -369,9 +369,9 @@ namespace
             if (bNameAsNumber)
                 std::fprintf(File, Header,
                              static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(Name)),
-                             static_cast<double>(It->Field_0x08), It->MinCount, It->MaxCount);
+                             static_cast<double>(It->ParsedWeight), It->MinCount, It->MaxCount);
             else
-                std::fprintf(File, Header, Name, static_cast<double>(It->Field_0x08),
+                std::fprintf(File, Header, Name, static_cast<double>(It->ParsedWeight),
                              It->MinCount, It->MaxCount);
             for (std::list<FRandEncShipChoice>::iterator Choice = It->ShipChoices.begin();
                  Choice != It->ShipChoices.end(); ++Choice)
@@ -507,7 +507,7 @@ namespace
     void ParseRandEncFormationValues(INI_Reader* Reader, FRandEncParams* Params,
                                      FRandEncFormation* Formation, bool bLaneRules)
     {
-        Formation->Field_0x08 = Reader->get_value_float(1);
+        Formation->ParsedWeight = Reader->get_value_float(1);
         Formation->MinCount = Reader->get_value_int(2);
         Formation->MaxCount = Reader->get_value_int(3);
         for (unsigned int Index = 4; !Reader->is_value_empty(Index); Index += 2)
@@ -534,7 +534,7 @@ namespace
             Formation->ShipChoices.push_back(Choice);
         }
         FRandEncFormation Copy(*Formation);
-        Copy.Weight = Formation->Field_0x08;
+        Copy.Weight = Formation->ParsedWeight;
         Params->Formations.push_back(Copy);
     }
 
@@ -1061,7 +1061,7 @@ bool FRandEncTLPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
         }
         // Without a target (+0x84 masked with 0x3fffffff) the named ship (FindObjectIdByName
         // on +8 with the controller id) or else the player's ship.
-        if ((Lane->GotoTargetId & 0x3fffffff) == 0)
+        if ((Lane->GotoTargetId & GIdValueMask) == 0)
         {
             if (Lane->TargetShipName.Length == 0)
             {
@@ -1229,7 +1229,7 @@ bool FRandEncSPPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
     // player's ship becomes both +0x84 and +0x88.
     FSystemInfo* const System = Player->GetSystemRecord();
     Space->System = System;
-    if ((Space->GotoTargetId & 0x3fffffff) == 0)
+    if ((Space->GotoTargetId & GIdValueMask) == 0)
     {
         unsigned int TargetId;
         if (Space->TargetShipName.Length == 0)

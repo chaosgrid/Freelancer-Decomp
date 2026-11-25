@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "Thorn.h"
+#include "dacom_factory.h"   // FDacomComponentFactory
 #include "readfile.h"
 #include "ThornScene.h"
 
@@ -19,7 +20,6 @@
 
 namespace
 {
-    const int kFdumpWarning = 0x100002;
 }
 
 void ThornFdump(const char* Message)
@@ -119,16 +119,6 @@ namespace
     {
         if (Message != nullptr)
             OutputDebugStringA(Message);
-    }
-
-    bool FactoryIidEqual(const char* Iid)
-    {
-        for (int Index = 0; Index < G_FactoryIidCompareBytes; ++Index)
-        {
-            if (Iid[Index] != Iids::ComponentFactory[Index])
-                return false;
-        }
-        return true;
     }
 
     // Lua 3.2 process state: ThornLua.cpp (FUN_06f24c80 / FUN_06f24cb0).
@@ -745,39 +735,14 @@ namespace
         KindSplineOrient,
     };
 
-    class FThornFactory final : public IComponentFactory
+    // QueryInterface (an exact compare of G_FactoryIidCompareBytes = 0x17 bytes), AddRef and
+    // Release are FDacomComponentFactory's.
+    class FThornFactory final : public FDacomComponentFactory
     {
     public:
-        FThornFactory(const char* Name, EThornFactoryKind Kind, bool bDeadSecondLinear)
-            : RefCount_(1), Name_(Name), Kind_(Kind), bDeadSecondLinear_(bDeadSecondLinear)
+        FThornFactory(const char* InName, EThornFactoryKind Kind, bool bDeadSecondLinear)
+            : FDacomComponentFactory(InName), Kind_(Kind), bDeadSecondLinear_(bDeadSecondLinear)
         {
-        }
-
-        const char* Name() const { return Name_; }
-
-        GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
-        {
-            *Out = nullptr;
-            if (!FactoryIidEqual(Iid))
-                return GR_INTERFACE_UNSUPPORTED;
-            *Out = static_cast<IComponentFactory*>(this);
-            AddRef();
-            return GR_OK;
-        }
-
-        unsigned long DACOM_API AddRef() override { return ++RefCount_; }
-
-        unsigned long DACOM_API Release() override
-        {
-            if (RefCount_ > 0)
-                --RefCount_;
-            const unsigned long Next = RefCount_;
-            if (Next == 0)
-            {
-                RefCount_ = 1;
-                delete this;
-            }
-            return Next;
         }
 
         // LAB_06f37400 (CV_CRSplinePath / CV_CROrientationSplinePath) and LAB_06f3f4c0
@@ -794,7 +759,7 @@ namespace
             }
 
             FThornAggDesc14* Extended = reinterpret_cast<FThornAggDesc14*>(Desc);
-            if (std::strcmp(Extended->NameAt4, Name_) != 0)
+            if (std::strcmp(Extended->NameAt4, Name) != 0)
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
@@ -817,7 +782,7 @@ namespace
             {
                 // 06f31e70 and its eleven factory clones: neither Desc+8 nor Desc+0xc is
                 // read; curves do not aggregate.
-                Object = ThornCreateParamCurve(Name_, bDeadSecondLinear_);
+                Object = ThornCreateParamCurve(Name, bDeadSecondLinear_);
                 if (Object == nullptr)
                 {
                     *Instance = nullptr;
@@ -828,7 +793,7 @@ namespace
             {
                 // Only allocation failure returns -4 here; math is acquired lazily by spline
                 // operations.
-                Object = ThornCreateSplinePath(Name_, Kind_ == KindSplineOrient, Extended->Outer,
+                Object = ThornCreateSplinePath(Name, Kind_ == KindSplineOrient, Extended->Outer,
                                                &Inner);
                 if (Object == nullptr)
                 {
@@ -849,8 +814,6 @@ namespace
         }
 
     private:
-        unsigned long RefCount_;
-        const char* Name_;
         EThornFactoryKind Kind_;
         bool bDeadSecondLinear_;
     };

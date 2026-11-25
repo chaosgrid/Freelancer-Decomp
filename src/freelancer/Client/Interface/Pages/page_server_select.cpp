@@ -30,6 +30,7 @@
 #include "Interface/ui_text_msg_button.h"
 #include "Interface/win3d_immediate.h"   // Win3DVec3Add (FUN_00423b30)
 #include "Interface/win_factory.h"       // WinFactoryCreate (FUN_0059db20)
+#include "Interface/menu_enter_state.h"
 
 #include "common_text.h"
 
@@ -338,7 +339,7 @@ bool PageServerSelect::SaveEdges()
 void PageServerSelect::Destroy()
 {
     // FUN_0056d8f0.
-    UnregisterEvent(0xf);
+    UnregisterEvent(USER_CANCEL);
     if (ServerTable != nullptr)
     {
         // The images are destroyed on the TRC they were made on, fetched each time.
@@ -422,11 +423,11 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
             (static_cast<unsigned>(g_client.packed_version) >> 16) & 0xffffu;
         wchar_t Text[0x100];
         swprintf(Text, 0x100, Format, (VersionWord >> 8) & 0xffu, VersionWord & 0xffu);
-        VersionText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+        VersionText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
         HideWin3D(Version);
     }
 
-    RegisterEvent(0xf);
+    RegisterEvent(USER_CANCEL);
 
     // The last two images are made on Refresh's TRC.
     UpPip = ServerTable->GetDeviceTRC()->create_image("interface\\intro\\images\\uppip.bmp");
@@ -892,7 +893,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_005714d0.
     unsigned const TableId = static_cast<unsigned>(reinterpret_cast<uintptr_t>(ServerTable));
-    if (Msg == 0x3004)
+    if (Msg == kWinMsgCommand)
     {
         PlayOrRewindUiSoundSlot(0);
         if (A == 0x3e9)
@@ -944,7 +945,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0xf001)
+    if (Msg == kWinMsgPress)
     {
         // A header click: the same column flips its direction, another becomes the sort column.
         if (A != TableId || (B & 0xffff0000u) != 0)
@@ -963,7 +964,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0x300d)
+    if (Msg == kWinMsgSelectionChanged)
     {
         // A row selected: its details (the vertical scroll reset for another server), the new
         // and the previous row redrawn.
@@ -995,7 +996,7 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0xf002)
+    if (Msg == kWinMsgDoubleClick)
     {
         // A double click on the table: connect and leave.
         if (A != TableId)
@@ -1010,15 +1011,15 @@ bool PageServerSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0xf003)
+    if (Msg == kWinMsgEscape)
     {
         // Back to the main menu at once.
-        Result = 1;
+        Result = kMenuStateMainMenu;
         MouseSetCursor("Arrow", true);
         return true;
     }
 
-    if (Msg == 0xf005)
+    if (Msg == kWinMsgScroll)
     {
         // The scroll bar moved.
         RebuildTable();
@@ -1174,7 +1175,7 @@ bool PageServerSelect::ConnectToServer(FServerInfo const* Server)
     // FUN_00572100.
     if (!G_LoginMgr.SetCurrentServer(*Server))
     {
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kIntroCpp, 0x14cb,
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kIntroCpp, 0x14cb,
               "Internal error: invalid server data.\n");
         return false;
     }
@@ -1183,7 +1184,7 @@ bool PageServerSelect::ConnectToServer(FServerInfo const* Server)
     std::wstring Password(L"");
     if (Server->bPassword != 0 && !NnPromptRunTextEntry(0x60071, &Password, false, 0xd48))
     {
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kIntroCpp, 0x14b4,
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kIntroCpp, 0x14b4,
               "Password cancelled.\n");
         return false;
     }
@@ -1193,7 +1194,7 @@ bool PageServerSelect::ConnectToServer(FServerInfo const* Server)
     if (::ConnectToServer(g_display.ini_path.c_str()))
         return true;
     G_LoginMgr.CreateGun();
-    FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kIntroCpp, 0x14c5,
+    FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kIntroCpp, 0x14c5,
           "Failed to connect to the server.\n");
     return false;
 }
@@ -1243,10 +1244,10 @@ void PageServerSelect::Update()
         {
             float Right[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
             float Left[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-            MainMenu->SetProperty(6, reinterpret_cast<uintptr_t>(Right), 0);
-            SetFilter->SetProperty(6, reinterpret_cast<uintptr_t>(Right), 0);
-            Connect->SetProperty(6, reinterpret_cast<uintptr_t>(Left), 0);
-            Refresh->SetProperty(6, reinterpret_cast<uintptr_t>(Left), 0);
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Right), 0);
+            SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Right), 0);
+            Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Left), 0);
+            Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Left), 0);
             float BoxPosition[3];
             Win3DVec3Add(BoxPosition, InfoBoxHome, Left);
             ServerInfoBox->SetPosition(BoxPosition);
@@ -1257,10 +1258,10 @@ void PageServerSelect::Update()
         {
             // Everything in place, shown and live; SlideT parked at 2.0.
             float ZeroOffset[3] = {0.0f, 0.0f, 0.0f};
-            MainMenu->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            SetFilter->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            Connect->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            Refresh->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
             ServerInfoBox->SetPosition(InfoBoxHome);
             ServerSelectBox->SetPosition(SelectBoxHome);
             ShowWin3D(ServerTable);
@@ -1295,10 +1296,10 @@ void PageServerSelect::Update()
         SlideT = SlideT - GetClientFrameTimeCapped() * 1.5;
         float Right[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
         float Left[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-        MainMenu->SetProperty(6, reinterpret_cast<uintptr_t>(Right), 0);
-        SetFilter->SetProperty(6, reinterpret_cast<uintptr_t>(Right), 0);
-        Connect->SetProperty(6, reinterpret_cast<uintptr_t>(Left), 0);
-        Refresh->SetProperty(6, reinterpret_cast<uintptr_t>(Left), 0);
+        MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Right), 0);
+        SetFilter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Right), 0);
+        Connect->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Left), 0);
+        Refresh->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Left), 0);
         float BoxPosition[3];
         Win3DVec3Add(BoxPosition, InfoBoxHome, Left);
         ServerInfoBox->SetPosition(BoxPosition);
@@ -1317,12 +1318,12 @@ void PageServerSelect::Update()
             HideWin3D(Version);
             if (LeaveDirection == 1)
             {
-                Result = 2;
+                Result = kMenuStateLogin;
                 LoadingScreenStart();
             }
             else if (LeaveDirection == -1)
             {
-                Result = 1;
+                Result = kMenuStateMainMenu;
             }
             bLeaving = 0;
         }
@@ -1335,11 +1336,11 @@ bool PageServerSelect::OnEvent(unsigned MsgId)
 {
     // LAB_00572330 (this = the +0x80 face): event 0xf goes back to the main menu unless a leave
     // runs.
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return UIPage::MasterWin::OnEvent(MsgId);
     if (bLeaving == 0)
     {
-        Result = 1;
+        Result = kMenuStateMainMenu;
         MouseSetCursor("Arrow", true);
     }
     return true;

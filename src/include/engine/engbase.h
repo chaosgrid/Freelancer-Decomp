@@ -377,7 +377,7 @@ struct FDeformAimDesc
     float* TargetPos;    // +0x10 three floats the aim follows
     float* TargetOrient; // +0x14 nine floats
     float Damping;       // +0x18
-    int Field1C;         // +0x1c TODO: meaning not recovered; freelancer passes 0
+    int Field1C;         // +0x1c freelancer passes 0; no reader identified
 };
 
 // The part table IDeformable::Create / CreateAlias read (Deformable2 FUN_065f36c0):
@@ -396,7 +396,7 @@ struct FDeformPartDesc
 {
     int LodCount;           // +0x00 in: the most LODs to load; out: how many were loaded
     FDeformLodDesc* Lods;   // +0x04
-    int Field08;            // +0x08 TODO: not read by 065f36c0
+    int Field08;            // +0x08 not read by 065f36c0 (Create / CreateAlias)
     char const* Path;       // +0x0C the part file, opened through DACOM_Acquire()
     unsigned long Flags;    // +0x10 bit 1 (2): skip LOD 0; bit 0 (1): stop after LOD 0
     unsigned long LodLimit; // +0x14 a mesh whose LOD index is below this (unsigned) gets

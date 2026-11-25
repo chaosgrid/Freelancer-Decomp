@@ -815,10 +815,10 @@ void TargetManager::UpdateAttackTargetOverride()
         FAiTargetVector* const targets = BuildAiTargetList(targetList);
         savedTargets = targets;
 
-        // JobParams.Field_00 (Sys+0x1824) picks a fraction of 5000.0f (.rdata:063a0810): the
+        // JobParams.RangeThreshold (Sys+0x1824) picks a fraction of 5000.0f (.rdata:063a0810): the
         // doubles 2/3 and 1/3 at .rdata:0639e0f0 / 0639e0e8 for 1 and 2, else all of it. The
         // compare below is done in double.
-        int const proximityTierSel = Job.Field_00;
+        int const proximityTierSel = Job.RangeThreshold;
         double proximityLimit = 5000.0;
         if (proximityTierSel == 1)
         {
@@ -975,7 +975,7 @@ void TargetManager::UpdateAttackTargetOverride()
         double const cdz = (double)candPos.z - selfPos.z;
         double const candDist = CmnAiSteer::InlineFastLength((cdz * cdz + cdy * cdy) + cdx * cdx);
 
-        int const proximityTierSel2 = Job.Field_00;   // Sys+0x1824
+        int const proximityTierSel2 = Job.RangeThreshold;   // Sys+0x1824
         double proximityLimit2 = 5000.0; // .rdata:DAT_063a0810
         if (proximityTierSel2 == 1)
         {

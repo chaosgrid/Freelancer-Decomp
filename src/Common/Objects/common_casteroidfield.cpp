@@ -153,7 +153,7 @@ void CAsteroidField::load(INI_Reader& Reader, int CubeSizeParm)
                         if (Reader.is_value_empty(4) || Reader.is_value_empty(5) ||
                             Reader.is_value_empty(6))
                         {
-                            FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+                            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                                   "E:\\FL\\Scratch\\Source\\Common\\CAsteroidSystem.cpp", 0x167,
                                   "invalid rotation specified for an asteroid");
                         }
@@ -241,7 +241,7 @@ void CAsteroidField::load(INI_Reader& Reader, int CubeSizeParm)
                         Universe::IZone const* Found = Universe::get_zone(SystemId, Name);
                         if (Found == nullptr)
                         {
-                            FDUMP(0x100001,
+                            FDUMP(kFdumpError,
                                   "%s(%d) : *** ERROR: AsteroidField linked to missing Exclusion Zone (%s) in file named (%s)",
                                   "E:\\FL\\Scratch\\Source\\Common\\CAsteroidSystem.cpp", 0x18c, Name,
                                   Reader.get_file_name());
@@ -373,7 +373,7 @@ void CAsteroidField::load(INI_Reader& Reader, int CubeSizeParm)
                     }
                     else
                     {
-                        FDUMP(0x100001,
+                        FDUMP(kFdumpError,
                               "%s(%d) : *** ERROR: loot zone information attached to asteroid field (%s) that has no zone",
                               "E:\\FL\\Scratch\\Source\\Common\\CAsteroidSystem.cpp", 0x246,
                               Reader.get_file_name());

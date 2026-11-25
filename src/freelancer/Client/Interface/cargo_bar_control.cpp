@@ -489,7 +489,7 @@ void CargoBarControl::MouseEnter(float const* Ray)
     WinControl* const ParentControl = Parent->AsWinControl();
     if (ParentControl == nullptr)
         return;
-    ParentControl->SetProperty(0x2c, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
+    ParentControl->SetProperty(kWinNotifyHighlight, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
 }
 
 void CargoBarControl::MouseLeave(float const* Ray)
@@ -502,7 +502,7 @@ void CargoBarControl::MouseLeave(float const* Ray)
     WinControl* const ParentControl = Parent->AsWinControl();
     if (ParentControl == nullptr)
         return;
-    ParentControl->SetProperty(0x2d, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
+    ParentControl->SetProperty(kWinNotifyUnhighlight, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
 }
 
 bool CargoBarControl::HitTest(float const* Ray)
@@ -522,26 +522,26 @@ intptr_t CargoBarControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_0055fb00 (RET 0xc): every case returns 0; nothing is forwarded to WinControl.
     switch (Msg)
     {
-    case 1:
+    case kWinPropHide:
         if (A != 0)
             Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));
         else
             Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         break;
-    case 2:
+    case kWinPropDisable:
         bShow = (A == 0) ? 1 : 0;
         break;
-    case 3:
+    case kWinPropToolTip:
         ToolTipIds = static_cast<int>(A);
         bToolTip = (A != 0) ? 1 : 0;
         break;
     case 0x19:
         bBorder = ((A & 0xffff0000u) != 0) ? 0 : 1;
         break;
-    case 0x2c:
+    case kWinNotifyHighlight:
         Field34b = 1;
         break;
-    case 0x2d:
+    case kWinNotifyUnhighlight:
         Field34b = 0;
         break;
     case 0x3f:

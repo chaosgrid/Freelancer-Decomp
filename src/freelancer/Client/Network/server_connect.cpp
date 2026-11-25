@@ -50,7 +50,7 @@ IServer* LoadServerModule(char const* DllName)
     G_ServerModule = LoadLibraryA(DllName);
     if (G_ServerModule == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Connect - failed to LoadLibrary(%s)\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Connect - failed to LoadLibrary(%s)\n",
               "E:\\FL\\Scratch\\Source\\network\\ServerConnect.cpp", 0x1f, DllName);
         return G_LoadedServer;
     }

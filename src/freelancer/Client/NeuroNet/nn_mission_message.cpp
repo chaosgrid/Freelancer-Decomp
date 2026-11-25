@@ -223,7 +223,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
         // The server's title, upper-cased (the delay-loaded CharUpperW, PTR_FUN_00616420).
         FmtStrSprintf(&G_NnMissionMessageTitle, G_NnTextScratchB, G_NnTextScratchCapacity);
         CharUpperW(G_NnTextScratchB);
-        Title->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
 
         if ((G_NnMissionMessageButtons & 1) != 0)
         {
@@ -293,7 +293,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
         {
             CBase const* const Base = Scanner;
             CObject const* const Object = Base->Object;
-            if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 3u) == 3u)
+            if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
             {
                 // An EH-tracked local in retail: its buffer is freed on the way out and by the
                 // unwind funclet.
@@ -311,7 +311,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
                 if (Pilot.Name.Text != nullptr && Pilot.Name.Text[0] != 0)
                 {
                     wcscpy(G_NnTextScratchB, Pilot.Name.Text);
-                    Title->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+                    Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
                 }
             }
         }
@@ -377,7 +377,7 @@ void NeuroNetMissionMessage::Update()
     {
         CBase const* const Base = Scanner;
         CObject const* const Object = Base->Object;
-        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 3u) == 3u &&
+        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple &&
             GetAttitudeClass(Player, Scanner) != -1)
         {
             bScannerOk = true;
@@ -404,7 +404,7 @@ intptr_t NeuroNetMissionMessage::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_0048af30 (RET 0xc). Nothing reaches WinControl's slot 42.
     (void)B;
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
 
     WinControl* const Clicked = reinterpret_cast<WinControl*>(A);

@@ -345,7 +345,7 @@ void FContentBase::Load(INI_Reader* Reader)
                     Fixture->Release();
                 }
             }
-            if ((Room.RoomId & 0x3fffffff) != 0)
+            if ((Room.RoomId & GIdValueMask) != 0)
                 Rooms.push_back(Room);
         }
         else if (Current->is_header("mBase"))

@@ -69,7 +69,7 @@ namespace
     StateMachineMessage const* RmMessageOf(StateMachine const* Machine, SMEventData const* Event,
                                            unsigned int Type)
     {
-        if (Event->get_event_type() != 3)
+        if (Event->get_event_type() != SMET_Message)
             return nullptr;
         StateMachineMessage const* Message = static_cast<SMMessage const*>(Event)->Message;
         if (Message->DeliveryState != -1 && Machine->get_state() != Message->DeliveryState)
@@ -98,7 +98,7 @@ namespace
     // ControllerId in common_net.h) is the controller message id, cast back after the type test.
     SMControllerEvent const* RmControllerOf(SMEventData const* Event, EMessage MessageId)
     {
-        if (Event->get_event_type() != 4)
+        if (Event->get_event_type() != SMET_Controller)
             return nullptr;
         SMControllerEvent const* Controller = static_cast<SMControllerEvent const*>(Event);
         if (static_cast<EMessage>(Controller->ControllerId) != MessageId)
@@ -109,7 +109,7 @@ namespace
     // The enter event test inlined in every state.
     bool RmIsEnterEvent(SMEventData const* Event)
     {
-        return Event->get_event_type() < 4 && Event->get_event_type() == 1;
+        return Event->get_event_type() < SMET_Controller && Event->get_event_type() == SMET_Enter;
     }
 
     // FUN_06f90b40 (and its inline copies).
@@ -156,18 +156,18 @@ FRmShipCountTrigger::FRmShipCountTrigger(unsigned int InCookie, unsigned int InO
 // LAB_06f92dd0.
 bool FRmShipCountTrigger::OnArmed(SMEventData const* Event, int const& State)
 {
-    if (State != 1)
+    if (State != RmTriggerArmed)
         return false;
     if (RmIsEnterEvent(Event))
     {
         if (CountAlive() <= Threshold)
-            set_state(2);
+            set_state(RmTriggerFired);
         return true;
     }
     if (RmControllerOf(Event, EMessage::ObjectDestroyed) != nullptr)
     {
         if (CountAlive() <= Threshold)
-            set_state(2);
+            set_state(RmTriggerFired);
         return true;
     }
     return false;
@@ -180,7 +180,7 @@ int FRmShipCountTrigger::CountAlive()
     for (std::list<FRmSpawnRecord*>::iterator It = Records->Records.begin();
          It != Records->Records.end(); ++It)
     {
-        if ((*It)->bHostile && (*It)->State == 2)
+        if ((*It)->bHostile && (*It)->State == RmRecordAlive)
             ++Count;
     }
     return Count;
@@ -198,13 +198,13 @@ FRmShipHealthTrigger::FRmShipHealthTrigger(unsigned int InCookie, unsigned int I
 // FUN_06f92ed0.
 bool FRmShipHealthTrigger::OnArmed(SMEventData const* Event, int const& State)
 {
-    if (State != 1)
+    if (State != RmTriggerArmed)
         return false;
     if (RmIsEnterEvent(Event))
     {
         int const Lowest = GetLowestHealth();
         if (Lowest != -1 && Lowest <= Threshold)
-            set_state(2);
+            set_state(RmTriggerFired);
         return true;
     }
     SMControllerEvent const* Controller = RmControllerOf(Event, EMessage::ObjectDamaged);
@@ -255,7 +255,7 @@ int FRmShipHealthTrigger::GetLowestHealth()
          It != Records->Records.end(); ++It)
     {
         FRmSpawnRecord* const Record = *It;
-        if (!Record->bHostile || Record->State != 2)
+        if (!Record->bHostile || Record->State != RmRecordAlive)
             continue;
         if (static_cast<FRmShipRecord*>(Record)->Kind != Kind)
             continue;
@@ -377,12 +377,12 @@ void FRmVignetteMachine::SpawnGroupWithTriggers(unsigned int Serial, FRmShipComp
         new FRmShipCountTrigger(Cookie, get_id(), &Ships->Records, 0);
     AllDead->SetActivator(Next->Serial);
     AddStateMachine(AllDead);
-    if (Next->SpawnTriggerMode == 2)
+    if (Next->SpawnTriggerMode == RmSpawnWaveDelay)
     {
         FRmCookieMessage Delayed(Next->Serial);
         send_delayed_message_to_me(&Delayed, static_cast<float>(Next->SpawnTriggerParam), SMMS_Self, 0);
     }
-    else if (Next->SpawnTriggerMode == 3)
+    else if (Next->SpawnTriggerMode == RmSpawnShipsLeft)
     {
         FRmShipCountTrigger* FewLeft =
             new FRmShipCountTrigger(Cookie, get_id(), &Ships->Records, Next->SpawnTriggerParam);
@@ -460,7 +460,7 @@ void FRmVignetteMachine::MarkGroupTargets(FRmRecordList* Members, FRmObjectiveMa
     if (Flagged != nullptr)
     {
         // Defensive ships 6, any other kind 7.
-        int const Key = (Flagged->Kind != 1 ? 1 : 0) + RmObjKillShips;
+        int const Key = (Flagged->Kind != RmShipKindDefensive ? 1 : 0) + RmObjKillShips;
         std::vector<FRmObjective*>::iterator Active = FindObjective(Key);
         unsigned int const SystemId = Offer->System->SystemId;
         if (Active == ActiveObjectives.end())
@@ -649,15 +649,16 @@ bool FRmVignetteMachine::HandleAnyState(SMEventData const* Event)
     {
         unsigned int const LootId = static_cast<FRmLootMessage const*>(Message)->ObjectId;
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(LootId));
-        if (Record->Kind != 2)
+        if (Record->Kind != RmLootCritical)
             return true;
         ClearShipTargets();
         ClearSolarTargets();
         set_state(RmStateCriticalLoot);
         int Key = 0;
-        if (Record->CriticalLootMode == 1)
+        if (Record->CriticalLootMode == RmCriticalLootDestroy)
             Key = RmObjDestroyLoot;
-        else if (Record->CriticalLootMode == 2 || Record->CriticalLootMode == 3)
+        else if (Record->CriticalLootMode == RmCriticalLootTractor ||
+                 Record->CriticalLootMode == RmCriticalLootReturn)
             Key = RmObjTractorLoot;
         else
             return true;
@@ -929,7 +930,7 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
             for (std::vector<FRmShipGroup>::iterator It = VignetteOffer->TargetShips.Groups.begin() + 1;
                  It != VignetteOffer->TargetShips.Groups.end(); ++It)
             {
-                if (It->SpawnTriggerMode != 1)
+                if (It->SpawnTriggerMode != RmSpawnPhaseDelay)
                     continue;
                 FRmCookieMessage Delayed(It->Serial);
                 send_delayed_message_to_me(&Delayed, static_cast<float>(It->SpawnTriggerParam),
@@ -937,18 +938,18 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
             }
         }
         int const Mode = VignetteOffer->TargetShips.EndTriggerMode;
-        if (Mode == 1)
+        if (Mode == RmEndTimer)
         {
             AddStateMachine(new FRmTimerTrigger(
                 CookieTargetDone, get_id(),
                 static_cast<float>(VignetteOffer->TargetShips.EndTriggerParam)));
         }
-        else if (Mode == 2)
+        else if (Mode == RmEndShipCount)
         {
             AddStateMachine(new FRmShipCountTrigger(CookieTargetDone, get_id(), &Ships->Records,
                                                     VignetteOffer->TargetShips.EndTriggerParam));
         }
-        else if (Mode == 3)
+        else if (Mode == RmEndShipHealth)
         {
             AddStateMachine(new FRmShipHealthTrigger(CookieTargetDone, get_id(),
                                                      &Ships->Records,
@@ -1060,7 +1061,7 @@ bool FRmVignetteMachine::HandleTargetBattle(SMEventData const* Event)
 
     // The exit to state 10: every alive ship leaves its formation for the main battle
     // (2000 is DAT_06fbc2cc).
-    if (Event->get_event_type() < 4 && Event->get_event_type() == 2)
+    if (Event->get_event_type() < SMET_Controller && Event->get_event_type() == SMET_Exit)
     {
         if (PendingState != RmStateApproachMain)
             return true;
@@ -1252,7 +1253,7 @@ bool FRmVignetteMachine::HandleApproachMain(SMEventData const* Event)
     }
 
     // The exit drops the main battle marker (key 2).
-    if (Event->is_sm_event() && Event->get_event_type() == 2)
+    if (Event->is_sm_event() && Event->get_event_type() == SMET_Exit)
     {
         RemoveObjective(RmObjGuideToMainBattle);
         return true;
@@ -1268,7 +1269,7 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
 
     // The flagged solars are marked; the first main group spawns unless delayed, every
     // delayed group gets its cookie.
-    if (Event->is_sm_event() && Event->get_event_type() == 1)
+    if (Event->is_sm_event() && Event->get_event_type() == SMET_Enter)
     {
         AreaRadius = 3500.0f;
         FRmRecordList Others = Solars->Query(1, 2, 2);
@@ -1292,12 +1293,12 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
         if (!VignetteOffer->Ships.Groups.empty())
         {
             std::vector<FRmShipGroup>::iterator First = VignetteOffer->Ships.Groups.begin();
-            if (First->SpawnTriggerMode != 1)
+            if (First->SpawnTriggerMode != RmSpawnPhaseDelay)
                 SpawnGroupWithTriggers(First->Serial, &VignetteOffer->Ships, CookieNextGroup);
             for (std::vector<FRmShipGroup>::iterator It = First;
                  It != VignetteOffer->Ships.Groups.end(); ++It)
             {
-                if (It->SpawnTriggerMode != 1)
+                if (It->SpawnTriggerMode != RmSpawnPhaseDelay)
                     continue;
                 FRmCookieMessage Delayed(It->Serial);
                 send_delayed_message_to_me(&Delayed, static_cast<float>(It->SpawnTriggerParam),
@@ -1391,7 +1392,7 @@ bool FRmVignetteMachine::HandleMainBattle(SMEventData const* Event)
 bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
 {
     // Controller message 0x27 is taken (the "any state" dock failure does not apply here).
-    if (Event->is_sm_event() && Event->get_event_type() == 1)
+    if (Event->is_sm_event() && Event->get_event_type() == SMET_Enter)
         return true;
     if (RmControllerOf(Event, EMessage::Msg0x27) != nullptr)
         return true;
@@ -1441,12 +1442,12 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         FRmLootMessage const* Picked = static_cast<FRmLootMessage const*>(Message);
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(Picked->ObjectId));
         int const Mode = Record->CriticalLootMode;
-        if (Mode == 1)
+        if (Mode == RmCriticalLootDestroy)
         {
             FDrop::Send(this, Record);
             return true;
         }
-        if (Mode != 2 && Mode != 3)
+        if (Mode != RmCriticalLootTractor && Mode != RmCriticalLootReturn)
             return true;
         FContentPlayerState* Picker = FindContentPlayerStateByShip(&Picked->Value);
         std::map<unsigned int, FContentPlayerState*>* PlayerMap = GetMissionPlayerMap();
@@ -1456,7 +1457,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
             return true;
         }
         RemoveObjective(RmObjTractorLoot);
-        if (Mode == 2)
+        if (Mode == RmCriticalLootTractor)
         {
             set_state(RmStateSucceeded);
             return true;
@@ -1488,7 +1489,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         unsigned int const LootId = static_cast<FRmLootMessage const*>(Message)->ObjectId;
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(LootId));
         int const Mode = Record->CriticalLootMode;
-        if (Mode == 3)
+        if (Mode == RmCriticalLootReturn)
         {
             RemoveObjective(RmObjReturnLoot);
             RemoveObjective(RmObjTractorLoot);
@@ -1506,7 +1507,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
             AddObjective(RmObjTractorLoot, static_cast<FRmObjective*>(Tractor));
             return true;
         }
-        if (Mode != 1 && Mode != 2)
+        if (Mode != RmCriticalLootDestroy && Mode != RmCriticalLootTractor)
             return true;
         Vector Where;
         Matrix Orientation;
@@ -1514,7 +1515,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         unsigned int SystemId = 0;
         pub::SpaceObj::GetSystem(Record->ObjectId, SystemId);
         std::vector<FRmObjective*>::iterator Active =
-            FindObjective(Mode == 1 ? RmObjDestroyLoot : RmObjTractorLoot);
+            FindObjective(Mode == RmCriticalLootDestroy ? RmObjDestroyLoot : RmObjTractorLoot);
         FRmRecordList Critical = Loot->Query(Record->CriticalLootMode, 2, 0, 2, 0);
         FRmObjective* const Objective = *Active;
         static_cast<FRmObjectiveType3*>(Objective)
@@ -1531,18 +1532,18 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         FRmLootRecord* Record =
             static_cast<FRmLootRecord*>(Loot->Records.FindById(Destroyed->ObjectId));
         int const Mode = Record->CriticalLootMode;
-        if (Mode == 1)
+        if (Mode == RmCriticalLootDestroy)
         {
             RemoveObjective(RmObjDestroyLoot);
             set_state(RmStateSucceeded);
             return true;
         }
-        if (Mode != 2 && Mode != 3)
+        if (Mode != RmCriticalLootTractor && Mode != RmCriticalLootReturn)
             return true;
         RemoveObjective(RmObjTractorLoot);
         VignetteOffer->General.SendConversations(RmCommGlobalFailDestroyedCriticalLoot, this,
                                                  FindContentPlayerStateByShip(&Destroyed->Value));
-        FailReason = Mode == 2 ? 4 : 5;
+        FailReason = Mode == RmCriticalLootTractor ? 4 : 5;
         set_state(RmStateFailed);
         return true;
     }
@@ -1553,11 +1554,11 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         unsigned int const LootId = static_cast<FRmLootMessage const*>(Message)->ObjectId;
         FRmLootRecord* Record = static_cast<FRmLootRecord*>(Loot->Records.FindById(LootId));
         int const Mode = Record->CriticalLootMode;
-        if (Mode == 1)
+        if (Mode == RmCriticalLootDestroy)
             FailReason = 6;
-        else if (Mode == 2)
+        else if (Mode == RmCriticalLootTractor)
             FailReason = 7;
-        else if (Mode == 3)
+        else if (Mode == RmCriticalLootReturn)
             FailReason = 8;
         set_state(RmStateFailed);
         return true;
@@ -1574,7 +1575,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
             return false;
         FRmRecordList Critical = Loot->Query(0, 2, 0, 0, 0);
         FRmLootRecord* const First = static_cast<FRmLootRecord*>(Critical.Records.front());
-        if (First->State == 4 && First->HolderId == Parms[3])
+        if (First->State == RmRecordDestroyedOther && First->HolderId == Parms[3])
         {
             FailReason = 9;
             set_state(RmStateFailed);
@@ -1589,7 +1590,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         FRmLootPlayerMessage const* Docked = static_cast<FRmLootPlayerMessage const*>(Message);
         FRmLootRecord* Record =
             static_cast<FRmLootRecord*>(Loot->Records.FindById(Docked->ObjectId));
-        if (Record->CriticalLootMode != 3)
+        if (Record->CriticalLootMode != RmCriticalLootReturn)
             return true;
         if (Docked->Value1 == VignetteOffer->OfferBase)
         {
@@ -1608,7 +1609,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
 bool FRmVignetteMachine::HandleSucceeded(SMEventData const* Event)
 {
     FRmVignetteEntryCookies const& Cookies = RmVignetteEntryCookies();
-    if (Event->is_sm_event() && Event->get_event_type() == 1)
+    if (Event->is_sm_event() && Event->get_event_type() == SMET_Enter)
     {
         VignetteOffer->General.SendConversations(RmCommGlobalSuccess, this, nullptr);
         StateMachineMessage Timeout(SMM_TIMEOUT);
@@ -1636,7 +1637,7 @@ bool FRmVignetteMachine::HandleSucceeded(SMEventData const* Event)
 bool FRmVignetteMachine::HandleFailed(SMEventData const* Event)
 {
     FRmVignetteEntryCookies const& Cookies = RmVignetteEntryCookies();
-    if (Event->is_sm_event() && Event->get_event_type() == 1)
+    if (Event->is_sm_event() && Event->get_event_type() == SMET_Enter)
     {
         StateMachineMessage Timeout(SMM_TIMEOUT);
         send_delayed_message_to_me(&Timeout, 5.0f, SMMS_Self, 0);
@@ -1662,7 +1663,7 @@ bool FRmVignetteMachine::HandleFailed(SMEventData const* Event)
 bool FRmVignetteMachine::HandleDone(SMEventData const* Event)
 {
     FRmVignetteEntryCookies const& Cookies = RmVignetteEntryCookies();
-    if (Event->is_sm_event() && Event->get_event_type() == 1)
+    if (Event->is_sm_event() && Event->get_event_type() == SMET_Enter)
     {
         Shutdown();
         return true;

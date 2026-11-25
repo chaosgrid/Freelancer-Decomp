@@ -30,6 +30,17 @@ struct IStoryMissionEvents
                                 unsigned int ControllerId) = 0;
 };
 
+// IStoryMissionEvents::OnMissionEvent's EventKind. The story (LAB_06ea6280) acts on these two
+// and ignores any other kind. The names are the port's, from the senders: 1 right after the
+// player joined the mission (FContentPlayerState::JoinMissionAsGroup: MissionScript's
+// "mission_accepted" / MissionResponse, Mission_01a / 01b), 3 once the mission state became
+// "succeed" (FMissionScript::ApplyDesiredMissionState).
+enum EStoryMissionEventKind : unsigned int
+{
+    STORY_MISSION_EVENT_JOINED = 1,
+    STORY_MISSION_EVENT_SUCCEEDED = 3,
+};
+
 // FUN_06ea6ba0 builds this polymorphic parameter object on the stack.
 // FUN_06eb75a0 reads PlayerId at +4 and StoryEvents at +8 before returning.
 struct FStoryMissionCreateParms final : pub::Controller::CreateParms

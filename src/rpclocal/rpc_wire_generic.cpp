@@ -598,9 +598,6 @@ unsigned int RpcEncodeWireBlobBufferFirst(FPacketBase& Packet, unsigned char** B
 unsigned int FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT::Decode(const unsigned char* Buffer,
                                                                    unsigned int Size,
                                                                    unsigned int* OutLength) {
-    FPayloadServerBlobReversed* Wire =
-        reinterpret_cast<FPayloadServerBlobReversed*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -609,9 +606,9 @@ unsigned int FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT::Decode(const unsigne
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();
     }
-    Wire->Size = Scratch;
-    Wire->Buffer = ::operator new(Wire->Size, std::nothrow);
-    if (!Stream.GetBytes(Wire->Buffer, Wire->Size)) {                  // 06d977ae onward
+    Wire.Size = Scratch;
+    Wire.Buffer = ::operator new(Wire.Size, std::nothrow);
+    if (!Stream.GetBytes(Wire.Buffer, Wire.Size)) {                    // 06d977ae onward
         return Stream.GetError();
     }
     if (Stream.Failed()) {
@@ -630,9 +627,6 @@ unsigned int FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT::Decode(const unsigne
 unsigned int FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM::Decode(const unsigned char* Buffer,
                                                            unsigned int Size,
                                                            unsigned int* OutLength) {
-    FPayloadServerBlobReversed* Wire =
-        reinterpret_cast<FPayloadServerBlobReversed*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -641,10 +635,10 @@ unsigned int FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM::Decode(const unsigned char* 
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();
     }
-    Wire->Size = Scratch;
-    if (Wire->Size != 0) {                                             // 06db114f / 06db1154
-        Wire->Buffer = ::operator new(Wire->Size, std::nothrow);
-        if (!Stream.GetBytes(Wire->Buffer, Wire->Size)) {              // 06db1162 onward
+    Wire.Size = Scratch;
+    if (Wire.Size != 0) {                                              // 06db114f / 06db1154
+        Wire.Buffer = ::operator new(Wire.Size, std::nothrow);
+        if (!Stream.GetBytes(Wire.Buffer, Wire.Size)) {                // 06db1162 onward
             return Stream.GetError();
         }
     }
@@ -702,9 +696,6 @@ unsigned int RpcDecodeWireOwnedBuffer(FPacketBase& Packet, const unsigned char* 
 unsigned int FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP::Decode(const unsigned char* Buffer,
                                                               unsigned int Size,
                                                               unsigned int* OutLength) {
-    FPayloadCommonBuffer* Wire =
-        reinterpret_cast<FPayloadCommonBuffer*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -713,17 +704,17 @@ unsigned int FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP::Decode(const unsigned cha
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();
     }
-    Wire->Size = Scratch;
-    if (Wire->Buffer == nullptr) {                                     // 06da5c30 / 06da5c38
-        Wire->Buffer = ::operator new(Wire->Size + 1u, std::nothrow);  // / 06da5c3e
-        Wire->bOwnsBuffer = 1;
+    Wire.Size = Scratch;
+    if (Wire.Buffer == nullptr) {                                      // 06da5c30 / 06da5c38
+        Wire.Buffer = ::operator new(Wire.Size + 1u, std::nothrow);    // / 06da5c3e
+        Wire.bOwnsBuffer = 1;
     }
-    if (!Stream.GetBytes(Wire->Buffer, Wire->Size)) {                  // 06da5c4d / 06da5c87
+    if (!Stream.GetBytes(Wire.Buffer, Wire.Size)) {                    // 06da5c4d / 06da5c87
         return Stream.GetError();
     }
     // Retail quirk: written unconditionally, even into a pre-existing buffer it did not
     // size itself.
-    reinterpret_cast<unsigned char*>(Wire->Buffer)[Wire->Size] = 0;
+    reinterpret_cast<unsigned char*>(Wire.Buffer)[Wire.Size] = 0;
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -901,10 +892,9 @@ bool RpcGetEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle** Slot) {
 }
 
 // 0x06d916a0 (slot) + 0x06da2240 (body) -- Encode.
-unsigned int RpcEncodeWireEquipList(FPacketBase& Packet, unsigned char** BufferHolder,
+unsigned int RpcEncodeWireEquipList(FRpcEquipListPacket& Packet, unsigned char** BufferHolder,
                                     unsigned int Capacity, unsigned int* OutLength) {
-    FRpcEquipWireHandle* const* Slot =
-        reinterpret_cast<FRpcEquipWireHandle* const*>(Packet.Payload());
+    FRpcEquipWireHandle* const* Slot = &Packet.EquipHandle;
 
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
@@ -919,9 +909,9 @@ unsigned int RpcEncodeWireEquipList(FPacketBase& Packet, unsigned char** BufferH
 }
 
 // 0x06d95bf0 (slot) + 0x06da2480 (body) -- Decode.
-unsigned int RpcDecodeWireEquipList(FPacketBase& Packet, const unsigned char* Buffer,
+unsigned int RpcDecodeWireEquipList(FRpcEquipListPacket& Packet, const unsigned char* Buffer,
                                     unsigned int Size, unsigned int* OutLength) {
-    FRpcEquipWireHandle** Slot = reinterpret_cast<FRpcEquipWireHandle**>(Packet.Payload());
+    FRpcEquipWireHandle** Slot = &Packet.EquipHandle;
 
     FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
 
@@ -958,21 +948,19 @@ unsigned int RpcDecodeWireEquipList(FPacketBase& Packet, const unsigned char* Bu
 unsigned int FPacket_FLPACKET_CLIENT_TRADERESPONSE::Decode(const unsigned char* Buffer,
                                                            unsigned int Size,
                                                            unsigned int* OutLength) {
-    FPayloadClientBlob* Wire = reinterpret_cast<FPayloadClientBlob*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
-    if (!Stream.GetDword(Wire->Size)) {
+    if (!Stream.GetDword(Wire.Size)) {
         return Stream.GetError();
     }
     // Allocated, stored, never written to: the next field overwrites the pointer.
-    Wire->Buffer = ::operator new(Wire->Size, std::nothrow);
+    Wire.Buffer = ::operator new(Wire.Size, std::nothrow);
     unsigned int Scratch = 0;
     if (!Stream.GetDword(Scratch)) {
         return Stream.GetError();
     }
     // The second wire dword lands on top of the pointer.
-    Wire->Buffer = reinterpret_cast<void*>(static_cast<size_t>(Scratch));
+    Wire.Buffer = reinterpret_cast<void*>(static_cast<size_t>(Scratch));
 
     *OutLength = Stream.Length();
     RpcRecordDecodedPacket(PacketId, Stream.Length());

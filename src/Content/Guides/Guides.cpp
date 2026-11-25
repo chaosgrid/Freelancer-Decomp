@@ -389,7 +389,7 @@ bool FTargetGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
     if (First.Pointer != nullptr)
         First->AddRef();
     int const Type = First->GetType();
-    if (Type == 5)
+    if (Type == OBJLIST_GOTO_VEC)
     {
         TRefHandle<FObjListDirective> Typed(First);
         OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(3);
@@ -397,7 +397,7 @@ bool FTargetGuide::RequestFleeDestination(pub::AI::ContentCallback::FleeDestinat
         OutFloat = 2000.0f;
         return true;
     }
-    if (Type == 0x13)
+    if (Type == OBJLIST_DOCK)
     {
         TRefHandle<FObjListDirective> Typed(First);
         OutType = static_cast<pub::AI::ContentCallback::FleeDestinationType>(2);
@@ -510,17 +510,17 @@ int FTradeRoute::Update(std::list<FObjListDirective*>* Out)
                 return GetStatus();
             }
             int const Type = Out->front()->GetType();
-            if (Type == 5)
+            if (Type == OBJLIST_GOTO_VEC)
                 State = 1;
             else
-                State = Type == 0x13 ? 2 : 1;
+                State = Type == OBJLIST_DOCK ? 2 : 1;
             return GetStatus();
         }
         case 1:
         {
             FObjListDirective** Active = Ship->GetActiveDirectiveSlot();
             Vector From;
-            if ((*Active)->GetType() == 5)
+            if ((*Active)->GetType() == OBJLIST_GOTO_VEC)
                 From = static_cast<FObjListGotoVec*>(*Active)->Op.Destination;   // +0x11c
             else
                 From = GetShipPosition(Ship);
@@ -531,9 +531,9 @@ int FTradeRoute::Update(std::list<FObjListDirective*>* Out)
                 return GetStatus();
             }
             int const Type = Out->front()->GetType();
-            if (Type == 5)
+            if (Type == OBJLIST_GOTO_VEC)
                 State = 1;
-            else if (Type == 0x13)
+            else if (Type == OBJLIST_DOCK)
                 State = 2;
             return GetStatus();
         }
@@ -1012,7 +1012,7 @@ FContentBase* FGuideDesc::FindTargetBase(unsigned int const* ObjectId,
     unsigned int BaseId = 0;
     unsigned int Type;
     pub::SpaceObj::GetType(*ObjectId, Type);
-    if ((Type & 0x40) != 0)
+    if ((Type & OBJ_JUMP_GATE) != 0)
     {
         // Through a jump object, a random base of the destination system
         // that accepts the ship's affiliation (rejected ones leave the list).

@@ -273,7 +273,7 @@ bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
                                   Equip->GetParentHPName().Value,
                                   EngineInstanceId, ChildHp) == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: CAttachedEquip: Failed to connect %s on %s to %s (Ignorable)",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: CAttachedEquip: Failed to connect %s on %s to %s (Ignorable)",
               kCAttachedEquipSource, 0x1d0, Arch->HpChild.Value, Arch->DaArchetype.Value,
               Equip->GetParentHPName().Value);
         return false;
@@ -361,7 +361,7 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
         else
         {
             Archetype::Equipment* Arch = Equip->Arch;
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: CAttachedEquip: Failed to create physics for [%s]: %s (Ignorable)",
                   kCAttachedEquipSource, 0x224, Arch->Nickname.get_string(), Arch->DaArchetype.Value);
             Debris->Release();
@@ -437,7 +437,7 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
     {
         // Unreachable (EquipObject was dereferenced above). Retail then calls Release on the
         // null pointer.
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: CAttachedEquip: Object (%s) failed to create attachment instance (Ignorable)\n",
               kCAttachedEquipSource, 0x2ab, ParentObj->Archetype->Nickname.get_string());
         EquipObject->Release();
@@ -452,7 +452,7 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
     long const ParentInst = Equip->GetParentConnector(false);
     if (ConnectAttachedHardpoints(ParentInst, ParentHp, Inst, ChildHp) == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: CAttachedEquip: Failed to connect %s on %s to %s (Ignorable)",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: CAttachedEquip: Failed to connect %s on %s to %s (Ignorable)",
               kCAttachedEquipSource, 0x2a5, Arch->HpChild.Value, Arch->DaArchetype.Value,
               Equip->GetParentHPName().Value);
         EquipObject->Release();
@@ -488,7 +488,7 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
         return true;
     }
 
-    FDUMP(0x100001, "%s(%d) : *** ERROR: CAttachedEquip: Failed to create physics for [%s]: %s (Ignorable)",
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: CAttachedEquip: Failed to create physics for [%s]: %s (Ignorable)",
           kCAttachedEquipSource, 0x29d, Arch->Nickname.get_string(), Arch->DaArchetype.Value);
     EquipObject->Release();
     EquipObject = nullptr;

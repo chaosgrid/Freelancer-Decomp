@@ -1245,7 +1245,7 @@ public:
     Archetype::CollisionGroup const* Arch;      // +0x04
     int RootIndex;                              // +0x08 FindChild, -1
     float HitPts;                               // +0x0c
-    int Field10;                                // +0x10 TODO: the ctor writes 1 (062a019d); no reader found in Common
+    int Field10;                                // +0x10 the ctor writes 1 (062a019d); nothing in common.dll reads it
     int State;                                  // +0x14 STATE_*
     int Fate;                                   // +0x18
     CObject* DestroyedObj;                      // +0x1c

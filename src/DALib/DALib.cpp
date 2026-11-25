@@ -291,7 +291,7 @@ void __cdecl DALib::Shutdown(HWND /*Hwnd*/)
 
     if (GLastReleaseCount != 0)
     {
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\DALib\\DALib.cpp",
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\DALib\\DALib.cpp",
               0x14e, "DA ENGINE: trailing references");
     }
 
@@ -335,7 +335,7 @@ void __cdecl DALib::Shutdown(HWND /*Hwnd*/)
     // Retail drains the pipeline pointer saved before teardown until a Release returns 0.
     while (GLastReleaseCount != 0)
     {
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\DALib\\DALib.cpp",
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", "E:\\FL\\Scratch\\Source\\DALib\\DALib.cpp",
               0x178, "******* DA SYSTEM: trailing references *******");
         GLastReleaseCount = SavedPipeline->Release();
     }

@@ -588,7 +588,7 @@ void ScrollControl::NotifyValue()
     if (Owner == nullptr)
         return;
     int const Current = Value;
-    Owner->SetProperty(0x3e, reinterpret_cast<uintptr_t>(AsWinControl()),
+    Owner->SetProperty(kWinNotifyScrollValue, reinterpret_cast<uintptr_t>(AsWinControl()),
                        static_cast<uintptr_t>(Current));
 }
 
@@ -1170,7 +1170,7 @@ intptr_t ScrollControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // FUN_005831b0 (RET 0xc).
     switch (Msg)
     {
-    case 0x06:
+    case kWinPropOffset:
     {
         // WinControl::Offset (+0xa8) from the vector at A, then the layout.
         float const* const NewOffset = reinterpret_cast<float const*>(A);
@@ -1180,7 +1180,7 @@ intptr_t ScrollControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         UpdateLayout();
         return 0;
     }
-    case 0x37:
+    case kScrollPropSetRange:
     {
         // The range, ordered, the value clamped into it, reported.
         int const First = static_cast<int>(A);
@@ -1200,7 +1200,7 @@ intptr_t ScrollControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         NotifyValue();
         return 0;
     }
-    case 0x38:
+    case kScrollPropSetValue:
     {
         // The value, not below the minimum; above the maximum only when the range is not empty.
         // Not reported.
@@ -1212,18 +1212,18 @@ intptr_t ScrollControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         UpdateThumb();
         return 0;
     }
-    case 0x39:
+    case kScrollPropGetMax:
         return MaxRange;
-    case 0x3a:
+    case kScrollPropGetMin:
         return MinRange;
-    case 0x3b:
+    case kScrollPropGetValue:
         return Value;
-    case 0x3c:
+    case kScrollPropSetPage:
         // The page size, and the button step (0 means 1).
         PageSize = static_cast<int>(A);
         Step = (B != 0) ? static_cast<int>(B) : 1;
         return 0;
-    case 0x3d:
+    case kScrollPropGetPage:
         return PageSize;
     default:
         return WinControl::SetProperty(Msg, A, B);

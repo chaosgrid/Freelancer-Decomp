@@ -28,7 +28,7 @@ namespace
         LARGE_INTEGER Counter;
         if (!QueryPerformanceCounter(&Counter))
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kTimingSource, 0x56,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kTimingSource, 0x56,
                   "QueryPerformanceCounter returned false");
             return 0;
         }
@@ -135,7 +135,7 @@ namespace
                 return Mean * 50.0;
         }
 
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kTimingSource, 0x11e,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kTimingSource, 0x11e,
               "TestClockSpeed - failed!");
         return 1000000.0 * 750.0;
     }
@@ -152,7 +152,7 @@ namespace Timing
         LARGE_INTEGER Freq;
         if (!QueryPerformanceFrequency(&Freq))
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: QueryPerformanceFrequence failed. GetLastError returned %u",
                   kTimingSource, 0x137, GetLastError());
             g_timing_frequency = 0.0;

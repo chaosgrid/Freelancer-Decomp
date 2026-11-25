@@ -172,7 +172,7 @@ unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This)
         &Desc, reinterpret_cast<void**>(&This->FxNode));
     if (NodeHr != GR_OK)
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: ParticleEffect::start_effect: couldnt create ale.tree "
               "for %s",
               "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3dc, This->Vis->Nickname);
@@ -194,12 +194,12 @@ unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This)
         if (Hr == static_cast<GENRESULT>(-8))
         {
             // No flag change.
-            FDUMP(0x100001, "%s(%d) : *** ERROR: could not find alchemy effect (%s) in file (%s)",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: could not find alchemy effect (%s) in file (%s)",
                   "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3eb, This->Vis->Nickname,
                   This->Vis->AlchemyPath);
             return 0;
         }
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: ParticleEffect::start_effect: couldnt create ale.eff "
               "(%s) in file (%s) ... Effect is most likely corrupted",
               "E:\\FL\\Scratch\\Source\\Client\\space\\Effect.cpp", 0x3f0,
@@ -228,7 +228,7 @@ unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
 
     if (EffectArch == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kEffectCpp, 0x37c,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kEffectCpp, 0x37c,
               "ParticleEffect::start_effect: archetype invalid (null archetype passed "
               "specified)");
         CallKillSlot(This);
@@ -261,7 +261,7 @@ unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
     if (TypeInfo == nullptr)
     {
         // The name comes from the VisEffect already at +0x04, not from the arch.
-        FDUMP(0x100002, "%s(%d) : *** WARNING: no type info specified for %s", kEffectCpp,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: no type info specified for %s", kEffectCpp,
               0x395, This->Vis->Nickname);
         CallKillSlot(This);
         return 0;
@@ -285,7 +285,7 @@ unsigned char FParticleEffect::Start(FEffectArch* EffectArch)
 
     if (This->Vis == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kEffectCpp, 0x3b0,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kEffectCpp, 0x3b0,
               "ParticleEffect::start_effect: archetype invalid (no visarch specified)");
         CallKillSlot(This);
         return 0;
@@ -388,11 +388,11 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
 
     // A watched gameobj of ManagerKind 1 or 2.
     FClientGameobj* const Watched = static_cast<FClientGameobj*>(EffectWatchedObject(Base));
-    if (Watched != nullptr && (Watched->ManagerKind == 1 || Watched->ManagerKind == 2))
+    if (Watched != nullptr && (Watched->ManagerKind == EClientGameobjKind::Ship || Watched->ManagerKind == EClientGameobjKind::Solar))
     {
         // A fully cloaked equipped object hides the effect (NaN does not).
         CObject const* const Obj = Watched->cobject();
-        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x103u) == 0x103u &&
+        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj &&
             static_cast<CEqObj const*>(Obj)->CloakPercent >= 1.0f)
             return 0;
 
@@ -534,7 +534,7 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
         EffectTypeInfoByIndex(static_cast<int>(This->EffectTypeId));
     if (TypeInfo == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kEffectCpp, 0x4c8,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kEffectCpp, 0x4c8,
               "effect shouldnt have gotten created w/o type info");
         return 0;
     }
@@ -591,7 +591,7 @@ void FParticleEffect::SetLod(float Lod)
     IFxEffect* const Fx = This->FxEffect;
     if (Fx == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kEffectCpp, 0x511,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kEffectCpp, 0x511,
               "Trying to set LOD on effect that does not exist - ADO");
         return;
     }
@@ -995,7 +995,7 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
     }
     if (Light != nullptr)
     {
-        EngineLightSetType((FEngineLight*)Light, 1, true);
+        EngineLightSetType((FEngineLight*)Light, kLightPoint, true);
         unsigned char const Rgb[3] = {EffectArch->LgtColorR, EffectArch->LgtColorG,
                                       EffectArch->LgtColorB};
         EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb);
@@ -1145,7 +1145,7 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
     }
     if (Light != nullptr)
     {
-        EngineLightSetType((FEngineLight*)Light, 1, true);
+        EngineLightSetType((FEngineLight*)Light, kLightPoint, true);
         unsigned char const Rgb[3] = {EffectArch->LgtColorR, EffectArch->LgtColorG,
                                       EffectArch->LgtColorB};
         EngineLightSetColorBytesAlt((FEngineLight*)Light, Rgb);

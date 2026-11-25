@@ -553,7 +553,7 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
     if (Pipeline->CreateBuffers(Hwnd, reinterpret_cast<int*>(&Local), reinterpret_cast<int*>(Out)) !=
         0)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: RenderMgr - failed to create_buffers(%d,%d) %d,%d\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: RenderMgr - failed to create_buffers(%d,%d) %d,%d\n",
               kRenderMgrCppPath, 0x240, Local.width, Local.height, Local.color_bpp,
               Local.depth_bpp);
         return false;
@@ -564,7 +564,7 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
     if (DALib::VertexBuffer->VbMgrInit(reinterpret_cast<void*>(1), reinterpret_cast<void*>(0x252),
                                        reinterpret_cast<void*>(0xfc00), nullptr) != 0)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRenderMgrCppPath, 0x24b,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRenderMgrCppPath, 0x24b,
               "unable to initialize VertexBuffer manager\n");
         return false;
     }
@@ -658,49 +658,49 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
 
     if (DALib::Data == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: could not find DATA directory (%s)\n", kMainCppPath,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: could not find DATA directory (%s)\n", kMainCppPath,
               0x2f8, g_display.data_path.Text);
         return false;
     }
     if (DALib::Hardpoint == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x2fd,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x2fd,
               "IHardpoint");
         return false;
     }
     if (DALib::Renderer == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x302,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x302,
               "IRenderer");
         return false;
     }
     if (DALib::TextureLib == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x307,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x307,
               "ITextureLibrary");
         return false;
     }
     if (DALib::MaterialLib == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x30c,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x30c,
               "IMaterialLibrary");
         return false;
     }
     if (DALib::VertexBuffer == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x311,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x311,
               "IVertexBufferManager");
         return false;
     }
     if (DALib::Alchemy == nullptr)
     {
         // Reported, not fatal.
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x316,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x316,
               "IAlchemy");
     }
     if (DALib::MaterialBatcher == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x31b,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing DA component (%s)\n", kMainCppPath, 0x31b,
               Iids::MaterialBatcher2);
         return false;
     }
@@ -850,7 +850,7 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
     srand(timeGetTime());
     if (CreateID("Freelancer") == 0)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kMainCppPath, 0x3d1,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kMainCppPath, 0x3d1,
               "Failed to initialize global ID maker instance.\n");
         return false;
     }
@@ -864,7 +864,7 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
         return false;
     if (ConfigResult != 0)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kMainCppPath, 0x3e1,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kMainCppPath, 0x3e1,
               "Config::startup() failed.\n");
         return false;
     }

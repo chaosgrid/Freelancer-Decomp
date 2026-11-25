@@ -333,7 +333,7 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
             {
                 CObject* const PlayerObject = PlayerBase->cobject();
                 if (PlayerObject != nullptr &&
-                    (static_cast<unsigned>(PlayerObject->ObjectClass) & 0x503u) == 0x503u)
+                    (static_cast<unsigned>(PlayerObject->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 {
                     IObjRW* const Target = static_cast<CShip*>(PlayerObject)->get_target();
                     if (Target != nullptr)
@@ -548,7 +548,7 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
 bool NnHelp::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00475430.
-    if (Msg != 0xef02)
+    if (Msg != kWinMsgHide)
         return WinControl::ProcessMessage(Msg, A, B); // FUN_005a0840
 
     // Out of the parent (no parent test), every child deleted, Destroy, delete.
@@ -569,7 +569,7 @@ intptr_t NnHelp::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_00475400 (RET 0xc).
     (void)B;
-    if (Msg == 0x26 && A == reinterpret_cast<uintptr_t>(CloseButton))
+    if (Msg == kWinNotifyClick && A == reinterpret_cast<uintptr_t>(CloseButton))
     {
         NnMainButtonOnModalOpen(); // FUN_0045a460
         return 1;
@@ -585,7 +585,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
     CObject const* const Target = Object->cobject(); // vt+0x150
     if (Target == nullptr)
         return;
-    if ((static_cast<unsigned>(Target->ObjectClass) & 3u) != 3u)
+    if ((static_cast<unsigned>(Target->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         return;
     CSimple const* const Simple = static_cast<CSimple const*>(Target);
 
@@ -605,7 +605,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
         IdsIntoOrEmpty(HudObjectTypeIds(Simple), Name, 0x80);
         wcscat(G_NnTextScratchB, Name);
         CharUpperW(G_NnTextScratchB);
-        Title->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
         GetIdsStringWWithRawFallback(0xd6ef, G_NnTextScratchB, G_NnTextScratchCapacity);
         AppendScratchB(Card);
     }
@@ -617,7 +617,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
         IdsIntoOrEmpty(GetObjectIdsName(Target), Name, 0x80);
         wcscat(G_NnTextScratchB, Name);
         CharUpperW(G_NnTextScratchB);
-        Title->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
         G_NnTextScratchB[0] = L'\0';
 
         // The pilot (ids 0x454).
@@ -634,7 +634,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
 
         // The attitude towards the player (ids 0x455, then 0x466
         // hostile / 0x467 neutral / 0x468 friendly).
-        if (Player != nullptr && (TypeBits & 0x7f0100u) != 0)
+        if (Player != nullptr && (TypeBits & (OBJ_SHIP_MASK | OBJ_STATION)) != 0)
         {
             int const Attitude = GetAttitudeClass(Player, Object); // FUN_0045a490
             GetIdsStringWWithRawFallback(0x455, G_NnTextScratchA, Capacity);
@@ -654,7 +654,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
             wcscat(G_NnTextScratchB, kLineBreak);
         }
 
-        if ((TypeBits & 0x7f0000u) != 0)
+        if ((TypeBits & OBJ_SHIP_MASK) != 0)
         {
             // The hull (ids 0x457): ftol(hit / max * 100). The x87 divide and multiply are
             // carried in double here; only max is rounded to float.
@@ -667,7 +667,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
             wcscat(G_NnTextScratchB, G_NnTextScratchA);
 
             // A CEqObj's shield (ids 0x464) when its capacity is above 0.
-            if ((static_cast<unsigned>(Target->ObjectClass) & 0x103u) == 0x103u)
+            if ((static_cast<unsigned>(Target->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             {
                 float ShieldMax = 0.0f;
                 float ShieldCur = 0.0f;
@@ -688,7 +688,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
 
             // A ship's group (ids 0x456 + CShip::get_group_name), and the
             // affiliation's infocard kept for the text.
-            if ((static_cast<unsigned>(Target->ObjectClass) & 0x503u) == 0x503u)
+            if ((static_cast<unsigned>(Target->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             {
                 CShip const* const Ship = static_cast<CShip const*>(Target);
                 unsigned const Group = Ship->get_group_name();
@@ -716,7 +716,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
 
         // A waypoint -- the player's own is numbered (ids 0x465), a
         // route's shows its marker.
-        if ((TypeBits & 0x200u) != 0)
+        if ((TypeBits & OBJ_WAYPOINT) != 0)
         {
             unsigned char bUserWaypoint = 0; // [ESP+0x1f]
             int WaypointIndex = 0;           // [ESP+0x18]
@@ -745,11 +745,11 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
 
         // Loot -- the text so far becomes the title, and the infocard
         // is the contents' good's (+0x8c), or the contents archetype's ids_info (+0x18).
-        if ((TypeBits & 0x10000000u) != 0)
+        if ((TypeBits & OBJ_LOOT) != 0)
         {
-            Title->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+            Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
             CObject const* const Loot = Object->cobject();
-            if (Loot != nullptr && (static_cast<unsigned>(Loot->ObjectClass) & 0x803u) == 0x803u)
+            if (Loot != nullptr && (static_cast<unsigned>(Loot->ObjectClass) & CObject::ClassLoot) == CObject::ClassLoot)
             {
                 Archetype::Equipment const* const Contents =
                     static_cast<CLoot const*>(Loot)->ContentsArch; // +0xec
@@ -773,7 +773,7 @@ void NnHelp::ShowObjectInfo(IObjRW* Object)
         // A CEqObj's own infocard (Reputation::Vibe::GetInfocard), and
         // with an infocard map entry and a dock base the base goods sections by the visit bits.
         CObject const* const Owner = Object->cobject();
-        if (Owner != nullptr && (static_cast<unsigned>(Owner->ObjectClass) & 0x103u) == 0x103u)
+        if (Owner != nullptr && (static_cast<unsigned>(Owner->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
         {
             CEqObj const* const EqObj = static_cast<CEqObj const*>(Owner);
             int const Vibe = static_cast<int>(EqObj->VibeId); // [ESP+0x34]

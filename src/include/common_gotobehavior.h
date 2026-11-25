@@ -264,10 +264,10 @@ void ProxWatcherNotifyZoneChange(unsigned char* Watcher, SystemManager* SysMgr, 
 //   +0x04 Throttle         -- get_projected_throttle(Speed, Type) (slot 0xD4)
 //   +0x08 AngularSpeed     -- folded from get_angular_speed_XY (slot 0xF0)
 //   +0x0C AngularThrottle  -- get_projected_axis_throttle_XY(...) (slot 0xF8)
-//   +0x10 Flag10           -- confirmed one byte; its MEANING is not proven, so
-//                             it keeps a placeholder name. Retail sets it to 1
-//                             up front, and on the non-cruise path rewrites it
-//                             to `MaxProjection < 20.0f && MinAlignCos > 0.99`.
+//   +0x10 bCruiseAllowed   -- one byte. Retail sets it to 1 up front, and on the
+//                             non-cruise path rewrites it to
+//                             `MaxProjection < 20.0f && MinAlignCos > 0.99`; its
+//                             only reader, GotoBehavior::Update, drops cruise on 0.
 // Callers zero only the first four dwords before the call and let the callee
 // write the byte; GotoBehavior::Update reads +0x04/+0x08/+0x10, FUN_062c47f0
 // reads +0x00/+0x08, SplineMoveIdea::Update (LAB_062d9d00) reads +0x04 twice.
@@ -279,14 +279,14 @@ struct FormationFollowerEnvelope
     float Throttle;              // +0x04
     float AngularSpeed;          // +0x08
     float AngularThrottle;       // +0x0c
-    unsigned char Flag10;        // +0x10 -- TODO: semantic name unproven
+    unsigned char bCruiseAllowed; // +0x10  FUN_062ebf50 writes it, GotoBehavior::Update reads it
 };
 
 static_assert(offsetof(FormationFollowerEnvelope, Speed) == 0x00, "FormationFollowerEnvelope::Speed offset");
 static_assert(offsetof(FormationFollowerEnvelope, Throttle) == 0x04, "FormationFollowerEnvelope::Throttle offset");
 static_assert(offsetof(FormationFollowerEnvelope, AngularSpeed) == 0x08, "FormationFollowerEnvelope::AngularSpeed offset");
 static_assert(offsetof(FormationFollowerEnvelope, AngularThrottle) == 0x0c, "FormationFollowerEnvelope::AngularThrottle offset");
-static_assert(offsetof(FormationFollowerEnvelope, Flag10) == 0x10, "FormationFollowerEnvelope::Flag10 offset");
+static_assert(offsetof(FormationFollowerEnvelope, bCruiseAllowed) == 0x10, "FormationFollowerEnvelope::bCruiseAllowed offset");
 static_assert(sizeof(FormationFollowerEnvelope) == 0x14, "FormationFollowerEnvelope is four floats plus a byte, 4-aligned");
 
 // The envelope's producer, FUN_062ebf50, is

@@ -367,7 +367,8 @@ public:
 
     int Caret;                          // +0x49c
     // +0x4a0 / +0x4a4 -- always written together with the caret (SetText, ClearText); every edit
-    // path requires them equal. TODO: meaning (a selection is the obvious reading, unproven).
+    // path (FUN_0057c9b0, LAB_0057ceb0) requires them equal. Writers: the ctor, FUN_0057be30,
+    // FUN_0057bff0 (0) and FUN_0057c0e0 (the count); none stores two different values.
     int Field_0x4a0;                    // +0x4a0
     int Field_0x4a4;                    // +0x4a4
     int Field_0x4a8;                    // +0x4a8 -- ctor 4; nothing in this class reads it

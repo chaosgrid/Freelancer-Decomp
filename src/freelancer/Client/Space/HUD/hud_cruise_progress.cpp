@@ -128,7 +128,7 @@ void HUD_CruiseProgress::Draw()
         return;
     }
     CEqObj* const Ship = static_cast<CEqObj*>(Object);
-    CEEngine* const Engine = CEEngine::cast(Ship->EquipManager.FindFirst(0x20000)); // +0xe4
+    CEEngine* const Engine = CEEngine::cast(Ship->EquipManager.FindFirst(EquipTypeEngine)); // +0xe4
     if (Engine == nullptr)
     {
         return;
@@ -160,14 +160,14 @@ void HUD_CruiseProgress::Draw()
         // The countdown before the charge starts.
         bCharging = 0;
         Text->SetCachedDraw(0, 0);                                      // FUN_0058ad70
-        Text->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), 1);
+        Text->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), 1);
         int const Seconds = static_cast<int>(ceil(-static_cast<double>(Elapsed))); // ftol
         // Retail's format is u"%s - %d%" (0x005d7fdc). VC6 msvcrt's _woutput leaves its format
         // loop at the terminator right after the lone trailing '%' and prints nothing for it;
         // the current CRT rejects an unterminated conversion through the invalid-parameter
         // handler instead, so the same output is produced here without that '%'.
         swprintf(Line, 0x3c, L"%s - %d", CountdownCaption, Seconds);
-        Text->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Line), 0);
+        Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Line), 0);
         Text->Draw();
         return;
     }
@@ -178,11 +178,11 @@ void HUD_CruiseProgress::Draw()
         // The charge percentage.
         Text->SetCachedDraw(1, static_cast<unsigned char>(bCharging == 0));
         bCharging = 1;
-        Text->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteCyan), 1);
+        Text->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteCyan), 1);
         // 100.0f (0x005ca230), 0.5 (double 0x005c75e8), ftol.
         int const Percent = static_cast<int>(static_cast<double>(Ratio) * 100.0 + 0.5);
         swprintf(Line, 0x3c, L"%s - %d%%", ChargingCaption, Percent);   // u"%s - %d%%" 0x005d7fc8
-        Text->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Line), 0);
+        Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Line), 0);
         Text->Draw();
     }
 }

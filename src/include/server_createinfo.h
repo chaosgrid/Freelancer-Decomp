@@ -487,7 +487,7 @@ struct FServerLootDesc
 
     // FUN_06d08e80, retail's constructor. Its only retail caller runs it over raw storage
     // (StarSystem::create_loot), and the other places that make one do not call it, so it
-    // is an explicit member here rather than a C++ constructor. Defined in server_classes.cpp.
+    // is an explicit member here rather than a C++ constructor. Defined in server_starsys.cpp.
     void init();
 };
 

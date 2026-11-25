@@ -473,7 +473,7 @@ void CStrafeEngine::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vect
         Dir.z = -Ori.E[2][1];
         break;
     default:
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
               "E:\\FL\\Scratch\\Source\\Common\\CStrafeEngine.cpp", 0x4d,
               "No strafe direction!");
         return;

@@ -113,7 +113,7 @@ bool RearViewCameraLoad(FRearViewCamera* Cam, const char* CockpitIniPath)
     INI_Reader Reader;
     if (!Reader.open(CockpitIniPath, false))
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: rearview camera file not found '%s'\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: rearview camera file not found '%s'\n",
               kCockpitCpp, 0x6e3, CockpitIniPath);
         bOk = false;
     }
@@ -123,7 +123,7 @@ bool RearViewCameraLoad(FRearViewCamera* Cam, const char* CockpitIniPath)
         // [RearView] is recognised only to warn about it; no key is read from it.
         if (Reader.is_header("RearView"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: [RearView] is obsolete in file %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [RearView] is obsolete in file %s\n",
                   kCockpitCpp, 0x6ea, CockpitIniPath);
             continue;
         }

@@ -112,7 +112,7 @@ bool NnArrivalText::Create(Win3D* NewParent, void* Data)
         NnFloatBits(0x3d75c28f), NnFloatBits(0x3fb33333), 0, 0, 0, 1));
 
     // The colour override; no null test on the control.
-    Caption->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPalettePaleGreen), 1);
+    Caption->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPalettePaleGreen), 1);
     Caption->Flags = static_cast<unsigned char>(Caption->Flags & 0xfc);
 
     SetOffset(0.0f, 0.0f, -1.0f);
@@ -190,7 +190,7 @@ void NnArrivalText::Update()
 
     // A caption that became visible this frame starts typing (60 ms per character).
     if (!bWasVisible && (Caption->Flags & 2) != 0)
-        Caption->SetProperty(0x50, 1, 0x3c);
+        Caption->SetProperty(kTextPropTypewriter, 1, 0x3c);
 }
 
 void NnArrivalText::ShowBaseArrival(float ArrivalTime)
@@ -215,7 +215,7 @@ void NnArrivalText::ShowBaseArrival(float ArrivalTime)
     _swprintf(G_NnTextScratchB, Format, G_NnTextScratchA, SecondHalf);
     CharUpperW(G_NnTextScratchB);
 
-    Caption->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+    Caption->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     int const Length = static_cast<int>(wcslen(G_NnTextScratchB));
 
     // Only a positive ArrivalTime (NaN not) sets the delay so typing plus the hold ends with it;
@@ -260,7 +260,7 @@ void NnArrivalText::ShowSystemArrival(bool bResetDelay)
         GetIdsStringWWithRawFallback(RegionIds, SecondHalf, Half);
         _swprintf(G_NnTextScratchB, Format, G_NnTextScratchA, SecondHalf);
         CharUpperW(G_NnTextScratchB);
-        Caption->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        Caption->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     }
     else
     {
@@ -269,7 +269,7 @@ void NnArrivalText::ShowSystemArrival(bool bResetDelay)
                                      G_NnTextScratchCapacity / 2);
         _swprintf(G_NnTextScratchB, Format, G_NnTextScratchA);
         CharUpperW(G_NnTextScratchB);
-        Caption->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        Caption->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
         Delay = 2.0f;
     }
 
@@ -294,7 +294,7 @@ void NnArrivalText::ShowNamedArrival(unsigned NameIds)
     GetIdsStringWWithRawFallback(static_cast<unsigned>(SystemIds), SecondHalf, Half);
     _swprintf(G_NnTextScratchB, Format, G_NnTextScratchA, SecondHalf);
     CharUpperW(G_NnTextScratchB);
-    Caption->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+    Caption->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     Delay = 2.0f;
 }
 
@@ -363,7 +363,7 @@ void NnArrivalTextShowRaw(float Delay, uintptr_t Arg)
         return;
     Self->Delay = Delay;
     Self->bWaitForLetterbox = 0;
-    Self->Caption->SetProperty(0x1e, Arg, 0);
+    Self->Caption->SetProperty(kTextPropSetIds, Arg, 0);
 }
 
 void NnArrivalTextShowSystemNow()
@@ -445,7 +445,7 @@ void NnSystemShutdown()
             delete G_NnMainButton;
     }
     if (G_NnTrade != nullptr)
-        G_NnTrade->SetProperty(0xef02, 0, 0);
+        G_NnTrade->SetProperty(kWinMsgHide, 0, 0);
     KnowledgeMapDestroy();
     InfocardMapDestroy();
     NnArrivalTextDestroy();

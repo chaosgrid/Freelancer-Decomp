@@ -471,7 +471,7 @@ public:
     // client or the object is this player's own ship, sends FLPACKET_SERVER_LAND (IClient
     // +0x0ec == SendServerLand) with the payload {*ObjId, *Arg2, *Arg3}; outside single
     // player the player's own ship landing first autosaves the slot (FUN_06d4c430). Its only
-    // caller is the per-system step FUN_06d0be50 (StarSystem::update in IServerImpl.cpp),
+    // caller is the per-system step FUN_06d0be50 (StarSystem::update in server_starsys.cpp),
     // walking the dock queue (SystemDockNode below). Arg2 is the id from a vtable +0x20
     // get_id (0 if none) and Arg3 is the dock node's +0x18.
     void on_object_landed(unsigned int const* ObjId, unsigned int const* Arg2,
@@ -506,7 +506,7 @@ public:
     //      Observer::should_be_visible(View, Obj);
     //   5. mark the record bCreatedOnClient and hand the payload to the IClient slot.
     // The ship one (FUN_06cf6630) is the odd one out and does NOT follow 4/5 -- see
-    // its own comment in server_classes.cpp.
+    // its own comment in server_observer.cpp.
     //
     // The first argument is the record the packet carries. Retail builds it in the
     // caller (FUN_06d07690 for ships, FUN_06d07b90 for loot, ...) and these five
@@ -554,11 +554,11 @@ public:
     void send_mine_explosion(FMineExplosion* Rec);
 
     // The tracked-list search by get_id(), inlined in FUN_06cf6820. Defined in
-    // server_classes.cpp.
+    // server_observer.cpp.
     SystemTrackedNode* find_by_id(unsigned int ObjId);
 
     // The tracked-list search by object pointer, inlined in FUN_06cf73d0. Defined in
-    // server_classes.cpp.
+    // server_observer.cpp.
     SystemTrackedNode* find_by_pointer(GameObject* Obj);
 };
 
@@ -792,7 +792,7 @@ public:
 
     // player_switched_out -- retail FUN_06d087f0 (.text:06d087f0, thiscall,
     // RET 8; the name is the port's). The system-switch twin of FUN_06d08890
-    // (PlayerDB_LeaveSystem in server_classes.cpp). Only caller:
+    // (PlayerDB_LeaveSystem in server_serverspace.cpp). Only caller:
     // IServerImpl::SystemSwitchOutComplete (.text:06cef848), pushing
     // (SessionId, the destination system id).
     //   .text:06d087f6 .. 06d087fd  remove_player(SessionId) (FUN_06d08740)
@@ -1020,7 +1020,7 @@ public:
     //     (FUN_06d02c20); enter_system(this, 0) (vt +0x170); check_fuses
     //     (vt +0x1bc); CObject::Release; the wrapper appended to Solars
     //     (+0x5c, MetaList append inlined); ++count; CObject::FindNext
-    //   .text:06d07282 .. 06d072ac  count == 0 -> FDUMP(0x100002, "%s(%d) :
+    //   .text:06d07282 .. 06d072ac  count == 0 -> FDUMP(kFdumpWarning, "%s(%d) :
     //                               *** WARNING: %s", StarSys.cpp, 0x129,
     //                               "failed to find any solar objects\n")
     // ------------------------------------------------------------------
@@ -1314,7 +1314,7 @@ public:
     // ------------------------------------------------------------------
     // The IObjAffect notifiers Ship/EqObj/Guided call after changing a ship's
     // controls. Names are the port's;
-    // bodies and instruction maps in server_classes.cpp. Every one tells the
+    // bodies and instruction maps in server_starsys.cpp. Every one tells the
     // players of this system who can see the object (FUN_06cf7370 /
     // FUN_06cf73d0), and the ones with SourceClient skip the player whose id
     // equals it -- the client that asked for the change.
@@ -1641,15 +1641,15 @@ public:
     void resolve_collision_side(CObject* Part, unsigned int PartId, GameObject** OutObj,
                                 unsigned short* OutSubObjId);
 
-    // FUN_06d0be50: one system's update for Dt seconds. Defined in IServerImpl.cpp.
+    // FUN_06d0be50: one system's update for Dt seconds. Defined in server_starsys.cpp.
     unsigned int update(float Dt);
 
     // The tail of FUN_06d0be50, after the per-player view update; not a function of its own in
-    // retail. Defined in IServerImpl.cpp.
+    // retail. Defined in server_starsys.cpp.
     void send_changed_affiliations();
 
     // FUN_06d0be50's ship-proximity pass; not a function of its own in retail. Defined in
-    // IServerImpl.cpp.
+    // server_starsys.cpp.
     void update_near_ships(float Step);
 };
 
@@ -1708,10 +1708,10 @@ extern unsigned char GbAllowPvp;
 
 // The one-entry cache of FUN_06d006c0 (the object lookup by id; see
 // server_gameobject.h, Server_LookupGameObject). Retail's storage, defined in
-// src/Server/IServerImpl.cpp. Readers and writers: FUN_06d006c0 (Server_FindObject),
+// src/Server/server_serverspace.cpp. Readers and writers: FUN_06d006c0 (Server_FindObject),
 // FUN_06d005d0 (Server_LookupCacheForget), FUN_06d00380 / FUN_06d00410
-// (Server_TakeInTransit / Server_DestroyInTransit), all in server_classes.cpp,
-// and FUN_06cffff0 (Server_CleanupPhysics, IServerImpl.cpp).
+// (Server_TakeInTransit / Server_DestroyInTransit), all in server_serverspace.cpp,
+// and FUN_06cffff0 (Server_CleanupPhysics, server_serverspace.cpp).
 //   DAT_06d8d8ec  watcher on the last object found (its Watchable, IObjRW+8);
 //                 FUN_06d006c0 .text:06d006dc reads it, -8 back to the IObjRW.
 //                 CRT init LAB_06cfff90 (FUN_06d00d50(0): both dwords zero),

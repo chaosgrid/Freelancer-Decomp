@@ -224,7 +224,7 @@ namespace Archetype
     // ArchDB::Insert's zero-id arm (FUN_062fbeb0 / FUN_062fbbe0).
     void ArchDBDumpNoNickname(char const* KindName)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Loaded '%s' has no nickname .. not adding to database.\n",
               ArchetypeSource, 0x84, KindName);
     }
@@ -232,14 +232,14 @@ namespace Archetype
     // ArchDB::Get(unsigned)'s miss dump.
     void ArchDBDumpMiss(unsigned NicknameId)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: ArchDB::Get(%u) failed",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: ArchDB::Get(%u) failed",
               ArchetypeSource, 0x3c, NicknameId);
     }
 
     // ArchDB::Get(ID_String const&)'s miss dump.
     void ArchDBDumpMiss(ID_String const& Name)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: ArchDB::Get(%s) failed. ID=%d",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: ArchDB::Get(%s) failed. ID=%d",
               ArchetypeSource, 0x49, Name.get_string(), Name.Id);
     }
 
@@ -358,7 +358,7 @@ unsigned __cdecl DecodeType(char const* Name)
             return Archetype::GObjectTypes[Index].Bits;
     }
 
-    FDUMP(0x100002, "%s(%d) : *** WARNING: unknown OBJECT_TYPE = '%s'\n",
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: unknown OBJECT_TYPE = '%s'\n",
           Archetype::ArchetypeSource, 0xe1, Name);
     return 0;
 }
@@ -647,7 +647,7 @@ namespace Archetype
         IFileSystem* Filesys = nullptr;
         if (DALib::Data->CreateInstance((AGGDESC*)&Desc, (void**)&Filesys) != 0)
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: failed to open archetype (%s) file system\n",
                   ArchetypeSource, 0x1c3, Path);
             return false;
@@ -671,7 +671,7 @@ namespace Archetype
                 bLoaded = Load(Path, &EngineIndex, &AnimIndex);
                 if (!bLoaded)
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: missing Archetype file %s\n",
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: missing Archetype file %s\n",
                           ArchetypeSource, 0x2b0, Path);
                     LoadCount += 1;
                     return false;
@@ -765,12 +765,12 @@ namespace Archetype
         char const* Path = DaArchetype.Value;
         if (Path[0] == '\0')
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: Cannot create_instance(). Archetype (%s) has no file assigned. NOT IGNORABLE!\n",
                   ArchetypeSource, 0x218, Nickname.get_string());
             return -1;
         }
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Cannot create_instance(). Archetype (%s) file isn't loaded/valid: %s.  NOT IGNORABLE!\n",
               ArchetypeSource, 0x21e, Nickname.get_string(), Path);
         return -1;

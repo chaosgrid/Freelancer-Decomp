@@ -120,6 +120,14 @@ public:
 // TU61 -- record base (retail 0x60 bytes, vtable 06fbc7c8: [0] FUN_06f866e0 / dtor
 // FUN_06f86700). ctor FUN_06f866a0. The copy ctor FUN_06f91310 and its inline copies are the
 // implicit member copy.
+// FRmSpawnRecord::State values.
+enum ERmRecordState
+{
+    RmRecordAlive = 2,
+    RmRecordDestroyed = 3,          // message 0x39 (a loot record: cause 0 or 1)
+    RmRecordDestroyedOther = 4,     // a loot record's message 0x39 with any other cause
+};
+
 class FRmSpawnRecord
 {
 public:
@@ -128,8 +136,8 @@ public:
 
     bool bHostile = true;                           // +0x04 hostile to players (ctor 1)
     TString<0x30> Name;                             // +0x08 empty (Length 0, Data[0] 0)
-    // +0x3c: 2 alive, 3 destroyed (message 0x39), 4 loot gone without a player (FUN_06f86fb0).
-    int State = 2;
+    // +0x3c: ERmRecordState (4 only for loot, FUN_06f86fb0).
+    int State = RmRecordAlive;
     unsigned int Flags = 0;                         // +0x40 bit 1: counted by FUN_06f87e90
     // +0x44: the attitude towards the players (FUN_06f8b930), -2.0 (DAT_06fbc2e8) = none.
     float Attitude = -2.0f;
@@ -321,28 +329,6 @@ public:
     FRmRecordList* Records;                         // +0x40 the ship machine's list
     int Threshold;                                  // +0x44
     int Kind;                                       // +0x48 FRmShipRecord::Kind (2)
-};
-
-// The comm sequence triggers (GRmCommTriggerNames, VignetteParams.ini) the vignette machine
-// passes to FRmOfferComponent::SendConversations. Names are the retail strings.
-enum ERmCommTrigger
-{
-    RmCommInSpaceInSystem = 1,                      // IN_SPACE_IN_SYSTEM
-    RmCommInSpaceNotInSystem = 2,                   // IN_SPACE_NOT_IN_SYSTEM
-    RmCommPreBattleSpawnRange = 3,                  // PLAYER_IN_PRE_BATTLE_SPAWN_RANGE
-    RmCommKilledAllGoingToMain = 4,                 // SUCCESS_KILLED_ALL_GOING_TO_MAIN
-    RmCommNotKilledAllGoingToMain = 5,              // SUCCESS_NOT_KILLED_ALL_GOING_TO_MAIN
-    RmCommMainBattleSolarSpawnRange = 6,            // PLAYER_IN_MAIN_BATTLE_SOLAR_SPAWN_RANGE
-    RmCommMainBattleShipSpawnRange = 7,             // PLAYER_IN_MAIN_BATTLE_SHIP_SPAWN_RANGE
-    RmCommFirstFriendlySpawn = 8,                   // FIRST_FRIENDLY_SPAWN
-    RmCommFirstDefensiveShipSpawn = 9,              // FIRST_DEFENSIVE_SHIP_SPAWN
-    RmCommFirstBigShipSpawn = 10,                   // FIRST_BIG_SHIP_SPAWN
-    RmCommLeftCombatArea = 11,                      // LEFT_COMBAT_AREA
-    RmCommReenteredCombatArea = 12,                 // REENTERED_COMBAT_AREA
-    RmCommGlobalSuccess = 13,                       // GLOBAL_SUCCESS
-    RmCommGlobalFailCombatRange = 14,               // GLOBAL_FAIL_COMBAT_RANGE
-    RmCommGlobalFailDestroyedCriticalLoot = 15,     // GLOBAL_FAIL_DESTROYED_CRITICAL_LOOT
-    RmCommGlobalFailOther = 16,                     // GLOBAL_FAIL_OTHER
 };
 
 // =======================================================================================
@@ -555,7 +541,7 @@ private:
     // objective 8.
     void MarkGroupTargets(FRmRecordList* Members, FRmObjectiveMap* Map);
 
-    // +0xa8: 0 from the factory. TODO: meaning (no reader in FUN_06f8c460).
+    // +0xa8: 0 from the factory (FUN_06f890f0, 06f89140); no other access in TU61.
     unsigned int Field_0xa8 = 0;
     // +0xac: the game time the players left the combat area (FUN_06efec10, stored as float),
     // -1.0 while they are in it.

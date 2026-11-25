@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "dacom.h"
+#include "dacom_factory.h"   // FDacomComponentFactory
 #include "luaprofile.h"
 #include "system.h"
 
@@ -21,7 +22,6 @@
 
 static const unsigned long kAggDescSize = 0x14;
 static const unsigned long kRegisterPriority = 0x40000000;
-static const unsigned int kFdumpNotice = 0x100003;
 static const int kLoadComponentsLine = 0x123;
 
 static const char kComponentName[] = "SystemContainer";  // s_SystemContainer_06f13080
@@ -127,18 +127,14 @@ static_assert(offsetof(FSystemContainer, bLoaded) == 0x24, "bLoaded at +0x24");
 static_assert(sizeof(FSystemContainer) == 0x28, "calloc(0x28, 1) @06f118f6");
 static_assert(sizeof(FComponentNode) == 0x14, "FComponentNode is 0x14");
 
-class FSystemContainerFactory final : public IComponentFactory
+// QueryInterface LAB_06f11830 (*Out = 0, then an exact compare with "1.11_IComponentFactory"),
+// AddRef and Release FUN_06f11870 are FDacomComponentFactory's.
+class FSystemContainerFactory final : public FDacomComponentFactory
 {
 public:
     FSystemContainerFactory();
 
-    GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
-
-    unsigned long RefCount;
-    const char* Name;
 };
 
 static_assert(sizeof(FSystemContainerFactory) == 0x0C, "factory is 0xC");
@@ -543,36 +539,7 @@ GENRESULT FSystemContainer::BindOuter(FSystemAggDesc* Desc)
 }
 
 // Inlined in FUN_06f117a0.
-FSystemContainerFactory::FSystemContainerFactory() : RefCount(1), Name(kComponentName) {}
-
-// LAB_06f11830: *Out = 0, then an exact compare with "1.11_IComponentFactory".
-GENRESULT DACOM_API FSystemContainerFactory::QueryInterface(const char* Iid, void** Out)
-{
-    *Out = nullptr;
-    if (strcmp(Iid, Iids::ComponentFactory) != 0)
-        return GR_INTERFACE_UNSUPPORTED;
-    *Out = (IComponentFactory*)(this);
-    AddRef();
-    return GR_OK;
-}
-
-unsigned long DACOM_API FSystemContainerFactory::AddRef()
-{
-    ++RefCount;
-    return RefCount;
-}
-
-// FUN_06f11870.
-unsigned long DACOM_API FSystemContainerFactory::Release()
-{
-    if (RefCount > 0)
-        --RefCount;
-    if (RefCount != 0)
-        return RefCount;
-    RefCount = 1;
-    delete this;
-    return 0;
-}
+FSystemContainerFactory::FSystemContainerFactory() : FDacomComponentFactory(kComponentName) {}
 
 // LAB_06f118a0.
 GENRESULT DACOM_API FSystemContainerFactory::CreateInstance(AGGDESC* Desc, void** Instance)

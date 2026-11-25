@@ -195,7 +195,7 @@ namespace
 
     void ZoneTypeNotSupported(int Line)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kSystemsSource, Line, kZoneTypeNotSupported);
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kSystemsSource, Line, kZoneTypeNotSupported);
     }
 
     // FUN_06339f20 (thiscall). Each column of the matrix copy is scaled by that axis's squared

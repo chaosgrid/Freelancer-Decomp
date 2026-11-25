@@ -31,7 +31,7 @@ struct FPropData
 
     std::string Template;   // +0x00 the archetype / PetalDB nickname (or a "$..." indirection)
     std::string Name;       // +0x10 the entity name (FUN_0044a2f0 finds props by it)
-    int Type;               // +0x20 0/5/6 PetalDB category, 1 ship, 2 solar, 3 asteroid, 4 equip
+    int Type;               // +0x20 EPetalCategory (common_fuses.h): 0/5/6 PetalDB, 1..4 archetypes
     Vector Pos;             // +0x24
     Matrix Orient;          // +0x30
     std::string Loadout;    // +0x54 only read for Type 1

@@ -200,7 +200,7 @@ void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
     FVoiceProfile* const Profile = LookupClientVoice(Voice);
     if (Profile == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Voice profile %u does not exist\n", GScriptSoundFile,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Voice profile %u does not exist\n", GScriptSoundFile,
               0xe8, Voice);
         return;
     }
@@ -210,7 +210,7 @@ void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
         Arch = Message;
         return;
     }
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Voice profile %s (%x) does not support message %s",
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Voice profile %s (%x) does not support message %s",
           GScriptSoundFile, 0xe3, Profile->GetName(), Voice, MessageName);
 }
 
@@ -426,7 +426,7 @@ void FThornSound::SetSpawnTable(FThornComponent** Table, int Count)
     }
     if (!bFound)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Speaker name %s for sound %s in script %s does not match any "
               "entity names, sound cannot play",
               GScriptSoundFile, 0x123, Speaker, Template, Owner->ScriptFile);
@@ -554,7 +554,7 @@ FThornSoundReference::FThornSoundReference(Csys const& ScriptFrame, FGfScript* I
     Target = G_GfScriptManager.FindCreatedEntity(kThornEntitySound, Desc->Name);
     if (Target == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: invalid sound reference to name %s",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: invalid sound reference to name %s",
               GScriptSoundFile, 0x2f2, Desc->Name);
     }
 }

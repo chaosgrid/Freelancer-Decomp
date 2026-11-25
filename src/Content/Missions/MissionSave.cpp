@@ -22,6 +22,7 @@
 #include "Missions/MissionObject.h"
 
 #include "Core/ContentPlayerState.h"
+#include "Core/ContentInternal.h"     // GIdValueMask
 #include "Encounters/Encounters.h"         // FFormation (NPC ship +0x150)
 #include "Guides/GuidesInternal.h"     // FLineGuide: the save prints the guide's line (guide +0x18)
 #include "Missions/MissionObjList.h"     // LoadObjList (FUN_06f25260)
@@ -320,7 +321,7 @@ void FMissionObject::SnapshotMissionObjects()
                 RecordIt->Choices.push_back(Choice);
             }
             RecordIt->Names.push_back(Npc->Nickname);
-            if (Npc->FormationSlot != 0 && Npc->FormationId != 0xffffffffu)
+            if (Npc->FormationSlot != 0 && Npc->FormationId != GNoFormationId)
                 continue;
             // The leader gives the place, priority, hit points and guide (raw, no AddRef) or
             // directives.
@@ -353,7 +354,7 @@ void FMissionObject::SnapshotMissionObjects()
             Record.Choices.push_back(Choice);
         }
         Record.Names.push_back(Npc->Nickname);
-        if (Npc->FormationSlot == 0 || Npc->FormationId == 0xffffffffu)
+        if (Npc->FormationSlot == 0 || Npc->FormationId == GNoFormationId)
         {
             ReadPlacement(Npc, &Record.Placement);
             Record.HitPoints = ReadHitPoints(Npc);
@@ -394,7 +395,7 @@ void FMissionObject::SnapshotMissionObjects()
                 continue;
             Ship->Priority = Npc->GetPriority();
             Ship->HitPoints = ReadHitPoints(Npc);
-            if (Npc->FormationSlot != 0 && Npc->FormationId != 0xffffffffu)
+            if (Npc->FormationSlot != 0 && Npc->FormationId != GNoFormationId)
             {
                 Ships.push_back(*Ship);
                 continue;
@@ -708,7 +709,7 @@ void FMissionObject::SaveMission(FILE* File)
 
         std::fprintf(File, "\n[MsnWingSave]\n");
         std::fprintf(File, "nickname = %s\n", GroupIt->Nickname.Data);
-        if ((GroupIt->ArrivalObjId & 0x3fffffff) == 0)
+        if ((GroupIt->ArrivalObjId & GIdValueMask) == 0)
         {
             std::fprintf(File, "position = %f, %f, %f\n", static_cast<double>(GroupIt->Position.x),
                          static_cast<double>(GroupIt->Position.y),

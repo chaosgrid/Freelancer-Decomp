@@ -57,9 +57,10 @@ struct FRandEncFormation
 {
     FFormation* Formation = nullptr;        // +0x00 -> FUN_06f66c80 (PlaceFormationBlocks)
     ID_String Nickname;                     // +0x04 dumped with get_string
-    // +0x08: "formation" value 1 as read (dumped); the parse copies it into Weight (+0x24).
-    // TODO: whether anything but Dump reads +0x08.
-    float Field_0x08 = 0.0f;
+    // +0x08: "formation" value 1 (the weight) as read; the parse copies it into Weight
+    // (+0x24), which FUN_06efba30 sums and picks (it reads +0x24, not +0x08). Only the
+    // dumps read +0x08, writing it back as the line's value 1.
+    float ParsedWeight = 0.0f;
     int MinCount = 0;                       // +0x0c ship count range (FUN_06efba30)
     int MaxCount = 0;                       // +0x10
     int Count = 0;                          // +0x14 the count picked for the current spawn
@@ -311,6 +312,17 @@ bool __cdecl CreateRandEncPopulator(char const* Name, FRandEncPopulator** Out);
 // TU62 -- killable solars. DAT_06fd3c20: map<nickname id, entry>, static init LAB_06f94f30
 // (map ctor FUN_06f95e80), atexit FUN_06f94f60.
 // ---------------------------------------------------------------------------------------
+// FRmKillableSolar::ZoneTypeMask bits, one per "only_allowed_in_zone_type" keyword; the
+// TU63 pickers pass pub::System::GetNestedProperties' flags as the mask they must fit in.
+enum ERmZoneTypeBits : unsigned int
+{
+    RM_ZONE_ROCK = 0x40,
+    RM_ZONE_DEBRIS = 0x80,
+    RM_ZONE_ICE = 0x100,
+    RM_ZONE_LAVA = 0x200,
+    RM_ZONE_CRYSTAL = 0x800,
+};
+
 struct FRmKillableSolar             // map value, retail 0x40 bytes
 {
     ID_String Nickname;             // +0x00 CreateID("nickname")
@@ -324,8 +336,7 @@ struct FRmKillableSolar             // map value, retail 0x40 bytes
     float HitpointsMax;             // +0x2c
     float DifficultyMin;            // +0x30
     float DifficultyMax;            // +0x34
-    unsigned int ZoneTypeMask;      // +0x38 rock 0x40, debris 0x80, ice 0x100, lava 0x200,
-                                    //       crystal 0x800
+    unsigned int ZoneTypeMask;      // +0x38 ERmZoneTypeBits
     int PilotChoices;               // +0x3c default 1
 };
 
@@ -339,13 +350,22 @@ FRmKillableSolar* __cdecl PickKillableSolar(unsigned int Faction, int SolarType,
 // TU62 -- vignette critical loot. DAT_06fd3c10: vector of 0x34-byte records, static init
 // LAB_06f95810, atexit FUN_06f95840 (record dtor FUN_06f95ca0).
 // ---------------------------------------------------------------------------------------
+// The critical loot "type" words (FRmCriticalLoot::Types) and the mission's CriticalLootMode
+// (FRmLootSpawn / FRmLootRecord, 0 = none) PickCriticalLoot matches them against.
+enum ERmCriticalLootMode
+{
+    RmCriticalLootNone = 0,
+    RmCriticalLootDestroy = 1,      // "destroy"
+    RmCriticalLootTractor = 2,      // "tractor"
+    RmCriticalLootReturn = 3,       // "return"
+};
+
 struct FRmCriticalLoot              // retail 0x34 bytes
 {
     int WhyDesired[2];              // +0x00 / +0x04 "why_desired" (two ints)
     int Name;                       // +0x08 "name" (int)
     unsigned int ArchetypeId;       // +0x0c pub::GetEquipmentID("archetype")
-    std::vector<unsigned int> Types; // +0x10 (alloc byte) / +0x14..+0x1c "type": destroy 1,
-                                    //       tractor 2, return 3
+    std::vector<unsigned int> Types; // +0x10 (alloc byte) / +0x14..+0x1c "type" (ERmCriticalLootMode)
     unsigned char bAnyFaction;      // +0x20 "faction = all"
     std::vector<unsigned int> Factions; // +0x24 (alloc byte) / +0x28..+0x30
 };

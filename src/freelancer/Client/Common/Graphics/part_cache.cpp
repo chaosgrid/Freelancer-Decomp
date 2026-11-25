@@ -634,7 +634,7 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
     // A SIGNED compare against 16000 indices.
     if (static_cast<int>(Cache->TotalIndices) > 0x3E80)
     {
-        FDUMP(0x100004,
+        FDUMP(kFdumpTrace1,
               "%s(%d) : TRACE_1:General:%s",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\cached_wire.cpp",
               0xE0,

@@ -169,7 +169,7 @@ IScriptEngine* __cdecl ThornScriptLoad(char const* Path)
     // RVA 0x1b8f0.
     if (Path == nullptr || Path[0] == '\0')
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kThornScriptSource, 0x18,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kThornScriptSource, 0x18,
               "Skipping null script filename...\n");
         return nullptr;
     }
@@ -204,7 +204,7 @@ IScriptEngine* __cdecl ThornScriptLoad(char const* Path)
         return Engine;
     }
 
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot load script file %s\n", kThornScriptSource, 0x30,
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot load script file %s\n", kThornScriptSource, 0x30,
           Path);
     Engine->Release();
     return nullptr;
@@ -408,7 +408,7 @@ void RoomData::read_set_script(char const* RelPath)
                 bRoomMain = true;
             if (CategoryName == nullptr)
             {
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: Entity %s in hardpoint script %s does not have a "
                       "category.\nIt might be incorrectly marked as a reference.",
                       kRoomDataSource, 0x293, Name, RelPath);
@@ -548,7 +548,7 @@ void RoomData::read_from_ini(char const* RelPath)
         }
         else if (Reader.is_header("Cloud"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: [Cloud] is obsolete in %s", kRoomDataSource,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [Cloud] is obsolete in %s", kRoomDataSource,
                   0x7fe, FullPath);
         }
         else if (Reader.is_header("Room_Sound") || Reader.is_header("Sound"))
@@ -557,7 +557,7 @@ void RoomData::read_from_ini(char const* RelPath)
         }
         else if (Reader.is_header("Fog"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: [Fog] is obsolete in %s, fog settings should be in scripts",
                   kRoomDataSource, 0x807, FullPath);
         }
@@ -571,22 +571,22 @@ void RoomData::read_from_ini(char const* RelPath)
         }
         else if (Reader.is_header("GoodsCartPlacement"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: [GoodsCartPlacement] is obsolete in %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [GoodsCartPlacement] is obsolete in %s",
                   kRoomDataSource, 0x813, FullPath);
         }
         else if (Reader.is_header("RepairRobotPlacement"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: [RepairRobotPlacement] is obsolete in %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [RepairRobotPlacement] is obsolete in %s",
                   kRoomDataSource, 0x817, FullPath);
         }
         else if (Reader.is_header("GoodsPilePlacement"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: [GoodsPilePlacement] is obsolete in %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [GoodsPilePlacement] is obsolete in %s",
                   kRoomDataSource, 0x81b, FullPath);
         }
         else if (Reader.is_header("ShipPlacement"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x81f,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x81f,
                   "[ShipPlacement] is obsolete");
         }
         else if (Reader.is_header("PlayerShipPlacement"))
@@ -600,17 +600,17 @@ void RoomData::read_from_ini(char const* RelPath)
         }
         else if (Reader.is_header("MonitorPlacement"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x82b,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x82b,
                   "[MonitorPlacement] is obsolete");
         }
         else if (Reader.is_header("Effect"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x82f,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x82f,
                   "[Effect] is obsolete");
         }
         else if (Reader.is_header("AvailableShip"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x833,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x833,
                   "[AvailableShip] is obsolete");
         }
         else if (Reader.is_header("Hotspot"))
@@ -627,17 +627,17 @@ void RoomData::read_from_ini(char const* RelPath)
         }
         else if (Reader.is_header("Billboard"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x843,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x843,
                   "[Billboard] is obsolete");
         }
         else if (Reader.is_header("Light"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x847,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x847,
                   "[Light] is obsolete");
         }
         else if (Reader.is_header("Lighting"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x84b,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kRoomDataSource, 0x84b,
                   "[Lighting] is obsolete");
         }
     }
@@ -937,7 +937,7 @@ void RoomData::read_RoomInfo_block(INI_Reader* Reader)
         }
         else if (Reader->is_value("mesh"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: mesh is obsolete in %s, use the setscript to specify the "
                   "room mesh\n",
                   kRoomDataSource, 0x3d7, Reader->get_file_name());
@@ -957,18 +957,18 @@ void RoomData::read_RoomInfo_block(INI_Reader* Reader)
         }
         else if (Reader->is_value("background_script"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: background_script is obsolete in %s, use scene\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: background_script is obsolete in %s, use scene\n",
                   kRoomDataSource, 0x3f5, Reader->get_file_name());
         }
         else if (Reader->is_value("background_script_oneshot"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: background_script_oneshot is obsolete in %s, use scene\n",
                   kRoomDataSource, 0x3f9, Reader->get_file_name());
         }
         else if (Reader->is_value("mission_vendor_type"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: mission_vendor_type is obsolete in %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: mission_vendor_type is obsolete in %s\n",
                   kRoomDataSource, 0x3fd, Reader->get_file_name());
         }
         else if (Reader->is_value("goodscart_script"))
@@ -984,21 +984,21 @@ void RoomData::read_RoomInfo_block(INI_Reader* Reader)
         }
         else if (Reader->is_value("goodscart_script_fighter"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: goodscart_script_fighter is obsolete in %s, use "
                   "goodscart_script\n",
                   kRoomDataSource, 0x410, Reader->get_file_name());
         }
         else if (Reader->is_value("goodscart_script_elite"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: goodscart_script_elite is obsolete in %s, use "
                   "goodscart_script\n",
                   kRoomDataSource, 0x414, Reader->get_file_name());
         }
         else if (Reader->is_value("goodscart_script_freighter"))
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: goodscart_script_freighter is obsolete in %s, use "
                   "goodscart_script\n",
                   kRoomDataSource, 0x418, Reader->get_file_name());
@@ -1014,12 +1014,12 @@ void RoomData::read_RoomInfo_block(INI_Reader* Reader)
         }
         else if (Reader->is_value("news_material"))
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: news_material is obsolete in %s\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: news_material is obsolete in %s\n",
                   kRoomDataSource, 0x427, Reader->get_file_name());
         }
         else if (Reader->is_value("is_outside"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: is_outside is obsolete in %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: is_outside is obsolete in %s\n",
                   kRoomDataSource, 0x42b, Reader->get_file_name());
         }
         else if (Reader->is_value("scene"))
@@ -1051,7 +1051,7 @@ void RoomData::read_ambient_script(INI_Reader* Reader)
     ValueCount -= First;
     if (ValueCount != 2 && ValueCount != 3)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Invalid scene = specification in [Room] block in file %s\n"
               "Expecting: scene = ambient|traffic|once, script.thn, [priority]\n",
               kRoomDataSource, 0x38a, Reader->get_file_name());
@@ -1072,7 +1072,7 @@ void RoomData::read_ambient_script(INI_Reader* Reader)
     else if (CallDacomStricmp(TypeName, "traffic") == 0)
     {
         Type = 2;
-        FDUMP(0x100002, "%s(%d) : *** WARNING: traffic ambient is obsolete in room .ini %s\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: traffic ambient is obsolete in room .ini %s\n",
               kRoomDataSource, 0x3a3, Reader->get_file_name());
     }
     else if (CallDacomStricmp(TypeName, "once") == 0)
@@ -1081,7 +1081,7 @@ void RoomData::read_ambient_script(INI_Reader* Reader)
     }
     else
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Invalid scene = specification in [Room] block in file %s\n"
               "Expecting: scene = ambient|traffic|once, script.thn\n",
               kRoomDataSource, 0x3ad, Reader->get_file_name());
@@ -1109,14 +1109,14 @@ void RoomData::read_Camera_block(INI_Reader* Reader)
         if (Reader->is_value("name"))
             malloc_strcpy(&CameraName, Reader->get_value_string());
         else if (Reader->is_value("index"))
-            FDUMP(0x100002, "%s(%d) : *** WARNING: index is obsolete in %s, use a camera name\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: index is obsolete in %s, use a camera name\n",
                   kRoomDataSource, 0x4d7, Reader->get_file_name());
         else if (Reader->is_value("near_plane"))
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: near_plane is obsolete in %s, use a camera name\n",
                   kRoomDataSource, 0x4db, Reader->get_file_name());
         else if (Reader->is_value("far_plane"))
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: far_plane is obsolete in %s, use a camera name\n",
                   kRoomDataSource, 0x4df, Reader->get_file_name());
         else
@@ -1166,10 +1166,10 @@ void RoomData::read_CharacterPlacement_block(INI_Reader* Reader)
         else if (Reader->is_value("start_script"))
             malloc_strcpy(&StartScript, Reader->get_value_string());
         else if (Reader->is_value("zoom_in"))
-            FDUMP(0x100001, "%s(%d) : *** ERROR: zoom_in in file %s is obsolete\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: zoom_in in file %s is obsolete\n",
                   kRoomDataSource, 0x635, Reader->get_file_name());
         else if (Reader->is_value("zoom_out"))
-            FDUMP(0x100001, "%s(%d) : *** ERROR: zoom_out in file %s is obsolete\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: zoom_out in file %s is obsolete\n",
                   kRoomDataSource, 0x639, Reader->get_file_name());
         else
             Reader->get_file_name(); // called, result unused
@@ -1177,7 +1177,7 @@ void RoomData::read_CharacterPlacement_block(INI_Reader* Reader)
 
     // Reported, not a stop -- the lookup below still runs with the null name.
     if (Name == nullptr)
-        FDUMP(0x100001, "%s(%d) : *** ERROR: [CharacterPlacement] in file %s did not supply name\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: [CharacterPlacement] in file %s did not supply name\n",
               kRoomDataSource, 0x647, Reader->get_file_name());
 
     // The last match wins.
@@ -1193,7 +1193,7 @@ void RoomData::read_CharacterPlacement_block(INI_Reader* Reader)
     if (Found != nullptr)
         malloc_strcpy(const_cast<char**>(&Found->StartScript), StartScript);
     else
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: [CharacterPlacement] in file %s refers to setpoint %s which does "
               "not exist\n",
               kRoomDataSource, 0x656, Reader->get_file_name(), Name);
@@ -1274,10 +1274,12 @@ void RoomData::read_Hotspot_block(INI_Reader* Reader)
     // RVA 0x169d0. The "behavior=" option table, .data:063eabc8 in table order; no match gives
     // -1.
     static const option_spec kExitDoorBehaviors[] = {
-        {"ExitDoor", 1},          {"NewsVendor", 2},        {"MissionVendor", 3},
-        {"Launch", 4},            {"StartDealer", 5},       {"StartShipDealer", 7},
-        {"FrontDesk", 6},         {"StartEquipDealer", 8},  {"MoveRight", 9},
-        {"MoveLeft", 10},         {"VirtualRoom", 11},      {"Repair", 12},
+        {"ExitDoor", kHotspotExitDoor},                 {"NewsVendor", kHotspotNewsVendor},
+        {"MissionVendor", kHotspotMissionVendor},       {"Launch", kHotspotLaunch},
+        {"StartDealer", kHotspotStartDealer},           {"StartShipDealer", kHotspotStartShipDealer},
+        {"FrontDesk", kHotspotFrontDesk},               {"StartEquipDealer", kHotspotStartEquipDealer},
+        {"MoveRight", kHotspotMoveRight},               {"MoveLeft", kHotspotMoveLeft},
+        {"VirtualRoom", kHotspotVirtualRoom},           {"Repair", kHotspotRepair},
     };
 
     // Appended before the keys are read (FUN_06279400), so every [Hotspot] block adds an entry,
@@ -1299,10 +1301,10 @@ void RoomData::read_Hotspot_block(INI_Reader* Reader)
         }
         // %s is the ADDRESS of INI_Reader::get_name (see IniReaderGetNameCode), as in retail.
         else if (Reader->is_value("zoom_in"))
-            FDUMP(0x100001, "%s(%d) : *** ERROR: zoom_in is obsolete in ini file %s\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: zoom_in is obsolete in ini file %s\n",
                   kRoomDataSource, 0x6e7, IniReaderGetNameCode());
         else if (Reader->is_value("zoom_out"))
-            FDUMP(0x100001, "%s(%d) : *** ERROR: zoom_out is obsolete in ini file %s\n",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: zoom_out is obsolete in ini file %s\n",
                   kRoomDataSource, 0x6eb, IniReaderGetNameCode());
         else if (Reader->is_value("room_switch"))
             Button.RoomSwitch = MallocCopy(Reader->get_value_string());
@@ -1430,7 +1432,7 @@ RoomCameraInfo const* RoomData::find_camera(char const* Name, char const* Script
             Found = Cameras[Index];
     }
     if (Found == nullptr)
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: script %s calls for camera %s which does not exist in room "
               ".ini = %s\n",
               kRoomDataSource, 0x557, ScriptName, Name, File);
@@ -1454,7 +1456,7 @@ RoomCameraInfo const* RoomData::find_camera_generic(char const* Pattern, char co
             Found = Cameras[Index];
     }
     if (Found == nullptr)
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: script %s calls for a camera name matching */%s/*, but none "
               "exist in room .ini = %s\n",
               kRoomDataSource, 0x578, ScriptName, Generic, File);
@@ -1472,7 +1474,7 @@ SetpointInfo const* RoomData::find_setpoint(char const* Name, char const* Script
             Found = Setpoints[Index];
     }
     if (Found == nullptr)
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: script %s calls for setpoint %s which does not exist in room "
               ".ini = %s\n",
               kRoomDataSource, 0x5a8, ScriptName, Name, File);
@@ -1496,7 +1498,7 @@ SetpointInfo const* RoomData::find_setpoint_generic(char const* Pattern, char co
             Found = Setpoints[Index];
     }
     if (Found == nullptr)
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: script %s calls for setpoint %s which does not exist in room "
               ".ini = %s\n",
               kRoomDataSource, 0x5c8, ScriptName, Pattern, File);

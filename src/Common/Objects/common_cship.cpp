@@ -179,7 +179,7 @@ void CShip::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
 
     if (BodyPtr == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: CShip::init_physics(): Failed to create ivp_real for %s. Expect a crash.",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: CShip::init_physics(): Failed to create ivp_real for %s. Expect a crash.",
               "E:\\FL\\Scratch\\Source\\Common\\CShip.cpp", 0x5c7, Archetype->DaArchetype.Value);
         return;
     }
@@ -1801,7 +1801,7 @@ void CShip::notify_set_target(CShip* TargetShip, bool bIsTarget)
 {
     // FUN_062b24d0. TargetShip is the ship that started or stopped targeting this one; no null
     // test.
-    if ((TargetShip->TypeBits & 0x30000) == 0)
+    if ((TargetShip->TypeBits & (OBJ_FIGHTER | OBJ_FREIGHTER)) == 0)
         return;
     unsigned const TargeterId = TargetShip->Id;
 
@@ -1973,7 +1973,7 @@ void CShip::request_exit_tradelane()
         Payload.ShipId = Id;
         Payload.EntranceId = 0;
         Payload.ExitId = 0;
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", "E:\\FL\\Scratch\\Source\\Common\\CShip.cpp", 0x3c5,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", "E:\\FL\\Scratch\\Source\\Common\\CShip.cpp", 0x3c5,
               "request_exit_tradelane");
 
         FBehaviorManagerEvent Event;
@@ -2267,7 +2267,7 @@ IObjRW* CShip::next_target(bool bReverse)
         CObject const* const Obj = Candidate->cobject();
         CSimple const* const Simple = (Obj != nullptr && (Obj->ObjectClass & 3) == 3)
             ? (CSimple const*)Obj : nullptr;
-        if (Simple->TypeBits == 0 || Simple->TypeBits == 0x20000000)
+        if (Simple->TypeBits == 0 || Simple->TypeBits == OBJ_ASTEROID)
             continue;
         return ScanEntryOwner(Scanner->Scans.Entries[Index]);
     }

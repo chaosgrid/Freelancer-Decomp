@@ -51,7 +51,7 @@ wchar_t const* MiscUtilLoadIdsCopy(wchar_t** Out, unsigned Ids)
     wchar_t Text[0x400]; // local_800
     if (GetIdsStringWWithRawFallback(Ids, Text, 0x400) == 0)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Failed to find string resource %d\n", kMiscUtilCpp,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Failed to find string resource %d\n", kMiscUtilCpp,
               0xf1, Ids);
     }
     return malloc_wstrcpy(Out, Text);
@@ -98,7 +98,7 @@ void MiscUtilAppendIds(wchar_t** Cursor, wchar_t* End, unsigned Ids)
     int const Copied = static_cast<int>(
         GetIdsStringWWithRawFallback(Ids, *Cursor, static_cast<int>(End - *Cursor)));
     if (Copied == 0)
-        FDUMP(0x100002, kFailedToLoadIds, kMiscUtilCpp, 0x18c, Ids);
+        FDUMP(kFdumpWarning, kFailedToLoadIds, kMiscUtilCpp, 0x18c, Ids);
     *Cursor += Copied;
     if (End == *Cursor)
     {
@@ -191,7 +191,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
     {
         if (Cursor >= End)
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: FmtStr::sprintf(): mad_lib %u (%S) was too long, please shorten",
                   kMiscUtilCpp, 0x1d3, Fmt->MadLibId, Dest);
             break;
@@ -483,7 +483,7 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
     DAEngine_create_filesystem(File, &Filesys, nullptr);
     if (Filesys == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: file (%s) does not exist.", kMiscUtilCpp, 0xbe,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: file (%s) does not exist.", kMiscUtilCpp, 0xbe,
               File);
         return Instance;
     }
@@ -499,7 +499,7 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
     long Handle = 0;
     if (!Archetype::Load(Filesys, &Handle, nullptr))
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: couldnt load archetype (%s) .", kMiscUtilCpp,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: couldnt load archetype (%s) .", kMiscUtilCpp,
               0x96, File);
         return Instance;
     }

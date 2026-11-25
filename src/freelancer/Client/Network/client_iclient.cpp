@@ -515,16 +515,16 @@ void IClientImpl::SendCommonPlayerTradeTerminateTrade(unsigned int /*ClientId*/,
             FClientGameobj* const Found = ClientObjDb_FindObject(GetPlayerCharacterId(), 1);
             if (Found != nullptr)
             {
-                FClientGameobj* const Ship = (Found->ManagerKind == 1) ? Found : nullptr;
+                FClientGameobj* const Ship = (Found->ManagerKind == EClientGameobjKind::Ship) ? Found : nullptr;
                 CObject* const Obj = Ship->GetObject();
                 CEqObj* const Eq =
-                    (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+                    (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                         ? static_cast<CEqObj*>(Obj)
                         : nullptr;
                 Eq->sync_cargo(GetPlayerEquipDescListRetail());
             }
         }
-        G_NnTrade->SetProperty(0xef02, 0, 0);
+        G_NnTrade->SetProperty(kWinMsgHide, 0, 0);
     }
     G_bTradeRequested = 0; // DAT_00674b00
 }
@@ -600,7 +600,7 @@ void IClientImpl::SendCommonPlayerTradeDelTradeEquip(unsigned int /*ClientId*/, 
 void IClientImpl::SendCommonPlayerTradeRequestTrade(unsigned int /*ClientId*/, unsigned int ShipId)
 {
     FClientGameobj* const Found = ClientObjDb_FindObject(ShipId, 1);
-    if (Found != nullptr && Found->ManagerKind == 1)
+    if (Found != nullptr && Found->ManagerKind == EClientGameobjKind::Ship)
     {
         FClientShipGameobj* const Ship = static_cast<FClientShipGameobj*>(Found);
         Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags | 0x04);
@@ -613,7 +613,7 @@ void IClientImpl::SendCommonPlayerTradeRequestTrade(unsigned int /*ClientId*/, u
 void IClientImpl::SendCommonPlayerTradeStopTradeRequest(unsigned int /*ClientId*/, unsigned int ShipId)
 {
     FClientGameobj* const Found = ClientObjDb_FindObject(ShipId, 1);
-    if (Found != nullptr && Found->ManagerKind == 1)
+    if (Found != nullptr && Found->ManagerKind == EClientGameobjKind::Ship)
     {
         FClientShipGameobj* const Ship = static_cast<FClientShipGameobj*>(Found);
         Ship->ShipFlags = static_cast<unsigned char>(Ship->ShipFlags & 0xfb);

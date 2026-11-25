@@ -68,7 +68,7 @@ namespace
 
     GENRESULT ReportInvalidReference(char const* Name, int Line)
     {
-        FDUMP(0x100001, GInvalidCameraReference, GScriptCameraFile, Line, Name);
+        FDUMP(kFdumpError, GInvalidCameraReference, GScriptCameraFile, Line, Name);
         return kThornReferenceMissing;
     }
 }

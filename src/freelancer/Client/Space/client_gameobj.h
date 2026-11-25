@@ -75,6 +75,19 @@ enum class EClientGameobjKind : int
     Debris = 10, // FUN_00530620 / FUN_005306e0
 };
 
+// FClientShipGameobj::JumpState, set by SetJumpState (FUN_005437d0). The update (FUN_00545050)
+// moves 1 -> 5 as the jump effect's clock passes JumpOutTime, JumpOutTunnelTime,
+// JumpInTunnelTime (with bJumpInReady) and JumpInTime; 5 -> 0 once the clock passes 1.0.
+enum EJumpState : int
+{
+    kJumpStateNone = 0,
+    kJumpStateJumpOut = 1,        // BeginJumpOut: the effect's StartJumpOut
+    kJumpStateJumpOutTunnel = 2,  // the effect enters the tunnel; other ships are removed
+    kJumpStateJumpInTunnel = 3,   // the destination system becomes the pending one
+    kJumpStateJumpIn = 4,         // BeginJumpIn: placed at the exit frame
+    kJumpStateArrived = 5,        // the arrival caption
+};
+
 // GameObject+0x28 -- the gameobj's effect list: a VC6 std::list whose node is 0x18 bytes
 // (next, prev, then the 0x10-byte effect companion {slot0, ISoundSource*, particle, light}).
 // FUN_004fcea0 inserts, FUN_004fcef0 removes one, FUN_004fd0d0 clears, FUN_004fd040 sweeps
@@ -339,7 +352,7 @@ public:
     // ---- data (IObjInspectImpl ends at +0x14) ---------------------------------------
     FClientGameobj* ListNext;          // +0x14  ObjDB bucket link (FUN_00542350 / 00542390)
     FClientGameobj* ListPrev;          // +0x18
-    int ManagerKind;                   // +0x1c  ObjDB bucket (1 ship, 2 solar, 3 beam, ...)
+    EClientGameobjKind ManagerKind;    // +0x1c  ObjDB bucket (1 ship, 2 solar, 3 beam, ...)
     ActionDB Actions;                  // +0x20  update(Dt) by slot 93, add by slot 108
     FGameobjEffectList EffectList;     // +0x28
     float NebulaUpdateTimer;                  // +0x34  ctor 0; slot 100 sets 10.0f; Ship ctor rand()/32768
@@ -738,7 +751,7 @@ public:
     float FireFailedCooldown;                 // +0x150 the update runs it down by Dt while above 0
     unsigned char bHullBreachWarned;         // +0x154
     unsigned char Pad155[3];
-    // +0x158 -- the state FUN_005437d0 (0..5) stores last. Readers: the draw pass (2 and 3),
+    // +0x158 -- the EJumpState FUN_005437d0 stores last. Readers: the draw pass (2 and 3),
     // StarSys music, FUN_005437d0 itself (== 5).
     int JumpState;
     unsigned char bJumpInReady;         // +0x15c FUN_00543630 sets 1

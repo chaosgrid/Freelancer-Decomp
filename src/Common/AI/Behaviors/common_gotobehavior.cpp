@@ -343,7 +343,7 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
     Out->Speed = MinFollowerSpeed;
     Out->Throttle = 1.0f;
     Out->AngularThrottle = 1.0f;
-    Out->Flag10 = 1;
+    Out->bCruiseAllowed = 1;
 
     // 0x503 is the "is a CShip" mask. Retail calls CShip::get_formation_followers
     // non-virtually even when the mask misses (this == 0), and so does the port.
@@ -531,7 +531,7 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
     // While cruising the flag keeps the 1 stored above. Otherwise it means "the formation
     // is tight"; NaN in either test writes 0.
     if (!bCruise)
-        Out->Flag10 = (MaxProjection < 20.0f && static_cast<double>(MinAlignCos) > 0.99) ? 1 : 0;
+        Out->bCruiseAllowed = (MaxProjection < 20.0f && static_cast<double>(MinAlignCos) > 0.99) ? 1 : 0;
 
     return true;
 }
@@ -627,13 +627,13 @@ EvaluateResult GotoBehavior::evaluate(unsigned int Context)
     // Only a zero get_type return with a ship-class bit reaches get_behavior_id.
     unsigned int Type = 0;
     int const TypeResult = Target->get_type(Type);
-    if (TypeResult == 0 && (Type & 0x7f0000) != 0)
+    if (TypeResult == 0 && (Type & OBJ_SHIP_MASK) != 0)
     {
         int const BehaviorId = Target->get_behavior_id();
-        if (BehaviorId == 0xe || BehaviorId == 0x11 || BehaviorId == 0x8)
+        if (BehaviorId == BEHAVIOR_GUIDE || BehaviorId == BEHAVIOR_FOLLOW || BehaviorId == BEHAVIOR_LAUNCH)
             return EvalSkip;
     }
-    if ((Type & 0x10000000) != 0)
+    if ((Type & OBJ_LOOT) != 0)
         return EvalBlocked;
 
     // DAT_063a227c = 25.0f; unordered gives EvalBlocked.
@@ -950,7 +950,7 @@ int GotoBehavior::Update()
 
             // A clear envelope flag cancels cruise.
             Face.SetThrottleScale(Envelope.AngularSpeed);
-            if (Envelope.Flag10 == 0)
+            if (Envelope.bCruiseAllowed == 0)
                 bCruise = 0;
         }
         else

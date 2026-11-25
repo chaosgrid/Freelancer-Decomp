@@ -21,7 +21,11 @@
 // ---------------------------------------------------------------------------
 template<typename T>
 struct FRetailVector {
-    unsigned int AllocPad;   // +0x00  allocator sub-object (padding)
+    // +0x00: the VC6 vector's allocator<T> member, an empty class: one byte, then three
+    // alignment bytes. Retail's FIREWEAPON / TRACTOROBJECTS packet ctors (rpclocal) store
+    // this one byte; nothing reads it.
+    unsigned char AllocPad;
+    unsigned char Pad_0x01[3]; // +0x01
     T* Begin;                // +0x04  _First
     T* End;                  // +0x08  _Last
     T* Cap;                  // +0x0c  _End
@@ -30,6 +34,7 @@ struct FRetailVector {
         return Begin != nullptr ? (unsigned int)(End - Begin) : 0u;
     }
 };
+static_assert(sizeof(FRetailVector<unsigned int>) == 0x10, "FRetailVector: VC6 vector, 0x10 bytes");
 
 // ---------------------------------------------------------------------------
 // SStartupInfo — 0x214 bytes. Layout from Server.dll IServerImpl::Startup (0x64b70: PlayerDB
@@ -76,8 +81,11 @@ struct SLoginInfo {
     // rpclocal's IServerImpl::Login (0x06d8cc70) copies a wide string from +0x00 and one
     // from +0xA0, then reads +0xC0; the receiver caps them at 0x28 and 0x10 characters.
     wchar_t AccountName[40];    // +0x00: account/character name (wide), 0x50 bytes
-    unsigned char Field_0x50[0x50]; // +0x50: TODO: not written by Login's sender
-    // TODO: semantics unrecovered; only a second 16-character wide string is confirmed.
+    // +0x50: not written by rpclocal's Login sender (0x06d8cc70, which copies only +0x00,
+    // +0xA0 and +0xC0); no reader identified.
+    unsigned char Field_0x50[0x50];
+    // +0xA0: the second wide string; only its 16-character width is confirmed (the name is
+    // the port's).
     wchar_t Password[16];     // +0xA0: second wide string, 0x20 bytes
     unsigned int CreateFlag;    // +0xC0: nonzero = allow account creation
     unsigned int Pad_C4;        // +0xC4: padding
@@ -165,7 +173,9 @@ struct XGoTradelane {
     unsigned int ObjectId;        // +0x00  compared against the player's ship id (player+0x3e4)
     unsigned int TradelaneRing1;  // +0x04
     unsigned int TradelaneRing2;  // +0x08
-    // TODO: semantics unproven (direction?). One byte; 5th argument of FUN_06d0df40.
+    // One byte, Server.dll FUN_06d0df40's 5th argument: copied unread into the type-4 message
+    // it hands the other ships' IBehaviorManager and into the IClient +0x18 notification to
+    // the observing players. Nothing in Server.dll tests it; the name is the port's.
     bool bMidLane;              // +0x0c
     unsigned char Pad_0x0d[3];    // +0x0d
 };
@@ -207,10 +217,12 @@ struct SGFGoodSellInfo {
 
 // SGFGoodVaporizedInfo — as SGFGoodSellInfo (rpclocal 0x06d8d650 / Server 0x06d17c30).
 // Size not proven.
+// Server.dll copies the three dwords unread, with the session id, into controller message
+// 0x1e (GFGoodVaporized); no reader of them identified.
 struct SGFGoodVaporizedInfo {
-    unsigned int Field_0x00;  // TODO: semantics unproven
-    unsigned int Field_0x04;  // TODO: semantics unproven
-    unsigned int Field_0x08;  // TODO: semantics unproven
+    unsigned int Field_0x00;
+    unsigned int Field_0x04;
+    unsigned int Field_0x08;
 };
 
 // SSPObjUpdateInfo — 0x30 bytes. Slot 52.
@@ -254,9 +266,11 @@ static_assert(sizeof(SSPObjCollisionInfo) == 0x14, "SSPObjCollisionInfo sizeof 0
 
 // SSPBadLandsObjCollisionInfo — 0x0c bytes. Slot 54.
 struct SSPBadLandsObjCollisionInfo {
-    unsigned int BadLandsObjId;    // +0x00  TODO: semantics unproven
-    unsigned int ObjectId;      // +0x04
-    unsigned short SubObjId;  // +0x08  TODO: semantics unproven
+    // +0x00: StarSystem::badlands_collision (FUN_06d0d6e0) passes it as the killer of
+    // destroy(1, Id) on the object; the name is the port's.
+    unsigned int BadLandsObjId;
+    unsigned int ObjectId;      // +0x04  the object destroyed (find_object)
+    unsigned short SubObjId;  // +0x08  serialized by rpclocal; Server.dll does not read it
     unsigned short Pad_0x0a;    // +0x0a
 };
 static_assert(sizeof(SSPBadLandsObjCollisionInfo) == 0xc, "SSPBadLandsObjCollisionInfo sizeof 0xc");

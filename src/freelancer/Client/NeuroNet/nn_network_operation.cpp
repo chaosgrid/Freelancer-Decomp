@@ -73,8 +73,8 @@ bool NnNetworkOperation::Create(Win3D* NewParent, void* Data)
     bCursorDrawFlag = NnModalPauseGame();
     Win3DSetKeyFocus(this);
     HudPushInputFocus(AsHudCmdHandler());
-    RegisterEvent(0xf);
-    RegisterEvent(0x11);
+    RegisterEvent(USER_CANCEL);
+    RegisterEvent(USER_ENTER);
 
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
@@ -111,7 +111,7 @@ intptr_t NnNetworkOperation::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_00472390 (RET 0xc): 0x42 recentres; every message returns 0 without reaching
     // WinControl's switch.
     (void)B;
-    if (Msg == 0x42)
+    if (Msg == kWinPropPlaceAtOffset)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
@@ -123,12 +123,12 @@ intptr_t NnNetworkOperation::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool NnNetworkOperation::OnEvent(unsigned MsgId)
 {
     // LAB_004723d0: 0xf closes the dialog; 0x11 is swallowed.
-    if (MsgId == 0xf)
+    if (MsgId == USER_CANCEL)
     {
         Close();
         return true;
     }
-    if (MsgId == 0x11)
+    if (MsgId == USER_ENTER)
         return true;
     return false;
 }
@@ -144,9 +144,9 @@ void NnNetworkOperationOpen(unsigned Ids)
         return;
     NnNetworkOperation* const Dialog = static_cast<NnNetworkOperation*>(Created);
     float const Zero[3] = {0.0f, 0.0f, 0.0f};
-    Dialog->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+    Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
     if (Dialog->ExitText != nullptr)
-        Dialog->ExitText->SetProperty(0x1e, Ids, 0);
+        Dialog->ExitText->SetProperty(kTextPropSetIds, Ids, 0);
     Dialog->CaptureMouse();
 }
 

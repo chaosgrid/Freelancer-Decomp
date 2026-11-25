@@ -168,7 +168,7 @@ bool RefreshRepairManagerFromPersonality(RepairManager* Self)
             IObjRW* const Handle = ObjRwFromWatchable(const_cast<Watchable*>(Node));
             CObject const* const Obj = Handle->cobject();   // IObjInspect slot 84
 
-            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x103) == 0x103)
+            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             {
                 IBehaviorManager* const Iface =
                     const_cast<CEqObj*>(static_cast<CEqObj const*>(Obj))->get_behavior_interface();

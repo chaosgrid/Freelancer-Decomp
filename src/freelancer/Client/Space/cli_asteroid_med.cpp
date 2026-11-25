@@ -60,7 +60,7 @@ void FCliMedAsteroidGameobj::OnSurfaceCollisionHit(void const* Contact, void con
     // Retail also tests Other's CBase (+0xc), never null for a live Other. class & 0x503 is a
     // CShip.
     if (bWatchListed != 0 && Other != nullptr && Other->GetObject() != nullptr &&
-        (static_cast<unsigned>(Other->GetObject()->ObjectClass) & 0x503u) == 0x503u)
+        (static_cast<unsigned>(Other->GetObject()->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
     {
         Explode(static_cast<Vector const*>(Contact));
         return;
@@ -87,7 +87,7 @@ void FCliMedAsteroidGameobj::ReportCollisionToServer(void const* A, void const* 
     {
         CObject* const OtherObj = Other->GetObject();
         unsigned Owner = 0;
-        if (OtherObj != nullptr && (static_cast<unsigned>(OtherObj->ObjectClass) & 3u) == 3u)
+        if (OtherObj != nullptr && (static_cast<unsigned>(OtherObj->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
             Owner = static_cast<CSimple const*>(OtherObj)->OwnerPlayer;
         else
             Owner = GetPlayerConnectionId();
@@ -113,13 +113,13 @@ void FCliMedAsteroidGameobj::Explode(Vector const* Pos)
 
     if (ExplosionArch == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x7a5,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x7a5,
               "asteroid_mine told to explode but has no explosion archetype");
         return;
     }
     if (ExplosionArch->Process != 2)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x79c,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x79c,
               "Explosion process for asteroid should be set to none");
         return;
     }
@@ -173,7 +173,7 @@ void FCliAsteroidCube::ApplyEvent(CmnAsteroid::asteroid_marker const* Event)
     {
         if (It != Asteroids.end())
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x72d,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x72d,
                   "asteroid cube told to create asteroid that already exists");
             return;
         }
@@ -190,7 +190,7 @@ void FCliAsteroidCube::ApplyEvent(CmnAsteroid::asteroid_marker const* Event)
 
     if (It == Asteroids.end())
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x739,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCliAsteroidSourceFile, 0x739,
               "asteroid cube told to delete asteroid that does not exist");
         return;
     }

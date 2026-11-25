@@ -471,7 +471,7 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     const GENRESULT LoadResult = ScriptOf(Cam->Script)->LoadFromPath(FullPath);
     if (LoadResult != GR_OK)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: ScriptCamera load failed: %s\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: ScriptCamera load failed: %s\n",
               kScriptCamSource, kScriptCamLoadWarningLine, FullPath);
         // The engine is NOT released and Script is NOT cleared; only the deactivate slot cleans
         // up. Kept as retail.

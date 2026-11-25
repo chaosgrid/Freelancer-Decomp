@@ -442,7 +442,7 @@ void LoadHudElementsFromIni()
     INI_Reader Reader;
     if (!Reader.open(G_HudIniPath, false))
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: hud file not found '%s'\n", kHudCpp, 0x13d,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: hud file not found '%s'\n", kHudCpp, 0x13d,
               G_HudIniPath);
     }
     else if (Reader.read_header())
@@ -485,7 +485,7 @@ void LoadHudElementsFromIni()
 
             if (Item == nullptr)
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: HUD - unknown INI entry '%s'\n", kHudCpp,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: HUD - unknown INI entry '%s'\n", kHudCpp,
                       0x136, Reader.get_header_ptr());
                 continue;
             }

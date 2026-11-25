@@ -328,7 +328,7 @@ void SetPlayerShipArchetypeIdRetail(unsigned ShipArchId)
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Error retrieving ship type %u",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Error retrieving ship type %u",
                   "E:\\FL\\Scratch\\Source\\Client\\nn\\Player.cpp", 0xae, ShipArchId);
         }
     }

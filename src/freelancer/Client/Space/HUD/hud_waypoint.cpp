@@ -342,7 +342,7 @@ void HUD_Waypoint::Render(FSpaceCamera* /*Camera*/, float DeltaSeconds)
     CObject* const Object = static_cast<CBase*>(static_cast<IObjInspectImpl*>(Obj))->Object;
     if (Object == nullptr)
         return;
-    if ((static_cast<unsigned>(Object->ObjectClass) & 3u) != 3u)
+    if ((static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
         return;
     memcpy(&Object->Orientation, Rotation, sizeof(Rotation));
 }

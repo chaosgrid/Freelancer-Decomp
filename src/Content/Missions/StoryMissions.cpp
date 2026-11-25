@@ -76,8 +76,7 @@ namespace
         unsigned char bBaseEnterHandled;
         // Write-only in retail: only this ctor stores them, and neither overridden slot reads
         // +0x334..+0x43d. +0x334 and +0x3b8 are the first dwords of two 0x84-byte blocks
-        // ending at +0x43c.
-        // TODO: meaning (no reader exists to derive it from).
+        // ending at +0x43c. With no reader their meaning cannot be derived.
         int Field_0x334;                              // +0x334 (ctor -1)
         int Field_0x3b8;                              // +0x3b8 (ctor -1)
         unsigned char Field_0x43c;                    // +0x43c (ctor 0)
@@ -217,7 +216,7 @@ namespace
             ID_String Vnpc;
             Vnpc.clear();
             PlayerState->JoinMissionAsGroup(ControllerId, 0, &Vnpc, false, 0);
-            StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed),
+            StoryEvents->OnMissionEvent(STORY_MISSION_EVENT_JOINED, static_cast<unsigned int>(CampaignSlotSucceed),
                                         ControllerId);
             SpacePopSetAttackClamp(1);                // DAT_06fd1c78 = 1
             bBaseEnterHandled = 1;
@@ -268,7 +267,7 @@ namespace
         ID_String Vnpc;
         Vnpc.clear();
         PlayerState->JoinMissionAsGroup(ControllerId, 0, &Vnpc, false, 0);
-        StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed),
+        StoryEvents->OnMissionEvent(STORY_MISSION_EVENT_JOINED, static_cast<unsigned int>(CampaignSlotSucceed),
                                     ControllerId);
         SpacePopSetAttackClamp(1);                    // DAT_06fd1c78 = 1
         // FMissionScript::RemoveRtc = FUN_06eba430.

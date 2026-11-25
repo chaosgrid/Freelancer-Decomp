@@ -117,10 +117,24 @@ struct EquipmentVal
     unsigned short Pad;
 };
 
+// The docking terminal types (the enum name is retail's, from get_dock_hardpoints' mangling;
+// the enumerators are the port's). get_dock_hardpoints answers Archetype::EqObj::
+// DockingSphere::Type, filled from the PTR_s_berth_063eca00 table (berth 1, moor_small 3,
+// moor_medium 4, moor_large 5, ring / pad 6, jump 7, airlock 8; no match 0);
+// pub::SpaceObj::GetTerminalInfo answers the same value. pub::AI::DirectiveLaunchOp::
+// TerminalType takes Content's [ObjList] Launch keywords: NONE 0, BERTH 1, PAD 2, MOOR_* 3..5,
+// RING 6, JUMP_GATE 7.
 enum TERMINAL_TYPE
 {
-    TerminalDock = 0,
-    TerminalMooring = 1
+    TERM_NONE = 0,
+    TERM_BERTH = 1,
+    TERM_PAD = 2,           // the Launch keyword "PAD"; the archetype table maps "pad" to 6
+    TERM_MOOR_SMALL = 3,
+    TERM_MOOR_MEDIUM = 4,
+    TERM_MOOR_LARGE = 5,
+    TERM_RING = 6,
+    TERM_JUMP = 7,
+    TERM_AIRLOCK = 8,
 };
 
 enum CancelRequestType
@@ -507,13 +521,15 @@ struct IObjAffect
     // ".?AURequestCB@IObjAffect@@" (TypeDescriptor .data:063ebdc8). DockBehavior and
     // InstantTradeLaneBehavior implement it as a second base at mdisp 0x2c, each with a
     // one-slot secondary vtable (DockBehavior's .rdata:0639f498 -> LAB_062c53f0, which adjusts
-    // `this` by -0x2c and dispatches). TODO: the three ints' meaning is not derived.
+    // `this` by -0x2c and dispatches). The caller is Server.dll's Ship::request_returned
+    // (FUN_06d01e80), which passes its own three arguments; pub::SpaceObj::Dock calls it with
+    // (0, its DOCK_HOST_RESPONSE, the dock port). A false answer drops the callback.
     //
     // Not COMMON_API: retail exports no RequestCB member. No virtual destructor: the
     // secondary vtables have one slot.
     struct RequestCB
     {
-        virtual bool OnResult(int Param1, int Param2, int Param3) = 0;
+        virtual bool OnResult(int RequestType, int Response, int Arg3) = 0;
     };
 
     // ------------------------------------------------------------------------------------
@@ -1203,7 +1219,8 @@ public:
     // Timer pair gating UpdateBehaviorTick's periodic UpdateAttackTargetOverride: the
     // timer accumulates Dt (FADD [this+0xe0]); once past AttackOverridePeriod (FCOMP
     // [this+0xe4]) it is wrapped via fmodf and Sys->Targeting.UpdateAttackTargetOverride()
-    // fires. TODO: no writer of AttackOverridePeriod found.
+    // fires. AttackOverridePeriod is written only by the ctor FUN_062d2220 (1.0f at
+    // .text:062d2261 / 062d242c / 062d2466); UpdateBehaviorTick (062d2bdd / 062d2bee) reads it.
     float AttackOverrideTimer;          // +0xE0
     float AttackOverridePeriod;         // +0xE4
     // +0xE8: the id of the last target reported through ContentCbPtr->ship_in_sights_event
@@ -1238,7 +1255,8 @@ public:
     // (FUN_062d29a0, 15 callers), e.g. (0x14, 0) DelayBehavior .text:062d0b14, (2, 0)
     // GotoBehavior 062fddf2, (0xe, 1) GuideBehavior 062cf56a. PendingCompletedBehavior holds
     // the finished behavior index, the current directive's third dword, or -1 (the reset the
-    // tail leaves). TODO: receiver of the +0x118 stores at .text:062d2332 / 062d4193 unchecked.
+    // tail leaves). Further +0x118 stores: the ctor FUN_062d2220 (.text:062d2332, ESI = this)
+    // and OnEvent (.text:062d4193, on the same ESI as its +0x170 store at 062d42cb).
     int PendingDirectiveResult;                       // +0x118
     int PendingCompletedBehavior;                       // +0x11C
     unsigned DefaultBehaviorIndex;                  // +0x120
@@ -1263,8 +1281,9 @@ public:
     unsigned char DockingPortFlag;      // +0x169
     unsigned char Opaque16a[2];         // +0x16A .. +0x16B
     int DockingPortStatus;              // +0x16C
-    // Nonzero skips UpdateBehaviorTick (`TEST AL,AL; JNZ <early-return>`). TODO: no writer
-    // found.
+    // Nonzero skips UpdateBehaviorTick (`TEST AL,AL; JNZ <early-return>`, read at 062d2b2d).
+    // The ctor zeroes it (062d22c5); OnEvent case 7 sets 1 (.text:062d42cb) when the event
+    // names the ship itself.
     unsigned char TickSuppressedFlag;   // +0x170
     unsigned char Opaque171[3];         // +0x171 .. +0x173
     // +0x174 .. +0x1C7: the behavior dispatch table, indexed by CurrentBehaviorIndex.
@@ -1465,3 +1484,31 @@ namespace BehaviorTypes
     COMMON_API int __cdecl get_behavior_id(char const* Name);
     COMMON_API char const* __cdecl get_behavior_name(int Id);
 }
+
+// The behavior type ids get_behavior_id / get_behavior_name, IBehaviorManager::get_behavior_id
+// and pub::AI::get_behavior_id deal in: the order of the behavior registry (the
+// TBehaviorTypeDesc statics of common_behaviortypes.cpp, ctors 062d0bb0 .. 062d15b0).
+enum EBehaviorTypeId
+{
+    BEHAVIOR_NULL = 0,
+    BEHAVIOR_BUZZ = 1,
+    BEHAVIOR_GOTO = 2,
+    BEHAVIOR_TRAIL = 3,
+    BEHAVIOR_FLEE = 4,
+    BEHAVIOR_EVADE = 5,
+    BEHAVIOR_IDLE = 6,
+    BEHAVIOR_DOCK = 7,
+    BEHAVIOR_LAUNCH = 8,
+    BEHAVIOR_INSTANT_TRADE_LANE = 9,
+    BEHAVIOR_FORMATION = 10,
+    BEHAVIOR_LARGE_SHIP = 11,
+    BEHAVIOR_CRUISE = 12,
+    BEHAVIOR_STRAFE = 13,
+    BEHAVIOR_GUIDE = 14,
+    BEHAVIOR_FACE = 15,
+    BEHAVIOR_LOOT = 16,
+    BEHAVIOR_FOLLOW = 17,
+    BEHAVIOR_DRASTIC_EVADE = 18,
+    BEHAVIOR_FREE_FLIGHT = 19,
+    BEHAVIOR_DELAY = 20,
+};

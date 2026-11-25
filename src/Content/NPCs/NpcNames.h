@@ -38,7 +38,7 @@ struct FNpcNameRequest
     // 0x3f1e, the latter appending it as the escort number (resources.dll 0x3f1e =
     // "%s0 %d0 %s1 %s2" with %s0 = 0x3f1f "Escort").
     int EscortNumber;
-    unsigned char Field_0x14;   // +0x14 TODO: written only by FUN_06f31650; no reader in TU42
+    unsigned char Field_0x14;   // +0x14 0 from FUN_06f31650 only; no reader in TU42
     int RankLevel;              // +0x18 FFactionNames::GetRankDesig; non-zero -> 0x3f22
     unsigned int ShipArchId;    // +0x1c pub::GetType / pub::GetShipArchSTRID
 };

@@ -308,7 +308,8 @@ public:
     bool Execute() override;                 // LAB_06ec8570
 
     unsigned int TargetId;   // +0x0c pub::GetNicknameId(s0)
-    unsigned int Field_0x10; // +0x10 ID_String (ctor clear). TODO: no reader found.
+    unsigned int Field_0x10; // +0x10 ID_String cleared by the ctor; Execute (LAB_06ec8570)
+                             // reads only +0x0c
 };
 
 // Act_EnableManeuver: new(0x14), ctor FUN_06ec86a0, vtable 06fb5c34.
@@ -354,8 +355,10 @@ public:
     bool Execute() override;                 // FUN_06ecb420
 
     unsigned char bClamp;     // +0x0c get_value_bool(0)
-    unsigned char Field_0x0d; // +0x0d (ctor 1). TODO: no reader found.
-    unsigned char Field_0x0e; // +0x0e (ctor 1). TODO: no reader found.
+    // +0x0d / +0x0e: 1 from the ctor (06ecb405); Parse (FUN_06ecdb30) and Execute
+    // (FUN_06ecb420) do not touch them.
+    unsigned char Field_0x0d;
+    unsigned char Field_0x0e;
 };
 
 // Act_PlayerEnemyClamp: new(0x14), ctor FUN_06eccb30, vtable 06fb5ef4. +0x0c = +0x10 = 2.
@@ -1160,7 +1163,7 @@ public:
     // writes it; the port starts it at -1, a mode FUN_06ecebc0 treats like any other that is not
     // 0..2 (rotation only).
     int Mode;
-    unsigned char Field_0xdc;  // +0xdc (ctor 0) TODO: no reader or writer found
+    unsigned char Field_0xdc;  // +0xdc 0 from the ctor (06ec6a68); Parse / Execute never touch it
     unsigned char bRename;     // +0xdd (ctor 0) value 8 present
     unsigned int ObjList;      // +0xe0 ID_String CreateID(s1)
     float Heading;             // +0xe4 (ctor -1.0f) optional f7, degrees about Y (< 0: none)

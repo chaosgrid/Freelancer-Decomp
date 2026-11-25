@@ -106,7 +106,7 @@ namespace
         }
         else
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: no archetype found for effect named \"%s\" in space dust",
                   kSpaceDustCppPath, 0x49, Name);
         }
@@ -190,7 +190,7 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
             {
                 if (!Zone->GetSpacedust(Name.Value, Particles))
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kSpaceDustCppPath, 0xa8,
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kSpaceDustCppPath, 0xa8,
                           "zone flagged as PROP_DUST_ZONE but has no dust");
                 }
                 if (Particles == 0)

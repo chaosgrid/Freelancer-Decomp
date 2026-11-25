@@ -518,19 +518,19 @@ void NnButtonControl::Update()
             if ((ButtonBits & 0x04) == 0)
             {
                 ButtonBits = static_cast<unsigned char>(ButtonBits | 0x04);
-                TellParent(this, 0x2b);
+                TellParent(this, kWinNotifyCapturedEnter);
                 if (Parent != nullptr)
                 {
                     NnUiPulseReset(); // FUN_0059d580
-                    TellParent(this, 0x2c);
+                    TellParent(this, kWinNotifyHighlight);
                 }
             }
         }
         else if ((ButtonBits & 0x04) != 0)
         {
             ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfb);
-            TellParent(this, 0x2a);
-            TellParent(this, 0x2d);
+            TellParent(this, kWinNotifyCapturedLeave);
+            TellParent(this, kWinNotifyUnhighlight);
         }
     }
 
@@ -704,7 +704,7 @@ void NnButtonControl::MouseEnter(float const* /*Ray*/)
     if (Parent != nullptr)
     {
         NnUiPulseReset(); // FUN_0059d580
-        TellParent(this, 0x2c);
+        TellParent(this, kWinNotifyHighlight);
     }
     ButtonBits = static_cast<unsigned char>(ButtonBits | 0x01);
     if ((ButtonBits2 & 0x02) != 0)
@@ -716,7 +716,7 @@ void NnButtonControl::MouseLeave(float const* /*Ray*/)
     // FUN_0055b900 (RET 4).
     if (ToolTipIds != 0)
         NnToolTipHideGlobal(); // FUN_004be390
-    TellParent(this, 0x2d);
+    TellParent(this, kWinNotifyUnhighlight);
     ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfe);
 }
 
@@ -749,7 +749,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         if (!HitTest(Ray)) // slot 4
         {
             // Released off the button.
-            TellParent(this, 0x29);
+            TellParent(this, kWinNotifyRelease);
             ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfe);
             return true;
         }
@@ -771,7 +771,7 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         if ((ButtonBits & 0x80) != 0)
         {
             // A double click only tells the parent 0x27 (its answer is ignored).
-            TellParent(this, 0x27);
+            TellParent(this, kWinNotifyDoubleClick);
             return true;
         }
         Activate(); // slot 45
@@ -787,12 +787,12 @@ bool NnButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         ButtonBits = static_cast<unsigned char>(ButtonBits | 0x80);
     else
         ButtonBits = static_cast<unsigned char>(ButtonBits & 0x7f);
-    TellParent(this, 0x28);
+    TellParent(this, kWinNotifyPress);
     ButtonBits = static_cast<unsigned char>(ButtonBits | 0x14);
     if (Parent != nullptr)
     {
         NnUiPulseReset(); // FUN_0059d580
-        TellParent(this, 0x2c);
+        TellParent(this, kWinNotifyHighlight);
     }
     Win3DPushCapture(this); // FUN_0059d8d0
     return true;
@@ -842,10 +842,10 @@ intptr_t NnButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x0c:
         ButtonBits = static_cast<unsigned char>((ButtonBits & 0xbf) | (A != 0 ? 0x40 : 0));
         return 0;
-    case 0x2c:
+    case kWinNotifyHighlight:
         ButtonBits = static_cast<unsigned char>(ButtonBits | 0x02);
         return 0;
-    case 0x2d:
+    case kWinNotifyUnhighlight:
         ButtonBits = static_cast<unsigned char>(ButtonBits & 0xfd);
         return 0;
     case 0x2e:
@@ -854,7 +854,7 @@ intptr_t NnButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x32:
         ButtonBits2 = static_cast<unsigned char>((ButtonBits2 & 0xfe) | (A != 0 ? 0x01 : 0));
         return 0;
-    case 0x33:
+    case kWinPropColour:
         memcpy(Colour, reinterpret_cast<void const*>(A), sizeof(Colour));
         bUseColour = (B == 1) ? 1 : 0;
         return 0;
@@ -867,7 +867,7 @@ intptr_t NnButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x36:
         bSpin = (A == 1) ? 1 : 0;
         return 0;
-    case 0x51:
+    case kWinPropBlink:
         bBlink = (A != 0) ? 1 : 0;
         return 0;
     default:
@@ -883,7 +883,7 @@ void NnButtonControl::Activate()
         HudPostCommand(static_cast<unsigned>(CommandId), 0); // FUN_005763b0
         return;
     }
-    TellParent(this, 0x26);
+    TellParent(this, kWinNotifyClick);
 }
 
 void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
@@ -1208,18 +1208,18 @@ void NnToggleButtonControl::Update()
         {
             if ((Bits & 0x01) == 0)
             {
-                TellParent(this, 0x2b);
+                TellParent(this, kWinNotifyCapturedEnter);
                 if (Parent != nullptr)
                 {
                     NnUiPulseReset(); // FUN_0059d580
-                    TellParent(this, 0x2c);
+                    TellParent(this, kWinNotifyHighlight);
                 }
             }
         }
         else if ((Bits & 0x04) != 0)
         {
-            TellParent(this, 0x2a);
-            TellParent(this, 0x2d);
+            TellParent(this, kWinNotifyCapturedLeave);
+            TellParent(this, kWinNotifyUnhighlight);
         }
     }
 
@@ -1316,7 +1316,7 @@ intptr_t NnToggleButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_0055cf90.
     switch (Msg)
     {
-    case 6:
+    case kWinPropOffset:
     {
         // The offset from A; with a MAIN instance bound the +0x378 instance moves to
         // +0x60 (+ +0xa8 under +0x2f4 bit 0). Then ButtonControl's 6 as well.

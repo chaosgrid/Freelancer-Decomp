@@ -102,6 +102,14 @@ private:
     FObjectShipEngineSound& operator=(FObjectShipEngineSound const&) = delete;
 };
 
+// FObjectShip::ScriptState.
+enum EShipScriptState : int
+{
+    kShipScriptNone = 0,
+    kShipScriptLaunching = 1, // PlayLaunchScript (FUN_00447cd0)
+    kShipScriptLanding = 2,   // PlayLandingScript (FUN_00447c30)
+};
+
 class FObjectShip : public FRoomObject
 {
 public:
@@ -179,7 +187,7 @@ public:
     FObjectShipEngineFx* EngineFx;      // +0xa0 new[count]
     FObjectShipEngineSound* LoopSounds; // +0xa4 new[count] character_loop_sound
     FObjectShipEngineSound* RumbleSounds; // +0xa8 new[count] rumble_sound
-    int ScriptState;                    // +0xac 0 none, 1 launching, 2 landing
+    int ScriptState;                    // +0xac EShipScriptState
 
 private:
     // FUN_00447120.

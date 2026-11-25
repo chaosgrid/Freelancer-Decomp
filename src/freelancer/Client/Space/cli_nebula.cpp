@@ -929,7 +929,7 @@ namespace
                     if (Shape == nullptr)
                     {
                         char const* const File = Reader.get_file_name();
-                        FDUMP(0x100001,
+                        FDUMP(kFdumpError,
                               "%s(%d) : *** ERROR: Texture Shape (%s) not found for [Clouds] in "
                               "file (%s)",
                               "E:\\FL\\Scratch\\Source\\Client\\Space\\SpaceTerrainRenderComp.cpp",
@@ -1015,7 +1015,7 @@ namespace
                 Clouds->NearFadeEnd = Reader.get_value_float(1);
                 if (Clouds->NearFadeEnd < Clouds->NearFadeStart)
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                           "E:\\FL\\Scratch\\Source\\Client\\Space\\SpaceTerrainRenderComp.cpp",
                           0x555, "near_fade_distances are flipped");
                     float const Far = Clouds->NearFadeEnd;
@@ -1307,7 +1307,7 @@ namespace
                 Universe::IZone const* const Z = Universe::get_zone(SystemId, Nick);
                 if (Z == nullptr)
                 {
-                    FDUMP(0x100001,
+                    FDUMP(kFdumpError,
                           "%s(%d) : *** ERROR: AsteroidField linked to missing Exclusion Zone (%s)",
                           "E:\\FL\\Scratch\\Source\\Client\\Space\\Nebula.cpp", 0x2b2, Nick);
                     continue;
@@ -1633,7 +1633,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
     unsigned const SystemId = StarSysGetActiveSystemId();
     This->Zone = const_cast<Universe::IZone*>(Universe::get_zone(SystemId, ZoneName));
     if (This->Zone == nullptr)
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Nebula linked to missing Zone (%s)",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Nebula linked to missing Zone (%s)",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\Nebula.cpp", 0x1ee, ZoneName);
     (void)This->Zone->GetShape();
 
@@ -1657,7 +1657,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
     if (!Reader.open(FullPath, false))
     {
         // An error, then the rebuild and the light as usual.
-        FDUMP(0x100001, "%s(%d) : *** ERROR: unable to open nebula file %s",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: unable to open nebula file %s",
               "E:\\FL\\Scratch\\Source\\Client\\Space\\Nebula.cpp", 0x312, FullPath);
     }
     else
@@ -1743,7 +1743,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
                 Light = GameLightConstruct(static_cast<FGameLight*>(Mem));
             This->DynamicLight = Light;
             // Type 3 = directional.
-            EngineLightSetType((FEngineLight*)Light, 3, false);
+            EngineLightSetType((FEngineLight*)Light, kLightDirectional, false);
             float Zero[3] = {0.0f, 0.0f, 0.0f};
             EngineLightSetPosition((FEngineLight*)Light, Zero);
             unsigned char White[3] = {0xff, 0xff, 0xff};
@@ -1755,7 +1755,7 @@ void FNebulaEffect::Load(char const* FilePath, char const* ZoneName)
             {
                 GameLightRelease(Light);
                 // Retail passes the double 500000.0 to a "%d".
-                FDUMP(0x100002,
+                FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: Could not create nebula light of range %d",
                       "E:\\FL\\Scratch\\Source\\Client\\Space\\Nebula.cpp", 0x32a, 500000.0);
                 This->DynamicLight = nullptr;

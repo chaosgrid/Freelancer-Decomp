@@ -56,23 +56,20 @@
 unsigned int FPacket_FLPACKET_COMMON_UPDATEOBJECT::Encode(unsigned char** BufferHolder,
                                                           unsigned int Capacity,
                                                           unsigned int* OutLength) {
-    const FPayloadCommonUpdateObject* Wire =
-        reinterpret_cast<const FPayloadCommonUpdateObject*>(Payload());
-
     // The encoder's buffer argument is a pointer to the buffer pointer.
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
 
-    Stream.PutByte(Wire->State);
-    Stream.PutDword(Wire->ObjectId);
-    Stream.PutBytes(&Wire->Position, 12u);                         // FUN_06d8f510
+    Stream.PutByte(Wire.State);
+    Stream.PutDword(Wire.ObjectId);
+    Stream.PutBytes(&Wire.Position, 12u);                          // FUN_06d8f510
 
-    Stream.PutQuantized(Wire->Orientation.x, FRpcMarshalStream::kOrientationScale);
-    Stream.PutQuantized(Wire->Orientation.y, FRpcMarshalStream::kOrientationScale);
-    Stream.PutQuantized(Wire->Orientation.z, FRpcMarshalStream::kOrientationScale);
-    Stream.PutQuantized(Wire->Orientation.w, FRpcMarshalStream::kOrientationScale);
-    Stream.PutQuantized(Wire->Throttle, FRpcMarshalStream::kOrientationScale);
-    Stream.PutFloat(Wire->Timestamp);
+    Stream.PutQuantized(Wire.Orientation.x, FRpcMarshalStream::kOrientationScale);
+    Stream.PutQuantized(Wire.Orientation.y, FRpcMarshalStream::kOrientationScale);
+    Stream.PutQuantized(Wire.Orientation.z, FRpcMarshalStream::kOrientationScale);
+    Stream.PutQuantized(Wire.Orientation.w, FRpcMarshalStream::kOrientationScale);
+    Stream.PutQuantized(Wire.Throttle, FRpcMarshalStream::kOrientationScale);
+    Stream.PutFloat(Wire.Timestamp);
 
     // FUN_06da13c0 (`XOR EAX,EAX ; RET 0xc`) emits nothing.
     if (Stream.Failed()) {
@@ -87,9 +84,6 @@ unsigned int FPacket_FLPACKET_COMMON_UPDATEOBJECT::Encode(unsigned char** Buffer
 unsigned int FPacket_FLPACKET_COMMON_UPDATEOBJECT::Decode(const unsigned char* Buffer,
                                                           unsigned int Size,
                                                           unsigned int* OutLength) {
-    FPayloadCommonUpdateObject* Wire =
-        reinterpret_cast<FPayloadCommonUpdateObject*>(Payload());
-
     // The decoder's buffer argument is the buffer pointer itself (no second dereference).
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // FUN_06da13c0 at the start consumes nothing: the dispatcher already ate the two header
@@ -101,33 +95,33 @@ unsigned int FPacket_FLPACKET_COMMON_UPDATEOBJECT::Decode(const unsigned char* B
     unsigned char Small8 = 0;
     unsigned int Scratch = 0;
     if (!Stream.GetByte(Small8)) { return Stream.GetError(); }
-    Wire->State = Small8;
+    Wire.State = Small8;
     if (!Stream.GetDword(Scratch)) { return Stream.GetError(); }
-    Wire->ObjectId = Scratch;
-    if (!Stream.GetBytes(&Wire->Position, 12u)) { return Stream.GetError(); }
+    Wire.ObjectId = Scratch;
+    if (!Stream.GetBytes(&Wire.Position, 12u)) { return Stream.GetError(); }
 
-    if (!Stream.GetQuantizedSigned(Wire->Orientation.x,
+    if (!Stream.GetQuantizedSigned(Wire.Orientation.x,
                                    FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    if (!Stream.GetQuantizedSigned(Wire->Orientation.y,
+    if (!Stream.GetQuantizedSigned(Wire.Orientation.y,
                                    FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    if (!Stream.GetQuantizedSigned(Wire->Orientation.z,
+    if (!Stream.GetQuantizedSigned(Wire.Orientation.z,
                                    FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    if (!Stream.GetQuantizedSigned(Wire->Orientation.w,
+    if (!Stream.GetQuantizedSigned(Wire.Orientation.w,
                                    FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
-    if (!Stream.GetQuantizedSigned(Wire->Throttle,
+    if (!Stream.GetQuantizedSigned(Wire.Throttle,
                                    FRpcMarshalStream::kOrientationInvScale)) {
         return Stream.GetError();
     }
     // A plain dword, no scale.
-    if (!Stream.GetFloat(Wire->Timestamp)) { return Stream.GetError(); }
+    if (!Stream.GetFloat(Wire.Timestamp)) { return Stream.GetError(); }
 
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -170,24 +164,21 @@ unsigned int FPacket_FLPACKET_COMMON_UPDATEOBJECT::Decode(const unsigned char* B
 unsigned int FPacket_FLPACKET_COMMON_TRACTOROBJECTS::Encode(unsigned char** BufferHolder,
                                                             unsigned int Capacity,
                                                             unsigned int* OutLength) {
-    const FPayloadCommonTractorObjects* Wire =
-        reinterpret_cast<const FPayloadCommonTractorObjects*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
-    if (!Stream.PutDword(Wire->ObjectId)) {
+    if (!Stream.PutDword(Wire.ObjectId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    if (!Stream.PutWord(Wire->TractorEquipId)) {
+    if (!Stream.PutWord(Wire.TractorEquipId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    const unsigned int Count = Wire->TargetIds.Count();
+    const unsigned int Count = Wire.TargetIds.Count();
     if (!Stream.PutWord((unsigned short)(Count & 0xffffu))) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
     // Walks First..Last, not the count just written.
-    for (const unsigned int* It = Wire->TargetIds.Begin;
-         It != Wire->TargetIds.End; ++It) {
+    for (const unsigned int* It = Wire.TargetIds.Begin;
+         It != Wire.TargetIds.End; ++It) {
         if (!Stream.PutDword(*It)) {
             return FRpcMarshalStream::kEncodeOverflow;
         }
@@ -201,15 +192,12 @@ unsigned int FPacket_FLPACKET_COMMON_TRACTOROBJECTS::Encode(unsigned char** Buff
 unsigned int FPacket_FLPACKET_COMMON_TRACTOROBJECTS::Decode(const unsigned char* Buffer,
                                                             unsigned int Size,
                                                             unsigned int* OutLength) {
-    FPayloadCommonTractorObjects* Wire =
-        reinterpret_cast<FPayloadCommonTractorObjects*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
-    if (!Stream.GetDword(Wire->ObjectId)) {
+    if (!Stream.GetDword(Wire.ObjectId)) {
         return Stream.GetError();
     }
-    if (!Stream.GetWord(Wire->TractorEquipId)) {
+    if (!Stream.GetWord(Wire.TractorEquipId)) {
         return Stream.GetError();
     }
     unsigned short Count = 0;
@@ -222,7 +210,7 @@ unsigned int FPacket_FLPACKET_COMMON_TRACTOROBJECTS::Decode(const unsigned char*
         if (!Stream.GetDword(Value)) {
             return Stream.GetError();
         }
-        RpcRetailVectorAppend(Wire->TargetIds, Value);
+        RpcRetailVectorAppend(Wire.TargetIds, Value);
     }
     *OutLength = Stream.Length();
     RpcRecordDecodedPacket(PacketId, Stream.Length());

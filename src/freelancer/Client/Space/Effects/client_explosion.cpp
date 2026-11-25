@@ -485,7 +485,7 @@ void Action_Explode::SpawnInnardsDebris()
     int const ObjectCount = static_cast<int>(Objects.size());
     if (ObjectCount <= 0)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: [Explosion] %s has innards_debris_num = %d, but has no "
               "'innards_debris_object =' entries",
               kExplosionSourceFile, 0x21e, Arch->Nickname.get_string(),
@@ -567,7 +567,7 @@ FDebrisArch* PickExplosionDebrisArch(std::vector<Archetype::FExplosionDebrisType
     FDebrisArch* const Found = FindDebrisArch(&Drawn.Debris);
     if (Found != nullptr)
         return Found;
-    FDUMP(0x100002,
+    FDUMP(kFdumpWarning,
           "%s(%d) : *** WARNING: Exploding: Couldn't find debris_type[%s]. using default.",
           kExplosionSourceFile, 0x70, Drawn.Debris.get_string());
     return GetDefaultDebrisArch();

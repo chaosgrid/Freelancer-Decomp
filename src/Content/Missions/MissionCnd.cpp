@@ -28,9 +28,6 @@ namespace
     // DAT_06fb4448 (raw 00 00 00 38) = 2^-15: rand() scale in Cnd_Timer::Parse.
     float const GRandUnitScale = 1.0f / 32768.0f;
 
-    // Retail tests an ID_String for "set" with TEST id,0x3fffffff.
-    unsigned int const GIdValueMask = 0x3fffffff;
-
     // DAT_06fcefc8 (TU21 initializer LAB_06ebf730): CreateID(null), the default of the
     // Cnd_DistVecLbl and Cnd_LootAcquired label fields.
     unsigned int const GNullId = CreateID(nullptr);
@@ -170,6 +167,14 @@ namespace
         return Value;
     }
 
+    // Cnd_DistShip / Cnd_DistVec TickMode (+0x84 / +0x5c): when the timer runs.
+    enum ECndTickMode
+    {
+        CND_TICK_ALWAYS = 0,       // "TICK_ALWAYS"
+        CND_TICK_TOWARDS = 1,      // "TICK_TOWARDS": while the distance does not grow
+        CND_TICK_AWAY = 2,         // "TICK_AWAY": while it does not shrink
+    };
+
     // Cnd_DistShip / Cnd_DistVec: a missing or unknown slot leaves the mode unchanged.
     void ParseTickMode(INI_Reader& Reader, unsigned int Slot, int& TickMode)
     {
@@ -177,16 +182,16 @@ namespace
             return;
         if (_stricmp("TICK_AWAY", Reader.get_value_string(Slot)) == 0)
         {
-            TickMode = 2;
+            TickMode = CND_TICK_AWAY;
             return;
         }
         if (_stricmp("TICK_TOWARDS", Reader.get_value_string(Slot)) == 0)
         {
-            TickMode = 1;
+            TickMode = CND_TICK_TOWARDS;
             return;
         }
         if (_stricmp("TICK_ALWAYS", Reader.get_value_string(Slot)) == 0)
-            TickMode = 0;
+            TickMode = CND_TICK_ALWAYS;
     }
 
     // Shared tail of Cnd_DistShip / Cnd_DistVec Matches. DistanceSq is the float the x87 sum
@@ -205,13 +210,13 @@ namespace
         double const Delta = static_cast<double>(DistanceSq) - static_cast<double>(LastDistanceSq);
         LastDistanceSq = DistanceSq;
         bool bTick = false;
-        if (TickMode == 0)
+        if (TickMode == CND_TICK_ALWAYS)
             bTick = true;
         // TICK_TOWARDS ticks when the distance did not grow.
-        else if (Delta <= 0.0 && TickMode == 1)
+        else if (Delta <= 0.0 && TickMode == CND_TICK_TOWARDS)
             bTick = true;
         // TICK_AWAY ticks when it did not shrink.
-        else if (Delta >= 0.0 && TickMode == 2)
+        else if (Delta >= 0.0 && TickMode == CND_TICK_AWAY)
             bTick = true;
         if (bTick)
             TickTimer -= DeltaSeconds;
@@ -541,7 +546,7 @@ CndDestroyed::CndDestroyed(FMissionScript* InMission)
     , Needed(-1)
     , Label(0)
     , KillerObjId(0)
-    , Mode(0x3e6)
+    , Mode(CND_DESTROYED_ALL_IGNORE_LANDING)
 {
     InitEmpty(KillerLabel);
 }
@@ -557,13 +562,13 @@ void CndDestroyed::Parse(INI_Reader& Reader)
     {
         char const* ModeName = Reader.get_value_string(2);
         if (_stricmp(ModeName, "EXPLODE") == 0)
-            Mode = 1;
+            Mode = CND_DESTROYED_EXPLODE;
         else if (_stricmp(ModeName, "SILENT") == 0)
-            Mode = 0;
+            Mode = CND_DESTROYED_SILENT;
         else if (_stricmp(ModeName, "ALL") == 0)
-            Mode = 0x3e7;
+            Mode = CND_DESTROYED_ALL;
         else if (_stricmp(ModeName, "ALL_IGNORE_LANDING") == 0)
-            Mode = 0x3e6;
+            Mode = CND_DESTROYED_ALL_IGNORE_LANDING;
     }
     if (!Reader.is_value_empty(3))
         KillerLabel = Reader.get_value_string(3);
@@ -579,11 +584,11 @@ bool CndDestroyed::Matches(pub::Controller::EMessage /*EventId*/, void const* Ev
     unsigned int const* Parms = static_cast<unsigned int const*>(EventParms);
     // A different destroy type only passes for ALL, or for ALL_IGNORE_LANDING while the
     // player has a ship.
-    if (static_cast<int>(Parms[4]) != Mode && Mode != 0x3e7)
+    if (static_cast<int>(Parms[4]) != Mode && Mode != CND_DESTROYED_ALL)
     {
         if (Mission->PlayerState->ShipObject == nullptr)
             return false;
-        if (Mode != 0x3e6)
+        if (Mode != CND_DESTROYED_ALL_IGNORE_LANDING)
             return false;
     }
     if (!Mission->HasObjectLabel(Parms[0], &Label))
@@ -759,7 +764,7 @@ CndDistShip::CndDistShip(FMissionScript* InMission)
     , bInside(0)
     , TickTimer(0.0f)
     , TickInterval(0.0f)
-    , TickMode(0)
+    , TickMode(CND_TICK_ALWAYS)
     , LastDistanceSq(0.0f)
     , ObjectAId(0)
     , ObjectBId(0)
@@ -870,7 +875,7 @@ CndDistVec::CndDistVec(FMissionScript* InMission)
     , bInside(0)
     , TickTimer(0.0f)
     , TickInterval(0.0f)
-    , TickMode(0)
+    , TickMode(CND_TICK_ALWAYS)
     , LastDistanceSq(0.0f)
     , ObjectId(0)
 {
@@ -1756,7 +1761,7 @@ bool CndNpcSystemEnter::Matches(pub::Controller::EMessage EventId, void const* E
             return true;
         unsigned int Type;
         pub::SpaceObj::GetType(Parms[2], Type);
-        if ((Type & 0x800) == 0 && (Type & 0x40) == 0)
+        if ((Type & OBJ_JUMP_HOLE) == 0 && (Type & OBJ_JUMP_GATE) == 0)
             return true;
         bDelayRunning = 1;
         DelayStart = Mission->ElapsedTime;

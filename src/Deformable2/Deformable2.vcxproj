@@ -53,7 +53,13 @@
     <ClInclude Include="..\include\dacom.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Deformable.cpp" />
     <ClCompile Include="Deformable2.cpp" />
+    <ClCompile Include="DeformableMesh.cpp" />
+    <ClCompile Include="DeformableObject.cpp" />
+    <ClCompile Include="DeformablePart.cpp" />
+    <ClCompile Include="DeformablePartArchetype.cpp" />
+    <ClCompile Include="DeformIK.cpp" />
     <ClCompile Include="EyeMaterial.cpp" />
   </ItemGroup>
   <ItemGroup>

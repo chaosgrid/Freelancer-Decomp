@@ -406,6 +406,8 @@ public:
     IVP_U_Point TargetSpeed;            // +0xac
     float MaxDeltaPosition;             // +0xbc
     float DeltaOrientation;             // +0xc0
+    // +0xc4..+0xcc: copied from the parms' +0x2c..+0x34 by the ctor (FUN_06343050,
+    // .text:06343083..06343095); no other instruction in 06342c00..06344000 reads them.
     float Field_0xc4;                   // +0xc4
     float Field_0xc8;                   // +0xc8
     float Field_0xcc;                   // +0xcc

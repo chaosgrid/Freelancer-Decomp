@@ -86,7 +86,7 @@ namespace
             FContentNpcShip* Other = AsNpcShip(*It);
             if (Other->SpaceObjId == Ship->SpaceObjId)
                 continue;
-            if (Ship->FormationId == 0xffffffffu)
+            if (Ship->FormationId == GNoFormationId)
                 continue;
             if (Other->FormationId != Ship->FormationId)
                 continue;
@@ -324,7 +324,7 @@ namespace
         {
             unsigned int Id = FindTargetId(Ship, ObjectName);
             Op->TetherObjectId = Id;
-            if ((Id & 0x3fffffff) == 0)
+            if ((Id & GIdValueMask) == 0)
             {
                 Ship->AdvanceDirective();
                 return true;
@@ -350,7 +350,7 @@ bool FObjListGotoShip::Execute(FContentShipBase* Ship)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
         Op.TargetId = static_cast<int32_t>(Id);
-        if ((Id & 0x3fffffff) == 0)
+        if ((Id & GIdValueMask) == 0)
         {
             Ship->AdvanceDirective();
             return true;
@@ -360,7 +360,7 @@ bool FObjListGotoShip::Execute(FContentShipBase* Ship)
     {
         unsigned int Id = FindTargetId(Ship, &ObjectName);
         Op.TetherObjectId = Id;
-        if ((Id & 0x3fffffff) == 0)
+        if ((Id & GIdValueMask) == 0)
         {
             Ship->AdvanceDirective();
             return true;
@@ -514,7 +514,7 @@ void FObjListGotoVec::SetDestination(Vector const* Destination, float Range, flo
     Op.MaxSpeed = MaxSpeed;
     Op.bFlyThrough = 0;
     Op.bGotoCruise = bCruise ? 1 : 0;
-    if ((ObjectId & 0x3fffffff) != 0)
+    if ((ObjectId & GIdValueMask) != 0)
         Op.TetherObjectId = ObjectId;
     Op.bGotoNoCruise = bNoCruise ? 1 : 0;
 }
@@ -538,7 +538,7 @@ bool FObjListTrail::Execute(FContentShipBase* Ship)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
         Op.TargetId = Id;
-        if ((Id & 0x3fffffff) == 0)
+        if ((Id & GIdValueMask) == 0)
         {
             Ship->AdvanceDirective();
             return true;
@@ -581,7 +581,7 @@ bool FObjListFollow::Execute(FContentShipBase* Ship)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
         Op.TargetId = Id;
-        if ((Id & 0x3fffffff) == 0)
+        if ((Id & GIdValueMask) == 0)
         {
             Ship->AdvanceDirective();
             return true;
@@ -635,7 +635,7 @@ bool FObjListGuide::Execute(FContentShipBase* Ship)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
         Op.GotoParams.TetherObjectId = Id;
-        if ((Id & 0x3fffffff) == 0)
+        if ((Id & GIdValueMask) == 0)
         {
             Ship->AdvanceDirective();
             return true;
@@ -722,14 +722,14 @@ bool FObjListGuideShip::Execute(FContentShipBase* Ship)
     Ship->IsNpcShip();
     unsigned int TargetId = FindTargetId(Ship, &TargetName);
     Op.GotoParams.TetherObjectId = TargetId;
-    if ((TargetId & 0x3fffffff) == 0)
+    if ((TargetId & GIdValueMask) == 0)
     {
         Ship->AdvanceDirective();
         return true;
     }
     unsigned int ObjectId = FindTargetId(Ship, &ObjectName);
     Op.GotoParams.TargetId = static_cast<int32_t>(ObjectId);
-    if ((ObjectId & 0x3fffffff) == 0)
+    if ((ObjectId & GIdValueMask) == 0)
     {
         Ship->AdvanceDirective();
         return true;
@@ -801,7 +801,7 @@ bool FObjListFace::Execute(FContentShipBase* Ship)
     {
         unsigned int Id = FindTargetId(Ship, &TargetName);
         Op.TargetId = Id;
-        if ((Id & 0x3fffffff) == 0)
+        if ((Id & GIdValueMask) == 0)
         {
             Ship->AdvanceDirective();
             return true;
@@ -865,7 +865,7 @@ bool FObjListSetLifeTime::Execute(FContentShipBase* Ship)
             FContentNpcShip* Other = AsNpcShip(*It);
             if (Ship->SpaceObjId == Other->SpaceObjId)
                 continue;
-            if (Ship->FormationId == 0xffffffffu)
+            if (Ship->FormationId == GNoFormationId)
                 continue;
             if (Other->FormationId != Ship->FormationId)
                 continue;
@@ -936,7 +936,7 @@ namespace
         {
             unsigned int Id = FindTargetId(Ship, ObjectName);
             Op->TargetId = Id;
-            if ((Id & 0x3fffffff) == 0)
+            if ((Id & GIdValueMask) == 0)
             {
                 Ship->AdvanceDirective();
                 return true;
@@ -1139,7 +1139,7 @@ bool FObjListFollowPlayer::Execute(FContentShipBase* Ship)
         if (Object->SpaceObjId == Ship->SpaceObjId)
             continue;
         FContentNpcShip* Member = AsNpcShip(Object);
-        if (Member->FormationSlot != 0 && Member->FormationId != 0xffffffffu)
+        if (Member->FormationSlot != 0 && Member->FormationId != GNoFormationId)
             RemoveFromFormation(Member);
 
         pub::AI::DirectiveFollowOp FollowOp;
@@ -1201,7 +1201,7 @@ int FObjListBreakFormation::GetType()
 // FUN_06f28d90 (CancelDirectives = FUN_06f57740).
 bool FObjListCancelObjective::Execute(FContentShipBase* Ship)
 {
-    if (Ship->FormationId == 0xffffffffu)
+    if (Ship->FormationId == GNoFormationId)
         Ship->CancelDirectives();
     else
         RemoveFromFormation(Ship);
@@ -1232,7 +1232,7 @@ bool FObjListDock::Execute(FContentShipBase* Ship)
     {
         unsigned int Id = FindTargetId(Ship, &ObjectName);
         Op.TetherObjectId = static_cast<int32_t>(Id);
-        if ((Id & 0x3fffffff) == 0)
+        if ((Id & GIdValueMask) == 0)
         {
             Ship->AdvanceDirective();
             return true;
@@ -1335,21 +1335,21 @@ void FObjListLaunch::Parse(INI_Reader* Reader)
     Op.DockPortIndex = Reader->get_value_int(1);
     char const* Kind = Reader->get_value_string(2);
     if (_stricmp(Kind, "NONE") == 0)
-        Op.TerminalType = 0;
+        Op.TerminalType = TERM_NONE;
     else if (_stricmp(Kind, "BERTH") == 0)
-        Op.TerminalType = 1;
+        Op.TerminalType = TERM_BERTH;
     else if (_stricmp(Kind, "PAD") == 0)
-        Op.TerminalType = 2;
+        Op.TerminalType = TERM_PAD;
     else if (_stricmp(Kind, "MOOR_SMALL") == 0)
-        Op.TerminalType = 3;
+        Op.TerminalType = TERM_MOOR_SMALL;
     else if (_stricmp(Kind, "MOOR_MEDIUM") == 0)
-        Op.TerminalType = 4;
+        Op.TerminalType = TERM_MOOR_MEDIUM;
     else if (_stricmp(Kind, "MOOR_LARGE") == 0)
-        Op.TerminalType = 5;
+        Op.TerminalType = TERM_MOOR_LARGE;
     else if (_stricmp(Kind, "RING") == 0)
-        Op.TerminalType = 6;
+        Op.TerminalType = TERM_RING;
     else if (_stricmp(Kind, "JUMP_GATE") == 0)
-        Op.TerminalType = 7;
+        Op.TerminalType = TERM_JUMP;
 }
 
 // 06f25090.
@@ -1387,7 +1387,7 @@ bool FObjListWaitForPlayerManeuver::Execute(FContentShipBase* Ship)
     unsigned int PlayerId = FindTargetId(Ship, &PlayerName);
     if (PlayerId == 0)
         return true;
-    if (pub::AI::get_behavior_id(PlayerId) == 10)
+    if (pub::AI::get_behavior_id(PlayerId) == BEHAVIOR_FORMATION)
     {
         FContentPlayerShip* PlayerShip = FindContentPlayerStateByShip(&PlayerId)->ShipObject;
         if (PlayerShip != nullptr && Ship->FormationId == PlayerShip->FormationId)

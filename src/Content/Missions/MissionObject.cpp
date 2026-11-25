@@ -107,11 +107,11 @@ FMissionObject::~FMissionObject()
     std::list<FMissionJumper>::iterator It = Jumpers.begin();
     for (; It != Jumpers.end(); ++It)
     {
-        if (It->Npc == nullptr || It->State == 0)
+        if (It->Npc == nullptr || It->State == JumperInSystem)
             continue;
         delete It->Npc;
         It->Npc = nullptr;
-        It->State = 0;
+        It->State = JumperInSystem;
     }
 }
 
@@ -185,7 +185,7 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
     std::list<FMissionObjective*>::iterator First = Nodes.begin();
     for (; First != Nodes.end(); ++First)
     {
-        if ((*First)->GetType() == 5)
+        if ((*First)->GetType() == NNOBJ_TYPE5)
             break;
     }
 
@@ -194,13 +194,13 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
         if (First == Nodes.end())
             return false;
         std::list<FMissionObjective*>::iterator RunEnd = First;
-        while (RunEnd != Nodes.end() && (*RunEnd)->GetType() == 5)
+        while (RunEnd != Nodes.end() && (*RunEnd)->GetType() == NNOBJ_TYPE5)
             ++RunEnd;
         List->EraseRange(First, RunEnd);
         return true;
     }
 
-    if (First != Nodes.end() && (*First)->GetType() == 5)
+    if (First != Nodes.end() && (*First)->GetType() == NNOBJ_TYPE5)
     {
         FNnPathLeg const& FirstLeg = Legs->front();
         Vector const& Point = FirstLeg.Kind == 1 ? FirstLeg.PointB : FirstLeg.PointA;
@@ -212,7 +212,7 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
             return false;
         }
         std::list<FMissionObjective*>::iterator RunEnd = First;
-        while (RunEnd != Nodes.end() && (*RunEnd)->GetType() == 5)
+        while (RunEnd != Nodes.end() && (*RunEnd)->GetType() == NNOBJ_TYPE5)
             ++RunEnd;
         List->EraseRange(First, RunEnd);
     }
@@ -230,7 +230,7 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
     for (; LegIt != Legs->end(); ++LegIt)
     {
         FMissionObjective* Created = nullptr;
-        if (CreateMissionObjective(5, this, &Created))
+        if (CreateMissionObjective(NNOBJ_TYPE5, this, &Created))
             Nodes.insert(Ins, Created);
         FNNObjectiveType5* Objective = static_cast<FNNObjectiveType5*>(Created);
 
@@ -253,7 +253,7 @@ bool FMissionObject::BuildPathObjectives(FSystemInfo* System, std::list<FNnPathL
             int RepB = -1;
             pub::SpaceObj::GetRep(LegIt->ObjectB, RepB);
             FMissionObjective* CreatedB = nullptr;
-            if (CreateMissionObjective(5, this, &CreatedB))
+            if (CreateMissionObjective(NNOBJ_TYPE5, this, &CreatedB))
                 Nodes.insert(Ins, CreatedB);
             FNNObjectiveType5* ObjectiveB = static_cast<FNNObjectiveType5*>(CreatedB);
             ObjectiveB->Objective.Type = static_cast<unsigned int>(LegType);
@@ -493,7 +493,7 @@ bool FNNObjectiveBase::BuildDescription()
 }
 
 // LAB_06ee9e10.
-int FNNObjectiveBase::GetType() { return 1; }
+int FNNObjectiveBase::GetType() { return NNOBJ_BASE; }
 
 // FUN_06f1a010: new(0x3c).
 FMissionObjective* FNNObjectiveBase::Clone() { return new FNNObjectiveBase(*this); }
@@ -539,7 +539,7 @@ bool FNNObjectiveNavMarker::BuildDescription()
 }
 
 // LAB_06ee9660.
-int FNNObjectiveNavMarker::GetType() { return 2; }
+int FNNObjectiveNavMarker::GetType() { return NNOBJ_NAVMARKER; }
 
 // FUN_06f1a0a0: new(0x4c).
 FMissionObjective* FNNObjectiveNavMarker::Clone() { return new FNNObjectiveNavMarker(*this); }
@@ -579,7 +579,7 @@ bool FNNObjectiveIds::BuildDescription()
 }
 
 // LAB_06f5e540.
-int FNNObjectiveIds::GetType() { return 3; }
+int FNNObjectiveIds::GetType() { return NNOBJ_IDS; }
 
 // FUN_06f1a140: new(0x38).
 FMissionObjective* FNNObjectiveIds::Clone() { return new FNNObjectiveIds(*this); }
@@ -622,7 +622,7 @@ bool FNNObjectiveRepInst::BuildDescription()
 {
     unsigned int ObjId = Mission->GetLabelObjectId(&Label);
     int Rep = -1;
-    if ((ObjId & 0x3fffffff) != 0 && pub::SpaceObj::GetRep(ObjId, Rep) != 0)
+    if ((ObjId & GIdValueMask) != 0 && pub::SpaceObj::GetRep(ObjId, Rep) != 0)
         Rep = -1;
     FmtStr& Text = Objective.Description;
     Text.destroy();
@@ -635,7 +635,7 @@ bool FNNObjectiveRepInst::BuildDescription()
 }
 
 // LAB_06f25080.
-int FNNObjectiveRepInst::GetType() { return 4; }
+int FNNObjectiveRepInst::GetType() { return NNOBJ_REP_INST; }
 
 // FUN_06f1a1d0: new(0x80).
 FMissionObjective* FNNObjectiveRepInst::Clone() { return new FNNObjectiveRepInst(*this); }
@@ -656,7 +656,7 @@ void FNNObjectiveType5::Parse(INI_Reader* Reader) { ParseType56(*this, Reader, R
 void FNNObjectiveType5::Save(FILE* File) { SaveType56(*this, File, RepInstance, SystemId, Marker); }
 bool FNNObjectiveType5::BuildDescription() { BuildType56(*this, RepInstance, SystemId, Marker); return true; }
 // LAB_06ee99a0.
-int FNNObjectiveType5::GetType() { return 5; }
+int FNNObjectiveType5::GetType() { return NNOBJ_TYPE5; }
 // FUN_06f1a280: new(0x54).
 FMissionObjective* FNNObjectiveType5::Clone() { return new FNNObjectiveType5(*this); }
 
@@ -672,7 +672,7 @@ void FNNObjectiveType6::Parse(INI_Reader* Reader) { ParseType56(*this, Reader, R
 void FNNObjectiveType6::Save(FILE* File) { SaveType56(*this, File, RepInstance, SystemId, Marker); }
 bool FNNObjectiveType6::BuildDescription() { BuildType56(*this, RepInstance, SystemId, Marker); return true; }
 // LAB_06f250c0.
-int FNNObjectiveType6::GetType() { return 6; }
+int FNNObjectiveType6::GetType() { return NNOBJ_TYPE6; }
 // FUN_06f1a330: new(0x54).
 FMissionObjective* FNNObjectiveType6::Clone() { return new FNNObjectiveType6(*this); }
 
@@ -704,7 +704,7 @@ bool FNNObjectiveType7::BuildDescription()
 }
 
 // LAB_06f250d0.
-int FNNObjectiveType7::GetType() { return 7; }
+int FNNObjectiveType7::GetType() { return NNOBJ_TYPE7; }
 
 // FUN_06f1a3e0: new(0x50).
 FMissionObjective* FNNObjectiveType7::Clone() { return new FNNObjectiveType7(*this); }
@@ -735,7 +735,7 @@ bool FNNObjectiveType8::BuildDescription()
 }
 
 // LAB_06f1a480.
-int FNNObjectiveType8::GetType() { return 8; }
+int FNNObjectiveType8::GetType() { return NNOBJ_TYPE8; }
 
 // FUN_06f1a490: new(0x3c).
 FMissionObjective* FNNObjectiveType8::Clone() { return new FNNObjectiveType8(*this); }
@@ -749,28 +749,28 @@ bool __cdecl CreateMissionObjective(int Type, FMissionObject* Mission, FMissionO
 {
     switch (Type)
     {
-    case 1:
+    case NNOBJ_BASE:
         *Out = new FNNObjectiveBase(Mission);
         break;
-    case 2:
+    case NNOBJ_NAVMARKER:
         *Out = new FNNObjectiveNavMarker(Mission);
         break;
-    case 3:
+    case NNOBJ_IDS:
         *Out = new FNNObjectiveIds(Mission);
         break;
-    case 4:
+    case NNOBJ_REP_INST:
         *Out = new FNNObjectiveRepInst(Mission);
         break;
-    case 5:
+    case NNOBJ_TYPE5:
         *Out = new FNNObjectiveType5(Mission);
         break;
-    case 6:
+    case NNOBJ_TYPE6:
         *Out = new FNNObjectiveType6(Mission);
         break;
-    case 7:
+    case NNOBJ_TYPE7:
         *Out = new FNNObjectiveType7(Mission);
         break;
-    case 8:
+    case NNOBJ_TYPE8:
         *Out = new FNNObjectiveType8(Mission);
         break;
     default:
@@ -824,13 +824,13 @@ void __cdecl LoadNNObjective(INI_Reader* Reader, FMissionObject* Mission, FMissi
                     continue;
             }
             else if (_stricmp(Reader->get_value_string(0), "navmarker") == 0)
-                Type = 2;
+                Type = NNOBJ_NAVMARKER;
             else if (_stricmp(Reader->get_value_string(0), "base") == 0)
-                Type = 1;
+                Type = NNOBJ_BASE;
             else if (_stricmp(Reader->get_value_string(0), "ids") == 0)
-                Type = 3;
+                Type = NNOBJ_IDS;
             else if (_stricmp(Reader->get_value_string(0), "rep_inst") == 0)
-                Type = 4;
+                Type = NNOBJ_REP_INST;
             else
                 continue;
             CreateMissionObjective(Type, Mission, &Objective);
@@ -1148,7 +1148,7 @@ void FMissionPlayer::SendPlaceholderObjective()
     FMissionOwnedObjectiveList Temp;
 
     FMissionObjective* Placeholder = nullptr;
-    CreateMissionObjective(7, Mission, &Placeholder);
+    CreateMissionObjective(NNOBJ_TYPE7, Mission, &Placeholder);
     if (Placeholder != nullptr)
         Temp.Objectives.push_back(Placeholder);
     Placeholder->Objective.Type = 0x89;
@@ -1256,14 +1256,14 @@ void FMissionObject::UpdateObjectiveTimer(pub::Controller::EMessage MessageId,
     if (MessageId == pub::Controller::EMessage::BaseExit)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
-        if (Parms[1] == PlayerId && (PlayerId & 0x3fffffff) != 0)
+        if (Parms[1] == PlayerId && (PlayerId & GIdValueMask) != 0)
             GObjectiveTimerRunning = false;
         return;
     }
     if (MessageId == pub::Controller::EMessage::SpaceEnter)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
-        if (Parms[1] == PlayerId && (PlayerId & 0x3fffffff) != 0)
+        if (Parms[1] == PlayerId && (PlayerId & GIdValueMask) != 0)
             GObjectiveTimerRunning = true;
         return;
     }
@@ -1568,11 +1568,11 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         if (!pub::SinglePlayer())
             break;
         bool bKeepHitPoints = true;
-        if ((Parms[2] & 0x3fffffff) != 0)
+        if ((Parms[2] & GIdValueMask) != 0)
         {
             unsigned int Type;
             pub::SpaceObj::GetType(Parms[2], Type);
-            if ((Type & 0x20) != 0 || (Type & 0x100) != 0)
+            if ((Type & OBJ_DOCKING_RING) != 0 || (Type & OBJ_STATION) != 0)
                 bKeepHitPoints = false;
         }
         RespawnMissionObjects(bKeepHitPoints);
@@ -1625,7 +1625,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         }
         // An NPC leaves +0xa4 (deleted when there is no other object); otherwise a [MsnSolar] /
         // [MsnLoot] record with that id is marked 2 (the loot walk only when no solar matched).
-        bool const bNoOther = (Parms[2] & 0x3fffffff) == 0;
+        bool const bNoOther = (Parms[2] & GIdValueMask) == 0;
         NpcIt = NpcObjects.find(Parms[0]);
         if (NpcIt != NpcObjects.end())
         {
@@ -1726,21 +1726,21 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
                 FMissionObjective* Objective = *ObjIt;
                 if (Objective->bHidden != 0)
                     continue;
-                if (Objective->GetType() != 4)
+                if (Objective->GetType() != NNOBJ_REP_INST)
                     continue;
                 TString<0x30> const* Label = &static_cast<FNNObjectiveRepInst*>(Objective)->Label;
                 unsigned int TargetId = 0;
                 if (FindContentPlayerState(PlayerId) != nullptr && PlayerState->ShipObject != nullptr)
                 {
                     TargetId = GetLabelShipId(Label);
-                    if ((TargetId & 0x3fffffff) == 0)
+                    if ((TargetId & GIdValueMask) == 0)
                     {
                         TargetId = GetLootId(Label);
-                        if ((TargetId & 0x3fffffff) == 0)
+                        if ((TargetId & GIdValueMask) == 0)
                             TargetId = GetSolarId(Label);
                     }
                 }
-                if ((TargetId & 0x3fffffff) == 0)
+                if ((TargetId & GIdValueMask) == 0)
                     continue;
                 if (TargetId != Object->SpaceObjId)
                     continue;
@@ -1780,7 +1780,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
             // FUN_06f1e440 appends {0, 0}, then the new node's npc is set.
             FMissionJumper Jumper;
             Jumper.Npc = nullptr;
-            Jumper.State = 0;
+            Jumper.State = JumperInSystem;
             Jumpers.push_back(Jumper);
             Jumpers.back().Npc = Npc;
         }
@@ -1921,7 +1921,7 @@ FContentNpcShip* FMissionObject::FindFormationNpc(TString<0x30> const* Label)
             FContentNpcShip* Npc = It->second;
             if (Npc == nullptr)
                 continue;
-            if (Npc->FormationSlot == 0 || Npc->FormationId == 0xffffffffu)
+            if (Npc->FormationSlot == 0 || Npc->FormationId == GNoFormationId)
                 return Npc;
         }
     }
@@ -1953,7 +1953,7 @@ FContentNpcShip* FMissionObject::FindRandEncFormationNpc(TString<0x30> const* La
                 FContentNpcShip* Npc = It->second;
                 if (Npc == nullptr)
                     continue;
-                if (Npc->FormationSlot == 0 || Npc->FormationId == 0xffffffffu)
+                if (Npc->FormationSlot == 0 || Npc->FormationId == GNoFormationId)
                     return Npc;
             }
         }
@@ -1969,10 +1969,10 @@ unsigned int FMissionObject::GetLabelObjectId(TString<0x30> const* Label)
     if (PlayerState->ShipObject == nullptr)
         return 0;
     unsigned int ShipId = GetLabelShipId(Label);
-    if ((ShipId & 0x3fffffff) != 0)
+    if ((ShipId & GIdValueMask) != 0)
         return ShipId;
     unsigned int LootId = GetLootId(Label);
-    if ((LootId & 0x3fffffff) != 0)
+    if ((LootId & GIdValueMask) != 0)
         return LootId;
     return GetSolarId(Label);
 }
@@ -2006,7 +2006,7 @@ unsigned int FMissionObject::GetSolarId(TString<0x30> const* Label)
             break;
         }
     }
-    if ((SolarId & 0x3fffffff) != 0)
+    if ((SolarId & GIdValueMask) != 0)
         return SolarId;
     // Else a universe object of that nickname.
     unsigned int NicknameId = pub::GetNicknameId(Label->Data);
@@ -2204,9 +2204,9 @@ void FMissionObject::OnShipJump(unsigned int const* ShipId)
         std::list<FMissionJumper>::iterator It = Jumpers.begin();
         for (; It != Jumpers.end(); ++It)
         {
-            if (It->State != 0)
+            if (It->State != JumperInSystem)
                 continue;
-            It->State = 2;
+            It->State = JumperWaitingForTimer;
             It->Npc->Relocate(nullptr, nullptr, nullptr);
         }
         return;
@@ -2220,7 +2220,7 @@ void FMissionObject::OnShipJump(unsigned int const* ShipId)
     {
         if (std::strcmp(Found->second->Nickname.Data, It->Npc->Nickname.Data) != 0)
             continue;
-        It->State = 1;
+        It->State = JumperJumpedAlone;
         It->Npc->Relocate(nullptr, nullptr, nullptr);
         return;
     }
@@ -2242,7 +2242,7 @@ void FMissionObject::UpdateJumpers(float DeltaTime)
     std::list<FMissionJumper>::iterator It = Jumpers.begin();
     for (; It != Jumpers.end(); ++It)
     {
-        if (It->State != 2)
+        if (It->State != JumperWaitingForTimer)
             continue;
         FSystemInfo* JumpSystem = FindSystemInfo(&JumpSystemId);
         JumpSystem->AddJumpingInSpaceObj(It->Npc, JumpGateId);
@@ -2252,7 +2252,7 @@ void FMissionObject::UpdateJumpers(float DeltaTime)
         Arrival[0] = It->Npc->SpaceObjId;
         Arrival[1] = JumpSystem->SystemId;
         OnNpcSystemEnter(Arrival);
-        It->State = 0;
+        It->State = JumperInSystem;
     }
     bJumpPending = 0;
     JumpTimer = -1.0f;
@@ -2265,9 +2265,9 @@ void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
     std::list<FMissionJumper>::iterator It = Jumpers.begin();
     for (; It != Jumpers.end(); ++It)
     {
-        if (It->State != 1)
+        if (It->State != JumperJumpedAlone)
         {
-            if (It->State == 2)
+            if (It->State == JumperWaitingForTimer)
                 bJumpPending = 1;
             continue;
         }
@@ -2287,13 +2287,13 @@ void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
         Matrix Orientation(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
         int Kind = 0;
         bool bAnchor = true;
-        if ((Type & 0x40) != 0)
+        if ((Type & OBJ_JUMP_GATE) != 0)
         {
             pub::SpaceObj::GetLocation(Parms[3], Position, Orientation);
             Position.z = Position.z + 700.0f;
             Kind = 0;
         }
-        else if ((Type & 0x800) != 0)
+        else if ((Type & OBJ_JUMP_HOLE) != 0)
         {
             pub::SpaceObj::GetLocation(Parms[3], Position, Orientation);
             Kind = 0;
@@ -2334,7 +2334,7 @@ void FMissionObject::PlaceJumpersAtLaunch(unsigned int const* Parms)
         Arrival[1] = Parms[0];
         Arrival[2] = Parms[3];
         OnNpcSystemEnter(Arrival);
-        It->State = 0;
+        It->State = JumperInSystem;
     }
 }
 
@@ -2507,7 +2507,7 @@ void FMissionObject::AttachRandEncNpc(void const* MessageParms)
     if (static_cast<unsigned int>(EncIt->Params->ShipsSpawned) != EncIt->NpcCount)
         return;
 
-    if ((EncIt->Params->DockTarget & 0x3fffffff) != 0)
+    if ((EncIt->Params->DockTarget & GIdValueMask) != 0)
     {
         // Every arm's ships; a ship missing from +0xa4 is appended as null.
         std::list<FContentShipBase*> Members;
@@ -2758,14 +2758,14 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
 
         // No head or no voice: the faction's picks (costume FUN_06f4f430, voice FUN_06f4f620)
         // with the name's gender.
-        if ((Npc->Appearance.PartIds[0] & 0x3fffffff) == 0 || (Npc->Voice & 0x3fffffff) == 0)
+        if ((Npc->Appearance.PartIds[0] & GIdValueMask) == 0 || (Npc->Voice & GIdValueMask) == 0)
         {
             FFactionProps* Faction = GetFactionProps(&Npc->Affiliation);
             if (Faction != nullptr)
             {
-                if ((Npc->Appearance.PartIds[0] & 0x3fffffff) == 0)
+                if ((Npc->Appearance.PartIds[0] & GIdValueMask) == 0)
                     Faction->PickSpaceCostume(Name.Gender, &Params->CommCostume);
-                if ((Npc->Voice & 0x3fffffff) == 0)
+                if ((Npc->Voice & GIdValueMask) == 0)
                     Faction->PickVoice(static_cast<unsigned int>(Name.Gender), &Params->Voice);
             }
         }
@@ -2975,7 +2975,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     FSystemInfo* PlayerSystem = PlayerState->GetSystemRecord();
     std::strcpy(Info.Nickname, Solar->Nickname.Data);
     Solar->SpaceObjId = pub::GetNicknameId(Info.Nickname);
-    Info.Field_0x00 = ControllerId;
+    Info.ControllerId = ControllerId;
     Info.SolarArchID = Solar->ArchetypeId;
     Info.SystemID = PlayerSystem != nullptr ? PlayerSystem->SystemId : 0;
 
@@ -3025,14 +3025,14 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     pub::Reputation::SetAffiliation(Info.VibeGroupId, Solar->Faction);
 
     // No head or no voice: the faction's picks, starting from GenderSlot (see above).
-    if ((Solar->SpaceCostume.PartIds[0] & 0x3fffffff) == 0 || (Solar->VoiceId & 0x3fffffff) == 0)
+    if ((Solar->SpaceCostume.PartIds[0] & GIdValueMask) == 0 || (Solar->VoiceId & GIdValueMask) == 0)
     {
         FFactionProps* Faction = GetFactionProps(&Solar->Faction);
         if (Faction != nullptr)
         {
             int Gender = GenderSlot;
             Faction->PickGender(&Gender);
-            if ((Solar->SpaceCostume.PartIds[0] & 0x3fffffff) == 0)
+            if ((Solar->SpaceCostume.PartIds[0] & GIdValueMask) == 0)
             {
                 // Retail passes &Info+0x40, which is laid out as a Costume; the pick writes it
                 // only on success, so the copy round trip leaves Info as it was otherwise.
@@ -3053,7 +3053,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
                 for (int Index = 0; Index < 8; ++Index)
                     Info.CostumeAccessory[Index] = InfoCostume.AccessoryIds[Index];
             }
-            if ((Solar->VoiceId & 0x3fffffff) == 0)
+            if ((Solar->VoiceId & GIdValueMask) == 0)
                 Faction->PickVoice(static_cast<unsigned int>(Gender), &Info.VoiceId);
         }
     }
@@ -3134,14 +3134,14 @@ void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
         if (FindContentPlayerState(PlayerId) != nullptr && PlayerState->ShipObject != nullptr)
         {
             Anchor = GetLabelShipId(&Loot->RelPosObj);
-            if ((Anchor & 0x3fffffff) == 0)
+            if ((Anchor & GIdValueMask) == 0)
             {
                 Anchor = GetLootId(&Loot->RelPosObj);
-                if ((Anchor & 0x3fffffff) == 0)
+                if ((Anchor & GIdValueMask) == 0)
                     Anchor = GetSolarId(&Loot->RelPosObj);
             }
         }
-        if ((Anchor & 0x3fffffff) == 0)
+        if ((Anchor & GIdValueMask) == 0)
             return;
         Vector AnchorPosition;
         Matrix AnchorOrientation;
@@ -3983,14 +3983,14 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
     switch (MessageId)
     {
     case EMessage::BaseExit:
-        if (State == 3 && Owner->PlayerId == Parms[1] && (Owner->PlayerId & 0x3fffffff) != 0)
+        if (State == 3 && Owner->PlayerId == Parms[1] && (Owner->PlayerId & GIdValueMask) != 0)
             State = 4;
         return State;
 
     case EMessage::TradelaneEnter:
         if (State != 3 || FindContentPlayerState(Owner->PlayerId) == nullptr)
             return State;
-        if (Parms[0] != Owner->PlayerState->GetShipId() || (Parms[0] & 0x3fffffff) == 0)
+        if (Parms[0] != Owner->PlayerState->GetShipId() || (Parms[0] & GIdValueMask) == 0)
             return State;
         State = 4;
         SendObjectives(true, false);
@@ -3999,7 +3999,7 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
     case EMessage::TradelaneExit:
         if (State != 4 || FindContentPlayerState(Owner->PlayerId) == nullptr)
             return State;
-        if (Parms[0] != Owner->PlayerState->GetShipId() || (Parms[0] & 0x3fffffff) == 0)
+        if (Parms[0] != Owner->PlayerState->GetShipId() || (Parms[0] & GIdValueMask) == 0)
             return State;
         StartNnPathTimer(this);
         State = 3;
@@ -4013,7 +4013,7 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
         return State;
 
     case EMessage::SpaceEnter:
-        if (Owner->PlayerId != Parms[1] || (Owner->PlayerId & 0x3fffffff) == 0)
+        if (Owner->PlayerId != Parms[1] || (Owner->PlayerId & GIdValueMask) == 0)
             return State;
         if (State == 4)
         {
@@ -4026,7 +4026,7 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
         break;
 
     case EMessage::SpaceExit:
-        if (Owner->PlayerId == Parms[1] && (Owner->PlayerId & 0x3fffffff) != 0)
+        if (Owner->PlayerId == Parms[1] && (Owner->PlayerId & GIdValueMask) != 0)
             TargetObjectId = 0;
         return State;
 
@@ -4058,7 +4058,7 @@ int FMissionNnPath::HandleMessage(pub::Controller::EMessage MessageId, void cons
     case EMessage::PlayerMissionChanged:
         if (Parms[1] != Owner->PlayerId)
             return State;
-        if (Parms[0] != Owner->ControllerId && (Parms[0] & 0x3fffffff) != 0)
+        if (Parms[0] != Owner->ControllerId && (Parms[0] & GIdValueMask) != 0)
             return State;
         break;
 
@@ -4121,10 +4121,10 @@ void FMissionNnPath::Rebuild()
     {
         if (bHasShip && Label.Length != 0)
         {
-            if ((TargetObjectId & 0x3fffffff) == 0)
+            if ((TargetObjectId & GIdValueMask) == 0)
             {
                 TargetObjectId = Owner->GetLabelObjectId(&Label);
-                if ((TargetObjectId & 0x3fffffff) != 0)
+                if ((TargetObjectId & GIdValueMask) != 0)
                 {
                     Vector Center;
                     pub::SpaceObj::GetRadius(TargetObjectId, TargetRadius, Center);
@@ -4139,7 +4139,7 @@ void FMissionNnPath::Rebuild()
     else
     {
         Target = GetNextHopConnectionObject(System->SystemId, SystemId, 1);
-        if ((Target & 0x3fffffff) == 0)
+        if ((Target & GIdValueMask) == 0)
             Target = GetNextHopConnectionObject(System->SystemId, SystemId, 0);
         GetConnectionPosition(System->SystemId, Target, &Destination);
     }

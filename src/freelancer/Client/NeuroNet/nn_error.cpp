@@ -97,15 +97,15 @@ bool NnError::Create(Win3D* NewParent, void* Data)
     }
 
     // No null test on the title.
-    Title->SetProperty(0x1d, reinterpret_cast<uintptr_t>(L"Freelancer Encountered an Error"), 0);
+    Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(L"Freelancer Encountered an Error"), 0);
 
     DrawLayer = 0x6e;
     DrawSubLayer = 6;
     bCursorDrawFlag = NnModalPauseGame();
     Win3DSetKeyFocus(this);
     HudPushInputFocus(AsHudCmdHandler());
-    RegisterEvent(0xf);
-    RegisterEvent(0x11);
+    RegisterEvent(USER_CANCEL);
+    RegisterEvent(USER_ENTER);
 
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
@@ -114,7 +114,7 @@ void NnError::Dismiss()
 {
     G_NnErrorPending = 0;
     if (Parent != nullptr)
-        Parent->ProcessMessage(0x3006, 0, 0);
+        Parent->ProcessMessage(kWinMsgConfirmAnswer, 0, 0);
     NnModalResumeGame(bCursorDrawFlag);
     ReleaseMouse();
     Win3D* Child = ChildHead;
@@ -150,13 +150,13 @@ intptr_t NnError::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_00472880: every message returns 0 without reaching WinControl's switch.
     (void)B;
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         if (A == reinterpret_cast<uintptr_t>(OkayButton))
             Dismiss();
         return 0;
     }
-    if (Msg == 0x42)
+    if (Msg == kWinPropPlaceAtOffset)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
@@ -168,7 +168,7 @@ intptr_t NnError::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool NnError::OnEvent(unsigned MsgId)
 {
     // LAB_004727f0: 0xf or 0x11 dismisses; anything else is not handled.
-    if (MsgId != 0xf && MsgId != 0x11)
+    if (MsgId != USER_CANCEL && MsgId != USER_ENTER)
         return false;
     Dismiss();
     return true;
@@ -186,11 +186,11 @@ namespace
             return;
         NnError* const Dialog = static_cast<NnError*>(Created);
         float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        Dialog->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
         if (Dialog->Title != nullptr)
             Dialog->Title->Flags = static_cast<unsigned char>(Dialog->Title->Flags & 0xfc);
         if (Dialog->Text != nullptr)
-            Dialog->Text->SetProperty(0x1e, Ids, 0);
+            Dialog->Text->SetProperty(kTextPropSetIds, Ids, 0);
         Dialog->CaptureMouse();
     }
 }
@@ -254,13 +254,13 @@ bool NnErrorRunModalMessage(char const* Message)
         {
             NnError* const Dialog = static_cast<NnError*>(Created);
             float const Zero[3] = {0.0f, 0.0f, 0.0f};
-            Dialog->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+            Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
             if (Dialog->Title != nullptr)
                 Dialog->Title->Flags = static_cast<unsigned char>(Dialog->Title->Flags | 0x03);
             wchar_t Wide[0x400];
             mbstowcs(Wide, Message, 0x400);
             if (Dialog->Text != nullptr)
-                Dialog->Text->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Wide), 0);
+                Dialog->Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Wide), 0);
             Dialog->CaptureMouse();
         }
     }

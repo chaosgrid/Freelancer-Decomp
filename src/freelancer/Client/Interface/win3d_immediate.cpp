@@ -276,7 +276,7 @@ void Win3DVertex3f(float X, float Y, float Z)
         if (Now - static_cast<double>(LastWarnTime) > static_cast<double>(WarnInterval))
         {
             LastWarnTime = static_cast<float>(Now);
-            FDUMP(0x100002, "%s(%d) : *** WARNING: GL: %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: GL: %s\n",
                   "E:\\FL\\Scratch\\Source\\Client\\cmn\\OpenGL.cpp", 0x59, "glVertex overflow");
         }
         return;
@@ -428,7 +428,7 @@ void Win3DEnable(int Capability)
         return;
 
     default:
-        FDUMP(0x100002, "%s(%d) : *** WARNING: GL: %s\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: GL: %s\n",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\OpenGL.cpp", 0x287, "glEnable - invalid");
         return;
     }
@@ -480,7 +480,7 @@ void Win3DDisable(int Capability)
         return;
 
     default:
-        FDUMP(0x100002, "%s(%d) : *** WARNING: GL: %s\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: GL: %s\n",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\OpenGL.cpp", 0x2bf, "glDisable");
         return;
     }
@@ -878,7 +878,7 @@ void Win3DEnd()
         }
 
         default:
-            FDUMP(0x100002, "%s(%d) : *** WARNING: glEnd invalid vertex mode (0x%X)\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: glEnd invalid vertex mode (0x%X)\n",
                   "E:\\FL\\Scratch\\Source\\Client\\cmn\\OpenGL.cpp", 0x1d2, G_PrimitiveMode);
             break;
         }

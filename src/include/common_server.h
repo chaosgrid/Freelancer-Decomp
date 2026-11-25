@@ -56,15 +56,20 @@ enum MissionMessageType {
 };
 
 // DOCK_HOST_RESPONSE — used in SpaceObj::Dock
+// The enumerator names are the port's, after what Content.dll's producers mean by each value:
+// CheckDockPermission (FUN_06f6c920) and ChooseDockTerminal (FUN_06f6c580). Server's
+// pub::SpaceObj::Dock (06cfa6e0) switches the docking lights on for 3 and 4 and stops after
+// the lights for 3; Ship::request_returned (FUN_06d01e80) keeps a dock request (type 0)
+// answered 3 pending (bDockInUse).
 enum DOCK_HOST_RESPONSE {
-    DOCK_HOST_RESPONSE_0 = 0,
-    DOCK_HOST_RESPONSE_1 = 1,
-    DOCK_HOST_RESPONSE_2 = 2,
-    DOCK_HOST_RESPONSE_3 = 3,
-    // Content.dll passes 4 after a granted dock (FUN_06f6e9d0) and 5 when a ship's docking
-    // is cancelled (FUN_06f6e810).
-    DOCK_HOST_RESPONSE_4 = 4,
-    DOCK_HOST_RESPONSE_5 = 5,
+    DOCK_HOST_RESPONSE_DENIED_HOSTILE = 0,      // the target's attitude to the ship is hostile
+    DOCK_HOST_RESPONSE_ACCESS_DENIED = 1,       // gate locked for the ship / docking not allowed
+    DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL = 2, // no terminal fits the ship's class
+    DOCK_HOST_RESPONSE_BUSY = 3,                // every fitting terminal busy, or the target moves
+    // Content passes 4 after a granted dock (FUN_06f6e9d0) and 5 when a ship's docking is
+    // cancelled (FUN_06f6e810); ChooseDockTerminal answers 5 for a target without terminals.
+    DOCK_HOST_RESPONSE_PROCEED = 4,
+    DOCK_HOST_RESPONSE_NO_TERMINAL = 5,
 };
 
 // EQInfo and TerminalInfo are declared in server_cobject.h under pub::SpaceObj namespace
@@ -367,7 +372,7 @@ namespace CmnAsteroid {
 
 namespace SrvAsteroid {
     // One server-side record per CmnAsteroid::CAsteroidField: retail's 0x20-byte
-    // "field entry" (operator new(0x20)). Defined in src/Server/server_classes.cpp.
+    // "field entry" (operator new(0x20)). Defined in src/Server/server_srvasteroid.cpp.
     struct FSrvAsteroidField;
 
     // Retail layout (.text:06d03710) in member order; the port does not reproduce the
@@ -440,7 +445,7 @@ namespace BaseGroupMessage {
 // FUN_06d19110 (cdecl): the same 8-byte control payload { MsgType, Param & 0xffff } sent
 // to every active player, each addressed by CHAT_ID{slot client id}. Only caller: EqObj's
 // destroy override FUN_06ce8080 (MsgType 0x14 with the dead player's id).
-// Defined in server_classes.cpp.
+// Defined in server_chat.cpp.
 void Server_BroadcastGroupControl(unsigned int MsgType, unsigned int Param);
 
 struct CMissionObjectives {
@@ -578,6 +583,9 @@ namespace Audio {
         unsigned int DangerMusic;
         unsigned int BattleMusic;
         unsigned int OverrideMusic;
+        // +0x10: Content's Act_PlayMusic stores value 5 of its line (bool), the death music 1;
+        // SetMusic (06d5eec0) passes it as a byte to IClient SET_MUSIC, and freelancer.exe
+        // FUN_00553340 stores its negation (SETZ) beside the override tracks.
         unsigned char Field10;
         unsigned int FadeBits;
     };

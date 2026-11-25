@@ -379,7 +379,7 @@ void BaseRichTextWin::Draw()
             if (Result == 0)
                 bSurfaceDirty = 0;
             else
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kRichDisplayCpp, 0x5a1,
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kRichDisplayCpp, 0x5a1,
                       "Failed to set BigImage from a buffer.\n");
         }
         operator delete(Buffer);
@@ -432,7 +432,7 @@ void BaseRichTextWin::Draw()
 bool BaseRichTextWin::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_0057afd0 (RET 0xc). 0xf005 is a scrollbar's value change; A is the sender.
-    if (Msg == 0xf005)
+    if (Msg == kWinMsgScroll)
     {
         if (A == static_cast<unsigned>(reinterpret_cast<uintptr_t>(ScrollBarV)))
         {
@@ -472,7 +472,7 @@ bool BaseRichTextWin::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 intptr_t BaseRichTextWin::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_0057ebb0 (RET 0xc): property 6 is SetAttachOffset inlined.
-    if (Msg != 6)
+    if (Msg != kWinPropOffset)
         return WinControl::SetProperty(Msg, A, B);
     SetAttachOffset(reinterpret_cast<float const*>(A));
     return 1;
@@ -863,12 +863,12 @@ void BaseRichTextWin::EnsureSurface()
             }
             if (static_cast<IDAComponent*>(Instance)->QueryInterface(
                     Iids::BigImage2, reinterpret_cast<void**>(&Image)) != 0)
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kRichDisplayCpp, 0x3c7,
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kRichDisplayCpp, 0x3c7,
                       "Failed to query IBigImage2 interface.\n");
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kRichDisplayCpp, 0x3cc,
+            FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kRichDisplayCpp, 0x3cc,
                   "Failed to create BigImage instance.\n");
         }
         operator delete(Buffer);
@@ -1327,14 +1327,14 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
             if (ImeBox != nullptr)
                 ImeBox->HandleKey(Key);
             if (Parent != nullptr)
-                Parent->ProcessMessage(0xf004u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
+                Parent->ProcessMessage(kWinMsgEnter, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
             return true;
         case 0x1b:
             // Escape: the same with 0xf003.
             if (ImeBox != nullptr)
                 ImeBox->HandleKey(Key);
             if (Parent != nullptr)
-                Parent->ProcessMessage(0xf003u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
+                Parent->ProcessMessage(kWinMsgEscape, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
             return true;
         case 0x23:
             // End.
@@ -1498,17 +1498,17 @@ void RichTextEditWin::OnDeactivating()
 bool RichTextEditWin::OnEvent(unsigned MsgId)
 {
     // FUN_0057c930 (RET 4, this = the +0x498 face).
-    if (MsgId == 1)
+    if (MsgId == USER_KEY)
         return OnKeyDown(HudCommandRecord());
-    if (MsgId == 2)
+    if (MsgId == USER_CHAR)
         return OnChar(HudCommandRecord());
-    if (MsgId == 0xf)
+    if (MsgId == USER_CANCEL)
     {
         // With a raw window message in the record, USER_CANCEL is posted again and the event
         // consumed.
         if (HudCommandRecord()->WindowMessage != 0)
         {
-            HudPostCommand(0xf, 0);
+            HudPostCommand(USER_CANCEL, 0);
             return true;
         }
     }
@@ -1576,9 +1576,9 @@ void RichTextEditWin::SetEditable(bool bNewEditable)
     if (HudGetInputFocus() != AsHudCmdHandler())
         return;
     if (bEditable != 0)
-        UnregisterEvent(0xf);
+        UnregisterEvent(USER_CANCEL);
     else
-        RegisterEvent(0xf);
+        RegisterEvent(USER_CANCEL);
 }
 
 void RichTextEditWin::ClearText()
@@ -1659,12 +1659,12 @@ void RichTextEditWin::Activate()
     // FUN_0057c750.
     Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
     HudPushInputFocus(AsHudCmdHandler());
-    RegisterEvent(1);
-    RegisterEvent(2);
+    RegisterEvent(USER_KEY);
+    RegisterEvent(USER_CHAR);
     if (bEditable != 0)
-        UnregisterEvent(0xf);
+        UnregisterEvent(USER_CANCEL);
     else
-        RegisterEvent(0xf);
+        RegisterEvent(USER_CANCEL);
     if (ImeBox != nullptr)
     {
         IMEFocus* const Focus = IMEFocus::GetSingleton();
@@ -1678,9 +1678,9 @@ void RichTextEditWin::Deactivate(bool bHide)
 {
     // FUN_0057c7d0 (RET 4). The IME focus is cleared only while the IME is enabled.
     OnDeactivating();
-    UnregisterEvent(1);
-    UnregisterEvent(2);
-    UnregisterEvent(0xf);
+    UnregisterEvent(USER_KEY);
+    UnregisterEvent(USER_CHAR);
+    UnregisterEvent(USER_CANCEL);
     HudPopInputFocus(AsHudCmdHandler());
     if (bHide)
         Flags = static_cast<unsigned char>(Flags & ~(kWin3DActive | kWin3DVisible));

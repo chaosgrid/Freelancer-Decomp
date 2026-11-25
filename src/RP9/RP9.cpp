@@ -86,9 +86,6 @@ static_assert(D3DXIFF_DDS == 4 && D3DXIFF_DIB == 6, "D3DXIMAGE_FILEFORMAT ids 0.
 
 namespace
 {
-    const int kFdumpError = 0x100001;
-    const int kFdumpWarning = 0x100002;
-    const int kFdumpNotice = 0x100003;
     // Retail pushes one literal per kind: "%s(%d) : WARNING:General:%s" (184 sites),
     // "... NOTICE ..." (24), "... ERROR ..." (1); the %s-substituted kind below yields the
     // same text.
@@ -668,13 +665,6 @@ namespace
 
     FRp9Factory* G_Factory = nullptr;
 
-    bool IidEqual(const char* Left, const char* Right)
-    {
-        if (Left == nullptr || Right == nullptr)
-            return false;
-        return std::strcmp(Left, Right) == 0;
-    }
-
     // Retail calls FDUMP unconditionally (no null test).
     void Rp9Fdump(int Flags, int Line, const char* Kind, const char* Message,
                   const char* File = kSrcRpDx8)
@@ -841,7 +831,7 @@ namespace
 
     // Every failed D3D call in rp_dx8.cpp/dx8_*.h: FUN_06d168f0 (sprintf) of the literal
     // "<name>: %s" with FUN_06d2b964(hr) into a 0x2000-byte stack buffer, then
-    // FDUMP(0x100002, "%s(%d) : WARNING:General:%s", <file>, <line>, buffer).
+    // FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", <file>, <line>, buffer).
     void FdumpHr(const char* Format, HRESULT Hr, int Line, const char* File = kSrcRpDx8)
     {
         char Text[0x2000];
@@ -1110,7 +1100,7 @@ GENRESULT DACOM_API FRp9Factory::QueryInterface(const char* Iid, void** Out)
     if (Out == nullptr)
         return GR_GENERIC;
     *Out = nullptr;
-    if (!IidEqual(Iid, Iids::ComponentFactory))
+    if (!Iids::Equal(Iid, Iids::ComponentFactory))
         return GR_INTERFACE_UNSUPPORTED;
     *Out = (IComponentFactory*)(this);
     AddRef();
@@ -1261,25 +1251,25 @@ GENRESULT FDirectX9::QueryLocal(const char* Iid, void** Out)
         return GR_GENERIC;
     *Out = nullptr;
     IDAComponent* Face = nullptr;
-    if (IidEqual(Iid, Iids::RenderPipeline8B))
+    if (Iids::Equal(Iid, Iids::RenderPipeline8B))
         Face = (IRenderPipeline*)(this);
-    else if (IidEqual(Iid, Iids::VertexBufferManager))
+    else if (Iids::Equal(Iid, Iids::VertexBufferManager))
         Face = (IVertexBufferManager*)(this);
-    else if (IidEqual(Iid, Iids::RPDraw))
+    else if (Iids::Equal(Iid, Iids::RPDraw))
         Face = (IRPDraw*)(this);
-    else if (IidEqual(Iid, Iids::RPIndexBuffer))
+    else if (Iids::Equal(Iid, Iids::RPIndexBuffer))
         Face = (IRPIndexBuffer*)(this);
-    else if (IidEqual(Iid, Iids::RPVertexBuffer))
+    else if (Iids::Equal(Iid, Iids::RPVertexBuffer))
         Face = (IRPVertexBuffer*)(this);
-    else if (IidEqual(Iid, Iids::GammaControl))
+    else if (Iids::Equal(Iid, Iids::GammaControl))
         Face = (IGammaControl*)(this);
-    else if (IidEqual(Iid, Iids::RPTexture))
+    else if (Iids::Equal(Iid, Iids::RPTexture))
         Face = (IRPTexture*)(this);
-    else if (IidEqual(Iid, Iids::AggregateComponent))
+    else if (Iids::Equal(Iid, Iids::AggregateComponent))
         Face = (IAggregateComponent*)(this);
-    else if (IidEqual(Iid, Iids::RenderPipelineEx))
+    else if (Iids::Equal(Iid, Iids::RenderPipelineEx))
         Face = (IRenderPipelineEx*)(this);
-    else if (IidEqual(Iid, Iids::RPDrawEx))
+    else if (Iids::Equal(Iid, Iids::RPDrawEx))
         Face = (IRPDrawEx*)(this);
     if (Face == nullptr)
         return GR_INTERFACE_UNSUPPORTED;

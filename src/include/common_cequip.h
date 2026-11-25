@@ -1073,7 +1073,7 @@ public:
     // FUN_0629cb70 (thiscall, RET 4): (re)build the phantom on the shield's geometry.
     void Attach(CEShield* Shield);
 
-    unsigned Field04;   // +0x04  TODO: no reader or writer found in Common.dll
+    unsigned Field04;   // +0x04  no instruction in common.dll reads or writes it (class never built)
     void* Phantom;      // +0x08  PhySys phantom handle
     int IntruderCount;  // +0x0c  -1 while torn down, 0 after Attach, +1/-1 per intruder
 };

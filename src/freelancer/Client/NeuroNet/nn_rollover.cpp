@@ -177,7 +177,7 @@ void NnRolloverControl::LoadRolloverTable()
 bool NnRolloverControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
 {
     // LAB_004b5700 (RET 0xc).
-    if (Msg != 0xef02)
+    if (Msg != kWinMsgHide)
         return false;
     Flags = static_cast<unsigned char>(Flags & 0xfd);
     return true;

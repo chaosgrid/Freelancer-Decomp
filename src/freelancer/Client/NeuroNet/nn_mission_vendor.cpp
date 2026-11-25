@@ -412,7 +412,7 @@ void NnMissionVendor::LoadOffers()
     ScrollOffset = 0;
     Field_0x374 = 0;
     Selected = 0;
-    SummaryScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(OfferCount - 1));
+    SummaryScroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(OfferCount - 1));
 }
 
 void NnMissionVendor::RefreshRows()
@@ -427,9 +427,9 @@ void NnMissionVendor::RefreshRows()
                                          SummaryDests[Row], SummaryTitles[Row], SummaryRewards[Row]};
 
         for (int Slot = 0; Slot < 6; ++Slot)
-            Controls[Slot]->SetProperty(2, 0, 0);
+            Controls[Slot]->SetProperty(kWinPropDisable, 0, 0);
         for (int Slot = 0; Slot < 6; ++Slot)
-            Controls[Slot]->SetProperty(1, 0, 0);
+            Controls[Slot]->SetProperty(kWinPropHide, 0, 0);
 
         // An unknown class keeps path 0 and ids 0 (unsigned compare).
         char const* Path = IconPaths[0];
@@ -439,18 +439,18 @@ void NnMissionVendor::RefreshRows()
             Path = IconPaths[Offer.MissionClass];
             Ids = G_MissionVendorIconIds[Offer.MissionClass];
         }
-        SummaryIcons[Row]->SetProperty(4, PointerArg(Path), 0);
-        IconFrames[Row]->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
-        SummaryBoxes[Row]->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
+        SummaryIcons[Row]->SetProperty(kWinPropMesh, PointerArg(Path), 0);
+        IconFrames[Row]->SetProperty(kWinPropToolTip, static_cast<uintptr_t>(Ids), 0);
+        SummaryBoxes[Row]->SetProperty(kWinPropToolTip, static_cast<uintptr_t>(Ids), 0);
 
         // The offer's +0x14 and +0x2c texts.
         FmtStrSprintf(&Offer.Title, Buffer, 0x400);
-        SummaryDests[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
+        SummaryDests[Row]->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
         FmtStrSprintf(&Offer.Description, Buffer, 0x400);
-        SummaryTitles[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
+        SummaryTitles[Row]->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
 
         FormatReward(Offer, Buffer);
-        SummaryRewards[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
+        SummaryRewards[Row]->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
 
         uintptr_t const bSelected = (Index == Selected) ? 1u : 0u;
         IconFrames[Row]->SetProperty(0xc, bSelected, 0);
@@ -467,14 +467,14 @@ void NnMissionVendor::RefreshRows()
         WinControl* const Controls[6] = {SummaryIcons[Row], IconFrames[Row], SummaryBoxes[Row],
                                          SummaryDests[Row], SummaryTitles[Row], SummaryRewards[Row]};
         for (int Slot = 0; Slot < 6; ++Slot)
-            Controls[Slot]->SetProperty(2, 1, 0);
+            Controls[Slot]->SetProperty(kWinPropDisable, 1, 0);
         for (int Slot = 0; Slot < 6; ++Slot)
-            Controls[Slot]->SetProperty(1, 1, 0);
-        SummaryIcons[Row]->SetProperty(4, PointerArg(IconPaths[0]), 0);
-        SummaryBoxes[Row]->SetProperty(0x1e, 0, 0);
-        SummaryDests[Row]->SetProperty(0x1e, 0, 0);
-        SummaryTitles[Row]->SetProperty(0x1e, 0, 0);
-        SummaryRewards[Row]->SetProperty(0x1e, 0, 0);
+            Controls[Slot]->SetProperty(kWinPropHide, 1, 0);
+        SummaryIcons[Row]->SetProperty(kWinPropMesh, PointerArg(IconPaths[0]), 0);
+        SummaryBoxes[Row]->SetProperty(kTextPropSetIds, 0, 0);
+        SummaryDests[Row]->SetProperty(kTextPropSetIds, 0, 0);
+        SummaryTitles[Row]->SetProperty(kTextPropSetIds, 0, 0);
+        SummaryRewards[Row]->SetProperty(kTextPropSetIds, 0, 0);
     }
 }
 
@@ -485,10 +485,10 @@ void NnMissionVendor::ShowSelected()
     if (Selected == -1)
     {
         // The video is left as it is.
-        MissionReject->SetProperty(0x1e, 0x72f, 0);
-        MissionDest->SetProperty(0x1e, 0, 0);
-        MissionTitle->SetProperty(0x1e, 0, 0);
-        MissionReward->SetProperty(0x1e, 0, 0);
+        MissionReject->SetProperty(kTextPropSetIds, 0x72f, 0);
+        MissionDest->SetProperty(kTextPropSetIds, 0, 0);
+        MissionTitle->SetProperty(kTextPropSetIds, 0, 0);
+        MissionReward->SetProperty(kTextPropSetIds, 0, 0);
         FmtStrSprintf(&StatusText, Buffer, 0x400);
         SetFullText(FullText, Buffer);
         return;
@@ -498,12 +498,12 @@ void NnMissionVendor::ShowSelected()
     // retail).
     MissionVendorProperties const& Offer = Offers[Selected];
     FmtStrSprintf(&Offer.Title, Buffer, 0x400);
-    MissionDest->SetProperty(0x1d, PointerArg(Buffer), 0);
+    MissionDest->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
     FmtStrSprintf(&Offer.Description, Buffer, 0x400);
-    MissionTitle->SetProperty(0x1d, PointerArg(Buffer), 0);
+    MissionTitle->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
     FormatReward(Offer, Buffer);
-    MissionReward->SetProperty(0x1d, PointerArg(Buffer), 0);
-    MissionReject->SetProperty(0x1e, 0, 0);
+    MissionReward->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
+    MissionReject->SetProperty(kTextPropSetIds, 0, 0);
     FmtStrSprintf(&Offer.Briefing, Buffer, 0x400);
     SetFullText(FullText, Buffer);
     UpdateVideo(); // FUN_0048d140
@@ -514,7 +514,7 @@ void NnMissionVendor::UpdateVideo()
     // FUN_0048d140.
     if (Selected < 0)
     {
-        MissionIcon->SetProperty(1, 1, 0);
+        MissionIcon->SetProperty(kWinPropHide, 1, 0);
         return;
     }
 
@@ -525,7 +525,7 @@ void NnMissionVendor::UpdateVideo()
     VideoTexture.assign(Texture, strlen(Texture));
 
     if (!VideoMaterial.Init(kVideoMaterialName))
-        FDUMP(0x100001, kNoMaterialInVendor, kMissionVendorCpp, 0x3af, kVideoMaterialName);
+        FDUMP(kFdumpError, kNoMaterialInVendor, kMissionVendorCpp, 0x3af, kVideoMaterialName);
     VideoMaterial.Swap(VideoTexture.c_str(), kVideoTextureLibrary);
 
     char const* Path = IconPaths[0];
@@ -535,9 +535,9 @@ void NnMissionVendor::UpdateVideo()
         Path = IconPaths[Offer.MissionClass];
         Ids = G_MissionVendorIconIds[Offer.MissionClass];
     }
-    MissionIcon->SetProperty(4, PointerArg(Path), 0);
-    MissionIcon->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
-    MissionIcon->SetProperty(1, 0, 0);
+    MissionIcon->SetProperty(kWinPropMesh, PointerArg(Path), 0);
+    MissionIcon->SetProperty(kWinPropToolTip, static_cast<uintptr_t>(Ids), 0);
+    MissionIcon->SetProperty(kWinPropHide, 0, 0);
 }
 
 void NnMissionVendor::Draw()
@@ -602,7 +602,7 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Win3DDeleteTree(this);
         return 0;
     }
-    case 0x3e:
+    case kWinNotifyScrollValue:
     {
         if (A == PointerArg(SummaryScroll) && static_cast<int>(B) != ScrollOffset)
         {
@@ -611,8 +611,8 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         return 0;
     }
-    case 0x2c:
-    case 0x2d:
+    case kWinNotifyHighlight:
+    case kWinNotifyUnhighlight:
     {
         // Retail quirks kept: Hovered is written (0x2c) or cleared (0x2d) on every pass until the
         // control is found, and 0x2d compares against Row - ScrollOffset (0x0048c515). Then the
@@ -620,7 +620,7 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         int Row = 0;
         for (; Row < 5; ++Row)
         {
-            if (Msg == 0x2c)
+            if (Msg == kWinNotifyHighlight)
                 Hovered = ScrollOffset + Row;
             else if (Hovered == Row - ScrollOffset)
                 Hovered = -1;
@@ -635,7 +635,7 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             SummaryBoxes[Row]->SetProperty(Msg, 0, 0);
         return 0;
     }
-    case 0x26:
+    case kWinNotifyClick:
     {
         if (A == PointerArg(CloseButton))
         {
@@ -682,9 +682,9 @@ intptr_t NnMissionVendor::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
 bool NnMissionVendor::OnEvent(unsigned MsgId)
 {
-    // LAB_0048d540 (RET 4), on the +0x32c face: USER_CANCEL (0x10) closes the window like the
+    // LAB_0048d540 (RET 4), on the +0x32c face: USER_STACKABLE_CANCEL (0x10) closes the window like the
     // close button. (Retail tests the adjusted `this` for null.)
-    if (MsgId != 0x10)
+    if (MsgId != USER_STACKABLE_CANCEL)
         return false;
     if (ResultCallback != nullptr)
         ResultCallback(ResultContext, 0);

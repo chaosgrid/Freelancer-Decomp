@@ -64,7 +64,7 @@ public:
     // falls into the hover walk), move (0x42), close (0x4e); returns 0.
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;
 
-    // Event::Handler face LAB_004a5f40 (RET 4) -- USER_CANCEL (0x10) closes the window.
+    // Event::Handler face LAB_004a5f40 (RET 4) -- USER_STACKABLE_CANCEL (0x10) closes the window.
     bool OnEvent(unsigned MsgId) override;
 
     float BasePosition[3];               // +0x330 {0, -0.1, -1.498}, set by Create

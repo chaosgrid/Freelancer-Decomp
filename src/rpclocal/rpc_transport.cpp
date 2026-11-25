@@ -82,26 +82,6 @@ void FPacketBase::AddRef() {
     ++UsageCount;
 }
 
-// The constructor's own immediate stores, untested in retail; every offset is inside the
-// class's own size.
-void RpcPacketStoreField(FPacketBase* Packet, unsigned int Offset, unsigned int Width,
-                         unsigned int Value) {
-    unsigned char* Bytes = reinterpret_cast<unsigned char*>(Packet) + Offset;
-    switch (Width) {
-        case 1:
-            *Bytes = (unsigned char)(Value & 0xffu);
-            break;
-        case 2:
-            *reinterpret_cast<unsigned short*>(Bytes) = (unsigned short)(Value & 0xffffu);
-            break;
-        case 4:
-            *reinterpret_cast<unsigned int*>(Bytes) = Value;
-            break;
-        default:
-            break;
-    }
-}
-
 // The 0x0c MSVCP60 std::list header, as every embedded list in this module wears it.
 // Type-agnostic on purpose: the node size comes from the caller, so one body covers
 // node sizes 0x0c, 0x10, 0x14 and 0x50 alike.
@@ -121,10 +101,8 @@ struct FRpcEmbeddedListNode {
 // As in FUN_06d9d4f0 (the CHARACTERINFO ctor; the other list-building ctors differ only in
 // offset and node size). Nothing is tested, not even the operator new result; the
 // sentinel's value bytes are left as operator new returned them.
-void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
-                                unsigned int NodeSize) {
-    FRpcEmbeddedListHeader* Header = reinterpret_cast<FRpcEmbeddedListHeader*>(
-        reinterpret_cast<unsigned char*>(Packet) + Offset);
+void RpcPacketBuildListSentinel(void* ListHeader, unsigned int NodeSize) {
+    FRpcEmbeddedListHeader* Header = static_cast<FRpcEmbeddedListHeader*>(ListHeader);
     Header->Allocator = 0;
     FRpcEmbeddedListNode* Sentinel =
         static_cast<FRpcEmbeddedListNode*>(::operator new(NodeSize));
@@ -135,9 +113,8 @@ void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
 }
 
 // FUN_06d9d1f0's list half: FUN_06d901f0 (list::erase) in a loop, then the sentinel.
-void RpcPacketDestroyEmbeddedList(FPacketBase* Packet, unsigned int Offset) {
-    FRpcEmbeddedListHeader* Header = reinterpret_cast<FRpcEmbeddedListHeader*>(
-        reinterpret_cast<unsigned char*>(Packet) + Offset);
+void RpcPacketDestroyEmbeddedList(void* ListHeader) {
+    FRpcEmbeddedListHeader* Header = static_cast<FRpcEmbeddedListHeader*>(ListHeader);
     FRpcEmbeddedListNode* Sentinel = static_cast<FRpcEmbeddedListNode*>(Header->Head);
     FRpcEmbeddedListNode* Node = Sentinel->Next;
     while (Node != Sentinel) {

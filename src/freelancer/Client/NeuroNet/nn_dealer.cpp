@@ -88,7 +88,7 @@ NnDealer::NnDealer()
     ShipDealerShipPrice = nullptr;
     PlayerShipTradeInValue = 0;
 
-    TradeMode = 1;      // +0x978
+    TradeMode = kTradeModeCommodity;      // +0x978
     bDealerMode = 1;    // +0x35c
     Inventory = nullptr; // +0x974
     Field980 = 1;
@@ -131,7 +131,7 @@ void NnDealer::CreateControls()
     // double. The results of the row controls are not kept: NN_Inventory's BindControls finds
     // them by name.
     float PriceColumn = 0.025f; // [ESP+0x2c] (0x3ccccccd)
-    if (TradeMode == 1)         // +0x978
+    if (TradeMode == kTradeModeCommodity)         // +0x978
         PriceColumn = 0.0f;
 
     // "PlayerTitle"; the result is not kept.
@@ -217,7 +217,7 @@ void NnDealer::CreateControls()
         }
 
         // "ItemGoodDeal0%d" -- the commodity dealer (trade mode 1) only.
-        if (TradeMode == 1)
+        if (TradeMode == kTradeModeCommodity)
         {
             sprintf(Name, "ItemGoodDeal0%d", Number);
             float const DealPosition[3] = {1.201f, QuantityY, 0.0001f}; // 0x38d1b717
@@ -270,7 +270,7 @@ void NnDealer::CreateControls()
     // The ship dealer's welcome block sits higher.
     float HelpY = -0.2f;   // [ESP+0x24] (0xbe4ccccd)
     float LineY = -0.143f; // DAT_005d1cac
-    if (TradeMode == 2)
+    if (TradeMode == kTradeModeShip)
     {
         HelpY = -0.131f;   // 0xbe0624dd
         LineY = -0.072f;   // DAT_005d1ca8
@@ -292,19 +292,19 @@ void NnDealer::CreateControls()
     wchar_t Title[0x40]; // [ESP+0xc0]
     Title[0] = 0;
     unsigned HelpIds = 0;
-    if (TradeMode == 1)
+    if (TradeMode == kTradeModeCommodity)
     {
         if (GetIdsStringWWithRawFallback(0x48b, Title, 0x40) == 0)
             Title[0] = 0;
         HelpIds = 0x478;
     }
-    else if (TradeMode == 2)
+    else if (TradeMode == kTradeModeShip)
     {
         if (GetIdsStringWWithRawFallback(0x486, Title, 0x40) == 0)
             Title[0] = 0;
         HelpIds = GetPlayerShipArchetypeIdRetail() != 0 ? 0x489 : 0x499; // FUN_004c3e10
     }
-    else if (TradeMode == 3)
+    else if (TradeMode == kTradeModeEquipment)
     {
         if (GetIdsStringWWithRawFallback(0x48c, Title, 0x40) == 0)
             Title[0] = 0;
@@ -333,7 +333,7 @@ void NnDealer::CreateControls()
             wchar_t BaseName[0x40];      // [ESP+0x244]
             wchar_t Format[0x3f];        // [ESP+0x2c4]
             wchar_t Welcome[0x100];      // [ESP+0x344]
-            if (TradeMode != 2)
+            if (TradeMode != kTradeModeShip)
             {
                 if (GetIdsStringWWithRawFallback(static_cast<unsigned>(BaseIds), BaseName, 0x40) ==
                     0)
@@ -343,7 +343,7 @@ void NnDealer::CreateControls()
                 CharUpperW(Welcome);
                 WelcomeString = Welcome;
             }
-            WelcomeText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(WelcomeString), 0);
+            WelcomeText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(WelcomeString), 0);
         }
     }
 
@@ -449,7 +449,7 @@ void NnDealer::CreateControls()
     float TextY = -0.359f;                   // [ESP+0x24]
     float SliderY = -0.28f;                  // [ESP+0x3c]
     float PriceY = -0.41f;                   // [ESP+0x2c]
-    if (TradeMode == 2)
+    if (TradeMode == kTradeModeShip)
     {
         TotalY = -0.424f;
         PromptY = NnFloatBits(0xbe7ced91); // DAT_005d1b0c, -0.247
@@ -504,7 +504,7 @@ void NnDealer::CreateControls()
         ErrorHelp = CreateTextControl("ErrorHelp", "Normal", ErrorPosition, nullptr, 0.352f,
                                       0.06f, 1.4f, 0, 0, 0, 0);
         NnDealerMakeMultiLine(ErrorHelp);
-        ErrorHelp->SetProperty(0x33, reinterpret_cast<uintptr_t>(White), 1);
+        ErrorHelp->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(White), 1);
     }
 
     {
@@ -527,7 +527,7 @@ void NnDealer::CreateControls()
     ContinueText = nullptr;     // +0x9e4
     ShipBuyProblem = nullptr;   // +0x9e8
     BackToShipDealer = nullptr; // +0x9ec
-    if (TradeMode != 2)
+    if (TradeMode != kTradeModeShip)
         return;
 
     // The ship dealer's continue button.
@@ -570,7 +570,7 @@ void NnDealer::CreateControls()
         ShipBuyProblem = CreateTextControl("ShipBuyProblem", "SubHeader", ProblemPosition, nullptr,
                                            0.36f, 0.06f, 1.6f, 0, 0, 0, 1);
         NnDealerMakeMultiLine(ShipBuyProblem);
-        ShipBuyProblem->SetProperty(0x33, reinterpret_cast<uintptr_t>(White), 1);
+        ShipBuyProblem->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(White), 1);
     }
 }
 
@@ -606,11 +606,11 @@ void NnDealer::Update()
     if ((Flags & kWin3DActive) == 0)
         return;
 
-    if (TradeMode == 1 || TradeMode == 3)
+    if (TradeMode == kTradeModeCommodity || TradeMode == kTradeModeEquipment)
     {
         RefreshMarketList(); // FUN_00482a90
     }
-    else if (TradeMode == 2)
+    else if (TradeMode == kTradeModeShip)
     {
         RefreshItemList(&Ship.Loadout, 0, 0); // FUN_0047d2f0
         EquipDesc* const Item = GetSelectedItem();
@@ -619,7 +619,7 @@ void NnDealer::Update()
         Field4e2 = 0;
     }
 
-    ErrorHelp->SetProperty(1, 1, 0);
+    ErrorHelp->SetProperty(kWinPropHide, 1, 0);
     Field4e2 = 0;
 
     // A selection here and on the partner; a
@@ -643,50 +643,50 @@ void NnDealer::Update()
     uintptr_t const HideBuy = bOwnSelection ? 0 : 1;
     uintptr_t const HideSell = bPartnerSelection ? 0 : 1;
     uintptr_t const HideTransfer = bAnySelection ? 0 : 1;
-    WelcomeText->SetProperty(1, HideWelcome, 0);
-    WelcomeLine->SetProperty(1, HideWelcome, 0);
-    WelcomeHelp->SetProperty(1, HideWelcome, 0);
-    BuyText->SetProperty(1, HideBuy, 0);
-    BuyArrow->SetProperty(1, HideBuy, 0);
-    SellText->SetProperty(1, HideSell, 0);
-    SellArrow->SetProperty(1, HideSell, 0);
-    BuySellTradeButton->SetProperty(1, HideTransfer, 0);
-    TransferItemButton->SetProperty(1, HideTransfer, 0);   // +0x364
-    TransferItemView->SetProperty(1, HideTransfer, 0);     // +0x368
-    TransferItemMesh->SetProperty(1, HideTransfer, 0);     // +0x36c
-    TransferItemName->SetProperty(1, HideTransfer, 0);     // +0x370
-    TransferItemQuantity->SetProperty(1, HideTransfer, 0); // +0x9d0
-    TransferItemDamage->SetProperty(1, HideSell, 0);       // +0x374
-    TransferItemPrice->SetProperty(1, HideTransfer, 0);    // +0x378
+    WelcomeText->SetProperty(kWinPropHide, HideWelcome, 0);
+    WelcomeLine->SetProperty(kWinPropHide, HideWelcome, 0);
+    WelcomeHelp->SetProperty(kWinPropHide, HideWelcome, 0);
+    BuyText->SetProperty(kWinPropHide, HideBuy, 0);
+    BuyArrow->SetProperty(kWinPropHide, HideBuy, 0);
+    SellText->SetProperty(kWinPropHide, HideSell, 0);
+    SellArrow->SetProperty(kWinPropHide, HideSell, 0);
+    BuySellTradeButton->SetProperty(kWinPropHide, HideTransfer, 0);
+    TransferItemButton->SetProperty(kWinPropHide, HideTransfer, 0);   // +0x364
+    TransferItemView->SetProperty(kWinPropHide, HideTransfer, 0);     // +0x368
+    TransferItemMesh->SetProperty(kWinPropHide, HideTransfer, 0);     // +0x36c
+    TransferItemName->SetProperty(kWinPropHide, HideTransfer, 0);     // +0x370
+    TransferItemQuantity->SetProperty(kWinPropHide, HideTransfer, 0); // +0x9d0
+    TransferItemDamage->SetProperty(kWinPropHide, HideSell, 0);       // +0x374
+    TransferItemPrice->SetProperty(kWinPropHide, HideTransfer, 0);    // +0x378
 
     // The good-deal marker only for the commodity dealer, whose trade button
     // plays UI sound 0x25 on a buy (WireStaticControl +0x380).
-    if (TradeMode != 1)
+    if (TradeMode != kTradeModeCommodity)
     {
         TransferItemGoodDeal->Flags = static_cast<unsigned char>(TransferItemGoodDeal->Flags & 0xfc);
     }
     else
     {
-        TransferItemGoodDeal->SetProperty(1, HideTransfer, 0);
+        TransferItemGoodDeal->SetProperty(kWinPropHide, HideTransfer, 0);
         static_cast<WireStaticControl*>(BuySellTradeButton)->SoundSlot = bOwnSelection ? 0x25 : 0;
     }
 
-    QuantityPrompt->SetProperty(1, HideTransfer, 0);
-    QuantitySlider->SetProperty(1, HideTransfer, 0);
-    QuantityText->SetProperty(1, HideTransfer, 0);
-    QuantityPrice->SetProperty(1, HideTransfer, 0);
-    QuantityTotal->SetProperty(1, HideTransfer, 0);
-    TransferPriceText->SetProperty(1, HideTransfer, 0); // +0x380
-    QuantityTotalText->SetProperty(1, HideTransfer, 0);
-    QuantityEdit->SetProperty(1, HideTransfer, 0);
-    PlusMinus->SetProperty(1, HideTransfer, 0);
+    QuantityPrompt->SetProperty(kWinPropHide, HideTransfer, 0);
+    QuantitySlider->SetProperty(kWinPropHide, HideTransfer, 0);
+    QuantityText->SetProperty(kWinPropHide, HideTransfer, 0);
+    QuantityPrice->SetProperty(kWinPropHide, HideTransfer, 0);
+    QuantityTotal->SetProperty(kWinPropHide, HideTransfer, 0);
+    TransferPriceText->SetProperty(kWinPropHide, HideTransfer, 0); // +0x380
+    QuantityTotalText->SetProperty(kWinPropHide, HideTransfer, 0);
+    QuantityEdit->SetProperty(kWinPropHide, HideTransfer, 0);
+    PlusMinus->SetProperty(kWinPropHide, HideTransfer, 0);
 
     // The button's caption (property 3) and the plus / minus sign.
-    if (TradeMode == 2)
-        BuySellTradeButton->SetProperty(3, 0x32d, 0);
+    if (TradeMode == kTradeModeShip)
+        BuySellTradeButton->SetProperty(kWinPropToolTip, 0x32d, 0);
     else
-        BuySellTradeButton->SetProperty(3, bOwnSelection ? 0x32e : 0x32f, 0);
-    PlusMinus->SetProperty(0x1e, bOwnSelection ? 0x482 : 0x481, 0);
+        BuySellTradeButton->SetProperty(kWinPropToolTip, bOwnSelection ? 0x32e : 0x32f, 0);
+    PlusMinus->SetProperty(kTextPropSetIds, bOwnSelection ? 0x482 : 0x481, 0);
 
     // The transfer panel appeared or went -- the quantity starts at the
     // partner's selected stack (1 without one). The partner is not null-tested.
@@ -697,9 +697,9 @@ void NnDealer::Update()
         EquipDesc* const PartnerItem = Inventory->GetSelectedItem();
         if (PartnerItem != nullptr)
             Quantity = PartnerItem->Count;
-        QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(Quantity), 0);
+        QuantitySlider->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(Quantity), 0);
         swprintf(ToolTipText, 0xff, L"%d", Quantity); // PTR_DAT_005d0ec4
-        QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
     }
 
     int MaxCount = 0; // [ESP+0x14]
@@ -707,12 +707,12 @@ void NnDealer::Update()
     {
         // The unit price, and a quantity of at least 1.
         FormatGroupedNumber(ToolTipText, TransferItemUnitPrice, -1); // FUN_004779a0
-        TransferPriceText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        TransferPriceText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         if (Quantity == 0)
         {
             Quantity = 1;
             swprintf(ToolTipText, 0xff, L"%d", 1);
-            QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+            QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         }
 
         if (SelectedIndex != -1)
@@ -723,7 +723,7 @@ void NnDealer::Update()
             // [ESP+0x18]: GetMaxBuyCount writes it; on the ship dealer's path retail leaves it
             // uninitialised unless a cap below sets it -- the port starts it at 0 (no message).
             int Reason = 0;
-            if (TradeMode != 2)
+            if (TradeMode != kTradeModeShip)
             {
                 unsigned const GoodId = GetSelectedMarketGood(); // FUN_00483580
                 MaxCount = GetMaxBuyCount(GoodId, &Reason);      // FUN_004837a0
@@ -840,13 +840,13 @@ void NnDealer::Update()
             if (MaxCount != 0)
             {
                 // The slider's range, and the quantity capped by it.
-                QuantitySlider->SetProperty(0x37, 1, static_cast<uintptr_t>(MaxCount));
+                QuantitySlider->SetProperty(kScrollPropSetRange, 1, static_cast<uintptr_t>(MaxCount));
                 if (Quantity > MaxCount)
                 {
                     Quantity = MaxCount;
-                    QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(MaxCount), 0);
+                    QuantitySlider->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(MaxCount), 0);
                     swprintf(ToolTipText, 0xff, L"%d", Quantity);
-                    QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+                    QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
                 }
             }
             else
@@ -872,27 +872,27 @@ void NnDealer::Update()
             // The maximum, the edit box's limit, the prompt, and an engine
             // cannot be traded in at the ship dealer.
             swprintf(ToolTipText, 0xff, L"%d", MaxCount);
-            TransferItemQuantity->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+            TransferItemQuantity->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
             if (MaxCount > 1)
             {
                 QuantityEdit->SetProperty(0x43, 1, 8);
-                QuantityPrompt->SetProperty(1, 0, 0);
+                QuantityPrompt->SetProperty(kWinPropHide, 0, 0);
             }
             else
             {
                 QuantityEdit->SetProperty(0x43, 0, 0);
-                QuantityPrompt->SetProperty(1, 1, 0);
+                QuantityPrompt->SetProperty(kWinPropHide, 1, 0);
             }
             Archetype::Equipment* const Shown = Archetype::GetEquipment(TransferItemArchId);
             if (Shown != nullptr && Shown->get_class_type() == Archetype::AClassEngine &&
-                TradeMode == 2)
+                TradeMode == kTradeModeShip)
                 ShowErrorText(0x52d, 0);
         }
         else
         {
             // The partner's item is sold -- up to its whole stack.
-            QuantitySlider->SetProperty(0x37, 1, static_cast<uintptr_t>(TransferItemMaxCount));
-            if ((TradeMode == 1 || TradeMode == 3) && Inventory != nullptr)
+            QuantitySlider->SetProperty(kScrollPropSetRange, 1, static_cast<uintptr_t>(TransferItemMaxCount));
+            if ((TradeMode == kTradeModeCommodity || TradeMode == kTradeModeEquipment) && Inventory != nullptr)
             {
                 EquipDesc* const PartnerItem = Inventory->GetSelectedItem();
                 if (PartnerItem != nullptr && PartnerItem->bMission) // +0x18
@@ -900,9 +900,9 @@ void NnDealer::Update()
             }
             Archetype::Equipment* const Shown = Archetype::GetEquipment(TransferItemArchId);
             if (Shown != nullptr && Shown->get_class_type() == Archetype::AClassEngine)
-                ShowErrorText(TradeMode == 2 ? 0x52d : 0x52c, 0);
+                ShowErrorText(TradeMode == kTradeModeShip ? 0x52d : 0x52c, 0);
             swprintf(ToolTipText, 0xff, L"%d", TransferItemMaxCount);
-            TransferItemQuantity->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+            TransferItemQuantity->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
             if (TransferItemMaxCount > 1)
                 QuantityEdit->SetProperty(0x43, 1, 8);
             else
@@ -910,12 +910,12 @@ void NnDealer::Update()
         }
 
         FormatGroupedNumber(ToolTipText, Quantity * TransferItemUnitPrice, -1);
-        QuantityTotalText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        QuantityTotalText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
     }
 
     // The ship dealer's help, price and "not enough credits" line. The
     // partner, +0x9f0 and (on the second path) +0x9e8 are not null-tested.
-    if (TradeMode == 2)
+    if (TradeMode == kTradeModeShip)
     {
         if (SelectedIndex == -1 && Inventory->SelectedIndex == -1)
             WelcomeHelp->Flags = static_cast<unsigned char>(WelcomeHelp->Flags | 3);
@@ -930,51 +930,51 @@ void NnDealer::Update()
         if (ShipPrice < 0) // JNS
             ShipPrice = 0;
         FormatGroupedNumber(ToolTipText, ShipPrice, 0x3c9);
-        ShipDealerShipPrice->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        ShipDealerShipPrice->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
 
         int const Cost = ShipHullPrice - PlayerShipTradeInValue - OwnResale + PartnerResale;
         if (ShipBuyProblem != nullptr && Cost > static_cast<int>(GetPlayerCreditsRetail())) // JLE
         {
-            ContinueButton->SetProperty(1, 1, 0);
-            ContinueText->SetProperty(1, 1, 0);
+            ContinueButton->SetProperty(kWinPropHide, 1, 0);
+            ContinueText->SetProperty(kWinPropHide, 1, 0);
             FormatGroupedNumber(ToolTipText, Cost - static_cast<int>(GetPlayerCreditsRetail()), -1);
             GetIdsStringWWithRawFallback(0x630, G_NnTextScratchA, G_NnTextScratchCapacity);
             swprintf(G_NnTextScratchB, 0x1000, G_NnTextScratchA, ToolTipText);
-            ShipBuyProblem->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+            ShipBuyProblem->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
         }
         else
         {
-            ContinueButton->SetProperty(1, 0, 0);
-            ContinueText->SetProperty(1, 0, 0);
-            ShipBuyProblem->SetProperty(0x1e, 0, 0);
+            ContinueButton->SetProperty(kWinPropHide, 0, 0);
+            ContinueText->SetProperty(kWinPropHide, 0, 0);
+            ShipBuyProblem->SetProperty(kTextPropSetIds, 0, 0);
         }
     }
 
     // The partner just traded (+0x3b8) -- the buy / sell controls hide.
     if (Inventory->bTradePending != 0)
     {
-        BuySellTradeButton->SetProperty(1, 1, 0);
-        BuyText->SetProperty(1, 1, 0);
-        BuyArrow->SetProperty(1, 1, 0);
-        SellText->SetProperty(1, 1, 0);
-        SellArrow->SetProperty(1, 1, 0);
+        BuySellTradeButton->SetProperty(kWinPropHide, 1, 0);
+        BuyText->SetProperty(kWinPropHide, 1, 0);
+        BuyArrow->SetProperty(kWinPropHide, 1, 0);
+        SellText->SetProperty(kWinPropHide, 1, 0);
+        SellArrow->SetProperty(kWinPropHide, 1, 0);
     }
 
     if (Inventory->bCheckStockAfterBuy != 0 || Inventory->bCheckHardpointAfterBuy != 0)
-        ErrorHelp->SetProperty(0x1e, 0, 0);
+        ErrorHelp->SetProperty(kTextPropSetIds, 0, 0);
 
     // The partner's pending good no longer fits -- drop the selection when
     // it is the one selected here and nothing can be bought.
     if (Inventory->bDeselectBoughtGoodIfEmpty == 0)
         return;
     Inventory->bDeselectBoughtGoodIfEmpty = 0;
-    if (SelectedIndex == -1 || TradeMode == 2)
+    if (SelectedIndex == -1 || TradeMode == kTradeModeShip)
         return;
     unsigned const SelectedGood = GetSelectedMarketGood(); // FUN_00483580
     if (MaxCount != 0 || SelectedGood != Inventory->PendingBuyGoodId)
         return;
     ClearSelection();
-    ErrorHelp->SetProperty(0x1e, 0, 0);
+    ErrorHelp->SetProperty(kTextPropSetIds, 0, 0);
 }
 
 intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -982,8 +982,8 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // FUN_004822a0 (RET 0xc).
     switch (Msg)
     {
-    case 0x2c:
-    case 0x2d:
+    case kWinNotifyHighlight:
+    case kWinNotifyUnhighlight:
         // The row hover goes to NN_Inventory (FUN_00479d10).
         return NnInventory::SetProperty(Msg, A, B);
 
@@ -1046,7 +1046,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    case 0x3e:
+    case kWinNotifyScrollValue:
         // A slider moved -- the list scroll or the quantity slider.
         if (reinterpret_cast<WinControl*>(A) == InventoryScroll) // +0x3d0
         {
@@ -1059,7 +1059,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         if (Quantity < 0)
             Quantity = 0;
         swprintf(ToolTipText, 0xff, L"%d", Quantity); // PTR_DAT_005d0ec4
-        QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
         return 0;
 
     case 0x45:
@@ -1068,7 +1068,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         wchar_t const* const Text = reinterpret_cast<wchar_t const*>(A);
         if (Text == nullptr)
         {
-            QuantitySlider->SetProperty(0x38, 1, 0);
+            QuantitySlider->SetProperty(kScrollPropSetValue, 1, 0);
             return 0;
         }
         int Value = 1; // the argument's slot, 1 before swscanf
@@ -1081,13 +1081,13 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Quantity = Value;
         swprintf(ToolTipText, 0xff, L"%d", Quantity);
         if (_wcsicmp(Text, ToolTipText) != 0)
-            QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
-        QuantitySlider->SetProperty(0x38, static_cast<uintptr_t>(Quantity), 0);
+            QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+        QuantitySlider->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(Quantity), 0);
         return 0;
     }
 
     case 0x1a:
-    case 0x26:
+    case kWinNotifyClick:
     {
         WinControl* const Control = reinterpret_cast<WinControl*>(A);
         if (Control == CloseButton) // +0x4d8
@@ -1116,7 +1116,7 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Control == BuySellTradeButton) // +0x9b0
         {
-            if (TradeMode == 2)
+            if (TradeMode == kTradeModeShip)
             {
                 if (SelectedIndex != -1)
                 {
@@ -1154,9 +1154,9 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
             // The quantity goes back to 1.
             Quantity = 1;
-            QuantitySlider->SetProperty(0x38, 1, 0);
+            QuantitySlider->SetProperty(kScrollPropSetValue, 1, 0);
             swprintf(ToolTipText, 0xff, L"%d", Quantity);
-            QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+            QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
             return 1;
         }
 
@@ -1211,28 +1211,28 @@ intptr_t NnDealer::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 void NnDealer::ShowErrorText(unsigned Ids, int Arg)
 {
     // FUN_0047fd50 (RET 8). No control pointer is null-tested.
-    ErrorHelp->SetProperty(1, 0, 0); // +0x9d4 shown
+    ErrorHelp->SetProperty(kWinPropHide, 0, 0); // +0x9d4 shown
 
     // Hide the rest (property 1, 1).
-    BuyText->SetProperty(1, 1, 0);            // +0x9a0
-    BuyArrow->SetProperty(1, 1, 0);           // +0x9a4
-    SellText->SetProperty(1, 1, 0);           // +0x9a8
-    SellArrow->SetProperty(1, 1, 0);          // +0x9ac
-    BuySellTradeButton->SetProperty(1, 1, 0); // +0x9b0
-    QuantityPrompt->SetProperty(1, 1, 0);     // +0x9b4
-    QuantitySlider->SetProperty(1, 1, 0);     // +0x9b8
-    QuantityText->SetProperty(1, 1, 0);       // +0x9bc
-    QuantityPrice->SetProperty(1, 1, 0);      // +0x9c0
-    QuantityTotal->SetProperty(1, 1, 0);      // +0x9c4
-    TransferPriceText->SetProperty(1, 1, 0);  // +0x380
-    QuantityTotalText->SetProperty(1, 1, 0);  // +0x9c8
-    QuantityEdit->SetProperty(1, 1, 0);       // +0x9cc
-    PlusMinus->SetProperty(1, 1, 0);          // +0x9d8
+    BuyText->SetProperty(kWinPropHide, 1, 0);            // +0x9a0
+    BuyArrow->SetProperty(kWinPropHide, 1, 0);           // +0x9a4
+    SellText->SetProperty(kWinPropHide, 1, 0);           // +0x9a8
+    SellArrow->SetProperty(kWinPropHide, 1, 0);          // +0x9ac
+    BuySellTradeButton->SetProperty(kWinPropHide, 1, 0); // +0x9b0
+    QuantityPrompt->SetProperty(kWinPropHide, 1, 0);     // +0x9b4
+    QuantitySlider->SetProperty(kWinPropHide, 1, 0);     // +0x9b8
+    QuantityText->SetProperty(kWinPropHide, 1, 0);       // +0x9bc
+    QuantityPrice->SetProperty(kWinPropHide, 1, 0);      // +0x9c0
+    QuantityTotal->SetProperty(kWinPropHide, 1, 0);      // +0x9c4
+    TransferPriceText->SetProperty(kWinPropHide, 1, 0);  // +0x380
+    QuantityTotalText->SetProperty(kWinPropHide, 1, 0);  // +0x9c8
+    QuantityEdit->SetProperty(kWinPropHide, 1, 0);       // +0x9cc
+    PlusMinus->SetProperty(kWinPropHide, 1, 0);          // +0x9d8
 
     // No argument -- the ids goes to the control as is (property 0x1e).
     if (Arg == 0)
     {
-        ErrorHelp->SetProperty(0x1e, Ids, 0);
+        ErrorHelp->SetProperty(kTextPropSetIds, Ids, 0);
         return;
     }
 
@@ -1240,7 +1240,7 @@ void NnDealer::ShowErrorText(unsigned Ids, int Arg)
     // DAT_0066dc60) is the format of swprintf into DAT_0066fc60 (property 0x1d).
     GetIdsStringWWithRawFallback(Ids, G_NnTextScratchA, G_NnTextScratchCapacity);
     swprintf(G_NnTextScratchB, 0x1000, G_NnTextScratchA, Arg);
-    ErrorHelp->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+    ErrorHelp->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
 }
 
 void NnDealer::SelectDealerRow(int Row, int /*Unused*/)
@@ -1250,18 +1250,18 @@ void NnDealer::SelectDealerRow(int Row, int /*Unused*/)
 
     // Quantity 1 on the slider and the edit box.
     Quantity = 1;
-    QuantitySlider->SetProperty(0x38, 1, 0);
+    QuantitySlider->SetProperty(kScrollPropSetValue, 1, 0);
     swprintf(ToolTipText, 0xff, L"%d", Quantity); // PTR_DAT_005d0ec4, into +0x508
-    QuantityEdit->SetProperty(0x1d, reinterpret_cast<uintptr_t>(ToolTipText), 0);
+    QuantityEdit->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(ToolTipText), 0);
 
     // The row's item on the ship model; the flag byte reuses the first
     // argument's slot ([ESP+0x10]).
-    bool const bFlag = TradeMode == 2 || TradeMode == 3;
+    bool const bFlag = TradeMode == kTradeModeShip || TradeMode == kTradeModeEquipment;
     EquipDesc* const Item = GetSelectedItem(); // FUN_0047e790
     Ship.ShowItem(Item, bFlag, Item != nullptr ? NnItemFilterMode(Item->ArchId) : kNnFilterNone); // FUN_004c6a50
 
     // A commodity dealer puts its partner on the cargo filter.
-    if (Inventory != nullptr && TradeMode == 1 && Inventory->Mode != 4)
+    if (Inventory != nullptr && TradeMode == kTradeModeCommodity && Inventory->Mode != 4)
         Inventory->SetMode(4, false); // FUN_0047f240
 
     // The partner's +0x394 names the hardpoint the selected good would go
@@ -1335,7 +1335,7 @@ void NnDealer::BuyShip()
     NavBarRefreshRepairTab(true);
 
     G_WeaponGroups.Clear(); // FUN_004f6190
-    HudPostCommand(0x6b, 0); // FUN_005763b0
+    HudPostCommand(USER_INVENTORY_CLOSE, 0); // FUN_005763b0
 
     // FUN_00489e80(DAT_00671c60, 0) -- the "ship_purchase_complete" voice.
     NnVoiceEnqueue(G_NnVoiceShipPurchaseCompleteId, 0);
@@ -1352,16 +1352,16 @@ void NnDealer::RefreshMarketList()
     // Update (trade modes 1 and 3 only) and this function itself (same mode), so that path is
     // never taken.
     unsigned Category = 0;
-    if (TradeMode == 1)
+    if (TradeMode == kTradeModeCommodity)
         Mode = 4; // +0x32c
-    else if (TradeMode == 3)
+    else if (TradeMode == kTradeModeEquipment)
         Category = 1;
 
     // The market's goods of that category (FUN_00437f70) into a local list,
     // then FUN_00483230 (mode 3) or FUN_00482f10 orders it.
     std::list<FClientMarketGood const*> Goods;
     ClientMarketCollectCategory(Market, &Goods, Category);
-    if (TradeMode == 3)
+    if (TradeMode == kTradeModeEquipment)
         SortEquipmentMarketGoods(&Goods); // FUN_00483230
     else
         SortMarketGoodsByName(&Goods);    // FUN_00482f10
@@ -1382,7 +1382,7 @@ void NnDealer::RefreshMarketList()
         // AH,0x44 + JP: only "equal" falls through to the 5).
         unsigned const ArchId = Good2Arch(Entry->Info.GoodId);
         int Filter = kNnFilterCommodity;
-        if (TradeMode == 3)
+        if (TradeMode == kTradeModeEquipment)
             Filter = NnItemFilterMode(ArchId); // FUN_0047e460
         else
         {
@@ -1421,7 +1421,7 @@ void NnDealer::RefreshMarketList()
     if (Counter != LastRowCount)
     {
         if (InventoryScroll != nullptr)
-            InventoryScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Counter - 1));
+            InventoryScroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Counter - 1));
         if (FirstRow != 0 &&
             static_cast<unsigned>(FirstRow + 5) > static_cast<unsigned>(Counter))
         {
@@ -1430,7 +1430,7 @@ void NnDealer::RefreshMarketList()
             else
                 FirstRow = 0;
             if (InventoryScroll != nullptr)
-                InventoryScroll->SetProperty(0x38, static_cast<uintptr_t>(FirstRow), 0);
+                InventoryScroll->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(FirstRow), 0);
         }
         LastRowCount = Counter;
         RefreshMarketList();
@@ -1443,7 +1443,7 @@ void NnDealer::RefreshMarketList()
         SelectedIndex = -1;
 
     // The equipment dealer points the partner's ship view at the good.
-    if (TradeMode == 3)
+    if (TradeMode == kTradeModeEquipment)
     {
         unsigned const GoodId = GetSelectedMarketGood(); // FUN_00483580
         if (GoodId != 0 && Inventory != nullptr)
@@ -1454,7 +1454,7 @@ void NnDealer::RefreshMarketList()
 bool NnDealer::CanBuyGood(unsigned GoodId)
 {
     // FUN_00482e00. Callers: the market list sorts FUN_00482f10 and FUN_00483230.
-    if (TradeMode != 3) // +0x978
+    if (TradeMode != kTradeModeEquipment) // +0x978
         return true;
 
     // Not docked (DAT_0066873c), or no market (FUN_0043a510 on
@@ -1870,10 +1870,10 @@ void NnDealer::RestorePlayerShipView()
     if (Inventory == nullptr)
         return;
 
-    ContinueText->SetProperty(0x1e, 0x461, 0);
-    ContinueButton->SetProperty(3, 0x330, 0);
-    BuyText->SetProperty(0x1e, 0x48a, 0);
-    SellText->SetProperty(0x1e, 0x48a, 0); // +0x9a8
+    ContinueText->SetProperty(kTextPropSetIds, 0x461, 0);
+    ContinueButton->SetProperty(kWinPropToolTip, 0x330, 0);
+    BuyText->SetProperty(kTextPropSetIds, 0x48a, 0);
+    SellText->SetProperty(kTextPropSetIds, 0x48a, 0); // +0x9a8
 
     // +0x9fc = FUN_004c6e90(partner ship arch (+0x348), 1), the value of
     // the partner's ship at this base.
@@ -1891,7 +1891,7 @@ void NnDealer::RestorePlayerShipView()
 void NnDealer::ShowShipPackage(unsigned GoodId)
 {
     // FUN_00483d40 (RET 4). Only the ship dealer (trade mode 2) shows packages.
-    if (TradeMode != 2)
+    if (TradeMode != kTradeModeShip)
         return;
 
     // No ship until the package resolves; the partner's filter mode.
@@ -1925,7 +1925,7 @@ unsigned NnDealer::GetSelectedMarketGood()
     // FUN_00483580. A selection, and a commodity or equipment dealer.
     if (SelectedIndex == -1)
         return 0;
-    if (TradeMode != 1 && TradeMode != 3)
+    if (TradeMode != kTradeModeCommodity && TradeMode != kTradeModeEquipment)
         return 0;
 
     // No room loaded (DAT_00668740) -- 0.
@@ -1933,12 +1933,12 @@ unsigned NnDealer::GetSelectedMarketGood()
         return 0;
 
     // FUN_0043a510(DAT_0066873c) on DAT_00668708 (not null-tested); its
-    // goods of category TradeMode == 3 (FUN_00437f70) into a local list, ordered by
+    // goods of category TradeMode == kTradeModeEquipment (FUN_00437f70) into a local list, ordered by
     // FUN_00483230 (trade mode 3) or FUN_00482f10 -- the same list RefreshMarketList shows.
     FClientMarket* const Market = GetClientLocationBaseMarket(GetClientLocationCurrentBase());
     std::list<FClientMarketGood const*> Goods;
-    ClientMarketCollectCategory(Market, &Goods, TradeMode == 3 ? 1u : 0u);
-    if (TradeMode == 3)
+    ClientMarketCollectCategory(Market, &Goods, TradeMode == kTradeModeEquipment ? 1u : 0u);
+    if (TradeMode == kTradeModeEquipment)
         SortEquipmentMarketGoods(&Goods); // FUN_00483230
     else
         SortMarketGoodsByName(&Goods);    // FUN_00482f10
@@ -1952,7 +1952,7 @@ unsigned NnDealer::GetSelectedMarketGood()
         FClientMarketGood const* const Entry = *It;
         if (Entry->Stock <= 0)
             continue;
-        if (TradeMode == 3 && NnItemFilterMode(Good2Arch(Entry->Info.GoodId)) != Mode)
+        if (TradeMode == kTradeModeEquipment && NnItemFilterMode(Good2Arch(Entry->Info.GoodId)) != Mode)
             continue;
         if (Row == SelectedIndex)
             return Entry->Info.GoodId;

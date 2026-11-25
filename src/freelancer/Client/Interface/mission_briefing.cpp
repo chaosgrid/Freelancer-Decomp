@@ -154,7 +154,7 @@ namespace
     // Slot 7 (LAB_0043d2e0) -- GF answers 1, IntroFocus 2.
     int MissionBriefing::GetEnvironmentType()
     {
-        return 3;
+        return kEnvironmentMissionBriefing;
     }
 
     // Slot 8 (LAB_0043d170).
@@ -220,7 +220,7 @@ namespace
         // The window's first child, the NeuroNetNavMap, gets the close message 0xef02.
         Win3D* const NavMap = State->ParentWindow->GetChildHead();
         if (NavMap != nullptr)
-            NavMap->ProcessMessage(0xef02, 0, 0);
+            NavMap->ProcessMessage(kWinMsgHide, 0, 0);
     }
 
     // Slot 14 (LAB_0043d360, RET 4).
@@ -271,7 +271,7 @@ namespace
             G_bMissionBriefingNavMapUp = 1;
             Win3D* const NavMap = WinFactoryCreate("NeuroNetNavMap", "NeuroNetNavMap",
                                                    State->ParentWindow, nullptr);
-            NavMap->ProcessMessage(0xef01, 0, 0);
+            NavMap->ProcessMessage(kWinMsgShow, 0, 0);
             NavMap->Flags =
                 static_cast<unsigned char>(NavMap->Flags | kWin3DActive | kWin3DVisible);
             G_bMissionBriefingNavMapUp = 0;

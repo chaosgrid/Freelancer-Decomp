@@ -880,7 +880,7 @@ void ChatControl::FillPrivate(int FirstItem, unsigned VisibleRows)
 bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_00467f10
-    if (Msg == 0xef01)
+    if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
             SetPosition(Parent->Position);
@@ -894,7 +894,7 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
             G_ChatMsgWin->Flags = static_cast<unsigned char>(G_ChatMsgWin->Flags & 0xfc);
         return true;
     }
-    if (Msg == 0xef02)
+    if (Msg == kWinMsgHide)
     {
         if (Parent != nullptr)
             Win3DReparent(this, nullptr);
@@ -914,7 +914,7 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     UiScrollTable* const List = reinterpret_cast<UiScrollTable*>(static_cast<uintptr_t>(A));
     bool const bOwnList = List == BroadcastList || List == PrivateList;
 
-    if (Msg == 0x300d && bOwnList)
+    if (Msg == kWinMsgSelectionChanged && bOwnList)
     {
         // The selected row's target, or the system channel.
         CHAT_ID Target = G_ChatIdChannel1;
@@ -940,7 +940,7 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         }
         return true;
     }
-    if (Msg == 0xf001 && bOwnList)
+    if (Msg == kWinMsgPress && bOwnList)
     {
         // A header click on the private list -- same column flips the direction, another
         // column becomes the sort column.
@@ -956,7 +956,7 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         ChatControlRefreshAll(this);
         return true;
     }
-    if (Msg == 0xf002 && bOwnList)
+    if (Msg == kWinMsgDoubleClick && bOwnList)
         return true;
 
     return WinControl::ProcessMessage(Msg, A, B);
@@ -965,7 +965,7 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 intptr_t ChatControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_00468220
-    if (Msg == 0x26 && reinterpret_cast<WinControl*>(A) == BtnCCClose)
+    if (Msg == kWinNotifyClick && reinterpret_cast<WinControl*>(A) == BtnCCClose)
     {
         NnMainButtonOnModalOpen();  // FUN_0045a460
         return 1;

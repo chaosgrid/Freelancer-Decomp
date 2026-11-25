@@ -344,7 +344,7 @@ bool NnTextControl::MouseEvent(FWin3DMouseEvent const* Event)
     {
         WinControl* const ParentControl = Parent->AsWinControl();
         if (ParentControl != nullptr)
-            ParentControl->SetProperty(0x27, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
+            ParentControl->SetProperty(kWinNotifyDoubleClick, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
     }
 
     if (bInCaptureList != 0)
@@ -360,7 +360,7 @@ bool NnTextControl::MouseEvent(FWin3DMouseEvent const* Event)
             {
                 WinControl* const ParentControl = Parent->AsWinControl();
                 if (ParentControl != nullptr)
-                    ParentControl->SetProperty(0x26, reinterpret_cast<uintptr_t>(AsWinControl()),
+                    ParentControl->SetProperty(kWinNotifyClick, reinterpret_cast<uintptr_t>(AsWinControl()),
                                                0);
             }
             return true;
@@ -811,7 +811,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // FUN_0058b360.
     switch (Msg)
     {
-    case 6:
+    case kWinPropOffset:
     {
         float const* const NewOffset = reinterpret_cast<float const*>(A);
         Offset[0] = NewOffset[0];
@@ -843,20 +843,20 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0xc:
         bHighlighted = static_cast<unsigned char>(A != 0 ? 1 : 0);
         return 0;
-    case 0x1d:
+    case kTextPropSetText:
         FontStringSetScale(FontString, Width, TextDepth(this));
         FontStringSetText(FontString, reinterpret_cast<wchar_t const*>(A));
         break;
-    case 0x1e:
+    case kTextPropSetIds:
         SetIds(static_cast<unsigned>(A));
         break;
-    case 0x1f:
+    case kTextPropGetText:
         return reinterpret_cast<intptr_t>(FontString->Text);
-    case 0x20:
+    case kTextPropGetLength:
         if (FontString->Text == nullptr)
             return 0;
         return static_cast<intptr_t>(wcslen(FontString->Text));
-    case 0x21:
+    case kTextPropGetLineCount:
         return LineCount;
     case 0x22:
         Field33c = static_cast<int>(B);
@@ -866,15 +866,15 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Field34c = static_cast<int>(A);
         Field350 = static_cast<int>(B);
         return 0;
-    case 0x24:
+    case kTextPropClickable:
         bClickable = static_cast<unsigned char>(A != 0 ? 1 : 0);
         return 0;
-    case 0x33:
+    case kWinPropColour:
         // The override flag is B == 1; the colour is the dword A points at.
         bColourOverride = static_cast<unsigned char>(B == 1 ? 1 : 0);
         memcpy(OverrideColour, reinterpret_cast<void const*>(A), sizeof(OverrideColour));
         return 0;
-    case 0x50:
+    case kTextPropTypewriter:
     {
         if (bTyping != 0)
         {
@@ -903,7 +903,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         return 0;
     }
-    case 0x51:
+    case kWinPropBlink:
         bBlink = 0;
         if (A != 0)
         {
@@ -1136,7 +1136,7 @@ intptr_t NnEditControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_0058c030 (slot 42, RET 0xc).
     switch (Msg)
     {
-    case 0x1d:
+    case kTextPropSetText:
         // The new text carries no cursor.
         bCursorShown = 0;
         return NnTextControl::SetProperty(Msg, A, B); // FUN_0058b360

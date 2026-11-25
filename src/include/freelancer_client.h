@@ -194,8 +194,8 @@ public:
     // IChatClient slot 0 (retail .text:005a6250, ch1 CHATMSG).
     void SendCommonChatMsg(CHAT_ID TargetId, CHAT_ID SenderId, unsigned long Size, const void* Data) override;
 
-    // +0x08, zeroed by .text:005b0840. TODO: no other reference to .data:0067ea6c in the
-    // retail listing -- meaning unrecovered.
+    // +0x08, zeroed by .text:005b0840; no other reference to .data:0067ea6c in the retail
+    // listing.
     unsigned int Field_0x08;
 };
 static_assert(sizeof(IClientImpl) == 0x0c, "retail Client spans .data:0067ea64..0067ea6f");

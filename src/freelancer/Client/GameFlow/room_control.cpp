@@ -1075,7 +1075,7 @@ void RoomControlUpdateCameraMove(FRoomRuntime* Runtime, float Delta)
 // FUN_00449990's end does.
 bool FRoomRuntime::OnEvent(unsigned MsgId)
 {
-    if (MsgId != 0xf || bCameraMoving == 0)
+    if (MsgId != USER_CANCEL || bCameraMoving == 0)
         return false;
     bCameraMoving = 0;
     G_bNnKeepPanelOpen = 0;
@@ -1509,7 +1509,7 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
         Sequence->bApplySpatial = 1;
         Sequence->bRestoreCamera = 1;
         Sequence->Priority = 0;
-        Sequence->Field_0x16 = 1;
+        Sequence->bTransition = 1;
         Sequence->Play();
         Runtime->SceneFlags[kRoomEntryScriptStarted] = 1;
     }
@@ -1545,7 +1545,7 @@ static void RoomControlStartScenes(FRoomRuntime* Runtime)
             Sequence->Priority = 0;
             Sequence->bDuckAmbient = 0;
             Sequence->bDuckMusic = 0;
-            Sequence->Field_0x16 = 1;
+            Sequence->bTransition = 1;
             Sequence->Play();
         }
         Runtime->SceneFlags[kRoomEntryScriptStarted] = 1;
@@ -1812,7 +1812,7 @@ static void RoomControlStartAnimations(FRoomRuntime* Runtime)
         int const Script = Runtime->Scripts.Find(Name); // FUN_00555b20
         if (Script == -1)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: animation name %s is not present in room mesh",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: animation name %s is not present in room mesh",
                   kRoomControlCpp, 0xed, Name);
             continue;
         }
@@ -1852,37 +1852,37 @@ static void RoomControlBuildButtons(FRoomRuntime* Runtime)
         RoomButton* Button = nullptr;
         switch (Behavior)
         {
-        case 1:
+        case kHotspotExitDoor:
             // operator_new(0x18), vftable 0x005cc068.
             Button = new ExitDoorButton();
             break;
-        case 2:
+        case kHotspotNewsVendor:
             // operator_new(0xc), FUN_0044d410.
             Button = new NewsVendorButton();
             break;
-        case 3:
+        case kHotspotMissionVendor:
             // operator_new(0xc), FUN_0044d540.
             Button = new MissionVendorButton();
             break;
-        case 4:
+        case kHotspotLaunch:
             // operator_new(0x18), vftable 0x005cc058.
             Button = new LaunchButton();
             break;
-        case 5:
-        case 6:
+        case kHotspotStartDealer:
+        case kHotspotFrontDesk:
             // operator_new(0xc), FUN_0044d2c0.
             Button = new RoomButton();
             break;
-        case 7:
-        case 8:
-        case 9:
-        case 0xa:
-        case 0xb:
-        case 0xc:
+        case kHotspotStartShipDealer:
+        case kHotspotStartEquipDealer:
+        case kHotspotMoveRight:
+        case kHotspotMoveLeft:
+        case kHotspotVirtualRoom:
+        case kHotspotRepair:
             // No button, the count unchanged.
             continue;
         default:
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Unknown button behavior type [%d]",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Unknown button behavior type [%d]",
                   kRoomControlHotspotCpp, 0x5b, Behavior);
             continue;
         }
@@ -1992,7 +1992,7 @@ FRoomRuntime* CreateRoomRuntime(RoomData* Room)
     SetFadeTarget(0.0f, static_cast<float>(1.0 / static_cast<double>(GetFadeDuration())));
     SetLetterboxTarget(0.0f, 3.0f);     // FUN_0041a0f0
     SetClientMouseCursorDrawFlag(1);    // FUN_0041dda0
-    Runtime->RegisterEvent(0xf);        // FUN_005760d0 on the +0x30 face
+    Runtime->RegisterEvent(USER_CANCEL);        // FUN_005760d0 on the +0x30 face
     MouseSetCursor("arrow", false);     // FUN_0041dde0
     // FUN_00558bf0, FUN_00558dd0, FUN_005592a0.
     HoldGameflowTime();
@@ -2376,7 +2376,7 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
     }
     else
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Invalid render type %d\n", kRoomControlCpp,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Invalid render type %d\n", kRoomControlCpp,
               0x6d1, Mode);
     }
 

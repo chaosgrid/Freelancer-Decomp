@@ -58,18 +58,18 @@ namespace
     {
         switch (TerminalType)
         {
-        case 1:
-        case 2:
-        case 6:
+        case TERM_BERTH:
+        case TERM_PAD:
+        case TERM_RING:
             return ContainsClass(ClassIds, GIdCanUseBerths);
-        case 3:
+        case TERM_MOOR_SMALL:
             return ContainsClass(ClassIds, GIdCanUseSmallMoors);
-        case 4:
+        case TERM_MOOR_MEDIUM:
             return ContainsClass(ClassIds, GIdCanUseMediumMoors);
-        case 5:
+        case TERM_MOOR_LARGE:
             return ContainsClass(ClassIds, GIdCanUseLargeMoors);
-        case 7:
-        case 8:
+        case TERM_JUMP:
+        case TERM_AIRLOCK:
             return true;
         default:
             return false;
@@ -171,7 +171,7 @@ std::list<FDockQueueEntry>::iterator __cdecl FindDockQueueEntry(std::list<FDockQ
 // std::sort (ContentSort), so ties keep retail's order.
 void __cdecl CollectFormationMembers(std::vector<FContentShipBase*>* Out, unsigned int FormationId)
 {
-    if (FormationId == 0xffffffffu)
+    if (FormationId == GNoFormationId)
         return;
 
     std::map<unsigned int, FSystemInfo>* Systems = GetSystemInfos();
@@ -219,7 +219,7 @@ FContentShipBase* __cdecl FindFormationLeader(unsigned int FormationId)
         {
             FContentShipBase* Ship = static_cast<FContentShipBase*>(*ObjIt);
             if (Ship->FormationId == FormationId &&
-                (Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu))
+                (Ship->FormationSlot == 0 || Ship->FormationId == GNoFormationId))
                 return Ship;
         }
 
@@ -230,7 +230,7 @@ FContentShipBase* __cdecl FindFormationLeader(unsigned int FormationId)
         {
             FContentShipBase* Ship = PlayerIt->second->ShipObject;
             if (Ship != nullptr && Ship->FormationId == FormationId &&
-                (Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu))
+                (Ship->FormationSlot == 0 || Ship->FormationId == GNoFormationId))
                 return Ship;
         }
     }
@@ -256,7 +256,7 @@ void __cdecl CancelDockingBehindLeader(FContentShipBase* Ship, unsigned int Form
     unsigned int DockTargetId = It->DockTargetId;
     pub::SpaceObj::TerminalInfo Info;
     pub::SpaceObj::GetTerminalInfo(It->DockTargetId, It->DockIndex, Info);
-    if (Info.Value == 7 || Info.Value == 8)
+    if (Info.Value == TERM_JUMP || Info.Value == TERM_AIRLOCK)
         CancelShipDocking(Ship->SpaceObjId, DockTargetId, false);
 }
 
@@ -278,7 +278,7 @@ void __cdecl ResetFormationState(FContentShipBase* Ship)
     }
 
     pub::AI::SetPersonalityParams Params;
-    if (FormationId != 0xffffffffu && Ship->FormationSlot != 0 && Ship->FormationId != 0xffffffffu)
+    if (FormationId != GNoFormationId && Ship->FormationSlot != 0 && Ship->FormationId != GNoFormationId)
     {
         FContentShipBase* Leader = FindFormationLeader(FormationId);
         if (Leader == nullptr)
@@ -293,7 +293,7 @@ void __cdecl ResetFormationState(FContentShipBase* Ship)
     Params.StateGraphId = pub::StateGraph::get_state_graph(
         pub::AI::get_state_graph_id(Ship->SpaceObjId), pub::StateGraph::LEADER);
     pub::AI::SubmitState(Ship->SpaceObjId, &Params);
-    unsigned int LeaderId = FormationId == 0xffffffffu ? 0 : Ship->SpaceObjId;
+    unsigned int LeaderId = FormationId == GNoFormationId ? 0 : Ship->SpaceObjId;
     pub::AI::update_formation_state(Ship->SpaceObjId, LeaderId, Offset);
 }
 
@@ -312,7 +312,7 @@ void __cdecl RemoveFromFormation(FContentShipBase* Ship)
             unsigned int MemberId = Member->SpaceObjId;
             FContentShipBase* Live =
                 static_cast<FContentShipBase*>(Member->GetSystem()->FindShip(MemberId));
-            if (Live != nullptr && Live->FormationId != 0xffffffffu)
+            if (Live != nullptr && Live->FormationId != GNoFormationId)
             {
                 CancelDockingBehindLeader(Live, Live->FormationId);
                 Live->SetFormation(0xffffffffu, 0, nullptr);
@@ -322,7 +322,7 @@ void __cdecl RemoveFromFormation(FContentShipBase* Ship)
         return;
     }
 
-    if (FormationId == 0xffffffffu)
+    if (FormationId == GNoFormationId)
         return;
     Ship->SetFormation(0xffffffffu, 0xffffffffu, nullptr);
     ResetFormationState(Ship);
@@ -356,7 +356,7 @@ void __cdecl FormFormation(std::list<FContentShipBase*>* Ships, FFormation* Form
         return;
 
     FContentShipBase* First = Ships->front();
-    if (First->FormationId != 0xffffffffu && First->IsNpcShip())
+    if (First->FormationId != GNoFormationId && First->IsNpcShip())
         ReleaseFormationMembers(First, Ships);
 
     unsigned int FormationId = AllocateFormationId();
@@ -471,7 +471,7 @@ void __cdecl CancelShipDocking(unsigned int ShipId, unsigned int PassThrough, bo
     It = FindDockQueueEntry(&GDockingShips, ShipId);
     if (It != GDockingShips.end())
     {
-        pub::SpaceObj::Dock(ShipId, It->DockTargetId, -1, DOCK_HOST_RESPONSE_5);
+        pub::SpaceObj::Dock(ShipId, It->DockTargetId, -1, DOCK_HOST_RESPONSE_NO_TERMINAL);
         while (It != GDockingShips.end())
         {
             if (It->ShipId != ShipId)
@@ -559,7 +559,7 @@ void __cdecl UpdateDockQueues()
                     Kick.bRedock = false;
                     Kicks.push_back(Kick);
                 }
-                else if (Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu)
+                else if (Ship->FormationSlot == 0 || Ship->FormationId == GNoFormationId)
                 {
                     FDockKick Kick;
                     Kick.Ship = Ship;
@@ -622,15 +622,15 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
     while (Wait != GDockWaitingShips.end())
     {
         int DockIndex = -1;
-        int Response = DOCK_HOST_RESPONSE_5;
+        int Response = DOCK_HOST_RESPONSE_NO_TERMINAL;
         unsigned int TargetType = 0;
         if (pub::SpaceObj::GetType(Wait->DockTargetId, TargetType) == 0)
         {
-            if ((TargetType & 0x20) != 0)
+            if ((TargetType & OBJ_DOCKING_RING) != 0)
                 DockIndex = Wait->bFinishOnClear ? 1 : 0;
             Response = TryStartDocking(Wait->SystemId, &Wait->ShipId, &Wait->DockTargetId,
                                        &DockIndex, Wait->bNoTimeout);
-            if (Response == DOCK_HOST_RESPONSE_4)
+            if (Response == DOCK_HOST_RESPONSE_PROCEED)
             {
                 // The radio chatter of a granted dock (DAT_06fd1c08, FUN_06ee8d70; its float
                 // result is dropped). System is not null-tested before FindShip.
@@ -652,13 +652,13 @@ void __cdecl FinishDocking(std::list<FDockQueueEntry>::iterator* It)
                 Event.Speaker = Wait->DockTargetId;
                 Event.Listener = Wait->ShipId;
                 Event.DockIndex = DockIndex;
-                Event.Response = DOCK_HOST_RESPONSE_4;
+                Event.Response = DOCK_HOST_RESPONSE_PROCEED;
                 Event.bWaitedInQueue = true;
                 GGcsConversations.QueueConversation(&Event);
                 unsigned int DockTargetType = 0;
                 pub::SpaceObj::GetType(Wait->DockTargetId, DockTargetType);
-                pub::SpaceObj::Dock(Wait->ShipId, Wait->DockTargetId, DockIndex, DOCK_HOST_RESPONSE_4);
-                if ((DockTargetType & 0xc40) == 0)
+                pub::SpaceObj::Dock(Wait->ShipId, Wait->DockTargetId, DockIndex, DOCK_HOST_RESPONSE_PROCEED);
+                if ((DockTargetType & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
                     BreakFormationAtDock(&Wait->SystemId, &Wait->ShipId, false, true);
                 else
                 {
@@ -697,14 +697,14 @@ int __cdecl TryStartDocking(unsigned int SystemId, unsigned int const* ShipId,
     FSystemInfo* System = FindSystemInfo(&SystemId);
     FContentShipBase* Ship = static_cast<FContentShipBase*>(System->FindShip(*ShipId));
     if (Ship == nullptr)
-        return DOCK_HOST_RESPONSE_5;
+        return DOCK_HOST_RESPONSE_NO_TERMINAL;
 
     Vector Position;
     Ship->GetPosition(&Position);
     int ShipRep = Ship->ReputationHandle->GetReputation();
     int Response = CheckDockPermission(&Ship->ClassIds, &ShipRep, ShipId, &Position,
                                        DockTargetId, DockIndex);
-    if (Response != DOCK_HOST_RESPONSE_4)
+    if (Response != DOCK_HOST_RESPONSE_PROCEED)
         return Response;
 
     FDockQueueEntry Entry;
@@ -742,12 +742,12 @@ int __cdecl CheckDockPermission(std::vector<unsigned int> const* ClassIds, int c
             pub::Player::SendNNMessage(Player->PlayerId, MessageId);
         }
         *DockIndex = -1;
-        return DOCK_HOST_RESPONSE_1;
+        return DOCK_HOST_RESPONSE_ACCESS_DENIED;
     }
 
     unsigned int TargetType = 0;
     pub::SpaceObj::GetType(*DockTargetId, TargetType);
-    if ((TargetType & 0xc40) == 0)
+    if ((TargetType & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) == 0)
     {
         float Attitude = 1.0f;
         if (*ShipRep != -1)
@@ -762,13 +762,13 @@ int __cdecl CheckDockPermission(std::vector<unsigned int> const* ClassIds, int c
             if (Player != nullptr)
                 pub::Player::SendNNMessage(Player->PlayerId,
                                            pub::GetNicknameId("nnv_dock_denied_destination_hostile"));
-            return DOCK_HOST_RESPONSE_0;
+            return DOCK_HOST_RESPONSE_DENIED_HOSTILE;
         }
     }
 
     DropPlayersLockedOutOfGate(ShipId, DockTargetId);
     int Response = ChooseDockTerminal(ClassIds, DockTargetId, Position, DockIndex);
-    if (Response != DOCK_HOST_RESPONSE_4)
+    if (Response != DOCK_HOST_RESPONSE_PROCEED)
         return Response;
 
     pub::SpaceObj::TerminalInfo Info;
@@ -776,18 +776,18 @@ int __cdecl CheckDockPermission(std::vector<unsigned int> const* ClassIds, int c
     Vector Linear;
     Vector Angular;
     if (pub::SpaceObj::GetMotion(*DockTargetId, Linear, Angular) != 0)
-        return DOCK_HOST_RESPONSE_4;
+        return DOCK_HOST_RESPONSE_PROCEED;
     double LinearSpeed = std::sqrt(static_cast<double>(Linear.y) * Linear.y +
                                    static_cast<double>(Linear.z) * Linear.z +
                                    static_cast<double>(Linear.x) * Linear.x);
     if (LinearSpeed > 0.01)
-        return DOCK_HOST_RESPONSE_3;
+        return DOCK_HOST_RESPONSE_BUSY;
     double AngularSpeed = std::sqrt(static_cast<double>(Angular.y) * Angular.y +
                                     static_cast<double>(Angular.z) * Angular.z +
                                     static_cast<double>(Angular.x) * Angular.x);
     if (AngularSpeed > 0.01)
-        return DOCK_HOST_RESPONSE_3;
-    return DOCK_HOST_RESPONSE_4;
+        return DOCK_HOST_RESPONSE_BUSY;
+    return DOCK_HOST_RESPONSE_PROCEED;
 }
 
 // FUN_06f6c580. With index -1 the terminals are walked until GetTerminalInfo fails (failing at
@@ -807,7 +807,7 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
         if (pub::SpaceObj::GetTerminalInfo(*DockTargetId, 0, Info) != 0)
         {
             *DockIndex = -1;
-            return DOCK_HOST_RESPONSE_5;
+            return DOCK_HOST_RESPONSE_NO_TERMINAL;
         }
         bool bAnyFits = false;
         do
@@ -823,7 +823,7 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
         if (!bAnyFits)
         {
             *DockIndex = -1;
-            return DOCK_HOST_RESPONSE_2;
+            return DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL;
         }
     }
     else
@@ -831,12 +831,12 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
         if (pub::SpaceObj::GetTerminalInfo(*DockTargetId, *DockIndex, Info) != 0)
         {
             *DockIndex = -1;
-            return DOCK_HOST_RESPONSE_5;
+            return DOCK_HOST_RESPONSE_NO_TERMINAL;
         }
         if (!DoesTerminalFitClasses(Info.Value, ClassIds))
         {
             *DockIndex = -1;
-            return DOCK_HOST_RESPONSE_2;
+            return DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL;
         }
         if (!IsDockTerminalInUse(*DockTargetId, *DockIndex))
             Candidates.push_back(*DockIndex);
@@ -845,7 +845,7 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
     if (Candidates.empty())
     {
         *DockIndex = -1;
-        return DOCK_HOST_RESPONSE_3;
+        return DOCK_HOST_RESPONSE_BUSY;
     }
 
     if (*DockIndex == -1 && Position != nullptr)
@@ -878,7 +878,7 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
             }
         }
         *DockIndex = BestIndex;
-        return DOCK_HOST_RESPONSE_4;
+        return DOCK_HOST_RESPONSE_PROCEED;
     }
 
     int Count = static_cast<int>(Candidates.size());
@@ -889,7 +889,7 @@ int __cdecl ChooseDockTerminal(std::vector<unsigned int> const* ClassIds,
     for (; Pick != 0; --Pick)
         ++Chosen;
     *DockIndex = *Chosen;
-    return DOCK_HOST_RESPONSE_4;
+    return DOCK_HOST_RESPONSE_PROCEED;
 }
 
 // FUN_06f6bdd0. Constants: 40000 DAT_06fbbcfc, 6250000 DAT_06fbbd00, 250000 DAT_06fbbd04, 10
@@ -916,21 +916,21 @@ bool __cdecl IsShipAtDockPoint(unsigned int SystemId, unsigned int const* ShipId
 
     switch (Info.Value)
     {
-    case 1:
-    case 3:
-    case 4:
-    case 5:
+    case TERM_BERTH:
+    case TERM_MOOR_SMALL:
+    case TERM_MOOR_MEDIUM:
+    case TERM_MOOR_LARGE:
     {
         // The one call of FUN_06eeaee0 here; x87 sum order (z*z + y*y) + x*x.
         Vector const Delta = SubtractVectors(ShipPosition, Hardpoint);
         return (static_cast<double>(Delta.z) * Delta.z + static_cast<double>(Delta.y) * Delta.y) +
                    static_cast<double>(Delta.x) * Delta.x < 40000.0f;
     }
-    case 7:
+    case TERM_JUMP:
         return DistanceSquared(ShipPosition, Hardpoint) < 6250000.0f;
-    case 8:
+    case TERM_AIRLOCK:
         return DistanceSquared(ShipPosition, Hardpoint) < 250000.0f;
-    case 6:
+    case TERM_RING:
         break;
     default:
         return false;
@@ -983,11 +983,11 @@ int __cdecl GetDockTypeForClasses(unsigned int const* DockTargetId,
 {
     unsigned int TargetType = 0;
     pub::SpaceObj::GetType(*DockTargetId, TargetType);
-    if ((TargetType & 0x840) != 0)
+    if ((TargetType & (OBJ_JUMP_GATE | OBJ_JUMP_HOLE)) != 0)
         return 7;
-    if ((TargetType & 0x400) != 0)
+    if ((TargetType & OBJ_AIRLOCK_GATE) != 0)
         return 8;
-    if ((TargetType & 0x20) != 0)
+    if ((TargetType & OBJ_DOCKING_RING) != 0)
         return ContainsClass(ClassIds, GIdCanUseBerths) ? 6 : 0;
     if (ContainsClass(ClassIds, GIdCanUseBerths))
         return 1;
@@ -1019,7 +1019,7 @@ void __cdecl DockFormationFollowers(unsigned int const* SystemId, unsigned int c
         Entry.bNoTimeout = false;
         GDockingShips.push_back(Entry);
         unsigned int MemberId = Members[Index]->SpaceObjId;
-        pub::SpaceObj::Dock(MemberId, *DockTargetId, *DockIndex, DOCK_HOST_RESPONSE_4);
+        pub::SpaceObj::Dock(MemberId, *DockTargetId, *DockIndex, DOCK_HOST_RESPONSE_PROCEED);
     }
 }
 
@@ -1043,7 +1043,7 @@ bool __cdecl IsPlayerInShipFormation(FSystemInfo* System, unsigned int ShipId)
 // FUN_06f6ed10. The leader is not null-tested, nor GetTerminalInfo's status.
 void __cdecl FollowLeaderIntoDock(FContentShipBase* Ship)
 {
-    if (Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu)
+    if (Ship->FormationSlot == 0 || Ship->FormationId == GNoFormationId)
         return;
     FContentShipBase* Leader = FindFormationLeader(Ship->FormationId);
     unsigned int const LeaderId = Leader->SpaceObjId;
@@ -1057,7 +1057,7 @@ void __cdecl FollowLeaderIntoDock(FContentShipBase* Ship)
     int const DockIndex = It->DockIndex;
     pub::SpaceObj::TerminalInfo Info;
     pub::SpaceObj::GetTerminalInfo(It->DockTargetId, DockIndex, Info);
-    if (Info.Value != 7 && Info.Value != 8)
+    if (Info.Value != TERM_JUMP && Info.Value != TERM_AIRLOCK)
         return;
 
     FDockQueueEntry Entry;
@@ -1070,7 +1070,7 @@ void __cdecl FollowLeaderIntoDock(FContentShipBase* Ship)
     Entry.bNoTimeout = false;
     GDockingShips.push_back(Entry);
     unsigned int ShipId = Ship->SpaceObjId;
-    pub::SpaceObj::Dock(ShipId, DockTargetId, DockIndex, DOCK_HOST_RESPONSE_4);
+    pub::SpaceObj::Dock(ShipId, DockTargetId, DockIndex, DOCK_HOST_RESPONSE_PROCEED);
 }
 
 // FUN_06f66690 (FindFormation = FUN_06efd1a0). Two paths: single player or NPC-only uses
@@ -1107,7 +1107,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
 
     if (!bPlayerRules)
     {
-        if (LeaderFormation == 0xffffffffu)
+        if (LeaderFormation == GNoFormationId)
         {
             LeaderFormation = AllocateFormationId();
             Leader->SetFormation(LeaderFormation, 0, FreighterBasic);
@@ -1119,7 +1119,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
         std::vector<FContentShipBase*> Members;
         CollectFormationMembers(&Members, LeaderFormation);
         FContentShipBase* const First = *Members.data();     // no empty test
-        if (First->FormationSlot != 0 && First->FormationId != 0xffffffffu)
+        if (First->FormationSlot != 0 && First->FormationId != GNoFormationId)
             return -8;
 
         FContentPlayerState* const Player = FindContentPlayerStateByShip(ShipId);
@@ -1127,14 +1127,15 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
         unsigned int FirstId = First->SpaceObjId;
         int DockIndex = 0;
         GetShipDockingTarget(&FirstId, &DockTargetId, &DockIndex, nullptr);
-        if ((DockTargetId & 0x3fffffff) != 0)
+        if ((DockTargetId & GIdValueMask) != 0)
         {
             unsigned int TargetType = 0;
             pub::SpaceObj::GetType(DockTargetId, TargetType);
             if (Player != nullptr)
             {
                 unsigned int PlayerId = Player->PlayerId;
-                if (IsContentGateLocked(&PlayerId, &DockTargetId) || (TargetType & 0x120) != 0)
+                if (IsContentGateLocked(&PlayerId, &DockTargetId) ||
+                    (TargetType & (OBJ_DOCKING_RING | OBJ_STATION)) != 0)
                     return -9;
             }
         }
@@ -1173,7 +1174,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
 
     FormationName = CreateID("multiplayer_freighter");
     FFormation* const Formation = FindFormation(&FormationName);
-    if (LeaderFormation == 0xffffffffu)
+    if (LeaderFormation == GNoFormationId)
     {
         LeaderFormation = AllocateFormationId();
         Leader->SetFormation(LeaderFormation, 0, Formation);
@@ -1189,7 +1190,7 @@ int __cdecl HandleFormationRequest(unsigned int const* ShipId, unsigned int cons
             unsigned int const MemberId = (*It)->SpaceObjId;
             FContentShipBase* Member =
                 static_cast<FContentShipBase*>((*It)->GetSystem()->FindShip(MemberId));
-            if (Member == nullptr || Member->FormationId == 0xffffffffu)
+            if (Member == nullptr || Member->FormationId == GNoFormationId)
                 continue;
             CancelDockingBehindLeader(Member, Member->FormationId);
             Member->SetFormation(0xffffffffu, 0, nullptr);
@@ -1241,13 +1242,13 @@ int HandleDockRequest(FDockRequest const* Request)
 {
     unsigned int TargetType = 0;
     pub::SpaceObj::GetType(Request->DockTargetId, TargetType);
-    int DockIndex = (TargetType & 0x20) != 0 ? 0 : -1;
+    int DockIndex = (TargetType & OBJ_DOCKING_RING) != 0 ? 0 : -1;
     int const Response = TryStartDocking(Request->SystemId, &Request->ShipId,
                                          &Request->DockTargetId, &DockIndex,
                                          Request->bNoTimeout);
     FSystemInfo* System = FindSystemInfo(&Request->SystemId);
 
-    if (Response != DOCK_HOST_RESPONSE_5)
+    if (Response != DOCK_HOST_RESPONSE_NO_TERMINAL)
     {
         FGcsDockGrantedEvent Event;
         Event.System = System;
@@ -1271,27 +1272,27 @@ int HandleDockRequest(FDockRequest const* Request)
         GGcsConversations.QueueConversation(&Event);
     }
 
-    if (Response == DOCK_HOST_RESPONSE_4)
+    if (Response == DOCK_HOST_RESPONSE_PROCEED)
     {
         unsigned int DockTargetType = 0;
         pub::SpaceObj::GetType(Request->DockTargetId, DockTargetType);
         pub::SpaceObj::Dock(Request->ShipId, Request->DockTargetId, DockIndex,
-                            DOCK_HOST_RESPONSE_4);
-        if ((DockTargetType & 0xc40) != 0)
+                            DOCK_HOST_RESPONSE_PROCEED);
+        if ((DockTargetType & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != 0)
         {
             DockFormationFollowers(&Request->SystemId, &Request->ShipId, &Request->DockTargetId,
                                    &DockIndex);
         }
         else
         {
-            bool const bReleasePlayers = (DockTargetType & 0x120) != 0;
+            bool const bReleasePlayers = (DockTargetType & (OBJ_DOCKING_RING | OBJ_STATION)) != 0;
             BreakFormationAtDock(&Request->SystemId, &Request->ShipId, false,
                                  bReleasePlayers);
         }
         return Response;
     }
 
-    if (Response == DOCK_HOST_RESPONSE_3)
+    if (Response == DOCK_HOST_RESPONSE_BUSY)
     {
         FDockQueueEntry Entry;
         Entry.Time = GetContentGameTime();
@@ -1320,12 +1321,12 @@ int HandleDockRequest(FDockRequest const* Request)
                 ++Position;
         }
         GDockWaitingShips.insert(Position, Entry);
-        pub::SpaceObj::Dock(Request->ShipId, Request->DockTargetId, -1, DOCK_HOST_RESPONSE_3);
+        pub::SpaceObj::Dock(Request->ShipId, Request->DockTargetId, -1, DOCK_HOST_RESPONSE_BUSY);
         return Response;
     }
 
-    if (Response == DOCK_HOST_RESPONSE_2 || Response == DOCK_HOST_RESPONSE_1 ||
-        Response == DOCK_HOST_RESPONSE_0 || Response == DOCK_HOST_RESPONSE_5)
+    if (Response == DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL || Response == DOCK_HOST_RESPONSE_ACCESS_DENIED ||
+        Response == DOCK_HOST_RESPONSE_DENIED_HOSTILE || Response == DOCK_HOST_RESPONSE_NO_TERMINAL)
     {
         pub::SpaceObj::Dock(Request->ShipId, Request->DockTargetId, DockIndex,
                             static_cast<DOCK_HOST_RESPONSE>(Response));
@@ -1346,7 +1347,7 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
     FContentShipBase* Leader = static_cast<FContentShipBase*>(System->FindShip(*ShipId));
     if (Leader == nullptr)
         return;
-    if (Leader->FormationSlot != 0 && Leader->FormationId != 0xffffffffu)
+    if (Leader->FormationSlot != 0 && Leader->FormationId != GNoFormationId)
         return;
     CollectFormationMembers(&Members, Leader->FormationId);
     if (Members.size() <= 1)
@@ -1396,7 +1397,7 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
             FindDockQueueEntry(&GDockingShips, Player->SpaceObjId);
         if (!Directives.Items.empty())
         {
-            FObjListDock* Dock = Directives.Items.front()->GetType() == 0x13
+            FObjListDock* Dock = Directives.Items.front()->GetType() == OBJLIST_DOCK
                                      ? dynamic_cast<FObjListDock*>(Directives.Items.front())
                                      : nullptr;
             if (Dock != nullptr)
@@ -1426,7 +1427,7 @@ void __cdecl BreakFormationAtDock(unsigned int const* SystemId, unsigned int con
 // FUN_06f6d040 (the IsContentGateLocked test inlined).
 void __cdecl DropPlayersLockedOutOfGate(unsigned int const* ShipId, unsigned int const* DockTargetId)
 {
-    if ((*ShipId & 0x3fffffffu) == 0)
+    if ((*ShipId & GIdValueMask) == 0)
         return;
     unsigned int SystemId = 0;
     pub::SpaceObj::GetSystem(*ShipId, SystemId);
@@ -1434,7 +1435,7 @@ void __cdecl DropPlayersLockedOutOfGate(unsigned int const* ShipId, unsigned int
     if (System == nullptr)
         return;
     FContentShipBase* Ship = static_cast<FContentShipBase*>(System->FindShip(*ShipId));
-    if (Ship == nullptr || Ship->FormationId == 0xffffffffu)
+    if (Ship == nullptr || Ship->FormationId == GNoFormationId)
         return;
 
     std::vector<FContentShipBase*> Members;
@@ -1560,8 +1561,8 @@ bool __cdecl CanUseDockTarget(std::vector<unsigned int> const* ClassIds, int con
     {
         switch (Info.Value)
         {
-        case 7:
-        case 8:
+        case TERM_JUMP:
+        case TERM_AIRLOCK:
             return true;
         default:
             if (DoesTerminalFitClasses(Info.Value, ClassIds))
@@ -1680,7 +1681,7 @@ namespace
                            unsigned int TerminalType, Vector const* HardpointPosition,
                            Matrix const* HardpointOrientation)
     {
-        if ((*TargetType & 0x20) != 0)
+        if ((*TargetType & OBJ_DOCKING_RING) != 0)
         {
             int Random = rand();
             Vector Offset;
@@ -1696,7 +1697,8 @@ namespace
         }
 
         Params->Orientation = *HardpointOrientation;
-        if (TerminalType != 3 && TerminalType != 4 && TerminalType != 5)
+        if (TerminalType != TERM_MOOR_SMALL && TerminalType != TERM_MOOR_MEDIUM &&
+            TerminalType != TERM_MOOR_LARGE)
         {
             Vector Axis;
             Axis.x = Params->Orientation.E[0][1];
@@ -1820,9 +1822,9 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
             FContentNpcShipParams& Params = *It;
             DockIndex = Params.DockIndex;
 
-            if ((TargetType & 0xc40) != 0)
+            if ((TargetType & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != 0)
             {
-                if (Params.FormationSlot == 0 || Params.FormationId == 0xffffffffu)
+                if (Params.FormationSlot == 0 || Params.FormationId == GNoFormationId)
                 {
                     TRefHandle<FObjListDirective> Directive;
                     CreateObjListDirective(OBJLIST_DELAY, &Directive.Pointer);
@@ -1830,24 +1832,26 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                     AddLeadingDirective(&Params, Directive);
                 }
             }
-            else if ((TargetType & 0x600de0) != 0)
+            else if ((TargetType & (OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING |
+                                    OBJ_STATION | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE |
+                                    OBJ_CAPITAL | OBJ_MINING)) != 0)   // 0x600de0
             {
-                if ((TargetType & 0x20) != 0)
+                if ((TargetType & OBJ_DOCKING_RING) != 0)
                     DockIndex = 1;
                 int ShipRep = Params.ReputationHandle->GetReputation();
                 int Response = CheckDockPermission(&Params.ClassIds, &ShipRep, &GLaunchNoShipId,
                                                    nullptr, DockTargetId, &DockIndex);
-                if (Response == 0 || Response == 2)
+                if (Response == DOCK_HOST_RESPONSE_DENIED_HOSTILE || Response == DOCK_HOST_RESPONSE_NO_FITTING_TERMINAL)
                 {
                     It = Queue.erase(It);
                     continue;
                 }
-                if (Response == 5)
+                if (Response == DOCK_HOST_RESPONSE_NO_TERMINAL)
                 {
                     EraseLaunchQueue(&Queue);
                     break;
                 }
-                if (Response == 3)
+                if (Response == DOCK_HOST_RESPONSE_BUSY)
                 {
                     if (Params.Longevity >= 0.0f)
                     {
@@ -1857,7 +1861,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                     ++It;
                     continue;
                 }
-                if (Response == 4)
+                if (Response == DOCK_HOST_RESPONSE_PROCEED)
                 {
                     pub::SpaceObj::GetTerminalInfo(*DockTargetId, DockIndex, Info);
                     pub::SpaceObj::GetHardpoint(*DockTargetId, Info.Name, &HardpointPosition,
@@ -1866,8 +1870,9 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
 
                 PlaceLaunchedShip(&Params, &TargetType, Info.Value, &HardpointPosition,
                                   &HardpointOrientation);
-                bool bOpenTerminal = !(Info.Value == 2 || Info.Value == 3 || Info.Value == 4 ||
-                                       Info.Value == 5);
+                bool bOpenTerminal = !(Info.Value == TERM_PAD || Info.Value == TERM_MOOR_SMALL ||
+                                       Info.Value == TERM_MOOR_MEDIUM ||
+                                       Info.Value == TERM_MOOR_LARGE);
                 if (Params.Longevity != -1.0f || bOpenTerminal)
                 {
                     TRefHandle<FObjListDirective> Directive;
@@ -1888,12 +1893,14 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
             FContentNpcShip* MsgShip = Ship;
             pub::Controller::_SendMessage(Controller, pub::Controller::EMessage::NpcShipCreated, &MsgShip);
 
-            if ((TargetType & 0xc40) != 0)
+            if ((TargetType & (OBJ_JUMP_GATE | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE)) != 0)
             {
                 unsigned int ShipId = Ship->SpaceObjId;
                 pub::SpaceObj::JumpIn(ShipId, *DockTargetId);
             }
-            else if ((TargetType & 0x600de0) != 0)
+            else if ((TargetType & (OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING |
+                                    OBJ_STATION | OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE |
+                                    OBJ_CAPITAL | OBJ_MINING)) != 0)   // 0x600de0
             {
                 FDockQueueEntry Entry;
                 Entry.SystemId = Params.System->SystemId;
@@ -1903,7 +1910,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 Entry.bFinishOnClear = true;
                 GDockingShips.push_back(Entry);
 
-                if ((TargetType & 0x200100) != 0)
+                if ((TargetType & (OBJ_STATION | OBJ_CAPITAL)) != 0)
                 {
                     // The dock hail handler keeps quiet about this ship for 30 s (FUN_06ee9b70;
                     // phantom DAT_06fbbb98 = 0, i.e. any).
@@ -1925,7 +1932,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
                 Event.Listener = Ship->SpaceObjId;
                 GGcsConversations.QueueConversation(&Event);
 
-                if ((TargetType & 0x100) == 0)
+                if ((TargetType & OBJ_STATION) == 0)
                 {
                     unsigned int ShipId = Ship->SpaceObjId;
                     pub::SpaceObj::Launch(ShipId, *DockTargetId, 0);

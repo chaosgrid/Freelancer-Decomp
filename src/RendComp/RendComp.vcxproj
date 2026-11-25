@@ -60,7 +60,8 @@
     <ClCompile Include="RendComp.cpp" />
     <ClCompile Include="RenderManager.cpp" />
     <ClCompile Include="Plugins.cpp" />
-    <ClCompile Include="TriMesh.cpp" />
+    <ClCompile Include="TriMeshArchetype.cpp" />
+    <ClCompile Include="VMeshData.cpp" />
     <ClCompile Include="VMeshLibrary.cpp" />
     <ClCompile Include="VMeshWire.cpp" />
     <ClCompile Include="VMeshPart.cpp" />

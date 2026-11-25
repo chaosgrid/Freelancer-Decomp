@@ -685,7 +685,7 @@ void BeginDockingCameraSequence(float Seconds)
     // -- and arms it anyway.
     if (G_SpaceApp.ActiveCamera != (FSpaceCamera*)&G_SpaceApp.Docking)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
               "E:\\FL\\Scratch\\Source\\Client\\space\\space.cpp", 0x8ad,
               "static docking camera must be the active camera before setting the fade out "
               "timer");

@@ -106,7 +106,7 @@ namespace
             int Parsed = MsvcrtAtoi(Token);
             if (Parsed < -8 || Parsed > 0xff)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: invalid KeyMap key value (%s)",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: invalid KeyMap key value (%s)",
                       "E:\\FL\\Scratch\\Source\\Client\\Interface\\KeyMap.cpp", 0x1e6, Token);
             }
             OutBinding->VirtualKey = Parsed;
@@ -238,7 +238,7 @@ int LoadKeyMapIni(char const* RelPath, bool bFatal)
     // A missing or wrong first header is reported and loading goes on.
     if (!Reader.read_header() || !Reader.is_header("KeyMap=1.1"))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: KeyMap file (%s) is not version 1.1",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: KeyMap file (%s) is not version 1.1",
               "E:\\FL\\Scratch\\Source\\Client\\Interface\\KeyMap.cpp", 0x2ea, FullPath);
     }
 

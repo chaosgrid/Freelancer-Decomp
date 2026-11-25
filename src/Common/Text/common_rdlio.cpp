@@ -222,7 +222,7 @@ namespace
         }
         if (wcsncmp(Value, L"false", Len) != 0)
         {
-            FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+            FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                   "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0xd5a,
                   "Invalid boolean in RDLX file. Assuming false.\n");
         }
@@ -303,7 +303,7 @@ void __cdecl ParseRdlxTag(RdlxParseContext& Ctx, wchar_t const* TagName, unsigne
                     }
                     else
                     {
-                        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+                        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                               "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0xd67,
                               "Invalid color name in RDLX file. Assuming white.\n");
                         ColorValue = 0xffffff;
@@ -328,7 +328,7 @@ void __cdecl ParseRdlxTag(RdlxParseContext& Ctx, wchar_t const* TagName, unsigne
                     }
                     if (!bFound)
                     {
-                        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+                        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                               "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0xd94,
                               "Invalid color name in RDLX file. Assuming white.\n");
                         ColorValue = 0xffffff;

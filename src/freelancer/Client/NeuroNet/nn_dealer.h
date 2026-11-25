@@ -124,7 +124,7 @@ public:
 
     // --- retail members (retail offsets) ---
     NnInventory* Inventory;          // +0x974 -- the inventory this dealer sits next to
-    int TradeMode;                   // +0x978 -- 1 (ctor); ProcessMessage 0xef02 resets it to 0
+    int TradeMode;                   // +0x978 -- ENnTradeMode; 1 (ctor); ProcessMessage 0xef02 resets it to 0
     int ShipPackageGoodId;                    // +0x97c
     int Field980;                    // +0x980 -- 1
     unsigned char Field984;          // +0x984 -- 0

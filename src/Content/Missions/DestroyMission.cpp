@@ -172,7 +172,7 @@ FDestroyMission::FDestroyMission(unsigned int const* InControllerId, FRandomMiss
 {
     DestSystem = FindSystemInfo(&MissionData->DestSys);
     MissionType = MissionData->Offers.front()->Type;
-    SMEventData const Enter(static_cast<STATE_MACHINE_EVENT_TYPE>(1));
+    SMEventData const Enter(SMET_Enter);
     StateMachineGroup::process(&Enter);
 }
 
@@ -302,38 +302,38 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
         // id (FRandomMissionObject::HandleMissionMessage), cast back after the type test.
         SMControllerEvent const* Controller = static_cast<SMControllerEvent const*>(Event);
         SMMessage const* Wrapped = static_cast<SMMessage const*>(Event);
-        if (Event->get_event_type() == 4 &&
+        if (Event->get_event_type() == SMET_Controller &&
             static_cast<EMessage>(Controller->ControllerId) == EMessage::Heartbeat)
         {
             RefreshAllObjectives();
             FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
-        if (Event->get_event_type() == 3 && DmIsForCurrentState(this, Wrapped->Message) &&
+        if (Event->get_event_type() == SMET_Message && DmIsForCurrentState(this, Wrapped->Message) &&
             Wrapped->Message->MessageType == GRmMsgMachineStarted)
         {
             if (RunningMachines.empty())
-                set_state(2);
+                set_state(DmStateRunning);
             unsigned int const Sender = Wrapped->Message->Sender;
             DmEraseFirst(&StartingMachines, Sender);
             DmAppendUnique(&RunningMachines, Sender);
             return true;
         }
-        if (Event->get_event_type() == 3 && DmIsForCurrentState(this, Wrapped->Message) &&
+        if (Event->get_event_type() == SMET_Message && DmIsForCurrentState(this, Wrapped->Message) &&
             Wrapped->Message->MessageType == GRmMsgRefreshObjectives)
         {
             Field_0x25c = 1;
             RefreshAllObjectives();
             return true;
         }
-        if (Event->get_event_type() == 4 &&
+        if (Event->get_event_type() == SMET_Controller &&
             static_cast<EMessage>(Controller->ControllerId) == EMessage::ObjectDestroyed)
         {
             if (RunningMachines.empty())
                 FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
-        if (Event->get_event_type() == 4 &&
+        if (Event->get_event_type() == SMET_Controller &&
             (static_cast<EMessage>(Controller->ControllerId) == EMessage::DockRequest ||
              static_cast<EMessage>(Controller->ControllerId) == EMessage::Msg0x25))
         {
@@ -347,13 +347,13 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
             FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
-        if (Event->get_event_type() == 4 &&
+        if (Event->get_event_type() == SMET_Controller &&
             static_cast<EMessage>(Controller->ControllerId) == EMessage::Msg0x27)
         {
             FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
-        if (Event->get_event_type() == 4 &&
+        if (Event->get_event_type() == SMET_Controller &&
             static_cast<EMessage>(Controller->ControllerId) == EMessage::GroupMemberLeft)
         {
             FRmPlayerLeftMessage Left(*static_cast<unsigned int const*>(Controller->DataPtr));
@@ -362,7 +362,7 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
             FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
-        if (Event->get_event_type() == 4 &&
+        if (Event->get_event_type() == SMET_Controller &&
             static_cast<EMessage>(Controller->ControllerId) == EMessage::PlayerSave)
         {
             unsigned int const* Parms = static_cast<unsigned int const*>(Controller->DataPtr);
@@ -380,7 +380,7 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
             FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
         }
-        if (Event->get_event_type() == 4)
+        if (Event->get_event_type() == SMET_Controller)
         {
             FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
             return true;
@@ -388,9 +388,9 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
         return false;
     }
 
-    if (State == 0)
+    if (State == DmStateBrief)
     {
-        if (Event->get_event_type() < 4 && Event->get_event_type() == 1)
+        if (Event->get_event_type() < SMET_Controller && Event->get_event_type() == SMET_Enter)
         {
             MissionTitle.destroy();
             MissionTitle = FmtStr();
@@ -404,18 +404,18 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
             return true;
         }
         SMMessage const* Wrapped = static_cast<SMMessage const*>(Event);
-        if (Event->get_event_type() == 3 && DmIsForCurrentState(this, Wrapped->Message) &&
+        if (Event->get_event_type() == SMET_Message && DmIsForCurrentState(this, Wrapped->Message) &&
             Wrapped->Message->MessageType == SMM_TIMEOUT)
         {
-            set_state(1);
+            set_state(DmStateLaunch);
             return true;
         }
         return false;
     }
 
-    if (State == 1)
+    if (State == DmStateLaunch)
     {
-        if (Event->get_event_type() >= 4 || Event->get_event_type() != 1)
+        if (Event->get_event_type() >= SMET_Controller || Event->get_event_type() != SMET_Enter)
             return false;
         CreateRuntimeMachines();
         if (!PendingMachines.empty())
@@ -429,25 +429,25 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
         return true;
     }
 
-    if (State == 3)
+    if (State == DmStateSucceeded)
     {
-        if (Event->get_event_type() >= 4 || Event->get_event_type() != 1)
+        if (Event->get_event_type() >= SMET_Controller || Event->get_event_type() != SMET_Enter)
             return false;
         OnMissionSucceed();
         return true;
     }
 
-    if (State == 4)
+    if (State == DmStateFailed)
     {
-        if (Event->get_event_type() >= 4 || Event->get_event_type() != 1)
+        if (Event->get_event_type() >= SMET_Controller || Event->get_event_type() != SMET_Enter)
             return false;
         FailMission(FailReason);
         return true;
     }
 
-    if (State == 2)
+    if (State == DmStateRunning)
     {
-        if (Event->get_event_type() != 3)
+        if (Event->get_event_type() != SMET_Message)
             return false;
         SMMessage const* Wrapped = static_cast<SMMessage const*>(Event);
         StateMachineMessage const* Message = Wrapped->Message;
@@ -456,10 +456,10 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
             DmEraseFirst(&RunningMachines, Message->Sender);
             remove_state_machine(Message->Sender);
             FailReason = static_cast<FRmMachineFailedMessage const*>(Message)->Reason;
-            set_state(4);
+            set_state(DmStateFailed);
             return true;
         }
-        if (Event->get_event_type() != 3)
+        if (Event->get_event_type() != SMET_Message)
             return false;
         if (!DmIsForCurrentState(this, Message) || Message->MessageType != GRmMsgMachineSucceeded)
             return false;
@@ -469,7 +469,7 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
             return true;
         if (PendingMachines.empty())
         {
-            set_state(3);
+            set_state(DmStateSucceeded);
             return true;
         }
         unsigned int const Id = PendingMachines[0];

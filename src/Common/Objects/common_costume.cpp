@@ -330,7 +330,7 @@ void CostumeDescriptions::load_bodypart(int TypeId, int Sex, DetailSwitchTable* 
         }
         else if (Reader->is_value("multilevel"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCharDescripSource, 0x2c9,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCharDescripSource, 0x2c9,
                   "multilevel is obsolete");
         }
     }
@@ -395,7 +395,7 @@ void CostumeDescriptions::load_bodyparts(char const* Path)
     INI_Reader Reader;
     if (!Reader.open(Path, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot open bodyparts ini file: %s",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot open bodyparts ini file: %s",
               kCharDescripSource, 0x3b0, Path);
         return;
     }
@@ -414,7 +414,7 @@ void CostumeDescriptions::load_bodyparts(char const* Path)
             {
                 if (Reader.is_value("nomotion"))
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kCharDescripSource, 0x33b,
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kCharDescripSource, 0x33b,
                           "nomotion is obsolete");
                 }
                 else if (Reader.is_value("sex"))
@@ -487,7 +487,7 @@ void CostumeDescriptions::load_bodyparts(char const* Path)
             }
             else
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Unknown header %s in bodyparts.ini\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Unknown header %s in bodyparts.ini\n",
                       kCharDescripSource, 0x3a8, Reader.get_header_ptr());
             }
         }
@@ -502,7 +502,7 @@ void CostumeDescriptions::load_costumes(char const* Path)
     INI_Reader Reader;
     if (!Reader.open(Path, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot open costume ini file: %s",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot open costume ini file: %s",
               kCharDescripSource, 0x415, Path);
         return;
     }
@@ -514,7 +514,7 @@ void CostumeDescriptions::load_costumes(char const* Path)
     {
         if (!Reader.is_header("Costume"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Unknown header %s in costumes.ini\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Unknown header %s in costumes.ini\n",
                   kCharDescripSource, 0x40e, Reader.get_header_ptr());
             continue;
         }
@@ -556,7 +556,7 @@ void CostumeDescriptions::load_costumes(char const* Path)
                 }
                 else
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: Cannot find accessory %s for costume %s\n",
                           kCharDescripSource, 0x3e4, AccName, NicknameText);
                 }
@@ -567,7 +567,7 @@ void CostumeDescriptions::load_costumes(char const* Path)
                 int TypeId = BodypartTypeFromName(KeyName);
                 if (TypeId < 0)
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: Invalid part type %s for costume %s\n",
                           kCharDescripSource, 0x404, KeyName, NicknameText);
                     continue;
@@ -585,7 +585,7 @@ void CostumeDescriptions::load_costumes(char const* Path)
                 }
                 else
                 {
-                    FDUMP(0x100002,
+                    FDUMP(kFdumpWarning,
                           "%s(%d) : *** WARNING: Cannot find bodypart %s (type %s) for costume %s\n",
                           kCharDescripSource, 0x3fc, PartName, KeyName, NicknameText);
                 }
@@ -697,7 +697,7 @@ void CostumeDescriptions::get_costume(int NicknameId, Costume& Out) const
     costume const* Desc = find_costume((unsigned long)NicknameId);
     if (Desc == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Costume id %x does not exist\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Costume id %x does not exist\n",
               kCharDescripSource, 0x27b, NicknameId);
         FillCostume(nullptr, Out);
         return;
@@ -732,7 +732,7 @@ int CostumeDescriptions::get_costume_gender(Costume const& Cost) const
         if (Gender == Part->Sex)
             continue;
 
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Costume body/head/lhand/rhand values %u/%u/%u/%u have "
               "inconsistent gender\n",
               kCharDescripSource, 0x2a1, Cost.PartIds[1], Cost.PartIds[0], Cost.PartIds[2],

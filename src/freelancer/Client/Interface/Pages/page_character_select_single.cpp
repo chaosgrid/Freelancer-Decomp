@@ -21,6 +21,7 @@
 #include "Interface/ui_rich_text_win.h"
 #include "Interface/ui_scroll.h"
 #include "Interface/ui_text_msg_button.h"
+#include "Interface/menu_enter_state.h"
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_archetype.h"  // Archetype::GetShip
@@ -175,7 +176,7 @@ void PageCharacterSelectSingle::Destroy()
     }
 
     UIPage::MasterWin::Destroy();
-    UnregisterEvent(0xf);
+    UnregisterEvent(USER_CANCEL);
 
     CharacterShip = nullptr;
     LoadCharacter = nullptr;
@@ -217,7 +218,7 @@ bool PageCharacterSelectSingle::Create(Win3D* NewParent, void* /*Payload*/)
     ShipLabel = static_cast<UiRichTextWin*>(FindWidget("ShipLabel"));
     ScreenTitle = static_cast<UiRichTextWin*>(FindWidget("ScreenTitle"));
 
-    RegisterEvent(0xf);
+    RegisterEvent(USER_CANCEL);
 
     CharScroll->SetArrowColors(ChromeColor(), ChromeColor());
     CharScroll->SetBarColors(ChromeColor(), ChromeColor());
@@ -485,7 +486,7 @@ void PageCharacterSelectSingle::BeginLeave(int Direction)
 bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_0056c360.
-    if (Msg == 0x3004)
+    if (Msg == kWinMsgCommand)
     {
         PlayOrRewindUiSoundSlot(0);
         if (A == 0x3003)
@@ -560,7 +561,7 @@ bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigne
                     if (Relisted != 2)
                         NnErrorRunModal(0x73c, false, nullptr);
                 }
-                Result = 5;
+                Result = kMenuStateServerSelect;
                 RefillLists();
                 return true;
             }
@@ -605,7 +606,7 @@ bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigne
         return false;
     }
 
-    if (Msg == 0xf001)
+    if (Msg == kWinMsgPress)
     {
         // A click on row B (from ListBox::MouseEvent) selects it in both lists when
         // -1 <= B < count; the details follow even for an out-of-range B.
@@ -618,23 +619,23 @@ bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigne
         return false;
     }
 
-    if (Msg == 0x3006)
+    if (Msg == kWinMsgConfirmAnswer)
     {
         // The confirm box's answer, back through the virtual ProcessMessage.
         if (A == 0)
         {
-            ProcessMessage(0x3004, 0xf003, 0);
+            ProcessMessage(kWinMsgCommand, 0xf003, 0);
             return true;
         }
         if (A == 1)
         {
-            ProcessMessage(0x3004, 0x3002, 0);
+            ProcessMessage(kWinMsgCommand, 0x3002, 0);
             return true;
         }
         return true;
     }
 
-    if (Msg == 0xf002)
+    if (Msg == kWinMsgDoubleClick)
     {
         // A double click loads the selection.
         if (CharSelDesc->SelectedIndex == -1)
@@ -645,7 +646,7 @@ bool PageCharacterSelectSingle::ProcessMessage(unsigned Msg, unsigned A, unsigne
         return true;
     }
 
-    if (Msg == 0xf005)
+    if (Msg == kWinMsgScroll)
     {
         // The bar moved.
         CharSelDesc->FirstVisible = static_cast<int>(CharScroll->GetValue());
@@ -787,7 +788,7 @@ void PageCharacterSelectSingle::Update()
             if (LeaveDirection == 1)
                 bLoadRequested = 1;
             else
-                Result = 1;
+                Result = kMenuStateMainMenu;
             SlideT = -2.0;
         }
         else
@@ -817,15 +818,15 @@ void PageCharacterSelectSingle::Update()
     CHARACTER_ID Local; // raw copy, then CHARACTER_ID::operator=, as retail
     memcpy(Local.Buffer, Chosen->Id.Buffer, sizeof(Local.Buffer));
     SelectedCharacter = Local;
-    Result = 0xc;
+    Result = kMenuStateEnterGame;
 }
 
 bool PageCharacterSelectSingle::OnEvent(unsigned MsgId)
 {
     // LAB_0056d310 (this = the +0x80 face).
-    if (MsgId == 0xf && bLeaving == 0)
+    if (MsgId == USER_CANCEL && bLeaving == 0)
     {
-        Result = 1;
+        Result = kMenuStateMainMenu;
         return true;
     }
     return UIPage::MasterWin::OnEvent(MsgId);

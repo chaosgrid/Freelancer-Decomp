@@ -244,7 +244,7 @@ void FThornComponent::ConnectEntityHardpoints(int IndexA, char const* HpA, int I
     if (DALib::Hardpoint->ConnectHardpoints(InstancePointer(InstanceB), &KeyB,
                                             InstancePointer(InstanceA), &KeyA) != 0)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Cannot connect hardpoint %s on entity %s to hardpoint %s on "
               "entity %s",
               GScriptBaseFile, 0x5e, HpB, EntityB->Name, HpA, EntityA->Name);
@@ -273,7 +273,7 @@ void FThornComponent::DisconnectEntityHardpoints(int IndexA, char const* HpA, in
     long const InstanceB = SummaryB.find_name_instance(HpB);
     if (DALib::Engine->DestroyJoint(InstancePointer(InstanceB), InstancePointer(InstanceA)) != 1)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Cannot disconnect hardpoint %s on entity %s from hardpoint %s "
               "on entity %s",
               GScriptBaseFile, 0x81, HpB, EntityB->Name, HpA, EntityA->Name);

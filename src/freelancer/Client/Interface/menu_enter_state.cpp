@@ -8,6 +8,7 @@
 
 #include "Interface/Pages/character_select_equip.h"
 #include "Core/client_frame_tick.h" // FUN_00424f30 / FUN_00425080 / FUN_00425140, FUN_0041b2e0
+#include "Core/client_state.h"
 #include "NeuroNet/Chat/chat_init.h"    // ChatShowMsgWin (FUN_0046a4a0)
 #include "NeuroNet/Chat/chat_msg_win.h" // ChatCreateMsgWin (FUN_0046b580)
 #include "Network/connect_flow.h"
@@ -99,11 +100,11 @@ namespace
     };
 
     FMainColumnSlot const kMainColumnSlots[5] = {
-        {0x4f4u, 0x10},
-        {0x4f5u, 0x03},
-        {0x4f6u, 0x04},
-        {0x4f8u, 0x0a},
-        {0x4f9u, 0x0b},
+        {0x4f4u, kMenuStateNewGame},
+        {0x4f5u, kMenuStateLoadGame},
+        {0x4f6u, kMenuStateMultiplayer},
+        {0x4f8u, kMenuStateOptions},
+        {0x4f9u, kMenuStateExit},
     };
 
     // DAT_0067c200 request / DAT_0067c1fc latch.
@@ -226,7 +227,7 @@ namespace
             ResetMissionOfferAnswerRetail();
             G_LoginMgr.Reset();
             if (!MenuNavStartSinglePlayer(Nav))
-                Nav->CurrentState = 0xd;
+                Nav->CurrentState = kMenuStateQuit;
         }
 
         SetClientMouseCursorDrawFlag(1);
@@ -295,10 +296,10 @@ namespace
                 (static_cast<unsigned>(g_client.packed_version) >> 16) & 0xffffu;
             wchar_t Text[0x100];
             swprintf(Text, 0x100, Format, (VersionWord >> 8) & 0xffu, VersionWord & 0xffu);
-            VersionText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Text), 0);
+            VersionText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Text), 0);
         }
 
-        Column.RegisterEvent(0xf); // USER_CANCEL
+        Column.RegisterEvent(USER_CANCEL); // USER_CANCEL
         Nav->ActivePage = &Column;
         GetPageCharacterSelect().CurrentCharacter = G_NoCharacterId;
     }
@@ -312,14 +313,14 @@ void EnterMenuState(FMenuNavState* Nav, int State)
 
     switch (State)
     {
-    case 1:
+    case kMenuStateMainMenu:
         EnterCase1(Nav);
         break;
 
-    case 2:
+    case kMenuStateLogin:
         if (SinglePlayer())
         {
-            Nav->CurrentState = 18;
+            Nav->CurrentState = kMenuStateSingleCharacterSelect;
         }
         else
         {
@@ -329,7 +330,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             Account.LoadAccount();
             if (!Account.VerifyAccount())
             {
-                Nav->CurrentState = 5;
+                Nav->CurrentState = kMenuStateServerSelect;
                 break;
             }
             // CLoginMgr +0x1a8 -- LoginToServer sends it.
@@ -342,20 +343,20 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             if (LoginToServer())
             {
                 G_LoginMgr.Reset();
-                Nav->CurrentState = 9;
+                Nav->CurrentState = kMenuStateCharacterSelect;
             }
             else
             {
-                Nav->CurrentState = 4;
+                Nav->CurrentState = kMenuStateMultiplayer;
             }
         }
         break;
 
-    case 3:
-        Nav->CurrentState = 2;
+    case kMenuStateLoadGame:
+        Nav->CurrentState = kMenuStateLogin;
         break;
 
-    case 4:
+    case kMenuStateMultiplayer:
         // Multiplayer.
         ShutdownServerConnection();
         ResetMissionOfferAnswerRetail();
@@ -363,17 +364,17 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         SetMultiPlayer(true);
         Nav->bFromMultiplayer = 1;
         ChatCreateMsgWin();
-        Nav->CurrentState = 5;
+        Nav->CurrentState = kMenuStateServerSelect;
         {
             // No account or a failed check -> state 6, the account page.
             CPlayerAccount Account;
             if (!Account.LoadAccount() || !Account.VerifyAccount())
-                Nav->CurrentState = 6;
+                Nav->CurrentState = kMenuStateAccountSelect;
         }
         LoadingScreenStart();
         break;
 
-    case 5:
+    case kMenuStateServerSelect:
     {
         GetPageCharacterSelect().CurrentCharacter = G_NoCharacterId;
         LoadingScreenStart();
@@ -393,7 +394,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         ReleaseActivePageInternal(Nav);
         if (!ServerPage.Desc.LoadFromFile(GetFullFilename(kPageServerSelect)))
         {
-            Nav->CurrentState = 1;
+            Nav->CurrentState = kMenuStateMainMenu;
             break;
         }
         ServerPage.Create(nullptr, nullptr);
@@ -402,7 +403,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         break;
     }
 
-    case 6:
+    case kMenuStateAccountSelect:
     {
         // As case 5, for the account page.
         ReleaseActivePageInternal(Nav);
@@ -415,7 +416,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         ReleaseActivePageInternal(Nav);
         if (!AccountPage.Desc.LoadFromFile(GetFullFilename(kPageAccountSelect)))
         {
-            Nav->CurrentState = 1;
+            Nav->CurrentState = kMenuStateMainMenu;
             break;
         }
         AccountPage.Create(nullptr, nullptr);
@@ -424,16 +425,16 @@ void EnterMenuState(FMenuNavState* Nav, int State)
     }
 
     case 7:
-    case 11:
-    case 13:
+    case kMenuStateExit:
+    case kMenuStateQuit:
         break;
 
     case 8:
     case 15:
-        Nav->CurrentState = 9;
+        Nav->CurrentState = kMenuStateCharacterSelect;
         break;
 
-    case 9:
+    case kMenuStateCharacterSelect:
     {
         // A failed load goes back to state 1.
         PreConnectReset();
@@ -443,7 +444,7 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         PageCharacterSelect& CharacterPage = GetPageCharacterSelect();
         if (!CharacterPage.Desc.LoadFromFile(GetFullFilename(kPageCharacterSelect)))
         {
-            Nav->CurrentState = 1;
+            Nav->CurrentState = kMenuStateMainMenu;
             break;
         }
         CharacterPage.Create(nullptr, nullptr);
@@ -451,13 +452,13 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         break;
     }
 
-    case 10:
+    case kMenuStateOptions:
         ReleaseActivePageInternal(Nav);
         GetPageOptions().Create(nullptr, nullptr);
         Nav->ActivePage = &GetPageOptions();
         break;
 
-    case 12:
+    case kMenuStateEnterGame:
         // Load the chosen character into the game.
         {
             LoadingScreenSetClear(1);
@@ -486,56 +487,56 @@ void EnterMenuState(FMenuNavState* Nav, int State)
             if (bSelected)
             {
                 G_LoginMgr.DestroyGun();
-                Nav->CurrentState = 0x14;
+                Nav->CurrentState = kMenuStateInGame;
             }
             else
             {
-                Nav->CurrentState = 5;
+                Nav->CurrentState = kMenuStateServerSelect;
             }
         }
         break;
 
-    case 14:
+    case kMenuStateCharacterCreate:
     {
         ReleaseActivePageInternal(Nav);
         PageCharacterCreate& CreatePage = GetPageCharacterCreate();
         if (!CreatePage.Load(GetFullFilename(kPageCharacterCreate)))
         {
-            Nav->CurrentState = 9;
+            Nav->CurrentState = kMenuStateCharacterSelect;
             break;
         }
         Nav->ActivePage = &CreatePage;
         break;
     }
 
-    case 16:
+    case kMenuStateNewGame:
         // New Game: the Restart.fl record the single-player session listed.
         {
             CCharacterSet::CharacterInfo const* const Restart = G_LoginMgr.FindRestartCharacter();
             if (Restart == nullptr)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                       "E:\\FL\\Scratch\\Source\\Client\\Interface\\Intro.cpp", 0x1d95,
                       "New game character file not found\n");
-                Nav->CurrentState = 1;
+                Nav->CurrentState = kMenuStateMainMenu;
             }
             else
             {
                 Nav->CharacterId = Restart->Id;
                 Nav->bHasCharacterPick = 1;
-                Nav->CurrentState = 0xc;
+                Nav->CurrentState = kMenuStateEnterGame;
             }
         }
         break;
 
-    case 17:
+    case kMenuStateFlasher:
         // Minimise, run Flasher.exe and wait for it, maximise again.
         ShowWindow(g_client.window, SW_MINIMIZE);
         _spawnl(_P_WAIT, "Flasher.exe", "Flasher.exe", nullptr);
         ShowWindow(g_client.window, SW_MAXIMIZE);
         break;
 
-    case 18:
+    case kMenuStateSingleCharacterSelect:
     {
         ReleaseActivePageInternal(Nav);
         // The path is computed before the statics are built.
@@ -550,12 +551,12 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         else
         {
             SinglePage.SlideT = -2.0;
-            Nav->CurrentState = 1;
+            Nav->CurrentState = kMenuStateMainMenu;
         }
         break;
     }
 
-    case 19:
+    case kMenuStateReturnFromGame:
         // Back from the game (latch 2 / 4). Latch 2 -> the character list (state 9); otherwise
         // the character by the name DAT_006732f0 kept, and on success straight back into the
         // game (0x14).
@@ -565,13 +566,13 @@ void EnterMenuState(FMenuNavState* Nav, int State)
         }
         if (GIntroModeLatch == 2)
         {
-            Nav->CurrentState = 9;
+            Nav->CurrentState = kMenuStateCharacterSelect;
             break;
         }
         if (G_LoginMgr.SelectCharacter(
                 G_LoginMgr.FindCharacterByName(GetPlayerCharacterNameRetail())))
         {
-            Nav->CurrentState = 0x14;
+            Nav->CurrentState = kMenuStateInGame;
         }
         break;
 
@@ -595,15 +596,15 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         int const Leaving = Nav->PrevState;
         // Retail sprintf()s "ExitState %d\n" into a local nobody reads; not ported.
 
-        if (Leaving == 5)
+        if (Leaving == kMenuStateServerSelect)
         {
             GServerSelectActive = 0;
         }
-        else if (Leaving == 10)
+        else if (Leaving == kMenuStateOptions)
         {
             if (GOptionsChild_67c20c == nullptr || (GOptionsChild_67c20c->Flags & 1) == 0)
             {
-                Nav->CurrentState = 1;
+                Nav->CurrentState = kMenuStateMainMenu;
                 if (GOptionsChild_67c20c != nullptr)
                     delete GOptionsChild_67c20c;
                 GOptionsChild_67c20c = nullptr;
@@ -631,7 +632,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         if (Next != 0)
         {
             Nav->CurrentState = Next;
-            if (Next == 0xc)
+            if (Next == kMenuStateEnterGame)
                 RefreshLoadingProgress();
         }
         break;
@@ -686,7 +687,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         WinControl* const Preferences = Options.Preferences;
         if (Preferences == nullptr)
         {
-            Nav->CurrentState = 1;
+            Nav->CurrentState = kMenuStateMainMenu;
             Options.Result = 0;
             break;
         }
@@ -696,7 +697,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
         {
             Win3DDeleteTree(Preferences);
             Options.Preferences = nullptr;
-            Nav->CurrentState = 1;
+            Nav->CurrentState = kMenuStateMainMenu;
             Options.Result = 0;
             break;
         }
@@ -709,7 +710,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
     }
     case 5:
         // State 13: the single-player start failed -- client state 1 (quit).
-        TransitionCode = 1;
+        TransitionCode = kClientStateQuit;
         break;
     case 6:
     {
@@ -743,7 +744,8 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
     }
     case 9:
         // State 20: into the game -- 3 when the player has a base (DAT_00673358), else 2.
-        TransitionCode = (GetPlayerBaseIdRetail() & 0x3fffffffu) != 0 ? 3 : 2;
+        TransitionCode =
+            (GetPlayerBaseIdRetail() & 0x3fffffffu) != 0 ? kClientStateBase : kClientStateSpace;
         break;
     default:
         break;
@@ -751,7 +753,7 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
 
     // No camera (retail passes a register that is 0 on every path): the mixer keeps its
     // listener. dt is the uncapped argument.
-    SetClientAudioMode(3);
+    SetClientAudioMode(kClientAudioModeRtc);
     TickClientSoundMixer(nullptr, DeltaSeconds);
 
     if (bDidEnter)

@@ -292,9 +292,9 @@ ShipViewControl::ShipViewControl()
     {
         // operator new(0xc8).
         FEngineLight* const Light = static_cast<FEngineLight*>(operator new(sizeof(FEngineLight)));
-        EngineLightInit(Light, -1);
+        EngineLightInit(Light, kLightNone);
         Lights[Index] = Light;
-        EngineLightSetType(Light, 3, false);
+        EngineLightSetType(Light, kLightDirectional, false);
 
         // The direction negated and normalised; the squares sum y, z, x, as retail.
         float const X = Directions[Index][0];

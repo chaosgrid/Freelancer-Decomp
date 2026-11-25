@@ -368,7 +368,7 @@ Personality::FormationUseStruct& Personality::FormationUseStruct::operator=(Form
 // AttackSubtargetOrder[0..1] only; the rest of both arrays, bWaitForLeaderTarget and
 // ScanForCargo are left as they were. The port zeroes them (over-initialisation).
 Personality::JobStruct::JobStruct()
-    : Field_00(0)
+    : RangeThreshold(0)
     , SceneToughnessThreshold(2)
     , TargetToughnessPreference(2)
     , CombatDriftDistance(10000.0f)
@@ -461,9 +461,9 @@ double Personality::get_range_threshold_value()
     // .text:062a87e0: 5000.0f (DAT_0639e0c8) times the doubles 2/3 (DAT_0639e0f0) / 1/3
     // (DAT_0639e0e8), returned unrounded.
     double const Base = 5000.0f;
-    if (JobParams.Field_00 == 1)
+    if (JobParams.RangeThreshold == 1)
         return Base * 0.66666666666666663;
-    if (JobParams.Field_00 == 2)
+    if (JobParams.RangeThreshold == 2)
         return Base * 0.33333333333333331;
     return Base;
 }

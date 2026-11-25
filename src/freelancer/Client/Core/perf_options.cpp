@@ -527,7 +527,7 @@ bool LoadPerfOptions(char const* FileName, FPerfDisplaySettings* Display)
             {
                 if (!bOk)
                 {
-                    FDUMP(0x100004, "%s(%d) : TRACE_1:General:%s", kPerfOptionsCpp, 0x127,
+                    FDUMP(kFdumpTrace1, "%s(%d) : TRACE_1:General:%s", kPerfOptionsCpp, 0x127,
                           "perfoptions out of date -- reverting to defaults");
                     break;
                 }

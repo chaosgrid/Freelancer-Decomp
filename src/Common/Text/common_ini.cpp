@@ -128,7 +128,7 @@ namespace
             int const Digit = ParseDigitValue(*Cursor);
             if (Digit >= Base)
             {
-                FDUMP(0x100002,
+                FDUMP(kFdumpWarning,
                       "%s(%d) : *** WARNING: ParseNumber: illegal BASE-N digit(s) in argument! '%s'",
                       ParseSource, 0x14e, Original);
                 break;
@@ -588,7 +588,7 @@ int INI_Reader::get_line_num() const
     // .text:0630f970. BINI has no lines.
     if (bBini)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", IniSource, 0x1f6,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", IniSource, 0x1f6,
               "INI_Reader behavior here differs from traditional behavior.");
         return 0;
     }
@@ -907,7 +907,7 @@ bool INI_Reader::get_value_bool(unsigned int Index)
     if (CallDacomStricmp(Field, "0") == 0)
         return false;
 
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid bool value %s in .ini file %s\n", IniSource, 0x126,
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid bool value %s in .ini file %s\n", IniSource, 0x126,
           Field, Text.get_file_name());
     return false;
 }

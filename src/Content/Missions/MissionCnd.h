@@ -147,6 +147,16 @@ public:
     unsigned int ObjectId;     // +0x54 (ctor 0) FUN_06f15940(+0x0c)
 };
 
+// CndDestroyed::Mode: the s2 keywords; SILENT / EXPLODE are compared with message 0x39's
+// destroy type (parms +0x10).
+enum ECndDestroyedMode
+{
+    CND_DESTROYED_SILENT = 0x0,                 // "SILENT"
+    CND_DESTROYED_EXPLODE = 0x1,                // "EXPLODE"
+    CND_DESTROYED_ALL_IGNORE_LANDING = 0x3e6,   // "ALL_IGNORE_LANDING" (the default)
+    CND_DESTROYED_ALL = 0x3e7,                  // "ALL"
+};
+
 // Cnd_Destroyed: new(0x54), ctor inline (06ebbc33), vtable 06fb5640, event 0x39.
 class CndDestroyed : public Cnd
 {
@@ -163,7 +173,7 @@ public:
     unsigned int Label;        // +0x14 ID_String CreateID(s0)
     TString<0x30> KillerLabel; // +0x18 optional s3
     unsigned int KillerObjId;  // +0x4c (ctor 0) FUN_06f15940(+0x18)
-    int Mode;                  // +0x50 (ctor 0x3e6) EXPLODE 1, SILENT 0, ALL 0x3e7, ALL_IGNORE_LANDING 0x3e6
+    int Mode;                  // +0x50 ECndDestroyedMode (ctor CND_DESTROYED_ALL_IGNORE_LANDING)
 };
 
 // Cnd_DistCircle: new(0xa4), ctor inline (06ebbce4), vtable 06fb5614, event 0x20.

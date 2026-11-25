@@ -399,7 +399,7 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
 
     // CharUpperW is delay-loaded in retail (FUN_005b74d9); the title is not null-tested.
     CharUpperW(G_NnTextScratchB);
-    Title->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+    Title->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
 
     {
         float const Position[3] = {NnFloatBits(0x3ecd4fdf), NnFloatBits(0x3e72b021), 0.0f};
@@ -415,28 +415,28 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
         PriceTitle = CreateTextControl("CommodityByBasePriceTitle", "SubHeader", Position, nullptr,
                                        kCbbPriceWidth, kCbbTextHeight,
                                        kCbbFontScale, 0x3d6, 0, 0, 1);
-        PriceTitle->SetProperty(0x24, 1, 0);
+        PriceTitle->SetProperty(kTextPropClickable, 1, 0);
     }
     {
         float const Position[3] = {kCbbBaseX, kCbbTitleY, 0.0f};
         BaseTitle = CreateTextControl("CommodityByBaseBaseTitle", "SubHeader", Position, nullptr,
                                       kCbbBaseWidth, kCbbTextHeight,
                                       kCbbFontScale, 0x3cc, 0, 0, 1);
-        BaseTitle->SetProperty(0x24, 1, 0);
+        BaseTitle->SetProperty(kTextPropClickable, 1, 0);
     }
     {
         float const Position[3] = {kCbbSystemX, kCbbTitleY, 0.0f};
         SystemTitle = CreateTextControl("CommodityByBaseSystemTitle", "SubHeader", Position,
                                         nullptr, kCbbSystemWidth, kCbbTextHeight,
                                         kCbbFontScale, 0x3cd, 0, 0, 1);
-        SystemTitle->SetProperty(0x24, 1, 0);
+        SystemTitle->SetProperty(kTextPropClickable, 1, 0);
     }
     {
         float const Position[3] = {kCbbBuySellX, kCbbTitleY, 0.0f};
         BuySellTitle = CreateTextControl("CommodityByBaseBuySellTitle", "SubHeader", Position,
                                          nullptr, kCbbPriceWidth, kCbbTextHeight,
                                          kCbbFontScale, 0x3d8, 0, 0, 1);
-        BuySellTitle->SetProperty(0x24, 1, 0);
+        BuySellTitle->SetProperty(kTextPropClickable, 1, 0);
     }
 
     // 13 lines. Retail computes Y on x87 with one rounding at the store; the product and the
@@ -456,28 +456,28 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
         Controls.Price = CreateTextControl(Name, "ItemName", PricePosition, nullptr,
                                            kCbbPriceWidth, kCbbTextHeight,
                                            kCbbFontScale, 0, 0, 0, 1);
-        Controls.Price->SetProperty(0x24, 1, 0);
+        Controls.Price->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(Name, "CommodityByBuySellPrice%d", Line);
         float const BuySellPosition[3] = {kCbbBuySellX, Y, 0.0f};
         Controls.BuySell = CreateTextControl(Name, "ItemName", BuySellPosition, nullptr,
                                              kCbbPriceWidth, kCbbTextHeight,
                                              kCbbFontScale, 0, 0, 0, 1);
-        Controls.BuySell->SetProperty(0x24, 1, 0);
+        Controls.BuySell->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(Name, "CommodityByBaseBase%d", Line);
         float const BasePosition[3] = {kCbbBaseX, Y, 0.0f};
         Controls.Base = CreateTextControl(Name, "ItemName", BasePosition, nullptr,
                                           kCbbBaseWidth, kCbbTextHeight,
                                           kCbbFontScale, 0, 0, 0, 1);
-        Controls.Base->SetProperty(0x24, 1, 0);
+        Controls.Base->SetProperty(kTextPropClickable, 1, 0);
 
         sprintf(Name, "CommodityByBaseSystem%d", Line);
         float const SystemPosition[3] = {kCbbSystemX, Y, 0.0f};
         Controls.System = CreateTextControl(Name, "ItemName", SystemPosition, nullptr,
                                             kCbbSystemWidth, kCbbTextHeight,
                                             kCbbFontScale, 0, 0, 0, 1);
-        Controls.System->SetProperty(0x24, 1, 0);
+        Controls.System->SetProperty(kTextPropClickable, 1, 0);
     }
 
     {
@@ -495,7 +495,7 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
     }
     RefreshRows();
 
-    RegisterEvent(0xf);
+    RegisterEvent(USER_CANCEL);
     SetOffset(0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f));
     SetPosition(Position);
 
@@ -530,10 +530,10 @@ void NnCommodityByBase::RefreshRows()
         FCommodityByBaseRow const& Data = G_CommodityByBaseRows[Row];
 
         FormatGroupedNumber(G_NnTextScratchB, Data.Price, -1);
-        Controls.Price->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        Controls.Price->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
 
         unsigned const SellsIds = Data.bBaseSells ? 0x3d9u : 0x3dau;
-        Controls.BuySell->SetProperty(0x1e, SellsIds, 0);
+        Controls.BuySell->SetProperty(kTextPropSetIds, SellsIds, 0);
 
         Controls.Base->SetProperty(
             0x1d,
@@ -552,22 +552,22 @@ void NnCommodityByBase::RefreshRows()
     int const Extra = Count - 13;
     if (Extra <= 0)
     {
-        Scroll->SetProperty(2, 1, 0);
+        Scroll->SetProperty(kWinPropDisable, 1, 0);
         Scroll->Flags = static_cast<unsigned char>(Scroll->Flags & 0xfd);
         return;
     }
-    Scroll->SetProperty(2, 0, 0);
+    Scroll->SetProperty(kWinPropDisable, 0, 0);
     Scroll->Flags = static_cast<unsigned char>(Scroll->Flags | 2);
-    Scroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Extra + 2));
+    Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Extra + 2));
 }
 
 intptr_t NnCommodityByBase::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_0046f550. 0x3e from the scroll bar moves the first row; 0x3e from anything else and
     // 0x26 are clicks.
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
     {
-        if (Msg != 0x3e)
+        if (Msg != kWinNotifyScrollValue)
             return 0;
         if (A == reinterpret_cast<uintptr_t>(Scroll))
         {
@@ -580,7 +580,7 @@ intptr_t NnCommodityByBase::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (A == reinterpret_cast<uintptr_t>(CloseButton))
     {
         Close();
-        HudPostCommand(0x66, 0);
+        HudPostCommand(USER_INVENTORY, 0);
         return 1;
     }
 
@@ -677,7 +677,7 @@ void NnCommodityByBase::Update()
             NnUiPulseBlendArgb(&Pulse);
             Color = Pulse;
         }
-        Title->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
+        Title->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
     }
 
     // A visible line (tested on its base name) pulses when the mouse is over any of its four
@@ -695,10 +695,10 @@ void NnCommodityByBase::Update()
             NnUiPulseBlendArgb(&Pulse);
             Color = Pulse;
         }
-        Controls.Base->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
-        Controls.BuySell->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
-        Controls.Price->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
-        Controls.System->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Color), 1);
+        Controls.Base->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
+        Controls.BuySell->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
+        Controls.Price->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
+        Controls.System->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Color), 1);
     }
 }
 
@@ -707,7 +707,7 @@ bool NnCommodityByBase::OnEvent(unsigned MsgId)
     // FUN_0046ffe0 on the +0x32c face.
     if (HudIsMousePickBlocked()) // FUN_0045a740
         return false;
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return false;
     Close();
     return true;

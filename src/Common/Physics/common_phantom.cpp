@@ -248,7 +248,7 @@ int __cdecl PhySys::CreatePhantom(PhantomParms const& Parms, PhyArch::Part const
     // phantom on this path; so does the port.
     if (Part.Surface == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kPhySysSource, 0x5d0, "Failed to create Phantom surface.");
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kPhySysSource, 0x5d0, "Failed to create Phantom surface.");
         OutHandle = nullptr;
         return 1;
     }
@@ -713,7 +713,7 @@ static void PhySys_CalcClosestPointOnSynapse(Vector const& QueryPos, IVP_Synapse
     default:
         // Retail's own error text and line number. The zero-fill is an ICF-folded helper
         // (AmbientScriptInfo::clear).
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: PhySys::CalcClosestPointOnSynapse(): Unknown IVP_Synapse type (%d).",
               kPhySysSource, 0x6d6, (int)Syn->status);
         Out.x = 0.0f;

@@ -292,7 +292,7 @@ int GuideBehavior::Update()
     bool bLeaderIsSelf = false;
 
     // ---- is the escorted object formed up on me? ----
-    if (ObjInspectOf(ObjA)->get_behavior_id() == 0xa)
+    if (ObjInspectOf(ObjA)->get_behavior_id() == BEHAVIOR_FORMATION)
     {
         IObjRW* Leader = nullptr;
         ObjInspectOf(ObjA)->get_formation_leader(Leader);

@@ -321,7 +321,7 @@ void NN_MainButton::Update()
         !ButtonScaler::IsActive())
     {
         bInventoryAfterDealer = 0;
-        HudPostCommand(0x66, 0);
+        HudPostCommand(USER_INVENTORY, 0);
     }
 
     // The same while the dealer window is still there.
@@ -330,7 +330,7 @@ void NN_MainButton::Update()
         !ButtonScaler::IsActive())
     {
         bInventoryWithDealer = 0;
-        HudPostCommand(0x66, 0);
+        HudPostCommand(USER_INVENTORY, 0);
     }
 }
 
@@ -382,7 +382,7 @@ void NN_MainButton::Draw()
 intptr_t NN_MainButton::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_0045d550 (RET 0xc).
-    if (Msg == 0x4f && (ButtonScaler::IsActive() || ButtonMover::IsActive()))
+    if (Msg == kWinNotifyToolTip && (ButtonScaler::IsActive() || ButtonMover::IsActive()))
     {
         return 1;
     }
@@ -392,7 +392,7 @@ intptr_t NN_MainButton::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool NN_MainButton::OnEvent(unsigned MsgId)
 {
     // FUN_0045cae0 (RET 4; this = the +0x32c face).
-    if (MsgId == 0x67)
+    if (MsgId == USER_STORY_STAR)
     {
         // The mission log is refused only by the screen/cursor/pause gates, not by the docked /
         // no-ship half of FUN_0045a740.
@@ -410,17 +410,17 @@ bool NN_MainButton::OnEvent(unsigned MsgId)
     // Byte-indexed switch over MsgId - 0x10 (0x0045cc6c).
     switch (MsgId)
     {
-    case 0x6e:
+    case USER_DISPLAY_LAST_OBJECTIVE:
         // Queue the current mission objective (DAT_0067230c) on the story star's pending list.
         StoryStarRequeueLastObjective();
         return true;
 
-    case 0x10:
+    case USER_STACKABLE_CANCEL:
         // USER_CANCEL through the cancel stack.
         ClosePanel();
         return true;
 
-    case 0x6b:
+    case USER_INVENTORY_CLOSE:
         // Toggle the inventory.
         if (OpenButton == Buttons[1])
         {
@@ -431,13 +431,13 @@ bool NN_MainButton::OnEvent(unsigned MsgId)
         OpenPanel(Buttons[1], 0x66);
         return true;
 
-    case 0x63:
-    case 0x65:
-    case 0x66:
-    case 0x67:
-    case 0x68:
-    case 0x69:
-    case 0x6a:
+    case USER_NAV_MAP:
+    case USER_PLAYER_STATS:
+    case USER_INVENTORY:
+    case USER_STORY_STAR:
+    case USER_CHAT_WINDOW:
+    case USER_GROUP_WINDOW:
+    case USER_HELP:
     {
         WinControl* const Button = Buttons[NnPanelSlot(static_cast<int>(MsgId))];
         if (OpenButton == Button)
@@ -586,7 +586,7 @@ void NN_MainButton::OnScaleFinished()
     }
 
     OpenButton->SetPosition(PanelOrigin[NnPanelSlot(OpenPanelId)]);
-    Window->ProcessMessage(0xef01, 0, 0);
+    Window->ProcessMessage(kWinMsgShow, 0, 0);
     Window->Flags = static_cast<unsigned char>(Window->Flags | 3);
     PlayOrRewindUiSoundSlot(2);
     HudPushCancelHandler(AsHudCmdHandler(), 0);
@@ -625,7 +625,7 @@ void NN_MainButton::OpenPanel(WinControl* Button, int PanelId)
     if (G_NnTrade != nullptr)
     {
         G_Server->TerminateTrade(GetPlayerConnectionId(), 0);
-        G_NnTrade->SetProperty(0xef02, 0, 0);
+        G_NnTrade->SetProperty(kWinMsgHide, 0, 0);
     }
 
     if (Button == OpenButton)
@@ -720,7 +720,7 @@ void NN_MainButton::ClosePanel()
     Win3D* const Window = Win3DFindByName(Name);
     if (Window != nullptr)
     {
-        Window->ProcessMessage(0xef02, 0, 0);
+        Window->ProcessMessage(kWinMsgHide, 0, 0);
     }
 
     // A full-size background shrinks to the slot's scale.
@@ -797,8 +797,8 @@ void NN_MainButton::SetGroupButtonAlert(bool bAlert)
 {
     // FUN_0045da10 (RET 4). No null test (only the multiplayer group control calls it).
     uintptr_t const Flag = bAlert ? 1u : 0u;
-    GroupButton->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), Flag);
-    GroupRoot->SetProperty(0x33, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), Flag);
+    GroupButton->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), Flag);
+    GroupRoot->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&G_NnPaletteRed), Flag);
 }
 
 void NN_MainButton::SetGroupButtonMesh(int Mode)

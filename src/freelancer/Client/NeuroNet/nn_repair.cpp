@@ -124,14 +124,14 @@ void NnRepair::ShowTotalCost()
 {
     wchar_t Buffer[0x100];
     swprintf(Buffer, 0x100, kCountFormat, SelectedTotal());
-    TotalCost->SetProperty(0x1d, PointerArg(Buffer), 0);
+    TotalCost->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
 }
 
 void NnRepair::ShowPlayerCash()
 {
     wchar_t Buffer[0x100];
     FormatGroupedNumber(Buffer, static_cast<int>(GetPlayerCreditsRetail()), 0x476);
-    PlayerCash->SetProperty(0x1d, PointerArg(Buffer), 0);
+    PlayerCash->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
 }
 
 bool NnRepair::Create(Win3D* NewParent, void* Data)
@@ -145,13 +145,13 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
         float const Half[3] = {0.133f, 0.026f, 0.0f};
         OkButton = CreateWireButtonControl("RepairOkButton", "ui_execute_transaction", Position,
                                            Half, 0, 0, 0x438, 0, 0);
-        OkButton->SetProperty(1, 1, 0);
+        OkButton->SetProperty(kWinPropHide, 1, 0);
     }
     {
         float const Position[3] = {0.0f, -0.216f, 0.0f};
         RepairText = CreateTextControl("RepairText", "ButtonText", Position, nullptr, 0.265f, 0.06f,
                                        1.5f, 0x427, 1, 0, 0);
-        RepairText->SetProperty(1, 1, 0);
+        RepairText->SetProperty(kWinPropHide, 1, 0);
     }
     {
         float const Position[3] = {0.22f, 0.231f, 0.0f};
@@ -265,7 +265,7 @@ bool NnRepair::Create(Win3D* NewParent, void* Data)
         float const Position[3] = {0.005f, -0.195f, 0.0f};
         NotEnoughCash = CreateTextControl("RepairNotEnoughCash", "Normal", Position, nullptr, 0.488f,
                                           0.03f, 1.2f, 0x4aa, 1, 0, 0);
-        NotEnoughCash->SetProperty(1, 1, 0);
+        NotEnoughCash->SetProperty(kWinPropHide, 1, 0);
     }
 
     ShowPlayerCash();
@@ -278,8 +278,8 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_004b3530 (RET 0xc): byte table 0x004b397c over Msg - 0x26. Every path returns 0.
     switch (Msg)
     {
-    case 0x2c:
-    case 0x2d:
+    case kWinNotifyHighlight:
+    case kWinNotifyUnhighlight:
     {
         int Row = 0;
         for (; Row < 9; ++Row)
@@ -290,7 +290,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         }
         if (Row == 9)
             return 0;
-        if (Msg == 0x2c)
+        if (Msg == kWinNotifyHighlight)
             Hovered = Row;
         else if (Hovered == Row)
             Hovered = -1;
@@ -328,7 +328,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         ShowTotalCost();
         return 0;
     }
-    case 0x3e:
+    case kWinNotifyScrollValue:
     {
         if (A != PointerArg(Scroll))
             return 0;
@@ -336,7 +336,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         RefreshRows();
         return 0;
     }
-    case 0x42:
+    case kWinPropPlaceAtOffset:
     {
         float const* const Target = reinterpret_cast<float const*>(A);
         SetOffset(Target[0], Target[1], Target[2]);
@@ -344,7 +344,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         PlayOrRewindUiSoundSlot(2); // FUN_005645c0
         return 0;
     }
-    case 0x26:
+    case kWinNotifyClick:
     {
         // An icon frame or a text area toggles its row's check box: property 0x30 flips on its
         // argument, so writing the state read back is the toggle.
@@ -547,7 +547,7 @@ void NnRepair::PopulateList()
     }
 
     // -1 for an empty list, as in retail.
-    Scroll->SetProperty(0x37, 0, static_cast<uintptr_t>(static_cast<int>(Items.size()) - 1));
+    Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(static_cast<int>(Items.size()) - 1));
 }
 
 void NnRepair::RefreshRows()
@@ -559,24 +559,24 @@ void NnRepair::RefreshRows()
     {
         FRepairItem const& Item = Items[static_cast<unsigned>(Index)];
 
-        ItemNames[Row]->SetProperty(2, 0, 0);
-        ItemPrices[Row]->SetProperty(2, 0, 0);
-        CheckBoxes[Row]->SetProperty(2, 0, 0);
-        CheckBoxFrames[Row]->SetProperty(2, 0, 0);
-        IconFrames[Row]->SetProperty(2, 0, 0);
-        SmallIcons[Row]->SetProperty(1, 0, 0);
-        TextAreas[Row]->SetProperty(2, 0, 0);
-        ItemDamages[Row]->SetProperty(1, 0, 0);
+        ItemNames[Row]->SetProperty(kWinPropDisable, 0, 0);
+        ItemPrices[Row]->SetProperty(kWinPropDisable, 0, 0);
+        CheckBoxes[Row]->SetProperty(kWinPropDisable, 0, 0);
+        CheckBoxFrames[Row]->SetProperty(kWinPropDisable, 0, 0);
+        IconFrames[Row]->SetProperty(kWinPropDisable, 0, 0);
+        SmallIcons[Row]->SetProperty(kWinPropHide, 0, 0);
+        TextAreas[Row]->SetProperty(kWinPropDisable, 0, 0);
+        ItemDamages[Row]->SetProperty(kWinPropHide, 0, 0);
 
-        ItemNames[Row]->SetProperty(0x1e, static_cast<uintptr_t>(Item.NameIds), 0);
+        ItemNames[Row]->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(Item.NameIds), 0);
         swprintf(Buffer, 0x100, kCountFormat, Item.Cost);
-        ItemPrices[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
+        ItemPrices[Row]->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
         CheckBoxes[Row]->SetProperty(0x30, Item.bSelected, 0);
 
         if (Item.IconMesh == nullptr)
-            SmallIcons[Row]->SetProperty(4, PointerArg(kBlackBoxMesh), 0);
+            SmallIcons[Row]->SetProperty(kWinPropMesh, PointerArg(kBlackBoxMesh), 0);
         else
-            SmallIcons[Row]->SetProperty(4, PointerArg(Item.IconMesh), PointerArg(Item.IconMaterial));
+            SmallIcons[Row]->SetProperty(kWinPropMesh, PointerArg(Item.IconMesh), PointerArg(Item.IconMaterial));
 
         int const Percent = Item.HealthPercent;
         ItemDamages[Row]->SetProperty(0x40, 100, static_cast<uintptr_t>(Percent));
@@ -597,17 +597,17 @@ void NnRepair::RefreshRows()
     // The rows past the list.
     for (; Row < 9; ++Row)
     {
-        ItemNames[Row]->SetProperty(0x1e, 0, 0);
-        ItemNames[Row]->SetProperty(2, 1, 0);
-        ItemPrices[Row]->SetProperty(0x1e, 0, 0);
-        ItemPrices[Row]->SetProperty(2, 1, 0);
-        CheckBoxes[Row]->SetProperty(2, 1, 0);
-        CheckBoxFrames[Row]->SetProperty(2, 1, 0);
-        IconFrames[Row]->SetProperty(2, 1, 0);
-        TextAreas[Row]->SetProperty(2, 1, 0);
-        ItemDamages[Row]->SetProperty(1, 1, 0);
+        ItemNames[Row]->SetProperty(kTextPropSetIds, 0, 0);
+        ItemNames[Row]->SetProperty(kWinPropDisable, 1, 0);
+        ItemPrices[Row]->SetProperty(kTextPropSetIds, 0, 0);
+        ItemPrices[Row]->SetProperty(kWinPropDisable, 1, 0);
+        CheckBoxes[Row]->SetProperty(kWinPropDisable, 1, 0);
+        CheckBoxFrames[Row]->SetProperty(kWinPropDisable, 1, 0);
+        IconFrames[Row]->SetProperty(kWinPropDisable, 1, 0);
+        TextAreas[Row]->SetProperty(kWinPropDisable, 1, 0);
+        ItemDamages[Row]->SetProperty(kWinPropHide, 1, 0);
         CheckBoxes[Row]->SetProperty(0x30, 0, 0);
-        SmallIcons[Row]->SetProperty(1, 1, 0);
+        SmallIcons[Row]->SetProperty(kWinPropHide, 1, 0);
     }
 }
 
@@ -680,16 +680,16 @@ void NnRepair::Draw()
     int const Total = SelectedTotal();
     if (Total == 0)
     {
-        NotEnoughCash->SetProperty(1, 1, 0);
-        OkButton->SetProperty(1, 1, 0);
-        RepairText->SetProperty(1, 1, 0);
+        NotEnoughCash->SetProperty(kWinPropHide, 1, 0);
+        OkButton->SetProperty(kWinPropHide, 1, 0);
+        RepairText->SetProperty(kWinPropHide, 1, 0);
     }
     else
     {
         bool const bOver = Total > static_cast<int>(GetPlayerCreditsRetail());
-        NotEnoughCash->SetProperty(1, bOver ? 0u : 1u, 0);
-        OkButton->SetProperty(1, bOver ? 1u : 0u, 0);
-        RepairText->SetProperty(1, bOver ? 1u : 0u, 0);
+        NotEnoughCash->SetProperty(kWinPropHide, bOver ? 0u : 1u, 0);
+        OkButton->SetProperty(kWinPropHide, bOver ? 1u : 0u, 0);
+        RepairText->SetProperty(kWinPropHide, bOver ? 1u : 0u, 0);
     }
 
     // The hovered row's frames draw at 0x65.
@@ -766,9 +766,9 @@ void NnRepair::Update()
 
 bool NnRepair::OnEvent(unsigned MsgId)
 {
-    // LAB_004b47c0 (RET 4), on the +0x32c face: USER_CANCEL (0x10) closes the window like the
+    // LAB_004b47c0 (RET 4), on the +0x32c face: USER_STACKABLE_CANCEL (0x10) closes the window like the
     // cancel button. (Retail tests the adjusted `this` for null.)
-    if (MsgId != 0x10)
+    if (MsgId != USER_STACKABLE_CANCEL)
         return false;
     Flags = static_cast<unsigned char>(Flags & 0xfc);
     Win3DReparent(this, nullptr); // FUN_0059dd00

@@ -224,7 +224,7 @@ void UiWinDeform::SetCostume(char const* Name)
         char Message[0x2000];
         _snprintf(Message, sizeof(Message), "Failed to create costume \"%s\".\n", Name);
         Message[sizeof(Message) - 1] = '\0';
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kUiWinCpp, 0x210, Message);
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kUiWinCpp, 0x210, Message);
         return;
     }
 

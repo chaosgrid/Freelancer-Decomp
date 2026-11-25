@@ -146,7 +146,7 @@ int FaceBehavior::OnEvaluateReadiness(float Unused)
                 // Ship-class objects only (0x30000).
                 uint Type;
                 Watched->get_type(Type);
-                if ((Type & 0x30000) != 0)
+                if ((Type & (OBJ_FIGHTER | OBJ_FREIGHTER)) != 0)
                 {
                     // Own speed squared on the x87 stack, strictly above 2500.0f (DAT_0639f9c8).
                     Vector const V = Sys->SelfTarget.Iface->get_velocity();

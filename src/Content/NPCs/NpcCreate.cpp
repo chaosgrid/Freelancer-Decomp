@@ -11,6 +11,7 @@
 #include "NPCs/PilotPersonalities.h"   // GetPilotPersonality (TU45 FUN_06f3e020)
 #include "Universe/SystemInfo.h"           // FSystemInfo::SystemId
 #include "Core/ContentStaticIds.h"     // TU24's 16 static-init thunks 06ed5390-06ed5570
+#include "Core/ContentInternal.h"     // GIdValueMask
 #include "common_id.h"
 #include "common_ini.h"
 #include "common_newchar.h"       // pub::StateGraph::get_state_graph
@@ -79,7 +80,7 @@ FSolarNpc::FSolarNpc(FSolarNpcDesc const* Desc)
     SpaceObjId = pub::GetNicknameId(Nickname.Data);
     MsgIdPrefix = Desc->MsgIdPrefix.Data;
 
-    if ((SpaceObjId & 0x3fffffff) != 0 && Desc->ReputationGroup != 0xffffffffu)
+    if ((SpaceObjId & GIdValueMask) != 0 && Desc->ReputationGroup != 0xffffffffu)
     {
         unsigned int Group = Desc->ReputationGroup;
         ReputationHandle = new FSolarNpcReputation(Nickname.Data, Group);

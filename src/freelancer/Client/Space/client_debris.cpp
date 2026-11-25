@@ -145,7 +145,7 @@ bool ReadDebrisArch(INI_Reader* Reader, bool bQuiet)
         return true;
     if (!bQuiet)
     {
-        FDUMP(0x100002,
+        FDUMP(kFdumpWarning,
               "%s(%d) : *** WARNING: Duplicate [Debris] name(%s).  First overwritten with second!",
               kDebrisSourceFile, 0xf8, Nickname.get_string());
     }
@@ -167,7 +167,7 @@ int LoadDebrisArchFile(char const* Path, bool bQuiet)
     }
     else
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Failed to open debris file[%s].",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Failed to open debris file[%s].",
               kDebrisSourceFile, 0x147, Path);
     }
     return static_cast<int>(G_DebrisArchDb.size() - SizeBefore);

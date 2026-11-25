@@ -708,12 +708,12 @@ namespace
     // "\n" is 0x005d0254.
     bool HudCaptionLocationTail(CSimple const* Object, FHudWideText* Out, int Mode)
     {
-        if (Mode == 2)
+        if (Mode == kCaptionNameAndLocation)
         {
             wcscat(G_NnTextScratchB, L"\n");
             HudCaptionAppendLocation(Object);
         }
-        else if (Mode == 1)
+        else if (Mode == kCaptionLocation)
         {
             HudCaptionAppendLocation(Object);
         }
@@ -726,15 +726,15 @@ namespace
     bool HudCaptionPlain(CSimple const* Object, unsigned Name, unsigned TypeBits,
                          FHudWideText* Out, int Mode)
     {
-        if (Mode == 0 || Mode == 2)
+        if (Mode == kCaptionName || Mode == kCaptionNameAndLocation)
         {
             GetIdsStringWWithRawFallback(Name, G_NnTextScratchB, G_NnTextScratchCapacity);
         }
-        if (TypeBits != 0x10000000u)
+        if (TypeBits != OBJ_LOOT)
         {
             return HudCaptionLocationTail(Object, Out, Mode);
         }
-        if (Mode != 0 && Mode != 2)
+        if (Mode != kCaptionName && Mode != kCaptionNameAndLocation)
         {
             return false;
         }
@@ -838,33 +838,33 @@ void NavMapSectorName(Vector const* Pos, wchar_t* Out)
 unsigned HudObjectKindIds(unsigned TypeBits)
 {
     // FUN_004e8060.
-    if ((TypeBits & 0x1u) != 0)
+    if ((TypeBits & OBJ_MOON) != 0)
         return 0x563;
-    if ((TypeBits & 0x2u) != 0)
+    if ((TypeBits & OBJ_PLANET) != 0)
         return 0x44b;
-    if ((TypeBits & 0x4u) != 0)
+    if ((TypeBits & OBJ_SUN) != 0)
         return 0x564;
-    if ((TypeBits & 0x8u) != 0)
+    if ((TypeBits & OBJ_BLACKHOLE) != 0)
         return 0x565;
-    if ((TypeBits & 0x8010u) != 0)
+    if ((TypeBits & (OBJ_SATELLITE | OBJ_MISSION_SATELLITE)) != 0)
         return 0x566;
-    if ((TypeBits & 0x20u) != 0)
+    if ((TypeBits & OBJ_DOCKING_RING) != 0)
         return 0x567;
-    if ((TypeBits & 0x40u) != 0)
+    if ((TypeBits & OBJ_JUMP_GATE) != 0)
         return 0x568;
-    if ((TypeBits & 0x80u) != 0)
+    if ((TypeBits & OBJ_TRADELANE_RING) != 0)
         return 0x4fa;
-    if ((TypeBits & 0x100u) != 0)
+    if ((TypeBits & OBJ_STATION) != 0)
         return 0x44c;
-    if ((TypeBits & 0x200u) != 0)
+    if ((TypeBits & OBJ_WAYPOINT) != 0)
         return 0x442;
-    if ((TypeBits & 0x400u) != 0)
+    if ((TypeBits & OBJ_AIRLOCK_GATE) != 0)
         return 0x56a;
-    if ((TypeBits & 0x800u) != 0)
+    if ((TypeBits & OBJ_JUMP_HOLE) != 0)
         return 0x56b;
-    if ((TypeBits & 0x1000u) != 0)
+    if ((TypeBits & OBJ_WEAPONS_PLATFORM) != 0)
         return 0x56c;
-    return (TypeBits & 0x2000u) != 0 ? 0x56du : 0u;
+    return (TypeBits & OBJ_DESTROYABLE_DEPOT) != 0 ? 0x56du : 0u;
 }
 
 bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
@@ -979,14 +979,14 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
     Line[0] = 0;
     unsigned char bWatched = 0;
     FClientGameobj* const Gameobj = ClientObjDb_FindObject(Object->Id, 0); // FUN_005416c0
-    if (Gameobj != nullptr && (TypeBits & 0xfdffu) != 0)
+    if (Gameobj != nullptr && (TypeBits & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0)
     {
         bWatched = Gameobj->bWatchListed;
     }
 
-    if (((TypeBits & 0x8000u) != 0 || bWatched != 0) && Name != 0)
+    if (((TypeBits & OBJ_MISSION_SATELLITE) != 0 || bWatched != 0) && Name != 0)
     {
-        if (Mode == 0 || Mode == 2)
+        if (Mode == kCaptionName || Mode == kCaptionNameAndLocation)
         {
             GetIdsStringWWithRawFallback(Name, Line, G_NnTextScratchCapacity);
         }
@@ -1014,11 +1014,11 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         {
             return false;
         }
-        if ((TypeBits & 0x7f0000u) == 0)
+        if ((TypeBits & OBJ_SHIP_MASK) == 0)
         {
             return HudCaptionPlain(Object, Name, TypeBits, Out, Mode);
         }
-        if (Mode != 1 && Mode != 2)
+        if (Mode != kCaptionLocation && Mode != kCaptionNameAndLocation)
         {
             return false;
         }
@@ -1038,7 +1038,7 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
     }
 
     unsigned const ShortName = Reputation::get_short_name(Affiliation);
-    if ((TypeBits & 0x7f0000u) != 0)
+    if ((TypeBits & OBJ_SHIP_MASK) != 0)
     {
         // The instance's two FmtStr names.
         FmtStr Name1;
@@ -1047,18 +1047,18 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         if (Reputation::Vibe::GetName(VibeId, Name1, Name2, DisplayName) == 0)
         {
             bool const bNoName1 = Name1.MadLibId == 0;
-            if (Mode == 0 || Mode == 2)
+            if (Mode == kCaptionName || Mode == kCaptionNameAndLocation)
             {
                 if (!bNoName1)
                 {
                     FmtStrSprintf(&Name1, Line, G_NnTextScratchCapacity); // FUN_0041c970
                 }
-                if (Mode == 2 && !bNoName1)
+                if (Mode == kCaptionNameAndLocation && !bNoName1)
                 {
                     wcscat(Line, L"\n");
                 }
             }
-            if (Mode == 1 || Mode == 2)
+            if (Mode == kCaptionLocation || Mode == kCaptionNameAndLocation)
             {
                 if (EqObj->OwnerPlayer != 0 && DisplayName != nullptr)
                 {
@@ -1092,17 +1092,17 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
     // name line, the ids_name as the location line.
     if (EqObj->DockingBaseId != 0 && ShortName != 0)
     {
-        if (Mode == 0 || Mode == 2)
+        if (Mode == kCaptionName || Mode == kCaptionNameAndLocation)
         {
             GetIdsStringWWithRawFallback(ShortName, Line, G_NnTextScratchCapacity);
             GetIdsStringWWithRawFallback(0x562, Scratch, G_NnTextScratchCapacity);
             wcscat(Line, Scratch);
-            if (Mode == 2)
+            if (Mode == kCaptionNameAndLocation)
             {
                 wcscat(Line, L"\n");
             }
         }
-        if (Mode == 1 || Mode == 2)
+        if (Mode == kCaptionLocation || Mode == kCaptionNameAndLocation)
         {
             GetIdsStringWWithRawFallback(Name, Scratch, G_NnTextScratchCapacity);
             wcscat(Line, Scratch);
@@ -1113,13 +1113,13 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
     // The object-kind ids, else the ids_name, as the second word.
     unsigned const KindIds = HudObjectKindIds(TypeBits);
     unsigned const SecondIds = KindIds != 0 ? KindIds : Name;
-    if (Mode == 0 || Mode == 2)
+    if (Mode == kCaptionName || Mode == kCaptionNameAndLocation)
     {
         // The first word is the faction short name, or for TypeBits
         // 0x20 the ids_name of the solar whose client gameobj owns the base at +0x164 (bucket 2
         // walked through get_base, slot 35; the owner through cobject, slot 84), cached.
         unsigned FirstIds = ShortName;
-        if ((TypeBits & 0x20u) != 0)
+        if ((TypeBits & OBJ_DOCKING_RING) != 0)
         {
             unsigned const OwnerBase = EqObj->DockingPointBaseId;
             if (OwnerBase != 0)
@@ -1149,7 +1149,7 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
                         }
                         CObject const* const Owner = Scan->cobject();
                         if (Owner != nullptr &&
-                            (static_cast<unsigned>(Owner->ObjectClass) & 3u) == 3u)
+                            (static_cast<unsigned>(Owner->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
                         {
                             FirstIds = GetObjectIdsName(Owner);
                             G_CaptionOwnerBaseId = OwnerBase;
@@ -1167,9 +1167,9 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
     }
 
     // A loot-type object answers only in Mode 0 / 2, with its count.
-    if (TypeBits == 0x10000000u)
+    if (TypeBits == OBJ_LOOT)
     {
-        if (Mode != 0 && Mode != 2)
+        if (Mode != kCaptionName && Mode != kCaptionNameAndLocation)
         {
             return false;
         }
@@ -1177,23 +1177,23 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
         return HudCaptionFinish(Out);
     }
 
-    if (Mode == 2)
+    if (Mode == kCaptionNameAndLocation)
     {
         wcscat(Line, L"\n");
     }
-    else if (Mode != 1)
+    else if (Mode != kCaptionLocation)
     {
         return HudCaptionFinish(Out);
     }
 
     // A trade-lane ring (TypeBits bit 7) with an "A->B" caption.
-    if ((TypeBits & 0x80u) != 0 &&
+    if ((TypeBits & OBJ_TRADELANE_RING) != 0 &&
         HudTradelaneCaption(Object, Scratch, G_NnTextScratchCapacity))
     {
         wcscat(Line, Scratch);
         return HudCaptionFinish(Out);
     }
-    if ((TypeBits & 0x8c0u) != 0)
+    if ((TypeBits & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_JUMP_HOLE)) != 0)
     {
         GetIdsStringWWithRawFallback(Name, Scratch, G_NnTextScratchCapacity);
         wcscat(Line, Scratch);
@@ -1330,7 +1330,7 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
         if (Gameobj != nullptr)
         {
             CObject const* const Object = Gameobj->cobject();
-            if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & 3u) != 3u)
+            if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
             {
                 Found = nullptr;
             }
@@ -2014,7 +2014,7 @@ void HudTargetBase::Draw()
 intptr_t HudTargetBase::SetProperty(int Msg, uintptr_t A, uintptr_t /*B*/)
 {
     // FUN_004e7950: always 0; the base is not called.
-    if (Msg == 0x26 && A == reinterpret_cast<uintptr_t>(ToggleButton))
+    if (Msg == kWinNotifyClick && A == reinterpret_cast<uintptr_t>(ToggleButton))
     {
         ToggleExpanded();
     }

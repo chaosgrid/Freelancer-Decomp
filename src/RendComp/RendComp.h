@@ -16,9 +16,6 @@
 #include <cstddef>
 #include <vector>
 
-static const int kFdumpError = 0x100001;
-static const int kFdumpWarning = 0x100002;
-static const int kFdumpNotice = 0x100003;
 static const char* const G_FdumpFmtError = "%s(%d) : ERROR:General:%s";
 static const char* const G_FdumpFmtWarning = "%s(%d) : WARNING:General:%s";
 static const char* const G_FdumpFmtNotice = "%s(%d) : NOTICE:General:%s";
@@ -150,10 +147,10 @@ struct FVmeshData
 
     int Release();
 
-    // FUN_06c2df60. Defined in VMeshLibrary.cpp.
+    // FUN_06c2df60. Defined in VMeshData.cpp.
     FVmeshData* Construct(const char* Name, unsigned long Size);
 
-    // FUN_06c2df00. Defined in VMeshLibrary.cpp.
+    // FUN_06c2df00. Defined in VMeshData.cpp.
     void Destruct();
 };
 
@@ -200,7 +197,6 @@ static_assert(sizeof(FVmeshGroup) == 0x28, "VMesh group 0x28");
 
 // FDUMP(Flags, "%s(%d) : <severity>:General:%s", File, Line, Message) exactly as retail pushes it.
 void RendCompFdumpAt(int Flags, const char* File, int Line, const char* Message);
-bool RendCompIidEqual(const char* Left, const char* Right);
 
 int FileOpenNode(void* File, const char* Name);
 int FileClose(void* File, int Handle);
@@ -239,7 +235,7 @@ void VectorNegate3(const float* Src, float* Dest);                       // FUN_
 float* TransposeXform3x3(const float* Src12, float* Dest9);             // FUN_06c330b0
 float* TransformPoint3(float* Dest3, const float* Matrix12, const float* Vec3); // FUN_06c33100
 
-// VMeshData layer (src/RendComp/VMeshLibrary.cpp).
+// VMeshData layer (src/RendComp/VMeshData.cpp).
 FVmeshData* VMeshDataLoad(IFileSystem* File, const char* Name);   // FUN_06c2dd20
 FVmeshData* VMeshDataFind(const FVmeshKey* Key);                  // FUN_06c2e720
 int VMeshDataAddRef(FVmeshData* Data);                            // FUN_06c2dfe0
@@ -260,6 +256,7 @@ struct FVmeshChannelRecord
 
 bool VMeshChannelPresent(unsigned long Fvf, unsigned int ChannelId);
 int VMeshChannelByteOffset(unsigned long Fvf, unsigned int ChannelId);
+int VMeshGroupRemove(FVmeshGroup* Group, FVmeshData* Data); // VMeshLibrary.cpp
 unsigned int VMeshFvfStride(unsigned long Fvf);
 // FUN_06c2e020 (VertexStart 0, VertexCount Header->Vertices) and FUN_06c31500 (the VMeshRef's
 // range): false and Out untouched when the channel is absent.

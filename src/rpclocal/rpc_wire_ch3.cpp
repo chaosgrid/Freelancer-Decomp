@@ -70,19 +70,16 @@ static unsigned int RpcWideLength(const wchar_t* Text) {
 // ===========================================================================
 unsigned int FPacket_FLPACKET_CLIENT_LOGIN::Encode(unsigned char** BufferHolder,
                                                    unsigned int Capacity, unsigned int* OutLength) {
-    FPayloadClientLogin* Wire =
-        reinterpret_cast<FPayloadClientLogin*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    if (!Stream.PutByte(Wire->CreateFlag)) {                              // 06dafb86/06dafb92
+    if (!Stream.PutByte(Wire.CreateFlag)) {                               // 06dafb86/06dafb92
         return Stream.GetError();
     }
     // Both lengths kept as bytes.
     const unsigned char LenA =
-        (unsigned char)(RpcWideLength(Wire->AccountName) & 0xffu);
+        (unsigned char)(RpcWideLength(Wire.AccountName) & 0xffu);
     const unsigned char LenB =
-        (unsigned char)(RpcWideLength(Wire->Password) & 0xffu);
+        (unsigned char)(RpcWideLength(Wire.Password) & 0xffu);
     if (!Stream.PutByte(LenA)) {                                          // 06dafbe1
         return Stream.GetError();
     }
@@ -91,13 +88,13 @@ unsigned int FPacket_FLPACKET_CLIENT_LOGIN::Encode(unsigned char** BufferHolder,
     }
     if (LenA != 0) {                                                      // 06dafc17
         // MSVCRT _wcslwr (IAT .rdata:06db320c), on the packet itself.
-        _wcslwr(Wire->AccountName);
-        if (!Stream.PutBytes(Wire->AccountName, (unsigned int)LenA * 2u)) {  // 06dafc63
+        _wcslwr(Wire.AccountName);
+        if (!Stream.PutBytes(Wire.AccountName, (unsigned int)LenA * 2u)) {   // 06dafc63
             return Stream.GetError();
         }
     }
     if (LenB != 0) {                                                      // 06dafc7b
-        if (!Stream.PutBytes(Wire->Password, (unsigned int)LenB * 2u)) {     // 06dafcc1
+        if (!Stream.PutBytes(Wire.Password, (unsigned int)LenB * 2u)) {      // 06dafcc1
             return Stream.GetError();
         }
     }
@@ -108,17 +105,14 @@ unsigned int FPacket_FLPACKET_CLIENT_LOGIN::Encode(unsigned char** BufferHolder,
 
 unsigned int FPacket_FLPACKET_CLIENT_LOGIN::Decode(const unsigned char* Buffer, unsigned int Size,
                                                    unsigned int* OutLength) {
-    FPayloadClientLogin* Wire =
-        reinterpret_cast<FPayloadClientLogin*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
     // 0x402 bytes from packet+0x20: both wide buffers and CreateFlag, which the read below
     // overwrites.
-    ::memset(Wire->AccountName, 0, 0x402u);
-    if (!Stream.GetByte(Wire->CreateFlag)) {                              // 06dafdba
+    ::memset(Wire.AccountName, 0, 0x402u);
+    if (!Stream.GetByte(Wire.CreateFlag)) {                               // 06dafdba
         return Stream.GetError();
     }
     unsigned char LenA = 0;
@@ -130,16 +124,16 @@ unsigned int FPacket_FLPACKET_CLIENT_LOGIN::Decode(const unsigned char* Buffer, 
         return Stream.GetError();
     }
     if (LenA != 0) {                                                      // 06dafe13
-        if (!Stream.GetBytes(Wire->AccountName, (unsigned int)LenA * 2u)) {  // 06dafe49
+        if (!Stream.GetBytes(Wire.AccountName, (unsigned int)LenA * 2u)) {   // 06dafe49
             return Stream.GetError();
         }
-        Wire->AccountName[LenA] = L'\0';
+        Wire.AccountName[LenA] = L'\0';
     }
     if (LenB != 0) {                                                      // 06dafe6e
-        if (!Stream.GetBytes(Wire->Password, (unsigned int)LenB * 2u)) {     // 06dafeae
+        if (!Stream.GetBytes(Wire.Password, (unsigned int)LenB * 2u)) {      // 06dafeae
             return Stream.GetError();
         }
-        Wire->Password[LenB] = L'\0';
+        Wire.Password[LenB] = L'\0';
     }
     *OutLength = Stream.Length();
     RpcRecordDecodedPacket(PacketId, Stream.Length());
@@ -154,19 +148,16 @@ unsigned int FPacket_FLPACKET_CLIENT_LOGIN::Decode(const unsigned char* Buffer, 
 unsigned int FPacket_FLPACKET_CLIENT_MUNCOLLISION::Encode(unsigned char** BufferHolder,
                                                           unsigned int Capacity,
                                                           unsigned int* OutLength) {
-    const FPayloadClientMunCollision* Wire =
-        reinterpret_cast<const FPayloadClientMunCollision*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    Stream.PutDword(Wire->ProjectileArchId);
-    Stream.PutDword(Wire->AttackerId);
-    Stream.PutDword(Wire->ObjectId);
-    Stream.PutWord(Wire->SubObjId);
+    Stream.PutDword(Wire.ProjectileArchId);
+    Stream.PutDword(Wire.AttackerId);
+    Stream.PutDword(Wire.ObjectId);
+    Stream.PutWord(Wire.SubObjId);
     // The three-dword copier FUN_06d8f510, via a stack temp.
-    Stream.PutDword(*reinterpret_cast<const unsigned int*>(&Wire->HitPosX));
-    Stream.PutDword(*reinterpret_cast<const unsigned int*>(&Wire->HitPosY));
-    Stream.PutDword(*reinterpret_cast<const unsigned int*>(&Wire->HitPosZ));
+    Stream.PutDword(*reinterpret_cast<const unsigned int*>(&Wire.HitPosX));
+    Stream.PutDword(*reinterpret_cast<const unsigned int*>(&Wire.HitPosY));
+    Stream.PutDword(*reinterpret_cast<const unsigned int*>(&Wire.HitPosZ));
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -178,21 +169,18 @@ unsigned int FPacket_FLPACKET_CLIENT_MUNCOLLISION::Encode(unsigned char** Buffer
 unsigned int FPacket_FLPACKET_CLIENT_MUNCOLLISION::Decode(const unsigned char* Buffer,
                                                           unsigned int Size,
                                                           unsigned int* OutLength) {
-    FPayloadClientMunCollision* Wire =
-        reinterpret_cast<FPayloadClientMunCollision*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.GetDword(Wire->ProjectileArchId);
-    Stream.GetDword(Wire->AttackerId);
-    Stream.GetDword(Wire->ObjectId);
-    Stream.GetWord(Wire->SubObjId);
+    Stream.GetDword(Wire.ProjectileArchId);
+    Stream.GetDword(Wire.AttackerId);
+    Stream.GetDword(Wire.ObjectId);
+    Stream.GetWord(Wire.SubObjId);
     // FUN_06d8f510 into packet+0x30.
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->HitPosX));
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->HitPosY));
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->HitPosZ));
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.HitPosX));
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.HitPosY));
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.HitPosZ));
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -209,17 +197,14 @@ unsigned int FPacket_FLPACKET_CLIENT_MUNCOLLISION::Decode(const unsigned char* B
 unsigned int FPacket_FLPACKET_CLIENT_OBJCOLLISION::Encode(unsigned char** BufferHolder,
                                                           unsigned int Capacity,
                                                           unsigned int* OutLength) {
-    const FPayloadClientObjCollision* Wire =
-        reinterpret_cast<const FPayloadClientObjCollision*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    Stream.PutDword(Wire->ObjectId);
-    Stream.PutWord(Wire->SubObjId);
-    Stream.PutDword(Wire->TargetObjectId);
-    Stream.PutWord(Wire->TargetSubObjId);
+    Stream.PutDword(Wire.ObjectId);
+    Stream.PutWord(Wire.SubObjId);
+    Stream.PutDword(Wire.TargetObjectId);
+    Stream.PutWord(Wire.TargetSubObjId);
     // FLD/FSTP in retail.
-    Stream.PutFloat(*reinterpret_cast<const float*>(&Wire->DamageBits));
+    Stream.PutFloat(*reinterpret_cast<const float*>(&Wire.DamageBits));
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -231,19 +216,16 @@ unsigned int FPacket_FLPACKET_CLIENT_OBJCOLLISION::Encode(unsigned char** Buffer
 unsigned int FPacket_FLPACKET_CLIENT_OBJCOLLISION::Decode(const unsigned char* Buffer,
                                                           unsigned int Size,
                                                           unsigned int* OutLength) {
-    FPayloadClientObjCollision* Wire =
-        reinterpret_cast<FPayloadClientObjCollision*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.GetDword(Wire->ObjectId);
-    Stream.GetWord(Wire->SubObjId);
-    Stream.GetDword(Wire->TargetObjectId);
-    Stream.GetWord(Wire->TargetSubObjId);
+    Stream.GetDword(Wire.ObjectId);
+    Stream.GetWord(Wire.SubObjId);
+    Stream.GetDword(Wire.TargetObjectId);
+    Stream.GetWord(Wire.TargetSubObjId);
     // Read back as a plain dword, not through the x87 stack.
-    Stream.GetDword(Wire->DamageBits);
+    Stream.GetDword(Wire.DamageBits);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -260,22 +242,19 @@ unsigned int FPacket_FLPACKET_CLIENT_OBJCOLLISION::Decode(const unsigned char* B
 unsigned int FPacket_FLPACKET_CLIENT_REQADDITEM::Encode(unsigned char** BufferHolder,
                                                         unsigned int Capacity,
                                                         unsigned int* OutLength) {
-    const FPayloadClientReqAddItem* Wire =
-        reinterpret_cast<const FPayloadClientReqAddItem*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    Stream.PutDword(Wire->ArchId);                                        // packet+0x20
-    Stream.PutDword((unsigned int)Wire->Count);                           // packet+0x24
-    Stream.PutFloat(Wire->Health);                                        // packet+0x2c
-    Stream.PutByte(Wire->bMounted);                                       // packet+0x30
-    Stream.PutDword(Wire->HardpointSize);                                 // packet+0x28
+    Stream.PutDword(Wire.ArchId);                                         // packet+0x20
+    Stream.PutDword((unsigned int)Wire.Count);                            // packet+0x24
+    Stream.PutFloat(Wire.Health);                                         // packet+0x2c
+    Stream.PutByte(Wire.bMounted);                                        // packet+0x30
+    Stream.PutDword(Wire.HardpointSize);                                  // packet+0x28
     if (Stream.Failed()) {
         return Stream.GetError();
     }
     // A zero length skips the block.
-    if (Wire->HardpointSize != 0) {
-        if (!Stream.PutBytes(Wire->Hardpoint, Wire->HardpointSize)) {     // 06d99f02
+    if (Wire.HardpointSize != 0) {
+        if (!Stream.PutBytes(Wire.Hardpoint, Wire.HardpointSize)) {       // 06d99f02
             return Stream.GetError();
         }
     }
@@ -286,26 +265,23 @@ unsigned int FPacket_FLPACKET_CLIENT_REQADDITEM::Encode(unsigned char** BufferHo
 
 unsigned int FPacket_FLPACKET_CLIENT_REQADDITEM::Decode(const unsigned char* Buffer,
                                                         unsigned int Size, unsigned int* OutLength) {
-    FPayloadClientReqAddItem* Wire =
-        reinterpret_cast<FPayloadClientReqAddItem*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.GetDword(Wire->ArchId);
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->Count));
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->Health));
-    Stream.GetByte(Wire->bMounted);
-    Stream.GetDword(Wire->HardpointSize);
+    Stream.GetDword(Wire.ArchId);
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.Count));
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.Health));
+    Stream.GetByte(Wire.bMounted);
+    Stream.GetDword(Wire.HardpointSize);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
     // Retail allocates unconditionally, before the byte run's bounds check; the packet's
     // destructor frees it.
-    Wire->Hardpoint = static_cast<char*>(
-        ::operator new(Wire->HardpointSize, std::nothrow));               // bare
-    if (!Stream.GetBytes(Wire->Hardpoint, Wire->HardpointSize)) {         // 06d9a0d6
+    Wire.Hardpoint = static_cast<char*>(
+        ::operator new(Wire.HardpointSize, std::nothrow));                // bare
+    if (!Stream.GetBytes(Wire.Hardpoint, Wire.HardpointSize)) {           // 06d9a0d6
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
@@ -320,21 +296,18 @@ unsigned int FPacket_FLPACKET_CLIENT_REQADDITEM::Decode(const unsigned char* Buf
 unsigned int FPacket_FLPACKET_CLIENT_REQMODIFYITEM::Encode(unsigned char** BufferHolder,
                                                            unsigned int Capacity,
                                                            unsigned int* OutLength) {
-    const FPayloadClientReqModifyItem* Wire =
-        reinterpret_cast<const FPayloadClientReqModifyItem*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    Stream.PutDword(Wire->EquipId);                                       // packet+0x28
-    Stream.PutDword((unsigned int)Wire->Count);                           // packet+0x20
-    Stream.PutFloat(Wire->Health);                                        // packet+0x2c
-    Stream.PutByte(Wire->bMounted);                                       // packet+0x30
-    Stream.PutDword(Wire->HardpointSize);                                 // packet+0x24
+    Stream.PutDword(Wire.EquipId);                                        // packet+0x28
+    Stream.PutDword((unsigned int)Wire.Count);                            // packet+0x20
+    Stream.PutFloat(Wire.Health);                                         // packet+0x2c
+    Stream.PutByte(Wire.bMounted);                                        // packet+0x30
+    Stream.PutDword(Wire.HardpointSize);                                  // packet+0x24
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    if (Wire->HardpointSize != 0) {                                       // 06d9a35b
-        if (!Stream.PutBytes(Wire->Hardpoint, Wire->HardpointSize)) {     // 06d9a392
+    if (Wire.HardpointSize != 0) {                                        // 06d9a35b
+        if (!Stream.PutBytes(Wire.Hardpoint, Wire.HardpointSize)) {       // 06d9a392
             return Stream.GetError();
         }
     }
@@ -346,24 +319,21 @@ unsigned int FPacket_FLPACKET_CLIENT_REQMODIFYITEM::Encode(unsigned char** Buffe
 unsigned int FPacket_FLPACKET_CLIENT_REQMODIFYITEM::Decode(const unsigned char* Buffer,
                                                            unsigned int Size,
                                                            unsigned int* OutLength) {
-    FPayloadClientReqModifyItem* Wire =
-        reinterpret_cast<FPayloadClientReqModifyItem*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.GetDword(Wire->EquipId);
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->Count));
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->Health));
-    Stream.GetByte(Wire->bMounted);
-    Stream.GetDword(Wire->HardpointSize);
+    Stream.GetDword(Wire.EquipId);
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.Count));
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.Health));
+    Stream.GetByte(Wire.bMounted);
+    Stream.GetDword(Wire.HardpointSize);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Wire->Hardpoint = static_cast<char*>(
-        ::operator new(Wire->HardpointSize, std::nothrow));               // bare
-    if (!Stream.GetBytes(Wire->Hardpoint, Wire->HardpointSize)) {         // 06d9a566
+    Wire.Hardpoint = static_cast<char*>(
+        ::operator new(Wire.HardpointSize, std::nothrow));                // bare
+    if (!Stream.GetBytes(Wire.Hardpoint, Wire.HardpointSize)) {           // 06d9a566
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
@@ -381,17 +351,14 @@ unsigned int FPacket_FLPACKET_CLIENT_REQMODIFYITEM::Decode(const unsigned char* 
 unsigned int FPacket_FLPACKET_CLIENT_SAVEGAME::Encode(unsigned char** BufferHolder,
                                                       unsigned int Capacity,
                                                       unsigned int* OutLength) {
-    const FPayloadClientSaveGame* Wire =
-        reinterpret_cast<const FPayloadClientSaveGame*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    if (!Stream.PutDword(Wire->DescriptionCount)) {                       // 06d9a875
+    if (!Stream.PutDword(Wire.DescriptionCount)) {                        // 06d9a875
         return Stream.GetError();
     }
-    if (Wire->DescriptionCount != 0) {                                    // 06d9a88a
-        if (!Stream.PutBytes(Wire->Description,
-                             Wire->DescriptionCount * 2u)) {              // 06d9a8d3
+    if (Wire.DescriptionCount != 0) {                                     // 06d9a88a
+        if (!Stream.PutBytes(Wire.Description,
+                             Wire.DescriptionCount * 2u)) {               // 06d9a8d3
             return Stream.GetError();
         }
     }
@@ -402,21 +369,18 @@ unsigned int FPacket_FLPACKET_CLIENT_SAVEGAME::Encode(unsigned char** BufferHold
 
 unsigned int FPacket_FLPACKET_CLIENT_SAVEGAME::Decode(const unsigned char* Buffer,
                                                       unsigned int Size, unsigned int* OutLength) {
-    FPayloadClientSaveGame* Wire =
-        reinterpret_cast<FPayloadClientSaveGame*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    if (!Stream.GetDword(Wire->DescriptionCount)) {                       // 06d9a9c1
+    if (!Stream.GetDword(Wire.DescriptionCount)) {                        // 06d9a9c1
         return Stream.GetError();
     }
-    if (Wire->DescriptionCount != 0) {                                    // 06d9a9c7
-        Wire->Description = static_cast<wchar_t*>(
-            ::operator new(Wire->DescriptionCount * 2u, std::nothrow));   // bare
-        if (!Stream.GetBytes(Wire->Description,
-                             Wire->DescriptionCount * 2u)) {              // 06d9aa1f
+    if (Wire.DescriptionCount != 0) {                                     // 06d9a9c7
+        Wire.Description = static_cast<wchar_t*>(
+            ::operator new(Wire.DescriptionCount * 2u, std::nothrow));    // bare
+        if (!Stream.GetBytes(Wire.Description,
+                             Wire.DescriptionCount * 2u)) {               // 06d9aa1f
             return Stream.GetError();
         }
     }
@@ -432,20 +396,17 @@ unsigned int FPacket_FLPACKET_CLIENT_SAVEGAME::Decode(const unsigned char* Buffe
 unsigned int FPacket_FLPACKET_CLIENT_MINEASTEROID::Encode(unsigned char** BufferHolder,
                                                           unsigned int Capacity,
                                                           unsigned int* OutLength) {
-    const FPayloadClientMineAsteroid* Wire =
-        reinterpret_cast<const FPayloadClientMineAsteroid*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    Stream.PutDword(Wire->SystemId);
+    Stream.PutDword(Wire.SystemId);
     // FUN_06d8f510 copies a stack temp out in index order (the temp's load order is the
     // compiler's, not the wire order).
-    Stream.PutFloat(Wire->PositionX);
-    Stream.PutFloat(Wire->PositionY);
-    Stream.PutFloat(Wire->PositionZ);
-    Stream.PutDword(Wire->LootId);
-    Stream.PutDword(Wire->SecondaryLoot);
-    Stream.PutDword(Wire->Quantity);
+    Stream.PutFloat(Wire.PositionX);
+    Stream.PutFloat(Wire.PositionY);
+    Stream.PutFloat(Wire.PositionZ);
+    Stream.PutDword(Wire.LootId);
+    Stream.PutDword(Wire.SecondaryLoot);
+    Stream.PutDword(Wire.Quantity);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -457,21 +418,18 @@ unsigned int FPacket_FLPACKET_CLIENT_MINEASTEROID::Encode(unsigned char** Buffer
 unsigned int FPacket_FLPACKET_CLIENT_MINEASTEROID::Decode(const unsigned char* Buffer,
                                                           unsigned int Size,
                                                           unsigned int* OutLength) {
-    FPayloadClientMineAsteroid* Wire =
-        reinterpret_cast<FPayloadClientMineAsteroid*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.GetDword(Wire->SystemId);
+    Stream.GetDword(Wire.SystemId);
     // FUN_06d8f510 into packet+0x24.
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->PositionX));
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->PositionY));
-    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire->PositionZ));
-    Stream.GetDword(Wire->LootId);
-    Stream.GetDword(Wire->SecondaryLoot);
-    Stream.GetDword(Wire->Quantity);
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.PositionX));
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.PositionY));
+    Stream.GetDword(*reinterpret_cast<unsigned int*>(&Wire.PositionZ));
+    Stream.GetDword(Wire.LootId);
+    Stream.GetDword(Wire.SecondaryLoot);
+    Stream.GetDword(Wire.Quantity);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -487,16 +445,13 @@ unsigned int FPacket_FLPACKET_CLIENT_MINEASTEROID::Decode(const unsigned char* B
 unsigned int FPacket_FLPACKET_CLIENT_REQUEST_EVENT::Encode(unsigned char** BufferHolder,
                                                            unsigned int Capacity,
                                                            unsigned int* OutLength) {
-    const FPayloadClientRequestEvent* Wire =
-        reinterpret_cast<const FPayloadClientRequestEvent*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    Stream.PutByte(Wire->EventType);
-    Stream.PutDword(Wire->ShipId);
-    Stream.PutDword(Wire->TargetId);
-    Stream.PutDword(Wire->SecondId);
-    Stream.PutByte(Wire->bFlag);
+    Stream.PutByte(Wire.EventType);
+    Stream.PutDword(Wire.ShipId);
+    Stream.PutDword(Wire.TargetId);
+    Stream.PutDword(Wire.SecondId);
+    Stream.PutByte(Wire.bFlag);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -508,18 +463,15 @@ unsigned int FPacket_FLPACKET_CLIENT_REQUEST_EVENT::Encode(unsigned char** Buffe
 unsigned int FPacket_FLPACKET_CLIENT_REQUEST_EVENT::Decode(const unsigned char* Buffer,
                                                            unsigned int Size,
                                                            unsigned int* OutLength) {
-    FPayloadClientRequestEvent* Wire =
-        reinterpret_cast<FPayloadClientRequestEvent*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
-    Stream.GetByte(Wire->EventType);
-    Stream.GetDword(Wire->ShipId);
-    Stream.GetDword(Wire->TargetId);
-    Stream.GetDword(Wire->SecondId);
-    Stream.GetByte(Wire->bFlag);
+    Stream.GetByte(Wire.EventType);
+    Stream.GetDword(Wire.ShipId);
+    Stream.GetDword(Wire.TargetId);
+    Stream.GetDword(Wire.SecondId);
+    Stream.GetByte(Wire.bFlag);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -540,18 +492,15 @@ unsigned int FPacket_FLPACKET_CLIENT_REQUEST_EVENT::Decode(const unsigned char* 
 unsigned int FPacket_FLPACKET_CLIENT_CREATENEWCHAR::Encode(unsigned char** BufferHolder,
                                                            unsigned int Capacity,
                                                            unsigned int* OutLength) {
-    const FPayloadClientCreateNewChar* Wire =
-        reinterpret_cast<const FPayloadClientCreateNewChar*>(Payload());
-
     FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
-    if (!Stream.PutWideString(Wire->Name)) {                              // 06daf465 FUN_06da14f0
+    if (!Stream.PutWideString(Wire.Name)) {                               // 06daf465 FUN_06da14f0
         return FRpcMarshalStream::kEncodeOverflow;
     }
-    Stream.PutDword(Wire->FactionId);
-    Stream.PutDword(Wire->BaseId);
-    Stream.PutDword(Wire->PackageId);
-    Stream.PutDword(Wire->PilotId);
+    Stream.PutDword(Wire.FactionId);
+    Stream.PutDword(Wire.BaseId);
+    Stream.PutDword(Wire.PackageId);
+    Stream.PutDword(Wire.PilotId);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -563,9 +512,6 @@ unsigned int FPacket_FLPACKET_CLIENT_CREATENEWCHAR::Encode(unsigned char** Buffe
 unsigned int FPacket_FLPACKET_CLIENT_CREATENEWCHAR::Decode(const unsigned char* Buffer,
                                                            unsigned int Size,
                                                            unsigned int* OutLength) {
-    FPayloadClientCreateNewChar* Wire =
-        reinterpret_cast<FPayloadClientCreateNewChar*>(Payload());
-
     FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
@@ -580,13 +526,13 @@ unsigned int FPacket_FLPACKET_CLIENT_CREATENEWCHAR::Decode(const unsigned char* 
         // Retail quirk: unbounded wcscpy. The wire length is a word, so a name longer than
         // the 0x40-wchar_t field runs over the four dwords (which the reads below then
         // overwrite) and on past the end of the packet.
-        wcscpy(Wire->Name, Name);
+        wcscpy(Wire.Name, Name);
         ::operator delete(Name);
     }
-    Stream.GetDword(Wire->FactionId);
-    Stream.GetDword(Wire->BaseId);
-    Stream.GetDword(Wire->PackageId);
-    Stream.GetDword(Wire->PilotId);
+    Stream.GetDword(Wire.FactionId);
+    Stream.GetDword(Wire.BaseId);
+    Stream.GetDword(Wire.PackageId);
+    Stream.GetDword(Wire.PilotId);
     if (Stream.Failed()) {
         return Stream.GetError();
     }

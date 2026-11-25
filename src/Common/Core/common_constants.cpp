@@ -119,7 +119,7 @@ namespace
     // ThrusterEquipConsts 0xb8, PhySysConsts 0xe8, CommConsts 0xfa) and the raw line text.
     void DumpUnknownConstant(INI_Reader& Reader, int Line)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: Unknown Constant definition: %s",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Unknown Constant definition: %s",
               kConstantsSource, Line, Reader.get_line_ptr());
     }
 }

@@ -268,7 +268,7 @@ namespace
     CSimple* NarrowSimple(FClientGameobj* Go)
     {
         CObject* const Obj = Go->Object;
-        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 3u) != 3u)
+        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSimple) != CObject::ClassSimple)
             return nullptr;
         return static_cast<CSimple*>(Obj);
     }
@@ -276,7 +276,7 @@ namespace
     CShip* NarrowShip(FClientGameobj* Go)
     {
         CObject* const Obj = Go->Object;
-        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) != 0x503u)
+        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
             return nullptr;
         return static_cast<CShip*>(Obj);
     }
@@ -365,8 +365,8 @@ void ClientObjDb_RegisterGameobj(FClientGameobj* Go, bool bRemotePhysics)
     // FUN_00540c30
     CSimple* const Simple = NarrowSimple(Go);
 
-    int const Kind = Go->ManagerKind;
-    if (Kind == 2)
+    EClientGameobjKind const Kind = Go->ManagerKind;
+    if (Kind == EClientGameobjKind::Solar)
     {
         // get_type's result is not tested.
         if (Go->cobject()->Radius > kLargeSolarRadiusThreshold)
@@ -382,7 +382,7 @@ void ClientObjDb_RegisterGameobj(FClientGameobj* Go, bool bRemotePhysics)
         // Nothing is created here: during a system load the partition was freed by
         // FUN_00540e90 and FUN_00540eb0 bulk-adds every solar afterwards. Simple is not
         // null-tested.
-        if (G_ClientObjDb.Spatial != nullptr && (Simple->TypeBits & 0xfdffu) != 0u)
+        if (G_ClientObjDb.Spatial != nullptr && (Simple->TypeBits & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0u)
         {
             FSpatialEntry Entry;
             Entry.Object = static_cast<IObjRW*>(Go);
@@ -393,7 +393,7 @@ void ClientObjDb_RegisterGameobj(FClientGameobj* Go, bool bRemotePhysics)
     }
     else
     {
-        FGameobjList* const List = KindList(Kind);
+        FGameobjList* const List = KindList(static_cast<int>(Kind));
         if (List != nullptr)
             LinkGameobj(List, Go);
     }
@@ -424,8 +424,8 @@ void ClientObjDb_Unregister(FClientGameobj* Go)
         }
     }
 
-    int const Kind = Go->ManagerKind;
-    if (Kind == 2)
+    EClientGameobjKind const Kind = Go->ManagerKind;
+    if (Kind == EClientGameobjKind::Solar)
     {
         UnlinkGameobj(&G_ClientObjDb.Lists[2], Go);
         std::vector<FClientGameobj*>::iterator Large = G_LargeSolars.begin();
@@ -447,7 +447,7 @@ void ClientObjDb_Unregister(FClientGameobj* Go)
         return;
     }
 
-    FGameobjList* const List = KindList(Kind);
+    FGameobjList* const List = KindList(static_cast<int>(Kind));
     if (List != nullptr)
         UnlinkGameobj(List, Go);
 }
@@ -662,7 +662,7 @@ void ClientObjDb_MoveBeams(float Dt)
     {
         CObject* const Obj = Go->Object;
         CBeam* Beam = nullptr;
-        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x67u) == 0x67u)
+        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassBeam) == CObject::ClassBeam)
             Beam = static_cast<CBeam*>(Obj);
         Beam->move(Dt);
     }
@@ -697,7 +697,7 @@ namespace
             return;
         // A non-CEqObj was hit on its root.
         CObject* const Obj = Go->Object;
-        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x103u) != 0x103u)
+        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         {
             *OutSubObjId = SUBOBJ_ID_ROOT;
             return;
@@ -725,7 +725,7 @@ namespace
         if (SubObjectID::IsShieldEquipID(SubObjId))
             return;
         // A functioning shield takes the hit.
-        CEShield* const Shield = CEShield::cast(Eq->EquipManager.FindFirst(0x100u));
+        CEShield* const Shield = CEShield::cast(Eq->EquipManager.FindFirst(EquipTypeShield));
         if (Shield == nullptr)
             return;
         if (!Shield->IsFunctioning())
@@ -751,7 +751,7 @@ void ClientObjDb_ProcessCollisions()
     {
         CObject* const Obj = Go->Object;
         CBeam* Beam = nullptr;
-        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x67u) == 0x67u)
+        if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassBeam) == CObject::ClassBeam)
             Beam = static_cast<CBeam*>(Obj);
         if (!(Beam->Lifetime >= 0.0f))
             continue;
@@ -879,7 +879,7 @@ namespace
         {
             CObject const* const Obj = Go->cobject();
             CEqObj const* EqObj = nullptr;
-            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x103u) == 0x103u)
+            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
                 EqObj = static_cast<CEqObj const*>(Obj);
             if (EqObj->VibeId == VibeId)
                 return Go;

@@ -206,13 +206,13 @@ struct FThornEventDesc
     int StartMs;        // +0x04
     int Flags;          // +0x08 bit 1 "loop" for START_MOTION
     int EventFlags;     // +0x0c
-    int Field10;        // +0x10 TODO: meaning not recovered
+    int Field10;        // +0x10 copied by FUN_06f438c0; no loader key for it identified
     int UniqueId;       // +0x14
     int DurationMs;     // +0x18
     int PrimaryIndex;   // +0x1c the entity the event drives
     int SecondaryIndex; // +0x20
     IParamCurve* ParamCurve; // +0x24 curve, or null
-    int ParamCurvePeriod;        // +0x28 TODO: meaning not recovered
+    int ParamCurvePeriod;        // +0x28 the pcurve_period key (thorn.dll loader, string 06f5eadc), ftol'd
 };
 
 static_assert(sizeof(void*) != 4 || sizeof(FThornEventDesc) == 0x2c,
@@ -315,12 +315,12 @@ struct FThornMotionEventDesc
     float TimeScale;              // +0x34 "time_scale"
     float Weight;                 // +0x38 "weight"
     char const* Animation;        // +0x3c "animation" (the script name CharacterInfo knows)
-    unsigned char Field40;        // +0x40 TODO: meaning not recovered (FUN_06f43af0 copies it)
+    unsigned char Field40;        // +0x40 FUN_06f43af0 copies it; the Lua loader sets no key here
     unsigned char Pad41[3];
     float Heading;                // +0x44 "heading"
     char const* LockedBone;       // +0x48 "locked_bone"
     float TransScale;             // +0x4c "trans_scale"
-    int Field50;                  // +0x50 TODO: meaning not recovered (FUN_06f43af0 copies it)
+    int Field50;                  // +0x50 FUN_06f43af0 copies it; the Lua loader sets no key here
 };
 
 static_assert(sizeof(void*) != 4 || sizeof(FThornMotionEventDesc) == 0x54,

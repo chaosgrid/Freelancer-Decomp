@@ -297,12 +297,12 @@ bool ListBox::MouseEvent(FWin3DMouseEvent const* Event)
     unsigned const TextArg = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Text));
     if (Event->Action == kWin3DMousePress)
     {
-        Parent->ProcessMessage(0xf001, TextArg, static_cast<unsigned>(SelectedIndex));
+        Parent->ProcessMessage(kWinMsgPress, TextArg, static_cast<unsigned>(SelectedIndex));
         return true;
     }
     if (Event->Action == kWin3DMouseDoubleClick)
     {
-        Parent->ProcessMessage(0xf002, TextArg, static_cast<unsigned>(SelectedIndex));
+        Parent->ProcessMessage(kWinMsgDoubleClick, TextArg, static_cast<unsigned>(SelectedIndex));
         return true;
     }
     return false;

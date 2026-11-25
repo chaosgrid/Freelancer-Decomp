@@ -121,7 +121,7 @@ int __cdecl PetalInterfaceDatabase::get_category(char const* Name)
     if (std::strcmp(Name, "Prop") == 0)
         return PetalCategoryProp;
 
-    FDUMP(0x100002, "%s(%d) : *** WARNING: Unknown Petal category name %s\n", kPetalSource, 0xbb,
+    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Unknown Petal category name %s\n", kPetalSource, 0xbb,
           Name);
     return -1;
 }
@@ -165,7 +165,7 @@ void PetalInterfaceDatabase::load_from_ini(char const* RelPath)
     INI_Reader Reader;
     if (!Reader.open(FullPath, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot open petal database file %s\n", kPetalSource,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot open petal database file %s\n", kPetalSource,
               0x86, FullPath);
         return;
     }
@@ -183,13 +183,13 @@ void PetalInterfaceDatabase::load_from_ini(char const* RelPath)
             int Category = ObjectTableCategory(ValueName);
             if (Category < 0)
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid category '%s' in petal database file %s\n",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid category '%s' in petal database file %s\n",
                       kPetalSource, 0x59, ValueName, FullPath);
             }
 
             if (Reader.is_value_empty(0) || Reader.is_value_empty(1))
             {
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: Invalid PetalDB entry %s in .ini file %s, cannot find nickname and mesh\n",
                       kPetalSource, 0x61, Reader.get_value_string(), FullPath);
             }
@@ -249,7 +249,7 @@ void __cdecl WeaponModDB_load(char const* Path)
     INI_Reader Reader;
     if (!Reader.open(Path, false))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Failed to open WeaponMod file %s.", kWeaponModSource,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Failed to open WeaponMod file %s.", kWeaponModSource,
               0x48, Path);
         return;
     }

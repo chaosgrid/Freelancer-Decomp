@@ -42,7 +42,7 @@ namespace
 void NeuroNetNavMap::BuildJumpLinks()
 {
     // FUN_004975a0.
-    if (ViewMode != 0)
+    if (ViewMode != kNavMapViewUniverse)
         return;
 
     // FUN_004a2f80 erases every node; the records are NOT freed (retail
@@ -236,10 +236,10 @@ void NeuroNetNavMap::RefreshMissionInfo()
     if (Path == nullptr)
     {
         // No route -- no abort button, a blank title and text.
-        AbortMissionButton->SetProperty(1, 1, 0);
-        AbortMissionText->SetProperty(1, 1, 0);
+        AbortMissionButton->SetProperty(kWinPropHide, 1, 0);
+        AbortMissionText->SetProperty(kWinPropHide, 1, 0);
         wcscpy(G_NnTextScratchB, L" ");
-        InfoTitle->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        InfoTitle->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
         InfoText->Flags = static_cast<unsigned char>(InfoText->Flags & 0xfd);
 
         RenderDisplayList Text;
@@ -257,7 +257,7 @@ void NeuroNetNavMap::RefreshMissionInfo()
 
     // The route's title and text (node +0x20 / +0x38).
     FmtStrSprintf(&Path->Title, G_NnTextScratchB, G_NnTextScratchCapacity);
-    InfoTitle->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+    InfoTitle->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     FmtStrSprintf(&Path->Text, G_NnTextScratchB, G_NnTextScratchCapacity);
     InfoText->Flags = static_cast<unsigned char>(InfoText->Flags | 2);
 
@@ -279,22 +279,22 @@ void NeuroNetNavMap::RefreshMissionInfo()
     FBestPath const* const First = BestPathGetFirst(); // FUN_004c5040
     if (First != nullptr && First->MissionType != 7 && First->MissionType != 8)
         bHideAbort = 0;
-    AbortMissionButton->SetProperty(1, bHideAbort, 0);
-    AbortMissionText->SetProperty(1, bHideAbort, 0);
+    AbortMissionButton->SetProperty(kWinPropHide, bHideAbort, 0);
+    AbortMissionText->SetProperty(kWinPropHide, bHideAbort, 0);
 }
 
 void NeuroNetNavMap::HideObjectTools()
 {
     // FUN_0049f0e0.
-    InZoomButton->SetProperty(1, 1, 0);
-    OutZoomButton->SetProperty(1, 1, 0);
-    InfoButton->SetProperty(1, 1, 0);
-    SetWaypointButton->SetProperty(1, 1, 0);
-    BestPathButton->SetProperty(1, 1, 0);
-    JumpGateButton->SetProperty(1, 1, 0);
-    SelectObjectButton->SetProperty(1, 1, 0);
-    ClearWaypointButton->SetProperty(1, 1, 0);
-    OptionBridge->SetProperty(1, 1, 0);
+    InZoomButton->SetProperty(kWinPropHide, 1, 0);
+    OutZoomButton->SetProperty(kWinPropHide, 1, 0);
+    InfoButton->SetProperty(kWinPropHide, 1, 0);
+    SetWaypointButton->SetProperty(kWinPropHide, 1, 0);
+    BestPathButton->SetProperty(kWinPropHide, 1, 0);
+    JumpGateButton->SetProperty(kWinPropHide, 1, 0);
+    SelectObjectButton->SetProperty(kWinPropHide, 1, 0);
+    ClearWaypointButton->SetProperty(kWinPropHide, 1, 0);
+    OptionBridge->SetProperty(kWinPropHide, 1, 0);
     bObjectToolsShown = 0;
 }
 
@@ -312,11 +312,11 @@ void NeuroNetNavMap::RefreshObjectives()
         int FirstScroll = Count - 3;
         if (FirstScroll < 0)
             FirstScroll = 0;
-        ObjectiveScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Count - 1));
+        ObjectiveScroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Count - 1));
         if (FirstScroll == 0)
-            ObjectiveScroll->SetProperty(2, 1, 0);
+            ObjectiveScroll->SetProperty(kWinPropDisable, 1, 0);
         else
-            ObjectiveScroll->SetProperty(2, 0, 0);
+            ObjectiveScroll->SetProperty(kWinPropDisable, 0, 0);
         if (ObjectiveFirstRow >= Count)
             ObjectiveFirstRow = 0;
 
@@ -351,13 +351,13 @@ void NeuroNetNavMap::RefreshObjectives()
             }
 
             // The row's text in the idle colour, both shown.
-            ObjectiveText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB),
+            ObjectiveText[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB),
                                             0);
-            ObjectiveText[Row]->SetProperty(0x33,
+            ObjectiveText[Row]->SetProperty(kWinPropColour,
                                             reinterpret_cast<uintptr_t>(&G_NnPaletteCyan),
                                             1);
-            ObjectiveText[Row]->SetProperty(1, 0, 0);
-            MissionObjective[Row]->SetProperty(1, 0, 0);
+            ObjectiveText[Row]->SetProperty(kWinPropHide, 0, 0);
+            MissionObjective[Row]->SetProperty(kWinPropHide, 0, 0);
             ++Row;
             if (Row >= 3)
                 return;
@@ -366,8 +366,8 @@ void NeuroNetNavMap::RefreshObjectives()
         // The rows left, hidden.
         for (; Row < 3; ++Row)
         {
-            ObjectiveText[Row]->SetProperty(1, 1, 0);
-            MissionObjective[Row]->SetProperty(1, 1, 0);
+            ObjectiveText[Row]->SetProperty(kWinPropHide, 1, 0);
+            MissionObjective[Row]->SetProperty(kWinPropHide, 1, 0);
         }
         return;
     }
@@ -407,27 +407,27 @@ void NeuroNetNavMap::RefreshObjectives()
         }
         FmtStrSprintf(&Waypoint->Marker, G_NnTextScratchA, G_NnTextScratchCapacity);
         wcscat(G_NnTextScratchB, G_NnTextScratchA);
-        ObjectiveText[Row]->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
-        ObjectiveText[Row]->SetProperty(1, 0, 0);
-        MissionObjective[Row]->SetProperty(1, 0, 0);
+        ObjectiveText[Row]->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        ObjectiveText[Row]->SetProperty(kWinPropHide, 0, 0);
+        MissionObjective[Row]->SetProperty(kWinPropHide, 0, 0);
         ++Row;
     }
 
     for (; Row < 3; ++Row)
     {
-        ObjectiveText[Row]->SetProperty(1, 1, 0);
-        MissionObjective[Row]->SetProperty(1, 1, 0);
+        ObjectiveText[Row]->SetProperty(kWinPropHide, 1, 0);
+        MissionObjective[Row]->SetProperty(kWinPropHide, 1, 0);
     }
 
     // The scroll range over the listed records.
     int FirstScroll = Listed - 3;
     if (FirstScroll < 0)
         FirstScroll = 0;
-    ObjectiveScroll->SetProperty(0x37, 0, static_cast<uintptr_t>(Listed - 1));
+    ObjectiveScroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Listed - 1));
     if (FirstScroll == 0)
-        ObjectiveScroll->SetProperty(2, 1, 0);
+        ObjectiveScroll->SetProperty(kWinPropDisable, 1, 0);
     else
-        ObjectiveScroll->SetProperty(2, 0, 0);
+        ObjectiveScroll->SetProperty(kWinPropDisable, 0, 0);
     if (ObjectiveFirstRow >= Listed)
         ObjectiveFirstRow = 0;
 }
@@ -439,11 +439,11 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
     uintptr_t const bBaseList = Mode == 7 ? 1 : 0;
     for (int Index = 0; Index < 15; ++Index)
     {
-        BaseTexts[Index]->SetProperty(0x24, bBaseList, 0);
-        BaseSystemTexts[Index]->SetProperty(0x24, bBaseList, 0);
+        BaseTexts[Index]->SetProperty(kTextPropClickable, bBaseList, 0);
+        BaseSystemTexts[Index]->SetProperty(kTextPropClickable, bBaseList, 0);
     }
-    BaseTitleText->SetProperty(0x24, bBaseList, 0);
-    SystemTitleText->SetProperty(0x24, bBaseList, 0);
+    BaseTitleText->SetProperty(kTextPropClickable, bBaseList, 0);
+    SystemTitleText->SetProperty(kTextPropClickable, bBaseList, 0);
 
     // Leaving an info-card mode (6 / 7) closes the card and brings back
     // what it covered.
@@ -452,10 +452,10 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
         InfoCard->Flags = static_cast<unsigned char>(InfoCard->Flags & 0xfc);
         CloseInfocardButton->Flags = static_cast<unsigned char>(CloseInfocardButton->Flags & 0xfc);
         CloseInfocardText->Flags = static_cast<unsigned char>(CloseInfocardText->Flags & 0xfc);
-        if (ViewMode == 0)
+        if (ViewMode == kNavMapViewUniverse)
         {
             for (int Index = 0; Index < 4; ++Index)
-                FactionLabels[Index]->SetProperty(1, 0, 0);
+                FactionLabels[Index]->SetProperty(kWinPropHide, 0, 0);
         }
         else
         {
@@ -484,15 +484,15 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
     // The zone filters only in the political / patrol modes.
     if (G_NavMapFilterMode == 1 || G_NavMapFilterMode == 2)
     {
-        AllFilter->SetProperty(1, 0, 0);
-        HostileFilter->SetProperty(1, 0, 0);
-        FriendlyFilter->SetProperty(1, 0, 0);
+        AllFilter->SetProperty(kWinPropHide, 0, 0);
+        HostileFilter->SetProperty(kWinPropHide, 0, 0);
+        FriendlyFilter->SetProperty(kWinPropHide, 0, 0);
     }
     else
     {
-        AllFilter->SetProperty(1, 1, 0);
-        HostileFilter->SetProperty(1, 1, 0);
-        FriendlyFilter->SetProperty(1, 1, 0);
+        AllFilter->SetProperty(kWinPropHide, 1, 0);
+        HostileFilter->SetProperty(kWinPropHide, 1, 0);
+        FriendlyFilter->SetProperty(kWinPropHide, 1, 0);
     }
 
     // Mode 6 (the info card) hides the filter row.
@@ -509,7 +509,7 @@ void NeuroNetNavMap::SetFilterMode(int Mode)
     }
 
     // The title (the mode indexes DAT_00611c84 unchecked, as in retail).
-    FilterTitle->SetProperty(0x1e, kNavMapFilterTitleIds[G_NavMapFilterMode], 0);
+    FilterTitle->SetProperty(kTextPropSetIds, kNavMapFilterTitleIds[G_NavMapFilterMode], 0);
 }
 
 void NeuroNetNavMap::RefreshMissionZones()
@@ -534,10 +534,10 @@ void NeuroNetNavMap::RefreshMissionZones()
 
     // In the system view (and with no transition running) the mission
     // filter shows only with zones; the mission mode falls back to physical without them.
-    if (ViewMode != 0 && bTransition == 0)
+    if (ViewMode != kNavMapViewUniverse && bTransition == 0)
     {
         unsigned char const bNoZones = MissionZoneIds.empty() ? 1 : 0;
-        MissionFilter->SetProperty(1, bNoZones, 0);
+        MissionFilter->SetProperty(kWinPropHide, bNoZones, 0);
         if (bNoZones != 0 && G_NavMapFilterMode == 3)
             SetFilterMode(0);
     }

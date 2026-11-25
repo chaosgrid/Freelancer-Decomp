@@ -106,7 +106,7 @@ namespace
         int const CountBefore = static_cast<int>(G_NnVoiceQueue.size());
         if (CountBefore >= kNnVoiceQueueCapacity)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                   "E:\\FL\\Scratch\\Source\\Client\\nn\\NN_Messaging.cpp", 0xa2,
                   "NN Message inbox overflow!");
             return;

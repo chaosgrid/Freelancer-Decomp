@@ -63,7 +63,7 @@ void __cdecl pub::StateGraph::LoadFromFile(char const* Path)
     FILE* File = fopen(Path, "r");
     if (File == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kStateGraphSource, 0x7d,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kStateGraphSource, 0x7d,
               "pub::StateGraph: unable to load state graph definitions");
         return;
     }
@@ -75,7 +75,7 @@ void __cdecl pub::StateGraph::LoadFromFile(char const* Path)
     if (BehaviorCount != kStateGraphBehaviors)
     {
         // Retail leaks the FILE here, and so does the port.
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kStateGraphSource, 0x8d,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kStateGraphSource, 0x8d,
               "pub::StateGraph: state graph definitions don't sync with current behavior list, need to re-save state_graph.ini");
         return;
     }

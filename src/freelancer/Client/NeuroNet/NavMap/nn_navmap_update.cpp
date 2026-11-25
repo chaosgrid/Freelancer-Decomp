@@ -187,13 +187,13 @@ namespace
         }
         if (bHidden)
         {
-            Text->SetProperty(0x1e, 0x62a, 0);
+            Text->SetProperty(kTextPropSetIds, 0x62a, 0);
             return;
         }
         GetIdsStringWWithRawFallback(static_cast<unsigned>(System->GetStridName()), G_NnTextScratchB,
                                      G_NnTextScratchCapacity);
         CharUpperW(G_NnTextScratchB); // FUN_005b74d9
-        Text->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
+        Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_NnTextScratchB), 0);
     }
 }
 
@@ -306,7 +306,7 @@ float* NeuroNetNavMap::CachedBasePosition(float* Out, unsigned BaseId,
 void NeuroNetNavMap::PlayerMapPosition(float* OutPos, float* OutHeading)
 {
     // FUN_00491be0.
-    if (ViewMode == 0)
+    if (ViewMode == kNavMapViewUniverse)
     {
         // The universe view -- the player's system's map position, not
         // scaled by SystemScale.
@@ -704,7 +704,7 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
     if (!(Dx < static_cast<double>(ScreenRectSize[0])) || !(Dy < ScreenRectSize[1]))
         return false;
 
-    if (ViewMode == 1 || ViewMode == 0)
+    if (ViewMode == kNavMapViewSystem || ViewMode == kNavMapViewUniverse)
     {
         // The camera ray to the map plane, then the map-frame fractions to
         // map units.
@@ -721,7 +721,7 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
                                           static_cast<double>(MapExtentZ));
         return true;
     }
-    if (ViewMode != 2)
+    if (ViewMode != kNavMapViewSystemZoomed)
         return false;
 
     // Zoomed in -- the ray's point as fractions of the zoomed frame, less
@@ -1114,8 +1114,8 @@ bool NeuroNetNavMap::RefreshWaypointItems()
         LastWaypointCount = GetPlayerWaypointCountRetail();
         unsigned const bHide =
             (GetPlayerWaypointCountRetail() == 0 || bBestPathObjectives != 0) ? 1u : 0u;
-        ClearAllWaypointsButton->SetProperty(1, bHide, 0);
-        ClearAllWaypointsText->SetProperty(1, bHide, 0);
+        ClearAllWaypointsButton->SetProperty(kWinPropHide, bHide, 0);
+        ClearAllWaypointsText->SetProperty(kWinPropHide, bHide, 0);
         RefreshObjectives();
         BuildJumpLinks(); // FUN_004975a0
     }
@@ -1322,17 +1322,17 @@ namespace
     {
         unsigned long Colour = G_NnPaletteCyan;
         reinterpret_cast<unsigned char*>(&Colour)[3] = Alpha;
-        Map->SystemNameText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), bFlag);
+        Map->SystemNameText->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), bFlag);
         for (int Index = 0; Index < 4; ++Index)
-            Map->FactionLabels[Index]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour),
+            Map->FactionLabels[Index]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour),
                                                    bFlag);
         unsigned long GridColour = G_NnPaletteCyan;
         reinterpret_cast<unsigned char*>(&GridColour)[3] = Alpha;
         for (int Index = 0; Index < 8; ++Index)
-            Map->GridLetters[Index]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&GridColour),
+            Map->GridLetters[Index]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&GridColour),
                                                  bFlag);
         for (int Index = 0; Index < 8; ++Index)
-            Map->GridNumbers[Index]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&GridColour),
+            Map->GridNumbers[Index]->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&GridColour),
                                                  bFlag);
     }
 
@@ -1364,12 +1364,12 @@ void NeuroNetNavMap::Update()
     // bit.
     unsigned const ShownSystem = CurrentSystem->GetId();
     unsigned char bShipButton = 1;
-    if (ShownSystem == GetPlayerStarSystemIdRetail() && ViewMode != 0)
+    if (ShownSystem == GetPlayerStarSystemIdRetail() && ViewMode != kNavMapViewUniverse)
         bShipButton = 0;
     if (bTransition != 0)
         bShipButton = 0;
     if (bShipButton != static_cast<unsigned char>((ShipButton->Flags >> 1) & 1))
-        ShipButton->SetProperty(1, bShipButton == 0 ? 1u : 0u, 0);
+        ShipButton->SetProperty(kWinPropHide, bShipButton == 0 ? 1u : 0u, 0);
 
     // The object tools close once the cursor moved away from where they opened (squared
     // distance strictly over 0.005; unordered does not close).
@@ -1457,12 +1457,12 @@ void NeuroNetNavMap::Update()
     if (bTransition == 0 && PendingSystem != nullptr)
     {
         Universe::ISystem const* const Pending = PendingSystem;
-        if (Pending == CurrentSystem && (ViewMode == 2 || ViewMode == 1))
+        if (Pending == CurrentSystem && (ViewMode == kNavMapViewSystemZoomed || ViewMode == kNavMapViewSystem))
         {
             // It is open -- done.
             PendingSystem = nullptr;
         }
-        else if (ViewMode != 1 && ViewMode != 2)
+        else if (ViewMode != kNavMapViewSystem && ViewMode != kNavMapViewSystemZoomed)
         {
             // The universe view zooms into its star first (sound 8); no
             // star, no switch.
@@ -1474,7 +1474,7 @@ void NeuroNetNavMap::Update()
                 CurrentSystem = Item->System;
                 bViewSwitch = 1;
                 bTransition = 1;
-                TransitionView = 1;
+                TransitionView = kNavMapViewSystem;
                 TransitionTime = 0.0f;
                 TransitionDuration = kNavMapSwitchSeconds;
                 PlayOrRewindUiSoundSlot(8); // FUN_005645c0(8)
@@ -1531,7 +1531,7 @@ void NeuroNetNavMap::Update()
                 }
                 // The record's dtor: ~FToolTipHoverInfo.
             }
-            else if (ViewMode != 0)
+            else if (ViewMode != kNavMapViewUniverse)
             {
                 int Rep = GroupMemberAt(MapPos); // FUN_004a21f0
                 if (Rep != -1)
@@ -1693,7 +1693,7 @@ void NeuroNetNavMap::Update()
 
     // The system view follows the player (marker position / heading) and
     // the waypoints; the universe view pulses its stars.
-    if (ViewMode != 0)
+    if (ViewMode != kNavMapViewUniverse)
     {
         if (PlayerItem != nullptr)
         {
@@ -1749,10 +1749,10 @@ void NeuroNetNavMap::Update()
             int const View = TransitionView;
             TransitionTime = TransitionDuration;
             bTransition = 0;
-            if (View == 0)
+            if (View == kNavMapViewUniverse)
             {
                 bViewSwitch = 0;
-                if (ViewMode == 0)
+                if (ViewMode == kNavMapViewUniverse)
                 {
                     // Back on the universe -- the texts opaque again.
                     NavMapTintTexts(this, NavMapPaletteAlpha(), 0);
@@ -1764,15 +1764,15 @@ void NeuroNetNavMap::Update()
                 EnterUniverseView(); // FUN_0049e550
                 bViewSwitch = 1;
                 bTransition = 1;
-                TransitionView = 0;
+                TransitionView = kNavMapViewUniverse;
                 TransitionTime = 0.0f;
                 TransitionDuration = kNavMapSwitchSeconds;
                 return;
             }
-            if (View == 1 && ViewMode != 2)
+            if (View == kNavMapViewSystem && ViewMode != kNavMapViewSystemZoomed)
             {
                 bViewSwitch = 0;
-                if (ViewMode == 1)
+                if (ViewMode == kNavMapViewSystem)
                 {
                     NavMapTintTexts(this, NavMapPaletteAlpha(), 0);
                     RefreshMissionInfo();
@@ -1783,7 +1783,7 @@ void NeuroNetNavMap::Update()
                 NavMapShowSystemName(SystemNameText, CurrentSystem, SkipSystemIds);
                 bViewSwitch = 1;
                 bTransition = 1;
-                TransitionView = 1;
+                TransitionView = kNavMapViewSystem;
                 TransitionTime = 0.0f;
                 TransitionDuration = kNavMapSwitchSeconds;
                 return;
@@ -1836,14 +1836,14 @@ void NeuroNetNavMap::Update()
                                               static_cast<double>(TransitionStart[1]));
             PanOffset[2] = static_cast<float>(static_cast<double>(PanOffset[2]) +
                                               static_cast<double>(TransitionStart[2]));
-            if (TransitionView != 0)
+            if (TransitionView != kNavMapViewUniverse)
             {
-                if (ViewMode == 2)
+                if (ViewMode == kNavMapViewSystemZoomed)
                 {
                     SetMapMeshTransform(ViewMode, static_cast<float>(1.0 - static_cast<double>(Ease)));
                     SetMapMeshTransform(TransitionView, Ease);
                 }
-                else if (ViewMode == 1)
+                else if (ViewMode == kNavMapViewSystem)
                 {
                     SetMapMeshTransform(TransitionView, Ease);
                     SetMapMeshTransform(ViewMode, 1.0f);
@@ -1857,7 +1857,7 @@ void NeuroNetNavMap::Update()
     if (G_bNavMapNoBestPath != 0)
     {
         G_bNavMapNoBestPath = 0;
-        NoBestPathText->SetProperty(1, 0, 0);
+        NoBestPathText->SetProperty(kWinPropHide, 0, 0);
         NoBestPathTimer = kNavMapNoBestPathSeconds;
     }
     if (NoBestPathTimer > 0.0f)
@@ -1867,7 +1867,7 @@ void NeuroNetNavMap::Update()
         // x87: hidden once less or equal (not while greater or unordered).
         if (Left <= 0.0)
         {
-            NoBestPathText->SetProperty(1, 1, 0);
+            NoBestPathText->SetProperty(kWinPropHide, 1, 0);
             NoBestPathTimer = 0.0f;
         }
     }

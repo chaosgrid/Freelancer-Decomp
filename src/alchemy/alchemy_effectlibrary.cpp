@@ -37,7 +37,7 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectLibrary::QueryInterface(const char* Iid, void** Out)
     {
-        if (IidEqual(Iid, Iids::FxEffectLibrary) || IidEqual(Iid, Iids::DAComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::FxEffectLibrary) || Iids::EqualNoNullTest(Iid, Iids::DAComponent))
         {
             AddRef();
             *Out = static_cast<IFxEffectLibrary*>(this);
@@ -85,7 +85,7 @@ namespace AlchemyImpl
             const char* ExistingName = Existing.Archetype->GetName();
             if (std::strcmp(ExistingName, NewName) != 0)
             {
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s",
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s",
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxEffect.cpp",
                       0x2d3, "Different name generates same Hash");
             }

@@ -333,7 +333,8 @@ struct FBarCharacter
 
     int UseCount;                  // +0x00 1; one per player visit holding it
     unsigned long Behavior;         // +0x04 -1, pub::GF::CharacterBehaviorCreate handle
-    int Field_0x08;               // +0x08 not written by the ctor or Create; use unknown
+    int Field_0x08;                 // +0x08 left unset by the ctor (FUN_06ea9340) and Create;
+                                    // only copied (FUN_06eb15b0); no reader in the port
     unsigned int CharacterId;       // +0x0c 0, pub::GF::CharacterCreate
     unsigned int RoomId;            // +0x10 0
     unsigned int Affiliation;       // +0x14 -1

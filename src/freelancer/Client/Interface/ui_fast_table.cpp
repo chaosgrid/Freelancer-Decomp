@@ -558,7 +558,7 @@ void UiFastTable::SetEdges(FUiFastTableEdges const* In)
     // FUN_0058d250
     if (In->Cols.size() != ColEdges.size() || In->Rows.size() != RowEdges.size())
     {
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kUiFastTableSource, 0x1c9,
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kUiFastTableSource, 0x1c9,
               "Table state does not match table.\n");
         return;
     }
@@ -568,7 +568,7 @@ void UiFastTable::SetEdges(FUiFastTableEdges const* In)
     float const* const OwnCols = ColEdges.data();
     if (InCols[0] != OwnCols[0] || InCols[0] != OwnCols[0])
     {
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kUiFastTableSource, 0x1d0,
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kUiFastTableSource, 0x1d0,
               "Table state does not match table.\n");
         return;
     }
@@ -596,7 +596,7 @@ bool UiFastTable::SelectRow(unsigned Row)
     SelectedRow = Row;
     bSelected = 1;
     if (Parent != nullptr && bChanged)
-        Parent->ProcessMessage(0x300du, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), Row);
+        Parent->ProcessMessage(kWinMsgSelectionChanged, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), Row);
     return true;
 }
 
@@ -1239,9 +1239,9 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
                 bSelected = 1;
                 unsigned const Self = static_cast<unsigned>(reinterpret_cast<uintptr_t>(this));
                 if (Parent != nullptr && bChanged)
-                    Parent->ProcessMessage(0x300du, Self, Row);
+                    Parent->ProcessMessage(kWinMsgSelectionChanged, Self, Row);
                 if (Parent != nullptr)
-                    Parent->ProcessMessage(0xf002u, Self, Row);
+                    Parent->ProcessMessage(kWinMsgDoubleClick, Self, Row);
             }
         }
         return true;
@@ -1259,7 +1259,7 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
                 SelectedRow = Row;
                 bSelected = 1;
                 if (Parent != nullptr && bChanged)
-                    Parent->ProcessMessage(0x300du, Self, Row);
+                    Parent->ProcessMessage(kWinMsgSelectionChanged, Self, Row);
                 return true;
             }
         }
@@ -1271,7 +1271,7 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
         }
         // The press lands on a cell that is not selected: (row << 16) | column to the parent,
         // which is read without a null test.
-        Parent->ProcessMessage(0xf001u, Self, (HoverRow << 16) | HoverColumn);
+        Parent->ProcessMessage(kWinMsgPress, Self, (HoverRow << 16) | HoverColumn);
         return true;
     }
 
@@ -1391,7 +1391,7 @@ bool UiScrollTable::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_0058f8b0: the own scrollbar's value change goes to the callback; the base class's
     // horizontal bar (+0x3f4) is swallowed; anything else is BaseRichTextWin's.
-    if (Msg == 0xf005u)
+    if (Msg == kWinMsgScroll)
     {
         if (A == static_cast<unsigned>(reinterpret_cast<uintptr_t>(ScrollBar)))
         {

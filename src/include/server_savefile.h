@@ -268,7 +268,7 @@ void Server_FLS1Transform(char* Data, int Length);
 
 // ---------------------------------------------------------------------------
 // The account-path helpers and the last-written-path global, shared by the
-// serializer (server_pub.cpp) and the save wrappers (server_savegame.cpp).
+// serializer (server_playerdb.cpp) and the save wrappers (server_savegame.cpp).
 // ---------------------------------------------------------------------------
 
 // Retail FUN_06d460f0: GetUserDataPath + "Accts" / "Accts\MultiPlayer" into the

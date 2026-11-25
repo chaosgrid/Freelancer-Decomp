@@ -229,6 +229,25 @@ struct COMMON_API ShipPlaceInfo
 
 static_assert(sizeof(ShipPlaceInfo) == 0x40, "ShipPlaceInfo sizeof 0x40");
 
+// RoomButtonInfo::Behavior: the "behavior=" option table RoomData::read_Hotspot_block reads
+// (.data:063eabc8, names as in the table; no match gives -1). The client's NavBar keeps the
+// same value as a service tab's type.
+enum EHotspotBehavior : int
+{
+    kHotspotExitDoor = 1,
+    kHotspotNewsVendor = 2,
+    kHotspotMissionVendor = 3,
+    kHotspotLaunch = 4,
+    kHotspotStartDealer = 5,
+    kHotspotFrontDesk = 6,
+    kHotspotStartShipDealer = 7,
+    kHotspotStartEquipDealer = 8,
+    kHotspotMoveRight = 9,
+    kHotspotMoveLeft = 0xa,
+    kHotspotVirtualRoom = 0xb,
+    kHotspotRepair = 0xc,
+};
+
 // RoomButtonInfo — button/hotspot in a room.
 struct COMMON_API RoomButtonInfo
 {
@@ -247,7 +266,7 @@ struct COMMON_API RoomButtonInfo
     char const* RoomSwitch;         // +0x04  "room_switch="
     char const* VirtualRoom;        // +0x08  "virtual_room="
     char const* SetVirtualRoom;     // +0x0c  "set_virtual_room="
-    int Behavior;                   // +0x10  "behavior=", exit-door option enum, -1 if unset
+    int Behavior;                   // +0x10  "behavior=", EHotspotBehavior, -1 if unset
     unsigned int StateSend;         // +0x14  "state_send=" bitmask
     unsigned int StateRead;         // +0x18  "state_read=" bitmask
     char const* StateTransition[4]; // +0x1c/0x20/0x24/0x28  "state_transition=", up to 4 entries
@@ -286,10 +305,10 @@ struct COMMON_API RoomLightInfo
     float Color[3];
     // +0x4C, 0x58 bytes -- the undecoded tail of ThornLightProperties (+0x38..+0x90); nothing
     // in Common.dll reads past +0x34. Left uninitialized by the ctor/clear() (0x13410 /
-    // 0x13490 skip from +0x38 to +0xa4). TODO: decode against the Thorn-side writer.
+    // 0x13490 skip from +0x38 to +0xa4). Its layout is not decoded.
     unsigned char Opaque4C[0x58];
     // +0xA4 -- add_set_script_light's 4th parameter; read_set_script passes the Thorn
-    // entity's +0x40 byte (0627510a). The ctor/clear() zero it. Meaning unknown.
+    // entity's +0x40 byte (0627510a). The ctor/clear() zero it; no reader in common.dll.
     unsigned char Type;
     // +0xA5..+0xA7: trailing compiler alignment padding, not addressed by any retail code path.
 };
@@ -1154,8 +1173,9 @@ COMMON_API GoodDesc* __cdecl find_good_item(GoodDescList* List, unsigned int Goo
 // wire buffer into one: the two sides of a trade (goods offered / requested).
 //
 // Field00/Field04/bFlag08 are marshaled (put_void x2, put_bool); the default ctor
-// leaves Field04 uninitialized (retail quirk kept). TODO: their meaning (probably
-// requester/responder ids and an accept flag) is in Server's trade logic.
+// leaves Field04 uninitialized (retail quirk kept). Server.dll's IServerImpl::TradeResponse
+// (.text:06d45840) copies all three unread into controller message 0x3f; no reader of them
+// is identified.
 // ---------------------------------------------------------------------------
 class COMMON_API TradeResponseInfo
 {
@@ -1384,7 +1404,8 @@ enum TransactionType
 //
 // Names: MinInventory from pub::Market::GetMinInventory (returns [mapped+0x8],
 // .text:06d12cbe); Type from the set_market_good mangling. MinLevel / MinRep (INI 1 and
-// 2) have no reader; the names rest on the ctor defaults (0.0 / -1.0). TODO: confirm.
+// 2) have no reader in common.dll or server.dll's traced market code; the names rest on the
+// INI order and the ctor defaults (0.0 / -1.0).
 // ---------------------------------------------------------------------------
 struct COMMON_API MarketGoodInfo
 {

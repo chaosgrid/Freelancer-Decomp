@@ -271,7 +271,7 @@ FThornLightReference::FThornLightReference(Csys const& ScriptFrame, FGfScript* I
 {
     Target = G_GfScriptManager.FindCreatedEntity(kThornEntityLight, Desc->Name);
     if (Target == nullptr)
-        FDUMP(0x100002, "%s(%d) : *** WARNING: invalid light reference to name %s",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: invalid light reference to name %s",
               GScriptLightFile, 0x177, Desc->Name);
 }
 

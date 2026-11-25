@@ -214,7 +214,7 @@ void FObjectShipEngineFx::Start(unsigned ArchId, float InLifetime, void* InInsta
             }
             else
             {
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: Cannot load engine flame effect ID=%u, name=%s\n",
                       kObjectShipCpp, 0x84, Flame->Id, Flame->get_string());
             }
@@ -305,7 +305,7 @@ FObjectShip::FObjectShip(FRoomRuntime* InOwner, FObjectShipDesc const& Desc)
       EngineFx(nullptr),
       LoopSounds(nullptr),
       RumbleSounds(nullptr),
-      ScriptState(0)
+      ScriptState(kShipScriptNone)
 {
     // FUN_00446ef0.
     Visuals.ResetFields();
@@ -352,7 +352,7 @@ void FObjectShip::Load(FObjectShipDesc const& Desc)
     SetFloorHeight(Desc.FloorHeight);
     Equipment = new EquipDescList();
     Equipment->Items = Desc.Equipment->Items;
-    ScriptState = 0;
+    ScriptState = kShipScriptNone;
     RebuildModel();
     RenderMode = 0;
     LightGroup = 3;
@@ -673,7 +673,7 @@ void FObjectShip::MountEquipment(int bCombined, unsigned ArchId, unsigned short 
     int const Index = Visuals.Summary->find_name(Hardpoint->Value);
     if (Index == -1)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing hardpoint (%s)", kObjectShipCpp, 0x275,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing hardpoint (%s)", kObjectShipCpp, 0x275,
               Hardpoint->Value);
         return;
     }
@@ -691,7 +691,7 @@ void FObjectShip::UnmountEquipment(int RemoveResult, unsigned /*ArchId*/, unsign
     int const Index = Visuals.Summary->find_name(Hardpoint->Value);
     if (Index == -1)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: missing hardpoint (%s)", kObjectShipCpp, 0x295,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: missing hardpoint (%s)", kObjectShipCpp, 0x295,
               Hardpoint->Value);
         return;
     }
@@ -718,12 +718,12 @@ void FObjectShip::PlayLaunchScript()
     Sequence->bApplySpatial = 1;
     Sequence->bRestoreCamera = 0;
     Sequence->Priority = 1;
-    Sequence->Field_0x16 = 1;
+    Sequence->bTransition = 1;
     Sequence->Callback = &FObjectShip::OnScriptStopped;
     Sequence->CallbackA = this;
     Sequence->CallbackB = nullptr;
     Sequence->Play();
-    ScriptState = 1;
+    ScriptState = kShipScriptLaunching;
     RequestGameflowStateFive();
 }
 
@@ -747,23 +747,23 @@ void FObjectShip::PlayLandingScript(char const* Script)
     Sequence->CallbackB = nullptr;
     Sequence->bPropsToRoom = 1;
     Sequence->Play();
-    ScriptState = 2;
+    ScriptState = kShipScriptLanding;
 }
 
 void __cdecl FObjectShip::OnScriptStopped(void* ShipPtr, void* /*Unused*/, unsigned char /*bArg*/)
 {
     // LAB_00448270.
     FObjectShip* const Ship = static_cast<FObjectShip*>(ShipPtr);
-    if (Ship->ScriptState == 0)
+    if (Ship->ScriptState == kShipScriptNone)
         return;
-    if (Ship->ScriptState == 1)
+    if (Ship->ScriptState == kShipScriptLaunching)
     {
         // +0xac is left at 1.
         RequestGameflowMissionBriefing();
         return;
     }
-    if (Ship->ScriptState == 2)
-        Ship->ScriptState = 0;
+    if (Ship->ScriptState == kShipScriptLanding)
+        Ship->ScriptState = kShipScriptNone;
 }
 
 // ---------------------------------------------------------------------------------------

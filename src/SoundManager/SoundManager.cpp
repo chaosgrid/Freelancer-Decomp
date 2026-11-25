@@ -125,12 +125,6 @@ namespace
               FormatMessage2000(Buf, "SoundMgr:Couldn't create archetype %d.\n", ArchId)); // 06eea1ec
     }
 
-    // Retail QIs compare inline (strcmp loop / REPE CMPSB) with no null checks.
-    bool IidEqual(const char* Left, const char* Right)
-    {
-        return strcmp(Left, Right) == 0;
-    }
-
     // Signed-char range tests, inlined three times in FUN_06ee6fd0.
     bool IsGuidHexDigit(char C)
     {
@@ -1031,7 +1025,7 @@ FSoundArchetype::~FSoundArchetype()
 GENRESULT DACOM_API FSoundArchetype::QueryInterface(const char* Iid, void** Out)
 {
     // LAB_06ee8190: the one-entry table DAT_06ee94b0; no null checks on Iid or Out.
-    if (!IidEqual(Iid, Iids::SoundArchetype))
+    if (!Iids::EqualNoNullTest(Iid, Iids::SoundArchetype))
     {
         *Out = nullptr; // only after the table walk
         return GR_INTERFACE_UNSUPPORTED;
@@ -1245,14 +1239,14 @@ GENRESULT DACOM_API FSoundInner::QueryInterface(const char* Iid, void** Out)
     // LAB_06ee8460: table DAT_06ee95cc {"1.11_ISoundManager", +0}, {"1.11_ISoundManagerStatus",
     // +4}; no null checks. The hit is AddRef'd through its own vtable, which goes to the
     // controlling unknown.
-    if (IidEqual(Iid, Iids::SoundManager))
+    if (Iids::EqualNoNullTest(Iid, Iids::SoundManager))
     {
         ISoundManager* Found = static_cast<ISoundManager*>(Self);
         Found->AddRef();
         *Out = Found;
         return GR_OK;
     }
-    if (IidEqual(Iid, Iids::SoundManagerStatus))
+    if (Iids::EqualNoNullTest(Iid, Iids::SoundManagerStatus))
     {
         ISoundManagerStatus* Found = static_cast<ISoundManagerStatus*>(Self);
         Found->AddRef();
@@ -1290,38 +1284,7 @@ unsigned long DACOM_API FSoundInner::Release()
     return Remaining;
 }
 
-FSoundManagerFactory::FSoundManagerFactory() : RefCount(1), Name(kComponentName) {}
-
-GENRESULT DACOM_API FSoundManagerFactory::QueryInterface(const char* Iid, void** Out)
-{
-    // LAB_06ee8290. No null checks.
-    *Out = nullptr;
-    if (!IidEqual(Iid, Iids::ComponentFactory))
-        return GR_INTERFACE_UNSUPPORTED;
-    *Out = static_cast<IComponentFactory*>(this);
-    AddRef();
-    return GR_OK;
-}
-
-unsigned long DACOM_API FSoundManagerFactory::AddRef()
-{
-    ++RefCount;
-    return RefCount;
-}
-
-unsigned long DACOM_API FSoundManagerFactory::Release()
-{
-    if (RefCount > 0)
-        --RefCount;
-    const unsigned long Remaining = RefCount;
-    if (Remaining == 0)
-    {
-        RefCount = 1;
-        delete this;
-        return 0;
-    }
-    return Remaining;
-}
+FSoundManagerFactory::FSoundManagerFactory() : FDacomComponentFactory(kComponentName) {}
 
 GENRESULT DACOM_API FSoundManagerFactory::CreateInstance(AGGDESC* Desc, void** Instance)
 {

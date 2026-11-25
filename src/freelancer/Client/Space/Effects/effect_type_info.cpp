@@ -141,7 +141,7 @@ bool LoadEffectTypeSection(INI_Reader* Reader)
             int Index = EffectTypeIndexFromName(Nick);
             if (Index >= kEffectTypeCount)
             {
-                FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kSourceFile, 0x4c,
+                FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kSourceFile, 0x4c,
                       "EffectTypes: unknown type");
                 Reader->log_link("EffectTypes");
             }
@@ -176,7 +176,7 @@ bool LoadEffectTypeSection(INI_Reader* Reader)
                 float Radius = Reader->get_value_float(0);
                 if (Radius < 0.0f)
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: effect type (%s) has negative radius",
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: effect type (%s) has negative radius",
                           kSourceFile, 0x7c, Current->Nickname);
                     Radius = 1.0f;
                 }
@@ -205,14 +205,14 @@ bool LoadEffectTypeSection(INI_Reader* Reader)
                 Current->PbubbleFar = Reader->get_value_float(1);
                 if (Current->PbubbleFar < Current->PbubbleNear)
                 {
-                    FDUMP(0x100002, "%s(%d) : WARNING:General:%s", kSourceFile, 0xc1,
+                    FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", kSourceFile, 0xc1,
                           "pbubble ranges backwards");
                     Reader->log_link("EffectTypes");
                 }
             }
             else
             {
-                FDUMP(0x100001, "%s(%d) : *** ERROR: EffectType (%s) has unknown parameter (%s)",
+                FDUMP(kFdumpError, "%s(%d) : *** ERROR: EffectType (%s) has unknown parameter (%s)",
                       kSourceFile, 0xc7, Current->Nickname, Reader->get_file_name());
             }
         }
@@ -237,7 +237,7 @@ bool LoadEffectLodSection(INI_Reader* Reader)
     }
     if (Lod >= static_cast<unsigned>(kEffectLodTypeCount))
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: invalid LOD type (%s)",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: invalid LOD type (%s)",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\VisEffectArch.cpp", 0x69, TypeName);
         Reader->log_link("");
         return false;

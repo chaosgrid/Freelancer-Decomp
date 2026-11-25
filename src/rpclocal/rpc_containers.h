@@ -74,6 +74,10 @@
 #include <string>
 #include <vector>
 
+// The equipment-list packet base (rpc_packet_classes.h), the parameter of the shared
+// equipment-list codec below.
+class FRpcEquipListPacket;
+
 // ===========================================================================
 // VC6 std::vector<T>::insert(_Last, 1, Value) on a retail-layout vector
 //
@@ -138,7 +142,7 @@ struct FRpcCollisionGroupList {
     FRpcCollisionGroupNode* Head;   // +0x04  dummy node; Next == Prev == itself when empty
     unsigned int Size;              // +0x08
 
-    // The header-level primitives behind RpcPacketCollisionGroups*, for the retail-image
+    // The header-level primitive for the retail-image
     // collision lists that still exist (SETCOLLISIONGROUPS / REQCOLLISIONGROUPS payloads and
     // the CHARACTERINFO record).
     void Init();
@@ -261,11 +265,9 @@ static_assert(sizeof(FRpcEquipWireHandle) == 4,
 // The ported helpers. Every one names the retail function it reproduces.
 // ===========================================================================
 
-// FUN_06d8fa90 -- `if (*(Handle**)payload is null) allocate the handle; deep-copy
-// Source into it`.
-void RpcPacketEquipAssign(FPacketBase* Packet, const FRpcEquipWireHandle* Source);
-
-// FUN_06d95d20 -- the inverse: `if (payload handle is non-null) copy it into Dest`.
+// FUN_06d8fa90 / FUN_06d95d20, the handle's packet side, are FRpcEquipListPacket::
+// AssignEquipHandle / ExtractEquipHandle (rpc_packet_classes.h). The exported free form of
+// the second takes the packet base; Packet must be one of the FRpcEquipListPacket classes.
 __declspec(dllexport) void RpcPacketEquipExtract(const FPacketBase* Packet, FRpcEquipWireHandle* Dest);
 
 // FUN_06d8c750 -- fills Handle from a retail std::vector<EquipDesc>. bAll false keeps
@@ -298,16 +300,17 @@ void RpcEquipHandleFromList(FRpcEquipWireHandle* Handle, const EquipDescList& So
 // Collision groups
 // ===========================================================================
 
-// The payload's own list header, i.e. retail FUN_06d8f7d0 (packet+0x20).
-FRpcCollisionGroupList* RpcPacketCollisionGroups(FPacketBase* Packet);
+// The payload's own list header, i.e. retail FUN_06d8f7d0 (packet+0x20): the Wire member
+// of FRpcCollisionGroupPacket (rpc_packet_classes.h). Exported in this free form; Packet
+// must be SETCOLLISIONGROUPS or REQCOLLISIONGROUPS.
 __declspec(dllexport) const FRpcCollisionGroupList* RpcPacketCollisionGroups(const FPacketBase* Packet);
 
 // The payload's list header is built by the concrete packet constructor
 // (FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS / _CLIENT_REQCOLLISIONGROUPS in
-// rpc_packet_registry.cpp, retail 0x06d9e8b0 / 0x06da10b0).
+// rpc_packet_classes.h, retail 0x06d9e8b0 / 0x06da10b0).
 
 // FUN_06d8f710 -- list assignment into the payload: RpcCollisionGroupListAssignRange
-// (below, with the create-object primitives) on RpcPacketCollisionGroups(Packet).
+// (below, with the create-object primitives) on the packet's Wire.
 
 // Walks a retail-layout node chain front to back, for RpcCollisionGroupListAssignRange
 // when the SOURCE is itself a retail-layout list (the create-object record copy in
@@ -338,18 +341,10 @@ struct FRpcCollisionGroupNodeIterator {
 // push_back plus a walk is the whole API -- retail has no assign for this one.
 // ===========================================================================
 
-FRpcLootWireList* RpcPacketLootList(FPacketBase* Packet);
+// The header is FPacket_FLPACKET_SERVER_CREATELOOT::Wire.Items; the list operations are
+// members of that class (rpc_packet_classes.h). Exported in this free form; Packet must be
+// a CREATELOOT packet.
 __declspec(dllexport) const FRpcLootWireList* RpcPacketLootList(const FPacketBase* Packet);
-
-// The packet constructor's share: dummy node pointing at itself, Size 0.
-void RpcPacketLootListInit(FPacketBase* Packet);
-
-// FUN_06d93160 -- one operator new(0x50) node at the tail, value copied by
-// FUN_06d93280, then ++Size (packet+0x30).
-void RpcPacketLootPushBack(FPacketBase* Packet, const FRpcLootWireRecord& Record);
-
-// Frees the node chain and the dummy node. Retail does it from the packet destructor.
-void RpcPacketLootListRelease(FPacketBase* Packet);
 
 // ===========================================================================
 // The reputation relation list (ch2 0x29 SETREPUTATION, 0x2b SETGROUPFEELINGS)
@@ -958,20 +953,13 @@ unsigned int RpcDecodeWireDwordTwoBytes(FPacketBase& Packet, const unsigned char
 
 // --- rpc_wire_varlen.cpp: the two codec pairs whose length is read out of the packet ---
 // 0x06daf830 / 0x06daf970 -- { word Length; char Text[Length] }, the strlen of the
-// CHARACTER_ID at payload+0x00. ch3 0x06 SELECTCHARACTER and ch3 0x3a DESTROYCHAR share
-// the pair outright (.rdata:06db5c88/06db5c98 and 06db5c8c/06db5c9c).
-unsigned int RpcEncodeWireCharacterId(FPacketBase& Packet, unsigned char** BufferHolder,
-                                      unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeWireCharacterId(FPacketBase& Packet, const unsigned char* Buffer,
-                                      unsigned int Size, unsigned int* OutLength);
-// 0x06dacca0 / 0x06dacd70, bodies FUN_06d8f530 / FUN_06d8f5e0 -- { word Count; { word
-// Id; float Health; } * Count } over the payload's own FRpcCollisionGroupList. ch2 0x48
-// SETCOLLISIONGROUPS and ch3 0x36 REQCOLLISIONGROUPS share the pair outright
-// (.rdata:06db52b0/06db5df8 and 06db52b4/06db5dfc).
-unsigned int RpcEncodeWireCollisionGroups(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeWireCollisionGroups(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
+// CHARACTER_ID at payload+0x00, shared outright by ch3 0x06 SELECTCHARACTER and ch3 0x3a
+// DESTROYCHAR (.rdata:06db5c88/06db5c98 and 06db5c8c/06db5c9c): FRpcCharacterIdPacket's
+// Encode / Decode. 0x06dacca0 / 0x06dacd70, bodies FUN_06d8f530 / FUN_06d8f5e0 -- { word
+// Count; { word Id; float Health; } * Count } over the payload's own
+// FRpcCollisionGroupList, shared outright by ch2 0x48 SETCOLLISIONGROUPS and ch3 0x36
+// REQCOLLISIONGROUPS (.rdata:06db52b0/06db5df8 and 06db52b4/06db5dfc):
+// FRpcCollisionGroupPacket's Encode / Decode (rpc_packet_classes.h).
 
 // 0x06db14f0 / 0x06dad820 -- a dword then one twelve-byte run (FUN_06d8f510).
 unsigned int RpcEncodeWireDwordBlock12(FPacketBase& Packet, unsigned char** BufferHolder,
@@ -994,9 +982,9 @@ unsigned int RpcDecodeWireOwnedBuffer(FPacketBase& Packet, const unsigned char* 
 // types: ch2 0x24 SETEQUIPMENT, ch2 0x25 SETCARGO, ch3 0x16 REQEQUIPMENT, ch3 0x17
 // REQCARGO. A word count then one { dword, float, dword, word, byte, byte, word, run }
 // record per element; the payload's four bytes are the handle POINTER, not the handle.
-unsigned int RpcEncodeWireEquipList(FPacketBase& Packet, unsigned char** BufferHolder,
+unsigned int RpcEncodeWireEquipList(FRpcEquipListPacket& Packet, unsigned char** BufferHolder,
                                     unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeWireEquipList(FPacketBase& Packet, const unsigned char* Buffer,
+unsigned int RpcDecodeWireEquipList(FRpcEquipListPacket& Packet, const unsigned char* Buffer,
                                     unsigned int Size, unsigned int* OutLength);
 
 // ===========================================================================
@@ -1057,8 +1045,6 @@ void* RpcFlattenFmtStr(const FmtStr& Source, unsigned int& OutSize);
 // FmtStr::unflatten(buffer, size). A null buffer is fine: unflatten clears the object and
 // returns 0.
 __declspec(dllexport) void RpcUnflattenFmtStr(FmtStr& Dest, void* Buffer, unsigned int Size);
-
-void RpcDumpWireCharacterIdDump(const FPacketBase& Packet, std::ostream& Out);
 
 // The two CHARACTERINFO list destructors (FUN_06d852e0 / FUN_06d85340) are ~MetaList /
 // ~OwnerList of OwnerList<CCharacterSet::CharacterInfo> -- the template in

@@ -395,7 +395,7 @@ void NnNews::LoadNews()
     ScrollOffset = 0;
     Field_0x57c = 0;
     Selected = 0;
-    Scroll->SetProperty(0x37, 0, static_cast<uintptr_t>(NewsCount - 1));
+    Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(NewsCount - 1));
     ::operator delete(static_cast<void*>(Taken));
 }
 
@@ -411,18 +411,18 @@ void NnNews::RefreshRows()
                                          Headlines[Row]};
 
         for (int Slot = 0; Slot < 4; ++Slot)
-            Controls[Slot]->SetProperty(2, 0, 0);
+            Controls[Slot]->SetProperty(kWinPropDisable, 0, 0);
         for (int Slot = 0; Slot < 4; ++Slot)
-            Controls[Slot]->SetProperty(1, 0, 0);
+            Controls[Slot]->SetProperty(kWinPropHide, 0, 0);
 
         char const* Path = nullptr;
         int Ids = 0;
         NewsIconFor(*this, Item.Icon, &Path, &Ids);
-        HeadlineIcons[Row]->SetProperty(4, PointerArg(Path), 0);
-        IconFrames[Row]->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
+        HeadlineIcons[Row]->SetProperty(kWinPropMesh, PointerArg(Path), 0);
+        IconFrames[Row]->SetProperty(kWinPropToolTip, static_cast<uintptr_t>(Ids), 0);
 
         FmtStrSprintf(&Item.Headline, Buffer, 0x400); // +0x28
-        Headlines[Row]->SetProperty(0x1d, PointerArg(Buffer), 0);
+        Headlines[Row]->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
 
         // A headline of fewer than two lines (unsigned) moves 0.016 down. For each of Create's
         // five HeadlinePositions the double difference rounds to the same float as the extended
@@ -433,7 +433,7 @@ void NnNews::RefreshRows()
             FontStringChildCount(static_cast<NnTextControl*>(Headlines[Row])->GetFontString()));
         if (Lines < 2)
             Moved[1] = static_cast<float>(static_cast<double>(Stored[1]) - 0.016);
-        Headlines[Row]->SetProperty(6, PointerArg(Moved), 0);
+        Headlines[Row]->SetProperty(kWinPropOffset, PointerArg(Moved), 0);
 
         uintptr_t const bSelected = (Index == Selected) ? 1u : 0u;
         IconFrames[Row]->SetProperty(0xc, bSelected, 0);
@@ -450,12 +450,12 @@ void NnNews::RefreshRows()
         WinControl* const Controls[4] = {HeadlineIcons[Row], IconFrames[Row], HeadlineBoxes[Row],
                                          Headlines[Row]};
         for (int Slot = 0; Slot < 4; ++Slot)
-            Controls[Slot]->SetProperty(2, 1, 0);
+            Controls[Slot]->SetProperty(kWinPropDisable, 1, 0);
         for (int Slot = 0; Slot < 4; ++Slot)
-            Controls[Slot]->SetProperty(1, 1, 0);
-        HeadlineIcons[Row]->SetProperty(4, PointerArg(IconPaths[0]), 0);
-        HeadlineBoxes[Row]->SetProperty(0x1e, 0, 0);
-        Headlines[Row]->SetProperty(0x1e, 0, 0);
+            Controls[Slot]->SetProperty(kWinPropHide, 1, 0);
+        HeadlineIcons[Row]->SetProperty(kWinPropMesh, PointerArg(IconPaths[0]), 0);
+        HeadlineBoxes[Row]->SetProperty(kTextPropSetIds, 0, 0);
+        Headlines[Row]->SetProperty(kTextPropSetIds, 0, 0);
     }
 }
 
@@ -468,7 +468,7 @@ void NnNews::ShowSelected()
     wchar_t Buffer[0x1000];
     NewsBroadcastProperties const& Item = News[Selected];
     FmtStrSprintf(&Item.Headline, Buffer, 0x1000); // +0x28
-    StoryHeadline->SetProperty(0x1d, PointerArg(Buffer), 0);
+    StoryHeadline->SetProperty(kTextPropSetText, PointerArg(Buffer), 0);
 
     // +0x40 as the story.
     FmtStrSprintf(&Item.Text, Buffer, 0x1000);
@@ -493,7 +493,7 @@ void NnNews::ShowSelected()
             VideoMaterial.Reset();   // FUN_0042cc30
             malloc_strcpy(&VideoTexture, Texture);
             if (!VideoMaterial.Init(kVideoMaterialName))
-                FDUMP(0x100001, kNoMaterialInNewsVendor, kNewsVendorCpp, 0x426, kVideoMaterialName);
+                FDUMP(kFdumpError, kNoMaterialInNewsVendor, kNewsVendorCpp, 0x426, kVideoMaterialName);
             VideoMaterial.Swap(VideoTexture, kVideoTextureLibrary);
         }
 
@@ -501,8 +501,8 @@ void NnNews::ShowSelected()
         char const* Path = nullptr;
         int Ids = 0;
         NewsIconFor(*this, Item.Icon, &Path, &Ids);
-        StoryIcon->SetProperty(4, PointerArg(Path), 0);
-        StoryIcon->SetProperty(3, static_cast<uintptr_t>(Ids), 0);
+        StoryIcon->SetProperty(kWinPropMesh, PointerArg(Path), 0);
+        StoryIcon->SetProperty(kWinPropToolTip, static_cast<uintptr_t>(Ids), 0);
     }
 }
 
@@ -561,7 +561,7 @@ void NnNews::BuildTicker()
             {
                 ID_String GoodName; // the ID_String at GoodInfo +0x48
                 GoodName.Id = Good->Id;
-                FDUMP(0x100002, kNoStringForGood, kNewsVendorCpp, 0x35f, Good->IdsName,
+                FDUMP(kFdumpWarning, kNoStringForGood, kNewsVendorCpp, 0x35f, Good->IdsName,
                       GoodName.get_string());
             }
             // wcslen is taken again every pass, as in retail.
@@ -630,7 +630,7 @@ void NnNews::TickerShow(int Start, float Offset)
     // the overhang over Start's stack slot (0x004a5d35) but still reads the original Offset.
     TickerView[Count] = L'\0';
     float const Overhang = static_cast<float>(X - Limit);
-    Ticker->SetProperty(0x1d, PointerArg(TickerView), 0);
+    Ticker->SetProperty(kTextPropSetText, PointerArg(TickerView), 0);
     Ticker->SetProperty(0x22, 0, 1);
     Ticker->SetProperty(0x23, FloatArg(Offset), FloatArg(Overhang));
 }
@@ -715,12 +715,12 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Win3DDeleteTree(this);
         return 0;
     }
-    case 0x3e:
-    case 0x2c:
-    case 0x2d:
+    case kWinNotifyScrollValue:
+    case kWinNotifyHighlight:
+    case kWinNotifyUnhighlight:
     {
         // Retail's case 0x3e falls through into the hover walk below.
-        if (Msg == 0x3e && A == PointerArg(Scroll) && static_cast<int>(B) != ScrollOffset)
+        if (Msg == kWinNotifyScrollValue && A == PointerArg(Scroll) && static_cast<int>(B) != ScrollOffset)
         {
             ScrollOffset = static_cast<int>(B);
             RefreshRows();
@@ -732,7 +732,7 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         for (; Row < 5; ++Row)
         {
             int const Item = ScrollOffset + Row;
-            if (Msg == 0x2c)
+            if (Msg == kWinNotifyHighlight)
                 Hovered = Item;
             else if (Hovered == Item)
                 Hovered = -1;
@@ -749,14 +749,14 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             HeadlineBoxes[Row]->SetProperty(Msg, 0, 0);
         return 0;
     }
-    case 0x42:
+    case kWinPropPlaceAtOffset:
     {
         float const* const Target = reinterpret_cast<float const*>(A);
         SetOffset(Target[0], Target[1], Target[2]);
         SetPosition(Position);
         return 0;
     }
-    case 0x26:
+    case kWinNotifyClick:
     {
         if (A == PointerArg(CloseButton))
         {
@@ -792,9 +792,9 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 
 bool NnNews::OnEvent(unsigned MsgId)
 {
-    // LAB_004a5f40 (RET 4), on the +0x32c face: USER_CANCEL (0x10) closes the window like the
+    // LAB_004a5f40 (RET 4), on the +0x32c face: USER_STACKABLE_CANCEL (0x10) closes the window like the
     // close button. (Retail tests the adjusted `this` for null.)
-    if (MsgId != 0x10)
+    if (MsgId != USER_STACKABLE_CANCEL)
         return false;
     if (ResultCallback != nullptr)
         ResultCallback(ResultContext);

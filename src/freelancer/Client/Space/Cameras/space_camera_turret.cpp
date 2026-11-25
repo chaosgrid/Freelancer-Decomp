@@ -290,19 +290,19 @@ bool TurretCameraOnEvent(FTurretCamera* Cam, unsigned MsgId)
     const bool bDown = HudCommandRecord()->bKeyDown != 0;
     switch (MsgId)
     {
-    case 0x32:
+    case USER_LOOK_ROTATE_CAMERA_LEFT:
         Cam->YawKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;
         return true;
-    case 0x33:
+    case USER_LOOK_ROTATE_CAMERA_RIGHT:
         Cam->YawKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;
         return true;
-    case 0x34:
+    case USER_LOOK_ROTATE_CAMERA_UP:
         Cam->PitchKeyRate = bDown ? -Cam->KeyRotateRate : 0.0f;
         return true;
-    case 0x35:
+    case USER_LOOK_ROTATE_CAMERA_DOWN:
         Cam->PitchKeyRate = bDown ? Cam->KeyRotateRate : 0.0f;
         return true;
-    case 0x36:
+    case USER_LOOK_ROTATE_CAMERA_RESET:
         // Recentre.
         Cam->Yaw = 0.0f;
         Cam->Pitch = 0.0f;
@@ -327,7 +327,7 @@ bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath)
     INI_Reader Reader;
     if (!Reader.open(CockpitIniPath, false))
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: turret camera file not found '%s'\n",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: turret camera file not found '%s'\n",
               kCockpitCpp, 0x5a0, CockpitIniPath);
         bOk = false;
     }
@@ -337,7 +337,7 @@ bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath)
         // [Turret] is recognised only to warn, like [ThirdPerson] and [RearView].
         if (Reader.is_header("Turret"))
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: [Turret] is obsolete in file %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [Turret] is obsolete in file %s\n",
                   kCockpitCpp, 0x5a7, CockpitIniPath);
             continue;
         }

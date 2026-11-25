@@ -90,6 +90,24 @@ public:
     unsigned char bOffscreen;     // +0x24
 };
 
+// FCharacterObject::ScriptState.
+enum ECharacterScriptState : int
+{
+    kCharacterScriptOwn = 0,       // its own idle script may run
+    kCharacterScriptTakenOver = 1, // a sequence took the character (FUN_004454e0)
+    kCharacterScriptReleased = 2,  // released without bRelease (FUN_00445540)
+};
+
+// FCharacterObject::Role, from the placement's setpoint segment (FUN_00444290).
+enum ECharacterRole : int
+{
+    kCharacterRoleNone = 0,
+    kCharacterRoleBartender = 1,       // "bartender"
+    kCharacterRoleTrader = 2,          // "trader"
+    kCharacterRoleShipDealer = 3,      // "shipdealer"
+    kCharacterRoleEquipmentDealer = 4, // "equipment"
+};
+
 struct FCharacterObject : FRoomObject
 {
     // FUN_00443ed0 (thiscall, RET 8) -- members built, the handles -1, then Load(Desc).
@@ -171,13 +189,13 @@ struct FCharacterObject : FRoomObject
     FCharacterHotspot* Hotspot;        // +0x2f4
     unsigned char bHovered;            // +0x2f8 the mouse is over the hotspot (name tooltip)
     wchar_t* DisplayName;              // +0x2fc Props.NameIds as ids, or Props.NameWide
-    int Role;                          // +0x300 0, 1 bartender, 2 trader, 3 shipdealer, 4 equipment
+    int Role;                          // +0x300 ECharacterRole
     HardpointSummary Hardpoints;       // +0x304 the body's hardpoints
     FPartCacheEntry Parts[kPartCacheEntries]; // +0x324
     FGfScriptSequence* OwnScript;      // +0x360 the idle script (FUN_00445340)
     char* OwnScriptName;               // +0x364 malloc'd
     unsigned char bOwnScriptPlaying;   // +0x368 FUN_00454f80 ran on +0x360
-    int ScriptState;                   // +0x36c 0 own, 1 taken over (FUN_004454e0), 2 released
+    int ScriptState;                   // +0x36c ECharacterScriptState
     int ActiveMotions;                 // +0x370 motion handles Thorn_Deformable holds
     int ActiveAims;                    // +0x374 aim handles Thorn_Deformable holds
     unsigned char bPoseDirty;          // +0x378 the pose moved: the next Update walks the mixer

@@ -1126,7 +1126,7 @@ bool FRandomMissionObject::UpdatePlayerCountObjective(FMissionPlayer* Player, bo
     std::list<FMissionObjective*>::iterator It = List.begin();
     for (; It != List.end(); ++It)
     {
-        if ((*It)->GetType() == 8)
+        if ((*It)->GetType() == NNOBJ_TYPE8)
             break;
     }
     if (It != List.end())
@@ -1270,7 +1270,7 @@ bool FRandomMissionObject::UpdateDockedObjective(FMissionPlayer* Player, bool* b
         if (!RmHasPosition(Position))
             return false;
         FMissionObjective* Created = nullptr;
-        CreateMissionObjective(2, this, &Created);
+        CreateMissionObjective(NNOBJ_NAVMARKER, this, &Created);
         Created->bHidden = 0;
         Created->Ids = 0x3319;
         Created->Objective.Type = 0x10;
@@ -1325,7 +1325,7 @@ bool FRandomMissionObject::UpdatePathObjectives(FMissionPlayer* Player, bool* bC
         if (List->Objectives.empty())
             return *bChanged;
         FMissionObjective* Front = List->GetFront();
-        if (Front->GetType() != 5)
+        if (Front->GetType() != NNOBJ_TYPE5)
             return *bChanged;
         Vector Now;
         State->GetPosition(&Now);
@@ -1527,7 +1527,7 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
     // A type 4 event's +0x08 int is the controller message id (see HandleMissionMessage); it is
     // read, and cast back to EMessage, only after the type test.
     SMControllerEvent const* Message = static_cast<SMControllerEvent const*>(Event);
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::SystemEnter)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(Message->DataPtr);
@@ -1535,7 +1535,7 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
             UpdatePlayerSystemFlags(Parms[2], Parms[0]);
         return true;
     }
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::SpaceEnter)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(Message->DataPtr);
@@ -1548,7 +1548,7 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
             UpdatePlayerSystemFlags(Parms[1], Parms[0]);
         return true;
     }
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::Heartbeat)
     {
         bool bCount = false;
@@ -1574,13 +1574,13 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
                                              Message->DataPtr);
         return true;
     }
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::AbortMission)
     {
         OnPlayerLeftGroup(static_cast<unsigned int const*>(Message->DataPtr));
         return true;
     }
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::ObjectDestroyed)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(Message->DataPtr);
@@ -1594,10 +1594,10 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
             FailMission(3);
         return true;
     }
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::FormationLeaderChanged)
         return true;
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::PlayerLoad)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(Message->DataPtr);
@@ -1606,13 +1606,13 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
         RejoinPlayer(Parms[0]);
         return true;
     }
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::GroupMemberJoined)
     {
         AddGroupMember(*static_cast<unsigned int const*>(Message->DataPtr));
         return true;
     }
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::PlayerLogout)
     {
         unsigned int const Leaving = *static_cast<unsigned int const*>(Message->DataPtr);
@@ -1622,7 +1622,7 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
                                              Message->DataPtr);
         return true;
     }
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Message->ControllerId) == EMessage::GroupMemberLeft)
     {
         unsigned int const Leaving = *static_cast<unsigned int const*>(Message->DataPtr);
@@ -1632,7 +1632,7 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
                                              Message->DataPtr);
         return true;
     }
-    if (Event->get_event_type() == 4)
+    if (Event->get_event_type() == SMET_Controller)
     {
         FMissionObject::HandleMissionMessage(static_cast<EMessage>(Message->ControllerId),
                                              Message->DataPtr);
@@ -1799,7 +1799,7 @@ bool FRandEncParams::SpawnFormation(FTransform const* Placement, int Count,
 
     std::list<FContentNpcShipParams> Blocks;
     ShipsSpawned += Formation.Count;
-    bool const bNoDockTarget = (DockTarget & 0x3fffffffu) == 0;
+    bool const bNoDockTarget = (DockTarget & GIdValueMask) == 0;
     for (int Index = 0; Index < Formation.Count; ++Index)
     {
         FContentNpcShipParams Params;

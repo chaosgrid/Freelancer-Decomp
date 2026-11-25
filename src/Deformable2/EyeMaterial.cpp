@@ -1103,7 +1103,7 @@ GENRESULT __thiscall FEyeMaterialImpl::Setup()
             Library->DecRefById(OldHandle);
         if (!bVerified)
         {
-            FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", G_FdumpFileMaterialImpl, 0x23F,
+            FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", G_FdumpFileMaterialImpl, 0x23F,
                   FormatDeformMessage(Message, "texture verify failed: %s: %s", Name, Row->Name));
         }
         Index += 1;
@@ -1566,6 +1566,14 @@ GENRESULT DACOM_API FEyeMaterialFactory::CreateInstance(AGGDESC* Desc, void** Ou
     Object->ScalarDeletingDestructor(1); // +0x54
     *Out = nullptr;
     return Result;
+}
+
+// FUN_065fdfb0. The FUN_065fdfd0 result is dropped; no test.
+void BindEyeMaterials(IMaterialLibrary* MaterialLib)
+{
+    RegisterEyeMaterialFactory();
+    MaterialLib->AddMapRule(0, G_EyeMaterialPattern,
+                                                       G_EyeMaterialName);
 }
 
 bool RegisterEyeMaterialFactory()

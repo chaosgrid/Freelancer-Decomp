@@ -108,7 +108,7 @@ struct FSubObjDamage
     unsigned short SubObjId;    // +0x04
     unsigned short Pad06;
     float Damage;               // +0x08
-    unsigned char Field_0x0c;   // +0x0c  a byte flag; meaning not yet derived
+    unsigned char Field_0x0c;   // +0x0c  FUN_06d0d730's third (byte) argument; the readers above use +4 / +8 only
     unsigned char Pad0d[3];
 };
 
@@ -174,7 +174,7 @@ struct FLootRecord
     float ContentsHitPts;                            // +0x10
     int Count;                                       // +0x14
     unsigned int MarkForPlayer;                      // +0x18  optional player id to mark loot for (0 = none; 0x06cf85c0 / mark_for_player)
-    unsigned int NameId;                         // +0x1c  zeroed by build_loot; meaning not derived
+    unsigned int NameId;                         // +0x1c  -> CLoot::CreateParms +0x60 (CLoot+0xe8 IDS override; create_loot); LootInfo +0x08, else 0
     Vector Velocity;                                 // +0x20
     Vector Position;                                 // +0x2c
     Matrix Orientation;                              // +0x38  (9 dwords, copied with REP MOVSD ECX=9)
@@ -507,7 +507,7 @@ public:
     StarSystem* OwnerSystem;
 
     // -- IObjAffect: GameObject's own table (.rdata:06d6576c), every entry a retail error
-    //    stub (-3 / -8 / 0, see server_gameobject.cpp). Ship and EqObj override most of
+    //    stub (-3 / -8 / 0, see server_gameobj.cpp). Ship and EqObj override most of
     //    them (EqObj's six below, Ship's in its own class). ----------------------------
     int set_throttle(float Throttle) override;
     int set_axis_throttle(Vector const& AxisThrottle) override;
@@ -553,7 +553,7 @@ protected:
     bool FindOfClass(CObject::Class ObjectClass, unsigned int const& Id);
 
     // The flush set_in_damage_callback and set_relative_health both inline in retail.
-    // Defined in server_gameobject.cpp.
+    // Defined in server_gameobj.cpp.
     void flush_pending_damage(DamageList& Pending);
 };
 
@@ -804,19 +804,19 @@ public:
     unsigned char bDeathFuseLit;
 
     // FUN_06ce83c0 (only caller EqObj::destroy): the CSimple's OwnerPlayer. Defined in
-    // server_gameobject.cpp.
+    // server_eqobj.cpp.
     unsigned int owner_player() const;
 
     // The slot of the connected player whose CURRENT ship this is, else null. Retail inlines
-    // the test at every difficulty-scale site. Defined in server_gameobject.cpp.
+    // the test at every difficulty-scale site. Defined in server_eqobj.cpp.
     PlayerData* player_of_ship() const;
 
     // The CSolar narrowing retail inlines at the loot-visit sites; null for everything that
-    // is not a solar. Defined in server_gameobject.cpp.
+    // is not a solar. Defined in server_eqobj.cpp.
     CSolar* as_solar() const;
 
     // The light / unlight pass apply_root_entry and apply_group_entry both inline in retail.
-    // Defined in server_gameobject.cpp.
+    // Defined in server_eqobj.cpp.
     template <typename FReadHitPts>
     void sweep_fuses(std::vector<Archetype::FGroupFuse> const& List, FReadHitPts ReadHitPts,
                      float After, unsigned short SubObjId, unsigned int InflictorId);
@@ -1704,12 +1704,12 @@ bool Server_FindLiveObject(unsigned int Id, GameObject*& OutObj, StarSystem*& Ou
 
 // Server_FindObject for the callers that only keep the object: retail passes a
 // dummy for OutSys at those sites. A false return always leaves OutObj null,
-// so the object pointer carries the whole answer. Defined in src/Server/server_pub.cpp.
+// so the object pointer carries the whole answer. Defined in src/Server/server_serverspace.cpp.
 GameObject* Server_LookupGameObject(unsigned int ObjId);
 
 // Retail FUN_06d00670 (.text:06d00670), __cdecl(unsigned int Flid): the lookup
 // above, then null when the object's own +0x160 (is_destroyed) answers true.
-// Defined in src/Server/server_pub.cpp.
+// Defined in src/Server/server_serverspace.cpp.
 GameObject* Server_LookupLiveObject(unsigned int Flid);
 
 // ---------------------------------------------------------------------------
@@ -1719,7 +1719,7 @@ GameObject* Server_LookupLiveObject(unsigned int Flid);
 // OutObjId gets the object the ship launches from (0 when none), OutKind the
 // launch_pos index (-1 when the ship is not launched from an object), OutPos /
 // OutOrient the launch transform. Clears Players[PlayerId].exited_base_id when
-// the player was in a base. Defined in src/Server/server_classes.cpp.
+// the player was in a base. Defined in src/Server/server_serverspace.cpp.
 // ---------------------------------------------------------------------------
 class Quaternion;
 void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int* OutKind,

@@ -289,7 +289,7 @@ namespace Archetype
             }
 
             // ArchDB::Get() has already dumped an ERROR; retail warns as well.
-            FDUMP(0x100002, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: 'inherit' failed. couldn't find %s",
                   ArchetypeSource, 0x828, Reader.get_value_string());
             return true;
         }

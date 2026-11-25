@@ -61,7 +61,7 @@ FMissionObjective* FRmObjective::CreateMissionObjective(FMissionObject* InMissio
                                                         FRmRuntimeMachine* Machine)
 {
     FMissionObjective* Created = nullptr;
-    ::CreateMissionObjective(7, InMission, &Created);
+    ::CreateMissionObjective(NNOBJ_TYPE7, InMission, &Created);
     Created->Objective.Type = static_cast<unsigned int>(ObjectiveType);
     IRmTextParamSource* Source = nullptr;
     if (Machine != nullptr)
@@ -234,7 +234,7 @@ void FRmObjectiveType3::SetTargetRecords(FRmRecordList* Records,
          It != Records->Records.end(); ++It)
     {
         FRmSpawnRecord* const Record = *It;
-        if ((Record->Flags & Mask) != 0 && Record->State == 2)
+        if ((Record->Flags & Mask) != 0 && Record->State == RmRecordAlive)
             Found.push_back(Record->ObjectId);
     }
     SetTargets(&Found, InPlayers, InSystemId, InPosition);
@@ -637,7 +637,7 @@ bool FRmSolarMachine::OnStateEvent(SMEventData const* Event, int const& State)
     SMControllerEvent const* Controller = static_cast<SMControllerEvent const*>(Event);
     // The type 4 event's int +0x08 is the controller message id (FRandomMissionObject::
     // HandleMissionMessage), cast back after the type test.
-    if (Event->get_event_type() != 4 ||
+    if (Event->get_event_type() != SMET_Controller ||
         static_cast<pub::Controller::EMessage>(Controller->ControllerId) !=
             pub::Controller::EMessage::ObjectDestroyed)
         return false;
@@ -646,7 +646,7 @@ bool FRmSolarMachine::OnStateEvent(SMEventData const* Event, int const& State)
     if (Record != nullptr)
     {
         unsigned int const ObjectId = Record->ObjectId;
-        Record->State = 3;
+        Record->State = RmRecordDestroyed;
         FRmSolarMessage Message(GRmMsgSolarDestroyed, ObjectId);
         send_immediate_message(&Message, OwnerId);
     }
@@ -691,7 +691,7 @@ bool FRmShipMachine::OnStateEvent(SMEventData const* Event, int const& State)
         return false;
     SMControllerEvent const* Controller = static_cast<SMControllerEvent const*>(Event);
     // The type 4 event's int +0x08 is the controller message id, cast back after the type test.
-    if (Event->get_event_type() != 4 ||
+    if (Event->get_event_type() != SMET_Controller ||
         static_cast<pub::Controller::EMessage>(Controller->ControllerId) !=
             pub::Controller::EMessage::ObjectDestroyed)
         return false;
@@ -702,7 +702,7 @@ bool FRmShipMachine::OnStateEvent(SMEventData const* Event, int const& State)
 
     unsigned int const Group = Record->Group;
     unsigned int const ObjectId = Record->ObjectId;
-    Record->State = 3;
+    Record->State = RmRecordDestroyed;
     // FuncInfo 06fc627c: the destroyed message lives to the exit; the group list and the two
     // later messages nest inside it.
     FRmShipMessage Destroyed(GRmMsgShipDestroyed, Group, ObjectId);
@@ -789,7 +789,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
 
     // Message DAT_06fd3b6c {+0x1c loot id, +0x20 ship id}: the loot is taken from its holder
     // and created again next to the ship. Record and player are not null-tested.
-    if (Event->get_event_type() == 3)
+    if (Event->get_event_type() == SMET_Message)
     {
         StateMachineMessage const* Message = static_cast<SMMessage const*>(Event)->Message;
         if ((Message->DeliveryState == -1 || Message->DeliveryState == get_state()) &&
@@ -842,7 +842,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
             pub::SpaceObj::CreateLoot(Record->ObjectId, Info);
 
             unsigned int const LootId = Record->ObjectId;
-            Record->State = 2;
+            Record->State = RmRecordAlive;
             Record->Units = static_cast<int>(Info.Units);
             Record->HolderId = 0;
             Record->CargoSlot = SUBOBJ_ID_NONE;
@@ -857,7 +857,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
     // A type 4 event's int +0x08 is the controller message id, cast back after the type test.
 
     // Message 0x39 {id, ..., +0x10 cause}: the loot is gone.
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Controller->ControllerId) == EMessage::ObjectDestroyed)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(Controller->DataPtr);
@@ -866,9 +866,9 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
             return true;
         int const Cause = static_cast<int>(Parms[4]);
         if (Cause == 1 || Cause == 0)
-            Record->State = 3;
+            Record->State = RmRecordDestroyed;
         else
-            Record->State = 4;
+            Record->State = RmRecordDestroyedOther;
         if (Cause == 1)
         {
             FRmLootMessage Message(GRmMsgLootDestroyed, Record->ObjectId, 0);
@@ -879,7 +879,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
             FRmLootMessage Message(GRmMsgLootLost, Record->ObjectId, 0);
             send_immediate_message(&Message, OwnerId);
         }
-        if (Record->Kind == 2)
+        if (Record->Kind == RmLootCritical)
         {
             bool bNoneLeft = false;
             {
@@ -896,7 +896,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
     }
 
     // Message 0x18 {id, ship, word slot, good, units}: picked up.
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Controller->ControllerId) == EMessage::LootAcquired)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(Controller->DataPtr);
@@ -914,7 +914,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
             // query and the 3b8c message.
             FRmLootMessage PickedUp(GRmMsgLootPickedUp, Record->ObjectId, *ShipId);
             send_immediate_message(&PickedUp, OwnerId);
-            if (Record->Kind == 2)
+            if (Record->Kind == RmLootCritical)
             {
                 bool bNoneLeft = false;
                 {
@@ -932,7 +932,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
     }
 
     // Message 0x27 {ship, word 1}: the critical loot the player holds.
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Controller->ControllerId) == EMessage::Msg0x27)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(Controller->DataPtr);
@@ -954,7 +954,7 @@ bool FRmLootMachine::OnStateEvent(SMEventData const* Event, int const& State)
     }
 
     // Message 0x3d {system}: the first alive critical loot, if in that system, is destroyed.
-    if (Event->get_event_type() == 4 &&
+    if (Event->get_event_type() == SMET_Controller &&
         static_cast<EMessage>(Controller->ControllerId) == EMessage::SystemUnloaded)
     {
         unsigned int const* Parms = static_cast<unsigned int const*>(Controller->DataPtr);
@@ -1070,13 +1070,13 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
     {
         switch (Line->SpeakerKind)
         {
-        case 1:
+        case RmTargetBase:
             Line->Speaker = 0;
             Line->CostumeId = Offer->McCostume;
             Line->VoiceId = Offer->VoiceId;
             Line->CaptionIds = 0x32d7;
             return true;
-        case 2:
+        case RmTargetBigSolar:
         {
             FRmRecordList Found = Solars->Query(0, 2, 0);
             if (Found.Records.empty())
@@ -1084,34 +1084,35 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
             Line->Speaker = Found.Records.front()->ObjectId;
             return true;
         }
-        case 3:
+        case RmTargetBigShip:
             for (std::list<FRmSpawnRecord*>::iterator It = Ships->Records.Records.begin();
                  It != Ships->Records.Records.end(); ++It)
             {
-                if (static_cast<FRmShipRecord*>(*It)->Kind == 2)
+                if (static_cast<FRmShipRecord*>(*It)->Kind == RmShipKindBig)
                 {
                     Line->Speaker = (*It)->ObjectId;
                     return true;
                 }
             }
             return false;
-        case 4:
+        case RmTargetDefensiveShip:
             for (std::list<FRmSpawnRecord*>::iterator It = Ships->Records.Records.begin();
                  It != Ships->Records.Records.end(); ++It)
             {
-                if (static_cast<FRmShipRecord*>(*It)->Kind == 1 && (*It)->State == 2)
+                if (static_cast<FRmShipRecord*>(*It)->Kind == RmShipKindDefensive &&
+                    (*It)->State == RmRecordAlive)
                 {
                     Line->Speaker = (*It)->ObjectId;
                     return true;
                 }
             }
             return false;
-        case 5:
+        case RmTargetFriendlyShip:
             // 0.0 is DAT_06fbc29c; unordered skips.
             for (std::list<FRmSpawnRecord*>::iterator It = Ships->Records.Records.begin();
                  It != Ships->Records.Records.end(); ++It)
             {
-                if ((*It)->Attitude > 0.0f && (*It)->State == 2)
+                if ((*It)->Attitude > 0.0f && (*It)->State == RmRecordAlive)
                 {
                     Line->Speaker = (*It)->ObjectId;
                     return true;
@@ -1125,10 +1126,10 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
 
     switch (Line->TargetKind)
     {
-    case 6:
+    case RmTargetPlayer:
         Line->PlayerIds.push_back(Player->PlayerId);
         return true;
-    case 7:
+    case RmTargetAllPlayers:
     {
         std::vector<FContentPlayerState*>* Players = GetMissionPlayers();
         for (std::vector<FContentPlayerState*>::iterator It = Players->begin();
@@ -1136,8 +1137,8 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
             Line->PlayerIds.push_back((*It)->PlayerId);
         return true;
     }
-    case 8:
-    case 9:
+    case RmTargetPlayersInRange:
+    case RmTargetPlayersOutOfRange:
     {
         std::vector<FContentPlayerState*>* Players = GetMissionPlayers();
         Vector Center;
@@ -1161,8 +1162,8 @@ bool FRmRuntimeMachine::ResolveLine(bool bSpeaker, FRmLine* Line, FContentPlayer
         }
         return true;
     }
-    case 10:
-    case 11:
+    case RmTargetPlayersInSystem:
+    case RmTargetPlayersOutOfSystem:
     {
         // Retail: the player index advances only past a player WITHOUT a ship (06f8a191 /
         // 06f8a129), so the loop never ends once a mission player has a ship. Shipped
@@ -1200,7 +1201,8 @@ bool FRmRuntimeMachine::CanSave()
 // LAB_06f71100 (ICF with FRmTrigger::OnIdle).
 bool FRmRuntimeMachine::OnState0(SMEventData const* Event, int const& State)
 {
-    if (State == RmStateIdle && Event->get_event_type() < 4 && Event->get_event_type() == 1)
+    if (State == RmStateIdle && Event->get_event_type() < SMET_Controller &&
+        Event->get_event_type() == SMET_Enter)
     {
         set_state(RmStateWaitStart);
         return true;
@@ -1211,7 +1213,7 @@ bool FRmRuntimeMachine::OnState0(SMEventData const* Event, int const& State)
 // LAB_06f8a610.
 bool FRmRuntimeMachine::OnState1(SMEventData const* Event, int const& State)
 {
-    if (State != RmStateWaitStart || Event->get_event_type() != 3)
+    if (State != RmStateWaitStart || Event->get_event_type() != SMET_Message)
         return false;
     StateMachineMessage const* Message = static_cast<SMMessage const*>(Event)->Message;
     if (Message->DeliveryState != -1 && get_state() != Message->DeliveryState)
@@ -1225,7 +1227,8 @@ bool FRmRuntimeMachine::OnState1(SMEventData const* Event, int const& State)
 // LAB_06f8a670.
 bool FRmRuntimeMachine::OnState2(SMEventData const* Event, int const& State)
 {
-    if (State == RmStateStarted && Event->get_event_type() < 4 && Event->get_event_type() == 1)
+    if (State == RmStateStarted && Event->get_event_type() < SMET_Controller &&
+        Event->get_event_type() == SMET_Enter)
     {
         set_state(RmStateStart);
         return true;
@@ -1273,10 +1276,11 @@ void FRmRuntimeMachine::UpdatePlayerObjectives(unsigned int InPlayerId)
     // std::list forbids ++end(), so the port stays at end().
     if (Player->PlayerState->ShipObject == nullptr && First != List.end())
         ++First;
-    while (First != List.end() && (*First)->GetType() == 5)
+    while (First != List.end() && (*First)->GetType() == NNOBJ_TYPE5)
         ++First;
     std::list<FMissionObjective*>::iterator Last = First;
-    while (Last != List.end() && (*Last)->GetType() != 8 && (*Last)->GetType() != 5)
+    while (Last != List.end() && (*Last)->GetType() != NNOBJ_TYPE8 &&
+           (*Last)->GetType() != NNOBJ_TYPE5)
         ++Last;
 
     // The run is replaced by clones of the machine's objectives unless it already matches
@@ -1319,7 +1323,7 @@ void FRmRuntimeMachine::UpdatePlayerObjectives(unsigned int InPlayerId)
             if (!List.empty())
             {
                 FMissionObjective* Front = Player->Objectives.GetFront();
-                if (Front->GetType() == 5)
+                if (Front->GetType() == NNOBJ_TYPE5)
                 {
                     Vector Now;
                     State->GetPosition(&Now);
@@ -1352,7 +1356,7 @@ void FRmRuntimeMachine::UpdatePlayerObjectives(unsigned int InPlayerId)
         {
             std::list<FMissionObjective*>::iterator It = List.begin();
             int PathCount = 0;
-            while (It != List.end() && (*It)->GetType() == 5)
+            while (It != List.end() && (*It)->GetType() == NNOBJ_TYPE5)
             {
                 ++It;
                 ++PathCount;
@@ -1419,7 +1423,9 @@ bool FRmRuntimeMachine::UpdatePathObjectives(FMissionPlayer* Player, bool* bChan
                 unsigned int ScanSystem = System->SystemId;
                 unsigned int Buffer[0x20] = {};
                 unsigned int Count = 0;
-                pub::System::ScanObjects(ScanSystem, Buffer, 0x20, Target, 0.0f, 0x600de0, Count);
+                pub::System::ScanObjects(ScanSystem, Buffer, 0x20, Target, 0.0f,
+                                         OBJ_DOCKING_RING | OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_STATION |
+                                         OBJ_AIRLOCK_GATE | OBJ_JUMP_HOLE | OBJ_CAPITAL | OBJ_MINING, Count);   // 0x600de0
                 TargetObjectId = Buffer[0];
             }
             int const FirstType = State->ShipObject != nullptr ? 0x5a : 0x0a;
@@ -1513,7 +1519,7 @@ bool FRmRuntimeMachine::SpawnSolar(FRmSolarSpawn* Solar)
     Costume SolarCostume;
     FSystemInfo* System = FindSystemInfo(&Solar->DestSys);
     std::strcpy(Info.Nickname, Solar->Nickname.Data);
-    Info.Field_0x00 = Mission->ControllerId;
+    Info.ControllerId = Mission->ControllerId;
     Info.SolarArchID = Solar->ArchetypeId;
     Info.SystemID = System != nullptr ? System->SystemId : 0;
     Info.Position = Solar->Position;
@@ -1546,7 +1552,7 @@ bool FRmRuntimeMachine::SpawnSolar(FRmSolarSpawn* Solar)
 
     FRmSolarRecord Record;
     Record.Name = Solar->Nickname.Data;
-    Record.State = 2;
+    Record.State = RmRecordAlive;
     Record.Loot = Solar->Loot;
     Record.Flags = static_cast<unsigned int>(Solar->ModeFlag);
     Record.Attitude = Solar->Attitude;
@@ -1636,7 +1642,7 @@ namespace
         pub::AI::Personality::JobStruct::FAttackPreference* const Prefs = Job->AttackPreferences;
         Job->FleeSceneThreatStyle = 4;                  // +0x3c4
         Job->SceneToughnessThreshold = 4;               // +0x2a4
-        Job->Field_00 = 0;                              // +0x2a0
+        Job->RangeThreshold = 0;                              // +0x2a0
         Prefs[0].ShipClass = 0;                         // +0x2b0
         Prefs[0].Range = Range;                         // +0x2b4
         Prefs[1].Range = Range;                         // +0x2c0
@@ -1743,7 +1749,7 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
         Block->HitPoints = Ship->HitPoints;
 
         Record->Name = Ship->Nickname.Data;
-        Record->State = 2;
+        Record->State = RmRecordAlive;
         Record->Loot = Ship->Loot;
         Record->Group = Group->Serial;
         Record->Flags = static_cast<unsigned int>(Ship->TargetFlags);
@@ -1835,7 +1841,7 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
              It != Ships->Records.Records.end(); ++It)
         {
             FRmSpawnRecord* const Other = *It;
-            if (Other->State != 2)
+            if (Other->State != RmRecordAlive)
                 continue;
             if (Other->ObjectId == Record->ObjectId)
                 continue;
@@ -1866,14 +1872,14 @@ bool FRmRuntimeMachine::SpawnLoot(FRmLootSpawn* InLoot)
         return false;
     pub::SpaceObj::LootInfo* Info = &InLoot->Info;
     Info->SystemID = System->SystemId;
-    if (InLoot->Kind == 2)
+    if (InLoot->Kind == RmLootCritical)
         Info->bMission = 1;
     if (InLoot->CriticalLoot != nullptr)
         Info->NameId = static_cast<unsigned int>(InLoot->CriticalLoot->Name + 0x50bb8);
     if (InLoot->bRelPos != 0)
     {
         unsigned int const Parent = Info->OwnerObjId;
-        if ((Parent & 0x3fffffff) != 0)
+        if ((Parent & GIdValueMask) != 0)
         {
             Vector ParentPosition;
             Matrix ParentOrientation;
@@ -1907,10 +1913,10 @@ bool FRmRuntimeMachine::SpawnLoot(FRmLootSpawn* InLoot)
     Record.HolderId = 0;
     Record.CargoSlot = SUBOBJ_ID_NONE;
     Record.GoodId = 0;
-    if (InLoot->Kind == 2)
+    if (InLoot->Kind == RmLootCritical)
     {
         Record.Flags = 2;
-        if (InLoot->CriticalLootMode != 1)
+        if (InLoot->CriticalLootMode != RmCriticalLootDestroy)
             pub::SpaceObj::SetInvincible2(Record.ObjectId, false, true, 1.0f);
         Loot->Records.Records.push_back(new FRmLootRecord(Record));
         FRmLootMessage Message(GRmMsgCriticalLootSpawned, Record.ObjectId, 0);
@@ -1951,7 +1957,7 @@ std::list<FMissionObjective*>::iterator FRmRuntimeMachine::ObjectiveListPosition
     for (std::list<FMissionObjective*>::iterator It = Objectives.Objectives.begin();
          It != Objectives.Objectives.end(); ++It)
     {
-        if ((*It)->GetType() == 5)
+        if ((*It)->GetType() == NNOBJ_TYPE5)
         {
             Offset = 1;
             break;
@@ -2073,7 +2079,7 @@ void FRmVignetteMachine::Shutdown()
         FContentNpcShip* const Ship = (*It)->NpcShip;
         Ship->Longevity = 24.0f;
         pub::AI::SubmitState(Ship->SpaceObjId, &ZoneParams);
-        if (Ship->FormationSlot == 0 || Ship->FormationId == 0xffffffffu)
+        if (Ship->FormationSlot == 0 || Ship->FormationId == GNoFormationId)
         {
             FGuideDesc Desc(4, Ship);
             Ship->SetGuideFromDesc(&Desc, true);
@@ -2090,7 +2096,7 @@ void FRmVignetteMachine::Shutdown()
          It != LootList.Records.end(); ++It)
     {
         FRmLootRecord* const Record = static_cast<FRmLootRecord*>(*It);
-        if (Record->Kind == 2)
+        if (Record->Kind == RmLootCritical)
             pub::SpaceObj::Destroy(Record->ObjectId, static_cast<DestroyType>(0));
         else
             pub::SpaceObj::SetInvincible(Record->ObjectId, false, true, 0.0f);

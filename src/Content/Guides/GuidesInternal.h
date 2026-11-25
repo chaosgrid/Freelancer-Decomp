@@ -158,7 +158,9 @@ public:
     int State = 0;                               // +0x08 0..4
     Vector Center = {};                          // +0x0c
     float Range = 0.0f;                          // +0x18 radius + 3000
-    unsigned int Field_0x1c = 0;                 // +0x1c 0 in the ctor and Clone. TODO: reader
+    // +0x1c: 0 from the guide ctor (FUN_06f06fe0), the guide copy (FUN_06f07180) and the
+    // route Clone (LAB_06f07750, 06f07791: set to 0, not copied); no route slot reads it.
+    unsigned int Field_0x1c = 0;
 };
 
 // ---------------------------------------------------------------------------------------
@@ -240,6 +242,24 @@ public:
 // States (+0x14): 0 off, 1 idle, 2 closing in, 3 in range, 4 closing in after the "stand by"
 // line, 5 waiting for that line, 6 scanning, 7 waiting for the demand line, 8 waiting for the
 // player's answer, 0xa jettisoned, 0xb tractoring, 0xc collecting, 0xd hostile.
+// FCargoScanRoute::State (see above). 9 is never used.
+enum ECargoScanState
+{
+    ScanOff = 0x0,
+    ScanIdle = 0x1,
+    ScanClosingIn = 0x2,
+    ScanInRange = 0x3,
+    ScanClosingInAgain = 0x4,     // closing in after the "stand by" line
+    ScanWaitStandBy = 0x5,        // waiting for that line to end
+    ScanScanning = 0x6,
+    ScanWaitDemand = 0x7,         // waiting for the demand line to end
+    ScanWaitAnswer = 0x8,         // waiting for the player's answer (AnswerTimer)
+    ScanJettisoned = 0xa,
+    ScanTractoring = 0xb,
+    ScanCollecting = 0xc,
+    ScanHostile = 0xd,
+};
+
 class FCargoScanRoute final : public FGuideRoute
 {
 public:
@@ -282,7 +302,7 @@ public:
                         unsigned int Response);
 
     FMissionDirectiveList Directives;            // +0x08 the directives Update hands out
-    int State = 0;                               // +0x14 see above
+    int State = ScanOff;                         // +0x14 ECargoScanState
     // +0x18: SetShip: the scanner's cargo scan range (pub::SpaceObj::GetScannerRange's second
     // value), 500 once scanning is possible.
     int ScanRange = -1;
@@ -296,7 +316,9 @@ public:
     std::vector<unsigned int> ScannedIds;        // +0x30 (allocator byte; +0x34..+0x3c)
     std::vector<unsigned int> LootIds;           // +0x40 the jettisoned cargo (+0x44..+0x4c)
     float AnswerTimer = 0.0f;                    // +0x50 state 8
-    unsigned int Field_0x54 = 0;                 // +0x54 0, copied. TODO: no reader found
+    // +0x54: 0 from the ctor (06f0ab93), copied by FUN_06f0c2c0 (06f0c3af); no other access
+    // in the scanner's code (06f0a900-06f0e000).
+    unsigned int Field_0x54 = 0;
     float ScanChance = 0.0f;                     // +0x58 SetShip: personality or faction scan_chance
     float LootTimer = -1.0f;                     // +0x5c 3.1 s before the loot is collected; -1 off
     bool bScanEnabled = true;                    // +0x60 SetScanEnabled

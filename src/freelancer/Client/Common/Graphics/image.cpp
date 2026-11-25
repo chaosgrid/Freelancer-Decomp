@@ -31,6 +31,10 @@ static_assert(sizeof(void*) != 4 || offsetof(Image, BigImage) == 0x14, "Image +0
 
 namespace
 {
+    // The TGA header's image type (byte 2, low three bits).
+    constexpr unsigned char kTgaColourMapped = 1;
+    constexpr unsigned char kTgaGreyscale = 3;
+
     char const kIntroCpp[] = "E:\\FL\\Scratch\\Source\\Client\\Interface\\Intro.cpp"; // 0x005e2724
     char const kBigImageFailed[] = "Failed to create a BigImage from an image source!\n"; // 0x005e2754
 
@@ -168,7 +172,7 @@ namespace
     // size) for a colour-mapped image, else byte +0x10 -- equal to 32 means 8 alpha bits.
     bool TgaHasAlpha(unsigned char const* Header)
     {
-        unsigned char const Bits = ((Header[2] & 7) == 1) ? Header[7] : Header[0x10];
+        unsigned char const Bits = ((Header[2] & 7) == kTgaColourMapped) ? Header[7] : Header[0x10];
         int const AlphaBits = (Bits == 0x20) ? 8 : 0;
         return AlphaBits > 0;
     }
@@ -177,7 +181,7 @@ namespace
     int TgaPaletteEntries(unsigned char const* Header)
     {
         unsigned char const Type = static_cast<unsigned char>(Header[2] & 7);
-        if (Type == 1)
+        if (Type == kTgaColourMapped)
         {
             short Length = 0;
             short First = 0;
@@ -185,7 +189,7 @@ namespace
             memcpy(&First, Header + 3, sizeof(First));
             return static_cast<int>(Length) + static_cast<int>(First);
         }
-        if (Type == 3)
+        if (Type == kTgaGreyscale)
             return 0x100;
         return 0;
     }
@@ -324,7 +328,7 @@ bool Image::LoadBmp(char const* Path)
             }
             else
             {
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kIntroCpp, 0x1ab, kBigImageFailed);
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kIntroCpp, 0x1ab, kBigImageFailed);
                 bResult = false;
             }
         }
@@ -374,11 +378,11 @@ bool Image::LoadTga(char const* Path)
             // Seeded with FUN_005b7010(0).
             unsigned long ImageFormat = static_cast<unsigned long>(PixelFormatFromD3D(0));
             unsigned char const Type = static_cast<unsigned char>(Header[2] & 7);
-            if (Type == 1 && Header[1] == 1)
+            if (Type == kTgaColourMapped && Header[1] == 1)
                 PixelFormatFind(&ImageFormat, 8, 0, 0, 0, 0);
             else if (Header[0x10] == 0x10)
                 PixelFormatFind(&ImageFormat, 0x10, 5, 5, 5, 0);
-            else if (Type == 3)
+            else if (Type == kTgaGreyscale)
                 PixelFormatFind(&ImageFormat, 8, 8, 0, 0, 0);
             else if (TgaHasAlpha(Header))
                 PixelFormatFind(&ImageFormat, 0x20, 8, 8, 8, 8);
@@ -400,7 +404,7 @@ bool Image::LoadTga(char const* Path)
                 // The pixels follow the 0x12-byte header, the id field and, for a colour-mapped
                 // image, 3 bytes per palette entry.
                 unsigned char const* Pixels = nullptr;
-                if ((Header[2] & 7) == 1)
+                if ((Header[2] & 7) == kTgaColourMapped)
                     Pixels = Header + Header[0] + 3 * (TgaPaletteEntries(Header) + 6);
                 else
                     Pixels = Header + Header[0] + 0x12;
@@ -426,7 +430,7 @@ bool Image::LoadTga(char const* Path)
                 }
                 else
                 {
-                    FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kIntroCpp, 0x1ff,
+                    FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kIntroCpp, 0x1ff,
                           kBigImageFailed);
                 }
             }

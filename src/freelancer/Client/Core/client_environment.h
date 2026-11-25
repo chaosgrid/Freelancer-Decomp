@@ -61,6 +61,15 @@ struct IInputEvent
     virtual bool Slot04(unsigned A, unsigned B, unsigned C) = 0;
 };
 
+// IEnvironment::GetEnvironmentType's answers.
+enum EEnvironmentType : int
+{
+    kEnvironmentSpace = 0,            // SpaceApp (0x004b5010)
+    kEnvironmentGameflow = 1,         // GF, the base (LAB_0051ca40)
+    kEnvironmentIntro = 2,            // IntroFocus (LAB_00517320)
+    kEnvironmentMissionBriefing = 3,  // MissionBriefing (LAB_0043d2e0)
+};
+
 struct IEnvironment : public IInputEvent
 {
     // +0x14, RET 0. GF LAB_00437260 (JMP FUN_00558e90); the others 0x00401e90 (a bare RET).

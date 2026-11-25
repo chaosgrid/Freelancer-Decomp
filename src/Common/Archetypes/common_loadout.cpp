@@ -226,7 +226,7 @@ int __cdecl Loadout::Load(char const* Path, bool bReload)
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: unable to open Loadout file %s", kLoadoutSource,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: unable to open Loadout file %s", kLoadoutSource,
               0xb3, Path);
     }
 

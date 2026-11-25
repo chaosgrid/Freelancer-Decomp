@@ -9,6 +9,7 @@
 #include "Missions/MissionDialogs.h"
 
 #include "Core/ContentStaticIds.h"   // TU28's 16 static-init thunks 06ef2070-06ef2250
+#include "Core/ContentInternal.h"     // GIdValueMask
 #include "Core/ContentPlayerState.h" // FindContentPlayerState (FUN_06f49b00), ...ByShip (FUN_06f49bc0)
 #include "Universe/SystemInfo.h"         // FSystemInfo (TU58), FindSystemInfo (FUN_06f75f30)
 #include "common_ini.h"
@@ -56,7 +57,7 @@ void FMissionDialog::Load(INI_Reader* Reader)
             Line.Comm.Key = PrevLineId;
             Line.Comm.TextId = pub::GetNicknameId(Reader->get_value_string(2));
             Line.Comm.TargetId = 0;   // retail leaves +0x74 unset until StartMissionDialog
-            Line.bFirst = (PrevLineId & 0x3fffffff) == 0 ? 1 : 0;
+            Line.bFirst = (PrevLineId & GIdValueMask) == 0 ? 1 : 0;
             It->second.push_back(Line);
             PrevLineId = Line.Comm.TextId;
         }

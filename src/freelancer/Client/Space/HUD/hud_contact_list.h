@@ -53,6 +53,38 @@ struct IObjRW;
 // BestPathObjectivesChanged (FUN_004bcbf0), cleared by the ctor and by Draw when it consumes it.
 extern unsigned char G_bHudContactListRefreshRequested;
 
+// FHudContactEntry::Kind, the row's icon and tooltip: named after the icon mesh of each index
+// (DAT_00612438, kContactIconPaths).
+enum EContactKind : int
+{
+    kContactShip = 0,
+    kContactPlanet = 1,
+    kContactStation = 2,
+    kContactBestPathWaypoint = 3,
+    kContactPlayerWaypoint = 4,
+    kContactBattleship = 5,
+    kContactJumpGate = 6,
+    kContactTradeLane = 7,
+    kContactFreighter = 8,
+    kContactTransport = 9,
+    kContactNomad = 0xa,
+    kContactLoot = 0xb,
+    kContactWeaponPlatform = 0xc,
+    kContactLootableDepot = 0xd,
+    kContactOtherPlayer = 0xe,
+    kContactGroupMember = 0xf,  // another player in the player's group
+};
+
+// HUD_ContactList::FilterMode, one per filter button.
+enum EContactFilter : int
+{
+    kContactFilterImportant = 0,  // "ImportantFilterButton"
+    kContactFilterShips = 1,      // "ShipsFilterButton"
+    kContactFilterSolars = 2,     // "SolarFilterButton"
+    kContactFilterLoot = 3,       // "LootFilterButton"
+    kContactFilterAll = 4,        // "AllFilterButton"
+};
+
 // One row source of the list (retail element 0x1c bytes in a VC6 std::list node of 0x24).
 struct FHudContactEntry
 {
@@ -67,7 +99,7 @@ struct FHudContactEntry
     // Watcher.target() - 8, or null: the IObjRW the row stands for.
     IObjRW* Object() const;
 
-    int Kind;                    // +0x00 0..0xf (icon / tooltip row), see the .cpp
+    int Kind;                    // +0x00 EContactKind (icon / tooltip row)
     BaseWatcher Watcher;         // +0x04
     float Distance;              // +0x0c sort key, the range text
     unsigned Id;                 // +0x10 the watched object's get_id
@@ -134,7 +166,7 @@ public:
     WinControl* SolarButton;           // +0x42c (+0x3f4) "SolarFilterButton"
     WinControl* LootButton;            // +0x430 (+0x3f8) "LootFilterButton"
     WinControl* AllButton;             // +0x434 (+0x3fc) "AllFilterButton"
-    int FilterMode;                    // +0x438 (+0x400) 0 important, 1 ships, 2 solars, 3 loot, 4 all
+    int FilterMode;                    // +0x438 (+0x400) EContactFilter
     unsigned char bDirty;              // +0x43c (+0x404) rebuild on the next Draw
     unsigned char Pad43d[3];
     CEquip* Scanner;                   // +0x440 (+0x408) the player ship's scanner (type 0x80000)

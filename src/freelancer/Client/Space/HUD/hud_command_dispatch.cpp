@@ -226,7 +226,7 @@ int HudDispatchCommand(unsigned MsgId, int Mode)
     }
 
     // Mode 1, USER_CANCEL (0xf), a key-down event and a non-empty cancel stack (DAT_0067c274).
-    if (Mode != 1 || MsgId != 0xfu)
+    if (Mode != 1 || MsgId != USER_CANCEL)
         return 0;
     if (G_HudCmdRecord.bKeyDown == 0)
         return 0;
@@ -367,7 +367,7 @@ bool SpaceSendCommand(FSpaceCommand* Command)
             FClientGameobj* const Object = reinterpret_cast<FClientGameobj*>(Held - 8);
             // ManagerKind 1 is the ship bucket: the object is an FClientShipGameobj, whose
             // slot 115 is FClientEquippedObj::HandleEquipMsg (overridden by the ship).
-            if (Object != nullptr && Object->ManagerKind == 1)
+            if (Object != nullptr && Object->ManagerKind == EClientGameobjKind::Ship)
                 static_cast<FClientShipGameobj*>(Object)->HandleEquipMsg(
                     reinterpret_cast<FCliEquipFirePacket const*>(Command));
         }

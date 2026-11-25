@@ -16,6 +16,7 @@
 #include "Interface/ui_text_edit.h"
 #include "Interface/ui_text_msg_button.h"
 #include "Interface/win3d_immediate.h"  // Win3DVec3Add (FUN_00423b30)
+#include "Interface/menu_enter_state.h"
 #include "NeuroNet/Chat/chat_init.h"        // EChatTextStyle
 
 #include "common_net.h"       // CPlayerAccount
@@ -82,7 +83,7 @@ bool PageAccountSelect::Create(Win3D* NewParent, void* /*Payload*/)
     SelectServer->GetToolTipHoverInfo()->IdsAlt = 0xace;
     Back->GetToolTipHoverInfo()->IdsAlt = 0xac6;
 
-    RegisterEvent(0xf); // FUN_005760d0 on the Event::Handler face
+    RegisterEvent(USER_CANCEL); // FUN_005760d0 on the Event::Handler face
 
     // Inlined twice (the list clear FUN_0046c860, StyleNode 0x9ca4, FUN_0057da40, the cut).
     LoadStyledIds(ExplainText, kTextStyleBody, 0x60005);
@@ -147,7 +148,7 @@ bool PageAccountSelect::Create(Win3D* NewParent, void* /*Payload*/)
 void PageAccountSelect::Destroy()
 {
     // FUN_005727b0. FUN_005760f0 on the Event::Handler face, MasterWin::Destroy FUN_00591de0.
-    UnregisterEvent(0xf);
+    UnregisterEvent(USER_CANCEL);
     UIPage::MasterWin::Destroy();
     AccountId = nullptr;
     SelectServer = nullptr;
@@ -173,8 +174,8 @@ void PageAccountSelect::Update()
             float BackOffset[3] = {T, 0.0f, 0.0f};
             float ServerOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
             float const Lift[3] = {0.0f, T, 0.0f};
-            Back->SetProperty(6, reinterpret_cast<uintptr_t>(BackOffset), 0);
-            SelectServer->SetProperty(6, reinterpret_cast<uintptr_t>(ServerOffset), 0);
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BackOffset), 0);
+            SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ServerOffset), 0);
             float BoxPosition[3];
             Win3DVec3Add(BoxPosition, BoxHome, Lift);
             AccountBox->SetPosition(BoxPosition);
@@ -182,8 +183,8 @@ void PageAccountSelect::Update()
         else
         {
             float ZeroOffset[3] = {0.0f, 0.0f, 0.0f};
-            Back->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            SelectServer->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
             AccountBox->SetPosition(BoxHome);
             ShowWin3D(Explain);
             ShowWin3D(AccountId);
@@ -206,8 +207,8 @@ void PageAccountSelect::Update()
         float const T = static_cast<float>(SlideT);
         float BackOffset[3] = {T, 0.0f, 0.0f};
         float ServerOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
-        Back->SetProperty(6, reinterpret_cast<uintptr_t>(BackOffset), 0);
-        SelectServer->SetProperty(6, reinterpret_cast<uintptr_t>(ServerOffset), 0);
+        Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BackOffset), 0);
+        SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ServerOffset), 0);
         float BoxPosition[3] = {BoxHome[0], T + BoxHome[1], BoxHome[2]}; // FUN_00422b80
         AccountBox->SetPosition(BoxPosition);
 
@@ -219,9 +220,9 @@ void PageAccountSelect::Update()
             HideWin3D(AccountId);
             HideWin3D(AccountBox);
             if (LeaveDirection == 1)
-                Result = 5;
+                Result = kMenuStateServerSelect;
             else if (LeaveDirection == -1)
-                Result = 1;
+                Result = kMenuStateMainMenu;
             bLeaving = 0;
         }
     }
@@ -233,7 +234,7 @@ void PageAccountSelect::Update()
 bool PageAccountSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
 {
     // FUN_00573010.
-    if (Msg == 0x3004)
+    if (Msg == kWinMsgCommand)
     {
         PlayOrRewindUiSoundSlot(0); // FUN_005645c0(0)
         if (A == 0x3e9) // "Back"
@@ -245,12 +246,12 @@ bool PageAccountSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
             return false;
         return SubmitTypedKey();
     }
-    if (Msg == 0xf003)
+    if (Msg == kWinMsgEscape)
     {
         BeginLeave(-1);
         return true;
     }
-    if (Msg == 0xf004)
+    if (Msg == kWinMsgEnter)
         return SubmitTypedKey();
     return false;
 }
@@ -280,7 +281,7 @@ bool PageAccountSelect::OnEvent(unsigned MsgId)
 {
     // LAB_005733b0 (this = the +0x80 face): event 0xf leaves back to the main menu; anything
     // else is FUN_0053f330 (false).
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return UIPage::MasterWin::OnEvent(MsgId);
     BeginLeave(-1);
     return true;

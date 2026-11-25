@@ -27,6 +27,30 @@
 class WinControl;
 struct Win3D;
 
+// The IntroFocus states (FMenuNavState::CurrentState, EnterMenuState's cases). The pages'
+// Result fields and the main-menu column's button commands are values of the same set.
+// 7, 8, 11 (the column's Exit command), 13 and 15 are listed only where their effect is plain.
+enum EMenuState : int
+{
+    kMenuStateMainMenu = 1,              // the TypeSelect column
+    kMenuStateLogin = 2,                 // SP -> 18; MP: account check and LoginToServer
+    kMenuStateLoadGame = 3,              // the column's "Load Game": -> 2
+    kMenuStateMultiplayer = 4,           // MP session set up -> 5 (or 6 without an account)
+    kMenuStateServerSelect = 5,          // PageServerSelect
+    kMenuStateAccountSelect = 6,         // PageAccountSelect
+    kMenuStateCharacterSelect = 9,       // PageCharacterSelect
+    kMenuStateOptions = 10,              // PageOptions
+    kMenuStateExit = 11,                 // the column's Exit command (TypeSelect opens NN_Exit)
+    kMenuStateEnterGame = 12,            // select the picked character -> 20
+    kMenuStateQuit = 13,                 // the single-player start failed: client state 1
+    kMenuStateCharacterCreate = 14,      // PageCharacterCreate
+    kMenuStateNewGame = 16,              // the Restart.fl character -> 12
+    kMenuStateFlasher = 17,              // runs Flasher.exe
+    kMenuStateSingleCharacterSelect = 18, // PageCharacterSelectSingle
+    kMenuStateReturnFromGame = 19,       // back from the game (intro latch 2 / 4)
+    kMenuStateInGame = 20,               // the driver returns client state 3 (base) or 2
+};
+
 struct FMenuNavState
 {
     int CurrentState;           // +0x004

@@ -149,7 +149,7 @@ namespace
             else
             {
                 // The "%s" before the name is the .rdata literal "temp".
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: [VisEffect] %s: Failed to load texture library: %s.  "
                       "Removing from txm list.",
                       "E:\\FL\\Scratch\\Source\\Client\\cmn\\VisEffectArch.cpp", 0x166, "temp",
@@ -410,7 +410,7 @@ namespace
             if (TypeIndex == kEffectTypeCount)
             {
                 Reader->log_link("");
-                FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kEffectArchCpp, 0x3a,
+                FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kEffectArchCpp, 0x3a,
                       "unknown effect type");
                 return true;
             }
@@ -418,7 +418,7 @@ namespace
             FEffectTypeInfo const* const Info = EffectTypeInfoByIndex(TypeIndex);
             if (Info == nullptr)
             {
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: EffectTypeInfo missing for EffectType (%d)",
                       kEffectArchCpp, 0x47, Effect->EffectType);
                 return true;
@@ -554,7 +554,7 @@ namespace
         {
             char const* const NewName =
                 Incoming->VisEffect != nullptr ? Incoming->VisEffect->AlchemyPath : "NULL";
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s: 'vis_effect' changed to %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s: 'vis_effect' changed to %s",
                   kEffectArchCpp, 0x89, EffectArchNickname(Existing), NewName);
             Existing->VisEffect = Incoming->VisEffect;
             Existing->VisEffectName = Incoming->VisEffectName;
@@ -567,7 +567,7 @@ namespace
                 Incoming->SndEffect != nullptr
                     ? static_cast<Archetype::ISound*>(Incoming->SndEffect)->GetFileName()
                     : "NULL";
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s: 'snd_effect' changed to %s",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s: 'snd_effect' changed to %s",
                   kEffectArchCpp, 0x93, EffectArchNickname(Existing), NewName);
             Existing->SndEffect = Incoming->SndEffect;
         }
@@ -575,7 +575,7 @@ namespace
         // Retail prints the old light name where the other messages print the arch nickname.
         if (strcmp(Existing->LgtEffect, Incoming->LgtEffect) != 0)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %s: 'lgt_effect.name' changed to %s.",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s: 'lgt_effect.name' changed to %s.",
                   kEffectArchCpp, 0x97, Existing->LgtEffect, Incoming->LgtEffect);
             size_t Len = strlen(Incoming->LgtEffect);
             if (Len >= 0x20)
@@ -588,7 +588,7 @@ namespace
         // An unordered pair counts as changed.
         if (Incoming->LgtRangeScale != Existing->LgtRangeScale)
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: %.2f: 'lgt_effect.range_scale' changed to %.2f.",
                   kEffectArchCpp, 0x98, static_cast<double>(Existing->LgtRangeScale),
                   static_cast<double>(Incoming->LgtRangeScale));
@@ -596,7 +596,7 @@ namespace
         }
         if (Incoming->LgtTimeScale != Existing->LgtTimeScale)
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: %.2f: 'lgt_effect.time_scale' changed to %.2f.",
                   kEffectArchCpp, 0x99, static_cast<double>(Existing->LgtTimeScale),
                   static_cast<double>(Incoming->LgtTimeScale));
@@ -607,7 +607,7 @@ namespace
         unsigned const NewColor = EffectArchColorDword(Incoming);
         if (NewColor != OldColor)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %x: 'lgt_color_value' changed to %x.",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %x: 'lgt_color_value' changed to %x.",
                   kEffectArchCpp, 0x9b, OldColor, NewColor);
             Existing->LgtColorR = Incoming->LgtColorR;
             Existing->LgtColorG = Incoming->LgtColorG;
@@ -617,7 +617,7 @@ namespace
 
         if (Incoming->LgtRadius != Existing->LgtRadius)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %2.f: 'lgt_radius' changed to %2.f.",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %2.f: 'lgt_radius' changed to %2.f.",
                   kEffectArchCpp, 0x9c, static_cast<double>(Existing->LgtRadius),
                   static_cast<double>(Incoming->LgtRadius));
             Existing->LgtRadius = Incoming->LgtRadius;
@@ -627,7 +627,7 @@ namespace
         unsigned const NewFlags = EffectArchFlagsDword(Incoming);
         if (NewFlags != OldFlags)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: %x: 'flags' changed to %x.", kEffectArchCpp,
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %x: 'flags' changed to %x.", kEffectArchCpp,
                   0x9e, OldFlags, NewFlags);
             Existing->Flags = Incoming->Flags;
             Existing->FlagsHigh[0] = Incoming->FlagsHigh[0];
@@ -660,7 +660,7 @@ namespace
         }
         else
         {
-            FDUMP(0x100002,
+            FDUMP(kFdumpWarning,
                   "%s(%d) : *** WARNING: [Effect] nickname = %s value is not unique. Aborted "
                   "second version.",
                   kEffectArchCpp, 0xfc, EffectArchNickname(Arch));
@@ -818,7 +818,7 @@ void EffectArchDestruct(FEffectArch* Arch)
     int Dangling = Arch->RefCount;
     if (Dangling <= 0)
         return;
-    FDUMP(0x100002,
+    FDUMP(kFdumpWarning,
           "%s(%d) : *** WARNING: Destroying effect archetype (%s) with %d dangling references. "
           "See SSTEVENS",
           kEffectArchCpp, 0x25, EffectArchNickname(Arch), Dangling);
@@ -939,7 +939,7 @@ bool VisEffectArchAddRef(FVisEffectArch* Vis)
     // An empty ale name is an error; the count still goes up.
     if (Vis->AlchemyPath[0] == '\0')
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\VisEffectArch.cpp", 0x13a,
               "[VisEffect]: Missing ale file name!");
         Vis->RefCount += 1;
@@ -1016,7 +1016,7 @@ int AleLibLoad(char const* AleName)
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Failed to load %s.",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Failed to load %s.",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\ALELib.cpp", 0x5c, AleName);
     }
 
@@ -1047,7 +1047,7 @@ int AleLibRelease(int Handle)
     int const Count = It->second.RefCount;
     if (Count != 0 && Count < 0)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s ref count < 0!",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s ref count < 0!",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\ALELib.cpp", 0x7d, It->first.c_str());
     }
     return Count;
@@ -1062,7 +1062,7 @@ int AleLibShutdown()
     {
         if (It->second.RefCount > 0)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: ALELib::Shutdown(): %s has %d dangling refs.",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: ALELib::Shutdown(): %s has %d dangling refs.",
                   "E:\\FL\\Scratch\\Source\\Client\\cmn\\ALELib.cpp", 0x96, It->first.c_str(),
                   It->second.RefCount);
             ++Dangling;

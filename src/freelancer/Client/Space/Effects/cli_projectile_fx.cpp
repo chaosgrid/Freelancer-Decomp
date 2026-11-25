@@ -746,7 +746,7 @@ void FCliGunFx::FireDirect(Vector const* Target)
     // sets the gun's target point.
     unsigned Owner = 0;
     CObject* const Object = Host->Object;
-    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 3u) == 3u)
+    if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
         Owner = static_cast<CSimple*>(Object)->OwnerPlayer;
     else
         Owner = GetPlayerConnectionId();
@@ -834,7 +834,7 @@ namespace
         if (Host == nullptr || Host->Object == nullptr)
             return nullptr;
         CObject* Obj = Host->Object;
-        if ((static_cast<unsigned>(Obj->ObjectClass) & 0x103u) != 0x103u)
+        if ((static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
             return nullptr;
         return static_cast<CEqObj*>(Obj);
     }
@@ -850,7 +850,7 @@ namespace
         unsigned char* RwBytes = static_cast<unsigned char*>(PlayerRw);
         CObject* Nested = *reinterpret_cast<CObject**>(RwBytes + 0x10);
         if (Nested == nullptr ||
-            ((static_cast<unsigned>(Nested->ObjectClass) & 0x503u) != 0x503u))
+            ((static_cast<unsigned>(Nested->ObjectClass) & CObject::ClassShip) != CObject::ClassShip))
             return nullptr;
         return Nested;
     }
@@ -902,7 +902,7 @@ namespace
         CEqObj* EqObj = ResolveEqObjFromHost(Host);
         CShip* Ship = nullptr;
         if (EqObj != nullptr &&
-            (static_cast<unsigned>(EqObj->ObjectClass) & 0x503u) == 0x503u)
+            (static_cast<unsigned>(EqObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
             Ship = static_cast<CShip*>(EqObj);
 
         unsigned short EffectiveSub = SubId;
@@ -956,7 +956,7 @@ namespace
             static_cast<FClientEquippedObj*>(static_cast<IObjAffect*>(AdjustorThis));
         CObject* const Obj0 = Owner->Object;
         CEqObj* const EqObj =
-            (Obj0 != nullptr && (static_cast<unsigned>(Obj0->ObjectClass) & 0x103u) == 0x103u)
+            (Obj0 != nullptr && (static_cast<unsigned>(Obj0->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
                 ? static_cast<CEqObj*>(Obj0)
                 : nullptr;
 
@@ -972,7 +972,7 @@ namespace
         if (Target != nullptr)
         {
             CObject const* Obj = Target->cobject();
-            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 3u) == 3u)
+            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
                 TargetSimple = const_cast<CSimple*>(static_cast<CSimple const*>(Obj));
         }
 
@@ -1023,7 +1023,7 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
         Light::AnimationArch* const Anim = GameLightFindAnimByName(Companion->LightAnimName);
         if (Anim == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: light animation (%s) is not defined\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: light animation (%s) is not defined\n",
                   kCliLauncherCpp, 0x140, Companion->LightAnimName);
             return;
         }
@@ -1037,7 +1037,7 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
         FGameLight* const Light = GameLightCreatePoint(Pos3, Rgba, Companion->FlashRadius);
         if (Light == nullptr)
         {
-            FDUMP(0x100002, "%s(%d) : *** WARNING: Light creation for gun failed: %s\n",
+            FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Light creation for gun failed: %s\n",
                   kCliLauncherCpp, 0x13b, Launch->Arch->Nickname.get_string());
             return;
         }
@@ -1111,7 +1111,7 @@ int CliShipActivateEquip(void* AdjustorThis, unsigned short const* HardpointId,
         static_cast<FClientGameobj*>(static_cast<IObjAffect*>(AdjustorThis));
     CObject* const Obj = Self->Object;
     CEqObj* const EqObj =
-        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x103u) == 0x103u)
+        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
             ? static_cast<CEqObj*>(Obj)
             : nullptr;
 
@@ -1124,7 +1124,7 @@ int CliShipActivateEquip(void* AdjustorThis, unsigned short const* HardpointId,
     if (bOn == 0 && Equip->Type == static_cast<unsigned>(EquipTypeEngine))
     {
         CShip* const Ship =
-            (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+            (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                 ? static_cast<CShip*>(Obj)
                 : nullptr;
         if (Ship->get_strafe_dir() != 0)
@@ -1362,7 +1362,7 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
                                         FCliEquipFirePacket const* Packet)
 {
     // FUN_00534460. Neither `this` nor the packet is tested at entry.
-    if (Packet->Op == 0x18)
+    if (Packet->Op == USER_USE_ITEM)
     {
         // The whole +0x10 dword is tested; the id pushed is its low word.
         unsigned short Hp = Packet->HardpointId;
@@ -1379,7 +1379,7 @@ unsigned char EquippedObjHandleEquipMsg(FClientEquippedObj* Host,
         return 1;
     }
 
-    if (Packet->Op != 0x19)
+    if (Packet->Op != USER_ACTIVATE_ITEM)
         return 0;
 
     // ActivateEquip arm, cases 0..4 (all return 0). FindByID is called with no test of the
@@ -1463,7 +1463,7 @@ void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket*
 
     CEqObj* Ship = nullptr;
     if (Host->Object != nullptr &&
-        ((static_cast<unsigned>(Host->Object->ObjectClass) & 0x503u) == 0x503u))
+        ((static_cast<unsigned>(Host->Object->ObjectClass) & CObject::ClassShip) == CObject::ClassShip))
         Ship = static_cast<CEqObj*>(Host->Object);
     if (Ship == nullptr)
         return;
@@ -1471,9 +1471,9 @@ void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket*
     // 0x1fe0 = launcher family mask (gun/mine/cm droppers etc.).
     constexpr int kLauncherMask = 0x1fe0;
 
-    if (Packet->Op == 0x1a)
+    if (Packet->Op == USER_NEXT_ITEM)
     {
-        Packet->Op = 0x19;
+        Packet->Op = USER_ACTIVATE_ITEM;
         CEquipTraverser Trav(kLauncherMask);
         CEquipManager* Mgr = &Ship->EquipManager;
         CEquip* First = Mgr->Traverse(Trav);
@@ -1497,9 +1497,9 @@ void CliShipPreprocessEquipUpdate(FClientEquippedObj* Host, FCliEquipFirePacket*
         return;
     }
 
-    if (Packet->Op == 0x1b)
+    if (Packet->Op == USER_PREV_ITEM)
     {
-        Packet->Op = 0x19;
+        Packet->Op = USER_ACTIVATE_ITEM;
         CEquipTraverser Trav(kLauncherMask);
         CEquipManager* Mgr = &Ship->EquipManager;
         CEquip* First = Mgr->ReverseTraverse(Trav);
@@ -1545,7 +1545,7 @@ void CliShipLeadAimFire(FClientEquippedObj* Host)
 
     // get_tgt_lead_fire_pos on the CShip narrowing, untested.
     CObject* const Obj = Host->Object;
-    CShip* const Ship = (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+    CShip* const Ship = (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                             ? static_cast<CShip*>(Obj)
                             : nullptr;
     Vector Lead;
@@ -1592,7 +1592,7 @@ unsigned char CliShipHandleEquipUpdate(FClientEquippedObj* Host,
     if (Handled != 0)
         return 1;
 
-    if (Local.Op == 0x1c)
+    if (Local.Op == USER_SET_TARGET)
     {
         // Packet +0x10 = object id (dword); +0x14 = sub id.
         unsigned const TargetId = *reinterpret_cast<unsigned const*>(
@@ -1609,12 +1609,12 @@ unsigned char CliShipHandleEquipUpdate(FClientEquippedObj* Host,
 
             // Every gun gets the target too; each pass re-narrows the object (class & 0x503)
             // and walks its manager with no test of the result.
-            CEquipTraverser Trav(0x80);
+            CEquipTraverser Trav(EquipTypeGun);
             while (true)
             {
                 CObject* const Obj = Host->Object;
                 CEqObj* const Ship =
-                    (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) == 0x503u)
+                    (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                         ? static_cast<CEqObj*>(Obj)
                         : nullptr;
                 CEquip* const Equip = Ship->EquipManager.Traverse(Trav);
@@ -1625,7 +1625,7 @@ unsigned char CliShipHandleEquipUpdate(FClientEquippedObj* Host,
             }
         }
     }
-    else if (Local.Op == 0xbb)
+    else if (Local.Op == USER_FIRE_FORWARD)
     {
         CliShipLeadAimFire(Host);
     }
@@ -1690,7 +1690,7 @@ namespace
             return false;
         CSimple* Simple = nullptr;
         if (Host != nullptr && Host->Object != nullptr &&
-            (static_cast<unsigned>(Host->Object->ObjectClass) & 0x103u) == 0x103u)
+            (static_cast<unsigned>(Host->Object->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
         {
             Simple = static_cast<CSimple*>(Host->Object);
         }
@@ -1858,7 +1858,7 @@ void FCliCmDropperFx::notify(Event Code, void* Param)
         // When the host object's owner is this client, fire this one equipment (no target).
         unsigned Owner = 0;
         CObject* const Object = Host->Object;
-        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & 3u) == 3u)
+        if (Object != nullptr && (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassSimple) == CObject::ClassSimple)
             Owner = static_cast<CSimple*>(Object)->OwnerPlayer;
         else
             Owner = GetPlayerConnectionId();
@@ -2012,7 +2012,7 @@ namespace
             }
             else
             {
-                FDUMP(0x100001,
+                FDUMP(kFdumpError,
                       "%s(%d) : *** ERROR: %s: [Effect] const_effect_name %s is missing from "
                       "effects.ini.",
                       "E:\\FL\\Scratch\\Source\\Client\\Space\\CliLauncher.cpp", 0x51,

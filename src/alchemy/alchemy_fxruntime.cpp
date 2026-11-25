@@ -24,14 +24,14 @@ namespace AlchemyImpl
     GENRESULT DACOM_API FFxRuntime::FInnerUnknown::QueryInterface(const char* Iid, void** Out)
     {
         // LAB_062043a0: only IFxRuntime and IAggregateComponent are listed.
-        if (IidEqual(Iid, Iids::FxRuntime))
+        if (Iids::EqualNoNullTest(Iid, Iids::FxRuntime))
         {
             IFxRuntime* const Interface = static_cast<IFxRuntime*>(Owner_);
             Interface->AddRef();
             *Out = Interface;
             return GR_OK;
         }
-        if (IidEqual(Iid, Iids::AggregateComponent))
+        if (Iids::EqualNoNullTest(Iid, Iids::AggregateComponent))
         {
             IAggregateComponent* const Interface = &Owner_->Aggregate_;
             Interface->AddRef();

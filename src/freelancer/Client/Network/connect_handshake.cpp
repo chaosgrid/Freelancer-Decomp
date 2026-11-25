@@ -8,6 +8,7 @@
 
 #include "Core/client_frame_tick.h"    // BeginClientRenderFrame / EndClientRenderFrame
 #include "common_server.h"        // IServer
+#include "dplay8_min.h"           // DPNERR_INVALIDPASSWORD, DPNERR_SESSIONFULL
 #include "common_misc.h"          // SinglePlayer
 #include "common_timing.h"        // Timing::read
 #include "Core/globals.h"              // PumpMessages, GetClientFrameTimeCapped
@@ -122,13 +123,13 @@ int WaitForServerResponse(unsigned char* bResponse, float MpTimeout, float SpTim
     if (G_ConnectResult != 0)
     {
         // DPNERR HRESULTs.
-        if (G_ConnectResult == static_cast<long>(0x80158410))
+        if (G_ConnectResult == DPNERR_INVALIDPASSWORD)
         {
             Result = 6;
         }
         else
         {
-            Result = (G_ConnectResult != static_cast<long>(0x80158610)) ? 5 : 4;
+            Result = (G_ConnectResult != DPNERR_SESSIONFULL) ? 5 : 4;
         }
         G_bWaitingForServer = false;
         return Result;
@@ -142,7 +143,7 @@ int WaitForServerResponse(unsigned char* bResponse, float MpTimeout, float SpTim
         {
             ShutdownServerConnection();    // FUN_005a8260
             MenuNavSetIntroModeRequest(3); // FUN_00564b10(3)
-            HudPostCommand(0xc5, 0);       // FUN_005763b0(0xc5, 0)
+            HudPostCommand(USER_EXIT_GAME, 0);       // FUN_005763b0(0xc5, 0)
         }
     }
 

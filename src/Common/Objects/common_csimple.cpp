@@ -239,7 +239,7 @@ void CSimple::init(CreateParms const& Parms)
         }
         else
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: ARCH(%s) ID(0x%X) CSimple::init(): "
                   "init_hit_pts (%f) greater than max (%f)",
                   kCSimpleSource, 0x45, Archetype->Nickname.get_string(), Id,
@@ -249,7 +249,7 @@ void CSimple::init(CreateParms const& Parms)
     }
     else
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: ARCH(%s) ID(0x%X) CSimple::init(): "
               "Negative init_hit_pts (%f)",
               kCSimpleSource, 0x3b, Archetype->Nickname.get_string(), Id,

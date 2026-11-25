@@ -155,7 +155,7 @@ GENRESULT DACOM_API FMaterialLibrary::AddMapRule(int Key, const char* Pattern, c
     char Message[0x2000];
     _snprintf(Message, sizeof(Message), "Adding material map: %s:%s:%s",
               Key == 1 ? "Type" : "Name", Pattern, TypeName);
-    FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+    FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
           "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialLibrary.cpp",
           0x362, Message);
     FMaterialMapRule Rule;
@@ -234,7 +234,7 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
     const char* SourceFile = "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialLibrary.cpp";
     if (FileSystem == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s", SourceFile, 0x195,
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", SourceFile, 0x195,
               "IFileSystem argument is NULL in MaterialLibrary::load_library");
         return (GENRESULT)-1;
     }
@@ -330,7 +330,7 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
                         char Message[0x2000];
                         std::snprintf(Message, sizeof(Message),
                             "Unable to load material '%s' as type '%s'\n", ChildName, Type);
-                        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+                        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
                               SourceFile, 0x1C1, Message);
                         unsigned long Record[2] = {
                             (unsigned long)ChildName, Crc};
@@ -972,7 +972,7 @@ FMaterialLibraryRecord* FMaterialLibrary::CreateGenericRecord(const char* Name, 
         char Message[0x2000];
         std::snprintf(Message, sizeof(Message),
             "Unable to create material '%s' ('%s', '%s')\n", NameCopy, TypeCopy, SelectedType);
-        FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
+        FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
             "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialLibrary.cpp",
             0x14F, Message);
         return nullptr;
@@ -1065,7 +1065,7 @@ FMaterialLibraryRecord* DACOM_API FMaterialLibrary::CreateAfterMap(const char* N
                     std::snprintf(Message, sizeof(Message),
                         "Unable to set super type for '%s' (%s) [%s]\n",
                         NameCopy, TypeCopy, SelectedType);
-                    FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
+                    FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s",
                         "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Shading\\Materials\\MaterialBatcher.cpp",
                         0x441, Message);
                 }

@@ -682,7 +682,7 @@ int CLoginMgr::Connect(bool bDisconnectFirst)
     char Address[0x400];
     if (SinglePlayer())
     {
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kLoginMgrSource, 0x15f,
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kLoginMgrSource, 0x15f,
               "Starting single player game.\n");
         SetupSinglePlayer();        // FUN_005aa210; its result is not read
         sprintf(Address, "%s", "localpass");
@@ -692,7 +692,7 @@ int CLoginMgr::Connect(bool bDisconnectFirst)
         char Notice[0x2000];
         sprintf(Notice, "MP Connect: Server %S, IP %S\n", CurrentServer.Name.c_str(),
                 CurrentServer.Address.c_str());
-        FDUMP(0x100003, "%s(%d) : NOTICE:General:%s", kLoginMgrSource, 0x165, Notice);
+        FDUMP(kFdumpNotice, "%s(%d) : NOTICE:General:%s", kLoginMgrSource, 0x165, Notice);
 
         char* Cursor = Address + sprintf(Address, "tcpip, %S:", CurrentServer.Address.c_str());
         if (CurrentServer.Port != 0)

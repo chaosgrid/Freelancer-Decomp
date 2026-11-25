@@ -161,7 +161,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
     }
     else
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Unable to read Freelancer config file (%s)",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Unable to read Freelancer config file (%s)",
               "E:\\FL\\Scratch\\Source\\Client\\config.cpp", 0x17f, Options->ini_path.Text);
     }
 

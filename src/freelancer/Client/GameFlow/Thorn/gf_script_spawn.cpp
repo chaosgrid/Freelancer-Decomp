@@ -250,7 +250,7 @@ void FGfScript::ApplySpecialMarker(FThornEntitySnap const* Snap, FThornComponent
         GetRoomRuntimeRoomData(Room)->find_setpoint_generic(Mapped, ScriptFile);
     if (Info == nullptr)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Generic script %s applied on trigger %s uses special marker %s "
               "mapping to %s which not exist in setpoint layer\n",
               GScriptFile, 0x80, ScriptFile, Name, EntityName, Mapped);
@@ -331,7 +331,7 @@ void FGfScript::ApplySpecialCamera(FThornEntitySnap const* Snap, FThornComponent
         GetRoomRuntimeRoomData(Room)->find_camera_generic(Mapped, ScriptFile);
     if (Info == nullptr)
     {
-        FDUMP(0x100001,
+        FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Cannot find remapped special camera %s implied by special "
               "camera name %s and character hardpoint name %s\n",
               GScriptFile, 0x121, Mapped, EntityName, Name);
@@ -494,7 +494,7 @@ FThornComponent* FGfScript::SpawnSound(int Index, FThornEntitySnap const* Snap)
         char const* const Speaker = ThornGetUserString(Engine, Index, "speaker");
         if (Speaker == nullptr)
         {
-            FDUMP(0x100001,
+            FDUMP(kFdumpError,
                   "%s(%d) : *** ERROR: Voice profile sound %s in script %s needs a speaker property",
                   GScriptFile, 0x21f, Snap->TemplateName, ScriptFile);
         }
@@ -567,7 +567,7 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
         FObjectProp* const Prop = RoomControlFindProp(Room, Snap->Name);
         if (Prop == nullptr)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: Cannot find referenced prop %s in the set layer",
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: Cannot find referenced prop %s in the set layer",
                   GScriptFile, 0x2b4, Snap->Name);
             return;
         }
@@ -585,7 +585,7 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
     {
         FObjectShip* const Ship = GfObjectShip();
         if (Ship == nullptr)
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", GScriptFile, 0x2d8, "No player ship");
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", GScriptFile, 0x2d8, "No player ship");
         // Retail goes on with a null ship.
         *OutObject = Ship;
         *OutInstance = static_cast<long>(reinterpret_cast<intptr_t>(Ship->GetEngineInstance()));
@@ -646,7 +646,7 @@ FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char
         Character = RoomControlPlayerCharacter(Room);
         if (Character == nullptr)
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", GScriptFile, 0x358,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", GScriptFile, 0x358,
                   "Player hardpoint is missing, so script cannot connect to the player.\n");
             return nullptr;
         }
@@ -673,7 +673,7 @@ FCharacterObject* FGfScript::ResolveCharacter(FThornEntitySnap const* Snap, char
     }
     else if (BindMode != 0)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", GScriptFile, 0x382,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", GScriptFile, 0x382,
               "Invalid character binding method\n");
     }
     if (Character == nullptr)

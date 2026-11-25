@@ -321,8 +321,11 @@ struct FGfScriptSequence
     unsigned char bHoldTime;       // +0x0f 1: FUN_00558bf0 at each script start
     int Priority;                  // +0x10 -> FGfScript +0x58
     unsigned char bPropsToRoom;    // +0x14 -> FGfScript +0x5c
-    unsigned char Field_0x15;      // +0x15 1 TODO: gates +0x2e with +0x16 (StartEntry, OnEvent)
-    unsigned char Field_0x16;      // +0x16 TODO: see +0x15
+    unsigned char bSkippable;      // +0x15 1: OnEvent(0xf) (LAB_00456840) sets bSkip only when
+                                   // set; CanSkipAll (FUN_004568a0) is false for a letterboxed 0
+    unsigned char bTransition;     // +0x16 set for room-entry, launch and dealer scripts; with the
+                                   // skip_transition_scripts option (FUN_00454910) StartEntry
+                                   // (FUN_00454fb0) starts such a skippable sequence skipped
     unsigned char Pad17;
     FStopCallback Callback;        // +0x18 called at the stop with (+0x1c, +0x20, bArg)
     void* CallbackA;               // +0x1c

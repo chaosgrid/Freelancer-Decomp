@@ -61,13 +61,6 @@ void RendCompFdumpAt(int Flags, const char* File, int Line, const char* Message)
     FDUMP(Flags, Format, File, Line, Message);
 }
 
-bool RendCompIidEqual(const char* Left, const char* Right)
-{
-    if (Left == nullptr || Right == nullptr)
-        return false;
-    return std::strcmp(Left, Right) == 0;
-}
-
 // RendComp carries the FileSystem component as void*; this is the single place that says
 // what it actually is, so every helper below calls ReadFile's published interface.
 static IFileSystem* AsFileSystem(void* File)

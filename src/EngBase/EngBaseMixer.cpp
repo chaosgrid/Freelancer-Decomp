@@ -83,33 +83,6 @@ float MixerEase(long Index)
     return G_MixerEaseTable[Index];
 }
 
-// FUN_0661d0b0. No bound check in retail.
-void MixerStackPush(FMixerStack* Stack, FMixerNode* Node)
-{
-    Stack->Nodes[Stack->Count] = Node;
-    Stack->Count += 1;
-}
-
-// FUN_0661d0d0: 0 when empty.
-FMixerNode* MixerStackPop(FMixerStack* Stack)
-{
-    if (Stack->Count == 0)
-        return nullptr;
-    Stack->Count -= 1;
-    return Stack->Nodes[Stack->Count];
-}
-
-// FUN_0661d0f0: pop, then tail-jump into the node's Evaluate, reusing the Kind argument slot
-// for the stack pointer. Kind is never read.
-void MixerStackEvaluate(FMixerStack* Stack, float* Out, unsigned long Kind)
-{
-    (void)Kind;
-    FMixerNode* Node = MixerStackPop(Stack);
-    if (Node == nullptr)
-        return;
-    Node->Evaluate(Out, Stack);
-}
-
 // FUN_0661d460: vec3 lerp, then 3DMath +0x58 slerp of the quaternions at +0xC into a local,
 // copied to Out+3.
 void MixerBlendPosQuat(float* Out, const float* A, const float* B, float T)
@@ -190,6 +163,33 @@ void MixerMarkDropped(FMixerNode* Node)
 }
 } // namespace
 
+// FUN_0661d0b0. No bound check in retail.
+void FMixerStack::Push(FMixerNode* Node)
+{
+    Nodes[Count] = Node;
+    Count += 1;
+}
+
+// FUN_0661d0d0: 0 when empty.
+FMixerNode* FMixerStack::Pop()
+{
+    if (Count == 0)
+        return nullptr;
+    Count -= 1;
+    return Nodes[Count];
+}
+
+// FUN_0661d0f0: pop, then tail-jump into the node's Evaluate, reusing the Kind argument slot
+// for the stack pointer. Kind is never read.
+void FMixerStack::Evaluate(float* Out, unsigned long Kind)
+{
+    (void)Kind;
+    FMixerNode* Node = Pop();
+    if (Node == nullptr)
+        return;
+    Node->Evaluate(Out, this);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Node methods
 // ---------------------------------------------------------------------------------------------
@@ -234,8 +234,8 @@ unsigned long FMixerBlend::Tick(float Dt)
 // LAB_0661d160.
 void FMixerBlend::Evaluate(float* Out, FMixerStack* Stack)
 {
-    FMixerNode* Right = MixerStackPop(Stack);
-    FMixerNode* Left = MixerStackPop(Stack);
+    FMixerNode* Right = Stack->Pop();
+    FMixerNode* Left = Stack->Pop();
     float LeftValue[7];
     float RightValue[7];
     Left->Evaluate(LeftValue, Stack);
@@ -660,7 +660,7 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
     Cursor = List->Head;
     while (Cursor != nullptr)
     {
-        MixerStackPush(&Stack, Cursor);
+        Stack.Push(Cursor);
         Cursor = Cursor->Next;
     }
 
@@ -685,7 +685,7 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
         }
 
         float Out[7];
-        MixerStackEvaluate(&Stack, Out, Kind);
+        Stack.Evaluate(Out, Kind);
 
         if (Desc->Kind == 0)
             G_AnimEngine->SetJointParams(Desc->Instance, 0, Out);

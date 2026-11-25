@@ -67,12 +67,6 @@ namespace
                                             Line, static_cast<unsigned int>(Hr)));
     }
 
-    // Retail QIs compare inline with no null checks.
-    bool IidEqual(const char* Left, const char* Right)
-    {
-        return strcmp(Left, Right) == 0;
-    }
-
     static const char kFraunhoferName[] = "Fraunhofer IIS MPEG Layer-3 Codec (advanced)";
 
     struct FAcmSearch
@@ -906,14 +900,14 @@ GENRESULT DACOM_API FStreamerInner::QueryInterface(const char* Iid, void** Out)
 {
     // LAB_06ef3d00: table 06efc24c {IStreamer,+0} {IStreamer2,+0} {IAggregateComponent,+4}, no
     // null checks. The hit is AddRef'd through its own vtable.
-    if (IidEqual(Iid, Iids::Streamer) || IidEqual(Iid, Iids::Streamer2))
+    if (Iids::EqualNoNullTest(Iid, Iids::Streamer) || Iids::EqualNoNullTest(Iid, Iids::Streamer2))
     {
         IStreamer2* Facet = static_cast<IStreamer2*>(Self);
         Facet->AddRef();
         *Out = Facet;
         return GR_OK;
     }
-    if (IidEqual(Iid, Iids::AggregateComponent))
+    if (Iids::EqualNoNullTest(Iid, Iids::AggregateComponent))
     {
         IAggregateComponent* Facet = static_cast<IAggregateComponent*>(Self);
         Facet->AddRef();

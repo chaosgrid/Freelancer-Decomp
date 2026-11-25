@@ -562,7 +562,7 @@ void IBehaviorManager::set_state_graph(int GraphId, bool bForce)
     // clears Flags1c8 bit 0 too.
     unsigned int Type = static_cast<unsigned int>(bForce);   // the reused param_2 dword
     ObjInspectOf(ObjRwFromWatchable(WatchablePtr))->get_type(Type);
-    if ((Type & 0xfdff) != 0)
+    if ((Type & OBJ_SOLAR_NO_WAYPOINT_MASK) != 0)
         Flags1c8 &= 0xFE;
 
     IStateGraph const* NewGraph = pub::StateGraph::get_state_graph_internal(EffectiveGraphId);
@@ -571,7 +571,7 @@ void IBehaviorManager::set_state_graph(int GraphId, bool bForce)
     StateGraph = const_cast<IStateGraph*>(NewGraph);
     if (NewGraph == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
               "E:\\FL\\Scratch\\Source\\Common\\Ai\\IBehaviorManager.cpp", 0xce,
               "IBehaviorManager: state graph not found in database!");
         return;
@@ -1025,7 +1025,7 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
         return;
     // ObjectClass & 0x103 == 0x103 -> CEqObj-derived.
     CObject* OwnerObj = const_cast<CObject*>(Owner);
-    if ((static_cast<unsigned>(OwnerObj->ObjectClass) & 0x103) != 0x103)
+    if ((static_cast<unsigned>(OwnerObj->ObjectClass) & CObject::ClassEqObj) != CObject::ClassEqObj)
         return;
     IBehaviorManager* Mgr = static_cast<CEqObj*>(OwnerObj)->get_behavior_interface();
     if (Mgr == nullptr)
@@ -1331,7 +1331,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                             // manager and asks its dock behavior ([+0x190], table[7]).
                             CObject const* const PartnerObj = ObjInspectOf(Partner)->cobject();
                             if (PartnerObj != nullptr
-                                && (static_cast<unsigned>(PartnerObj->ObjectClass) & 0x503) == 0x503)
+                                && (static_cast<unsigned>(PartnerObj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
                             {
                                 IBehaviorManager* const PartnerMgr =
                                     static_cast<CEqObj*>(const_cast<CObject*>(PartnerObj))->get_behavior_interface();
@@ -1346,7 +1346,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                         else
                         {
                             // Multiplayer asks the partner for its own current target.
-                            if (ObjInspectOf(Partner)->get_behavior_id() == 7)
+                            if (ObjInspectOf(Partner)->get_behavior_id() == BEHAVIOR_DOCK)
                                 ObjInspectOf(Partner)->get_target(Target);
                         }
                     }
@@ -1374,7 +1374,7 @@ void IBehaviorManager::UpdateBehaviorTick(float Dt)
                     if (bInRange)
                     {
                         // Bit 7 of the target's type word picks status 2 over 1.
-                        DockingPortStatus = ((TargetType & 0x80) != 0) ? 2 : 1;
+                        DockingPortStatus = ((TargetType & OBJ_TRADELANE_RING) != 0) ? 2 : 1;
                     }
                 }
             }
@@ -1701,7 +1701,7 @@ bool IBehaviorManager::SetCurrentBehavior(int NewIndex, bool bForce, void* Direc
     // No guard on the watched object; a CEqObj owner gets the new index in CEqObj+0x1a0.
     IObjRW* const WatchedObj = ObjRwFromWatchable(WatchablePtr);
     CObject const* const Owned = WatchedObj->cobject();
-    if (Owned != nullptr && (static_cast<unsigned>(Owned->ObjectClass) & 0x103) == 0x103)
+    if (Owned != nullptr && (static_cast<unsigned>(Owned->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
     {
         static_cast<CEqObj*>(const_cast<CObject*>(Owned))->BehaviorIndex = EffectiveIndex;
     }

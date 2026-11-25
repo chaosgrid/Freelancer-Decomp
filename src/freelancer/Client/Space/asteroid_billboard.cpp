@@ -548,7 +548,7 @@ void BillboardComputeLighting(FAsteroidBillboardBlock* Bb, float const* Pos,
             break;
         FEngineLight* const Light = static_cast<FEngineLight*>(Slots[SlotIndex]);
         // Only directional lights (+0xb0 == 3).
-        if (Light->Type != 3)
+        if (Light->Type != kLightDirectional)
             continue;
 
         float LightAmbient[3] = {0.0f, 0.0f, 0.0f};
@@ -1004,7 +1004,7 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
                             ++Drawn;
                             if (Drawn > Deferred)
                             {
-                                FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
+                                FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s",
                                       kSpaceTerrainRenderCompCpp, 0x410,
                                       "asteroid billboard render count mistake");
                                 continue;

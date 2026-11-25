@@ -13,6 +13,7 @@
 #include <windows.h>
 
 #include "dacom_iids.h"  // every "1.11_*" interface id, in one place
+#include "fdump_severity.h"
 
 typedef long GENRESULT;
 

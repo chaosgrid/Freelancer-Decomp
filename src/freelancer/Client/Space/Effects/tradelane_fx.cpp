@@ -213,7 +213,7 @@ namespace
         if (Gameobj == nullptr)
             return nullptr;
         CObject* const Obj = Gameobj->GetObject();
-        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) != 0x303u)
+        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
             return nullptr;
         return static_cast<CSolar*>(Obj);
     }
@@ -223,7 +223,7 @@ namespace
     Archetype::ICliObj* TlTradeLaneCompanion(FClientGameobj* RingGameobj)
     {
         CSolar* const Solar = TlNarrowSolar(RingGameobj);
-        CEquip const* const Equip = Solar->EquipManager.FindFirst(0x800000u);
+        CEquip const* const Equip = Solar->EquipManager.FindFirst(EquipTypeTradeLane);
         if (Equip == nullptr)
             return nullptr;
         Archetype::Equipment const* const Arch = Equip->EquipArch();
@@ -691,7 +691,7 @@ namespace
 
     void TlBadThings()
     {
-        FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kTradeLaneCpp, 0x367, "bad things (tm)");
+        FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kTradeLaneCpp, 0x367, "bad things (tm)");
     }
 
     // FUN_005142e0 -- put Ship on this node. Already on it: only the
@@ -979,7 +979,7 @@ namespace
             return;
         CObject* const PlayerObj = Player->GetObject();
         CEqObj* const PlayerEq =
-            (PlayerObj != nullptr && (static_cast<unsigned>(PlayerObj->ObjectClass) & 0x103u) == 0x103u)
+            (PlayerObj != nullptr && (static_cast<unsigned>(PlayerObj->ObjectClass) & CObject::ClassEqObj) == CObject::ClassEqObj)
                 ? static_cast<CEqObj*>(PlayerObj)
                 : nullptr;
         IBehaviorManager* const Behavior = PlayerEq->get_behavior_interface();
@@ -995,7 +995,7 @@ namespace
     CShip* TlNarrowShip(FClientGameobj* Gameobj)
     {
         CObject* const Obj = Gameobj->GetObject();
-        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & 0x503u) != 0x503u)
+        if (Obj == nullptr || (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
             return nullptr;
         return static_cast<CShip*>(Obj);
     }
@@ -1127,7 +1127,7 @@ bool TradeLaneStartCommand(FClientGameobj* EntranceRing, FClientGameobj* ExitRin
         LaneSide = 0;
         if (EntranceRing->traverse_rings(NextId, false) < 0 || NextId != ExitRing->get_id())
         {
-            FDUMP(0x100001, "%s(%d) : ERROR:General:%s", kTradeLaneCpp, 0x3bc,
+            FDUMP(kFdumpError, "%s(%d) : ERROR:General:%s", kTradeLaneCpp, 0x3bc,
                   "server passed non-contigious ring information.... start tradlane command ignored");
             return false;
         }
@@ -1334,7 +1334,7 @@ void TradeLaneRingSideCommand(FClientGameobj* RingGameobj, unsigned ShipId, bool
 
     if (TlShipRingPtr(Ship) != nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kTradeLaneCpp, 0x424,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kTradeLaneCpp, 0x424,
               "tradelane activate: server activating a tradelane twice for the same ship. ignoring. ");
         FTradeLaneRingRuntime* const Old = TlShipRingPtr(Ship);
         if (Old != nullptr)
@@ -1358,7 +1358,7 @@ void TradeLaneRingSideCommand(FClientGameobj* RingGameobj, unsigned ShipId, bool
     bool bDirection = false;
     if (RingGameobj->get_lane_direction(Ship->get_transform(), &bDirection) != 0)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kTradeLaneCpp, 0x42d,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kTradeLaneCpp, 0x42d,
               " couldnt find lane direction for activation effect. ignoring. ");
         return;
     }
@@ -1375,7 +1375,7 @@ void TradeLaneClientSolarActivate(FClientGameobj* SolarGo, bool bActivate, unsig
     // the pointer; TypeBits (+0xe0) is then read with no test.
     CObject* const Obj = SolarGo->GetObject();
     CSolar* const Solar =
-        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+        (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
             ? static_cast<CSolar*>(Obj)
             : nullptr;
     if (Solar->is_lane_ring())
@@ -1441,18 +1441,18 @@ void TradeLaneSPObjActivate(unsigned ObjectId, bool bActivate, unsigned ShipId)
     FClientGameobj* const Go = ClientObjDb_FindObject(ObjectId, 0);
     if (Go == nullptr)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s", kIClientSCpp, 0x5f0,
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", kIClientSCpp, 0x5f0,
               "SPObjActivate failed... probably jump-gate in old system closing?\n");
         return;
     }
-    if (Go->ManagerKind == 2)
+    if (Go->ManagerKind == EClientGameobjKind::Solar)
     {
         TradeLaneClientSolarActivate(Go, bActivate, ShipId);
         return;
     }
-    if (Go->ManagerKind == 1)
+    if (Go->ManagerKind == EClientGameobjKind::Ship)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kIClientSCpp, 0x5e8,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kIClientSCpp, 0x5e8,
               "Combat mode no longer supported! (Ignorable)");
     }
 }

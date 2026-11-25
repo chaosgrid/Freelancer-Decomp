@@ -153,7 +153,7 @@ namespace
         int Range = static_cast<int>(List->Items.Items.size()) - List->VisibleRows;
         if (Range < 0)
             Range = 0;
-        List->ScrollBar->SetProperty(0x37, 0, static_cast<uintptr_t>(Range));
+        List->ScrollBar->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(Range));
         List->Refresh(-1);
     }
 
@@ -420,7 +420,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     FormatTradeWidgetName("TitleFrame");
     TitleFrame = CreateStaticControl(G_TradeWidgetName, kTitleBoxMesh, Zero, "hp_title_frame", Zero,
                                      1, 1, 1, 0, 0, 0, 1, 0, 0, 0, Zero);
-    TitleFrame->SetProperty(1, 1, 0);
+    TitleFrame->SetProperty(kWinPropHide, 1, 0);
 
     FormatTradeWidgetName("TitleArrow");
     TitleArrow = CreateStaticControl(G_TradeWidgetName, kTitleArrowMesh, Zero, "hp_title_arrow",
@@ -436,8 +436,8 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     FormatTradeWidgetName("TargetName");
     TargetName = CreateTextControl(G_TradeWidgetName, "TradePlayerName", Zero, "hp_target_name",
                                    0.415f, 0.039f, 2.0f, 0, 1, 0, 0);
-    PlayerName->SetProperty(0x1d, PointerArg(GetPlayerCharacterNameRetail()), 0); // DAT_006732f0
-    TargetName->SetProperty(0x1d, PointerArg(kTargetNamePlaceholder), 0);
+    PlayerName->SetProperty(kTextPropSetText, PointerArg(GetPlayerCharacterNameRetail()), 0); // DAT_006732f0
+    TargetName->SetProperty(kTextPropSetText, PointerArg(kTargetNamePlaceholder), 0);
 
     // The two "accepted" texts start as red "not accepted" (ids 0x75a).
     FormatTradeWidgetName("PlayerAcceptedText");
@@ -448,9 +448,9 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     TargetAcceptedText = AsText(CreateTextControl(G_TradeWidgetName, "SubHeader", Zero,
                                                   "hp_target_accepted", 0.415f, 0.029f, 1.5f, 0,
                                                   1, 0, 0));
-    PlayerAcceptedText->SetProperty(0x1e, 0x75a, 0);
+    PlayerAcceptedText->SetProperty(kTextPropSetIds, 0x75a, 0);
     PlayerAcceptedText->TextColour = TradeColour(0xff, 0, 0, 0xc0);
-    TargetAcceptedText->SetProperty(0x1e, 0x75a, 0);
+    TargetAcceptedText->SetProperty(kTextPropSetIds, 0x75a, 0);
     TargetAcceptedText->TextColour = TradeColour(0xff, 0, 0, 0xc0);
 
     // The player's full cargo bar, its half extents from the mesh.
@@ -472,7 +472,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerCargoEmpty = CreateStaticControl(G_TradeWidgetName, kCargoEmptyMesh, Zero,
                                            "hp_player_cargo_capacity", Zero, 1, 1, 0, 1, 0, 0, 1,
                                            0, 0, 0, Zero);
-    PlayerCargoFull->SetProperty(1, 1, 0);
+    PlayerCargoFull->SetProperty(kWinPropHide, 1, 0);
 
     // The other player's full bar with the same colours, hidden.
     FormatTradeWidgetName("TargetCargoBarFull");
@@ -481,7 +481,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
                                           0, 0, 0, Zero);
     WinControlHalfExtentsFromMesh(TargetCargoFull->HalfExtents, &TargetCargoFull->MeshHolder);
     SetCargoBarColours(AsStatic(TargetCargoFull));
-    TargetCargoFull->SetProperty(1, 1, 0);
+    TargetCargoFull->SetProperty(kWinPropHide, 1, 0);
 
     // Its caption (retail's hardpoint name is spelt "traget").
     FormatTradeWidgetName("TargetCargoText");
@@ -570,14 +570,14 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerCardFrame = CreateStaticControl(G_TradeWidgetName, kInfoFrameMesh, CardFrameAt,
                                           "hp_player_infocard_center", Zero, 0, 1, 1, 0, 0, 0, 1,
                                           0, 0, 0, Zero);
-    PlayerCardFrame->SetProperty(1, 1, 0);
+    PlayerCardFrame->SetProperty(kWinPropHide, 1, 0);
 
     FormatTradeWidgetName("PICClose");
     PlayerCardClose = CreateButtonControl(G_TradeWidgetName, kCloseMesh, kCloseMesh, nullptr,
                                           nullptr, Zero, "hp_player_infocard_close", Zero, 0, 0, 0,
                                           1, 0, 0, 0);
     WinControlHalfExtentsFromMesh(PlayerCardClose->HalfExtents, &PlayerCardClose->MeshHolder);
-    PlayerCardClose->SetProperty(1, 1, 0);
+    PlayerCardClose->SetProperty(kWinPropHide, 1, 0);
 
     unsigned const NoColour = 0;
     float const ModelViewSize[3] = {0.13f, -0.047f, 0.0f};
@@ -587,7 +587,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerCardModel = static_cast<ShipViewControl*>(CreateShipViewControl(
         G_TradeWidgetName, ModelRotSpeed, Zero, ModelYpr, ModelViewSize, "hp_player_infocard_model",
         false, false, &NoColour, &NoColour));
-    PlayerCardModel->SetProperty(1, 1, 0);
+    PlayerCardModel->SetProperty(kWinPropHide, 1, 0);
     PlayerCardModel->ViewFlags &= 0x7f;
 
     float const PlayerTitleAt[3] = {0.095f, 0.0125f, 0.0f};
@@ -595,7 +595,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     PlayerCardTitle = CreateTextControl(G_TradeWidgetName, "SubHeader", PlayerTitleAt,
                                         "hp_player_infocard_itemname", 0.255f, 0.01f, 1.5f, 0, 0,
                                         0, 0);
-    PlayerCardTitle->SetProperty(1, 1, 0);
+    PlayerCardTitle->SetProperty(kWinPropHide, 1, 0);
     PlayerCardTitle->SetProperty(0x22, 0, 1);
 
     FormatTradeWidgetName("PICInfo");
@@ -612,7 +612,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     TargetCardFrame = CreateStaticControl(G_TradeWidgetName, kInfoFrameMesh, TargetFrameAt,
                                           "hp_target_infocard_center", Zero, 0, 1, 1, 0, 0, 0, 1,
                                           0, 0, 0, Zero);
-    TargetCardFrame->SetProperty(1, 1, 0);
+    TargetCardFrame->SetProperty(kWinPropHide, 1, 0);
 
     float const TargetCloseAt[3] = {0.01f, 0.0f, 0.0f};
     FormatTradeWidgetName("TICClose");
@@ -620,14 +620,14 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
                                           nullptr, TargetCloseAt, "hp_target_infocard_close", Zero,
                                           0, 0, 0, 1, 0, 0, 0);
     WinControlHalfExtentsFromMesh(TargetCardClose->HalfExtents, &TargetCardClose->MeshHolder);
-    TargetCardClose->SetProperty(1, 1, 0);
+    TargetCardClose->SetProperty(kWinPropHide, 1, 0);
 
     float const TargetModelAt[3] = {0.01f, 0.0f, 0.0f};
     FormatTradeWidgetName("TICModel");
     TargetCardModel = static_cast<ShipViewControl*>(CreateShipViewControl(
         G_TradeWidgetName, ModelRotSpeed, TargetModelAt, ModelYpr, ModelViewSize,
         "hp_target_infocard_model", false, false, &NoColour, &NoColour));
-    TargetCardModel->SetProperty(1, 1, 0);
+    TargetCardModel->SetProperty(kWinPropHide, 1, 0);
     TargetCardModel->ViewFlags &= 0x7f;
 
     float const TargetTitleAt[3] = {0.105f, 0.0125f, 0.0f};
@@ -635,7 +635,7 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
     TargetCardTitle = CreateTextControl(G_TradeWidgetName, "SubHeader", TargetTitleAt,
                                         "hp_target_infocard_itemname", 0.255f, 0.01f, 1.5f, 0, 0,
                                         0, 0);
-    TargetCardTitle->SetProperty(1, 1, 0);
+    TargetCardTitle->SetProperty(kWinPropHide, 1, 0);
     TargetCardTitle->SetProperty(0x22, 0, 1);
 
     FormatTradeWidgetName("TICInfo");
@@ -777,7 +777,7 @@ bool NnTrade::KeyEvent(unsigned Key, unsigned char* Modifiers)
     bQuantityTyped = 1;
     if (bHandled)
     {
-        QuantityBar->SetProperty(0x38, static_cast<uintptr_t>(Quantity), 0);
+        QuantityBar->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(Quantity), 0);
         SetQuantity(Quantity);
     }
     return bHandled;
@@ -825,7 +825,7 @@ void NnTrade::SetQuantity(int NewQuantity)
         }
     }
 
-    QuantityText->SetProperty(0x1d, PointerArg(Out), 0);
+    QuantityText->SetProperty(kTextPropSetText, PointerArg(Out), 0);
     Quantity = NewQuantity;
 }
 
@@ -843,43 +843,43 @@ void NnTrade::SetMode(int NewMode)
     if (NewMode == 1)
     {
         // Everything but the lists hidden.
-        TitleFrame->SetProperty(1, 1, 0);
-        TitleArrow->SetProperty(1, 1, 0);
-        TitleText->SetProperty(1, 1, 0);
+        TitleFrame->SetProperty(kWinPropHide, 1, 0);
+        TitleArrow->SetProperty(kWinPropHide, 1, 0);
+        TitleText->SetProperty(kWinPropHide, 1, 0);
         QuantityLine->Hide(); // FUN_004bed40 inlined
-        QuantityTitle->SetProperty(1, 1, 0);
-        QuantityFrame->SetProperty(1, 1, 0);
-        QuantityAccept->SetProperty(1, 1, 0);
-        QuantityReject->SetProperty(1, 1, 0);
-        QuantityText->SetProperty(1, 1, 0);
-        QuantityBar->SetProperty(1, 1, 0);
+        QuantityTitle->SetProperty(kWinPropHide, 1, 0);
+        QuantityFrame->SetProperty(kWinPropHide, 1, 0);
+        QuantityAccept->SetProperty(kWinPropHide, 1, 0);
+        QuantityReject->SetProperty(kWinPropHide, 1, 0);
+        QuantityText->SetProperty(kWinPropHide, 1, 0);
+        QuantityBar->SetProperty(kWinPropHide, 1, 0);
         for (size_t Index = 0; Index < CenterList->Lines.size(); ++Index)
             CenterList->Lines[Index]->Hide();
-        CenterList->ScrollBar->SetProperty(1, 1, 0);
-        AcceptTradeFrame->SetProperty(1, 1, 0);
-        AcceptTradeText->SetProperty(1, 1, 0);
+        CenterList->ScrollBar->SetProperty(kWinPropHide, 1, 0);
+        AcceptTradeFrame->SetProperty(kWinPropHide, 1, 0);
+        AcceptTradeText->SetProperty(kWinPropHide, 1, 0);
         return;
     }
 
     if (NewMode == 2)
     {
         // The arrow, the title, the offer list and "accept trade".
-        TitleFrame->SetProperty(1, 1, 0);
-        TitleArrow->SetProperty(1, 0, 0);
-        TitleText->SetProperty(1, 0, 0);
+        TitleFrame->SetProperty(kWinPropHide, 1, 0);
+        TitleArrow->SetProperty(kWinPropHide, 0, 0);
+        TitleText->SetProperty(kWinPropHide, 0, 0);
         QuantityLine->Hide(); // FUN_004bed40 inlined
-        QuantityTitle->SetProperty(1, 1, 0);
-        QuantityFrame->SetProperty(1, 1, 0);
-        QuantityAccept->SetProperty(1, 1, 0);
-        QuantityReject->SetProperty(1, 1, 0);
-        QuantityText->SetProperty(1, 1, 0);
-        QuantityBar->SetProperty(1, 1, 0);
+        QuantityTitle->SetProperty(kWinPropHide, 1, 0);
+        QuantityFrame->SetProperty(kWinPropHide, 1, 0);
+        QuantityAccept->SetProperty(kWinPropHide, 1, 0);
+        QuantityReject->SetProperty(kWinPropHide, 1, 0);
+        QuantityText->SetProperty(kWinPropHide, 1, 0);
+        QuantityBar->SetProperty(kWinPropHide, 1, 0);
         for (size_t Index = 0; Index < CenterList->Lines.size(); ++Index)
             CenterList->Lines[Index]->Show(); // FUN_004bedc0
-        CenterList->ScrollBar->SetProperty(1, 0, 0);
+        CenterList->ScrollBar->SetProperty(kWinPropHide, 0, 0);
         CenterList->Refresh(-1);
-        AcceptTradeFrame->SetProperty(1, 0, 0);
-        AcceptTradeText->SetProperty(1, 0, 0);
+        AcceptTradeFrame->SetProperty(kWinPropHide, 0, 0);
+        AcceptTradeText->SetProperty(kWinPropHide, 0, 0);
         return;
     }
 
@@ -889,20 +889,20 @@ void NnTrade::SetMode(int NewMode)
     // The quantity panel replaces the offer list.
     for (size_t Index = 0; Index < CenterList->Lines.size(); ++Index)
         CenterList->Lines[Index]->Hide();
-    CenterList->ScrollBar->SetProperty(1, 1, 0);
-    AcceptTradeFrame->SetProperty(1, 1, 0);
-    AcceptTradeText->SetProperty(1, 1, 0);
-    TitleFrame->SetProperty(1, 1, 0);
-    TitleArrow->SetProperty(1, 0, 0);
-    TitleText->SetProperty(1, 0, 0);
+    CenterList->ScrollBar->SetProperty(kWinPropHide, 1, 0);
+    AcceptTradeFrame->SetProperty(kWinPropHide, 1, 0);
+    AcceptTradeText->SetProperty(kWinPropHide, 1, 0);
+    TitleFrame->SetProperty(kWinPropHide, 1, 0);
+    TitleArrow->SetProperty(kWinPropHide, 0, 0);
+    TitleText->SetProperty(kWinPropHide, 0, 0);
     QuantityLine->SetItem(SelectedItem); // FUN_004bef00
     QuantityLine->Show();                // FUN_004bedc0
-    QuantityTitle->SetProperty(1, 0, 0);
-    QuantityFrame->SetProperty(1, 0, 0);
-    QuantityAccept->SetProperty(1, 0, 0);
-    QuantityReject->SetProperty(1, 0, 0);
-    QuantityText->SetProperty(1, 0, 0);
-    QuantityBar->SetProperty(1, 0, 0);
+    QuantityTitle->SetProperty(kWinPropHide, 0, 0);
+    QuantityFrame->SetProperty(kWinPropHide, 0, 0);
+    QuantityAccept->SetProperty(kWinPropHide, 0, 0);
+    QuantityReject->SetProperty(kWinPropHide, 0, 0);
+    QuantityText->SetProperty(kWinPropHide, 0, 0);
+    QuantityBar->SetProperty(kWinPropHide, 0, 0);
 
     // The other hold's free space is 1000 when the other ship's hold size is unknown.
     EquipDesc Unit = *SelectedItem;
@@ -956,7 +956,7 @@ void NnTrade::SetMode(int NewMode)
     QuantityBar->MinRange = Held;
     QuantityBar->MaxRange = (SelectedItem->Count < Most) ? SelectedItem->Count : Most;
     if (bFromPlayer && SelectedItem->Count == 1)
-        QuantityBar->SetProperty(1, 1, 0);
+        QuantityBar->SetProperty(kWinPropHide, 1, 0);
 
     // Re-entered (4) with a value that no longer fits: the voice line; a fresh panel forgets
     // the typed digits.
@@ -971,9 +971,9 @@ void NnTrade::SetMode(int NewMode)
     }
 
     // Start at the most; the title says which way it goes.
-    QuantityBar->SetProperty(0x38, static_cast<uintptr_t>(Most), 0);
+    QuantityBar->SetProperty(kScrollPropSetValue, static_cast<uintptr_t>(Most), 0);
     SetQuantity(Most);
-    QuantityTitle->SetProperty(0x1e, (SelectedLine->Owner == PlayerList) ? 0x757 : 0x758, 0);
+    QuantityTitle->SetProperty(kTextPropSetIds, (SelectedLine->Owner == PlayerList) ? 0x757 : 0x758, 0);
 
     // Nothing fits: the voice line and back to browsing.
     if (Most >= 1)
@@ -1085,7 +1085,7 @@ void NnTrade::SetTarget(unsigned ObjectId)
     Archetype::Ship const* const ShipArch = Ship->shiparch(); // CObject +0x88
     TargetHoldSize = ShipArch->HoldSize;
     TargetCargoUsed = TargetHoldSize - Ship->get_cargo_hold_remaining();
-    TargetName->SetProperty(0x1d, PointerArg(Ship->get_pilot_name()), 0);
+    TargetName->SetProperty(kTextPropSetText, PointerArg(Ship->get_pilot_name()), 0);
     TargetOwnerPlayer = Ship->OwnerPlayer; // CSimple +0xb4
     TargetNanobotLimit = ShipArch->NanobotLimit;
     if (TargetNanobotLimit == -1)
@@ -1102,12 +1102,12 @@ void NnTrade::SetTargetAccepted(unsigned char bAccepted)
     // FUN_004c2620 (RET 4): ids 0x759 on green, else 0x75a on red; alpha 0xc0.
     if (bAccepted == 1)
     {
-        TargetAcceptedText->SetProperty(0x1e, 0x759, 0);
+        TargetAcceptedText->SetProperty(kTextPropSetIds, 0x759, 0);
         TargetAcceptedText->TextColour = TradeColour(0, 0xff, 0, 0xc0);
     }
     else
     {
-        TargetAcceptedText->SetProperty(0x1e, 0x75a, 0);
+        TargetAcceptedText->SetProperty(kTextPropSetIds, 0x75a, 0);
         TargetAcceptedText->TextColour = TradeColour(0xff, 0, 0, 0xc0);
     }
 }
@@ -1117,12 +1117,12 @@ void NnTrade::SetPlayerAccepted(unsigned char bAccepted)
     // FUN_004c2690 (RET 4) -- FUN_004c2620 on +0x410.
     if (bAccepted == 1)
     {
-        PlayerAcceptedText->SetProperty(0x1e, 0x759, 0);
+        PlayerAcceptedText->SetProperty(kTextPropSetIds, 0x759, 0);
         PlayerAcceptedText->TextColour = TradeColour(0, 0xff, 0, 0xc0);
     }
     else
     {
-        PlayerAcceptedText->SetProperty(0x1e, 0x75a, 0);
+        PlayerAcceptedText->SetProperty(kTextPropSetIds, 0x75a, 0);
         PlayerAcceptedText->TextColour = TradeColour(0xff, 0, 0, 0xc0);
     }
 }
@@ -1152,17 +1152,17 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
         List->bSelectMode = bShow;
         List->Refresh(-1);
         uintptr_t const bHide = (bShow == 0) ? 1 : 0;
-        PlayerCardFrame->SetProperty(1, bHide, 0);
-        PlayerCardClose->SetProperty(1, bHide, 0);
-        PlayerCardModel->SetProperty(1, bHide, 0);
-        PlayerCardTitle->SetProperty(1, bHide, 0);
+        PlayerCardFrame->SetProperty(kWinPropHide, bHide, 0);
+        PlayerCardClose->SetProperty(kWinPropHide, bHide, 0);
+        PlayerCardModel->SetProperty(kWinPropHide, bHide, 0);
+        PlayerCardTitle->SetProperty(kWinPropHide, bHide, 0);
         if (bShow != 0)
         {
             // Retail's FUN_0053e4a0(1) on the ship view is a bare RET 4 and is not ported.
             if (Mesh.Value != nullptr)
                 PlayerCardModel->LoadMesh(Mesh.Value, Material.Value, false,
                                           false); // FUN_00585890
-            PlayerCardTitle->SetProperty(0x1e, static_cast<uintptr_t>(IdsName), 0);
+            PlayerCardTitle->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(IdsName), 0);
             RenderDisplayList Card;
             {
                 StyleNode Style(kTextStyleChatSystem);
@@ -1187,14 +1187,14 @@ void NnTrade::ShowInfoCard(CTradeEquipList* List, unsigned char bShow)
         List->bSelectMode = bShow;
         List->Refresh(-1);
         uintptr_t const bHide = (bShow == 0) ? 1 : 0;
-        TargetCardFrame->SetProperty(1, bHide, 0);
-        TargetCardClose->SetProperty(1, bHide, 0);
-        TargetCardModel->SetProperty(1, bHide, 0);
-        TargetCardTitle->SetProperty(1, bHide, 0);
+        TargetCardFrame->SetProperty(kWinPropHide, bHide, 0);
+        TargetCardClose->SetProperty(kWinPropHide, bHide, 0);
+        TargetCardModel->SetProperty(kWinPropHide, bHide, 0);
+        TargetCardTitle->SetProperty(kWinPropHide, bHide, 0);
         if (bShow != 0)
         {
             TargetCardModel->LoadMesh(Mesh.Value, Material.Value, false, false);
-            TargetCardTitle->SetProperty(0x1e, static_cast<uintptr_t>(IdsName), 0);
+            TargetCardTitle->SetProperty(kTextPropSetIds, static_cast<uintptr_t>(IdsName), 0);
             RenderDisplayList Card;
             {
                 StyleNode Style(kTextStyleChatSystem);
@@ -1227,7 +1227,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // FUN_004c2d50 (RET 0xc).
     WinControl* const Control = reinterpret_cast<WinControl*>(A);
 
-    if (Msg == 0x2c || Msg == 0x2d)
+    if (Msg == kWinNotifyHighlight || Msg == kWinNotifyUnhighlight)
     {
         // Mouse over (0x2c) / out (0x2d): a row's frames follow the hovered button's bit 2, get
         // bit 0 (pressed-look) set or cleared and the row is lifted: layer 2 when selected
@@ -1245,7 +1245,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Flags = Line->InfoFrame->GetButtonBits();
         Line->InfoFrame->SetButtonBits(static_cast<unsigned char>(((Flags ^ Bit2) & 0x04) ^ Flags));
         unsigned Layer;
-        if (Msg == 0x2c)
+        if (Msg == kWinNotifyHighlight)
         {
             Line->IconFrame->SetButtonBits(static_cast<unsigned char>(Line->IconFrame->GetButtonBits() | 1));
             Line->InfoFrame->SetButtonBits(static_cast<unsigned char>(Line->InfoFrame->GetButtonBits() | 1));
@@ -1269,7 +1269,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    if (Msg == 0x3e)
+    if (Msg == kWinNotifyScrollValue)
     {
         // The quantity bar moved, or a list's bar (its +0x2f0 is the list) scrolled.
         if (Control == QuantityBar)
@@ -1287,7 +1287,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    if (Msg == 0xef02)
+    if (Msg == kWinMsgHide)
     {
         // Close: the HUD panels the window collapsed come back, then the window takes itself
         // apart.
@@ -1309,7 +1309,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         return 0;
     }
 
-    if (Msg != 0x26)
+    if (Msg != kWinNotifyClick)
         return 0;
 
     // --- 0x26: a click ---
@@ -1317,7 +1317,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         // IServer +0x140, then the button is disabled.
         G_Server->TerminateTrade(GetPlayerConnectionId(), 0);
-        TradeClose->SetProperty(2, 1, 0);
+        TradeClose->SetProperty(kWinPropDisable, 1, 0);
         return 0;
     }
 
@@ -1483,7 +1483,7 @@ intptr_t NnTrade::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     if (Control == AcceptTradeFrame)
     {
         // The player accepts: green text, IServer +0x144.
-        PlayerAcceptedText->SetProperty(0x1e, 0x759, 0);
+        PlayerAcceptedText->SetProperty(kTextPropSetIds, 0x759, 0);
         PlayerAcceptedText->TextColour = TradeColour(0, 0xff, 0, 0xc0);
         G_Server->AcceptTrade(GetPlayerConnectionId(), true);
         return 0;

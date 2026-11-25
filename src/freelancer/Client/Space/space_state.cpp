@@ -20,6 +20,7 @@
 #include "Interface/Pages/character_select_equip.h" // FUN_004c4a30 / FUN_004c4a60
 #include "Space/Effects/client_equip_fx.h"
 #include "Core/client_frame_tick.h"      // FUN_00424f30 / FUN_00425080 / FUN_00425140, FUN_0041b2e0
+#include "Core/client_state.h"
 #include "Core/client_tick_profile.h"    // Port-only owner-requested diagnostics
 #include "Space/Effects/client_fuse.h"
 #include "Space/client_gameobj.h"         // FClientGameobj (the player's object, FUN_0054a940)
@@ -173,9 +174,9 @@ namespace
                     }
                     // HUD_Status is not null-tested.
                     if (GetHudStatus()->bRearView == 1)
-                        HudPostCommand(0x39u, 0);
+                        HudPostCommand(USER_REARVIEW_CAMERA_MODE_OFF, 0);
                     if (GetHudStatus()->bTurretView == 1)
-                        HudPostCommand(0xbfu, 0);
+                        HudPostCommand(USER_AUTO_TURRET, 0);
                     if (!IsLetterboxVisible())
                     {
                         SetLetterboxTarget(1.0f, 3.0f);
@@ -320,7 +321,7 @@ void SpaceApp::Slot06(unsigned A)
 // Slot 7 (0x004b5010): environment type 0.
 int SpaceApp::GetEnvironmentType()
 {
-    return 0;
+    return kEnvironmentSpace;
 }
 
 // Slot 8 (0x00401e90): empty (InitializeEngine calls it).
@@ -405,7 +406,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
 
     switch (MsgId)
     {
-    case 0x31:
+    case USER_COCKPIT_CAMERA_MODE:
         // The first/third-person toggle, refused while the mouse pick is blocked
         // (FUN_0045a740).
         if (HudIsMousePickBlocked())
@@ -429,7 +430,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
         // Any other preference -- consumed, nothing done.
         return true;
 
-    case 0xbf:
+    case USER_AUTO_TURRET:
         // The turret view toggle (HUD_Status +0x5b9), refused while the mouse pick is blocked.
         if (HudIsMousePickBlocked())
             return false;
@@ -448,14 +449,14 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
         else
         {
             // FUN_005763b0(0x36, 0), then "player".
-            HudPostCommand(0x36u, 0);
+            HudPostCommand(USER_LOOK_ROTATE_CAMERA_RESET, 0);
             if (App->bCameraReady != 0)
                 SwitchSpaceCameraMode("player", nullptr);
         }
         GetHudStatus()->UpdateSpecialModeCaptions(); // FUN_004dca20
         return true;
 
-    case 0x38:
+    case USER_REARVIEW_CAMERA_MODE:
         // The rear view follows the key (the command record's key-down
         // byte, FUN_00576240 +0x18). With the mouse pick blocked only a rear view already up
         // gets through (to be released).
@@ -479,7 +480,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
         SpaceAppRestoreViewAfterRear(App);
         return true;
 
-    case 0x39:
+    case USER_REARVIEW_CAMERA_MODE_OFF:
         // Rear view off; the same tail as 0x38's release.
         GetHudStatus()->bRearView = 0;
         if (App->ActiveCamera != SpaceCameraOf(&App->RearView))
@@ -490,7 +491,7 @@ bool FSpaceAppEventFace::OnEvent(unsigned MsgId)
         SpaceAppRestoreViewAfterRear(App);
         return true;
 
-    case 0x0f:
+    case USER_CANCEL:
     {
         // Single player only, while docking: the player ship's docking port (the answer of
         // get_docking_port unread), that port's dock target, and when it names one IServer
@@ -548,7 +549,7 @@ void SpaceAppLoadCamerasIni(SpaceApp* App)
                 Camera = SpaceCameraOf(&App->Death);
             else
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: Unknown camera type? (%s)",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: Unknown camera type? (%s)",
                       "E:\\FL\\Scratch\\Source\\Client\\space\\space.cpp", 0x17e,
                       Reader.get_header_ptr());
                 continue;
@@ -562,7 +563,7 @@ void SpaceAppLoadCamerasIni(SpaceApp* App)
                 const char* const Value = Reader.get_value_string();
                 if (static_cast<unsigned char>(AsCamera(Camera)->SetProperty(Name, Value)) == 0)
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: [%s] unknown property '%s = %s'",
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: [%s] unknown property '%s = %s'",
                           "E:\\FL\\Scratch\\Source\\Client\\space\\space.cpp", 0x18a,
                           Reader.get_header_ptr(), Name, Value);
                 }
@@ -599,9 +600,9 @@ void SpaceAppArmDeathCamera()
             // Something close -- the rear view and the turret view closed when up, and the
             // drift limited to 100.
             if (GetHudStatus()->bRearView == 1)
-                HudPostCommand(0x39u, 0);
+                HudPostCommand(USER_REARVIEW_CAMERA_MODE_OFF, 0);
             if (GetHudStatus()->bTurretView == 1)
-                HudPostCommand(0xbfu, 0);
+                HudPostCommand(USER_AUTO_TURRET, 0);
             Death->MaxDriftSpeed = 100.0f;
             bCrowded = true;
         }
@@ -609,7 +610,7 @@ void SpaceAppArmDeathCamera()
         {
             // Nothing close -- only the rear view is closed.
             if (GetHudStatus()->bRearView == 1)
-                HudPostCommand(0x39u, 0);
+                HudPostCommand(USER_REARVIEW_CAMERA_MODE_OFF, 0);
         }
     }
     if (!bCrowded)
@@ -694,7 +695,7 @@ namespace
             {
                 CObject* const Candidate = static_cast<FClientGameobj*>(PlayerRW)->GetObject();
                 if (Candidate != nullptr &&
-                    (static_cast<unsigned>(Candidate->ObjectClass) & 1u) == 1u)
+                    (static_cast<unsigned>(Candidate->ObjectClass) & CObject::ClassObject) == CObject::ClassObject)
                 {
                     Object = Candidate;
                 }
@@ -775,7 +776,7 @@ namespace
         {
             SetPlayerBaseIdRetail(G_PendingLandBase);
             SetPlayerLocationIdRetail(0);
-            G_SpaceNextState = 3;
+            G_SpaceNextState = kClientStateBase;
             G_PendingLandBase = 0;
         }
     }
@@ -944,7 +945,7 @@ int UpdateSpaceState(SpaceApp* State, float DeltaSeconds)
 
     // No active camera -> 6, leave space.
     if (GetActiveSpaceCamera() == nullptr)
-        return 6;
+        return kClientStateMenu;
 
     // The simulation half, skipped while FUN_0042d740 holds the local server.
     if (!ShouldSkipLocalServerTick())
@@ -1094,7 +1095,7 @@ int UpdateSpaceState(SpaceApp* State, float DeltaSeconds)
     }
 
     if (State->bLeaveRequested != 0)
-        G_SpaceNextState = 6;
+        G_SpaceNextState = kClientStateMenu;
 
     // FUN_00425140, only when FUN_00424f30 began the scene.
     if (bSceneBegun)

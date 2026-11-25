@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <cstring>
+
 // Every DACOM interface id used anywhere in the port, in one place.
 // The strings come from the retail binaries (QueryInterface / CreateInstance call sites
 // and .rdata); a typo is a silent QI failure at runtime (docs/re/cross_dll_protocol.md).
@@ -119,4 +121,23 @@ namespace Iids
     // means "Direct3D 8, use the retail path".
     static const char RenderPipelineEx[] = "RP9_IRenderPipelineEx";
     static const char RPDrawEx[] = "RP9_IRPDrawEx";
+
+    // The exact compare of two interface id strings the QueryInterface and CreateInstance
+    // bodies use; retail inlines it in every module (strcmp loops or REPE CMPSB). The ports of
+    // Deformable2, EngBase, flmaterials, RendComp, RP9 and Shading test both pointers for null
+    // first (false then).
+    inline bool Equal(const char* Left, const char* Right)
+    {
+        if (Left == nullptr || Right == nullptr)
+            return false;
+        return std::strcmp(Left, Right) == 0;
+    }
+
+    // The same compare without the null test: SoundManager and SoundStreamer (retail QIs
+    // compare inline with no null checks), alchemy (the QI table walks 0620ab50 and every twin
+    // compare the requested IID byte by byte with no null test).
+    inline bool EqualNoNullTest(const char* Left, const char* Right)
+    {
+        return std::strcmp(Left, Right) == 0;
+    }
 }

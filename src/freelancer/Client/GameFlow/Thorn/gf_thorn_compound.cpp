@@ -250,11 +250,11 @@ GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const
             {
                 if (Name == nullptr || Name[0] != '\0')
                 {
-                    FDUMP(0x100001, "%s(%d) : *** ERROR: %s", GScriptCompoundFile, 0x17d,
+                    FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", GScriptCompoundFile, 0x17d,
                           "Thorn requested a sub_part for which the implementation is not written");
                     return GR_OK;
                 }
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %s", GScriptCompoundFile, 0x179,
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s", GScriptCompoundFile, 0x179,
                       "Petal bug:  Script wants target_type = PART with target_name = <null>\n");
                 return GR_OK;
             }
@@ -287,7 +287,7 @@ GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const
         }
         else
         {
-            FDUMP(0x100001, "%s(%d) : *** ERROR: %s", GScriptCompoundFile, 0x17d,
+            FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", GScriptCompoundFile, 0x17d,
                   "Thorn requested a sub_part for which the implementation is not written");
             return GR_OK;
         }

@@ -27,6 +27,14 @@
 
 struct FRoomObject;
 
+// FHotspot::SendEvent's events.
+enum EHotspotEvent : int
+{
+    kHotspotEventEnter = 1,  // owner slot 10 (+0x28)
+    kHotspotEventLeave = 2,  // owner slot 11 (+0x2c)
+    kHotspotEventClick = 3,  // owner slot 12 (+0x30)
+};
+
 class FHotspot
 {
 public:

@@ -234,7 +234,7 @@ bool DockBehavior::OnResult(int Param1, int Param2, int Param3)
 
         RefreshApproachState();   // FUN_062c50e0
 
-        if (StateFlags32c & 0x840)
+        if (StateFlags32c & (OBJ_JUMP_GATE | OBJ_JUMP_HOLE))
             EnterState(6);
         else
             EnterState(2);
@@ -386,7 +386,7 @@ void DockBehavior::RecomputeApproach()
             : nullptr;
         Move.PublishTargetId(ObjInspectOf(Obj2)->get_id());
     }
-    else if ((StateFlags32c & 0x40) != 0)
+    else if ((StateFlags32c & OBJ_JUMP_GATE) != 0)
     {
         // Retail resets the -1 written above to 0 on this branch only.
         DockPortIndex = 0;
@@ -535,9 +535,9 @@ int DockBehavior::CheckClearanceProgress()
     Candidate->get_type(Type);
     if ((Type & 0x600de0) != 0)
     {
-        if ((Type & 0x8c0) == 0)
+        if ((Type & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_JUMP_HOLE)) == 0)
         {
-            if ((Type & 0x120) == 0)
+            if ((Type & (OBJ_DOCKING_RING | OBJ_STATION)) == 0)
                 return 2;
             if (!Candidate->has_dock_hardpoints())
                 return 2;
@@ -545,7 +545,7 @@ int DockBehavior::CheckClearanceProgress()
     }
     else
     {
-        if ((Type & 0x3) == 0)
+        if ((Type & (OBJ_MOON | OBJ_PLANET)) == 0)
             return 2;
         unsigned int Base = 0;
         Candidate->get_base(Base);
@@ -600,7 +600,7 @@ void DockBehavior::SubmitGotoDirective(Vector const& ReferencePoint)
     Op.TetherNearRange = ProxWatcher450.NearDistance;
     Op.TetherFarRange = ProxWatcher450.FarDistance;
 
-    if ((StateFlags32c & 0xc0) != 0)
+    if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
     {
         Op.GotoKind = 1;
         Op.Destination = DestPoint3cc;
@@ -702,7 +702,7 @@ void DockBehavior::EnterState(int NewState)
         Op.TetherNearRange = ProxWatcher450.NearDistance;
         Op.TetherFarRange = QueryHandleRange(&ProxWatcher450, 0);
 
-        if ((StateFlags32c & 0xc0) != 0)
+        if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
             Op.GotoKind = 1;
             Op.Destination = DestPoint3cc;
@@ -727,7 +727,7 @@ void DockBehavior::EnterState(int NewState)
     {
         SetAvoidanceAllowed(1, 3);   // FUN_062d21d0
 
-        if ((StateFlags32c & 0xc0) != 0)
+        if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
             // Each FSTP to a float is a float below; everything kept on the x87 stack is double.
             NavHelperRefreshLeadPoint();
@@ -804,10 +804,10 @@ void DockBehavior::EnterState(int NewState)
             // StandOffRadius from the watched object's size: times 0.5f (DAT_0639c13c) for
             // 0x80, times 1/3 for 0x40 only, otherwise unchanged.
             unsigned int const TypeBits = StateFlags32c;
-            if ((TypeBits & 0x80) != 0)
+            if ((TypeBits & OBJ_TRADELANE_RING) != 0)
                 StandOffRadius = static_cast<float>(
                     static_cast<double>(Behavior_GetIfaceMaxScalarAttribute(Watched)) * 0.5);
-            else if ((TypeBits & 0x40) != 0)
+            else if ((TypeBits & OBJ_JUMP_GATE) != 0)
                 StandOffRadius = static_cast<float>(
                     static_cast<double>(Behavior_GetIfaceMaxScalarAttribute(Watched)) * OneThird);
         }
@@ -826,7 +826,7 @@ void DockBehavior::EnterState(int NewState)
         Face.Commit();
         return;
     case 6:
-        if ((StateFlags32c & 0xc0) != 0)
+        if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
             Face.SetAngleWeight8c(BitsToFloat(0x3ec90fdbu)); // FUN_062d93c0, pi/8
             Face.SetPosition(DestPoint3cc);           // FUN_062d7560
@@ -836,7 +836,7 @@ void DockBehavior::EnterState(int NewState)
             MaxApproachSpeed46c = 10.0f;
             return;
         }
-        if ((StateFlags32c & 0x800) != 0)
+        if ((StateFlags32c & OBJ_JUMP_HOLE) != 0)
             break;
 
         Face.SetBasis(Orient3a8);                     // FUN_062d75c0
@@ -879,13 +879,13 @@ void DockBehavior::EnterState(int NewState)
         Move.SetRange3c(static_cast<float>(
             static_cast<double>(DockPointRadius) * kEnterState9RadiusScale));
 
-        if ((StateFlags32c & 0xc0) != 0)
+        if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
             Face.SetDirection(Facing38c);             // FUN_062d7590
             Move.SetField44(2);                       // FUN_062d88b0
             return;
         }
-        if ((StateFlags32c & 0x800) != 0)
+        if ((StateFlags32c & OBJ_JUMP_HOLE) != 0)
         {
             Move.SetMode(0);                          // FUN_062d5980
             // FUN_062d5a70 writes MoveIdea+0x59, not the +0x58 SetEnabled() writes.
@@ -908,7 +908,7 @@ void DockBehavior::EnterState(int NewState)
         Face.SetBasis(Orient40c);
         Move.SetMode(1);                              // FUN_062d5980
         MaxApproachSpeed46c = 18.0f;                   // .data:DAT_063ebdb8
-        if ((StateFlags32c & 0x20) != 0)
+        if ((StateFlags32c & OBJ_DOCKING_RING) != 0)
             break;
         SysMgr->GunGroups.SetShieldActive(0);   // FUN_062e9a60
         return;
@@ -959,7 +959,7 @@ void DockBehavior::RefreshApproachState()
     Orient3a8 = XformC.Rotation;
 
     CombatFlag344 = 0;
-    if ((StateFlags32c & 0x200100) == 0)
+    if ((StateFlags32c & (OBJ_STATION | OBJ_CAPITAL)) == 0)
     {
         Vector D1;
         D1.x = DestPoint3cc.x - InterceptPoint39c.x;
@@ -997,7 +997,7 @@ void DockBehavior::RefreshApproachState()
         }
     }
 
-    if ((StateFlags32c & 0x40) != 0)
+    if ((StateFlags32c & OBJ_JUMP_GATE) != 0)
     {
         Vector D3;
         D3.x = SavedPosition3fc.x - DestPoint3cc.x;
@@ -1028,7 +1028,7 @@ int DockBehavior::UpdateApproachTail()
         if (Pilot->OnUpdate() != 2)
             return UpdateResult;
 
-        if ((StateFlags32c & 0xc0) != 0)
+        if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
             EnterState(2);
             UpdateResult = 1;
@@ -1087,7 +1087,7 @@ int DockBehavior::UpdateApproachTail()
         }
 
         bool bPastDock = false;
-        if ((StateFlags32c & 0xc0) != 0)
+        if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0)
         {
             // ((Dz*Fz + Dy*Fy) + Dx*Fx) on the x87 stack; >= 0 or unordered falls to
             // LAB_062c4c04, < 0 exits to LAB_062c4c35.
@@ -1113,7 +1113,7 @@ int DockBehavior::UpdateApproachTail()
                 break;
         }
 
-        EnterState(((StateFlags32c & 0x8c0) == 0) ? 6 : 3);
+        EnterState(((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING | OBJ_JUMP_HOLE)) == 0) ? 6 : 3);
         UpdateResult = 1;
         return UpdateResult;
     }
@@ -1154,7 +1154,7 @@ int DockBehavior::UpdateApproachTail()
         return UpdateResult;
     }
     case 6:
-        if ((StateFlags32c & 0x800) != 0)
+        if ((StateFlags32c & OBJ_JUMP_HOLE) != 0)
         {
             EnterState(9);
             UpdateResult = 1;
@@ -1163,7 +1163,7 @@ int DockBehavior::UpdateApproachTail()
         {
             int MoveResult = Move.Update(DeltaTime);
             int FaceResult = Face.Update(DeltaTime);
-            if (((StateFlags32c & 0xc0) != 0) && (FaceResult == 1))
+            if (((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) != 0) && (FaceResult == 1))
             {
                 EnterState(8);
                 UpdateResult = 1;
@@ -1251,7 +1251,7 @@ int DockBehavior::UpdateApproachTail()
 
         if (MoveResult != 1)
             break;
-        if (TerminalType != 3 && TerminalType != 4 && TerminalType != 5)
+        if (TerminalType != TERM_MOOR_SMALL && TerminalType != TERM_MOOR_MEDIUM && TerminalType != TERM_MOOR_LARGE)
         {
             EnterState(0xb);
             return UpdateResult;
@@ -1308,7 +1308,7 @@ bool DockBehavior::CheckCanProceed()
     case 3:
     case 6:
     {
-        if ((StateFlags32c & 0xc0) == 0)
+        if ((StateFlags32c & (OBJ_JUMP_GATE | OBJ_TRADELANE_RING)) == 0)
             break;
         NavHelperRefreshLeadPoint();   // FUN_062c47c0
         Vector Delta;
@@ -1365,7 +1365,7 @@ void DockBehavior::AdvancePreamble()
     float AngularCap = 1000.0f;
 
     // Retail zeroes the first four dwords and lets the callee write the trailing byte, so
-    // Flag10 is left alone.
+    // bCruiseAllowed is left alone.
     FormationFollowerEnvelope Envelope;
     Envelope.Speed = 0.0f;
     Envelope.Throttle = 0.0f;

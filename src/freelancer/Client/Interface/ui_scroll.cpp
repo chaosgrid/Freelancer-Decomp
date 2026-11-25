@@ -486,11 +486,11 @@ void UiScroll::NotifyParent()
     // Inlined at every site in retail.
     if (Parent == nullptr)
         return;
-    Parent->ProcessMessage(0xf005u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
+    Parent->ProcessMessage(kWinMsgScroll, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
     WinControl* const Owner = Parent->AsWinControl();
     if (Owner == nullptr)
         return;
-    Owner->SetProperty(0x3e, reinterpret_cast<uintptr_t>(this),
+    Owner->SetProperty(kWinNotifyScrollValue, reinterpret_cast<uintptr_t>(this),
                        static_cast<uintptr_t>(static_cast<int>(Value_)));
 }
 
@@ -504,7 +504,7 @@ bool UiScroll::HitTest(float const* Ray)
     {
         WinControl* const Owner = Parent->AsWinControl();
         if (Owner != nullptr)
-            Owner->SetProperty(0x25, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
+            Owner->SetProperty(kWinNotifyHover, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
     }
     return true;
 }
@@ -859,7 +859,7 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
     {
         WinControl* const Owner = Parent->AsWinControl();
         if (Owner != nullptr)
-            Owner->SetProperty(0x29, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
+            Owner->SetProperty(kWinNotifyRelease, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
     }
 
     if (ScrollInsideBox(Local.X, Local.Y, Width_, Height_))
@@ -959,7 +959,7 @@ intptr_t UiScroll::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     // LAB_00597350 (RET 0xc).
     switch (Msg)
     {
-    case 6:
+    case kWinPropOffset:
     {
         // A -> float[3], the new scroll offset: move by its change (each difference and sum
         // rounded to float), then the inverse.
@@ -987,7 +987,7 @@ intptr_t UiScroll::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         memcpy(InverseLayout_, &Inverse, sizeof(InverseLayout_));
         return 1;
     }
-    case 0x37:
+    case kScrollPropSetRange:
     {
         // (A, B) = the integer range. The page goes back to +0x428; a range shorter than the
         // page hides the bar (flags &= 0xfc), otherwise it is shown and the top grows by one.
@@ -1009,12 +1009,12 @@ intptr_t UiScroll::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Relayout();
         return 1;
     }
-    case 0x38:
+    case kScrollPropSetValue:
         Value_ = static_cast<float>(static_cast<int>(A));
         ClampValues();
         Relayout();
         return 1;
-    case 0x3b:
+    case kScrollPropGetValue:
         return static_cast<int>(Value_);
     default:
         return WinControl::SetProperty(Msg, A, B);

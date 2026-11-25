@@ -101,7 +101,7 @@ FFontAtlasPage* CreateAtlasPage(unsigned NeedW, unsigned NeedH)
         static_cast<int>(TexW), static_cast<int>(TexH), &Format32, 1u, 0u, &Page->Texture);
     if (Gr != GR_OK)
     {
-        FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+        FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
               "E:\\FL\\Scratch\\Source\\Client\\cmn\\Font.cpp", 0x192,
               "FontString - failed to create texture");
         delete Page;
@@ -409,7 +409,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
             if (ExtTextOutW(G_AtlasDc, -SrcX, -SrcY, ETO_OPAQUE, &Clip, This->Text_, Length,
                             nullptr) == FALSE)
             {
-                FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+                FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                       "E:\\FL\\Scratch\\Source\\Client\\cmn\\Font.cpp", 0x329,
                       "FontString - ExtTextOutW failed.\n");
                 bOk = 0;
@@ -430,7 +430,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
                     DALib::Pipeline;
                 if (Pipeline->LockTexture(Page->Texture, 0, LockOut) != GR_OK)
                 {
-                    FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
+                    FDUMP(kFdumpWarning, "%s(%d) : *** WARNING: %s",
                           "E:\\FL\\Scratch\\Source\\Client\\cmn\\Font.cpp", 0x34c,
                           "FontString - Could not lock texture.");
                     bOk = 0;

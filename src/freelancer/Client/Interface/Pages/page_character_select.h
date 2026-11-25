@@ -108,7 +108,7 @@ public:
     RenderDisplayList DetailsRestricted;     // +0x368 -- IDS 0x6007c, trailing paragraph cut
     RenderDisplayList MotdHeader;            // +0x374 -- IDS 0x60007, trailing paragraph cut
     // +0x380 (5 bytes): the constructor writes flags 0 and colour 0x52eaf5; nothing in the page
-    // reads it. TODO: its reader is not identified.
+    // reads it; no reader identified.
     TextRenderAttributes Field_0x380;
     TextRenderContext::Image* UpPip;         // +0x388 -- interface\intro\images\uppip.bmp
     TextRenderContext::Image* DownPip;       // +0x38c -- DownPip.bmp

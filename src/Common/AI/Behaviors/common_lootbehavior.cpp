@@ -227,7 +227,7 @@ bool LootBehavior::IsLootUnclaimed(IObjRW* Loot)
             continue;
         unsigned OtherType = 0;                                     // not pre-set in retail
         Other->get_type(OtherType);                                 // result unread
-        if ((OtherType & 0x7f0000u) == 0)
+        if ((OtherType & OBJ_SHIP_MASK) == 0)
             continue;
         CObject const* const OtherShip = CObjectOfClass(Other, CObject::ClassShip);
         if (OtherShip == nullptr)
@@ -272,7 +272,7 @@ bool LootBehavior::AcquireLootTarget(FLootTarget* Slot)
         IObjRW* const Candidate = WatchedObject(List->Entries[Index]);
         unsigned CandidateType = 0;                                 // not pre-set in retail
         Candidate->get_type(CandidateType);
-        if ((CandidateType & 0x10000000u) == 0)
+        if ((CandidateType & OBJ_LOOT) == 0)
             continue;
 
         // Retail: each failed test below ends the whole scan (`JE 062ceb0f`, past the loop),

@@ -58,9 +58,9 @@ namespace
     // Inlined in FUN_00446ac0 / FUN_00446b40: which options show a prop of Type.
     bool IsPropTypeShown(int Type)
     {
-        if (Type == 0)
+        if (Type == PetalCategoryRoom)
             return GetGameOption(kGameOptBackgroundGroup) >= 1;
-        if (Type == 1)
+        if (Type == PetalCategorySpaceship)
             return GetGameOption(kGameOptObjectsGroup) != 0 && GetGameOption(kGameOptShips) != 0;
         return GetGameOption(kGameOptObjectsGroup) != 0;
     }
@@ -134,7 +134,7 @@ void FObjectProp::DrawOpaque(ICamera* /*Camera*/)
     if (bDetached != 0)
         return;
     // A type-5 prop first casts its shadow (FUN_0044b370).
-    if (Type == 5)
+    if (Type == PetalCategoryEquipmentCart)
     {
         RoomControlDrawShadow(Owner, reinterpret_cast<unsigned long>(GetEngineInstance()), 0,
                               0);
@@ -164,9 +164,9 @@ void FObjectProp::Load(FPropData const& Data)
     Archetype::Root* Arch = nullptr;
     switch (Data.Type)
     {
-    case 0:
-    case 5:
-    case 6:
+    case PetalCategoryRoom:
+    case PetalCategoryEquipmentCart:
+    case PetalCategoryProp:
     {
         // The PetalDB record of that category.
         unsigned const Id = ResolveTemplate(Template);
@@ -175,30 +175,30 @@ void FObjectProp::Load(FPropData const& Data)
         LoadPetal(Record, Template);
         break;
     }
-    case 1:
+    case PetalCategorySpaceship:
         Arch = Archetype::GetShip(ResolveTemplate(Template));
         break;
-    case 2:
+    case PetalCategorySolar:
         Arch = Archetype::GetSolar(ResolveTemplate(Template));
         break;
-    case 3:
+    case PetalCategoryAsteroid:
         Arch = Archetype::GetAsteroid(ResolveTemplate(Template));
         break;
-    case 4:
+    case PetalCategoryEquipment:
         Arch = Archetype::GetEquipment(ResolveTemplate(Template));
         break;
     default:
         break;
     }
 
-    if (Data.Type >= 1 && Data.Type <= 4)
+    if (Data.Type >= PetalCategorySpaceship && Data.Type <= PetalCategoryEquipment)
     {
         if (Arch == nullptr)
         {
             // The equipment case builds the severity with FUN_00411c50(0x10000, 1), the others
             // pass 0x100001 directly -- the same value.
             unsigned Severity = 0x100001;
-            if (Data.Type == 4)
+            if (Data.Type == PetalCategoryEquipment)
                 PackNibbleByte(&Severity, 0x10000, 1);
             FDUMP(Severity, "%s(%d) : *** ERROR: No valid archetype for prop %s\n",
                   kObjectPropCpp, 0x69, Template);
@@ -216,7 +216,7 @@ void FObjectProp::Load(FPropData const& Data)
         }
     }
 
-    if (Data.Type == 1 && Data.Loadout.length() != 0 && RtcSlider::is_enabled("ship_loadouts"))
+    if (Data.Type == PetalCategorySpaceship && Data.Loadout.length() != 0 && RtcSlider::is_enabled("ship_loadouts"))
         LoadLoadout(Data.Loadout.c_str());
 
     FInstanceMatrix Xform;
@@ -233,7 +233,7 @@ void FObjectProp::LoadPetal(void const* RecordPtr, char const* Template)
         static_cast<PetalInterfaceDatabase::petal_record const*>(RecordPtr);
     if (Record == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: No valid PetalDB archetype for prop %s\n",
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: No valid PetalDB archetype for prop %s\n",
               kObjectPropCpp, 0x86, Template);
         return;
     }
@@ -300,7 +300,7 @@ unsigned FObjectProp::ResolveTemplate(char const* Template)
     if (_stricmp(Template, "$terrain_dyna_02") == 0)
         return Base->TerrainDyna02;
 
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Invalid indirection template name %s in prop\n",
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Invalid indirection template name %s in prop\n",
           kObjectPropCpp, 0xd8, Template);
     return 0;
 }
@@ -311,7 +311,7 @@ void FObjectProp::LoadLoadout(char const* LoadoutName)
     Loadout::Map const* LoadoutMap = Loadout::Get(CreateID(LoadoutName));
     if (LoadoutMap == nullptr)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Failed to find loadout %s\n", kObjectPropCpp, 0x158,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Failed to find loadout %s\n", kObjectPropCpp, 0x158,
               LoadoutName);
         return;
     }

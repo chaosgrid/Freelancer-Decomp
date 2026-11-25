@@ -160,7 +160,7 @@ bool FSwappedMaterial::CaptureOriginal()
     }
 
     if (!bFound)
-        FDUMP(0x100001, kNoDtName, kSwappedMaterialCpp, 0x9c, MaterialName);
+        FDUMP(kFdumpError, kNoDtName, kSwappedMaterialCpp, 0x9c, MaterialName);
     Material->Release();
     return true;
 }
@@ -171,7 +171,7 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
     IMaterial* const Material = FindMaterial(MaterialName);
     if (Material == nullptr)
     {
-        FDUMP(0x100001, kNoMaterial, kSwappedMaterialCpp, 0xdf, MaterialName);
+        FDUMP(kFdumpError, kNoMaterial, kSwappedMaterialCpp, 0xdf, MaterialName);
         return;
     }
 
@@ -212,7 +212,7 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
     }
 
     if (!bFound)
-        FDUMP(0x100001, kNoDtName, kSwappedMaterialCpp, 0xd4, MaterialName);
+        FDUMP(kFdumpError, kNoDtName, kSwappedMaterialCpp, 0xd4, MaterialName);
 
     // Slot 6 with (0, 1.0f).
     Material->ApplyVerify(nullptr, reinterpret_cast<void*>(0x3f800000u));

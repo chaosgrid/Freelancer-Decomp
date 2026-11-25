@@ -83,7 +83,7 @@ bool NnConfirm::Create(Win3D* NewParent, void* Data)
         Font->bMultiLine = 1;
         Font->LayoutGen = 0;
     }
-    Text->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Question), 0);
+    Text->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Question), 0);
 
     float const ButtonExtents[3] = {NnFloatBits(0x3db851ec), NnFloatBits(0x3cac0831), 0.0f};
     float const YesPosition[3] = {Base[0] - kYesOffsetX, Base[1] - kRowOffsetY, Base[2]};
@@ -104,10 +104,10 @@ bool NnConfirm::Create(Win3D* NewParent, void* Data)
 
     DrawLayer = 0x6e;
     DrawSubLayer = 7;
-    RegisterEvent(0x13);
-    RegisterEvent(0x12);
-    RegisterEvent(0xf);
-    RegisterEvent(0x11);
+    RegisterEvent(USER_YES);
+    RegisterEvent(USER_NO);
+    RegisterEvent(USER_CANCEL);
+    RegisterEvent(USER_ENTER);
     Win3DSetKeyFocus(this);                        // FUN_0059d8c0
     G_ModalCaptureCount = G_ModalCaptureCount + 1; // DAT_0067dccc
 
@@ -117,7 +117,7 @@ bool NnConfirm::Create(Win3D* NewParent, void* Data)
 void NnConfirm::Answer(unsigned bYes)
 {
     if (Parent != nullptr)
-        Parent->ProcessMessage(0x3006, bYes, 0);
+        Parent->ProcessMessage(kWinMsgConfirmAnswer, bYes, 0);
     ReleaseMouse();
     Win3D* Child = ChildHead;
     while (Child != nullptr)
@@ -140,7 +140,7 @@ void NnConfirm::Draw()
 bool NnConfirm::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // LAB_004887d0: 0xf003 / 0xf004 go on to slot 42 with A and B; always false.
-    if (Msg == 0xf003 || Msg == 0xf004)
+    if (Msg == kWinMsgEscape || Msg == kWinMsgEnter)
         SetProperty(static_cast<int>(Msg), A, B);
     return false;
 }
@@ -149,7 +149,7 @@ intptr_t NnConfirm::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // LAB_00488800. Every path returns 0; nothing reaches WinControl's switch.
     (void)B;
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         if (A == reinterpret_cast<uintptr_t>(YesBox))
         {
@@ -161,18 +161,18 @@ intptr_t NnConfirm::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Answer(0);
             return 0;
         }
-        FDUMP(0x100001, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x5af,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", kNnLoadSaveCpp, 0x5af,
               "Invalid button in confirmation dialog\n");
         return 0;
     }
-    if (Msg == 0x42)
+    if (Msg == kWinPropPlaceAtOffset)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
         SetPosition(Position);
         return 0;
     }
-    if (Msg == 0xf003)
+    if (Msg == kWinMsgEscape)
     {
         // The Event::Handler face's slot 0 with 0xf -- "no".
         OnEvent(0xf);
@@ -186,12 +186,12 @@ bool NnConfirm::OnEvent(unsigned MsgId)
     // LAB_00488700.
     switch (MsgId)
     {
-    case 0xf:
-    case 0x12:
+    case USER_CANCEL:
+    case USER_NO:
         Answer(0);
         return true;
-    case 0x11:
-    case 0x13:
+    case USER_ENTER:
+    case USER_YES:
         Answer(1);
         return true;
     default:
@@ -211,7 +211,7 @@ namespace
             return nullptr;
         NnConfirm* const Dialog = static_cast<NnConfirm*>(Created);
         float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        Dialog->SetProperty(0x42, reinterpret_cast<uintptr_t>(Zero), 0);
+        Dialog->SetProperty(kWinPropPlaceAtOffset, reinterpret_cast<uintptr_t>(Zero), 0);
         Dialog->CaptureMouse(); // slot 32
         return Created;
     }

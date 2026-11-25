@@ -205,7 +205,7 @@ namespace
             return;
 
         // The player's live mission controller (FUN_06f487c0).
-        if ((PlayerState->LiveMissionId & 0x3fffffffu) != 0)
+        if ((PlayerState->LiveMissionId & GIdValueMask) != 0)
             return;
 
         switch (MissionNum)
@@ -255,14 +255,14 @@ namespace
     void FStory::OnMissionEvent(unsigned int EventKind, unsigned int Chapter,
                                 unsigned int ControllerToDestroy)
     {
-        if (EventKind == 1)
+        if (EventKind == STORY_MISSION_EVENT_JOINED)
         {
             SetMissionChapter(Chapter, 1);
             if (Chapter == 23)
                 SetShipBoughtReputation();
             return;
         }
-        if (EventKind != 3)
+        if (EventKind != STORY_MISSION_EVENT_SUCCEEDED)
             return;
 
         switch (Chapter)
@@ -385,7 +385,7 @@ namespace
                         SetContentPlayerMissionNumber(
                             MissionPlayerState, static_cast<unsigned int>(MissionNum), 0);
                     }
-                    if ((GStoryMissionController & 0x3fffffffu) != 0)
+                    if ((GStoryMissionController & GIdValueMask) != 0)
                     {
                         FStoryLoadMessage LoadMessage;
                         LoadMessage.PlayerId = PlayerId;
@@ -440,7 +440,7 @@ namespace
         case pub::Controller::EMessage::PlayerMissionChanged:
             if (DeltaWorth != -1.0f && MissionNum != 42 &&
                 static_cast<unsigned int const*>(MessageParms)[1] == PlayerId &&
-                (static_cast<unsigned int const*>(MessageParms)[0] & 0x3fffffffu) == 0)
+                (static_cast<unsigned int const*>(MessageParms)[0] & GIdValueMask) == 0)
                 AdvanceMission();
             break;
         default:

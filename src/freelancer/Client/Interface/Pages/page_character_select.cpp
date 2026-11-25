@@ -25,6 +25,7 @@
 #include "Interface/ui_scroll.h"
 #include "Interface/ui_text_msg_button.h"
 #include "Interface/win3d_immediate.h"   // Win3DVec3Add (FUN_00423b30)
+#include "Interface/menu_enter_state.h"
 
 #include "common_text.h"
 
@@ -264,7 +265,7 @@ bool PageCharacterSelect::SaveEdges()
 void PageCharacterSelect::Destroy()
 {
     // FUN_00567290.
-    UnregisterEvent(0xf);
+    UnregisterEvent(USER_CANCEL);
     if (CharacterTable != nullptr)
     {
         CharacterTable->GetEdges(&Edges);
@@ -310,7 +311,7 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
     Motd = static_cast<UiRichTextWin*>(FindWidget("MOTD"));
     bCharacterChosen = 0;
 
-    RegisterEvent(0xf);
+    RegisterEvent(USER_CANCEL);
 
     // Tip mode 3: one tip per cell.
     CharacterTable->SetTipMode(3);
@@ -652,7 +653,7 @@ void PageCharacterSelect::FillRow(unsigned Row, CCharacterSet::CharacterInfo con
 bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_00569670.
-    if (Msg == 0x3004)
+    if (Msg == kWinMsgCommand)
     {
         PlayOrRewindUiSoundSlot(0);
         int Direction = 0;
@@ -717,7 +718,7 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0x300d)
+    if (Msg == kWinMsgSelectionChanged)
     {
         // A click on the table: the selection moves to the clicked row's character; the new and
         // the old row are redrawn.
@@ -770,12 +771,12 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0x3006)
+    if (Msg == kWinMsgConfirmAnswer)
     {
         // The delete confirm's answer.
         if (A == 0)
         {
-            ProcessMessage(0x3004, 0xf003, 0); // virtual, on itself
+            ProcessMessage(kWinMsgCommand, 0xf003, 0); // virtual, on itself
             return true;
         }
         if (A != 1)
@@ -793,7 +794,7 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         }
         else if (Destroyed == 2)
         {
-            Result = 5;
+            Result = kMenuStateServerSelect;
         }
         else
         {
@@ -804,7 +805,7 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
             {
                 if (Relisted != 2)
                     NnErrorRunModal(0x73c, false, nullptr);
-                Result = 5;
+                Result = kMenuStateServerSelect;
             }
         }
         RebuildTable();
@@ -812,7 +813,7 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0xf001)
+    if (Msg == kWinMsgPress)
     {
         // A header click: the sort column or its direction, the headers redrawn, the table
         // rebuilt (RebuildTable's body inline, the leftover rows through ClearRow).
@@ -880,7 +881,7 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0xf002)
+    if (Msg == kWinMsgDoubleClick)
     {
         // A double click on the table loads.
         if (static_cast<uintptr_t>(A) != reinterpret_cast<uintptr_t>(CharacterTable))
@@ -890,7 +891,7 @@ bool PageCharacterSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    if (Msg == 0xf005)
+    if (Msg == kWinMsgScroll)
     {
         RebuildTable();
         return true;
@@ -932,7 +933,7 @@ void PageCharacterSelect::UpdateButtons()
 bool PageCharacterSelect::OnEvent(unsigned MsgId)
 {
     // LAB_0056a300 (this = the +0x80 face): event 0xf reconnects unless a leave runs.
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return UIPage::MasterWin::OnEvent(MsgId);
     if (bLeaving == 0)
     {
@@ -940,9 +941,9 @@ bool PageCharacterSelect::OnEvent(unsigned MsgId)
         if (!ConnectToServer(g_display.ini_path.Text))
         {
             G_LoginMgr.Reset();
-            Result = 4; // dead store, overwritten below as retail
+            Result = kMenuStateMultiplayer; // dead store, overwritten below as retail
         }
-        Result = 5;
+        Result = kMenuStateServerSelect;
     }
     return true;
 }
@@ -968,11 +969,11 @@ void PageCharacterSelect::Update()
             float const Along[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
             float const Against[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
             float const Up[3] = {0.0f, static_cast<float>(SlideT), 0.0f};
-            LoadCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
-            NewCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
-            DeleteCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
-            Back->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
-            MainMenu->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
+            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
             float Scaled[3];
             float Position[3];
             ScaleVec3(Scaled, Against, 1.20000005f);
@@ -988,11 +989,11 @@ void PageCharacterSelect::Update()
         {
             // Arrived (strictly past 0): everything in place, shown and live; SlideT parked at 2.0.
             float const ZeroOffset[3] = {0.0f, 0.0f, 0.0f};
-            LoadCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            NewCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            DeleteCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            Back->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            MainMenu->SetProperty(6, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
             CharacterBox->SetPosition(CharacterBoxHome);
             MotdBox->SetPosition(MotdBoxHome);
             ServerDetailsBox->SetPosition(DetailsBoxHome);
@@ -1039,11 +1040,11 @@ void PageCharacterSelect::Update()
         {
             float const Along[3] = {static_cast<float>(SlideT), 0.0f, 0.0f};
             float const Negated = static_cast<float>(-SlideT);
-            LoadCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
-            NewCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
-            DeleteCharacter->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
-            Back->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
-            MainMenu->SetProperty(6, reinterpret_cast<uintptr_t>(Along), 0);
+            LoadCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            NewCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            DeleteCharacter->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
+            MainMenu->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Along), 0);
             // The same three positions as the slide-in, but built with FUN_00422b80's float sums.
             float const Out[3] = {Negated * 1.20000005f, 0.0f, 0.0f};
             float Position[3] = {Out[0] + CharacterBoxHome[0], Out[1] + CharacterBoxHome[1],
@@ -1091,17 +1092,17 @@ void PageCharacterSelect::Update()
                 G_CharacterCreateSelection.Info.BaseId = *Faction.Bases.begin();
                 G_CharacterCreateSelection.Info.PackageId = *Faction.Packages.begin();
                 G_CharacterCreateSelection.Info.PilotId = *Faction.Pilots.begin();
-                Result = 0xe;
+                Result = kMenuStateCharacterCreate;
             }
             else if (LeaveDirection == -2)
             {
                 ShutdownServerConnection();
-                Result = 1;
+                Result = kMenuStateMainMenu;
             }
             else
             {
                 ShutdownServerConnection();
-                Result = 4;
+                Result = kMenuStateMultiplayer;
             }
         }
     }
@@ -1124,7 +1125,7 @@ void PageCharacterSelect::Update()
         return;
     bCharacterChosen = 1;
     SelectedCharacter = static_cast<CharacterRowData const*>(RowRecord->Payload.Object)->Id;
-    Result = 0xc;
+    Result = kMenuStateEnterGame;
     if (SelectedCharacter != CurrentCharacter)
         ChatResetForConnect();
     CurrentCharacter = SelectedCharacter;

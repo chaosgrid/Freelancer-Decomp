@@ -88,6 +88,52 @@ inline T RpcPayloadRead(const FPacketBase* Packet, unsigned int Offset) {
     return Value;
 }
 
+// The whole of Value copied byte for byte into Wire (a packet's payload member, or a local
+// of the same type), pad bytes included: a struct assignment need not copy those, and a
+// float member is not moved through the FPU.
+template<typename T>
+inline bool RpcPayloadWrite(T& Wire, const T& Value) {
+    unsigned char* Dst = reinterpret_cast<unsigned char*>(&Wire);
+    const unsigned char* Src = reinterpret_cast<const unsigned char*>(&Value);
+    for (unsigned int i = 0; i < (unsigned int)sizeof(T); ++i) {
+        Dst[i] = Src[i];
+    }
+    return true;
+}
+
+// ===========================================================================
+// Codec-table adapters. A codec that serves one packet class takes that class (or the one
+// base its classes share); the table holds it through these, which supply the generic
+// FRpcMarshalFn / FRpcDeliverFn / FRpcServerDeliverFn signature. The serializer built the
+// class registered for the entry's (channel, opcode) (RpcPacketFactory<T>,
+// rpc_packet_classes.h), so the downcast is exact.
+// ===========================================================================
+template<typename TFn>
+struct TRpcCodecPacket;
+
+template<typename TPacket, typename... TArgs>
+struct TRpcCodecPacket<bool (*)(TPacket&, TArgs...)> {
+    typedef TPacket Type;
+};
+
+// MSVC deduces an `auto` template argument naming a function as a function reference.
+template<typename TPacket, typename... TArgs>
+struct TRpcCodecPacket<bool (&)(TPacket&, TArgs...)> {
+    typedef TPacket Type;
+};
+
+template<auto Marshal>
+bool RpcMarshalAs(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+    typedef typename TRpcCodecPacket<decltype(Marshal)>::Type TPacket;
+    return Marshal(*static_cast<TPacket*>(Packet), Args, ArgCount);
+}
+
+template<auto Deliver>
+bool RpcDeliverAs(const FPacketBase* Packet, IClient* Client, IChatClient* ChatClient) {
+    typedef typename TRpcCodecPacket<decltype(Deliver)>::Type TPacket;
+    return Deliver(*static_cast<TPacket*>(Packet), Client, ChatClient);
+}
+
 // Bare operator new(N) -- a size of 0 included -- and a byte copy; the packet owns the
 // block. The block writers of channels 2 and 3 (FUN_06d97b00, FUN_06d90a00, FUN_06d97470,
 // FUN_06d989b0, FUN_06d9a160, FUN_06d9a5f0, FUN_06d9aab0) and the IServerImpl senders do
@@ -392,6 +438,17 @@ struct FPayloadServerBlobReversed {
 static_assert(sizeof(FPayloadServerBlobReversed) == 0x08, "ch2 reversed-blob payload 0x08");
 
 // --- per-type shapes -----------------------------------------------------
+
+// ch2 0x49 FLPACKET_SERVER_SETHULLSTATUS, size 0x24 -> payload 0x04: the float shape
+// (FPayloadServerFloat, the view of the shared codec RpcEncodeWireFloat) under the name of
+// IClient::SendServerSetHullStatus's argument.
+struct FPayloadServerSetHullStatus {
+    float HullStatus;           // +0x00
+};
+static_assert(sizeof(FPayloadServerSetHullStatus) == sizeof(FPayloadServerFloat),
+              "SETHULLSTATUS payload 0x04");
+static_assert(offsetof(FPayloadServerSetHullStatus, HullStatus) == 0x00,
+              "SETHULLSTATUS payload +0x00");
 
 // ch2 0x06 FLPACKET_SERVER_DESTROYOBJECT, size 0x28 -> payload 0x08.
 // Sender 0x06d89140 (IClient+0x0dc), receiver caseD_6 at 0x06d81f6a.
@@ -1364,6 +1421,13 @@ struct FPayloadClientDword {
 };
 static_assert(sizeof(FPayloadClientDword) == 0x04, "ch3 single-dword payload 0x04");
 
+// payload 0x04: one float. ch3 0x3b REQHULLSTATUS, 0x46 REQDIFFICULTYSCALE (encoded through
+// x87 by RpcEncodeWireFloat, decoded as a dword).
+struct FPayloadClientFloat {
+    float Field_0x00;
+};
+static_assert(sizeof(FPayloadClientFloat) == 0x04, "ch3 float payload 0x04");
+
 // payload 0x08. ch3 0x19, 0x2b, 0x3e, 0x43.
 struct FPayloadClientDwordPair {
     unsigned int Field_0x00;
@@ -1445,6 +1509,19 @@ struct FPayloadClientCommComplete {
 };
 static_assert(sizeof(FPayloadClientCommComplete) == sizeof(FPayloadClientDwordQuad),
               "COMMCOMPLETE payload 0x10");
+
+// ch3 0x12 GFGOODBUY: IServer::GFGoodBuy(SGFGoodBuyInfo const&, uint); the sender copies the
+// struct's four dwords straight through (MarshalCh3StructHead<4>), the receiver rebuilds it
+// in the same order.
+struct FPayloadClientGFGoodBuy {
+    unsigned int BaseId;          // +0x00  SGFGoodBuyInfo+0x00
+    unsigned int Null04;          // +0x04  SGFGoodBuyInfo+0x04, always 0 from the client
+    unsigned int GoodId;          // +0x08  SGFGoodBuyInfo+0x08
+    unsigned int Count;           // +0x0c  SGFGoodBuyInfo+0x0c
+};
+static_assert(sizeof(FPayloadClientGFGoodBuy) == sizeof(FPayloadClientDwordQuad),
+              "GFGOODBUY payload 0x10");
+static_assert(offsetof(FPayloadClientGFGoodBuy, Count) == 0x0c, "GFGOODBUY payload +0x0c");
 
 // --- per-opcode shapes ----------------------------------------------------
 
@@ -1758,6 +1835,13 @@ extern IChatServer* GRealChatServer;
 // call that FUN_06d86a70's matching case makes. SessionId is the dispatcher's own
 // param_1, which retail substitutes wherever the session id was dropped.
 typedef bool (*FRpcServerDeliverFn)(const FPacketBase* Packet, IServer* Server, unsigned int SessionId);
+
+// The channel-3 counterpart of RpcDeliverAs (rpc_payloads.h, top).
+template<auto Deliver>
+bool RpcDeliverToServerAs(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
+    typedef typename TRpcCodecPacket<decltype(Deliver)>::Type TPacket;
+    return Deliver(*static_cast<TPacket*>(Packet), Server, SessionId);
+}
 
 struct FRpcServerCodec {
     unsigned short Channel;

@@ -65,6 +65,23 @@ struct FWin3DMouseEvent
     int Action;
 };
 
+// The message ids slot 23 (ProcessMessage) carries between windows. Several panels relay them
+// unchanged into their slot 42 (SetProperty), which then switches on the same ids.
+enum EWin3DMessage : unsigned
+{
+    kWinMsgCommand = 0x3004,          // a button's click: A = its command (UiTextMsgButton
+                                      // LAB_0059a3d0, TypeSelect)
+    kWinMsgConfirmAnswer = 0x3006,    // NN_Confirm's answer (A 1 yes / 0 no), NN_Error's close
+    kWinMsgSelectionChanged = 0x300d, // UiFastTable: another row selected (A table, B row)
+    kWinMsgPress = 0xf001,            // ListBox row / UiFastTable cell press
+    kWinMsgDoubleClick = 0xf002,      // ListBox row / UiFastTable row double click
+    kWinMsgEscape = 0xf003,           // RichTextEditWin: Escape (FUN_0057c9b0)
+    kWinMsgEnter = 0xf004,            // RichTextEditWin: Enter (FUN_0057c9b0)
+    kWinMsgScroll = 0xf005,           // UiScroll: its value changed (A = the scroll bar)
+    kWinMsgShow = 0xef01,             // WinControl FUN_005a0840: shown at the parent's position
+    kWinMsgHide = 0xef02,             // WinControl: hidden; the NeuroNet panels close on it
+};
+
 struct Win3D : public LinkTree<Win3D>
 {
     // FUN_004b6790

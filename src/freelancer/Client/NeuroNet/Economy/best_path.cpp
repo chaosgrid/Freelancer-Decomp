@@ -53,7 +53,7 @@ namespace
             // solars).
             CObject* const Obj = Go->Object;
             CEqObj* Solar = nullptr;
-            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 0x303u) == 0x303u)
+            if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & CObject::ClassSolar) == CObject::ClassSolar)
                 Solar = static_cast<CEqObj*>(Obj);
             if (Solar->DockingBaseId == G_BestPathBaseId)
             {

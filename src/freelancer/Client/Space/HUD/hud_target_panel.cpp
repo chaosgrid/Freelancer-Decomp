@@ -159,7 +159,7 @@ namespace
     void SetPos(WinControl* Control, float X, float Y, float Z)
     {
         float const Pos[3] = {X, Y, Z};
-        Control->SetProperty(6, reinterpret_cast<uintptr_t>(Pos), 0);
+        Control->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Pos), 0);
     }
 
     // Inlined by retail at three sites.
@@ -430,8 +430,8 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
     , TargetButton(nullptr)
     , NextEnemyButton(nullptr)
     , FormationButton(nullptr)
-    , Mode(0)
-    , ShownMode(0)
+    , Mode(kTargetPanelContactList)
+    , ShownMode(kTargetPanelContactList)
     , bFormationAvailable(0)
     , RankText(nullptr)
     , ShownRank(-1.0f)
@@ -527,7 +527,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     float const ShipNamePos[3] = {-0.488f, -0.2f, 0.0f};
     ShipName = CreateTextControl("TargetShipName", "HudSmall", ShipNamePos, nullptr, 0.205f,
                                  0.03f, 1.0f, 0, 1, 0, 1);
-    ShipName->SetProperty(0x50, 1, 0x14);
+    ShipName->SetProperty(kTextPropTypewriter, 1, 0x14);
     ShipName->HomeOffset[0] = ShipNamePos[0];
     ShipName->HomeOffset[1] = ShipNamePos[1];
     ShipName->HomeOffset[2] = ShipNamePos[2];
@@ -535,7 +535,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     float const SubNamePos[3] = {-0.488f, -0.218f, 0.0f};
     SubtargetName = CreateTextControl("SubtargetName", "HudSmall", SubNamePos, nullptr, 0.205f,
                                       0.03f, 1.0f, 0, 1, 0, 1);
-    SubtargetName->SetProperty(0x50, 1, 0x14);
+    SubtargetName->SetProperty(kTextPropTypewriter, 1, 0x14);
     SubtargetName->HomeOffset[0] = SubNamePos[0];
     SubtargetName->HomeOffset[1] = SubNamePos[1];
     SubtargetName->HomeOffset[2] = SubNamePos[2];
@@ -609,18 +609,18 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
                                           "interface\\HUD\\HUD_formation.3db", nullptr,
                                           "ui_select_item", nullptr, FormationPos, nullptr,
                                           SmallHalf, 0, 1, 0, 0, 0x60c, 0, 0x59);
-    FormationButton->SetProperty(1, 1, 0);
+    FormationButton->SetProperty(kWinPropHide, 1, 0);
 
     float const RankPos[3] = {-0.49f, -0.361f, 0.0f};
     RankText = CreateTextControl("TargetRankText", "HudSmall", RankPos, nullptr, 0.228f, 0.03f,
                                  0.9f, 0, 1, 0x574, 1);
 
     HideExpandedControls(true);
-    PreviousButton->SetProperty(1, 1, 0);
-    NextButton->SetProperty(1, 1, 0);
-    TradeButton->SetProperty(1, 1, 0);
-    ContactListButton->SetProperty(0xc, Mode == 0 ? 1 : 0, 0);
-    TargetButton->SetProperty(0xc, Mode == 1 ? 1 : 0, 0);
+    PreviousButton->SetProperty(kWinPropHide, 1, 0);
+    NextButton->SetProperty(kWinPropHide, 1, 0);
+    TradeButton->SetProperty(kWinPropHide, 1, 0);
+    ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
+    TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
 
     // Retail clones the StyleNode twice: the list takes a clone of the clone, and the first
     // clone is deleted.
@@ -673,8 +673,8 @@ void HudTarget::ToggleExpanded()
         }
 
         LabelRefreshTimer = kOne;
-        ShipName->SetProperty(0x50, 1, 0x14);
-        SubtargetName->SetProperty(0x50, 1, 0x14);
+        ShipName->SetProperty(kTextPropTypewriter, 1, 0x14);
+        SubtargetName->SetProperty(kTextPropTypewriter, 1, 0x14);
         return;
     }
 
@@ -690,14 +690,14 @@ void HudTarget::HideExpandedControls(bool bHide)
 {
     // FUN_004e1930.
     uintptr_t const Hide = bHide ? 1 : 0;
-    ViewPanel->SetProperty(1, Hide, 0);
-    ShipName->SetProperty(1, Hide, 0);
-    SubtargetName->SetProperty(1, Hide, 0);
-    CloseButton->SetProperty(1, Hide, 0);
-    RankText->SetProperty(1, Hide, 0);
-    PreviousButton->SetProperty(1, Hide, 0);
-    NextButton->SetProperty(1, Hide, 0);
-    TradeButton->SetProperty(1, Hide, 0);
+    ViewPanel->SetProperty(kWinPropHide, Hide, 0);
+    ShipName->SetProperty(kWinPropHide, Hide, 0);
+    SubtargetName->SetProperty(kWinPropHide, Hide, 0);
+    CloseButton->SetProperty(kWinPropHide, Hide, 0);
+    RankText->SetProperty(kWinPropHide, Hide, 0);
+    PreviousButton->SetProperty(kWinPropHide, Hide, 0);
+    NextButton->SetProperty(kWinPropHide, Hide, 0);
+    TradeButton->SetProperty(kWinPropHide, Hide, 0);
 }
 
 void HudTarget::DrawViewObject()
@@ -716,7 +716,7 @@ void HudTarget::DrawViewObject()
     {
         return;
     }
-    if (Mode != 1)
+    if (Mode != kTargetPanelTarget)
     {
         return;
     }
@@ -733,7 +733,7 @@ void HudTarget::DrawViewObject()
     if (Object != nullptr && IsClass(Object, 3))
     {
         Simple = static_cast<CSimple*>(Object);
-        if ((Simple->TypeBits & 7u) != 0)
+        if ((Simple->TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0)
         {
             // The chrome colour at 80 % per byte (0.8f is DAT_005d8d40) as the current colour,
             // and a 16 x 16 sphere of the hierarchy radius in the object's transform (slot 4,
@@ -813,10 +813,10 @@ void HudTarget::UpdateLabels()
     {
         return;
     }
-    ShipName->SetProperty(1, 1, 0);
-    SubtargetName->SetProperty(1, 1, 0);
-    ShipName->SetProperty(0x1e, 1, 0);
-    SubtargetName->SetProperty(0x1e, 1, 0);
+    ShipName->SetProperty(kWinPropHide, 1, 0);
+    SubtargetName->SetProperty(kWinPropHide, 1, 0);
+    ShipName->SetProperty(kTextPropSetIds, 1, 0);
+    SubtargetName->SetProperty(kTextPropSetIds, 1, 0);
 
     CObject* const Object = CObjectOfObjRw(WatchedObjRw(ViewObject));
     if (Object == nullptr || !IsClass(Object, 3))
@@ -842,9 +842,9 @@ void HudTarget::UpdateLabels()
             IdsText[0] = 0;
         }
         wcscpy(SubName, IdsText);
-        ShipName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(SubName), 0);
-        ShipName->SetProperty(1, Hide, 0);
-        SubtargetName->SetProperty(1, 1, 0);
+        ShipName->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(SubName), 0);
+        ShipName->SetProperty(kWinPropHide, Hide, 0);
+        SubtargetName->SetProperty(kWinPropHide, 1, 0);
         return;
     }
 
@@ -867,15 +867,15 @@ void HudTarget::UpdateLabels()
         {
             Label->Offset[1] = static_cast<float>(static_cast<double>(Label->Offset[1]) - 0.004);
         }
-        Label->SetProperty(6, reinterpret_cast<uintptr_t>(Label->Offset), 0);
+        Label->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(Label->Offset), 0);
     }
 
     // The name line (Mode 0) with the faction short name.
     FHudWideText Caption = {nullptr, 0};
-    if (HudBuildObjectCaption(Simple, &Caption, 0, true))
+    if (HudBuildObjectCaption(Simple, &Caption, kCaptionName, true))
     {
-        ShipName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Caption.Text), 0);
-        ShipName->SetProperty(1, Hide, 0);
+        ShipName->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Caption.Text), 0);
+        ShipName->SetProperty(kWinPropHide, Hide, 0);
         // The flashing sub-target's name, when it has one.
         bool bSubDone = false;
         if (SubTargetFlash.SubId != SUBOBJ_ID_NONE)
@@ -883,8 +883,8 @@ void HudTarget::UpdateLabels()
             GetSubTargetName(SubName);
             if (SubName[0] != 0)
             {
-                SubtargetName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(SubName), 0);
-                SubtargetName->SetProperty(1, Hide, 0);
+                SubtargetName->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(SubName), 0);
+                SubtargetName->SetProperty(kWinPropHide, Hide, 0);
                 bSubDone = true;
             }
         }
@@ -892,11 +892,11 @@ void HudTarget::UpdateLabels()
         {
             // Otherwise the location line (Mode 1) -- the label keeps its old text when that
             // fails, and is shown either way.
-            if (HudBuildObjectCaption(Simple, &Caption, 1, true))
+            if (HudBuildObjectCaption(Simple, &Caption, kCaptionLocation, true))
             {
-                SubtargetName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(Caption.Text), 0);
+                SubtargetName->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(Caption.Text), 0);
             }
-            SubtargetName->SetProperty(1, Hide, 0);
+            SubtargetName->SetProperty(kWinPropHide, Hide, 0);
         }
     }
     else
@@ -960,10 +960,10 @@ void HudTarget::UpdateLabels()
                 free(Pilot.Text);
             }
         }
-        ShipName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(NameText), 0);
-        ShipName->SetProperty(1, Hide, 0);
-        SubtargetName->SetProperty(0x1d, reinterpret_cast<uintptr_t>(SubText), 0);
-        SubtargetName->SetProperty(1, Hide, 0);
+        ShipName->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(NameText), 0);
+        ShipName->SetProperty(kWinPropHide, Hide, 0);
+        SubtargetName->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(SubText), 0);
+        SubtargetName->SetProperty(kWinPropHide, Hide, 0);
     }
 
     if (Caption.Text != nullptr)
@@ -980,7 +980,7 @@ void HudTarget::OnViewObjectChanged()
     Win3D* const Scanner = Win3DFindByName("NN_Scanner");
     if (Scanner != nullptr)
     {
-        Scanner->ProcessMessage(0xef02, 0, 0);
+        Scanner->ProcessMessage(kWinMsgHide, 0, 0);
     }
 
     IObjRW* const View = WatchedObjRw(ViewObject);
@@ -999,11 +999,11 @@ void HudTarget::OnViewObjectChanged()
         {
             unsigned long Colour = 0;
             HudReputationColor(&Colour, WatchedObjRw(HUDItem::Target), WatchedObjRw(ViewObject));
-            ShipName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
-            SubtargetName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
+            ShipName->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
+            SubtargetName->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
         }
-        ShipName->SetProperty(0x50, 1, 0x14);
-        SubtargetName->SetProperty(0x50, 1, 0x14);
+        ShipName->SetProperty(kTextPropTypewriter, 1, 0x14);
+        SubtargetName->SetProperty(kTextPropTypewriter, 1, 0x14);
 
         SubTargetCount = RebuildSubTargets(&SubTargets);
 
@@ -1059,7 +1059,7 @@ void HudTarget::OnViewObjectChanged()
 intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 {
     // FUN_004e19e0.
-    if (Msg == 0x26)
+    if (Msg == kWinNotifyClick)
     {
         if (A == reinterpret_cast<uintptr_t>(CloseButton))
         {
@@ -1081,7 +1081,7 @@ intptr_t HudTarget::SetProperty(int Msg, uintptr_t A, uintptr_t B)
                     SelectPreviousSubTarget();
                 }
                 UpdateLabels();
-                SubtargetName->SetProperty(0x50, 1, 0x14);
+                SubtargetName->SetProperty(kTextPropTypewriter, 1, 0x14);
                 return 1;
             }
             if (A == reinterpret_cast<uintptr_t>(RequestGroupButton))
@@ -1197,7 +1197,7 @@ void HudTarget::Update()
     {
         // The toggle is hidden while the close (scaler) runs.
         uintptr_t const Hide = (bExpanded != 0 && !ButtonMover::IsActive()) ? 1 : 0;
-        ToggleButton->SetProperty(1, Hide, 0);
+        ToggleButton->SetProperty(kWinPropHide, Hide, 0);
         ButtonScaler::Update();
         UpdateTradeButton();
         HudTargetBase::Update();
@@ -1261,10 +1261,10 @@ void HudTarget::Update()
                 }
             }
         }
-        FormationButton->SetProperty(1, bFormation == 0 ? 1 : 0, 0);
-        if (bFormation == 0 && Mode == 2)
+        FormationButton->SetProperty(kWinPropHide, bFormation == 0 ? 1 : 0, 0);
+        if (bFormation == 0 && Mode == kTargetPanelFormation)
         {
-            Mode = 0;
+            Mode = kTargetPanelContactList;
         }
         bFormationAvailable = bFormation;
     }
@@ -1279,7 +1279,7 @@ void HudTarget::Update()
             IObjRW* const Current = SyncPlayerTarget();
             if (Current == nullptr && bHadViewObject != 0 && bExpanded != 0)
             {
-                Mode = 0;
+                Mode = kTargetPanelContactList;
             }
             SetViewObject(Current);
             bHadViewObject = (WatchedObjRw(ViewObject) != nullptr) ? 1 : 0;
@@ -1288,9 +1288,9 @@ void HudTarget::Update()
 
     if (Mode != ShownMode)
     {
-        ContactListButton->SetProperty(0xc, Mode == 0 ? 1 : 0, 0);
-        TargetButton->SetProperty(0xc, Mode == 1 ? 1 : 0, 0);
-        FormationButton->SetProperty(0xc, Mode == 2 ? 1 : 0, 0);
+        ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
+        TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
+        FormationButton->SetProperty(0xc, Mode == kTargetPanelFormation ? 1 : 0, 0);
     }
 
     // The target was lost while flagged unfriendly -- post 0x26 (next target) and play UI
@@ -1305,9 +1305,9 @@ void HudTarget::Update()
         }
     }
 
-    if (bExpanded != 0 && Mode != 1)
+    if (bExpanded != 0 && Mode != kTargetPanelTarget)
     {
-        if (ShownMode == 1)
+        if (ShownMode == kTargetPanelTarget)
         {
             // Leaving the target view: hide every child, then show this panel, the view panel,
             // the close button and the three switches again.
@@ -1318,7 +1318,7 @@ void HudTarget::Update()
             SetFlagBits(ContactListButton);
             SetFlagBits(NextEnemyButton);
             SetFlagBits(TargetButton);
-            FormationButton->SetProperty(1, bFormationAvailable == 0 ? 1 : 0, 0);
+            FormationButton->SetProperty(kWinPropHide, bFormationAvailable == 0 ? 1 : 0, 0);
             LabelRefreshTimer = kOne;
         }
         ShownMode = Mode;
@@ -1329,7 +1329,7 @@ void HudTarget::Update()
         return;
     }
 
-    if (bExpanded != 0 && ShownMode != 1)
+    if (bExpanded != 0 && ShownMode != kTargetPanelTarget)
     {
         ShownMode = Mode;
         SetFlagBits(ShipName);
@@ -1351,15 +1351,15 @@ void HudTarget::Update()
         if (bExpanded != 0 && bChanged)
         {
             UpdateLabels();
-            SubtargetName->SetProperty(0x50, 1, 0x14);
+            SubtargetName->SetProperty(kTextPropTypewriter, 1, 0x14);
         }
         UpdateButtons(true);
         return;
     }
 
-    ShipName->SetProperty(1, 1, 0);
-    SubtargetName->SetProperty(1, 1, 0);
-    RankText->SetProperty(1, 1, 0);
+    ShipName->SetProperty(kWinPropHide, 1, 0);
+    SubtargetName->SetProperty(kWinPropHide, 1, 0);
+    RankText->SetProperty(kWinPropHide, 1, 0);
     ClearFlagBits(PreviousButton);
     ClearFlagBits(NextButton);
     ClearFlagBits(TradeButton);
@@ -1411,9 +1411,9 @@ void HudTarget::OnMoveFinished()
     // The collapse ended.
     bExpanded = 0;
     SetGameSessionFlags(1, false);
-    ContactListButton->SetProperty(0xc, Mode == 0 ? 1 : 0, 0);
-    TargetButton->SetProperty(0xc, Mode == 1 ? 1 : 0, 0);
-    FormationButton->SetProperty(0xc, Mode == 2 ? 1 : 0, 0);
+    ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
+    TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
+    FormationButton->SetProperty(0xc, Mode == kTargetPanelFormation ? 1 : 0, 0);
     HalfExtents[0] = 0.109f;
     HalfExtents[1] = 0.02f;
     HalfExtents[2] = 0.0f;
@@ -1441,7 +1441,7 @@ void HudTarget::OnScaleFinished()
         SetPos(TargetButton, -0.329f, TopY, 0.0f);
         SetPos(FormationButton, -0.363f, TopY, 0.0f);
 
-        if (Mode != 1)
+        if (Mode != kTargetPanelTarget)
         {
             SetHiddenWithChildren(true);
             Flags |= 3;
@@ -1470,10 +1470,10 @@ void HudTarget::OnScaleFinished()
         SetFlagBits(TargetButton);
         SetFlagBits(NextEnemyButton);
         SetFlagBits(TargetButton); // retail sets +0x63c twice
-        FormationButton->SetProperty(1, bFormationAvailable == 0 ? 1 : 0, 0);
-        ContactListButton->SetProperty(0xc, Mode == 0 ? 1 : 0, 0);
-        TargetButton->SetProperty(0xc, Mode == 1 ? 1 : 0, 0);
-        FormationButton->SetProperty(0xc, Mode == 2 ? 1 : 0, 0);
+        FormationButton->SetProperty(kWinPropHide, bFormationAvailable == 0 ? 1 : 0, 0);
+        ContactListButton->SetProperty(0xc, Mode == kTargetPanelContactList ? 1 : 0, 0);
+        TargetButton->SetProperty(0xc, Mode == kTargetPanelTarget ? 1 : 0, 0);
+        FormationButton->SetProperty(0xc, Mode == kTargetPanelFormation ? 1 : 0, 0);
         HalfExtents[0] = 0.131f;  // 0x3e0624dd
         HalfExtents[1] = 0.117f;  // 0x3def9db2
         HalfExtents[2] = 0.0f;
@@ -1495,7 +1495,7 @@ void HudTarget::OnScaleFinished()
     SetPos(RequestGroupButton, -0.445f, kRowLoweredY, 0.0f);
     SetPos(ContactListButton, -0.343f, kRowLoweredY, 0.0f);
     SetPos(TargetButton, -0.377f, kRowLoweredY, 0.0f);
-    MinimizedFrame->SetProperty(1, 0, 0);
+    MinimizedFrame->SetProperty(kWinPropHide, 0, 0);
     SetPos(MinimizedFrame, -0.4105f, kRowLoweredY, -1.0f);
 
     WinControl* const Row[8] = {NextEnemyButton, ScanButton, TractorButton,
@@ -1530,7 +1530,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
     }
     FClientGameobj* const PlayerGameobj =
         static_cast<FClientGameobj*>(static_cast<IObjInspectImpl*>(Player));
-    if (PlayerGameobj->ManagerKind != 1)
+    if (PlayerGameobj->ManagerKind != EClientGameobjKind::Ship)
     {
         return false;
     }
@@ -1591,7 +1591,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
             OpenScanner();
             return true;
         }
-        Scanner->ProcessMessage(0xef02, 0, 0);
+        Scanner->ProcessMessage(kWinMsgHide, 0, 0);
         return true;
     }
 
@@ -1601,7 +1601,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         {
             return false;
         }
-        if (Mode == 1)
+        if (Mode == kTargetPanelTarget)
         {
             UpdateLabels();
         }
@@ -1611,17 +1611,17 @@ bool HudTarget::OnEvent(unsigned MsgId)
     case USER_NEXT_SUBTARGET:
         SelectNextSubTarget();
         UpdateLabels();
-        SubtargetName->SetProperty(0x50, 1, 0x14);
+        SubtargetName->SetProperty(kTextPropTypewriter, 1, 0x14);
         return true;
 
     case USER_PREV_SUBTARGET:
         SelectPreviousSubTarget();
         UpdateLabels();
-        SubtargetName->SetProperty(0x50, 1, 0x14);
+        SubtargetName->SetProperty(kTextPropTypewriter, 1, 0x14);
         return true;
 
     case USER_CONTACT_LIST:
-        Mode = 0;
+        Mode = kTargetPanelContactList;
         if (bExpanded == 0)
         {
             ToggleExpanded();
@@ -1629,7 +1629,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         return true;
 
     case USER_FORMATION_LIST:
-        Mode = 2;
+        Mode = kTargetPanelFormation;
         if (bExpanded == 0)
         {
             ToggleExpanded();
@@ -1643,7 +1643,7 @@ bool HudTarget::OnEvent(unsigned MsgId)
         return true;
 
     case USER_SWITCH_TO_TARGET:
-        Mode = 1;
+        Mode = kTargetPanelTarget;
         if (bExpanded == 0)
         {
             ToggleExpanded();
@@ -1739,7 +1739,7 @@ int HudTarget::GetMode(bool bRaw)
     {
         return Mode;
     }
-    return 3;
+    return kTargetPanelNotShown;
 }
 
 void HudTarget::OpenScanner()
@@ -1805,8 +1805,8 @@ void HudTarget::UpdateButtons(bool bFull)
         {
             unsigned long Colour = 0;
             HudReputationColor(&Colour, WatchedObjRw(HUDItem::Target), WatchedObjRw(ViewObject));
-            ShipName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
-            SubtargetName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
+            ShipName->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
+            SubtargetName->SetProperty(kWinPropColour, reinterpret_cast<uintptr_t>(&Colour), 1);
         }
         UpdateLabels();
     }
@@ -1819,14 +1819,14 @@ void HudTarget::UpdateButtons(bool bFull)
     // The sub-target arrows: a view with live sub-targets, and a ship only with type bit
     // 0x200000.
     bool bSubTargets = WatchedObjRw(ViewObject) != nullptr && SubTargetCount > 0;
-    if (ViewShip != nullptr && (ViewShip->TypeBits & 0x200000) == 0)
+    if (ViewShip != nullptr && (ViewShip->TypeBits & OBJ_CAPITAL) == 0)
     {
         bSubTargets = false;
     }
     uintptr_t const ArrowHide = (bSubTargets && bExpanded != 0) ? 0 : 1;
     if (PreviousButton != nullptr && bFull)
     {
-        PreviousButton->SetProperty(1, ArrowHide, 0);
+        PreviousButton->SetProperty(kWinPropHide, ArrowHide, 0);
     }
     if (NextButton != nullptr)
     {
@@ -1834,7 +1834,7 @@ void HudTarget::UpdateButtons(bool bFull)
         {
             goto RankDone;
         }
-        NextButton->SetProperty(1, ArrowHide, 0);
+        NextButton->SetProperty(kWinPropHide, ArrowHide, 0);
     }
     if (!bFull)
     {
@@ -1859,7 +1859,7 @@ void HudTarget::UpdateButtons(bool bFull)
                 GetIdsStringWWithRawFallback(0x619, G_RankLine, G_NnTextScratchCapacity);
                 swprintf(G_RankSuffix, 0x1000, L" %d", static_cast<int>(Rank));
                 wcscat(G_RankLine, G_RankSuffix);
-                RankText->SetProperty(0x1d, reinterpret_cast<uintptr_t>(G_RankLine), 0);
+                RankText->SetProperty(kTextPropSetText, reinterpret_cast<uintptr_t>(G_RankLine), 0);
             }
         }
     }
@@ -1892,7 +1892,7 @@ RankDone:
                 {
                     CEqObj* const PlayerEq = static_cast<CEqObj*>(PlayerObject);
                     CEScanner const* const Scanner =
-                        CEScanner::cast(PlayerEq->EquipManager.FindFirst(0x80000));
+                        CEScanner::cast(PlayerEq->EquipManager.FindFirst(EquipTypeScanner));
                     // A NaN distance keeps it hidden.
                     if (Scanner != nullptr &&
                         Distance <= Scanner->ScannerArch()->CargoScanRange)
@@ -1901,19 +1901,19 @@ RankDone:
                     }
                 }
             }
-            ScanButton->SetProperty(1, bHideScan, 0);
+            ScanButton->SetProperty(kWinPropHide, bHideScan, 0);
             Win3D* const ScannerWindow = Win3DFindByName("NN_Scanner");
             bScannerOpen = (ScannerWindow != nullptr) ? 1 : 0;
             ScanButton->SetProperty(0xc, bScannerOpen, 0);
             if (ScannerWindow != nullptr && bHideScan != 0)
             {
-                ScannerWindow->ProcessMessage(0xef02, 0, 0);
+                ScannerWindow->ProcessMessage(kWinMsgHide, 0, 0);
             }
         }
 
         if (TractorButton != nullptr)
         {
-            TractorButton->SetProperty(1, bLoot ? 0 : 1, 0);
+            TractorButton->SetProperty(kWinPropHide, bLoot ? 0 : 1, 0);
         }
 
         if (CommButton != nullptr)
@@ -1932,8 +1932,8 @@ RankDone:
                     CommHide = 0;
                 }
             }
-            CommButton->SetProperty(1, CommHide, 0);
-            RequestGroupButton->SetProperty(1, bPlayerShip ? 0 : 1, 0);
+            CommButton->SetProperty(kWinPropHide, CommHide, 0);
+            RequestGroupButton->SetProperty(kWinPropHide, bPlayerShip ? 0 : 1, 0);
         }
     }
     UpdateTradeButton();
@@ -1970,7 +1970,7 @@ void HudTarget::UpdateTradeButton()
         {
             bEnable = true;
         }
-        TradeButton->SetProperty(1, bEnable ? 0 : 1, 0);
+        TradeButton->SetProperty(kWinPropHide, bEnable ? 0 : 1, 0);
     }
 }
 

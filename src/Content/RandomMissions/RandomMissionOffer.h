@@ -236,12 +236,46 @@ public:
 // One loot object of a vignette (retail 0x108 bytes: an FMissionLoot and three dwords; the
 // dtor FUN_06ec7820 is the FMissionLoot one -- only the +0xec label list needs freeing).
 // Built by FUN_06f979b0 and copied in by FUN_06f97580.
+// A ship group's SpawnTriggerMode (the vignette machine, FUN_06f8beb0 / LAB_06f8c460).
+enum ERmSpawnTriggerMode
+{
+    RmSpawnDefault = 0,       // the first group at once, a later one once the ships before
+                              // it are dead
+    RmSpawnPhaseDelay = 1,    // SpawnTriggerParam seconds after the phase starts
+    RmSpawnWaveDelay = 2,     // SpawnTriggerParam seconds after the group before it spawned
+    RmSpawnShipsLeft = 3,     // when SpawnTriggerParam ships of the groups before it are left
+};
+
+// The target ships' EndTriggerMode: the trigger the vignette machine arms for the end.
+enum ERmEndTriggerMode
+{
+    RmEndNone = 0,
+    RmEndTimer = 1,           // FRmTimerTrigger
+    RmEndShipCount = 2,       // FRmShipCountTrigger
+    RmEndShipHealth = 3,      // FRmShipHealthTrigger
+};
+
+// FRmLootSpawn::Kind / FRmLootRecord::Kind (FUN_06f979b0 sets them).
+enum ERmLootKind
+{
+    RmLootBonus = 1,        // a bonus loot of the group (PickRmBonusLoot)
+    RmLootCritical = 2,     // the block's critical loot (PickCriticalLoot)
+};
+
+// FRmShipSpawn::ShipKind / FRmShipRecord::Kind: the first ship of a block with a target ship is
+// the big ship (objective RmObjKillBigShips), every other ship a defensive one (RmObjKillShips).
+enum ERmShipKind
+{
+    RmShipKindDefensive = 1,
+    RmShipKindBig = 2,
+};
+
 struct FRmLootSpawn : public FMissionLoot
 {
-    // +0xfc: 2 marks the critical loot (FUN_06f89650 and LAB_06f896f0 count its +0x94 units
-    // and take its +0x104). TODO: the other values.
+    // +0xfc: ERmLootKind, 0 until FUN_06f979b0 sets it. FUN_06f89650 and LAB_06f896f0 count
+    // the critical loot's +0x94 units and take its +0x104.
     int Kind = 0;
-    int CriticalLootMode = 0;                   // +0x100 0=none, 1=destroy, 2=tractor, 3=bring_back
+    int CriticalLootMode = 0;                   // +0x100 ERmCriticalLootMode
     // +0x104: the critical loot record (LAB_06f896f0 appends its +0x08 Name as a loot).
     FRmCriticalLoot const* CriticalLoot = nullptr;
 };
@@ -261,7 +295,7 @@ public:
     // passes a name). FUN_06f88940 keeps the name reserved while one ship carries it.
     FNpcNameParams* TargetName = nullptr;
     int TargetFlags = 2;                        // +0xd8 2 = required kill target, 0 = optional
-    int ShipKind = 1;                           // +0xdc 2 = assassination target/big ship, 1 = escort
+    int ShipKind = RmShipKindDefensive;         // +0xdc ERmShipKind
     std::vector<FRmLootSpawn> Loot;             // +0xe0 (alloc byte) / +0xe4..+0xec
 };
 
@@ -274,7 +308,7 @@ struct FRmShipGroup
     unsigned char bRequired = 1;                // +0x00 ship block +0x00
     unsigned char bSpawned = 0;                 // +0x01 set to 1 by SpawnShipGroup (read by FUN_06f88940)
     unsigned char bClearPriorTargets = 0;       // +0x02 ship block +0x03
-    int SpawnTriggerMode = 0;                   // +0x04 ship block +0x18 (0=imm, 1=phase delay, 2=wave delay, 3=count)
+    int SpawnTriggerMode = RmSpawnDefault;      // +0x04 ship block +0x18 (ERmSpawnTriggerMode)
     int SpawnTriggerParam = -1;                 // +0x08 ship block +0x1c (seconds or remaining ship count)
     FSystemInfo* System = nullptr;              // +0x0c FindSystemInfo(query DestSys)
     FMatrix Orientation;                        // +0x10 identity
@@ -348,7 +382,7 @@ public:
     FRmTargetShipComponent() = default;         // inlined in FUN_06f88240
     ~FRmTargetShipComponent() override;         // FUN_06f88500 (ICF)
 
-    int EndTriggerMode = 0;                     // +0x50 0=none, 1=timer, 2=ship count, 3=ship health
+    int EndTriggerMode = RmEndNone;             // +0x50 ERmEndTriggerMode
     int EndTriggerParam = -1;                   // +0x54 seconds / ship count / health percent
 };
 

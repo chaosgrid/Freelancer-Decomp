@@ -44,21 +44,6 @@ namespace
         throw std::out_of_range("invalid bitset<N> position");
     }
 
-    // FUN_06d4eda0 (thiscall on the player slot): the character name through the
-    // reputation vibe at slot+0x318, falling back to u">>>BAD   NAME<<<"
-    // (.data:06d8d40c) when Reputation::Vibe::GetName returns -2. The returned
-    // pointer aliases the vibe's own name buffer. The same helper is ported
-    // file-locally in server_chat.cpp and server_classes.cpp.
-    wchar_t const* PlayerData_GetName(PlayerData const& Slot)
-    {
-        static wchar_t const BadName[] = L">>>BAD   NAME<<<";
-        wchar_t const* DisplayName = BadName;
-        FmtStr Name1;
-        FmtStr Name2;
-        if (::Reputation::Vibe::GetName(Slot.rep_vibe, Name1, Name2, DisplayName) == -2)
-            DisplayName = BadName;
-        return DisplayName;
-    }
 }
 
 // ============================================================================
@@ -330,7 +315,7 @@ void FRoomEntry::enter(unsigned int SessionId)
     Record->Props.NameIds = 0;
     Record->Props.FactionId = 0xffffffff;
     PlayerData& Slot = Players[SessionId];
-    malloc_wstrcpy(&Record->Props.NameWide, PlayerData_GetName(Slot));
+    malloc_wstrcpy(&Record->Props.NameWide, Slot.get_character_name());
 
     // A local copy of the 0x34-byte Costume at slot+0x2e4, then the four part ids, the
     // accessory count and the first `count` accessories -- not the whole struct.
@@ -553,7 +538,7 @@ void FBaseEntry::send_start_room(unsigned int SessionId)
     unsigned int const DefaultRoom = Data->StartRoomId;
     if (DefaultRoom == 0)
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: No start room in base %u\n", GBaseDBFile, 0x454, Data->BaseId);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: No start room in base %u\n", GBaseDBFile, 0x454, Data->BaseId);
     }
 
     unsigned int StartRoom = DefaultRoom;
@@ -807,7 +792,7 @@ FBaseEntry* BaseDB::find_base(unsigned int Id)
     std::map<unsigned int, FBaseEntry*>::iterator It = BaseMap.find(Id);
     if (It != BaseMap.end())
         return It->second;
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
     return nullptr;
 }
 
@@ -817,7 +802,7 @@ FRoomEntry* BaseDB::find_location(unsigned int Id)
     std::map<unsigned int, FRoomEntry*>::iterator It = LocationMap.find(Id);
     if (It != LocationMap.end())
         return It->second;
-    FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Id);
+    FDUMP(kFdumpError, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Id);
     return nullptr;
 }
 
@@ -829,7 +814,7 @@ void BaseDB::load_base(unsigned int SessionId, unsigned int Id)
     std::map<unsigned int, FBaseEntry*>::iterator It = BaseMap.find(Id);
     if (It == BaseMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
         return;
     }
     FBaseEntry* const Base = It->second;
@@ -851,7 +836,7 @@ void BaseDB::unload_base(unsigned int SessionId, unsigned int Id)
     std::map<unsigned int, FBaseEntry*>::iterator It = BaseMap.find(Id);
     if (It == BaseMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
         return;
     }
     FBaseEntry* const Base = It->second;
@@ -872,7 +857,7 @@ void BaseDB::enter_location(unsigned int SessionId, unsigned int Id)
     std::map<unsigned int, FRoomEntry*>::iterator It = LocationMap.find(Id);
     if (It == LocationMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Id);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Id);
         return;
     }
     if (It->second != nullptr)
@@ -886,7 +871,7 @@ void BaseDB::exit_location(unsigned int SessionId, unsigned int Id)
     std::map<unsigned int, FRoomEntry*>::iterator It = LocationMap.find(Id);
     if (It == LocationMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Id);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Id);
         return;
     }
     FRoomEntry* const Room = It->second;
@@ -933,7 +918,7 @@ void BaseDB::base_info(unsigned int SessionId, unsigned int Id, bool bFull)
     std::map<unsigned int, FBaseEntry*>::iterator It = BaseMap.find(Id);
     if (It == BaseMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
         return;
     }
     FBaseEntry* const Base = It->second;
@@ -974,7 +959,7 @@ void BaseDB::location_info(unsigned int SessionId, unsigned int Id, bool bFull)
     std::map<unsigned int, FRoomEntry*>::iterator It = LocationMap.find(Id);
     if (It == LocationMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Id);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Id);
         return;
     }
     FRoomEntry* const Room = It->second;
@@ -1017,7 +1002,7 @@ int BaseDB::create_character(CharacterProperties const& Props, unsigned int Reco
     if (It != LocationMap.end())
         Room = It->second;
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Props.RoomId);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Props.RoomId);
     int const Handle = Room->create_character(Props, RecordFilter);
     CharacterMap.insert(std::map<unsigned int, FRoomEntry*>::value_type((unsigned int)Handle, Room));
     return Handle;
@@ -1030,7 +1015,7 @@ void BaseDB::destroy_character(unsigned int Handle)
     std::map<unsigned int, FRoomEntry*>::iterator It = CharacterMap.find(Handle);
     if (It == CharacterMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find npc character %u\n", GBaseDBFile, 0x720, Handle);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find npc character %u\n", GBaseDBFile, 0x720, Handle);
     }
     else if (It->second != nullptr)
     {
@@ -1040,7 +1025,7 @@ void BaseDB::destroy_character(unsigned int Handle)
     It = CharacterMap.find(Handle);
     if (It == CharacterMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find npc character %u\n", GBaseDBFile, 0x739, Handle);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find npc character %u\n", GBaseDBFile, 0x739, Handle);
         return;
     }
     CharacterMap.erase(It);
@@ -1052,7 +1037,7 @@ void BaseDB::set_character_behavior(unsigned int Handle, unsigned long Behavior)
     std::map<unsigned int, FRoomEntry*>::iterator It = CharacterMap.find(Handle);
     if (It == CharacterMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find npc character %u\n", GBaseDBFile, 0x720, Handle);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find npc character %u\n", GBaseDBFile, 0x720, Handle);
         return;
     }
     FRoomEntry* const Room = It->second;
@@ -1080,7 +1065,7 @@ unsigned int BaseDB::create_behavior(ScriptBehavior const& Props, unsigned int R
     if (It != LocationMap.end())
         Room = It->second;
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Props.LocationId);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Props.LocationId);
     unsigned int const Handle = Room->create_behavior(Props, RecordFilter);
     BehaviorMap.insert(std::map<unsigned int, FRoomEntry*>::value_type(Handle, Room));
     return Handle;
@@ -1093,7 +1078,7 @@ void BaseDB::destroy_behavior(unsigned long Handle)
     std::map<unsigned int, FRoomEntry*>::iterator It = BehaviorMap.find(Key);
     if (It == BehaviorMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find behavior %u\n", GBaseDBFile, 0x774, Key);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find behavior %u\n", GBaseDBFile, 0x774, Key);
     }
     else if (It->second != nullptr)
     {
@@ -1103,7 +1088,7 @@ void BaseDB::destroy_behavior(unsigned long Handle)
     It = BehaviorMap.find(Key);
     if (It == BehaviorMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find behavior %u\n", GBaseDBFile, 0x78d, Key);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find behavior %u\n", GBaseDBFile, 0x78d, Key);
         return;
     }
     BehaviorMap.erase(It);
@@ -1117,7 +1102,7 @@ unsigned int BaseDB::create_mission_vendor(MissionVendorProperties const& Props,
     if (It != BaseMap.end())
         Base = It->second;
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Props.BaseId);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Props.BaseId);
     unsigned int const Handle = Base->create_mission_vendor(Props, RecordFilter);
     MissionVendorMap.insert(std::map<unsigned int, FBaseEntry*>::value_type(Handle, Base));
     return Handle;
@@ -1130,7 +1115,7 @@ void BaseDB::destroy_mission_vendor(unsigned long Handle)
     std::map<unsigned int, FBaseEntry*>::iterator It = MissionVendorMap.find(Key);
     if (It == MissionVendorMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find mission vendor offer %u\n", GBaseDBFile, 0x7b2, Key);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find mission vendor offer %u\n", GBaseDBFile, 0x7b2, Key);
     }
     else if (It->second != nullptr)
     {
@@ -1140,7 +1125,7 @@ void BaseDB::destroy_mission_vendor(unsigned long Handle)
     It = MissionVendorMap.find(Key);
     if (It == MissionVendorMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find mission vendor offer %u\n", GBaseDBFile, 0x7cb, Key);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find mission vendor offer %u\n", GBaseDBFile, 0x7cb, Key);
         return;
     }
     MissionVendorMap.erase(It);
@@ -1155,7 +1140,7 @@ int BaseDB::count_mission_vendors(unsigned int Id, unsigned int SessionFilter)
     if (It != BaseMap.end())
         Base = It->second;
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Id);
     int Count = 0;
     MetaNode<MissionComputerRecord>* Node = nullptr;
     while (Base->MissionVendors.Records.traverse(Node, true))
@@ -1174,7 +1159,7 @@ void BaseDB::mission_vendor_acceptance(unsigned long Handle, bool bAccepted, Fmt
     std::map<unsigned int, FBaseEntry*>::iterator It = MissionVendorMap.find((unsigned int)Handle);
     if (It == MissionVendorMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find mission vendor offer %u\n", GBaseDBFile, 0x7b2,
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find mission vendor offer %u\n", GBaseDBFile, 0x7b2,
               (unsigned int)Handle);
         return;
     }
@@ -1190,7 +1175,7 @@ unsigned int BaseDB::create_news_broadcast(NewsBroadcastProperties const& Props,
     if (It != BaseMap.end())
         Base = It->second;
     else
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Props.BaseId);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Base %u is invalid\n", GBaseDBFile, 0x659, Props.BaseId);
     unsigned int const Handle = Base->create_news_broadcast(Props, RecordFilter);
     NewsMap.insert(std::map<unsigned int, FBaseEntry*>::value_type(Handle, Base));
     return Handle;
@@ -1203,7 +1188,7 @@ void BaseDB::destroy_news_broadcast(unsigned long Handle)
     std::map<unsigned int, FBaseEntry*>::iterator It = NewsMap.find(Key);
     if (It == NewsMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find news broadcast %u\n", GBaseDBFile, 0x809, Key);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find news broadcast %u\n", GBaseDBFile, 0x809, Key);
     }
     else if (It->second != nullptr)
     {
@@ -1213,7 +1198,7 @@ void BaseDB::destroy_news_broadcast(unsigned long Handle)
     It = NewsMap.find(Key);
     if (It == NewsMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find news broadcast %u\n", GBaseDBFile, 0x822, Key);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find news broadcast %u\n", GBaseDBFile, 0x822, Key);
         return;
     }
     NewsMap.erase(It);
@@ -1225,7 +1210,7 @@ unsigned int BaseDB::create_ambient_script(AmbientScriptProperties const& Props,
     std::map<unsigned int, FRoomEntry*>::iterator It = LocationMap.find(Props.RoomId);
     if (It == LocationMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Props.RoomId);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Location %u is invalid\n", GBaseDBFile, 0x66d, Props.RoomId);
         return 0xffffffff;
     }
     FRoomEntry* const Room = It->second;
@@ -1243,7 +1228,7 @@ void BaseDB::destroy_ambient_script(unsigned long Handle)
     std::map<unsigned int, FRoomEntry*>::iterator It = AmbientScriptMap.find(Key);
     if (It == AmbientScriptMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find ambient script %u\n", GBaseDBFile, 0x84a, Key);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find ambient script %u\n", GBaseDBFile, 0x84a, Key);
     }
     else if (It->second != nullptr)
     {
@@ -1253,7 +1238,7 @@ void BaseDB::destroy_ambient_script(unsigned long Handle)
     It = AmbientScriptMap.find(Key);
     if (It == AmbientScriptMap.end())
     {
-        FDUMP(0x100001, "%s(%d) : *** ERROR: Could not find ambient script %u\n", GBaseDBFile, 0x863, Key);
+        FDUMP(kFdumpError, "%s(%d) : *** ERROR: Could not find ambient script %u\n", GBaseDBFile, 0x863, Key);
         return;
     }
     AmbientScriptMap.erase(It);

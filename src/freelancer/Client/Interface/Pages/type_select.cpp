@@ -10,6 +10,7 @@
 #include "Common/Fonts/ids_rdl.h"      // LoadIdsIntoRdl (FUN_0057da40), RdlRemoveLastParagraph (FUN_0057eb40)
 #include "Network/login_mgr.h"
 #include "Interface/menu_ui_init.h"
+#include "Interface/menu_enter_state.h"
 #include "NeuroNet/nn_prompt.h"    // NnPromptRunYesNo, NnPromptRunChoice
 
 #include "common_errorhandler.h" // ErrorHandler::log_last_error, SeverityWarning
@@ -113,7 +114,7 @@ bool TextMsgButton::MouseEvent(FWin3DMouseEvent const* Event)
         return false;
     if (Parent == nullptr)
         return false;
-    return Parent->ProcessMessage(0x3004, static_cast<unsigned>(Command), 0);
+    return Parent->ProcessMessage(kWinMsgCommand, static_cast<unsigned>(Command), 0);
 }
 
 void TextMsgButton::Init(Win3D* NewParent, wchar_t const* Caption, float BoxWidth,
@@ -396,15 +397,15 @@ void TypeSelect::Draw()
 bool TypeSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
 {
     // FUN_00566bd0.
-    if (Msg != 0x3004)
+    if (Msg != kWinMsgCommand)
         return false;
     PlayOrRewindUiSoundSlot(0);
 
     switch (A)
     {
-    case 3:    // Load Game
-    case 0xa:  // Options
-    case 0x10: // New Game
+    case kMenuStateLoadGame:
+    case kMenuStateOptions:
+    case kMenuStateNewGame:
         // Start the slide-out unless one is running.
         if (bAnimating != 0)
             return false;
@@ -414,7 +415,7 @@ bool TypeSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
         AnimTime = 0.34999999999999998;
         return true;
 
-    case 4:
+    case kMenuStateMultiplayer:
     {
         // Multiplayer. Until it has been accepted once, the online-play notice (IDS 0x601eb);
         // declined -> true, nothing started, the latch left clear.
@@ -457,12 +458,12 @@ bool TypeSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
         return true;
     }
 
-    case 0xb:
+    case kMenuStateExit:
         // NN_Exit.
         RequestClientQuitDialog();
         return true;
 
-    case 0x11:
+    case kMenuStateFlasher:
         NextState = static_cast<int>(A);
         return true;
 
@@ -474,7 +475,7 @@ bool TypeSelect::ProcessMessage(unsigned Msg, unsigned A, unsigned /*B*/)
 bool TypeSelect::OnEvent(unsigned MsgId)
 {
     // FUN_00566fc0: USER_CANCEL (0xf) raises NN_Exit.
-    if (MsgId != 0xf)
+    if (MsgId != USER_CANCEL)
         return false;
     RequestClientQuitDialog();
     return true;

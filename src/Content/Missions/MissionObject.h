@@ -160,7 +160,9 @@ struct FMissionLoot
     TString<0x30> RelPosObj;                          // +0xa4 "rel_pos_obj"
     Vector RelPosOffset;                              // +0xd8 "rel_pos_offset"
     unsigned char bRelPos;                            // +0xe4 set by "rel_pos_obj"
-    unsigned int Field_0xe8;                          // +0xe8 TODO: meaning (template 0)
+    // +0xe8: 0 in the LoadMission template; the loot users (spawn FUN_06f16fa0, HasLabel
+    // FUN_06f19ca0) read +0xf0 (the label list), not +0xe8.
+    unsigned int Field_0xe8;
     std::list<unsigned int> LabelIds;                 // +0xec CreateID of the nickname and labels
     // +0xf8: SUBOBJ_ID_NONE; message 0x18 writes word parms+8 (FUN_06eb8f50).
     unsigned short SubObjId;
@@ -248,10 +250,18 @@ struct FMissionRandEnc
 // state-2 NPCs in through the gate (state 0), FUN_06f14c10 places state-1 NPCs next to the
 // launching object (state 0). The mission dtor deletes an NPC whose state is not 0 (it is out
 // of every system then, so no system owns it).
+// FMissionJumper::State (see above).
+enum EMissionJumperState
+{
+    JumperInSystem = 0,           // in the mission's system
+    JumperJumpedAlone = 1,        // the NPC jumped on its own; placed at the launch object
+    JumperWaitingForTimer = 2,    // the player jumped; brought in once the jump timer passes
+};
+
 struct FMissionJumper
 {
     FContentNpcShip* Npc;                             // +0x00
-    int State;                                        // +0x04
+    int State;                                        // +0x04 EMissionJumperState
 };
 
 // One formation of a random encounter to create again after a load / player respawn: the value
@@ -294,6 +304,20 @@ class FMissionObject;
 // (FUN_06f1a630) names types 1-4 "base", "navmarker", "ids", "rep_inst". Retail has no RTTI for
 // them; the port names 1-4 after those keys and 5-8 by their type id.
 // ---------------------------------------------------------------------------------------
+// FMissionObjective::GetType ids = the cases of the factory FUN_06f19cd0 (CreateMissionObjective).
+// 1-4 are named after the [NNObjective] "type" keywords (FUN_06f1a630), 5-8 after their classes.
+enum EMissionObjectiveType
+{
+    NNOBJ_BASE = 1,          // "base", FNNObjectiveBase
+    NNOBJ_NAVMARKER = 2,     // "navmarker", FNNObjectiveNavMarker
+    NNOBJ_IDS = 3,           // "ids", FNNObjectiveIds
+    NNOBJ_REP_INST = 4,      // "rep_inst", FNNObjectiveRepInst
+    NNOBJ_TYPE5 = 5,         // FNNObjectiveType5 (the slot 11 path objectives)
+    NNOBJ_TYPE6 = 6,         // FNNObjectiveType6
+    NNOBJ_TYPE7 = 7,         // FNNObjectiveType7 (a ready FmtStr)
+    NNOBJ_TYPE8 = 8,         // FNNObjectiveType8 (one int)
+};
+
 class FMissionObjective
 {
 public:
@@ -878,7 +902,9 @@ public:
     // passes JumpDelay).
     unsigned char bJumpPending;                       // +0x30 (ctor 0)
     float JumpTimer;                                  // +0x34 (ctor -1.0f)
-    ID_String Field_0x38;                             // +0x38 TODO: meaning (ctor clear)
+    // +0x38: cleared by the ctor (FUN_06f0e3e0); no other this+0x38 access in TU38, TU21,
+    // TU27 or TU47.
+    ID_String Field_0x38;
     std::map<unsigned int, FMissionPlayer*> Players;  // +0x3c
     // +0x50 / +0x68: FmtStr, ctor inlined.
     FmtStr MissionTitle;                              // +0x50 [Mission] "mission_title"
@@ -889,7 +915,9 @@ public:
     unsigned char MissionType;
     unsigned char bDestroyed;                         // +0x81 (FUN_06f0f100)
     float ObjectiveResendTimer;                       // +0x84 slot 19 accumulates dt (FADD)
-    unsigned int Field_0x88;                          // +0x88 TODO: meaning (ctor 0)
+    // +0x88: 0 from the ctor (06f0e4db); no other access in TU38, TU21, TU27, TU47 or
+    // TU15/16.
+    unsigned int Field_0x88;
     // +0x8c list (ctor FUN_06f1e5b0): random-encounter formations to create again, consumed by
     // FUN_06f145d0 (message 0x36).
     std::list<FMissionRandEncRespawn> RandEncRespawns;
