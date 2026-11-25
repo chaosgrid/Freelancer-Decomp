@@ -31,6 +31,7 @@
 // GetArchMaxHitPts, [06db305c] SinglePlayer, and the data import [06db3100] SUBOBJ_ID_NONE
 // (the slot holds the ADDRESS of the ushort).
 #include "common_misc.h"
+#include "rpc_packet_classes.h"
 
 #include <cstddef>
 #include <cstring>
@@ -97,8 +98,8 @@ static void RpcContainerFreeRecord(FRpcEquipWireRecord* Record) {
 // ===========================================================================
 // FUN_06d913e0
 // ===========================================================================
-FRpcEquipWireListHeader* RpcEquipHandleGetList(const FRpcEquipWireHandle* Handle) {
-    return Handle->List;
+FRpcEquipWireListHeader* FRpcEquipWireHandle::GetList() const {
+    return List;
 }
 
 // ===========================================================================
@@ -152,30 +153,30 @@ static void RpcEquipHandleLinkBack(FRpcEquipWireListHeader* Header, FRpcEquipWir
     ++Header->Size;
 }
 
-void RpcEquipHandlePushBack(FRpcEquipWireHandle* Handle, FRpcEquipWireRecord* Record) {
-    if (Handle->List == nullptr && RpcEquipHandleBuildList(Handle) == nullptr) {
+void FRpcEquipWireHandle::PushBack(FRpcEquipWireRecord* Record) {
+    if (List == nullptr && RpcEquipHandleBuildList(this) == nullptr) {
         return;
     }
-    RpcEquipHandleLinkBack(Handle->List, Record);
+    RpcEquipHandleLinkBack(List, Record);
 }
 
 // ===========================================================================
 // FUN_06d91340 -- the handle's destructor
 // ===========================================================================
-void RpcEquipHandleDestroy(FRpcEquipWireHandle* Handle) {
+void FRpcEquipWireHandle::Destroy() {
     // The handle itself is not tested.
-    if (Handle->List == nullptr) {
+    if (List == nullptr) {
         return;
     }
     // Phase 1 (06d91358): free the records, leaving the chain intact. The loop bound re-reads
     // the handle's dummy every round.
-    for (FRpcEquipWireNode* Node = Handle->List->Head->Next; Node != Handle->List->Head;
+    for (FRpcEquipWireNode* Node = List->Head->Next; Node != List->Head;
          Node = Node->Next) {
         RpcContainerFreeRecord(Node->Value);
     }
     // Phase 2 (06d91381): the handle is re-read and re-tested, then every node is
     // unlinked and freed with the size decremented as retail does, then the dummy.
-    FRpcEquipWireListHeader* Header = Handle->List;
+    FRpcEquipWireListHeader* Header = List;
     if (Header == nullptr) {
         return;
     }
@@ -196,12 +197,12 @@ void RpcEquipHandleDestroy(FRpcEquipWireHandle* Handle) {
     // Deviation: retail leaves the caller's handle pointing at the freed header. The port
     // nulls it because RpcCreateObjectHeaderRelease runs on the receiver statics, whose handle
     // is filled again by the next packet. Not a guard: nothing is skipped.
-    Handle->List = nullptr;
+    List = nullptr;
 }
 
 // Retail runs FUN_06d91340 on every handle object on both the normal and the unwind path.
 __declspec(dllexport) FRpcEquipWireHandle::~FRpcEquipWireHandle() {
-    RpcEquipHandleDestroy(this);
+    Destroy();
 }
 
 // ===========================================================================
@@ -212,11 +213,11 @@ __declspec(dllexport) FRpcEquipWireHandle::~FRpcEquipWireHandle() {
 // scalar fields -- including the byte at +0x0f -- and, when HardpointSize is non-zero, copies
 // the name up to its NUL.
 // ===========================================================================
-void RpcEquipHandleCopy(FRpcEquipWireHandle* Dest, const FRpcEquipWireHandle* Source) {
+void FRpcEquipWireHandle::Copy(const FRpcEquipWireHandle* Source) {
     if (Source->List == nullptr) {
         return;
     }
-    if (Dest->List == nullptr && RpcEquipHandleBuildList(Dest) == nullptr) {
+    if (List == nullptr && RpcEquipHandleBuildList(this) == nullptr) {
         return;
     }
     // The loop bound re-reads the source's dummy every round.
@@ -240,7 +241,7 @@ void RpcEquipHandleCopy(FRpcEquipWireHandle* Dest, const FRpcEquipWireHandle* So
         if (To->HardpointSize != 0) {
             To->Hardpoint = RpcContainerCopyString(From->Hardpoint, To->HardpointSize);
         }
-        RpcEquipHandleLinkBack(Dest->List, To);
+        RpcEquipHandleLinkBack(List, To);
     }
 }
 
@@ -263,7 +264,7 @@ void RpcPacketEquipAssign(FPacketBase* Packet, const FRpcEquipWireHandle* Source
         *Slot = Handle;
     }
     if (*Slot != nullptr) {
-        RpcEquipHandleCopy(*Slot, Source);
+        (*Slot)->Copy(Source);
     }
 }
 
@@ -274,7 +275,7 @@ __declspec(dllexport) void RpcPacketEquipExtract(const FPacketBase* Packet, FRpc
     FRpcEquipWireHandle* const* Slot =
         reinterpret_cast<FRpcEquipWireHandle* const*>(Packet->Payload());
     if (*Slot != nullptr) {
-        RpcEquipHandleCopy(Dest, *Slot);
+        Dest->Copy(*Slot);
     }
 }
 
@@ -314,7 +315,7 @@ void RpcEquipHandleFromVector(FRpcEquipWireHandle* Handle,
                 (unsigned short)(RpcContainerStringLength(Item->Hardpoint) + 1u);
             Record->Hardpoint = RpcContainerCopyString(Item->Hardpoint, Record->HardpointSize);
         }
-        RpcEquipHandlePushBack(Handle, Record);
+        Handle->PushBack(Record);
     }
 }
 
@@ -335,7 +336,7 @@ void RpcEquipDescVectorRelease(EquipDescVector* Vector) {
 
 __declspec(dllexport) void RpcEquipVectorFromHandle(EquipDescVector* Dest,
                               const FRpcEquipWireHandle* Source) {
-    const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(Source);
+    const FRpcEquipWireListHeader* Header = Source->GetList();
     if (Header == nullptr) {
         return;
     }
@@ -389,7 +390,7 @@ __declspec(dllexport) void RpcEquipVectorFromHandle(EquipDescVector* Dest,
 // add_equipment_item -- retail does no combinable merging here and never touches NextId.
 // ===========================================================================
 __declspec(dllexport) void RpcEquipListFromHandle(EquipDescList& Dest, const FRpcEquipWireHandle* Source) {
-    const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(Source);
+    const FRpcEquipWireListHeader* Header = Source->GetList();
     if (Header == nullptr) {
         // A null list means an empty EquipDescList, not a failure.
         return;
@@ -454,7 +455,7 @@ void RpcEquipHandleFromList(FRpcEquipWireHandle* Handle, const EquipDescList& So
                 (unsigned short)(RpcContainerStringLength(It->Hardpoint) + 1u);
             Record->Hardpoint = RpcContainerCopyString(It->Hardpoint, Record->HardpointSize);
         }
-        RpcEquipHandlePushBack(Handle, Record);
+        Handle->PushBack(Record);
     }
 }
 
@@ -474,8 +475,8 @@ __declspec(dllexport) const FRpcCollisionGroupList* RpcPacketCollisionGroups(con
 // Stand-in for the create-object record constructors' std::list ctor, which builds the dummy
 // node (the packet classes build theirs in rpc_packet_registry.cpp, as 0x06d9e8b0 / 0x06da10b0
 // do). The dummy's allocation is untested.
-void RpcCollisionGroupListInit(FRpcCollisionGroupList* List) {
-    if (List->Head != nullptr) {
+void FRpcCollisionGroupList::Init() {
+    if (Head != nullptr) {
         return;   // already constructed
     }
     FRpcCollisionGroupNode* Dummy =
@@ -485,12 +486,12 @@ void RpcCollisionGroupListInit(FRpcCollisionGroupList* List) {
     Dummy->Prev = Dummy;
     Dummy->Id = 0;   // the dummy's value is never read
     Dummy->HealthBits = 0;
-    List->Allocator = 0;
-    List->Pad_0x01[0] = 0;
-    List->Pad_0x01[1] = 0;
-    List->Pad_0x01[2] = 0;
-    List->Head = Dummy;
-    List->Size = 0;
+    Allocator = 0;
+    Pad_0x01[0] = 0;
+    Pad_0x01[1] = 0;
+    Pad_0x01[2] = 0;
+    Head = Dummy;
+    Size = 0;
 }
 
 // FUN_06d8f710 -- list assignment, in retail's three phases, from an array of 8-byte
@@ -498,7 +499,7 @@ void RpcCollisionGroupListInit(FRpcCollisionGroupList* List) {
 void RpcCollisionGroupListAssign(FRpcCollisionGroupList* List,
                                  const FRpcCollisionGroupDescMirror* Items,
                                  unsigned int Count) {
-    RpcCollisionGroupListInit(List);
+    List->Init();
     RpcCollisionGroupListAssignRange(List, Items, Items + Count);
 }
 
@@ -614,15 +615,14 @@ void RpcRelationListLink(FRpcRelationList* List, FRpcRelation* Block) {
 // The mission-objective record list (ch2 0x35)
 // ===========================================================================
 
-void RpcMissionObjectiveListPushBack(FRpcMissionObjectiveList* List,
-                                     FRpcMissionObjectiveRecord* Record) {
+void FRpcMissionObjectiveList::PushBack(FRpcMissionObjectiveRecord* Record) {
     // FUN_06d8fc10: a null record is silently dropped and neither counter moves (retail's
     // own test).
     if (Record == nullptr) {
         return;
     }
     // The dummy is read untested: the packet constructor built it (06d9daad).
-    FRpcMissionObjectiveNode* Dummy = List->Head;
+    FRpcMissionObjectiveNode* Dummy = Head;
     FRpcMissionObjectiveNode* Tail = Dummy->Prev;
     // Untested allocation.
     FRpcMissionObjectiveNode* New =
@@ -636,7 +636,7 @@ void RpcMissionObjectiveListPushBack(FRpcMissionObjectiveList* List,
     Dummy->Prev = New;
     New->Prev->Next = New;
     New->Value = Record;
-    ++List->Size;
+    ++Size;
 }
 
 __declspec(dllexport) const FRpcMissionObjectiveRecord* RpcMissionObjectiveListAt(
@@ -716,7 +716,7 @@ static void RpcEquipHandleFromEquipDescVector(FRpcEquipWireHandle* Handle,
                 static_cast<unsigned short>(RpcContainerStringLength(Item->Hardpoint) + 1u);
             Record->Hardpoint = RpcContainerCopyString(Item->Hardpoint, Record->HardpointSize);
         }
-        RpcEquipHandlePushBack(Handle, Record);
+        Handle->PushBack(Record);
     }
 }
 
@@ -747,7 +747,7 @@ static void RpcEquipDescVectorPushBack(EquipDescVector& Vector, const EquipDesc&
 // (interned) or make_internal. Unlike FUN_06d84d60 there is no null-record test here.
 static void RpcEquipDescVectorAppendFromHandle(EquipDescVector& Dest,
                                                const FRpcEquipWireHandle* Source) {
-    const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(Source);
+    const FRpcEquipWireListHeader* Header = Source->GetList();
     if (Header == nullptr) {
         return;
     }
@@ -814,7 +814,7 @@ FRpcCreateObjectHead::FRpcCreateObjectHead() {
 // member destructors, which is also retail's EH order (FuncInfo_06db70a4).
 FRpcCreateObjectHead::~FRpcCreateObjectHead() {
     // The handle goes first; its own member destructor then finds it null.
-    RpcEquipHandleDestroy(&Equipment);
+    Equipment.Destroy();
     if (Ids != nullptr) {
         ::operator delete(Ids);
     }
@@ -977,9 +977,9 @@ static void RpcIdBlockFromWire(Costume& Dest, const FRpcIdArrayBlockWire* Block)
 // FUN_06d95b60 -- the wire id block's destructor. Called by the CHARACTERINFO packet
 // destructor FUN_06d93350; retail also reaches it from three EH unwind funclets, which the
 // port's non-throwing constructors do not need.
-static void RpcIdBlockWireDestroy(FRpcIdArrayBlockWire* Block) {
-    if (Block->Ids != nullptr) {
-        ::operator delete(Block->Ids);
+void FRpcIdArrayBlockWire::Destroy() {
+    if (Ids != nullptr) {
+        ::operator delete(Ids);
     }
 }
 
@@ -988,7 +988,7 @@ static void RpcIdBlockWireFree(FRpcIdArrayBlockWire* Block) {
     if (Block == nullptr) {
         return;
     }
-    RpcIdBlockWireDestroy(Block);
+    Block->Destroy();
     ::operator delete(Block);
 }
 
@@ -1006,7 +1006,7 @@ void RpcCharacterInfoRecordToWire(FRpcCharacterInfoWireRecord* Wire,
     Wire->CollisionGroups.Head = nullptr;
     Wire->CollisionGroups.Size = 0;
     // 06d899c1: the record constructor builds the std::list at +0x268 (the dummy node).
-    RpcCollisionGroupListInit(&Wire->CollisionGroups);
+    Wire->CollisionGroups.Init();
 
     Wire->Name = Source->Id;
     Wire->bIsRestart = Source->bIsRestart;
@@ -1060,14 +1060,14 @@ void RpcCharacterInfoRecordToWire(FRpcCharacterInfoWireRecord* Wire,
         const unsigned int Length = RpcContainerStringLength(It->Hardpoint);
         Record->Hardpoint = RpcContainerCopyString(It->Hardpoint, Length + 1u);
         Record->HardpointSize = (unsigned short)(Length + 1u);
-        RpcEquipHandlePushBack(&Wire->Equipment, Record);
+        Wire->Equipment.PushBack(Record);
     }
 
     // FUN_06d955c0's postscript (06d959c6), the only thing the packet-bound hop adds:
     // +0x260 = the list's size truncated to a byte, or 0. +0x260 is the count the wire codec
     // emits and the decoder loops on, so it must not be left zero.
     {
-        const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(&Wire->Equipment);
+        const FRpcEquipWireListHeader* Header = Wire->Equipment.GetList();
         Wire->EquipmentCount = (Header != nullptr) ? (unsigned char)(Header->Size & 0xffu) : 0;
     }
 
@@ -1107,7 +1107,7 @@ void RpcCharacterInfoRecordFromWire(CCharacterSet::CharacterInfo* Dest,
     // 06d84839: one EquipDesc per wire record. Only the list HEADER is tested; the dummy and
     // each node's record are used as they are.
     Dest->Equipment.Items.clear();
-    const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(&Wire->Equipment);
+    const FRpcEquipWireListHeader* Header = Wire->Equipment.GetList();
     if (Header != nullptr) {
         for (const FRpcEquipWireNode* Node = Header->Head->Next; Node != Header->Head;
              Node = Node->Next) {
@@ -1144,9 +1144,8 @@ void RpcCharacterInfoRecordFromWire(CCharacterSet::CharacterInfo* Dest,
 // 06d94305 (decoder) and 06d95ad4 (FUN_06d955c0): untested new(0xc), spliced before the
 // dummy. The dummy is the one the packet constructor built (06d9d52f), so it is read without a
 // test, as retail reads packet+0x28.
-void RpcCharacterInfoWireListPushBack(FRpcCharacterInfoWireList* List,
-                                      FRpcCharacterInfoWireRecord* Record) {
-    FRpcCharacterInfoWireNode* Dummy = List->Head;
+void FRpcCharacterInfoWireList::PushBack(FRpcCharacterInfoWireRecord* Record) {
+    FRpcCharacterInfoWireNode* Dummy = Head;
     FRpcCharacterInfoWireNode* Tail = Dummy->Prev;
     FRpcCharacterInfoWireNode* Node = static_cast<FRpcCharacterInfoWireNode*>(
         ::operator new(sizeof(FRpcCharacterInfoWireNode), std::nothrow));
@@ -1158,25 +1157,25 @@ void RpcCharacterInfoWireListPushBack(FRpcCharacterInfoWireList* List,
     Dummy->Prev = Node;
     Node->Prev->Next = Node;
     Node->Value = Record;
-    ++List->Size;
+    ++Size;
 }
 
 // FUN_06d93350, the CHARACTERINFO destructor's body, in retail's two passes. Pass 1: for every
 // node whose value is non-null, the record's owned members in retail's order, then the record;
 // the nodes are left alone. Pass 2: every node unlinked and freed (FUN_06d901f0), then the
 // sentinel.
-void RpcCharacterInfoWireListRelease(FRpcCharacterInfoWireList* List) {
-    FRpcCharacterInfoWireNode* Node = List->Head->Next;
-    while (Node != List->Head) {
+void FRpcCharacterInfoWireList::Release() {
+    FRpcCharacterInfoWireNode* Node = Head->Next;
+    while (Node != Head) {
         FRpcCharacterInfoWireRecord* Record = Node->Value;
         if (Record != nullptr) {
             // FUN_06d95b60 (the id array at +0x14) and the block, for +0x274 then +0x278.
             if (Record->BlockA != nullptr) {
-                RpcIdBlockWireDestroy(Record->BlockA);
+                Record->BlockA->Destroy();
                 ::operator delete(Record->BlockA);
             }
             if (Record->BlockB != nullptr) {
-                RpcIdBlockWireDestroy(Record->BlockB);
+                Record->BlockB->Destroy();
                 ::operator delete(Record->BlockB);
             }
             // COMMON.DLL's list<CollisionGroupDesc>::erase(begin, end), then the sentinel. No
@@ -1194,14 +1193,14 @@ void RpcCharacterInfoWireListRelease(FRpcCharacterInfoWireList* List) {
             ::operator delete(Groups.Head);
             Groups.Head = nullptr;
             Groups.Size = 0;
-            RpcEquipHandleDestroy(&Record->Equipment);
+            Record->Equipment.Destroy();
             // The two basic_string destructors (+0x214 then +0x204) run as the record's
             // member destructors, in the same order.
             delete Record;
         }
         Node = Node->Next;
     }
-    FRpcCharacterInfoWireNode* Sentinel = List->Head;
+    FRpcCharacterInfoWireNode* Sentinel = Head;
     FRpcCharacterInfoWireNode* Erase = Sentinel->Next;
     while (Erase != Sentinel) {
         FRpcCharacterInfoWireNode* Erased = Erase;
@@ -1209,11 +1208,11 @@ void RpcCharacterInfoWireListRelease(FRpcCharacterInfoWireList* List) {
         Erased->Prev->Next = Erased->Next;
         Erased->Next->Prev = Erased->Prev;
         ::operator delete(Erased);
-        --List->Size;
+        --Size;
     }
-    ::operator delete(List->Head);
-    List->Head = nullptr;
-    List->Size = 0;
+    ::operator delete(Head);
+    Head = nullptr;
+    Size = 0;
 }
 
 // FUN_06d94460's id-block copy (06d94692 for +0x274, 06d94770 for +0x278). The null test only
@@ -1272,15 +1271,14 @@ void RpcCharacterInfoWireRecordFree(FRpcCharacterInfoWireRecord* Record) {
     ::operator delete(Groups.Head);
     Groups.Head = nullptr;
     Groups.Size = 0;
-    RpcEquipHandleDestroy(&Record->Equipment);
+    Record->Equipment.Destroy();
     // The two basic_string destructors (+0x214 then +0x204) run as the record's member
     // destructors, in the same order.
     delete Record;
 }
 
 // FUN_06d94460 (`this` = the packet, argument = the destination header).
-void RpcCharacterInfoWireListCopy(FRpcCharacterInfoWireList* Dest,
-                                  const FRpcCharacterInfoWireList* Source) {
+void FRpcCharacterInfoWireList::Copy(const FRpcCharacterInfoWireList* Source) {
     // The source dummy is read untested; the loop bound re-reads it every round.
     for (const FRpcCharacterInfoWireNode* Node = Source->Head->Next; Node != Source->Head;
          Node = Node->Next) {
@@ -1292,7 +1290,7 @@ void RpcCharacterInfoWireListCopy(FRpcCharacterInfoWireList* Dest,
         // result either way, as in the sender. Retail's constructor leaves +0x230..+0x240
         // alone; every field it does not set is overwritten below.
         FRpcCharacterInfoWireRecord* To = new (std::nothrow) FRpcCharacterInfoWireRecord();
-        RpcCollisionGroupListInit(&To->CollisionGroups);
+        To->CollisionGroups.Init();
 
         To->Name = From->Name;
         To->bIsRestart = From->bIsRestart;
@@ -1318,10 +1316,10 @@ void RpcCharacterInfoWireListCopy(FRpcCharacterInfoWireList* Dest,
         RpcIdBlockWireCopy(&To->BlockA, From->BlockA);
         RpcIdBlockWireCopy(&To->BlockB, From->BlockB);
 
-        RpcEquipHandleCopy(&To->Equipment, &From->Equipment);
+        To->Equipment.Copy(&From->Equipment);
         // +0x260 is DERIVED from the copy, not copied (same postscript as FUN_06d955c0).
         {
-            const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(&To->Equipment);
+            const FRpcEquipWireListHeader* Header = To->Equipment.GetList();
             To->EquipmentCount = (Header != nullptr) ? (unsigned char)(Header->Size & 0xffu) : 0;
         }
 
@@ -1330,7 +1328,7 @@ void RpcCharacterInfoWireListCopy(FRpcCharacterInfoWireList* Dest,
                                          FRpcCollisionGroupNodeIterator(From->CollisionGroups.Head->Next),
                                          FRpcCollisionGroupNodeIterator(From->CollisionGroups.Head));
 
-        RpcCharacterInfoWireListPushBack(Dest, To);
+        PushBack(To);
     }
 }
 
@@ -1377,7 +1375,7 @@ void RpcCharacterInfoWireListCopy(FRpcCharacterInfoWireList* Dest,
 static FRpcCollisionGroupNode* RpcCollisionGroupListPushBack(FRpcCollisionGroupList* List,
                                                              unsigned int Field_0x00,
                                                              unsigned int Field_0x04) {
-    RpcCollisionGroupListInit(List);
+    List->Init();
     FRpcCollisionGroupNode* Dummy = List->Head;
     FRpcCollisionGroupNode* Tail = Dummy->Prev;
     FRpcCollisionGroupNode* New = static_cast<FRpcCollisionGroupNode*>(
@@ -1464,13 +1462,32 @@ static bool RpcDecodeIdBlock(FRpcMarshalStream& Stream, FRpcIdArrayBlockWire** O
     return true;
 }
 
-unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength) {
+// ===========================================================================
+// The ch2 0x03 WIRE CODEC -- packet vtable slots +0x04 and +0x08.
+//
+// Retail: LAB_06d949d0 (encode) and FUN_06d934d0 (decode), slots +0x04 / +0x08 of
+// PTR_FUN_06db3dc4 (CDAPCharacterInfo ctor 0x06d9d54f). Both are __thiscall with THREE
+// stack arguments.
+//
+// The two argument shapes are NOT symmetric, and that asymmetry is retail's:
+//   * encode takes a pointer TO the buffer pointer and a plain capacity, like the shared
+//     payload-less encoder LAB_06da13d0. Retail never writes the caller's pointer back --
+//     the moving cursor lives in packet+0x18.
+//   * decode takes the buffer pointer DIRECTLY, and again the capacity.
+// Both report the byte count through arg3 and return 0, or FRpcMarshalStream's 0x16 / 0x17.
+//
+// Encode's count INCLUDES the two header bytes FUN_06da1380 writes; decode's does NOT,
+// because its header hook FUN_06da13c0 is a no-op -- the dispatcher has already consumed
+// the header.
+// ===========================================================================
+unsigned int FPacket_FLPACKET_SERVER_CHARACTERINFO::Encode(unsigned char** BufferHolder,
+                                                           unsigned int Capacity,
+                                                           unsigned int* OutLength) {
     const FPayloadServerCharacterInfo* Wire =
-        reinterpret_cast<const FPayloadServerCharacterInfo*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerCharacterInfo*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
 
     // The LOW BYTE of the list's Size.
     const unsigned char Count = (unsigned char)(Wire->Records.Size & 0xffu);
@@ -1519,7 +1536,7 @@ unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** B
             // recomputed.
             Stream.PutByte(Record->EquipmentCount);
             // The header is tested; the dummy and each node's record are not.
-            const FRpcEquipWireListHeader* Equip = RpcEquipHandleGetList(&Record->Equipment);
+            const FRpcEquipWireListHeader* Equip = Record->Equipment.GetList();
             if (Equip != nullptr) {
                 for (const FRpcEquipWireNode* Item = Equip->Head->Next;
                      Item != Equip->Head && !Stream.Failed(); Item = Item->Next) {
@@ -1552,18 +1569,19 @@ unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** B
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
     if (!Stream.Failed()) {
-        RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+        RpcRecordEncodedPacket(PacketId, Stream.Length());
     }
     return Stream.GetError();
 }
 
-unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CHARACTERINFO::Decode(const unsigned char* Buffer,
+                                                           unsigned int Size,
+                                                           unsigned int* OutLength) {
     FPayloadServerCharacterInfo* Wire =
-        reinterpret_cast<FPayloadServerCharacterInfo*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerCharacterInfo*>(Payload());
 
     // The buffer pointer is taken DIRECTLY, and the decoder reads no header.
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     unsigned char Count = 0;
     if (!Stream.GetByte(Count)) {
@@ -1577,7 +1595,7 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
             continue;
         }
         // The record constructor's std::list at +0x268 (the dummy node).
-        RpcCollisionGroupListInit(&Record->CollisionGroups);
+        Record->CollisionGroups.Init();
 
         // Every failed read below returns the error at once: the record is not in the packet
         // list yet, and retail neither frees it nor reports a length. The port leaks it the
@@ -1661,7 +1679,7 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
             if (!Stream.GetBytes(E->Hardpoint, E->HardpointSize)) {
                 return Stream.GetError();
             }
-            RpcEquipHandlePushBack(&Record->Equipment, E);
+            Record->Equipment.PushBack(E);
         }
         if (!Stream.GetDword(Scratch)) {                             // rec+0x270
             return Stream.GetError();
@@ -1682,13 +1700,13 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
                 return Stream.GetError();
             }
         }
-        RpcCharacterInfoWireListPushBack(&Wire->Records, Record);
+        Wire->Records.PushBack(Record);
     }
     Stream.GetDword(Wire->SaveFailureCount);                              // packet+0x20
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
     if (!Stream.Failed()) {
-        RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+        RpcRecordDecodedPacket(PacketId, Stream.Length());
     }
     return Stream.GetError();
 }
@@ -2047,7 +2065,7 @@ unsigned int RpcEncodeCreateObjectCommon(FRpcMarshalStream& Stream,
     }
     // The handle's list pointer is null until the first push_back. A null list ships a zero
     // COUNT and no records, which is not the same code path as a present-but-empty list.
-    const FRpcEquipWireListHeader* Equip = RpcEquipHandleGetList(&Wire->Equipment);
+    const FRpcEquipWireListHeader* Equip = Wire->Equipment.GetList();
     if (Equip == nullptr) {
         Stream.PutWord(static_cast<unsigned short>(0));
     } else {
@@ -2199,7 +2217,7 @@ unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
             // and so it is here.
             return Stream.GetError();
         }
-        RpcEquipHandlePushBack(&Wire->Equipment, Record);
+        Wire->Equipment.PushBack(Record);
     }
 
     unsigned char GroupCount = 0;
@@ -2355,15 +2373,34 @@ static const unsigned char kCreateShipFlagUsingTradelane = 0x01;  // payload +0x
 static const unsigned char kCreateShipFlagMarkedBy = 0x02;        // payload +0xc8
 static const unsigned char kCreateShipFlagOwnerPlayer = 0x04;     // payload +0x9c != 0
 
+// ===========================================================================
+// The four OUTER wire slots of the create-object pair
+//
+//   ch2 0x04 CREATESHIP   encode 0x06d97d20 (vtable .rdata:06db3fc8)
+//                         decode 0x06d98250 (vtable .rdata:06db3fcc)
+//   ch2 0x42 CREATESOLAR  encode 0x06dac7c0
+//                         decode 0x06daca80 (vtable .rdata:06db52a4)
+//
+// These are the packet vtable's +0x04 / +0x08 entries themselves. Each one sets the
+// four marshalling dwords up, runs the two-byte routing header hook, calls the shared
+// 0x7c header codec above, ships its own tail and reports the byte count. They pass their
+// three stack arguments straight through to FUN_06da3720 / FUN_06da4020, which read none.
+//
+// Same per-direction asymmetry as CHARACTERINFO: encode's first argument is a pointer TO
+// the buffer pointer (never written back), decode's IS the buffer; encode's count
+// includes the two routing bytes FUN_06da1380 writes, decode's (no-op hook FUN_06da13c0)
+// excludes them.
+// ===========================================================================
 // 0x06d97d20 -- CREATESHIP, packet vtable +0x04.
-unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATESHIP::Encode(unsigned char** BufferHolder,
+                                                        unsigned int Capacity,
+                                                        unsigned int* OutLength) {
     const FPayloadServerCreateShip* Wire =
-        reinterpret_cast<const FPayloadServerCreateShip*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerCreateShip*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     // The two routing bytes; the cursor starts at 2.
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
     // Retail DISCARDS the shared header's return value and lets the sticky error stop the
     // first field below.
     RpcEncodeCreateObjectCommon(Stream, &Wire->Common);
@@ -2442,18 +2479,18 @@ unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** Buff
     }
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
 // 0x06d98250 -- CREATESHIP, packet vtable +0x08.
-unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATESHIP::Decode(const unsigned char* Buffer,
+                                                        unsigned int Size, unsigned int* OutLength) {
     FPayloadServerCreateShip* Wire =
-        reinterpret_cast<FPayloadServerCreateShip*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerCreateShip*>(Payload());
 
     // The buffer pointer is taken with no dereference; the header hook reads nothing.
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // The shared header's return value is discarded, as on the encode side.
     RpcDecodeCreateObjectCommon(Stream, &Wire->Common);
 
@@ -2535,20 +2572,21 @@ unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char*
     }
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
 // 0x06dac7c0 -- CREATESOLAR, packet vtable +0x04. Shorter than CREATESHIP and with NO flag
 // byte: its two leading bytes go out unconditionally, and the reputation pair comes BEFORE
 // the two name blocks rather than after them.
-unsigned int RpcEncodeServerCreateSolar(FPacketBase& Packet, unsigned char** BufferHolder,
-                                        unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATESOLAR::Encode(unsigned char** BufferHolder,
+                                                         unsigned int Capacity,
+                                                         unsigned int* OutLength) {
     const FPayloadServerCreateSolar* Wire =
-        reinterpret_cast<const FPayloadServerCreateSolar*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerCreateSolar*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
     RpcEncodeCreateObjectCommon(Stream, &Wire->Common);
     if (!Stream.PutByte(Wire->bDestructible)) {
         return Stream.GetError();
@@ -2573,17 +2611,17 @@ unsigned int RpcEncodeServerCreateSolar(FPacketBase& Packet, unsigned char** Buf
     }
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
 // 0x06daca80 -- CREATESOLAR, packet vtable +0x08.
-unsigned int RpcDecodeServerCreateSolar(FPacketBase& Packet, const unsigned char* Buffer,
-                                        unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATESOLAR::Decode(const unsigned char* Buffer,
+                                                         unsigned int Size, unsigned int* OutLength) {
     FPayloadServerCreateSolar* Wire =
-        reinterpret_cast<FPayloadServerCreateSolar*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerCreateSolar*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // The shared header's result is discarded.
     RpcDecodeCreateObjectCommon(Stream, &Wire->Common);
     if (!Stream.GetByte(Wire->bDestructible)) {
@@ -2611,7 +2649,7 @@ unsigned int RpcDecodeServerCreateSolar(FPacketBase& Packet, const unsigned char
     }
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -2717,14 +2755,22 @@ static bool RpcFireWeaponGetComponent(FRpcMarshalStream& Stream, float& OutValue
     return Stream.GetFloat(OutValue);
 }
 
+// ===========================================================================
+// ch1 0x02 FLPACKET_COMMON_FIREWEAPON -- the adaptive-precision direction codec.
+//
+// Packet vtable PTR_FUN_06db4388 = { FUN_06d9b000, LAB_06da4f60, LAB_06da5550,
+// IServerImpl::GetServerStats }, published by the type's constructor FUN_06d9afb0
+// together with routing header 0x10002 (channel 1, opcode 2).
+// ===========================================================================
 // LAB_06da4f60 -- FIREWEAPON, packet vtable +0x04.
-unsigned int RpcEncodeCommonFireWeapon(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_COMMON_FIREWEAPON::Encode(unsigned char** BufferHolder,
+                                                        unsigned int Capacity,
+                                                        unsigned int* OutLength) {
     const FPayloadCommonFireWeapon* Wire =
-        reinterpret_cast<const FPayloadCommonFireWeapon*>(Packet.Payload());
+        reinterpret_cast<const FPayloadCommonFireWeapon*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
     if (!Stream.PutDword(Wire->ObjectId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
@@ -2795,19 +2841,19 @@ unsigned int RpcEncodeCommonFireWeapon(FPacketBase& Packet, unsigned char** Buff
 
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
 // LAB_06da5550 -- FIREWEAPON, packet vtable +0x08.
-unsigned int RpcDecodeCommonFireWeapon(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_COMMON_FIREWEAPON::Decode(const unsigned char* Buffer,
+                                                        unsigned int Size, unsigned int* OutLength) {
     FPayloadCommonFireWeapon* Wire =
-        reinterpret_cast<FPayloadCommonFireWeapon*>(Packet.Payload());
+        reinterpret_cast<FPayloadCommonFireWeapon*>(Payload());
 
     // The decode side is handed the bytes, not a holder; the routing word is already gone,
     // so the cursor starts at the object id.
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.GetDword(Wire->ObjectId)) {
         return FRpcMarshalStream::kDecodeOverrun;
     }
@@ -2864,7 +2910,7 @@ unsigned int RpcDecodeCommonFireWeapon(FPacketBase& Packet, const unsigned char*
 
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -2883,15 +2929,24 @@ unsigned int RpcDecodeCommonFireWeapon(FPacketBase& Packet, const unsigned char*
 // pointer as the constructor left it.
 // ===========================================================================
 
+// ===========================================================================
+// ch3 0x22 FLPACKET_CLIENT_DBGCREATESHIP -- LAB_06db0560 / LAB_06db0b30, slots +0x04
+// and +0x08 of PTR_FUN_06db5d54 (ctor FUN_06da0e20, routing header 0x30022). The payload
+// layout is on FPayloadClientDbgCreateShip in rpc_payloads.h.
+//
+// This type has no sender in the release image, so the codecs are reachable only from
+// the network Encode/Decode path, never from the single-player queue.
+// ===========================================================================
 // LAB_06db0560 -- DBGCREATESHIP, packet vtable +0x04.
-unsigned int RpcEncodeClientDbgCreateShip(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_CLIENT_DBGCREATESHIP::Encode(unsigned char** BufferHolder,
+                                                           unsigned int Capacity,
+                                                           unsigned int* OutLength) {
     const FPayloadClientDbgCreateShip* Wire =
-        reinterpret_cast<const FPayloadClientDbgCreateShip*>(Packet.Payload());
+        reinterpret_cast<const FPayloadClientDbgCreateShip*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
     // The two routing bytes; the cursor starts at 2.
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
 
     // Five plain dwords.
     if (!Stream.PutDword(Wire->Field_0x00) ||
@@ -2958,7 +3013,7 @@ unsigned int RpcEncodeClientDbgCreateShip(FPacketBase& Packet, unsigned char** B
 
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -2967,13 +3022,14 @@ unsigned int RpcEncodeClientDbgCreateShip(FPacketBase& Packet, unsigned char** B
 // Retail allocates each block BEFORE the bounds check that guards the copy and stores the
 // pointer at once; the packet's destructor FUN_06db0500 frees it, so a half-decoded packet
 // still releases cleanly.
-unsigned int RpcDecodeClientDbgCreateShip(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_CLIENT_DBGCREATESHIP::Decode(const unsigned char* Buffer,
+                                                           unsigned int Size,
+                                                           unsigned int* OutLength) {
     FPayloadClientDbgCreateShip* Wire =
-        reinterpret_cast<FPayloadClientDbgCreateShip*>(Packet.Payload());
+        reinterpret_cast<FPayloadClientDbgCreateShip*>(Payload());
 
     // The buffer is taken WITHOUT a dereference; the routing word is already gone.
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     if (!Stream.GetDword(Wire->Field_0x00) ||
         !Stream.GetDword(Wire->Field_0x04) ||
@@ -3049,7 +3105,7 @@ unsigned int RpcDecodeClientDbgCreateShip(FPacketBase& Packet, const unsigned ch
 
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -3104,14 +3160,21 @@ static const unsigned int kPlayerTradeRequestTrade = 0x20;
 static const unsigned int kPlayerTradeAcceptTrade = 0x40;
 static const unsigned int kPlayerTradeStopTradeRequest = 0x80;
 
+// ===========================================================================
+// ch1 0x12 FLPACKET_COMMON_PLAYER_TRADE -- LAB_06da7030 / LAB_06da7430, slots +0x04 and
+// +0x08 of PTR_FUN_06db4498 (ctor FUN_06d9bad0, routing header 0x10012). Eight sub-types
+// behind one jump table; the inverted IsMPServer test and the decoder's one stray 0x16
+// are described in rpc_containers.cpp.
+// ===========================================================================
 // LAB_06da7030 -- PLAYER_TRADE, packet vtable +0x04.
-unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** BufferHolder,
-                                        unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_COMMON_PLAYER_TRADE::Encode(unsigned char** BufferHolder,
+                                                          unsigned int Capacity,
+                                                          unsigned int* OutLength) {
     const FPayloadCommonPlayerTrade* Wire =
-        reinterpret_cast<const FPayloadCommonPlayerTrade*>(Packet.Payload());
+        reinterpret_cast<const FPayloadCommonPlayerTrade*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
     // The sub-type goes out as ONE byte.
     if (!Stream.PutByte((unsigned char)(Wire->SubType & 0xffu))) {
         return FRpcMarshalStream::kEncodeOverflow;
@@ -3188,18 +3251,19 @@ unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** Buf
 
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
 // LAB_06da7430 -- PLAYER_TRADE, packet vtable +0x08.
-unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char* Buffer,
-                                        unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_COMMON_PLAYER_TRADE::Decode(const unsigned char* Buffer,
+                                                          unsigned int Size,
+                                                          unsigned int* OutLength) {
     FPayloadCommonPlayerTrade* Wire =
-        reinterpret_cast<FPayloadCommonPlayerTrade*>(Packet.Payload());
+        reinterpret_cast<FPayloadCommonPlayerTrade*>(Payload());
 
     // The buffer is taken WITHOUT a dereference.
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     unsigned char SubTypeByte = 0;
     if (!Stream.GetByte(SubTypeByte)) {
@@ -3299,7 +3363,7 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
 
     *OutLength = Stream.Length();
     // Retail runs the byte-statistics tail on the SUCCESS PATH ONLY. See FPacketWireStats.
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -3336,14 +3400,18 @@ unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char
 // and the size is incremented per element.
 // ===========================================================================
 
-unsigned int RpcEncodeServerDamageObject(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength) {
+// 0x06d90480 / 0x06d906c0 -- ch2 0x05 DAMAGEOBJECT: three scalars, then the list's count
+// and one { word, byte, float } per DamageEntry. Lives in rpc_containers.cpp, next to the
+// damage-list helpers it needs.
+unsigned int FPacket_FLPACKET_SERVER_DAMAGEOBJECT::Encode(unsigned char** BufferHolder,
+                                                          unsigned int Capacity,
+                                                          unsigned int* OutLength) {
     const FPayloadServerDamageObject* Wire =
-        reinterpret_cast<const FPayloadServerDamageObject*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerDamageObject*>(Payload());
     const DamageList& Damage = Wire->Damage;
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));
     if (!Stream.PutDword(Wire->ObjectId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
@@ -3377,17 +3445,18 @@ unsigned int RpcEncodeServerDamageObject(FPacketBase& Packet, unsigned char** Bu
         }
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerDamageObject(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_DAMAGEOBJECT::Decode(const unsigned char* Buffer,
+                                                          unsigned int Size,
+                                                          unsigned int* OutLength) {
     FPayloadServerDamageObject* Wire =
-        reinterpret_cast<FPayloadServerDamageObject*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerDamageObject*>(Payload());
     DamageList& Damage = Wire->Damage;
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     if (!Stream.GetDword(Wire->ObjectId)) {
         return Stream.GetError();
@@ -3430,7 +3499,7 @@ unsigned int RpcDecodeServerDamageObject(FPacketBase& Packet, const unsigned cha
         ++Damage.Count;
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 

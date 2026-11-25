@@ -146,6 +146,7 @@ struct FDacomFactory : IComponentFactory
 // Nondelegating inner unknowns own the aggregate lifetime.
 struct FAnimationObject;
 struct FHardpointObject;
+struct FEngineObject;
 
 struct FAnimationInner : IDAComponent
 {
@@ -175,6 +176,9 @@ struct FEngineChildNode
     char Name[0x30];
     // +0x38: an inner unknown (component list) or an IEngineComponent facet (engine-component list).
     IDAComponent* Object;
+
+    // FUN_066235d0. Defined in EngBase.cpp.
+    void Insert(unsigned long* Count, const char* Name, IDAComponent* Object);
 };
 
 inline IEngineComponent* AsEngineComponent(IDAComponent* Object)
@@ -212,6 +216,15 @@ struct FArchetypeHandle
     std::vector<FConstraintRecord> Constraints; // +0x28
 
     explicit FArchetypeHandle(const FArchetypeName* Source); // FUN_0661ea00
+
+    // FUN_0661eab0. Defined in EngBase.cpp.
+    unsigned long AddRef(FEngineObject* Engine);
+
+    // FUN_0661eaf0. Defined in EngBase.cpp.
+    unsigned long Release(FEngineObject* Engine);
+
+    // FUN_0661eb30. Defined in EngBase.cpp.
+    FArchetypeChild* FindChildByCrc(unsigned long Crc);
 };
 
 // Archetype handles indexed by name CRC.
@@ -224,6 +237,15 @@ struct FEngBaseFreeList
     void* FreeHead;
     long FreeLimit;
     long FreeCount;
+
+    // FUN_06625bd0. Defined in EngBase.cpp.
+    void* Alloc();
+
+    // FUN_06625c00. Defined in EngBase.cpp.
+    void Free(void* Element);
+
+    // FUN_06625c40. Defined in EngBase.cpp.
+    void Drain();
 };
 
 struct FEngineInstance;
@@ -273,6 +295,9 @@ struct FInstanceTransform : IInstanceTransform
     float Extra;             // +0x34
     float ExtraVec[3];       // +0x38
     unsigned long User;      // +0x44
+
+    // FUN_0661f330. Defined in EngBase.cpp.
+    void Free();
 };
 
 // FUN_0661eb80 / pool DAT_0662b158 size 0xEC.
@@ -300,6 +325,27 @@ struct FEngineInstance
     float Extent;
     float ExtentVec[3];
     FArchetypeChild* PartChild;
+
+    // FUN_0661ed40. Defined in EngBase.cpp.
+    void TransformExtra(float* OutExtent, float* OutVec);
+
+    // FUN_0661ec90. Defined in EngBase.cpp.
+    unsigned char ConnectChild(FEngineInstance* Child, const unsigned long* Payload);
+
+    // FUN_0661ed60. Defined in EngBase.cpp.
+    unsigned char InvalidateExtentChain(unsigned char bFromThis);
+
+    // FUN_0661ece0. Defined in EngBase.cpp.
+    void SetExtentAndInvalidate(float Extent, const float* Vec, unsigned char bXform);
+
+    // FUN_0661ec30. Defined in EngBase.cpp.
+    unsigned char UnlinkChild(FEngineInstance* Node);
+
+    // FUN_0661f250. Defined in EngBase.cpp.
+    unsigned char ComposeWorld();
+
+    // FUN_0661ed90. Defined in EngBase.cpp.
+    void ComputeInstanceExtent(unsigned char bRecursive, float* OutExtent, float* OutVec);
 };
 
 struct FAggDescC
@@ -395,6 +441,18 @@ struct FEngineObject : IEngine
     void* DACOM_API GetInstanceRoot(void* Instance) override;
     void* DACOM_API FindArchetypeChild(void* Handle, void* ChildHandle) override;
     unsigned long DACOM_API RejectOperation(void* A, void* B) override; // TODO: original operation purpose.
+
+    // FUN_0661f550. Defined in EngBase.cpp.
+    void Construct();
+
+    // FUN_0661f750. Defined in EngBase.cpp.
+    void Destruct();
+
+    // FUN_0661f8b0. Defined in EngBase.cpp.
+    FArchetypeHandle* LookupArchetype(FArchetypeName* Name);
+
+    // FUN_06621710. Defined in EngBase.cpp.
+    void DestroyInstanceBody(FEngineInstance* Instance);
 };
 
 // Track copies retain the channel and duplicate names; destruction releases them.
@@ -410,6 +468,9 @@ struct FAnimTrack
     FAnimTrack(const FAnimTrack& Other);    // FUN_06613210
     ~FAnimTrack();                          // FUN_066131d0
     FAnimTrack& operator=(const FAnimTrack&) = delete;
+
+    // FUN_06611350. Defined in EngBase.cpp.
+    void LoadChannelNode(void* FileSystem);
 };
 
 // Script animation value owns tracks and retains its longest channel.
@@ -430,6 +491,9 @@ struct FAnimNameEntry
     ~FAnimNameEntry();                       // FUN_066113c0 (EngBase.cpp)
     FAnimNameEntry(const FAnimNameEntry&) = delete;
     FAnimNameEntry& operator=(const FAnimNameEntry&) = delete;
+
+    // FUN_06611440. Defined in EngBase.cpp.
+    void LoadScriptMaps(const char* Name, void* FileSystem);
 };
 
 // The script's name map, keyed by CRC32 of the name and compared unsigned; every walk over it
@@ -521,6 +585,20 @@ struct FTypedChannel
     // Retail +0x38, a byte: bit 0 is set from FUN_0661ad90's result by IChannel::Play, tested by
     // IChannel::StopGraph and the standalone pass of LAB_066157f0, cleared by FUN_06611f90.
     unsigned char PlayState;                         // +0x38
+
+    // Typed-channel members the mixer drives (EngBase.cpp).
+    void ApplyFromArchetype();
+    unsigned long Tick(float Dt);
+
+    // FUN_0661af70. Defined in EngBase.cpp.
+    unsigned long DACOM_API TimePlayable(const float* Time);
+
+    // FUN_0661ad90. Defined in EngBase.cpp.
+    unsigned long DACOM_API TryBindIfTimeValid(const FPlayHeader* Header);
+
+    // FUN_0661b120. Defined in EngBase.cpp.
+    unsigned long Collect(float T0, float T1, unsigned long Mode, float* Buf, unsigned long Cap,
+                          unsigned long* Count);
 };
 
 // Type 1, operator new 0x44, table 066291a4: one float sampled at +0x3C.
@@ -639,6 +717,12 @@ struct FMixerList
     FMixerNode* Tail;
     unsigned long Count;
     float BlendDuration;
+
+    // Mixer list primitives (EngBaseMixer.cpp).
+    void Unlink(FMixerNode* Node);
+    void UnlinkAndFree(FMixerNode* Node);
+    void FreeList();
+    void UnlinkParentBlend(FMixerNode* Node, unsigned char bOuter);
 };
 
 // Nodes have no virtual destructor; MixerFreeNode deallocates their storage directly.
@@ -725,6 +809,52 @@ struct FAnimPlayback
     std::vector<FTypedChannel*> Typed;
     FTypedChannel* LongestTyped;          // +0x18: set by FUN_066124e0, 0 when none bound
     FAnimScript* Script;                  // +0x1C: set by LAB_06614920
+
+    // Playback overlay writers (EngBaseMixer.cpp). Inner is the playback root's entry in the
+    // mixer map (FUN_06614f70 on playback+4).
+    void WriteOverlayPos(const float* Pos, FMixerDescMap* Inner);
+    void AddOverlayPos(const float* Delta, FMixerDescMap* Inner);
+
+    // FUN_06612a00. Defined in EngBase.cpp.
+    void FreeTyped();
+
+    // FUN_06611f90. Defined in EngBase.cpp.
+    void CloneTypedChannels(FAnimNameEntry* Entry);
+
+    // FUN_06612250. Defined in EngBase.cpp.
+    unsigned long FilterTyped(IChannel* Filter);
+
+    // FUN_066122a0. Defined in EngBase.cpp.
+    unsigned long HasTyped(void* Object);
+
+    // FUN_066122d0. Defined in EngBase.cpp.
+    unsigned long TouchMappedTyped(void* OutPos, void* OutSampledPos);
+
+    // FUN_066128f0. Defined in EngBase.cpp.
+    void StopTyped();
+
+    // FUN_06612920. Defined in EngBase.cpp.
+    void ApplyTyped();
+
+    // FUN_066126e0. Defined in EngBase.cpp.
+    unsigned long EvalTyped(unsigned long Flags, float Start, float Speed,
+                            unsigned long BlendDurationBits, unsigned long ScaleBits,
+                            unsigned long TranslationScaleBits, const float* Transform);
+
+    // FUN_066127e0. Defined in EngBase.cpp.
+    unsigned long EvalStoredTyped();
+
+    // FUN_06612940. Defined in EngBase.cpp.
+    FTypedChannel* FindTypedByHeader(const FAnimBindOut* Header);
+
+    // FUN_066129c0. Defined in EngBase.cpp.
+    void SetTypedTime(float Time);
+
+    // FUN_066129f0. Defined in EngBase.cpp.
+    float StoredDuration();
+
+                                   // FUN_06612a70
+    void WriteOverlayOrient(const float* Matrix, FMixerDescMap* Inner);
 };
 
 // Retail Animation+0x14: playback id -> record. FUN_06614580 / FUN_06612e70 compare the key
@@ -830,6 +960,11 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     unsigned char DACOM_API Eval(unsigned long PlaybackId, void* OutSampledPos, unsigned long Flags,
                                  float Time, float Speed, void* BlendDuration, void* Scale,
                                  float TranslationScale) override;
+
+    // Mixer maps on the Animation object (EngBaseMixer.cpp).
+    FMixerDescMap* MixerFindKey(long Key);
+    FMixerDescMap* MixerFindOrAddKey(long Key);
+    void MixerDestroyAll();
 };
 
 // Hardpoint and EngineComponent facets share a cache and nondelegating inner unknown.
@@ -867,6 +1002,9 @@ struct FHardpointObject : IHardpoint, IEngineComponent
     int DACOM_API UpdateInstance(void* Instance, void* Arg) override;
     int DACOM_API QueryInstance(void* Instance, const char* Iid, void** Out) override;
     int DACOM_API Notify(void* Arg) override;
+
+    // FUN_06625c70. Defined in EngBase.cpp.
+    void Construct();
 };
 
 // ChannelArchetype, operator_new(0x20). LAB_0661d8d0 loads a 0xC-byte Header plus a Frames blob.
@@ -896,6 +1034,27 @@ struct FChannelArchetypeObject : IChannelArchetype
                                         unsigned long Capacity, unsigned long* Count) override;
     GENRESULT DACOM_API CollectAt(float Time, float* OutKeys, unsigned long Capacity,
                                      unsigned long* Count) override;
+
+    // FUN_0661d730. Defined in EngBase.cpp.
+    void InnerCtor();
+
+    // FUN_0661d750. Defined in EngBase.cpp.
+    void Teardown();
+
+    // FUN_0661d7a0. Defined in EngBase.cpp.
+    const unsigned char* FramePayload(unsigned long Index) const;
+
+    // FUN_0661d820. Defined in EngBase.cpp.
+    double FrameTime(unsigned long Index) const;
+
+    // FUN_0661d820. Defined in EngBase.cpp.
+    unsigned long FrameIndexAt(float Time) const;
+
+    // FUN_0661db70. Defined in EngBase.cpp.
+    void DecompressFrames();
+
+    // FUN_0661e3d0. Defined in EngBase.cpp.
+    unsigned long RelocatedKey(unsigned long Index) const;
 };
 
 void EngBaseFdump(int Flags, const char* File, int Line, const char* Kind, const char* Message);
@@ -925,9 +1084,8 @@ I3DMathEngine* Create3DMathEngine();
 // which have their own.
 I3DMathEngine* Acquire3DMathEngine();
 
-// Typed-channel members the mixer drives (EngBase.cpp).
-void TypedApplyFromArchetype(FTypedChannel* This);                 // FUN_0661b070
-unsigned long TypedTick(FTypedChannel* This, float Dt);            // FUN_0661b420
+                 // FUN_0661b070
+            // FUN_0661b420
 
 // The mixer-map key of a typed channel: typed+0x18 read as a signed int (FUN_06614f70).
 inline long TypedMixerKey(FTypedChannel* This)
@@ -935,17 +1093,15 @@ inline long TypedMixerKey(FTypedChannel* This)
     return (long)(ptrdiff_t)(This->Bind);
 }
 
-// Mixer list primitives (EngBaseMixer.cpp).
-void MixerUnlink(FMixerList* List, FMixerNode* Node);                             // FUN_06617220
-void MixerUnlinkAndFree(FMixerList* List, FMixerNode* Node);                      // FUN_06617260
-void MixerFreeList(FMixerList* List);                                             // FUN_066172c0
-void MixerUnlinkParentBlend(FMixerList* List, FMixerNode* Node, unsigned char bOuter); // FUN_066156f0
+                             // FUN_06617220
+                      // FUN_06617260
+                                             // FUN_066172c0
+ // FUN_066156f0
 void MixerFreeNode(FMixerNode* Node);                                             // FUN_066281d0
 
-// Mixer maps on the Animation object (EngBaseMixer.cpp).
-FMixerDescMap* MixerFindKey(FAnimationObject* Animation, long Key);               // FUN_06614f70
-FMixerDescMap* MixerFindOrAddKey(FAnimationObject* Animation, long Key);          // FUN_06614e20
-void MixerDestroyAll(FAnimationObject* Animation);                                // FUN_06616d90 (+0x3C part)
+               // FUN_06614f70
+          // FUN_06614e20
+                                // FUN_06616d90 (+0x3C part)
 void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FMixerList* List,
                        float Dt);                                                 // FUN_066152d0
 void MixerBlendAttach(FAnimationObject* Animation, FTypedChannel* Typed, float Duration,
@@ -955,11 +1111,5 @@ unsigned char MixerHasLeaf(FAnimationObject* Animation, FTypedChannel* Typed);  
 void MixerWalkKey(FAnimationObject* Animation, long Key, float Dt);               // LAB_06616800 body
 void MixerWalkAll(FAnimationObject* Animation, float Dt);                         // LAB_066157f0 body
 
-// Playback overlay writers (EngBaseMixer.cpp). Inner is the playback root's entry in the
-// mixer map (FUN_06614f70 on playback+4).
-void PlaybackWriteOverlayPos(FAnimPlayback* Playback, const float* Pos,
-                             FMixerDescMap* Inner);                               // FUN_06612a70
-void PlaybackWriteOverlayOrient(FAnimPlayback* Playback, const float* Matrix,
-                                FMixerDescMap* Inner);                            // FUN_06612b80
-void PlaybackAddOverlayPos(FAnimPlayback* Playback, const float* Delta,
-                           FMixerDescMap* Inner);                                 // FUN_06612c60
+                            // FUN_06612b80
+                                 // FUN_06612c60

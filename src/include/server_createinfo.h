@@ -101,6 +101,8 @@ void Server_QuatToMatrix(Matrix& Out, Quaternion const& In);
 // ---------------------------------------------------------------------------
 struct I3DMathEngine;
 I3DMathEngine* Server_Acquire3DMathEngine();
+// The module's one lazily created engine (a deviation: retail has one per source file).
+I3DMathEngine* Server_MathEngine();
 
 // ===========================================================================
 // CEqObjCreateInfo -- retail size 0xac: both constructors' last store is the
@@ -482,6 +484,11 @@ struct FServerLootDesc
     unsigned char bTemporary;         // +0x45  builder, .text:06d07c6f, CLoot+0xfd
     unsigned char bMarkedBy;          // +0x46  caller, .text:06cf57ba, is_marked_by(PlayerId)
     unsigned char Pad47;              // +0x47
+
+    // FUN_06d08e80, retail's constructor. Its only retail caller runs it over raw storage
+    // (StarSystem::create_loot), and the other places that make one do not call it, so it
+    // is an explicit member here rather than a C++ constructor. Defined in server_classes.cpp.
+    void init();
 };
 
 // The SendServerCreateLoot argument block, built at S+0x6c by the CREATELOOT branch.

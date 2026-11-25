@@ -120,9 +120,6 @@ void Server_LoadSinglePlayerState(INI_Reader& Reader) {
 // it; Login bumps +0x04 / +0x0c, PlayerDB::logout +0x08 (server_classes.cpp),
 // AbortMission +0x1c.
 ServerStats GServerStats = {};
-// .data:DAT_06d8d758 -- IServerS.cpp's own lazily acquired I3DMathEngine (FUN_06d5ff70),
-// used only by PlayerLaunch.
-static I3DMathEngine* GIServerSMathEngine = nullptr;
 // .data:DAT_06d8f9c8 -- [Freelancer] initial_world. Read also by
 // PlayerDB::create_restart_file, hence external linkage.
 char g_InitialWorldPath[260] = {0};
@@ -140,8 +137,6 @@ static void Server_CleanupPhysics();
 static void Server_ControllerCleanup();
 static void Server_PhysicsUpdate(float dt);
 
-// FUN_06d0be50 -- one system's update; defined next to Server_PhysicsUpdate.
-static unsigned int StarSystem_Update(StarSystem* Sys, float Dt);
 static void Server_TimerTick(float dt);
 static void Server_TimerFiring(float dt);
 
@@ -154,9 +149,9 @@ static PlayerSlot* GetPlayerBySession(unsigned int session_id) {
 // Callers: BaseExit's two refusals, the inlined LocationExit refusal inside BaseExit and
 // LocationExit's own. What the MP transport does with a NULL packet is not recovered, so the
 // name only says what the code does.
-static void PlayerData_SendClientNullPacket(PlayerData& Slot) {
+void PlayerData::send_client_null_packet() {
     if (SinglePlayer()) return;
-    ::g_pClientInterface->PushToClient(Slot.client_id, nullptr);
+    ::g_pClientInterface->PushToClient(client_id, nullptr);
 }
 
 // IServerImpl and the exported object `Server` (ordinal 524) are declared in
@@ -248,7 +243,7 @@ void IServerImpl::FireWeapon(unsigned int player_id, const XFireWeaponInfo& info
             return;
         if (Obj->is_destroyed())
             return;
-        PlayerData_TerminateTrade(Players[player_id]);
+        Players[player_id].terminate_trade();
         static_cast<IObjAffect*>(Obj)->fire_weapons(info.Hardpoints.data(),
                                                static_cast<unsigned>(info.Hardpoints.size()),
                                                &info.TargetPos, static_cast<int>(player_id));
@@ -353,7 +348,7 @@ void IServerImpl::JettisonCargo(unsigned int player_id, const XJettisonCargo& in
             return;
         if (Obj->is_destroyed())
             return;
-        PlayerData_TerminateTrade(Players[player_id]);
+        Players[player_id].terminate_trade();
         static_cast<IObjAffect*>(Obj)->jettison_cargo(info.ItemId, static_cast<int>(info.Count),
                                                static_cast<int>(player_id));
     }
@@ -417,7 +412,7 @@ void IServerImpl::CharacterInfoReq(unsigned int session_id, bool bSendEmpty) {
         // Only when the bool is false does the slot fill it (FUN_06d499c0); with the bool
         // set (CreateNewCharacter's failure path), the list goes out empty.
         if (!bSendEmpty)
-            PlayerData_BuildCharacterSet(Players[session_id], Set);
+            Players[session_id].build_character_set(Set);
 
         // IClient slot 13, FLPACKET_SERVER_CHARACTERINFO; no null test on the interface.
         g_pClientInterface->SendServerCharacterInfo(session_id, Set);
@@ -429,7 +424,7 @@ void IServerImpl::CharacterSelect(const CHARACTER_ID& char_id, unsigned int sess
         PlayerData& Slot = Players[session_id];
 
         // The worker FUN_06d4a5d0 (server_classes.cpp); a miss or a failed load ends here.
-        if (!PlayerData_SelectCharacter(Slot, char_id, session_id)) return;
+        if (!Slot.select_character(char_id, session_id)) return;
 
         // The SETREPUTATION argument. +0x04 is never written by retail (stack residue);
         // zeroed here.
@@ -508,7 +503,7 @@ void IServerImpl::DestroyCharacter(const CHARACTER_ID& char_id, unsigned int ses
         PlayerSlot* player = &Players[session_id];
 
         // FUN_06d49f60, result ignored (server_classes.cpp).
-        PlayerData_DestroyCharacter(*player, char_id, session_id);
+        player->destroy_character(char_id, session_id);
 
         CharacterInfoReq(session_id, false);
     }
@@ -517,7 +512,7 @@ void IServerImpl::CharacterSkipAutosave(unsigned int session_id) {
         // Retail .text:06d45380: PlayerDB::is_valid inlined, then FUN_06d4c5f0(slot).
         PlayerSlot* p = GetPlayerBySession(session_id);
         if (!p) return;
-        PlayerData_SkipNextAutosave(*p);
+        p->skip_next_autosave();
     }
 
     // The in-base request family, .text:06d17300 .. 06d1761b. Every member but
@@ -525,30 +520,30 @@ void IServerImpl::CharacterSkipAutosave(unsigned int session_id) {
     // dword test, the base BaseEnter wrote) on a slot indexed RAW -- no PlayerDB::is_valid,
     // no client-id test.
 
-    // ReqShipArch -- retail .text:06d17300; FUN_06d4ec10 is PlayerData_SetShipArch.
+    // ReqShipArch -- retail .text:06d17300; FUN_06d4ec10 is PlayerData::set_ship_arch.
 void IServerImpl::ReqShipArch(unsigned int arch_id, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
-        PlayerData_SetShipArch(Players[session_id], arch_id);
+        Players[session_id].set_ship_arch(arch_id);
     }
     // ReqHullStatus -- retail .text:06d17340, the one member of the family that validates
     // the session first. The x87 clamp keeps NaN (only a true `< 0` is zeroed).
-    // FUN_06d4ed10 is PlayerData_SetRelativeHealth.
+    // FUN_06d4ed10 is PlayerData::set_relative_health.
 void IServerImpl::ReqHullStatus(float hull_status, unsigned int session_id) {
         if (!Players.is_valid(session_id)) return;
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
         if ((Players[session_id].current_base & 0x3fffffff) == 0) return;
         if (hull_status < 0.0f) hull_status = 0.0f;
-        PlayerData_SetRelativeHealth(Players[session_id], hull_status, true);
+        Players[session_id].set_relative_health(hull_status, true);
     }
     // ReqCollisionGroups -- retail .text:06d173e0; FUN_06d4f320.
 void IServerImpl::ReqCollisionGroups(const std::list<CollisionGroupDesc>& groups, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
-        PlayerData_SetCollisionGroups(Players[session_id], groups);
+        Players[session_id].set_collision_groups(groups);
     }
     // ReqEquipment -- retail .text:06d17420; FUN_06d4eeb0.
 void IServerImpl::ReqEquipment(const EquipDescList& equipment, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
-        PlayerData_LoadEquipment(Players[session_id], equipment);
+        Players[session_id].load_equipment(equipment);
     }
 
     // Slot 29: ReqCargo -- retail .text:06d28880 is empty (ordinal 366, ICF-folded with
@@ -567,14 +562,14 @@ void IServerImpl::ReqAddItem(unsigned int arch_id, const char* hardpoint, int co
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
         CacheString Hp;
         Hp.Value = StringAlloc(hardpoint, false);
-        PlayerData_AddEquipment(Players[session_id], arch_id, Hp, count, health, b_mounted,
-                                /*bMission*/false, /*bNotify*/true);
+        Players[session_id].add_equipment(arch_id, Hp, count, health, b_mounted,
+                                          /*bMission*/false, /*bNotify*/true);
     }
     // ReqRemoveItem -- retail .text:06d174e0, tail call to FUN_06d4f100 with bNotify = 0:
     // no IClient slot 27, the client asked for the removal and already knows.
 void IServerImpl::ReqRemoveItem(unsigned short equip_id, int count, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
-        PlayerData_RemoveEquipment(Players[session_id], equip_id, count, /*bNotify*/false);
+        Players[session_id].remove_equipment(equip_id, count, /*bNotify*/false);
     }
     // ReqModifyItem -- retail .text:06d17530; FUN_06d4f170 takes six stack dwords but reads
     // five, so the port drops the trailing literal 0.
@@ -583,21 +578,21 @@ void IServerImpl::ReqModifyItem(unsigned short equip_id, const char* hardpoint, 
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
         CacheString Hp;
         Hp.Value = StringAlloc(hardpoint, false);
-        PlayerData_ModifyEquipment(Players[session_id], equip_id, Hp, count, health, b_mounted);
+        Players[session_id].modify_equipment(equip_id, Hp, count, health, b_mounted);
     }
 
 void IServerImpl::ReqSetCash(int cash, unsigned int session_id) {
-        // Retail .text:06d175a0: the in-base gate, then FUN_06d4f480 (PlayerData_SetCash).
+        // Retail .text:06d175a0: the in-base gate, then FUN_06d4f480 (PlayerData::set_cash).
         // Cash is an int (?ReqSetCash@...@@UAEXHI@Z).
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
-        PlayerData_SetCash(Players[session_id], cash);
+        Players[session_id].set_cash(cash);
     }
 
 void IServerImpl::ReqChangeCash(int delta, unsigned int session_id) {
         // Retail .text:06d175e0: the in-base gate, then FUN_06d4f4e0(delta, false) --
-        // PlayerData_AdjustCash without the +0x320 total.
+        // PlayerData::adjust_cash without the +0x320 total.
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
-        PlayerData_AdjustCash(Players[session_id], delta, false);
+        Players[session_id].adjust_cash(delta, false);
     }
 
     // IServerImpl::BaseEnter -- retail .text:06d17630. The system change is keyed on
@@ -633,8 +628,8 @@ void IServerImpl::BaseEnter(unsigned int base_id, unsigned int session_id) {
         Server_ControllerDispatch(0, pub::Controller::EMessage::BaseEnter, BaseEvent);
 
         if (!SinglePlayer()) {
-            PlayerData_ResetTotalEarned(Players[session_id]);
-            PlayerData_SnapshotEquipment(Players[session_id]);
+            Players[session_id].reset_total_earned();
+            Players[session_id].snapshot_equipment();
         }
     }
 
@@ -644,11 +639,11 @@ void IServerImpl::BaseEnter(unsigned int base_id, unsigned int session_id) {
 void IServerImpl::BaseExit(unsigned int base_id, unsigned int session_id) {
         if (!Players.is_valid(session_id)) return;
         if ((Players[session_id].entered_base_id & 0x3fffffff) == 0) {
-            PlayerData_SendClientNullPacket(Players[session_id]);
+            Players[session_id].send_client_null_packet();
             return;
         }
         if (base_id != Players[session_id].entered_base_id) {
-            PlayerData_SendClientNullPacket(Players[session_id]);
+            Players[session_id].send_client_null_packet();
             return;
         }
         if ((Players[session_id].current_location & 0x3fffffff) != 0) {
@@ -659,7 +654,7 @@ void IServerImpl::BaseExit(unsigned int base_id, unsigned int session_id) {
         unsigned int ExitEvent[2] = { base_id, session_id };
         Server_ControllerDispatch(0, pub::Controller::EMessage::BaseExit, ExitEvent);
         GetBaseDB()->unload_base(session_id, base_id);   // FUN_06d142c0
-        PlayerData_AutoSave(Players[session_id]);
+        Players[session_id].auto_save();
 
         Players[session_id].exited_base_id = Players[session_id].current_base;
         Players[session_id].current_base = 0;
@@ -687,7 +682,7 @@ void IServerImpl::LocationExit(unsigned int location_id, unsigned int session_id
         if ((Players[session_id].current_base & 0x3fffffff) == 0 ||
             (Players[session_id].current_location & 0x3fffffff) == 0 ||
             Players[session_id].current_location != location_id) {
-            PlayerData_SendClientNullPacket(Players[session_id]);
+            Players[session_id].send_client_null_packet();
             return;
         }
         unsigned int RoomEvent[2] = { location_id, session_id };
@@ -914,7 +909,7 @@ void IServerImpl::SystemSwitchOutComplete(unsigned int ship_id, unsigned int ses
         std::memcpy(&Msg3b[6], &Pos.z, sizeof(float));
         Server_ControllerDispatch(0, pub::Controller::EMessage::SystemEnter, Msg3b);
 
-        PlayerData_AutoSave(*p);
+        p->auto_save();
     }
 
     // PlayerLaunch -- retail .text:06cefb20.
@@ -964,16 +959,11 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
         Server_GetLaunchPosition(session_id, &LaunchObjId, &LaunchKind, &Req.Position,
                                  &Req.Orientation);
 
-        // The file's lazily acquired math engine (DAT_06d8d758).
-        if (GIServerSMathEngine == nullptr)
-            GIServerSMathEngine = Server_Acquire3DMathEngine();
         Matrix LaunchOrient;
-        GIServerSMathEngine->QuaternionToMatrix(reinterpret_cast<FMatrix&>(LaunchOrient),
+        Server_MathEngine()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(LaunchOrient),
                                                 reinterpret_cast<FQuaternion const&>(Req.Orientation));
-        if (GIServerSMathEngine == nullptr)
-            GIServerSMathEngine = Server_Acquire3DMathEngine();
         Vector HpOffset;
-        GIServerSMathEngine->TransformMatrix(reinterpret_cast<FVector&>(HpOffset),
+        Server_MathEngine()->TransformMatrix(reinterpret_cast<FVector&>(HpOffset),
                                              reinterpret_cast<FMatrix const&>(LaunchOrient),
                                              reinterpret_cast<FVector const&>(HpPos));
 
@@ -1042,9 +1032,7 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
         // Single player: the orientation matrix again and beam_object on the wrapper's raw
         // object under the (& 1) test -- called whatever that test yields, as in retail.
         if (SinglePlayer()) {
-            if (GIServerSMathEngine == nullptr)
-                GIServerSMathEngine = Server_Acquire3DMathEngine();
-            GIServerSMathEngine->QuaternionToMatrix(reinterpret_cast<FMatrix&>(LaunchOrient),
+            Server_MathEngine()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(LaunchOrient),
                                                     reinterpret_cast<FQuaternion const&>(Req.Orientation));
             CObject* Raw = nullptr;
             if (NewShip != nullptr) {
@@ -1111,7 +1099,7 @@ void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& info, unsigned int session
         if (Players.is_valid(session_id)) {
             // FUN_06d498f0 reads only its first stack argument; the port's helper takes
             // just that one (common_server_playerdb.h).
-            if (!PlayerData_CheckPositionBound(Players[session_id], &info.Position))
+            if (!Players[session_id].check_position_bound(&info.Position))
                 return;
         }
         System->sp_obj_update(info, session_id);
@@ -1185,7 +1173,7 @@ void IServerImpl::SPRequestUseItem(const SSPUseItem& info, unsigned int session_
         if (static_cast<IObjAffect*>(Obj)->use_item(info.ItemId, info.Count,
                                                    static_cast<int>(session_id)) != 0)
             return;
-        PlayerData_TerminateTrade(Players[session_id]);
+        Players[session_id].terminate_trade();
     }
     // SPRequestInvincibility -- retail .text:06cf1380. Raw (unmasked) ship id compare.
     // Turning invincibility on is honoured only for reason 2 (the ship is in some dockable
@@ -1249,7 +1237,7 @@ void IServerImpl::SaveGame(const CHARACTER_ID& char_id, const wchar_t* descripti
         PlayerSlot* p = GetPlayerBySession(session_id);
         if (!p) return;
         if ((p->ship_object_id & 0x3fffffff) != 0) return;
-        PlayerData_SaveGame(*p, char_id.Buffer, description, 0);
+        p->save_game(char_id.Buffer, description, 0);
     }
     // MissionSaveB -- retail .text:06d45a30: SP only, a live session, then
     // FUN_06d4c600(slot, mission_id) -- the mission id IS the save's descrip_strid.
@@ -1259,7 +1247,7 @@ void IServerImpl::MissionSaveB(unsigned int session_id, unsigned long mission_id
         if (session_id == 0 || (session_id - 1) >= max_players) return;
         PlayerSlot* p = GetPlayerBySession(session_id);
         if (!p) return;
-        PlayerData_MissionSave(*p, static_cast<unsigned int>(mission_id));
+        p->mission_save(static_cast<unsigned int>(mission_id));
     }
     // RequestEvent -- retail .text:06cf08e0: IObjAffect +0x5c with no RequestCB. session_id is
     // never read; no controller message.
@@ -1642,9 +1630,9 @@ void IServerImpl::TerminateTrade(unsigned int session_id, int reason) {
     // is computed per side through ftol and a negative result ends the trade (reason 5). The
     // cash exchange is unconditional. sync_cargo is called on both narrowed ships, and the
     // system from the own ship's lookup is used, all without null tests.
-    // FUN_06d4f460 = PlayerData_GetCash, FUN_06d4f4e0 = PlayerData_AdjustCash,
-    // FUN_06d4f260 = PlayerData_RemoveCargo, FUN_06d4f230 = PlayerData_AddEquipment with
-    // the cargo-bay hardpoint, FUN_06d0b110 = StarSystem_SendRemoteCargoUpdate.
+    // FUN_06d4f460 = PlayerData::get_cash, FUN_06d4f4e0 = PlayerData::adjust_cash,
+    // FUN_06d4f260 = PlayerData::remove_cargo, FUN_06d4f230 = PlayerData::add_equipment with
+    // the cargo-bay hardpoint, FUN_06d0b110 = StarSystem::send_remote_cargo_update.
 void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
         PlayerSlot* const p = GetPlayerBySession(session_id);
         if (!p) return;
@@ -1662,11 +1650,11 @@ void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
         if (!PartnerOffer->GetAccepted()) return;
         if (!Offer->GetAccepted()) return;
 
-        if (Offer->GetMoneyOffered() > static_cast<unsigned long>(PlayerData_GetCash(Own))) {
+        if (Offer->GetMoneyOffered() > static_cast<unsigned long>(Own.get_cash())) {
             TerminateTrade(session_id, 3);
             return;
         }
-        if (PartnerOffer->GetMoneyOffered() > static_cast<unsigned long>(PlayerData_GetCash(Partner))) {
+        if (PartnerOffer->GetMoneyOffered() > static_cast<unsigned long>(Partner.get_cash())) {
             TerminateTrade(session_id, 3);
             return;
         }
@@ -1737,22 +1725,22 @@ void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
             return;
         }
 
-        PlayerData_AdjustCash(Own, static_cast<int>(PartnerOffer->GetMoneyOffered() - Offer->GetMoneyOffered()),
-                              true);
-        PlayerData_AdjustCash(Partner, static_cast<int>(Offer->GetMoneyOffered() - PartnerOffer->GetMoneyOffered()),
-                              true);
+        Own.adjust_cash(static_cast<int>(PartnerOffer->GetMoneyOffered() - Offer->GetMoneyOffered()),
+                        true);
+        Partner.adjust_cash(static_cast<int>(Offer->GetMoneyOffered() - PartnerOffer->GetMoneyOffered()),
+                            true);
 
         for (It = OwnItems.begin(); It != OwnItems.end(); ++It) {
-            PlayerData_RemoveCargo(Own, It->ArchId, It->Count, It->Health, true);
-            PlayerData_AddEquipment(Partner, It->ArchId, EquipDesc::CARGO_BAY_HP_NAME, It->Count,
-                                    It->Health, /*bEquipped*/false, /*bMission*/false,
-                                    /*bNotify*/true);
+            Own.remove_cargo(It->ArchId, It->Count, It->Health, true);
+            Partner.add_equipment(It->ArchId, EquipDesc::CARGO_BAY_HP_NAME, It->Count,
+                                  It->Health, /*bEquipped*/false, /*bMission*/false,
+                                  /*bNotify*/true);
         }
         for (It = PartnerItems.begin(); It != PartnerItems.end(); ++It) {
-            PlayerData_RemoveCargo(Partner, It->ArchId, It->Count, It->Health, true);
-            PlayerData_AddEquipment(Own, It->ArchId, EquipDesc::CARGO_BAY_HP_NAME, It->Count,
-                                    It->Health, /*bEquipped*/false, /*bMission*/false,
-                                    /*bNotify*/true);
+            Partner.remove_cargo(It->ArchId, It->Count, It->Health, true);
+            Own.add_equipment(It->ArchId, EquipDesc::CARGO_BAY_HP_NAME, It->Count,
+                              It->Health, /*bEquipped*/false, /*bMission*/false,
+                              /*bNotify*/true);
         }
 
         OwnShip->sync_cargo(Own.equipment);
@@ -1762,8 +1750,8 @@ void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
         StarSystem* ShipSystem = nullptr;
         if (!Server_FindObject(OwnShip->Id, ScratchObj, ShipSystem))
             ShipSystem = nullptr;
-        StarSystem_SendRemoteCargoUpdate(*ShipSystem, OwnObj);
-        StarSystem_SendRemoteCargoUpdate(*ShipSystem, PartnerObj);
+        ShipSystem->send_remote_cargo_update(OwnObj);
+        ShipSystem->send_remote_cargo_update(PartnerObj);
 
         TerminateTrade(session_id, 1);
     }
@@ -1834,7 +1822,7 @@ void IServerImpl::DelTradeEquip(unsigned int session_id, const EquipDesc& equip)
     }
 
     // Slot 85: RequestTrade -- retail .text:06cf22c0. FUN_06d50920 is
-    // PlayerData_SetTradeRequest. Retail's own body makes no IClient call.
+    // PlayerData::set_trade_request. Retail's own body makes no IClient call.
 void IServerImpl::RequestTrade(unsigned int session_id, unsigned int target_id) {
         PlayerSlot* const p = GetPlayerBySession(session_id);
         if (!p) return;
@@ -1845,16 +1833,16 @@ void IServerImpl::RequestTrade(unsigned int session_id, unsigned int target_id) 
             InitiateTrade(session_id, target_id);
             return;
         }
-        PlayerData_SetTradeRequest(Players[session_id], target_id);
+        Players[session_id].set_trade_request(target_id);
     }
 
     // Slot 86: StopTradeRequest -- retail .text:06cf2350. FUN_06d50a40(record, 1) is
-    // PlayerData_CancelTradeRequest with the partner-list unlink on.
+    // PlayerData::cancel_trade_request with the partner-list unlink on.
 void IServerImpl::StopTradeRequest(unsigned int session_id) {
         PlayerSlot* const p = GetPlayerBySession(session_id);
         if (!p) return;
         g_pClientInterface->SendCommonPlayerTradeTerminateTrade(session_id, 0);
-        PlayerData_CancelTradeRequest(Players[session_id], true);
+        Players[session_id].cancel_trade_request(true);
     }
     // ReqDifficultyScale -- retail .text:06d45a90: SP only; FUN_06d4ed40 clamps to
     // [0.0, 2.0] and stores at player+0x3C4.
@@ -1907,9 +1895,9 @@ void IServerImpl::Dock(const unsigned int& base_id, const unsigned int& session_
 
         // Otherwise update the ship's system right now with 0.2f: the dock queue is
         // processed, the LAND goes out and the player leaves that system.
-        StarSystem_Update(System, 0.2f);
+        System->update(0.2f);
 
-        PlayerData_FlushPendingVisits(Players[session_id]);   // FUN_06d4b450
+        Players[session_id].flush_pending_visits();   // FUN_06d4b450
 
         unsigned int LeaveEvent[3];
         LeaveEvent[0] = System->SystemInfo->NicknameId;
@@ -2478,7 +2466,7 @@ struct FDockEventPayload {
 // (FUN_06cf73d0); one without a ship gets (Client, 0, Aff). The map is Common's single
 // global, so the first system updated in a frame consumes it and the others see null, as
 // in retail.
-static void StarSystem_SendChangedAffiliations(StarSystem* Sys)
+void StarSystem::send_changed_affiliations()
 {
     std::map<unsigned int, unsigned int>* const Changed =
         ::Reputation::GetChangedAffiliationClientMap();
@@ -2498,10 +2486,10 @@ static void StarSystem_SendChangedAffiliations(StarSystem* Sys)
         if (Ship != 0)
         {
             GameObject* const Obj = Server_LookupGameObject(Ship);
-            SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(Sys->PlayerListHead);
+            SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
             for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
             {
-                if (SystemPlayerView_IsObjectVisible(&Node->View, Obj))
+                if (Node->View.is_object_visible(Obj))
                     g_pClientInterface->SendServerMiscObjUpdateAffiliation(Node->View.PlayerId, Ship, Affiliation);
             }
         }
@@ -2518,9 +2506,9 @@ static void StarSystem_SendChangedAffiliations(StarSystem* Sys)
 // ticks: every object within 10000 (DAT_06d88af0) of a player's ship, plus every object
 // of the block at +0xd4, gets update(Step) once. The de-duplication zeroes only the FIRST
 // later duplicate of each item, as retail does.
-static void StarSystem_UpdateNearShips(StarSystem* Sys, float Step)
+void StarSystem::update_near_ships(float Step)
 {
-    void* const Bucket = Sys->GetBucket(0xfdffu);
+    void* const Bucket = GetBucket(0xfdffu);
     if (Bucket == nullptr)
         return;
 
@@ -2541,8 +2529,8 @@ static void StarSystem_UpdateNearShips(StarSystem* Sys, float Step)
     // Geometry::Sphere and FSpatialQueryResult.
     ISpatialPartition* const Partition = static_cast<ISpatialPartition*>(Bucket);
 
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(Sys->PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(Sys->PlayerListHead);
+    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
+         Node != static_cast<SystemPlayerNode*>(PlayerListHead);
          Node = Node->Next)
     {
         unsigned int const ShipId = Players[Node->View.PlayerId].ship_object_id;
@@ -2557,7 +2545,7 @@ static void StarSystem_UpdateNearShips(StarSystem* Sys, float Step)
     }
 
     FSystemListNode* It = nullptr;
-    while (Sys->DockingSolars.traverse(It, true))
+    while (DockingSolars.traverse(It, true))
     {
         if (It->Data == nullptr)
             continue;
@@ -2602,9 +2590,9 @@ static void StarSystem_UpdateNearShips(StarSystem* Sys, float Step)
 
 // FUN_06ce3360 (thiscall on the StarSystem; the name is the port's). One side of a PhySys
 // collision -> the GameObject wrapper and the sub-object it was hit on. Only caller:
-// StarSystem_ProcessCollisions.
-static void StarSystem_ResolveCollisionSide(StarSystem* Sys, CObject* Part, unsigned int PartId,
-                                            GameObject** OutObj, unsigned short* OutSubObjId)
+// StarSystem::process_collisions.
+void StarSystem::resolve_collision_side(CObject* Part, unsigned int PartId, GameObject** OutObj,
+                                        unsigned short* OutSubObjId)
 {
     *OutObj = nullptr;
     *OutSubObjId = SUBOBJ_ID_NONE;
@@ -2619,14 +2607,14 @@ static void StarSystem_ResolveCollisionSide(StarSystem* Sys, CObject* Part, unsi
         {
             if ((Class & 0x67u) != 0x67u)
             {
-                Found = Sys->find_object(static_cast<CSimple*>(Root)->Id);   // FUN_06d0c840
+                Found = find_object(static_cast<CSimple*>(Root)->Id);   // FUN_06d0c840
             }
             else
             {
                 // A beam: node->Data read without a null test, the first whose cobject()
                 // is the collided part itself (not the root).
                 FSystemListNode* Node = nullptr;
-                while (Sys->Beams.traverse(Node, true))
+                while (Beams.traverse(Node, true))
                 {
                     GameObject* const Data = Node->Data;
                     if (Data->cobject() == Part)
@@ -2675,12 +2663,12 @@ static void StarSystem_ResolveCollisionSide(StarSystem* Sys, CObject* Part, unsi
 // FUN_06ce34d0 (thiscall on the StarSystem; the name is the port's). The system's collision
 // pass: PhySys::GenerateCollisions once per beam, then every event PhySys::GetCollisions
 // returns for this system is resolved on both sides and delivered to both wrappers'
-// on_collision. Only caller: the multiplayer tail of StarSystem_Update.
-static void StarSystem_ProcessCollisions(StarSystem* Sys)
+// on_collision. Only caller: the multiplayer tail of StarSystem::update.
+void StarSystem::process_collisions()
 {
     // A node that does not make a CBeam passes null.
     FSystemListNode* Node = nullptr;
-    while (Sys->Beams.traverse(Node, true))
+    while (Beams.traverse(Node, true))
     {
         CBeam* Beam = nullptr;
         GameObject* const Data = Node->Data;
@@ -2696,20 +2684,20 @@ static void StarSystem_ProcessCollisions(StarSystem* Sys)
 
     PhySys::CollisionEvent const* Begin = nullptr;
     PhySys::CollisionEvent const* End = nullptr;
-    PhySys::GetCollisions(Sys->SystemInfo->NicknameId, Begin, End);
+    PhySys::GetCollisions(SystemInfo->NicknameId, Begin, End);
 
     // Retail takes the next element before the dispatch and compares the end after it.
     for (PhySys::CollisionEvent const* Event = Begin; Event != End; ++Event)
     {
         GameObject* ObjA = nullptr;
         unsigned short SubA = 0;
-        StarSystem_ResolveCollisionSide(Sys, Event->ObjectA, Event->PartIdA, &ObjA, &SubA);
+        resolve_collision_side(Event->ObjectA, Event->PartIdA, &ObjA, &SubA);
         if (ObjA == nullptr)
             continue;
 
         GameObject* ObjB = nullptr;
         unsigned short SubB = 0;
-        StarSystem_ResolveCollisionSide(Sys, Event->ObjectB, Event->PartIdB, &ObjB, &SubB);
+        resolve_collision_side(Event->ObjectB, Event->PartIdB, &ObjB, &SubB);
         if (ObjB == nullptr)
             continue;
 
@@ -2753,7 +2741,7 @@ static void StarSystem_ProcessCollisions(StarSystem* Sys)
 // accumulator forward. A hang or many iterations means an upstream bad dt.
 // Callers: Server_PhysicsUpdate (FUN_06d10320) and IServerImpl::Dock (0.2f).
 // Returns the number of step iterations, a port diagnostic; retail returns nothing.
-static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
+unsigned int StarSystem::update(float Dt)
 {
     float Step = Dt;
     if (!SinglePlayer() && static_cast<double>(Step) > 0.2)
@@ -2772,25 +2760,25 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
             ++Iterations;
 
             // Every FUN_06cf4f40 call gets the block at +0xe8 as the deferred list.
-            ObjectList* const Deferred = &Sys->Deferred;
-            StarSystem_TickObjectList(&Sys->Ships, CurStep, Deferred);
-            StarSystem_TickObjectList(&Sys->GuidedMunitions, CurStep, Deferred);
+            ObjectList* const Deferred = &this->Deferred;
+            Ships.tick(CurStep, Deferred);
+            GuidedMunitions.tick(CurStep, Deferred);
 
-            StarSystem_UpdateNearShips(Sys, CurStep);
+            update_near_ships(CurStep);
 
-            StarSystem_TickObjectList(&Sys->Loot, CurStep, Deferred);
-            StarSystem_TickObjectList(&Sys->Beams, CurStep, Deferred);
-            StarSystem_TickObjectList(&Sys->Mines, CurStep, Deferred);
-            StarSystem_TickObjectList(&Sys->CounterMeasures, CurStep, Deferred);
+            Loot.tick(CurStep, Deferred);
+            Beams.tick(CurStep, Deferred);
+            Mines.tick(CurStep, Deferred);
+            CounterMeasures.tick(CurStep, Deferred);
 
             // COMMON.DLL::CmnAsteroid::Update (cdecl): StarSystem is the IObjDB it walks.
-            CmnAsteroid::Update(Sys, CurStep);
+            CmnAsteroid::Update(this, CurStep);
 
             // FUN_06d03480: runs FUN_06d04480 on each field of this system's entry in the
             // SrvAsteroid::SrvAsteroidSystem map at DAT_06d8d980 (server_classes.cpp).
-            SrvAsteroid::SrvAsteroid_UpdateSystem(Sys);
+            SrvAsteroid::SrvAsteroid_UpdateSystem(this);
 
-            StarSystem_TickObjectList(&Sys->MedAsteroids, CurStep, Deferred);
+            MedAsteroids.tick(CurStep, Deferred);
 
             // (a) Drain the deferred block, which the passes above fill with the objects
             // whose update() answered false. The node removed is always the head, so the
@@ -2812,14 +2800,14 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
 
             // (b) The dock queue at +0x14 (server_sysdb.h, SystemDockNode), skipped while
             // empty.
-            if (Sys->DockQueueSize != 0)
+            if (DockQueueSize != 0)
             {
                 // The players whose ships land this step.
                 std::list<unsigned int> Landed;
 
                 // The end test re-reads the head every pass.
-                SystemDockNode* Node = static_cast<SystemDockNode*>(Sys->DockQueueHead)->Next;
-                while (Node != static_cast<SystemDockNode*>(Sys->DockQueueHead))
+                SystemDockNode* Node = static_cast<SystemDockNode*>(DockQueueHead)->Next;
+                while (Node != static_cast<SystemDockNode*>(DockQueueHead))
                 {
                     GameObject* const Obj = FSystemDockEntry::WatchedObject(Node->Entry.Object);
                     GameObject* const DockTarget = FSystemDockEntry::WatchedObject(Node->Entry.Target);
@@ -2844,12 +2832,12 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
                         // Every player in the system is told (FLPACKET_SERVER_LAND, and the
                         // multiplayer autosave of the owner's slot). ObjId is re-read for
                         // each view.
-                        SystemPlayerNode* View = static_cast<SystemPlayerNode*>(Sys->PlayerListHead)->Next;
-                        while (View != static_cast<SystemPlayerNode*>(Sys->PlayerListHead))
+                        SystemPlayerNode* View = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
+                        while (View != static_cast<SystemPlayerNode*>(PlayerListHead))
                         {
                             unsigned int ObjId = Obj->get_id();
-                            SystemPlayerView_OnObjectLanded(&View->View, &ObjId, &TargetId,
-                                                            &Node->Entry.BaseId);
+                            View->View.on_object_landed(&ObjId, &TargetId,
+                                                        &Node->Entry.BaseId);
                             View = View->Next;
                         }
 
@@ -2890,25 +2878,25 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
                 for (std::list<unsigned int>::iterator It = Landed.begin(); It != Landed.end(); ++It)
                 {
                     unsigned int const PlayerId = *It;
-                    Sys->remove_player(PlayerId);
-                    PlayerData_FlushPendingVisits(Players[PlayerId]);
+                    remove_player(PlayerId);
+                    Players[PlayerId].flush_pending_visits();
                     if (SinglePlayer())
-                        Sys->shutdown();
+                        shutdown();
                 }
 
                 Landed.clear();
-                SystemDockNode* const DockHead = static_cast<SystemDockNode*>(Sys->DockQueueHead);
-                Sys->erase_docks(DockHead->Next, DockHead);   // FUN_06d0f410
+                SystemDockNode* const DockHead = static_cast<SystemDockNode*>(DockQueueHead);
+                erase_docks(DockHead->Next, DockHead);   // FUN_06d0f410
             }
 
             // Multiplayer only, and only while the system has players. SinglePlayer() is
             // called again here, not reused from the clamp.
-            if (!SinglePlayer() && Sys->PlayerListSize != 0)
+            if (!SinglePlayer() && PlayerListSize != 0)
             {
                 // CBeam::move is called even when the node does not narrow to a CBeam --
                 // retail has no test, so every object on this block is a beam there.
                 FSystemListNode* BeamNode = nullptr;
-                while (Sys->Beams.traverse(BeamNode, true))
+                while (Beams.traverse(BeamNode, true))
                 {
                     GameObject* const BeamWrapper = BeamNode->Data;
                     CObject* const BeamObject =
@@ -2920,9 +2908,9 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
                     Beam->move(CurStep);
                 }
 
-                PhySys::Update(Sys->SystemInfo->NicknameId, CurStep);
+                PhySys::Update(SystemInfo->NicknameId, CurStep);
 
-                StarSystem_ProcessCollisions(Sys);
+                process_collisions();
             }
 
             if (Target - Accum < static_cast<double>(CurStep))
@@ -2932,16 +2920,16 @@ static unsigned int StarSystem_Update(StarSystem* Sys, float Dt)
 
     // After the step loop (or the skip): every player view gets FUN_06cf53e0 with the
     // original dt as a double.
-    if (Sys->PlayerListSize != 0)
+    if (PlayerListSize != 0)
     {
-        for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(Sys->PlayerListHead)->Next;
-             Node != static_cast<SystemPlayerNode*>(Sys->PlayerListHead); Node = Node->Next)
+        for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
+             Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
         {
-            SystemPlayerView_Update(&Node->View, Target);
+            Node->View.update(Target);
         }
     }
 
-    StarSystem_SendChangedAffiliations(Sys);
+    send_changed_affiliations();
 
     return Iterations;
 }
@@ -2977,7 +2965,7 @@ static void Server_StepSystems(float dt) {
             SysDB::SysMapType::iterator It = SysDB::SysMap.find(SysId);
             if (It != SysDB::SysMap.end())
             {
-                StarSystem_Update(&It->second, dt);
+                It->second.update(dt);
             }
 
             bool bPresent = false;

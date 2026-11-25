@@ -137,6 +137,11 @@ struct FRpcCollisionGroupList {
     unsigned char Pad_0x01[3];      // +0x01
     FRpcCollisionGroupNode* Head;   // +0x04  dummy node; Next == Prev == itself when empty
     unsigned int Size;              // +0x08
+
+    // The header-level primitives behind RpcPacketCollisionGroups*, for the retail-image
+    // collision lists that still exist (SETCOLLISIONGROUPS / REQCOLLISIONGROUPS payloads and
+    // the CHARACTERINFO record).
+    void Init();
 };
 
 static_assert(sizeof(FRpcCollisionGroupList) == 0x0c,
@@ -201,12 +206,12 @@ static_assert(sizeof(FRpcEquipWireListHeader) == 0x0c,
 // SETEQUIPMENT, SETCARGO, REQEQUIPMENT and REQCARGO all allocate 0x24 bytes, i.e. exactly
 // four bytes of payload.
 //
-// A class with a destructor in retail: FUN_06d91340 (RpcEquipHandleDestroy) is what every
+// A class with a destructor in retail: FUN_06d91340 (FRpcEquipWireHandle::Destroy) is what every
 // EH unwind funclet runs on a live handle (receiver stack handles, sender handles, the
 // handle inside a record at +0x264 or a create-object header at +0x70); the constructor is
-// an inline null store. The explicit RpcEquipHandleDestroy calls in destructor bodies leave
+// an inline null store. The explicit FRpcEquipWireHandle::Destroy calls in destructor bodies leave
 // it null, so the member destructor is a no-op after them. The handles the payload slot
-// points at are raw operator new(4) blocks, torn down by hand (RpcEquipHandleDestroy +
+// points at are raw operator new(4) blocks, torn down by hand (FRpcEquipWireHandle::Destroy +
 // operator delete, 06da2205).
 struct FRpcEquipWireHandle {
     FRpcEquipWireListHeader* List;  // +0x00, null until the first push_back
@@ -215,6 +220,23 @@ struct FRpcEquipWireHandle {
     __declspec(dllexport) ~FRpcEquipWireHandle();         // FUN_06d91340
     FRpcEquipWireHandle(const FRpcEquipWireHandle&) = delete;
     FRpcEquipWireHandle& operator=(const FRpcEquipWireHandle&) = delete;
+
+    // FUN_06d913e0 -- the handle's only accessor.
+    FRpcEquipWireListHeader* GetList() const;
+
+    // FUN_06d91580 -- push_back(Record). Creates the header and its dummy node on the
+    // first call (operator new(0xc) twice), then links one operator new(0xc) node at the
+    // tail and bumps Size. The list takes ownership of Record.
+    void PushBack(FRpcEquipWireRecord* Record);
+
+    // FUN_06d91340 -- the handle's destructor. For every node: free Record->Hardpoint,
+    // then the record; then unlink and free every node, the dummy node and the header.
+    // Retail leaves the handle's own pointer dangling afterwards; the port nulls it.
+    void Destroy();
+
+    // FUN_06d913f0 -- deep copy of one handle into another. Allocates a fresh 0x18 record
+    // per element, including a fresh copy of the hardpoint string.
+    void Copy(const FRpcEquipWireHandle* Source);
 };
 
 static_assert(sizeof(FRpcEquipWireHandle) == 4,
@@ -238,23 +260,6 @@ static_assert(sizeof(FRpcEquipWireHandle) == 4,
 // ===========================================================================
 // The ported helpers. Every one names the retail function it reproduces.
 // ===========================================================================
-
-// FUN_06d913e0 -- the handle's only accessor.
-FRpcEquipWireListHeader* RpcEquipHandleGetList(const FRpcEquipWireHandle* Handle);
-
-// FUN_06d91580 -- push_back(Record). Creates the header and its dummy node on the
-// first call (operator new(0xc) twice), then links one operator new(0xc) node at the
-// tail and bumps Size. The list takes ownership of Record.
-void RpcEquipHandlePushBack(FRpcEquipWireHandle* Handle, FRpcEquipWireRecord* Record);
-
-// FUN_06d91340 -- the handle's destructor. For every node: free Record->Hardpoint,
-// then the record; then unlink and free every node, the dummy node and the header.
-// Retail leaves the handle's own pointer dangling afterwards; the port nulls it.
-void RpcEquipHandleDestroy(FRpcEquipWireHandle* Handle);
-
-// FUN_06d913f0 -- deep copy of one handle into another. Allocates a fresh 0x18 record
-// per element, including a fresh copy of the hardpoint string.
-void RpcEquipHandleCopy(FRpcEquipWireHandle* Dest, const FRpcEquipWireHandle* Source);
 
 // FUN_06d8fa90 -- `if (*(Handle**)payload is null) allocate the handle; deep-copy
 // Source into it`.
@@ -391,11 +396,6 @@ void RpcRelationListLink(FRpcRelationList* List, FRpcRelation* Block);
 
 // The list is the one the packet constructor built (FUN_06d9da40, 06d9daad).
 
-// Takes ownership of Record (retail hands FUN_06d8fc10 the operator new(0xc) block it
-// just filled, and the packet destructor frees it).
-void RpcMissionObjectiveListPushBack(FRpcMissionObjectiveList* List,
-                                     FRpcMissionObjectiveRecord* Record);
-
 // FUN_06d8fc60.
 __declspec(dllexport) const FRpcMissionObjectiveRecord* RpcMissionObjectiveListAt(
     const FRpcMissionObjectiveList* List, unsigned int Index);
@@ -523,10 +523,6 @@ struct FRpcCreateObjectWire : FRpcCreateObjectHead {
     DamageList Damage;
 };
 
-// The header-level primitives behind RpcPacketCollisionGroups*, for the retail-image
-// collision lists that still exist (SETCOLLISIONGROUPS / REQCOLLISIONGROUPS payloads and
-// the CHARACTERINFO record).
-void RpcCollisionGroupListInit(FRpcCollisionGroupList* List);
 void RpcCollisionGroupListAssign(FRpcCollisionGroupList* Dest,
                                  const FRpcCollisionGroupDescMirror* Items,
                                  unsigned int Count);
@@ -537,7 +533,7 @@ void RpcCollisionGroupListAssign(FRpcCollisionGroupList* Dest,
 //
 // Retail's self-assignment guard (`payload == source`) has no counterpart: the port's
 // source and destination are never the same object. The destination's dummy node exists
-// already (RpcCollisionGroupListInit, the stand-in for the packet constructor).
+// already (FRpcCollisionGroupList::Init, the stand-in for the packet constructor).
 template<typename TIterator>
 void RpcCollisionGroupListAssignRange(FRpcCollisionGroupList* List, TIterator First,
                                       TIterator Last) {
@@ -735,6 +731,9 @@ struct FRpcIdArrayBlockWire {
     unsigned int RightHand;        // +0x0c
     int Count;                      // +0x10
     unsigned int* Ids;              // +0x14  operator new(Count << 2)
+
+    // FUN_06d95b60. Defined in rpc_containers.cpp.
+    void Destroy();
 };
 static_assert(sizeof(FRpcIdArrayBlockWire) == 0x18,
               "the wire id block is operator new(0x18)");
@@ -807,6 +806,23 @@ struct FRpcCharacterInfoWireList {
     unsigned char Pad_0x01[3];              // +0x01
     FRpcCharacterInfoWireNode* Head;        // +0x04
     unsigned int Size;                      // +0x08
+
+    // FUN_06d955c0 -- the sender's transfer of its temporary list into the packet. Retail
+    // builds the deep copy twice (once into a stack list, then again into the packet, each
+    // hop allocating fresh records); every hop re-allocates, so one copy here produces
+    // identical packet contents. The dummy node already stands: the packet constructor built
+    // it (FPacket_FLPACKET_SERVER_CHARACTERINFO's constructor, rpc_packet_registry.cpp).
+    void PushBack(FRpcCharacterInfoWireRecord* Record);
+
+    // Frees every record (its equipment handle, its collision list, its two id blocks and
+    // their arrays), every node and the dummy. Retail's packet destructor does this.
+    void Release();
+
+    // FUN_06d94460 -- the RECEIVER's deep copy of the packet's list (header at packet+0x24)
+    // into a list of its own: one fresh 0x27c record
+    // per non-null source record, every owned member re-allocated, pushed at Dest's tail.
+    // Dest's dummy must already stand.
+    void Copy(const FRpcCharacterInfoWireList* Source);
 };
 static_assert(sizeof(FRpcCharacterInfoWireList) == 0x0c, "retail std::list header is 0x0c");
 
@@ -815,24 +831,6 @@ struct FPayloadServerCharacterInfo {
     FRpcCharacterInfoWireList Records;      // +0x04 .. +0x0f
 };
 static_assert(sizeof(FPayloadServerCharacterInfo) == 0x10, "CHARACTERINFO payload 0x10");
-
-// FUN_06d955c0 -- the sender's transfer of its temporary list into the packet. Retail
-// builds the deep copy twice (once into a stack list, then again into the packet, each
-// hop allocating fresh records); every hop re-allocates, so one copy here produces
-// identical packet contents. The dummy node already stands: the packet constructor built
-// it (FPacket_FLPACKET_SERVER_CHARACTERINFO's constructor, rpc_packet_registry.cpp).
-void RpcCharacterInfoWireListPushBack(FRpcCharacterInfoWireList* List,
-                                      FRpcCharacterInfoWireRecord* Record);
-// Frees every record (its equipment handle, its collision list, its two id blocks and
-// their arrays), every node and the dummy. Retail's packet destructor does this.
-void RpcCharacterInfoWireListRelease(FRpcCharacterInfoWireList* List);
-
-// FUN_06d94460 -- the RECEIVER's deep copy of the packet's list (header at packet+0x24)
-// into a list of its own: one fresh 0x27c record
-// per non-null source record, every owned member re-allocated, pushed at Dest's tail.
-// Dest's dummy must already stand.
-void RpcCharacterInfoWireListCopy(FRpcCharacterInfoWireList* Dest,
-                                  const FRpcCharacterInfoWireList* Source);
 
 // The receiver's inline teardown of ONE copied record, right after it is converted
 // (IServerImpl::HandleCharacterInfo 06d849fe): both id blocks, the collision
@@ -846,29 +844,6 @@ void RpcCharacterInfoRecordToWire(FRpcCharacterInfoWireRecord* Wire,
                                   const CCharacterSet::CharacterInfo* Source);
 void RpcCharacterInfoRecordFromWire(CCharacterSet::CharacterInfo* Dest,
                                     const FRpcCharacterInfoWireRecord* Wire);
-
-// ===========================================================================
-// The ch2 0x03 WIRE CODEC -- packet vtable slots +0x04 and +0x08.
-//
-// Retail: LAB_06d949d0 (encode) and FUN_06d934d0 (decode), slots +0x04 / +0x08 of
-// PTR_FUN_06db3dc4 (CDAPCharacterInfo ctor 0x06d9d54f). Both are __thiscall with THREE
-// stack arguments.
-//
-// The two argument shapes are NOT symmetric, and that asymmetry is retail's:
-//   * encode takes a pointer TO the buffer pointer and a plain capacity, like the shared
-//     payload-less encoder LAB_06da13d0. Retail never writes the caller's pointer back --
-//     the moving cursor lives in packet+0x18.
-//   * decode takes the buffer pointer DIRECTLY, and again the capacity.
-// Both report the byte count through arg3 and return 0, or FRpcMarshalStream's 0x16 / 0x17.
-//
-// Encode's count INCLUDES the two header bytes FUN_06da1380 writes; decode's does NOT,
-// because its header hook FUN_06da13c0 is a no-op -- the dispatcher has already consumed
-// the header.
-// ===========================================================================
-unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
 
 // ===========================================================================
 // The {dword size, that many raw bytes} pair, retail's only variable-length primitive
@@ -896,65 +871,6 @@ bool RpcGetSizedBlock(FRpcMarshalStream& Stream, unsigned int& OutSize, void*& O
 // ===========================================================================
 bool RpcPutEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle* const* Slot);
 bool RpcGetEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle** Slot);
-
-// ===========================================================================
-// ch2 codec slots transcribed in rpc_wire_ch2.cpp -- see the file header there for
-// how each packet class was tied to its channel/opcode through its constructor.
-// ===========================================================================
-unsigned int RpcEncodeServerCreateLoot(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerCreateLoot(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerSetReputation(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSendComm(FPacketBase& Packet, unsigned char** BufferHolder,
-                                     unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerSendComm(FPacketBase& Packet, const unsigned char* Buffer,
-                                     unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerCreateGuided(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerCreateGuided(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerCreateMine(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerCreateMine(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerCreateCounter(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerCreateCounter(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSetAddItem(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerSetAddItem(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSetMissionObjectives(FPacketBase& Packet,
-                                                 unsigned char** BufferHolder,
-                                                 unsigned int Capacity,
-                                                 unsigned int* OutLength);
-unsigned int RpcDecodeServerSetMissionObjectives(FPacketBase& Packet,
-                                                 const unsigned char* Buffer,
-                                                 unsigned int Size,
-                                                 unsigned int* OutLength);
-
-// ===========================================================================
-// ch1 codec slots transcribed in rpc_wire_ch1.cpp.
-// ===========================================================================
-unsigned int RpcEncodeCommonUpdateObject(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeCommonUpdateObject(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength);
-// 0x06da7a00 / 0x06da7b90 -- ch1 0x1d TRACTOROBJECTS: dword, word, word count, then that
-// many dwords appended into the payload's own std::vector<unsigned int>.
-unsigned int RpcEncodeCommonTractorObjects(FPacketBase& Packet, unsigned char** BufferHolder,
-                                           unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeCommonTractorObjects(FPacketBase& Packet, const unsigned char* Buffer,
-                                           unsigned int Size, unsigned int* OutLength);
 
 // ===========================================================================
 // The shape-only codec slots transcribed in rpc_wire_generic.cpp.
@@ -1039,79 +955,6 @@ unsigned int RpcEncodeWireDwordTwoBytes(FPacketBase& Packet, unsigned char** Buf
                                         unsigned int Capacity, unsigned int* OutLength);
 unsigned int RpcDecodeWireDwordTwoBytes(FPacketBase& Packet, const unsigned char* Buffer,
                                         unsigned int Size, unsigned int* OutLength);
-// 0x06da67a0 / 0x06da68f0 -- ch1 0x08, and the wire reorders the last two fields.
-unsigned int RpcEncodeCommonActivateEquip(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeCommonActivateEquip(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
-// 0x06da6b80 / 0x06da6cf0 -- ch1 0x0f, three dwords then a byte.
-unsigned int RpcEncodeCommonGoTradelane(FPacketBase& Packet, unsigned char** BufferHolder,
-                                        unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeCommonGoTradelane(FPacketBase& Packet, const unsigned char* Buffer,
-                                        unsigned int Size, unsigned int* OutLength);
-// 0x06da8e30 / 0x06da8f80 -- ch2 0x0a, dword, byte, dword.
-unsigned int RpcEncodeServerActivateObject(FPacketBase& Packet, unsigned char** BufferHolder,
-                                           unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerActivateObject(FPacketBase& Packet, const unsigned char* Buffer,
-                                           unsigned int Size, unsigned int* OutLength);
-// 0x06dab200 / 0x06dab350 -- ch2 0x47, and the wire reorders the last two fields the
-// OTHER way round from ch1 0x08's.
-unsigned int RpcEncodeServerCfgInterfaceNotification(FPacketBase& Packet,
-                                                     unsigned char** BufferHolder,
-                                                     unsigned int Capacity,
-                                                     unsigned int* OutLength);
-unsigned int RpcDecodeServerCfgInterfaceNotification(FPacketBase& Packet,
-                                                     const unsigned char* Buffer,
-                                                     unsigned int Size,
-                                                     unsigned int* OutLength);
-// 0x06daeec0 / 0x06daf010 -- ch3 0x14, dword, dword, byte.
-unsigned int RpcEncodeClientMissionResponse(FPacketBase& Packet, unsigned char** BufferHolder,
-                                            unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientMissionResponse(FPacketBase& Packet, const unsigned char* Buffer,
-                                            unsigned int Size, unsigned int* OutLength);
-// 0x06daa820 / 0x06daa990 -- ch2 0x44, dword then three consecutive bytes.
-unsigned int RpcEncodeServerRequestReturned(FPacketBase& Packet, unsigned char** BufferHolder,
-                                            unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerRequestReturned(FPacketBase& Packet, const unsigned char* Buffer,
-                                            unsigned int Size, unsigned int* OutLength);
-// 0x06daa560 / 0x06daa6d0 -- ch3 0x32, byte, dword, dword, byte.
-unsigned int RpcEncodeClientRequestCancel(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientRequestCancel(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
-// 0x06da7fe0 / 0x06da8100 -- ch2 0x27, byte then dword.
-unsigned int RpcEncodeServerRequestCreateShipResp(FPacketBase& Packet,
-                                                  unsigned char** BufferHolder,
-                                                  unsigned int Capacity,
-                                                  unsigned int* OutLength);
-unsigned int RpcDecodeServerRequestCreateShipResp(FPacketBase& Packet,
-                                                  const unsigned char* Buffer,
-                                                  unsigned int Size,
-                                                  unsigned int* OutLength);
-// 0x06db12c0 / 0x06db13e0 -- ch3 0x25, dword then word.
-unsigned int RpcEncodeClientDbgDestroyObject(FPacketBase& Packet, unsigned char** BufferHolder,
-                                             unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientDbgDestroyObject(FPacketBase& Packet, const unsigned char* Buffer,
-                                             unsigned int Size, unsigned int* OutLength);
-// 0x06daa0c0 -- ch2 0x2a, dword then FLOAT. Its DECODE slot is 0x06d95d40, the
-// dword-pair family's decoder above; only the encoder is its own.
-unsigned int RpcEncodeServerAdjustAttitude(FPacketBase& Packet, unsigned char** BufferHolder,
-                                           unsigned int Capacity, unsigned int* OutLength);
-// 0x06dabdf0 / 0x06dabf10 -- ch2 0x08, a dword and then eight bytes, skipping the hole
-// at payload+0x04.
-unsigned int RpcEncodeServerCharSelectVerified(FPacketBase& Packet,
-                                               unsigned char** BufferHolder,
-                                               unsigned int Capacity,
-                                               unsigned int* OutLength);
-unsigned int RpcDecodeServerCharSelectVerified(FPacketBase& Packet,
-                                               const unsigned char* Buffer,
-                                               unsigned int Size,
-                                               unsigned int* OutLength);
-// 0x06db1670 / 0x06db17a0 -- a dword then one 128-byte run. ch3 0x2d only.
-unsigned int RpcEncodeClientDbgConsole(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientDbgConsole(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength);
 
 // --- rpc_wire_varlen.cpp: the two codec pairs whose length is read out of the packet ---
 // 0x06daf830 / 0x06daf970 -- { word Length; char Text[Length] }, the strlen of the
@@ -1129,26 +972,6 @@ unsigned int RpcEncodeWireCollisionGroups(FPacketBase& Packet, unsigned char** B
                                           unsigned int Capacity, unsigned int* OutLength);
 unsigned int RpcDecodeWireCollisionGroups(FPacketBase& Packet, const unsigned char* Buffer,
                                           unsigned int Size, unsigned int* OutLength);
-// 0x06dabbb0 / 0x06dabd00 -- ch2 0x45 SET_MISSION_MESSAGE, { dword Field_0x08; dword
-// TextSize; bytes }. The payload's LAST field leads on the wire; see the .cpp.
-unsigned int RpcEncodeServerSetMissionMessage(FPacketBase& Packet,
-                                              unsigned char** BufferHolder,
-                                              unsigned int Capacity,
-                                              unsigned int* OutLength);
-unsigned int RpcDecodeServerSetMissionMessage(FPacketBase& Packet,
-                                              const unsigned char* Buffer,
-                                              unsigned int Size, unsigned int* OutLength);
-// 0x06d8f840 / 0x06d8f970 -- ch2 0x3d REMOTEOBJECTCARGOUPDATE, { dword; byte; the
-// equipment/cargo list }. Reaches FUN_06da2240 / FUN_06da2480 through the two helpers
-// above, the same way retail's slots do.
-unsigned int RpcEncodeServerRemoteObjectCargoUpdate(FPacketBase& Packet,
-                                                    unsigned char** BufferHolder,
-                                                    unsigned int Capacity,
-                                                    unsigned int* OutLength);
-unsigned int RpcDecodeServerRemoteObjectCargoUpdate(FPacketBase& Packet,
-                                                    const unsigned char* Buffer,
-                                                    unsigned int Size,
-                                                    unsigned int* OutLength);
 
 // 0x06db14f0 / 0x06dad820 -- a dword then one twelve-byte run (FUN_06d8f510).
 unsigned int RpcEncodeWireDwordBlock12(FPacketBase& Packet, unsigned char** BufferHolder,
@@ -1164,36 +987,9 @@ unsigned int RpcDecodeWireBlobSizeFirst(FPacketBase& Packet, const unsigned char
 // with this one encoder; the differences between them are real, see the .cpp.
 unsigned int RpcEncodeWireBlobBufferFirst(FPacketBase& Packet, unsigned char** BufferHolder,
                                           unsigned int Capacity, unsigned int* OutLength);
-// 0x06d97730 -- allocates unconditionally.
-unsigned int RpcDecodeWireBlobBufferFirst(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
-// 0x06db10e0 -- skips the allocation and the run when the count is zero.
-unsigned int RpcDecodeWireBlobBufferFirstSkipEmpty(FPacketBase& Packet,
-                                                   const unsigned char* Buffer,
-                                                   unsigned int Size,
-                                                   unsigned int* OutLength);
 // 0x06da62d0 -- the 0x0c channel-1 buffer family: reuses a buffer already in the payload.
 unsigned int RpcDecodeWireOwnedBuffer(FPacketBase& Packet, const unsigned char* Buffer,
                                       unsigned int Size, unsigned int* OutLength);
-// 0x06da5bc0 -- the same, but allocates Size + 1 and NUL-terminates. ch1 0x11 only.
-unsigned int RpcDecodeWireOwnedString(FPacketBase& Packet, const unsigned char* Buffer,
-                                      unsigned int Size, unsigned int* OutLength);
-// 0x06d9a660 -- ch3 0x27 TRADERESPONSE's own decoder. Its ENCODE side is the shared
-// RpcEncodeWireDwordPair (0x06da9110); the pair does not round-trip, see rpc_wire_generic.cpp.
-unsigned int RpcDecodeWireTradeResponse(FPacketBase& Packet, const unsigned char* Buffer,
-                                        unsigned int Size, unsigned int* OutLength);
-// 0x06d90480 / 0x06d906c0 -- ch2 0x05 DAMAGEOBJECT: three scalars, then the list's count
-// and one { word, byte, float } per DamageEntry. Lives in rpc_containers.cpp, next to the
-// damage-list helpers it needs.
-unsigned int RpcEncodeServerDamageObject(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerDamageObject(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength);
-// 0x06dac3c0 / 0x06dac5c0 -- ch2 0x41 BURNFUSE, seven flat fields. In rpc_wire_ch2.cpp.
-unsigned int RpcEncodeServerBurnFuse(FPacketBase& Packet, unsigned char** BufferHolder,
-                                     unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerBurnFuse(FPacketBase& Packet, const unsigned char* Buffer,
-                                     unsigned int Size, unsigned int* OutLength);
 // 0x06d916a0 + 0x06da2240 / 0x06d95bf0 + 0x06da2480 -- the equipment/cargo list. Four
 // types: ch2 0x24 SETEQUIPMENT, ch2 0x25 SETCARGO, ch3 0x16 REQEQUIPMENT, ch3 0x17
 // REQCARGO. A word count then one { dword, float, dword, word, byte, byte, word, run }
@@ -1235,70 +1031,9 @@ unsigned int RpcEncodeCreateObjectCommon(FRpcMarshalStream& Stream,
 unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
                                          FRpcCreateObjectWire* Wire);
 
-// ===========================================================================
-// The four OUTER wire slots of the create-object pair
-//
-//   ch2 0x04 CREATESHIP   encode 0x06d97d20 (vtable .rdata:06db3fc8)
-//                         decode 0x06d98250 (vtable .rdata:06db3fcc)
-//   ch2 0x42 CREATESOLAR  encode 0x06dac7c0
-//                         decode 0x06daca80 (vtable .rdata:06db52a4)
-//
-// These are the packet vtable's +0x04 / +0x08 entries themselves. Each one sets the
-// four marshalling dwords up, runs the two-byte routing header hook, calls the shared
-// 0x7c header codec above, ships its own tail and reports the byte count. They pass their
-// three stack arguments straight through to FUN_06da3720 / FUN_06da4020, which read none.
-//
-// Same per-direction asymmetry as CHARACTERINFO: encode's first argument is a pointer TO
-// the buffer pointer (never written back), decode's IS the buffer; encode's count
-// includes the two routing bytes FUN_06da1380 writes, decode's (no-op hook FUN_06da13c0)
-// excludes them.
-// ===========================================================================
-unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerCreateSolar(FPacketBase& Packet, unsigned char** BufferHolder,
-                                        unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerCreateSolar(FPacketBase& Packet, const unsigned char* Buffer,
-                                        unsigned int Size, unsigned int* OutLength);
-
-// ===========================================================================
-// ch1 0x02 FLPACKET_COMMON_FIREWEAPON -- the adaptive-precision direction codec.
-//
-// Packet vtable PTR_FUN_06db4388 = { FUN_06d9b000, LAB_06da4f60, LAB_06da5550,
-// IServerImpl::GetServerStats }, published by the type's constructor FUN_06d9afb0
-// together with routing header 0x10002 (channel 1, opcode 2).
-// ===========================================================================
-unsigned int RpcEncodeCommonFireWeapon(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeCommonFireWeapon(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength);
-
-// ===========================================================================
-// ch3 0x22 FLPACKET_CLIENT_DBGCREATESHIP -- LAB_06db0560 / LAB_06db0b30, slots +0x04
-// and +0x08 of PTR_FUN_06db5d54 (ctor FUN_06da0e20, routing header 0x30022). The payload
-// layout is on FPayloadClientDbgCreateShip in rpc_payloads.h.
-//
-// This type has no sender in the release image, so the codecs are reachable only from
-// the network Encode/Decode path, never from the single-player queue.
-// ===========================================================================
-unsigned int RpcEncodeClientDbgCreateShip(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientDbgCreateShip(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
 // The type's constructor FUN_06da0e20 is FPacket_FLPACKET_CLIENT_DBGCREATESHIP's, with
 // its identity quaternion, in rpc_packet_registry.cpp.
 
-// ===========================================================================
-// ch1 0x12 FLPACKET_COMMON_PLAYER_TRADE -- LAB_06da7030 / LAB_06da7430, slots +0x04 and
-// +0x08 of PTR_FUN_06db4498 (ctor FUN_06d9bad0, routing header 0x10012). Eight sub-types
-// behind one jump table; the inverted IsMPServer test and the decoder's one stray 0x16
-// are described in rpc_containers.cpp.
-// ===========================================================================
-unsigned int RpcEncodeCommonPlayerTrade(FPacketBase& Packet, unsigned char** BufferHolder,
-                                        unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeCommonPlayerTrade(FPacketBase& Packet, const unsigned char* Buffer,
-                                        unsigned int Size, unsigned int* OutLength);
 // FUN_06d9bad0's one non-zero default, EquipArchId = 0xffffffff, is stored by
 // FPacket_FLPACKET_COMMON_PLAYER_TRADE's constructor in rpc_packet_registry.cpp.
 
@@ -1323,116 +1058,7 @@ void* RpcFlattenFmtStr(const FmtStr& Source, unsigned int& OutSize);
 // returns 0.
 __declspec(dllexport) void RpcUnflattenFmtStr(FmtStr& Dest, void* Buffer, unsigned int Size);
 
-// ===========================================================================
-// The remaining 22 codec slots, and the twelve per-type dump slots.
-//
-// rpc_wire_closeout.cpp holds the thirteen channel-1 / channel-2 pairs, rpc_wire_ch3.cpp
-// the nine channel-3 pairs and rpc_packet_dump.cpp the dumps. Every one of the 162
-// registered types has its real vtable +0x04 / +0x08 body. The three retail asymmetries they reproduce -- ch1 0x1b's second
-// block length, ch2 0x2b's missing relation count and ch2 0x32's unallocated destination
-// -- are written up in docs/re/deviations.md.
-// ===========================================================================
-unsigned int RpcEncodeCommonChatMsg(FPacketBase& Packet, unsigned char** BufferHolder,
-                                    unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeCommonChatMsg(FPacketBase& Packet, const unsigned char* Buffer,
-                                    unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeCommonPopUpDialog(FPacketBase& Packet, unsigned char** BufferHolder,
-                                        unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeCommonPopUpDialog(FPacketBase& Packet, const unsigned char* Buffer,
-                                        unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerLaunch(FPacketBase& Packet, unsigned char** BufferHolder,
-                                   unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerLaunch(FPacketBase& Packet, const unsigned char* Buffer,
-                                   unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSystemSwitchIn(FPacketBase& Packet, unsigned char** BufferHolder,
-                                           unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerSystemSwitchIn(FPacketBase& Packet, const unsigned char* Buffer,
-                                           unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSetGroupFeelings(FPacketBase& Packet, unsigned char** BufferHolder,
-                                             unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerSetGroupFeelings(FPacketBase& Packet, const unsigned char* Buffer,
-                                             unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerRequestSpaceScript(FPacketBase& Packet, unsigned char** BufferHolder,
-                                               unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerRequestSpaceScript(FPacketBase& Packet, const unsigned char* Buffer,
-                                               unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerReplaceMissionObjective(FPacketBase& Packet, unsigned char** BufferHolder,
-                                                    unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerReplaceMissionObjective(FPacketBase& Packet, const unsigned char* Buffer,
-                                                    unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSetCamera(FPacketBase& Packet, unsigned char** BufferHolder,
-                                      unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerSetCamera(FPacketBase& Packet, const unsigned char* Buffer,
-                                      unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerLoadHint(FPacketBase& Packet, unsigned char** BufferHolder,
-                                     unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerLoadHint(FPacketBase& Packet, const unsigned char* Buffer,
-                                     unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSetDirective(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerSetDirective(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerPlayerList(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerPlayerList(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerObjectCargoUpdate(FPacketBase& Packet, unsigned char** BufferHolder,
-                                              unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerObjectCargoUpdate(FPacketBase& Packet, const unsigned char* Buffer,
-                                              unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeServerSetMusic(FPacketBase& Packet, unsigned char** BufferHolder,
-                                     unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeServerSetMusic(FPacketBase& Packet, const unsigned char* Buffer,
-                                     unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientLogin(FPacketBase& Packet, unsigned char** BufferHolder,
-                                  unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientLogin(FPacketBase& Packet, const unsigned char* Buffer,
-                                  unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientMunCollision(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientMunCollision(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientObjCollision(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientObjCollision(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientReqAddItem(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientReqAddItem(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientReqModifyItem(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientReqModifyItem(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientSaveGame(FPacketBase& Packet, unsigned char** BufferHolder,
-                                     unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientSaveGame(FPacketBase& Packet, const unsigned char* Buffer,
-                                     unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientMineAsteroid(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientMineAsteroid(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientRequestEvent(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientRequestEvent(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength);
-unsigned int RpcEncodeClientCreateNewChar(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength);
-unsigned int RpcDecodeClientCreateNewChar(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength);
-
-// Packet vtable slot +0x0c: eleven bodies serving twelve types. See rpc_packet_dump.cpp.
-void RpcDumpServerConnectResponse(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpServerLoginResponse(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpServerCharacterInfo(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpServerLaunch(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpServerCharSelectVerified(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpServerSetReputation(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpServerRepairObject(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpClientLogin(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpClientRequestLaunch(const FPacketBase& Packet, std::ostream& Out);
 void RpcDumpWireCharacterIdDump(const FPacketBase& Packet, std::ostream& Out);
-void RpcDumpClientCreateNewChar(const FPacketBase& Packet, std::ostream& Out);
 
 // The two CHARACTERINFO list destructors (FUN_06d852e0 / FUN_06d85340) are ~MetaList /
 // ~OwnerList of OwnerList<CCharacterSet::CharacterInfo> -- the template in

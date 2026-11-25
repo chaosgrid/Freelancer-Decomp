@@ -289,7 +289,7 @@ void FContentPlayerState::Save(FILE* File)
                 TradelaneExceptions[Index].SecondRingId);
     }
 
-    SaveContentPlayerStats(Stats, File);
+    Stats.Save(File);
 }
 
 namespace
@@ -462,33 +462,33 @@ unsigned int FContentPlayerState::GetGroupLiveMission() const
 }
 
 // FUN_06f495f0 (06f495f0-06f49777).
-void SaveContentPlayerStats(FContentPlayerStats const& Stats, FILE* File)
+void FContentPlayerStats::Save(FILE* File) const
 {
-    for (std::map<unsigned int, int>::const_iterator It = Stats.ShipTypesKilled.begin();
-         It != Stats.ShipTypesKilled.end(); ++It)
+    for (std::map<unsigned int, int>::const_iterator It = ShipTypesKilled.begin();
+         It != ShipTypesKilled.end(); ++It)
         fprintf(File, "ship_type_killed = %u, %d\n", It->first, It->second);
 
-    for (std::map<unsigned char, int>::const_iterator It = Stats.RandomMissionsCompleted.begin();
-         It != Stats.RandomMissionsCompleted.end(); ++It)
+    for (std::map<unsigned char, int>::const_iterator It = RandomMissionsCompleted.begin();
+         It != RandomMissionsCompleted.end(); ++It)
         fprintf(File, "rm_completed = %u, %d\n", static_cast<unsigned int>(It->first), It->second);
 
-    for (std::map<unsigned char, int>::const_iterator It = Stats.RandomMissionsAborted.begin();
-         It != Stats.RandomMissionsAborted.end(); ++It)
+    for (std::map<unsigned char, int>::const_iterator It = RandomMissionsAborted.begin();
+         It != RandomMissionsAborted.end(); ++It)
         fprintf(File, "rm_aborted = %u, %d\n", static_cast<unsigned int>(It->first), It->second);
 
-    for (std::map<unsigned char, int>::const_iterator It = Stats.RandomMissionsFailed.begin();
-         It != Stats.RandomMissionsFailed.end(); ++It)
+    for (std::map<unsigned char, int>::const_iterator It = RandomMissionsFailed.begin();
+         It != RandomMissionsFailed.end(); ++It)
         fprintf(File, "rm_failed = %u, %d\n", static_cast<unsigned int>(It->first), It->second);
 
-    fprintf(File, "total_cash_earned = %f\n", static_cast<double>(Stats.TotalCashEarned));
-    fprintf(File, "total_time_played = %f\n", static_cast<double>(Stats.TotalTimePlayed));
+    fprintf(File, "total_cash_earned = %f\n", static_cast<double>(TotalCashEarned));
+    fprintf(File, "total_time_played = %f\n", static_cast<double>(TotalTimePlayed));
 
-    for (int Index = 0; Index < static_cast<int>(Stats.SystemsVisited.size()); ++Index)
-        fprintf(File, "sys_visited = %u\n", Stats.SystemsVisited[Index]);
-    for (int Index = 0; Index < static_cast<int>(Stats.BasesVisited.size()); ++Index)
-        fprintf(File, "base_visited = %u\n", Stats.BasesVisited[Index]);
-    for (int Index = 0; Index < static_cast<int>(Stats.HolesVisited.size()); ++Index)
-        fprintf(File, "holes_visited = %u\n", Stats.HolesVisited[Index]);
+    for (int Index = 0; Index < static_cast<int>(SystemsVisited.size()); ++Index)
+        fprintf(File, "sys_visited = %u\n", SystemsVisited[Index]);
+    for (int Index = 0; Index < static_cast<int>(BasesVisited.size()); ++Index)
+        fprintf(File, "base_visited = %u\n", BasesVisited[Index]);
+    for (int Index = 0; Index < static_cast<int>(HolesVisited.size()); ++Index)
+        fprintf(File, "holes_visited = %u\n", HolesVisited[Index]);
 }
 
 // FUN_06f49b00 (06f49b00-06f49b43).

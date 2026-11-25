@@ -14,8 +14,8 @@
 // CharacterSelect copies that record onto the slot later.
 //
 // FUN_06d4a5d0's head and MP-only front (.text:06d4a652 .. .text:06d4aa85) are
-// PlayerData_SelectCharacter (server_classes.cpp); its tail is
-// PlayerData_LoadSelectedCharacter below.
+// PlayerData::select_character (server_classes.cpp); its tail is
+// PlayerData::load_selected_character below.
 
 #include "../include/common_pub.h"
 #include "../include/common_server.h"          // Players (PlayerDB::operator[])
@@ -89,16 +89,21 @@ namespace {
 struct FCostumeTarget {
     Costume* Target;
     CostumeDescriptions const* Descriptions;
+
+    // FUN_06d48c80.
+    unsigned int find_part_id(int TypeId, char const* Name, char const* File) const;
+
+    // FUN_06d48cd0.
+    unsigned int find_accessory_id(char const* Name, char const* File) const;
 };
 
 // ---------------------------------------------------------------------------
 // FUN_06d48c80 (thiscall on FCostumeTarget). A miss or a part whose Id is 0 both
 // warn and return 0.
 // ---------------------------------------------------------------------------
-unsigned int CostumeTarget_FindPartId(FCostumeTarget const& Holder, int TypeId,
-                                      char const* Name, char const* File) {
+unsigned int FCostumeTarget::find_part_id(int TypeId, char const* Name, char const* File) const {
     unsigned int Id = 0;
-    bodypart const* Part = Holder.Descriptions->find_bodypart(TypeId, Name);
+    bodypart const* Part = Descriptions->find_bodypart(TypeId, Name);
     if (Part != nullptr)
         Id = Part->Id;
     if (Id == 0) {
@@ -111,10 +116,9 @@ unsigned int CostumeTarget_FindPartId(FCostumeTarget const& Holder, int TypeId,
 // ---------------------------------------------------------------------------
 // FUN_06d48cd0 (thiscall on FCostumeTarget). Same shape over find_accessory.
 // ---------------------------------------------------------------------------
-unsigned int CostumeTarget_FindAccessoryId(FCostumeTarget const& Holder, char const* Name,
-                                           char const* File) {
+unsigned int FCostumeTarget::find_accessory_id(char const* Name, char const* File) const {
     unsigned int Id = 0;
-    accessory const* Accessory = Holder.Descriptions->find_accessory(Name);
+    accessory const* Accessory = Descriptions->find_accessory(Name);
     if (Accessory != nullptr)
         Id = Accessory->Id;
     if (Id == 0) {
@@ -122,15 +126,6 @@ unsigned int CostumeTarget_FindAccessoryId(FCostumeTarget const& Holder, char co
               PlayerDbSource, 0x263, Name, File);
     }
     return Id;
-}
-
-// ---------------------------------------------------------------------------
-// FUN_06d48940 (thiscall on Costume). No bound and no zero test: an id of 0 (the
-// miss above) is appended too.
-// ---------------------------------------------------------------------------
-void Costume_AddAccessory(Costume& Target, unsigned int AccessoryId) {
-    Target.AccessoryIds[Target.AccessoryCount] = AccessoryId;
-    ++Target.AccessoryCount;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,22 +195,22 @@ bool LoadCostumeKey(INI_Reader& Reader, FCostumeTarget const& Holder, char const
                     char const* File) {
     if (strcmp(Suffix, "body") == 0) {
         Holder.Target->PartIds[1] =
-            CostumeTarget_FindPartId(Holder, 0, Reader.get_value_string(), File);
+            Holder.find_part_id(0, Reader.get_value_string(), File);
         return true;
     }
     if (strcmp(Suffix, "head") == 0) {
         Holder.Target->PartIds[0] =
-            CostumeTarget_FindPartId(Holder, 1, Reader.get_value_string(), File);
+            Holder.find_part_id(1, Reader.get_value_string(), File);
         return true;
     }
     if (strcmp(Suffix, "lefthand") == 0) {
         Holder.Target->PartIds[2] =
-            CostumeTarget_FindPartId(Holder, 2, Reader.get_value_string(), File);
+            Holder.find_part_id(2, Reader.get_value_string(), File);
         return true;
     }
     if (strcmp(Suffix, "righthand") == 0) {
         Holder.Target->PartIds[3] =
-            CostumeTarget_FindPartId(Holder, 3, Reader.get_value_string(), File);
+            Holder.find_part_id(3, Reader.get_value_string(), File);
         return true;
     }
     if (strcmp(Suffix, "hair") == 0) {
@@ -226,8 +221,8 @@ bool LoadCostumeKey(INI_Reader& Reader, FCostumeTarget const& Holder, char const
     }
     if (strcmp(Suffix, "accessory") == 0) {
         unsigned int const Id =
-            CostumeTarget_FindAccessoryId(Holder, Reader.get_value_string(), File);
-        Costume_AddAccessory(*Holder.Target, Id);
+            Holder.find_accessory_id(Reader.get_value_string(), File);
+        Holder.Target->add_accessory(Id); // FUN_06d48940; an id of 0 (the miss above) is appended too
         return true;
     }
     if (strcmp(Suffix, "costume") == 0) {
@@ -299,11 +294,10 @@ void BuildAccountDir(char* Out, PlayerData const& Slot) {
 } // namespace
 
 // ===========================================================================
-// PlayerData_LoadSaveRecord -- retail FUN_06d47120, thiscall on the PlayerData.
+// PlayerData::load_save_record -- retail FUN_06d47120, thiscall on the PlayerData.
 // ===========================================================================
-bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
-                                       PlayerData::FSavedCharacter& Record) {
-    (void)Slot; // only forwarded as the log reader's unused ECX
+bool PlayerData::load_save_record(char const* Path, PlayerData::FSavedCharacter& Record) {
+    (void)*this; // only forwarded as the log reader's unused ECX
 
     bool bSawPlayer = false;
     FSaveFileBuffer Buffer;
@@ -574,62 +568,60 @@ bool __cdecl PlayerData_LoadSaveRecord(PlayerData& Slot, char const* Path,
 }
 
 // ===========================================================================
-// PlayerData_LoadSavedCharacter -- retail FUN_06d48d50, thiscall.
+// PlayerData::load_saved_character -- retail FUN_06d48d50, thiscall.
 // ===========================================================================
-bool __cdecl PlayerData_LoadSavedCharacter(PlayerData& Slot, char const* Dir,
-                                           char const* FileName) {
+bool PlayerData::load_saved_character(char const* Dir, char const* FileName) {
     CHARACTER_ID Key;
     safe_strcpy(Key.Buffer, 0x200, FileName);
-    PlayerData::FSavedCharacter& Record = Slot.saved_characters[Key];  // FUN_06d57090
+    PlayerData::FSavedCharacter& Record = saved_characters[Key];  // FUN_06d57090
 
     char Path[0x104];
     _makepath(Path, nullptr, Dir, FileName, nullptr);
 
-    if (PlayerData_LoadSaveRecord(Slot, Path, Record)) {
+    if (load_save_record(Path, Record)) {
         safe_strcpy(Record.FileName, 0x200, FileName);
         return true;
     }
     FDUMP(0x100002, "%s(%d) : *** WARNING: Failed to load saved game %s",
           PlayerDbSource, 0x4a8, Path);
     std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::iterator It =
-        Slot.saved_characters.find(Key);                               // FUN_06d5a180
-    if (It != Slot.saved_characters.end())
-        Slot.saved_characters.erase(It);                               // FUN_06d57760
+        saved_characters.find(Key);                               // FUN_06d5a180
+    if (It != saved_characters.end())
+        saved_characters.erase(It);                               // FUN_06d57760
     return false;
 }
 
 // ===========================================================================
-// PlayerData_ReloadSavedCharacter -- retail FUN_06d4b5a0, thiscall.
+// PlayerData::reload_saved_character -- retail FUN_06d4b5a0, thiscall.
 // ===========================================================================
-void __cdecl PlayerData_ReloadSavedCharacter(PlayerData& Slot, char const* FileName) {
+void PlayerData::reload_saved_character(char const* FileName) {
     // No ".fl" extension in MP.
     char KeyName[0x104];
     _makepath(KeyName, nullptr, nullptr, FileName, IsMPServer() ? nullptr : "fl");
 
     char AccountDir[0x104];
-    BuildAccountDir(AccountDir, Slot);
+    BuildAccountDir(AccountDir, *this);
 
     char Path[0x104];
     _makepath(Path, nullptr, AccountDir, KeyName, nullptr);
 
     CHARACTER_ID Key;
     safe_strcpy(Key.Buffer, 0x200, KeyName);
-    PlayerData::FSavedCharacter& Record = Slot.saved_characters[Key];
-    if (PlayerData_LoadSaveRecord(Slot, Path, Record)) {
+    PlayerData::FSavedCharacter& Record = saved_characters[Key];
+    if (load_save_record(Path, Record)) {
         safe_strcpy(Record.FileName, 0x200, KeyName);
         return;
     }
     std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::iterator It =
-        Slot.saved_characters.find(Key);
-    if (It != Slot.saved_characters.end())
-        Slot.saved_characters.erase(It);
+        saved_characters.find(Key);
+    if (It != saved_characters.end())
+        saved_characters.erase(It);
 }
 
 // ===========================================================================
-// PlayerData_SaveGame -- retail FUN_06d4c800, thiscall.
+// PlayerData::save_game -- retail FUN_06d4c800, thiscall.
 // ===========================================================================
-bool __cdecl PlayerData_SaveGame(PlayerData& Slot, char const* Name,
-                                 wchar_t const* Description, unsigned int DescripStrId) {
+bool PlayerData::save_game(char const* Name, wchar_t const* Description, unsigned int DescripStrId) {
     std::string FileName;
     if (Name[0] != '\0') {
         // A fixed 0x200-byte copy, cut at the first '.'.
@@ -641,7 +633,7 @@ bool __cdecl PlayerData_SaveGame(PlayerData& Slot, char const* Name,
         FileName.assign(Copy, strlen(Copy));
     } else {
         char AccountDir[0x104];
-        BuildAccountDir(AccountDir, Slot);
+        BuildAccountDir(AccountDir, *this);
 
         // Up to 200 probes of <dir>\Save%04x.fl from rand() (extension kept even in
         // MP). A name is free when GetFileAttributesA fails with ERROR_FILE_NOT_FOUND.
@@ -662,25 +654,25 @@ bool __cdecl PlayerData_SaveGame(PlayerData& Slot, char const* Name,
         }
     }
 
-    if (PlayerData_SerializeToFile(Slot, FileName.c_str(), Description, DescripStrId)) {
-        PlayerData_ReloadSavedCharacter(Slot, FileName.c_str());
+    if (serialize_to_file(FileName.c_str(), Description, DescripStrId)) {
+        reload_saved_character(FileName.c_str());
         return true;
     }
-    ++Slot.save_failure_count;
+    ++save_failure_count;
     return false;
 }
 
 // ===========================================================================
-// PlayerData_MissionSave -- retail FUN_06d4c600, thiscall.
+// PlayerData::mission_save -- retail FUN_06d4c600, thiscall.
 // ===========================================================================
-bool __cdecl PlayerData_MissionSave(PlayerData& Slot, unsigned int DescripStrId) {
-    if (!PlayerData_SaveGame(Slot, "", nullptr, DescripStrId))
+bool PlayerData::mission_save(unsigned int DescripStrId) {
+    if (!save_game("", nullptr, DescripStrId))
         return false;
 
     // Retail inlines the account-name hash and rebuilds the accounts root into
     // DAT_06d90158, which is what Server_GetAccountsRoot returns.
     char AccountDirName[0x104];
-    BuildAccountDirName(AccountDirName, Slot);
+    BuildAccountDirName(AccountDirName, *this);
     char AccountDir[0x104];
     _makepath(AccountDir, nullptr, Server_GetAccountsRoot(), AccountDirName, nullptr);
 
@@ -693,13 +685,13 @@ bool __cdecl PlayerData_MissionSave(PlayerData& Slot, unsigned int DescripStrId)
 }
 
 // ===========================================================================
-// PlayerData_AutoSave -- retail FUN_06d4c430.
+// PlayerData::auto_save -- retail FUN_06d4c430.
 // ===========================================================================
-bool __cdecl PlayerData_AutoSave(PlayerData& Slot) {
+bool PlayerData::auto_save() {
     if (IsMPServer()) {
-        if (IsMPServer() && !Slot.selected_character.is_valid())
+        if (IsMPServer() && !selected_character.is_valid())
             return false;
-        if (Slot.system_id == 0)                                        // +0x3e0
+        if (system_id == 0)                                        // +0x3e0
             return false;
     }
 
@@ -707,7 +699,7 @@ bool __cdecl PlayerData_AutoSave(PlayerData& Slot) {
         // No end() test: CharacterSelect stores +0x64 only after its own find
         // succeeded, so a record always exists.
         std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::iterator It =
-            Slot.saved_characters.find(Slot.selected_character);
+            saved_characters.find(selected_character);
 
         // "<date> <time>".
         char Time[0x10];
@@ -717,126 +709,125 @@ bool __cdecl PlayerData_AutoSave(PlayerData& Slot) {
         _strtime(Time);
         _strdate(Date);
         swprintf(Description, 0x200, L"%S %S", Date, Time);
-        return PlayerData_SerializeToFile(Slot, It->second.FileName, Description, 0);
+        return serialize_to_file(It->second.FileName, Description, 0);
     }
 
     // Single player. Universe::IBase vt+0x54 is the port's IBase::bAutosaveForbidden.
     bool bAllowed = true;
-    if ((Slot.current_base & 0x3fffffff) != 0) {
-        Universe::IBase const* Base = Universe::get_base(Slot.current_base);
+    if ((current_base & 0x3fffffff) != 0) {
+        Universe::IBase const* Base = Universe::get_base(current_base);
         if (Base->bAutosaveForbidden)
             bAllowed = false;
     }
-    if (Slot.bSkipNextAutosave == 0 && bAllowed) {
+    if (bSkipNextAutosave == 0 && bAllowed) {
         char Name[0x200];
         safe_strcpy(Name, 0x200, "AutoSave");
-        return PlayerData_SaveGame(Slot, Name, nullptr, 0x65c);
+        return save_game(Name, nullptr, 0x65c);
     }
-    Slot.bSkipNextAutosave = 0;
+    bSkipNextAutosave = 0;
     return false;
 }
 
 // ===========================================================================
-// PlayerData_SkipNextAutosave -- retail FUN_06d4c5f0.
+// PlayerData::skip_next_autosave -- retail FUN_06d4c5f0.
 // ===========================================================================
-void __cdecl PlayerData_SkipNextAutosave(PlayerData& Slot) {
-    Slot.bSkipNextAutosave = 1;
+void PlayerData::skip_next_autosave() {
+    bSkipNextAutosave = 1;
 }
 
 // ===========================================================================
-// PlayerData_ApplySavedCharacter -- the record -> slot copy of retail
+// PlayerData::apply_saved_character -- the record -> slot copy of retail
 // FUN_06d4a5d0, .text:06d4ac77 .. .text:06d4b089.
 // ===========================================================================
-void __cdecl PlayerData_ApplySavedCharacter(PlayerData& Slot,
-                                            PlayerData::FSavedCharacter const& Record,
-                                            unsigned int SessionId) {
-    Slot.current_base = Record.BaseId;                                  // +0x3ec
-    Slot.last_base_id = Record.LastBaseId;                              // +0x3f0
-    Slot.current_location = Record.LocationId;                          // +0x3f8
+void PlayerData::apply_saved_character(PlayerData::FSavedCharacter const& Record,
+                                       unsigned int SessionId) {
+    current_base = Record.BaseId;                                  // +0x3ec
+    last_base_id = Record.LastBaseId;                              // +0x3f0
+    current_location = Record.LocationId;                          // +0x3f8
     if ((Record.BaseId & 0x3fffffff) != 0) {
-        Slot.last_base_id = Record.BaseId;
+        last_base_id = Record.BaseId;
         // IBase vt+0x10 is the port's IBase::SystemId.
-        Slot.system_id = Universe::get_base(Record.BaseId)->SystemId;
+        system_id = Universe::get_base(Record.BaseId)->SystemId;
     } else {
-        Slot.system_id = Record.SystemId;
+        system_id = Record.SystemId;
     }
 
     // The rep vibe is rebuilt.
-    if (Slot.rep_vibe != -1) {
-        ::Reputation::Vibe::Free(Slot.rep_vibe);
-        Slot.rep_vibe = -1;
+    if (rep_vibe != -1) {
+        ::Reputation::Vibe::Free(rep_vibe);
+        rep_vibe = -1;
     }
-    Server_VibeID_Alloc(reinterpret_cast<unsigned int*>(&Slot.rep_vibe)); // FUN_06d45b60
-    ::Reputation::Vibe::Alloc(Slot.rep_vibe);
-    ::Reputation::Vibe::SetClientID(Slot.rep_vibe, SessionId);
+    Server_VibeID_Alloc(reinterpret_cast<unsigned int*>(&rep_vibe)); // FUN_06d45b60
+    ::Reputation::Vibe::Alloc(rep_vibe);
+    ::Reputation::Vibe::SetClientID(rep_vibe, SessionId);
     FmtStr const EmptyName;
-    ::Reputation::Vibe::Set(Slot.rep_vibe, Record.RepGroup, Record.Rank,
+    ::Reputation::Vibe::Set(rep_vibe, Record.RepGroup, Record.Rank,
                             static_cast<unsigned char>(Record.Relations.size()),
                             Record.Relations.empty() ? nullptr : &Record.Relations[0],
                             EmptyName, EmptyName, Record.Name.c_str());
 
     // The com_ costume: four parts, the count, then only `count` accessory ids.
     for (int Part = 0; Part < 4; ++Part)
-        Slot.com_costume.PartIds[Part] = Record.ComCostume.PartIds[Part];
-    Slot.com_costume.AccessoryCount = Record.ComCostume.AccessoryCount;
-    for (int I = 0; I < static_cast<int>(Slot.com_costume.AccessoryCount); ++I)
-        Slot.com_costume.AccessoryIds[I] = Record.ComCostume.AccessoryIds[I];
+        com_costume.PartIds[Part] = Record.ComCostume.PartIds[Part];
+    com_costume.AccessoryCount = Record.ComCostume.AccessoryCount;
+    for (int I = 0; I < static_cast<int>(com_costume.AccessoryCount); ++I)
+        com_costume.AccessoryIds[I] = Record.ComCostume.AccessoryIds[I];
 
     // slot+0x2c4 from record+0x30c.
-    Slot.voice_length = CopyBoundedString(Slot.voice, 0x20, Record.Voice.Data);
+    voice_length = CopyBoundedString(voice, 0x20, Record.Voice.Data);
 
     // The base costume, same shape.
     for (int Part = 0; Part < 4; ++Part)
-        Slot.costume.PartIds[Part] = Record.BaseCostume.PartIds[Part];
-    Slot.costume.AccessoryCount = Record.BaseCostume.AccessoryCount;
-    for (int I = 0; I < static_cast<int>(Slot.costume.AccessoryCount); ++I)
-        Slot.costume.AccessoryIds[I] = Record.BaseCostume.AccessoryIds[I];
+        costume.PartIds[Part] = Record.BaseCostume.PartIds[Part];
+    costume.AccessoryCount = Record.BaseCostume.AccessoryCount;
+    for (int I = 0; I < static_cast<int>(costume.AccessoryCount); ++I)
+        costume.AccessoryIds[I] = Record.BaseCostume.AccessoryIds[I];
 
-    Slot.initial_pos[0] = Record.Position[0];
-    Slot.initial_pos[1] = Record.Position[1];
-    Slot.initial_pos[2] = Record.Position[2];
-    memcpy(Slot.initial_ornt, Record.Orientation, sizeof(Slot.initial_ornt));
+    initial_pos[0] = Record.Position[0];
+    initial_pos[1] = Record.Position[1];
+    initial_pos[2] = Record.Position[2];
+    memcpy(initial_ornt, Record.Orientation, sizeof(initial_ornt));
 
-    Slot.ship_archetype = Record.ShipArchetype;                         // +0x264
-    Slot.relative_health = Record.HullStatus;                           // +0x268
-    Slot.equipment.Items = Record.Equipment.Items;
-    Slot.collision_groups = Record.CollisionGroups;                     // +0x26c
+    ship_archetype = Record.ShipArchetype;                         // +0x264
+    relative_health = Record.HullStatus;                           // +0x268
+    equipment.Items = Record.Equipment.Items;
+    collision_groups = Record.CollisionGroups;                     // +0x26c
 
-    Slot.cash = Record.Money;                                           // +0x31c
-    Slot.equip_id_maker = Record.EquipIdMaker;                          // +0x3c8
-    Slot.num_kills = Record.NumKills;                                   // +0x334
-    Slot.num_mission_successes = Record.NumMissionSuccesses;            // +0x338
-    Slot.num_mission_failures = Record.NumMissionFailures;              // +0x33c
-    Slot.save_failure_count = 0;                                        // +0x344
-    Slot.current_location = 0;                                          // +0x3f8, after the copy above
-    Slot.character_id = 0;
-    Slot.ship_object_id = 0;                                            // +0x3e4
-    Slot.created_ship_id = 0;                                           // +0x3e8
-    Slot.exited_base_id = 0;                                            // +0x410
-    Slot.bSkipNextAutosave = 0;                                        // +0x340
-    Slot.starting_ring = Record.StartingRing;                           // +0x414
-    Slot.rank_level = Record.Rank;                                      // +0x284
+    cash = Record.Money;                                           // +0x31c
+    equip_id_maker = Record.EquipIdMaker;                          // +0x3c8
+    num_kills = Record.NumKills;                                   // +0x334
+    num_mission_successes = Record.NumMissionSuccesses;            // +0x338
+    num_mission_failures = Record.NumMissionFailures;              // +0x33c
+    save_failure_count = 0;                                        // +0x344
+    current_location = 0;                                          // +0x3f8, after the copy above
+    character_id = 0;
+    ship_object_id = 0;                                            // +0x3e4
+    created_ship_id = 0;                                           // +0x3e8
+    exited_base_id = 0;                                            // +0x410
+    bSkipNextAutosave = 0;                                        // +0x340
+    starting_ring = Record.StartingRing;                           // +0x414
+    rank_level = Record.Rank;                                      // +0x284
 
-    Slot.weapon_group_name = Record.WeaponGroups;                       // +0x380
-    Slot.visit_map = Record.Visits;                                     // +0x3a0
-    Slot.mission_log = Record.MissionLog;                               // +0x390
-    Slot.interface_state = Record.Interface;                            // +0x39c
+    weapon_group_name = Record.WeaponGroups;                       // +0x380
+    visit_map = Record.Visits;                                     // +0x3a0
+    mission_log = Record.MissionLog;                               // +0x390
+    interface_state = Record.Interface;                            // +0x39c
 }
 
 // ===========================================================================
-// PlayerData_SendVisitedState -- retail FUN_06d4b520, thiscall on the slot.
+// PlayerData::send_visited_state -- retail FUN_06d4b520, thiscall on the slot.
 // Block: dword count, then {dword system id, byte flags} per visit (5-byte stride).
 // Sent through IClient +0x170 (slot 92); rpclocal's sender (0x06d8b540, ch1 op 0x13)
 // keeps and frees the block.
 // ===========================================================================
-void __cdecl PlayerData_SendVisitedState(PlayerData& Slot, unsigned int SessionId) {
-    unsigned int const Count = static_cast<unsigned int>(Slot.visit_map.size());
+void PlayerData::send_visited_state(unsigned int SessionId) {
+    unsigned int const Count = static_cast<unsigned int>(visit_map.size());
     unsigned int const Size = Count * 5 + 4;
     unsigned char* const Block = static_cast<unsigned char*>(::operator new(Size));
     memcpy(Block, &Count, 4);
     unsigned char* Cursor = Block + 4;
-    for (std::map<unsigned int, unsigned char>::const_iterator It = Slot.visit_map.begin();
-         It != Slot.visit_map.end(); ++It) {
+    for (std::map<unsigned int, unsigned char>::const_iterator It = visit_map.begin();
+         It != visit_map.end(); ++It) {
         memcpy(Cursor, &It->first, 4);
         Cursor[4] = It->second;
         Cursor += 5;
@@ -863,39 +854,38 @@ int MissionLogEntrySize(FmtStr const& Entry) {
 } // namespace
 
 // ===========================================================================
-// PlayerData_SendMissionLog -- retail FUN_06d50740, thiscall on the slot.
+// PlayerData::send_mission_log -- retail FUN_06d50740, thiscall on the slot.
 // Header {1, entry count (+0x398)}, then the entries. IClient +0x184 (slot 97) gets
 // the running offset, not `Size`; rpclocal keeps and frees the block (sender
 // 0x06d8b7f0).
 // ===========================================================================
-void __cdecl PlayerData_SendMissionLog(PlayerData& Slot, unsigned int SessionId) {
+void PlayerData::send_mission_log(unsigned int SessionId) {
     int Size = 8;
-    for (std::list<FmtStr>::const_iterator It = Slot.mission_log.begin();
-         It != Slot.mission_log.end(); ++It)
+    for (std::list<FmtStr>::const_iterator It = mission_log.begin();
+         It != mission_log.end(); ++It)
         Size += MissionLogEntrySize(*It);
 
     unsigned char* const Block = static_cast<unsigned char*>(::operator new(static_cast<size_t>(Size)));
-    unsigned int const Header[2] = { 1u, static_cast<unsigned int>(Slot.mission_log.size()) };
+    unsigned int const Header[2] = { 1u, static_cast<unsigned int>(mission_log.size()) };
     memcpy(Block, Header, sizeof(Header));
     unsigned char* Cursor = Block + 8;
     int Offset = 8;
-    for (std::list<FmtStr>::const_iterator It = Slot.mission_log.begin();
-         It != Slot.mission_log.end(); ++It)
+    for (std::list<FmtStr>::const_iterator It = mission_log.begin();
+         It != mission_log.end(); ++It)
         AppendMissionLogData(&*It, Cursor, Offset, Size);
     g_pClientInterface->SendCommonSetMissionLog(SessionId, Block, static_cast<unsigned int>(Offset));
 }
 
 // ===========================================================================
-// PlayerData_LoadSelectedCharacter -- the second half of retail FUN_06d4a5d0,
+// PlayerData::load_selected_character -- the second half of retail FUN_06d4a5d0,
 // .text:06d4aa85 .. .text:06d4b1fa, where the SP and MP paths join. The record is
 // the found map node + 0x20c.
 // ===========================================================================
-bool __cdecl PlayerData_LoadSelectedCharacter(PlayerData& Slot,
-                                              PlayerData::FSavedCharacter const& Record,
-                                              unsigned int SessionId) {
+bool PlayerData::load_selected_character(PlayerData::FSavedCharacter const& Record,
+                                         unsigned int SessionId) {
     // <accts>\<account dir>\<record file name>.
     char AccountDir[0x104];
-    BuildAccountDir(AccountDir, Slot);
+    BuildAccountDir(AccountDir, *this);
     char Path[0x104];
     _makepath(Path, nullptr, AccountDir, Record.FileName, nullptr);
 
@@ -926,22 +916,22 @@ bool __cdecl PlayerData_LoadSelectedCharacter(PlayerData& Slot,
     if (SinglePlayer())
         Server_LoadSinglePlayerState(Reader);
 
-    PlayerData_ApplySavedCharacter(Slot, Record, SessionId);
+    apply_saved_character(Record, SessionId);
 
-    PlayerData_SendVisitedState(Slot, SessionId);
+    send_visited_state(SessionId);
 
     // IClient +0x16c (slot 91). rpclocal's sender leaves the not-owned flag clear
     // (payload+0x08 = 0), so the string's own buffer goes out as is.
-    char const* const WeaponGroups = Slot.weapon_group_name.c_str();
+    char const* const WeaponGroups = weapon_group_name.c_str();
     g_pClientInterface->SendCommonSetWeaponGroup(SessionId,
                                                  reinterpret_cast<const unsigned char*>(WeaponGroups),
                                                  static_cast<unsigned int>(strlen(WeaponGroups)));
 
-    PlayerData_SendMissionLog(Slot, SessionId);
+    send_mission_log(SessionId);
 
     // A 4-byte block holding +0x39c, IClient +0x188 (slot 98); the packet takes it over.
     unsigned int* const InterfaceBlock = static_cast<unsigned int*>(::operator new(4));
-    *InterfaceBlock = Slot.interface_state;
+    *InterfaceBlock = interface_state;
     g_pClientInterface->SendCommonSetInterfaceState(SessionId,
                                                     reinterpret_cast<unsigned char*>(InterfaceBlock), 4);
 
@@ -964,7 +954,7 @@ bool __cdecl PlayerData_LoadSelectedCharacter(PlayerData& Slot,
 }
 
 // ===========================================================================
-// PlayerData_CreateNewCharacter -- retail FUN_06d4b790, thiscall on the PlayerData.
+// PlayerData::create_new_character -- retail FUN_06d4b790, thiscall on the PlayerData.
 // Only caller: PlayerDB::create_new_character, .text:06d541a0. Writes
 // <account dir>\<name hash>.fl from (MP)NewCharacter.fl with the %%...%% placeholders
 // substituted from NewChar::TheDB.
@@ -984,11 +974,11 @@ void BuildAccountDirForName(char* Out, wchar_t const* AccountName) {
 
 } // namespace
 
-bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInfo const& Info) {
+bool PlayerData::create_new_character(SCreateCharacterInfo const& Info) {
     // Retail's `this == NULL` arm (empty directory) is unreachable: the only caller
     // passes &m_PlayerArray[SessionId - 1].
     char AccountDir[0x104];
-    BuildAccountDirForName(AccountDir, Slot.AccountName);
+    BuildAccountDirForName(AccountDir, AccountName);
 
     // The file name is the FUN_06d46370 hash of the new character's name, in SP too.
     char HashName[0x104];
@@ -1158,10 +1148,10 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
         }
 
         if (bResult) {
-            PlayerData_ReloadSavedCharacter(Slot, FileName.c_str());
+            reload_saved_character(FileName.c_str());
             if (!SinglePlayer()) {
                 FDUMP(0x100003, "LOG: Create character on account %S (\"%s\")\n",
-                      Slot.AccountName, Path);
+                      AccountName, Path);
             }
         }
         // The writer's destructor finds its FILE* already null.

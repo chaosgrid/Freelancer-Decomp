@@ -371,6 +371,9 @@ public:
     unsigned int Affiliation;            // +0xe0 Vibe::GetAffiliation
     float Attitude;                      // +0xe4 Vibe::AttitudeTowards, 127-scale byte
     unsigned char bMarkedBy;             // +0xe8 <- bMarkedBy (+0xa8)
+
+    // FUN_06b3f970. Defined in rpc_server_channel_senders.cpp.
+    void SetDisplayName(const wchar_t* Name);
 };
 
 // ===== end SERVER 0x01..0x1f =====

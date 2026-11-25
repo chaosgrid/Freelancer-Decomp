@@ -153,6 +153,33 @@ struct Costume
     unsigned PartIds[4];
     unsigned AccessoryIds[8];
     unsigned AccessoryCount;
+
+    // An inline member in retail; Server.dll's copy is FUN_06d48940. No bound and no zero
+    // test: an id of 0 is appended too.
+    void add_accessory(unsigned AccessoryId)
+    {
+        AccessoryIds[AccessoryCount] = AccessoryId;
+        ++AccessoryCount;
+    }
+
+    // An inline member in retail; Content.dll's copy is FUN_06eb8ef0 (thiscall, one argument).
+    // The four parts, the accessory count, then that many accessories.
+    bool operator==(Costume const& Other) const
+    {
+        if (PartIds[0] != Other.PartIds[0] || PartIds[1] != Other.PartIds[1] ||
+            PartIds[2] != Other.PartIds[2] || PartIds[3] != Other.PartIds[3])
+            return false;
+        if (AccessoryCount != Other.AccessoryCount)
+            return false;
+        // The count is signed.
+        int const Count = static_cast<int>(AccessoryCount);
+        for (int Index = 0; Index < Count; ++Index)
+        {
+            if (AccessoryIds[Index] != Other.AccessoryIds[Index])
+                return false;
+        }
+        return true;
+    }
 };
 
 class COMMON_API CostumeDescriptions

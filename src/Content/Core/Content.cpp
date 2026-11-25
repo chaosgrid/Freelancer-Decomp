@@ -51,6 +51,17 @@ I3DMathEngine* __cdecl ContentAcquire3DMathEngine()
     return static_cast<I3DMathEngine*>(Instance);
 }
 
+// Deviation from retail (docs/re/deviations.md): retail keeps one lazily filled engine pointer
+// per source file, each filled by its own ContentAcquire3DMathEngine call the first time that file needs
+// it, and every user inlines the fetch. The port keeps one.
+I3DMathEngine* ContentMathEngine()
+{
+    static I3DMathEngine* Engine = nullptr;
+    if (Engine == nullptr)
+        Engine = ContentAcquire3DMathEngine();
+    return Engine;
+}
+
 IDLL::IDLL()
 {
 }

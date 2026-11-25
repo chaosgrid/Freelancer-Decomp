@@ -62,6 +62,7 @@
     <ClInclude Include="rpc_transport.h" />
     <ClInclude Include="rpc_payloads.h" />
     <ClInclude Include="rpc_containers.h" />
+    <ClInclude Include="rpc_packet_classes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="rpclocal.cpp" />

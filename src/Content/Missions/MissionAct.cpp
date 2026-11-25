@@ -164,7 +164,7 @@ void ActDeactTrig::Parse(INI_Reader& Reader)
 bool ActDeactTrig::Execute()
 {
     if (Mission != nullptr)
-        DeactivateMissionTrigger(Mission, &TargetTriggerId);
+        Mission->DeactivateTrigger(&TargetTriggerId);
     return true;
 }
 
@@ -914,7 +914,7 @@ void ActMovePlayer::Parse(INI_Reader& Reader)
 // LAB_06ecb3d0: FUN_06ebb540.
 bool ActMovePlayer::Execute()
 {
-    MoveMissionPlayer(Mission, &Position, RadiusSq);
+    Mission->MovePlayer(&Position, RadiusSq);
     return true;
 }
 
@@ -936,7 +936,7 @@ void ActRemoveRtc::Parse(INI_Reader& Reader)
 // LAB_06ece1e0: FUN_06eba430.
 bool ActRemoveRtc::Execute()
 {
-    RemoveMissionRtc(Mission, &RtcFile);
+    Mission->RemoveRtc(&RtcFile);
     return true;
 }
 
@@ -1260,10 +1260,8 @@ void ActSetInitialPlayerPos::Parse(INI_Reader& Reader)
     Rotation.Y = Reader.get_value_float(5);
     Rotation.X = Reader.get_value_float(4);
     Rotation.W = Reader.get_value_float(3);
-    if (GTriggerMathEngine == nullptr)
-        GTriggerMathEngine = ContentAcquire3DMathEngine();
     FMatrix Result;
-    GTriggerMathEngine->QuaternionToMatrix(Result, Rotation);
+    ContentMathEngine()->QuaternionToMatrix(Result, Rotation);
     memcpy(&Orientation, &Result, sizeof(Orientation));
 }
 
@@ -1700,11 +1698,11 @@ bool FMissionNagDist::HandleMessage(pub::Controller::EMessage MessageId, void co
 }
 
 // FUN_06ecef10.
-void DispatchNagMessage(FMissionScript* Script, pub::Controller::EMessage MessageId,
-                        void const* MessageParms)
+void FMissionScript::DispatchNagMessage(pub::Controller::EMessage MessageId,
+                                        void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
-    std::map<unsigned int, FMissionNag*>& Nags = Script->Nags;
+    std::map<unsigned int, FMissionNag*>& Nags = this->Nags;
     // System enter moves the player's nags to the new system.
     if (MessageId == pub::Controller::EMessage::SystemEnter)
     {
@@ -1716,7 +1714,7 @@ void DispatchNagMessage(FMissionScript* Script, pub::Controller::EMessage Messag
         }
     }
     // Retail reads it as the map's +0x14 (mission +0x218).
-    if (Script->NagClamp != 0)
+    if (NagClamp != 0)
         return;
     std::map<unsigned int, FMissionNag*>::iterator It = Nags.begin();
     while (It != Nags.end())
@@ -3056,14 +3054,14 @@ void ActSendComm::Parse(INI_Reader& Reader)
                 ++Index;
             }
             if (_stricmp(Receiver.Data, "Player") == 0)
-                AddDialogCostume(Mission, &SpeakerCostume);
+                Mission->AddDialogCostume(&SpeakerCostume);
         }
     }
     if (Reader.is_value_empty(6) && _stricmp(Receiver.Data, "Player") == 0)
     {
         Costume* const NpcCostume = Mission->GetMissionCostume(&Sender);
         if (NpcCostume != nullptr)
-            AddDialogCostume(Mission, NpcCostume);
+            Mission->AddDialogCostume(NpcCostume);
     }
 }
 
@@ -3124,7 +3122,7 @@ ActEtherComm::ActEtherComm(FMissionScript* InMission)
     memset(&SpeakerCostume, 0, sizeof(SpeakerCostume));
 }
 
-// LAB_06ec87c0. The accessory count has no bound (as retail). AddDialogCostume: FUN_06eb8ef0
+// LAB_06ec87c0. The accessory count has no bound (as retail). FMissionScript::AddDialogCostume: FUN_06eb8ef0
 // scan, FUN_06ed23d0 insert into mission +0x31c.
 void ActEtherComm::Parse(INI_Reader& Reader)
 {
@@ -3151,7 +3149,7 @@ void ActEtherComm::Parse(INI_Reader& Reader)
         ++SpeakerCostume.AccessoryCount;
         ++Index;
     }
-    AddDialogCostume(Mission, &SpeakerCostume);
+    Mission->AddDialogCostume(&SpeakerCostume);
 }
 
 // LAB_06ec8990 (GetLabelShipId = FUN_06f15940).
@@ -3212,10 +3210,8 @@ bool ActSetOrient::Execute()
     FSystemInfo* const System = Mission->PlayerState->GetSystemRecord();
     if (System == nullptr)
         return true;
-    if (GTriggerMathEngine == nullptr)
-        GTriggerMathEngine = ContentAcquire3DMathEngine();
     FMatrix Rotation;
-    GTriggerMathEngine->QuaternionToMatrix(Rotation, Orientation);
+    ContentMathEngine()->QuaternionToMatrix(Rotation, Orientation);
     Matrix NewOrientation;
     memcpy(&NewOrientation, &Rotation, sizeof(NewOrientation));
     unsigned int const SystemId = System->SystemId;
@@ -3262,10 +3258,8 @@ namespace
         float const QuatX = Reader.get_value_float(5);
         float const QuatW = Reader.get_value_float(4);
         FQuaternion const Rotation = NormalizeQuaternion(QuatW, QuatX, QuatY, QuatZ);
-        if (GTriggerMathEngine == nullptr)
-            GTriggerMathEngine = ContentAcquire3DMathEngine();
         FMatrix Result;
-        GTriggerMathEngine->QuaternionToMatrix(Result, Rotation);
+        ContentMathEngine()->QuaternionToMatrix(Result, Rotation);
         Placement->Rotation = Result;
     }
 
@@ -3317,14 +3311,10 @@ bool ActRelocateForm::Execute()
         FMatrix SlotOrientation;
         memset(&SlotOrientation, 0, sizeof(SlotOrientation));
         Formation->GetSlotTransform(Member->FormationSlot, &SlotPosition, &SlotOrientation);
-        if (GTriggerMathEngine == nullptr)
-            GTriggerMathEngine = ContentAcquire3DMathEngine();
         FVector WorldPosition;
-        GTriggerMathEngine->TransformXform(WorldPosition, Placement, SlotPosition);
-        if (GTriggerMathEngine == nullptr)
-            GTriggerMathEngine = ContentAcquire3DMathEngine();
+        ContentMathEngine()->TransformXform(WorldPosition, Placement, SlotPosition);
         FMatrix WorldRotation;
-        GTriggerMathEngine->MulMatrix(WorldRotation, Placement.Rotation, SlotOrientation);
+        ContentMathEngine()->MulMatrix(WorldRotation, Placement.Rotation, SlotOrientation);
         Vector Position;
         Position.x = WorldPosition.X;
         Position.y = WorldPosition.Y;
@@ -3507,10 +3497,8 @@ void ActStaticCam::Parse(INI_Reader& Reader)
     float const QuatX = Reader.get_value_float(4);
     float const QuatW = Reader.get_value_float(3);
     FQuaternion const Rotation = NormalizeQuaternion(QuatW, QuatX, QuatY, QuatZ);
-    if (GTriggerMathEngine == nullptr)
-        GTriggerMathEngine = ContentAcquire3DMathEngine();
     FMatrix Result;
-    GTriggerMathEngine->QuaternionToMatrix(Result, Rotation);
+    ContentMathEngine()->QuaternionToMatrix(Result, Rotation);
     memcpy(&Camera.Rotation, &Result, sizeof(Camera.Rotation));
     if (!Reader.is_value_empty(7))
         Fov = Reader.get_value_float(7);
@@ -4021,10 +4009,8 @@ namespace
         float const X = Reader.get_value_float(First + 1);
         float const W = Reader.get_value_float(First);
         FQuaternion const Rotation = NormalizeQuaternion(W, X, Y, Z);
-        if (GTriggerMathEngine == nullptr)
-            GTriggerMathEngine = ContentAcquire3DMathEngine();
         FMatrix Result;
-        GTriggerMathEngine->QuaternionToMatrix(Result, Rotation);
+        ContentMathEngine()->QuaternionToMatrix(Result, Rotation);
         *Out = Result;
     }
 
@@ -4082,18 +4068,14 @@ namespace
             Heading3.D[2][0] = static_cast<float>(-Sin);
             Heading3.D[2][2] = static_cast<float>(Cos);
         }
-        if (GTriggerMathEngine == nullptr)
-            GTriggerMathEngine = ContentAcquire3DMathEngine();
         FMatrix Rotation;
-        GTriggerMathEngine->MulMatrix(Rotation, Heading3, ObjectRotation);
+        ContentMathEngine()->MulMatrix(Rotation, Heading3, ObjectRotation);
 
         int const PlacementMode = *Mode;
         if (PlacementMode == 2)
         {
-            if (GTriggerMathEngine == nullptr)
-                GTriggerMathEngine = ContentAcquire3DMathEngine();
             FVector Turned;
-            GTriggerMathEngine->TransformMatrix(Turned, ObjectRotation, Offset->Translation);
+            ContentMathEngine()->TransformMatrix(Turned, ObjectRotation, Offset->Translation);
             OutPosition->x = Turned.X + ObjectPosition.x;
             OutPosition->y = Turned.Y + ObjectPosition.y;
             OutPosition->z = Turned.Z + ObjectPosition.z;

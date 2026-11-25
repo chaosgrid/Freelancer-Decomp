@@ -264,3 +264,13 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 **Retail.** `WinMain` starts with `CreateMutexA(NULL, FALSE, "FreelancerClient")` (.text:005b2f87..005b2fac); a null handle or `GetLastError() == ERROR_ALREADY_EXISTS` (0xb7) jumps to the exit (LAB_005b3385) and returns 1, so only one client runs per machine.
 **Port.** The same code, compiled only when `FL_SINGLE_INSTANCE` is defined. Nothing defines it, so by default the client creates no mutex and any number of instances start.
 **Why.** The owner tests multiplayer by running several local clients against one FLServer.
+
+## Server, Content, alchemy: one math engine per module instead of one per source file
+
+> **Status:** OPEN (readability decision by the owner, 2026-11-25)
+> **Owner:** `Server_MathEngine` (`src/Server/server_createinfo.cpp`), `ContentMathEngine` (`src/Content/Core/Content.cpp`), `Shared3DMath` (`src/alchemy/alchemy_common.cpp`)
+> **Removal condition:** none planned; revert only if a per-file engine instance turns out to carry state
+
+**Retail.** Every source file that needs `I3DMathEngine` keeps its own file-static pointer and inlines the lazy fetch at each use: `if (ptr == 0) ptr = <create "3DMathEngine">`. Server.dll has twelve such pointers (for example DAT_06d8d7f8 for Observer.cpp, DAT_06d8d868 for SpaceObj, DAT_06d8da08 for StarSys.cpp), Content.dll fourteen, alchemy.dll seventeen. Each fetch is a separate `ICOManager::CreateInstance`, so a module holds up to that many engine instances; none is released.
+**Port.** One accessor per module with one lazily created instance. The per-file pointers, their inlined fetches and the three copies of the matrix-to-quaternion helper in Server (`Observer_`, `SpaceObj_`, `Server_MatrixToQuat`) are gone; alchemy `FFxEmitterBase::SubmitParticle` lost the engine-slot reference parameter it only used for the fetch.
+**Why.** About 70 copies of the same four lines. The engine is used as a stateless calculator, so which instance answers makes no observable difference; the difference is the number of instances created (one per module instead of one per retail source file).

@@ -107,7 +107,7 @@ protected:
 //   FUN_06d48b60  Encode
 //
 // NO USER DESTRUCTOR. Retail tears the SaveGame part of a writer down with the
-// string destructor only: the open-failure exit of PlayerData_SerializeToFile
+// string destructor only: the open-failure exit of PlayerData::serialize_to_file
 // runs the writer's destructor inline -- .text:06d4cfb6 concrete vptr,
 // .text:06d4cfcd CALL FUN_06d4eb00, .text:06d4cfe0 _Tidy of the path,
 // .text:06d4cff7 _Tidy of the buffer -- and there is no FILE* test after the
@@ -263,7 +263,7 @@ struct FSaveFileBuffer : public SaveGame {
 // .text:06d48bf8 really is a memory load: its bytes are `8a 91 18 b3 d6 06`,
 // opcode 0x8a with mod=10/rm=001, i.e. base ECX plus disp32. That check matters,
 // because the sibling instruction at .text:06d4ceee looks like the same thing in
-// Ghidra's output and is not -- see PlayerData_SerializeToFile.
+// Ghidra's output and is not -- see PlayerData::serialize_to_file.
 void Server_FLS1Transform(char* Data, int Length);
 
 // ---------------------------------------------------------------------------

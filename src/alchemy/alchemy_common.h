@@ -246,6 +246,8 @@ namespace AlchemyImpl
 
     // ---- 3D-math / mesh-pose helpers ---------------------------------------
     I3DMathEngine* Create3DMath();
+    // The module's one lazily created engine (a deviation: retail has one per source file).
+    I3DMathEngine* Shared3DMath();
     I3DMathEngine* Acquire3DMath();
     ICamera* DrawCameraFromCookie();
     bool GetDrawCameraPosition(float* Out);

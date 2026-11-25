@@ -22,9 +22,6 @@
 
 namespace
 {
-// DAT_06d8d8d0 -- Fuse.cpp's own lazily acquired math engine (Tumble / Impulse). Retail
-// never tests it for null.
-I3DMathEngine* GFuseMathEngine = nullptr;
 
 // The DamageList every damage Trigger builds inline, filled the same way everywhere: cause
 // 0x15, the source as inflictor, and its owner player when the source is a ship in the
@@ -787,11 +784,8 @@ void ImpulseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
             {
                 HardpointToWorld(Owner->get_index(), HpInfo);
 
-                // The offset rotated into the hardpoint's frame (I3DMathEngine +0x38).
-                if (GFuseMathEngine == nullptr)
-                    GFuseMathEngine = Server_Acquire3DMathEngine();
                 FVector Offset;
-                GFuseMathEngine->TransposeTransform(Offset,
+                Server_MathEngine()->TransposeTransform(Offset,
                                                     reinterpret_cast<FMatrix const&>(HpInfo.Orient),
                                                     reinterpret_cast<FVector const&>(PosOffset));
 
@@ -934,10 +928,8 @@ void TumbleAction::Trigger(unsigned SourceId, unsigned short SubObjId)
 
                     // Rotated into the ship's frame (I3DMathEngine +0x30).
                     Matrix const& Orientation = Owner->get_orientation();
-                    if (GFuseMathEngine == nullptr)
-                        GFuseMathEngine = Server_Acquire3DMathEngine();
                     FVector Rotated;
-                    GFuseMathEngine->Rotate(Rotated,
+                    Server_MathEngine()->Rotate(Rotated,
                                             reinterpret_cast<FTransform const&>(Orientation),
                                             Axis);
 

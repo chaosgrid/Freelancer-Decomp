@@ -23,7 +23,6 @@ namespace AlchemyImpl
 {
     namespace
     {
-        I3DMathEngine* G_AnimatedTransform3DMath = nullptr; // DAT_06257c58.
     }
 
     // ---- Shared helpers ---------------------------------------------------------------
@@ -2203,12 +2202,7 @@ namespace AlchemyImpl
             StoreAlchemyFpuFloat(ScaleXform12[8],
                                  ForwardAppearanceSingleEval(Children_[8], TimeAf, TimeBf));
 
-            I3DMathEngine* Math = G_AnimatedTransform3DMath;
-            if (Math == nullptr)
-            {
-                Math = Create3DMath();
-                G_AnimatedTransform3DMath = Math;
-            }
+            I3DMathEngine* Math = Shared3DMath();
             float Composed[12];
             Math->MulTransform( // +0x1C
                 *reinterpret_cast<FTransform*>(Composed),

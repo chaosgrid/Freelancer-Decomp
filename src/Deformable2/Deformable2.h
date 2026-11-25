@@ -48,6 +48,12 @@ struct FFaceGroup
     unsigned short* Indices;
     unsigned long IndexCount;
     unsigned long UvBoneIndex; // +0x20 FUN_065f7590: -1 none; 0 = EyeMaterial
+
+    // FUN_065f7c70. Defined in Deformable2.cpp.
+    void Construct();
+
+    // FUN_065f7340. Defined in Deformable2.cpp.
+    int Draw(FMaterialSubmitContext* Context, int StartIndex);
 };
 
 static_assert(sizeof(FFaceGroup) == 0x24, "face group must be 0x24");
@@ -106,6 +112,9 @@ struct FBoneVertexList
     unsigned short* Start;
     unsigned short* Finish;
     unsigned short* CapacityEnd;
+
+    // FUN_065f9430. Defined in Deformable2.cpp.
+    void Destroy();
 };
 
 static_assert(sizeof(FBoneVertexList) == 0x10, "bone vertex list must be 0x10");
@@ -145,6 +154,12 @@ struct FDeformMesh
     virtual unsigned char GetBoundSphere(float* OutRadius, float* OutCenter); // 4 +0x10
     virtual unsigned char Draw(ICamera* Camera, FDeformPart* Part) = 0;       // 5 +0x14
     virtual ~FDeformMesh();                                                   // 6 +0x18
+
+    // FUN_065f28e0. Defined in Deformable2.cpp.
+    void AddRef();
+
+    // FUN_065f28f0. Defined in Deformable2.cpp.
+    int Release();
 };
 
 // FUN_065f8b00 on calloc(1, 0x84). Vtable PTR_LAB_0660135c.
@@ -195,6 +210,18 @@ struct FMeshArchetype : FDeformMesh
     unsigned char Pad72[2];
     float SphereCenter[3];      // +0x74
     float SphereRadius;         // +0x80
+
+    // FUN_065f90c0. Defined in Deformable2.cpp.
+    void FillStreamDesc(FRpVertexSrcDesc* Out);
+
+    // FUN_065f7e80. Defined in Deformable2.cpp.
+    bool LoadGeometry(IFileSystem* Fs);
+
+    // FUN_065f8480. Defined in Deformable2.cpp.
+    bool LoadUvDeformTables(IFileSystem* Fs);
+
+    // FUN_065f89e0. Defined in Deformable2.cpp.
+    bool LoadTables(FLodHolder* Holder, IFileSystem* Fs);
 };
 
 static_assert(sizeof(FMeshArchetype) == 0x84, "mesh archetype must be 0x84");
@@ -362,6 +389,12 @@ struct FSkeleton
     FBoneSlot Bones[150];
     void* EngineHandle;
     int RefCount;
+
+    // FUN_065f10c0. Defined in Deformable2.cpp.
+    void DestroyHandles();
+
+    // FUN_065f1100. Defined in Deformable2.cpp.
+    bool Load(const char* Name, IFileSystem* Fs);
 };
 
 static_assert(sizeof(FSkeleton) == 0x1E88, "skeleton must be 0x1e88");
@@ -394,6 +427,9 @@ struct FBoneRuntime : IInstanceTransform
     GENRESULT DACOM_API SetUser(void* InInstance, unsigned long User) override;       // LAB_065f1790
     unsigned long DACOM_API GetUser(void* InInstance) override;                       // LAB_065f17a0
     unsigned long DACOM_API MarkWorldDirty(void* InInstance) override; // LAB_065f17b0
+
+    // FUN_065f1030. Defined in Deformable2.cpp.
+    void ComposeWorldMatrix(const float* InverseRoot);
 };
 
 static_assert(sizeof(FBoneRuntime) == 0x70, "bone runtime must be 0x70");
@@ -410,6 +446,12 @@ struct FLodHolder
     int RefCount;
 
     unsigned char AttachSkeleton(FSkeleton* Skel); // FUN_065f1550
+
+    // FUN_065f14a0. Defined in Deformable2.cpp.
+    FBoneRuntime* BindOneBoneRuntime(int Index, void* BoneInst);
+
+    // FUN_065f14f0. Defined in Deformable2.cpp.
+    bool LinkBoneByParent(void* BoneInst, int Parent);
 };
 
 static_assert(sizeof(FLodHolder) == 0x10, "LOD holder must be 0x10");
@@ -424,6 +466,15 @@ struct FSvdMatrix
     float Cell[G_SvdMaxDim][G_SvdMaxDim]; // +0x00 stride 0xC
     int RowCount;       // +0x240 this+0x240
     int ColCount;       // +0x244 this+0x244
+
+    // FUN_065f9f00. Defined in Deformable2.cpp.
+    unsigned char SvdCmp(float* A, float* W, float* V);
+
+    // FUN_065fadb0. Defined in Deformable2.cpp.
+    void PseudoInverse(FSvdMatrix* Out);
+
+    // FUN_065f9d70. Defined in Deformable2.cpp.
+    void Transpose(FSvdMatrix* Out) const;
 };
 
 static_assert(sizeof(FSvdMatrix) == 0x248, "SVD matrix must be 0x248");
@@ -476,6 +527,12 @@ struct FIkEvent : IChannelOwner
     float Damping;           // +0x38 desc+0x18, the DLS damping factor
     int ApplyTick;           // +0x3C Apply calls this round; solves on 0, wraps at JointCount
     int JointCount;          // +0x40 FUN_065fb030
+
+    // FUN_065fc000. Defined in Deformable2.cpp.
+    void SolveDls();
+
+    // FUN_065fce60. Defined in Deformable2.cpp.
+    void SolveDlsAlt();
 };
 
 static_assert(sizeof(FIkEvent) == 0x44, "IK event must be 0x44");
@@ -539,6 +596,21 @@ struct FDeformPart
 
     unsigned char BindMeshes(FLodHolder* Holder, FDeformMesh** InMeshes, int Count); // FUN_065f67f0
     void Reset(); // FUN_065f6760
+
+    // FUN_065f6930. Defined in Deformable2.cpp.
+    bool SelectLod(int LodIndex);
+
+    // FUN_065f69c0. Defined in Deformable2.cpp.
+    void MarkSkinDirty();
+
+    // FUN_065f6720. Defined in Deformable2.cpp.
+    void Construct();
+
+    // FUN_065f68c0. Defined in Deformable2.cpp.
+    unsigned char BoundSphere(float* OutRadius, float* OutCenter);
+
+    // FUN_065f69d0. Defined in Deformable2.cpp.
+    unsigned char DrawLive(ICamera* Camera, void* /*Unused*/);
 };
 
 static_assert(offsetof(FDeformPart, Vb) == 0x14, "part VB descriptor +0x14");
@@ -566,6 +638,42 @@ struct FDeformInstance : IChannelSink
     void DACOM_API OnOpaqueNotification(void* A, void* B) override; // LAB_065f5290
     void DACOM_API OnLoop(unsigned long ChannelKey, float* Transform,
                           void* Context) override;                           // LAB_065f52b0
+
+    // FUN_065f4c80. Defined in Deformable2.cpp.
+    void DestroyAllList();
+
+    // FUN_065f4d30. Defined in Deformable2.cpp.
+    void DestroyListByHandle(int Handle);
+
+    // FUN_065f4de0. Defined in Deformable2.cpp.
+    void SweepExpiredList();
+
+    // FUN_065f5400. Defined in Deformable2.cpp.
+    FIkListNode* AllocAimEvent(const unsigned char* Desc, void* PlayExtra);
+
+    // FUN_065f3650. Defined in Deformable2.cpp.
+    void ConstructBody();
+
+    // FUN_065f36c0. Defined in Deformable2.cpp.
+    bool ConnectParts(int* Parts, void* Arg3, void* Arg4);
+
+    // FUN_065f3ed0. Defined in Deformable2.cpp.
+    void Teardown();
+
+    // FUN_065f4070. Defined in Deformable2.cpp.
+    void DrawParts(void* /*Unused*/, ICamera* Camera, int* OutLod, void* RenderArg,
+                   unsigned long Flags);
+
+    // FUN_065f41d0. Defined in Deformable2.cpp.
+    int PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, void* ArgE, void* ArgF,
+                 void* ArgG, void* ArgH, void* ScriptOrNull);
+
+    // FUN_065f4660. Defined in Deformable2.cpp.
+    int PlayAnimChain(void* Name, void* Extra, void* ArgC, void* ArgD, void* ArgE, void* ArgF,
+                      void* ArgG, void* ArgH, void* Joint);
+
+    // FUN_065f59d0. Defined in Deformable2.cpp.
+    unsigned char WalkHardpoints(void* UserFn, void* UserData);
 };
 
 static_assert(sizeof(FDeformableFactory) == 0x0C, "factory must be 0xC");

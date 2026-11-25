@@ -1195,19 +1195,18 @@ static const FPayloadServerMiscObjUpdate* Ch2MiscObjUpdate(const FPacketBase* Pa
 
 // FUN_06d98b20: basic_string<unsigned short>::assign(source, 0, npos) into packet+0x40.
 // The string is wide: the MSVCP60 imports are the basic_string<G> instantiation.
-static void Ch2MiscObjUpdateSetText(FPayloadServerMiscObjUpdate* Wire,
-                                    const std::wstring& Source) {
-    Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagText);
-    Wire->Text.assign(Source, 0, std::wstring::npos);
+void FPayloadServerMiscObjUpdate::SetText(const std::wstring& Source) {
+    Flags = (unsigned short)(Flags | kMiscObjUpdateFlagText);
+    Text.assign(Source, 0, std::wstring::npos);
 }
 
 // FUN_06d98cf0, called once per element; an empty vector leaves the flag clear and the
 // receiver never calls slot 120.
-static void Ch2MiscObjUpdateAddId(FPayloadServerMiscObjUpdate* Wire, unsigned int Value) {
-    Wire->Flags = (unsigned short)(Wire->Flags | kMiscObjUpdateFlagIds);
-    Wire->Ids.push_back(Value);
+void FPayloadServerMiscObjUpdate::AddId(unsigned int Value) {
+    Flags = (unsigned short)(Flags | kMiscObjUpdateFlagIds);
+    Ids.push_back(Value);
     // Every push_back stores the low byte of the new size at packet+0x68, the wire count.
-    Wire->IdCount = (unsigned char)(Wire->Ids.size() & 0xffu);
+    IdCount = (unsigned char)(Ids.size() & 0xffu);
 }
 
 // Args[0] is the sender variant; Args[1..] are that slot's arguments minus the session id.
@@ -1232,7 +1231,7 @@ static bool MarshalMiscObjUpdate(FPacketBase* Packet, const unsigned int* Args, 
     case kMiscObjUpdateVariant_Motd: { // 0x06d8c430: FUN_06d98b20
         // The wide string's address (Server's PlayerDB::SetMOTD, 0x746e0), read untested.
         const std::wstring* Source = reinterpret_cast<const std::wstring*>(Args[1]);
-        Ch2MiscObjUpdateSetText(Wire, *Source);
+        Wire->SetText(*Source);
         return true;
     }
 
@@ -1270,7 +1269,7 @@ static bool MarshalMiscObjUpdate(FPacketBase* Packet, const unsigned int* Args, 
             reinterpret_cast<const std::vector<unsigned int>*>(Args[1]);
         for (std::vector<unsigned int>::const_iterator It = Source->begin();
              It != Source->end(); ++It) {
-            Ch2MiscObjUpdateAddId(Wire, *It);
+            Wire->AddId(*It);
         }
         return true;
     }
@@ -2073,7 +2072,7 @@ static bool MarshalSetMissionObjectives(FPacketBase* Packet, const unsigned int*
         Record->Pad_0x01[2] = 0;
         Record->TextBuffer = RpcFlattenFmtStr(Source->Entries[i].Text, Record->TextSize);
         // FUN_06d8fc10 pushes and bumps packet+0x38 and packet+0x44 together.
-        RpcMissionObjectiveListPushBack(&Live->Objectives, Record);
+        Live->Objectives.PushBack(Record);
         ++Live->Count;
     }
     return true;
@@ -2536,7 +2535,7 @@ static bool MarshalCharacterInfo(FPacketBase* Packet, const unsigned int* Args,
         // runs on the result either way.
         FRpcCharacterInfoWireRecord* Copy = new (std::nothrow) FRpcCharacterInfoWireRecord();
         RpcCharacterInfoRecordToWire(Copy, Record);
-        RpcCharacterInfoWireListPushBack(&Wire->Records, Copy);
+        Wire->Records.PushBack(Copy);
         Previous = Record;
     }
     Wire->SaveFailureCount = Source->SaveFailureCount;
@@ -2602,7 +2601,7 @@ __declspec(dllexport) bool RpcHandleCharacterInfo(const FPacketBase* Packet, ICl
     // FUN_06d94460 deep-copies the packet's records into the stack list; everything below
     // reads the copy, not the packet.
     FCharacterInfoLocalList Local;
-    RpcCharacterInfoWireListCopy(&Local.List, &Wire->Records);
+    Local.List.Copy(&Wire->Records);
 
     for (const FRpcCharacterInfoWireNode* Node = Local.List.Head->Next;
          Node != Local.List.Head; Node = Node->Next) {

@@ -10,6 +10,7 @@
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
 #include "common_server_types.h"
+#include "rpc_packet_classes.h"
 
 #include <new>
 #include <ostream>

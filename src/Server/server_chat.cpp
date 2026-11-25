@@ -102,23 +102,23 @@ static unsigned int ChatIdFromWord(unsigned int Id)
 // ---------------------------------------------------------------------------
 
 // FUN_06d4a1e0 (thiscall on the slot).
-static bool PlayerData_HasSelectedCharacter(const PlayerData& Slot)
+bool PlayerData::has_selected_character() const
 {
     if (!IsMPServer())
         return true;
-    return Slot.selected_character.Buffer[0] != '\0';
+    return selected_character.Buffer[0] != '\0';
 }
 
 // FUN_06d4eda0 (thiscall on the slot): the fallback is .data:06d8d40c; the result aliases
 // the vibe's own name buffer. Also ported in server_basedb.cpp and server_classes.cpp.
 static const wchar_t GChatBadName[] = L">>>BAD   NAME<<<";
 
-static const wchar_t* PlayerData_GetCharacterName(const PlayerData& Slot)
+const wchar_t* PlayerData::get_character_name() const
 {
     const wchar_t* DisplayName = GChatBadName;
     FmtStr Name1;
     FmtStr Name2;
-    if (::Reputation::Vibe::GetName(Slot.rep_vibe, Name1, Name2, DisplayName) == -2)
+    if (::Reputation::Vibe::GetName(rep_vibe, Name1, Name2, DisplayName) == -2)
         DisplayName = GChatBadName;
     return DisplayName;
 }
@@ -152,10 +152,10 @@ static void ChatGroup_Invite(unsigned int Inviter, unsigned int Invitee, const w
     if (!Players.is_valid(Invitee))
         return;
     PlayerData& InviteeSlot = Players[Invitee];
-    if (!PlayerData_HasSelectedCharacter(InviteeSlot))
+    if (!InviteeSlot.has_selected_character())
         return;
     if (Name != nullptr &&
-        _wcsicmp(Name, PlayerData_GetCharacterName(InviteeSlot)) != 0)
+        _wcsicmp(Name, InviteeSlot.get_character_name()) != 0)
         return;
 
     // A groupless inviter founds one, joining it first.
@@ -195,10 +195,10 @@ static void ChatGroup_Join(unsigned int Joiner, unsigned int Inviter, const wcha
     if (!Players.is_valid(Inviter))
         return;
     PlayerData& InviterSlot = Players[Inviter];
-    if (!PlayerData_HasSelectedCharacter(InviterSlot))
+    if (!InviterSlot.has_selected_character())
         return;
     if (Name != nullptr &&
-        _wcsicmp(Name, PlayerData_GetCharacterName(InviterSlot)) != 0)
+        _wcsicmp(Name, InviterSlot.get_character_name()) != 0)
         return;
 
     CPlayerGroup* const OldGroup = static_cast<CPlayerGroup*>(JoinerSlot.group_ptr);
@@ -269,7 +269,7 @@ typedef bool (__cdecl* FChatCommandFn)(FChatCommandContext* Ctx, std::vector<std
 // - `.` is spelled `[^\n]`: GRETA's dot (vtable PTR_06d6906c) fails only on NUL or '\n',
 //   while ECMAScript's also refuses '\r', U+2028 and U+2029.
 // - `^` is GRETA's beginning-of-STRING node (FUN_06d284c0); MSVC's `^` also matches after
-//   every '\n', so ChatCommand_Match passes match_continuous (every pattern starts with
+//   every '\n', so FChatCommand::match passes match_continuous (every pattern starts with
 //   `^`).
 // - `\s` is built by ChatCommand_SpaceClass: GRETA classifies code units <= 0xff with
 //   msvcrt _isctype on the "C" table (0x09-0x0D, 0x20; no retail module sets LC_CTYPE)
@@ -297,6 +297,9 @@ static std::wstring ChatCommand_SpaceClass()
 struct FChatCommand {
     std::wregex* Pattern;
     FChatCommandFn Callback;
+
+    // FUN_06d18be0.
+    bool match(FChatCommandContext* Ctx, const wchar_t* Text) const;
 };
 
 // .data:DAT_06d8f5bc (built by LAB_06d18a20). Its atexit FUN_06d18a60 frees the nodes but
@@ -318,20 +321,20 @@ static FChatCommand ChatCommand_Make(const wchar_t* Text, FChatCommandFn Callbac
 
 // FUN_06d18be0 (thiscall on the entry): true on any match, whatever the callback returns;
 // the callback gets one string per backref (0 = whole match).
-static bool ChatCommand_Match(const FChatCommand& Entry, FChatCommandContext* Ctx, const wchar_t* Text)
+bool FChatCommand::match(FChatCommandContext* Ctx, const wchar_t* Text) const
 {
-    if (Entry.Pattern == nullptr)
+    if (Pattern == nullptr)
         return false;
     std::wcmatch Match;
     // match_continuous = GRETA's beginning-of-string `^` (see FChatCommand).
-    if (!std::regex_search(Text, Match, *Entry.Pattern, std::regex_constants::match_continuous))
+    if (!std::regex_search(Text, Match, *Pattern, std::regex_constants::match_continuous))
         return false;
-    if (Entry.Callback == nullptr)
+    if (Callback == nullptr)
         return true;
     std::vector<std::wstring> Args(Match.size());
     for (size_t Index = 0; Index < Match.size(); ++Index)
         Args[Index].assign(Match[Index].first, Match[Index].second);
-    Entry.Callback(Ctx, &Args);
+    Callback(Ctx, &Args);
     return true;
 }
 
@@ -546,7 +549,7 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
         Ctx.bPassThrough = false;
         std::list<FChatCommand>::reverse_iterator It = GChatCommands.rbegin();
         for (; It != GChatCommands.rend(); ++It) {
-            if (ChatCommand_Match(*It, &Ctx, GChatText + 1)) {
+            if (It->match(&Ctx, GChatText + 1)) {
                 if (!Ctx.bPassThrough)
                     return;
                 Sender = Ctx.Sender;
@@ -567,8 +570,8 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
             StyleNode Node(static_cast<unsigned short>(0xd5ec));
             Server_RdlAppend(Rdl, Node);
         }
-        if (PlayerData_HasSelectedCharacter(*SenderSlot)) {
-            TextNode Node(PlayerData_GetCharacterName(*SenderSlot), -1);
+        if (SenderSlot->has_selected_character()) {
+            TextNode Node(SenderSlot->get_character_name(), -1);
             Server_RdlAppend(Rdl, Node);
         } else {
             TextNode Node(L"<unnamed>", -1);
@@ -688,7 +691,7 @@ void Server_SubmitChat(CHAT_ID Sender, unsigned long Size, const void* Data, CHA
         SysDB::SysMapType::iterator Found = SysDB::SysMap.find(SenderSlot->system_id);   // FUN_06d15d10
         if (Found != SysDB::SysMap.end()) {
             std::set<unsigned int> Owners;                     // FUN_06d1b150
-            StarSystem_CollectCreatedOwners(&Found->second, SenderWord, &Owners);
+            Found->second.collect_created_owners(SenderWord, &Owners);
             std::set<unsigned int>::const_iterator It = Owners.begin();
             for (; It != Owners.end(); ++It) {
                 g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(ChatIdFromWord(*It)), Target,

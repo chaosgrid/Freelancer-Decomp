@@ -80,9 +80,6 @@ namespace
     float const GSpacePopAttitudeFloor =
         static_cast<float>(static_cast<double>(-0.6f) + 0.01);
 
-    // DAT_06fd0ea8: this TU's math engine, created on first use (FUN_06fa8fa0).
-    I3DMathEngine* GSpacePopMath = nullptr;
-
     unsigned int ZoneDensity(FSystemZone const* Zone)
     {
         // FUN_06ef9dc0 on zone +0x18; the callers compare it unsigned and widen it to 64 bits
@@ -100,8 +97,6 @@ namespace
     // (I3DMathEngine slot +0x28, TransformXform).
     Vector TransformByPlacement(FSpaceObjPlacement const* Placement, Vector const* Point)
     {
-        if (GSpacePopMath == nullptr)
-            GSpacePopMath = ContentAcquire3DMathEngine();
         FTransform Xform;
         for (int Row = 0; Row < 3; ++Row)
         {
@@ -116,7 +111,7 @@ namespace
         Source.Y = Point->y;
         Source.Z = Point->z;
         FVector Result;
-        GSpacePopMath->TransformXform(Result, Xform, Source);
+        ContentMathEngine()->TransformXform(Result, Xform, Source);
         Vector Out;
         Out.x = Result.X;
         Out.y = Result.Y;

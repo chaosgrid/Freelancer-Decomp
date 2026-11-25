@@ -782,6 +782,12 @@ struct FPayloadServerMiscObjUpdate {
     // the loop bound, so a zero here drops the whole array on the wire.
     unsigned char IdCount;         // +0x48
     unsigned char Pad_0x49[3];        // +0x49
+
+    // FUN_06d98b20. Defined in rpc_payload_ch2.cpp.
+    void SetText(const std::wstring& Source);
+
+    // FUN_06d98cf0. Defined in rpc_payload_ch2.cpp.
+    void AddId(unsigned int Value);
 };
 // Retail payload 0x4c (registry 0x6c). The port's is larger (std::wstring / std::vector
 // are not VC6's 0x10 bytes each); FPacket_FLPACKET_SERVER_MISCOBJUPDATE holds it as a
@@ -1182,6 +1188,10 @@ struct FRpcMissionObjectiveList {
     unsigned char Pad_0x01[3];      // +0x01
     FRpcMissionObjectiveNode* Head; // +0x04
     unsigned int Size;              // +0x08
+
+    // Takes ownership of Record (retail hands FUN_06d8fc10 the operator new(0xc) block it
+    // just filled, and the packet destructor frees it).
+    void PushBack(FRpcMissionObjectiveRecord* Record);
 };
 static_assert(sizeof(FRpcMissionObjectiveList) == 0x0c,
               "retail std::list header is 0x0c: allocator, head, size");

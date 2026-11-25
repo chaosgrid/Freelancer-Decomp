@@ -216,51 +216,51 @@ void VMeshBuildVertexDesc(const FVmeshDataHeader* Header, unsigned long VertexSt
 static int VMeshGroupRemove(FVmeshGroup* Group, FVmeshData* Data);
 
 // FUN_06c2d480: DestroyVb(&group->VertexBuffer).
-void VMeshGroupDestroyVb(FVmeshGroup* Group)
+void FVmeshGroup::DestroyVb()
 {
-    G_VertexBuffer->DestroyVb(&Group->VertexBuffer);
+    G_VertexBuffer->DestroyVb(&VertexBuffer);
 }
 
 // FUN_06c2d490: DestroyIb(&group->IndexBuffer).
-void VMeshGroupDestroyIb(FVmeshGroup* Group)
+void FVmeshGroup::DestroyIb()
 {
-    G_IndexBuffer->DestroyIb(&Group->IndexBuffer);
+    G_IndexBuffer->DestroyIb(&IndexBuffer);
 }
 
 // FUN_06c2d460: Fvf = 0, then both buffers.
-static void VMeshGroupReleaseBuffers(FVmeshGroup* Group)
+void FVmeshGroup::ReleaseBuffers()
 {
-    Group->Fvf = 0;
-    VMeshGroupDestroyVb(Group);
-    VMeshGroupDestroyIb(Group);
+    Fvf = 0;
+    DestroyVb();
+    DestroyIb();
 }
 
 // FUN_06c2d330 (thiscall on the group). Already a member -> true. The first member
 // fixes the FVF; a different FVF -> false. Totals grow before the old group lets go.
-static bool VMeshGroupAdd(FVmeshGroup* Group, FVmeshData* Data)
+bool FVmeshGroup::Add(FVmeshData* Data)
 {
-    if (Data->Group == Group)
+    if (Data->Group == this)
         return true;
     const FVmeshDataHeader* Header = Data->Header;
-    if (Group->Fvf == 0)
-        Group->Fvf = Header->Fvf;
-    const bool bSameFvf = Group->Fvf == Header->Fvf;
+    if (Fvf == 0)
+        Fvf = Header->Fvf;
+    const bool bSameFvf = Fvf == Header->Fvf;
     if (!bSameFvf)
         return bSameFvf;
-    Group->VertexTotal += Header->Vertices;
-    Group->IndexTotal += Header->Indices;
+    VertexTotal += Header->Vertices;
+    IndexTotal += Header->Indices;
     if (Data->Group != nullptr)
         VMeshGroupRemove(Data->Group, Data);
-    Data->Group = Group;
-    FVmeshData* Last = Group->Last;
-    Group->Last = Data;
+    Data->Group = this;
+    FVmeshData* Last = this->Last;
+    this->Last = Data;
     if (Last == nullptr)
-        Group->First = Data;
+        First = Data;
     else
         Last->Next = Data;
     Data->Prev = Last;
     Data->Next = nullptr;
-    Group->Count += 1;
+    Count += 1;
     return bSameFvf;
 }
 
@@ -296,7 +296,7 @@ static int VMeshGroupRemove(FVmeshGroup* Group, FVmeshData* Data)
         const int Count = Group->Count;
         if (Count == 0)
         {
-            VMeshGroupReleaseBuffers(Group);
+            Group->ReleaseBuffers();
             delete Group;
         }
         Result = Count;
@@ -307,26 +307,26 @@ static int VMeshGroupRemove(FVmeshGroup* Group, FVmeshData* Data)
 // FUN_06c2d4a0 (ECX = group). A VB that still selects is kept. Otherwise it is rebuilt for
 // VertexTotal vertices and every member copies its vertices in at a running base; a failed
 // copy stops the walk. Returns the final select_vb result (or the create failure).
-int VMeshGroupEnsureVb(FVmeshGroup* Group)
+int FVmeshGroup::EnsureVb()
 {
-    int Result = G_VertexBuffer->SelectVb(Group->VertexBuffer);
+    int Result = G_VertexBuffer->SelectVb(VertexBuffer);
     if (Result >= 0)
         return Result;
-    G_VertexBuffer->DestroyVb(&Group->VertexBuffer);
-    Result = G_VertexBuffer->CreateVb(Group->Fvf, Group->VertexTotal,
-                                      (unsigned int**)(&Group->VertexBuffer), 0);
+    G_VertexBuffer->DestroyVb(&VertexBuffer);
+    Result = G_VertexBuffer->CreateVb(Fvf, VertexTotal,
+                                      (unsigned int**)(&VertexBuffer), 0);
     if (Result < 0)
         return Result;
     unsigned int LockOffset = 0;
     void* LockBits = nullptr;
-    if (G_VertexBuffer->LockVb(Group->VertexBuffer, &LockOffset, &LockBits, Group->VertexTotal) >= 0)
+    if (G_VertexBuffer->LockVb(VertexBuffer, &LockOffset, &LockBits, VertexTotal) >= 0)
     {
         unsigned long Base = 0;
         FVmeshData* Data = nullptr;
         while (true)
         {
             if (Data == nullptr)
-                Data = Group->First;
+                Data = First;
             else
                 Data = Data->Next;
             if (Data == nullptr)
@@ -334,32 +334,32 @@ int VMeshGroupEnsureVb(FVmeshGroup* Group)
             FRpVertexSrcDesc Desc;
             VMeshBuildVertexDesc(Data->Header, 0, Data->Header->Vertices, &Desc);
             unsigned int OutBase = Base;
-            if (G_VertexBuffer->CopyVertices(Group->VertexBuffer, &OutBase, &Desc, 0,
+            if (G_VertexBuffer->CopyVertices(VertexBuffer, &OutBase, &Desc, 0,
                                              Desc.SrcCount) < 0)
                 break;
-            Data->VertexBuffer = Group->VertexBuffer;
-            Data->Fvf = Group->Fvf;
+            Data->VertexBuffer = VertexBuffer;
+            Data->Fvf = Fvf;
             Data->BaseVertex = OutBase;
             Base += Data->Header->Vertices;
         }
-        G_VertexBuffer->UnlockVb(Group->VertexBuffer);
+        G_VertexBuffer->UnlockVb(VertexBuffer);
     }
-    return G_VertexBuffer->SelectVb(Group->VertexBuffer);
+    return G_VertexBuffer->SelectVb(VertexBuffer);
 }
 
-int VMeshGroupEnsureIb(FVmeshGroup* Group, unsigned long BaseVertex)
+int FVmeshGroup::EnsureIb(unsigned long BaseVertex)
 {
-    int Result = G_IndexBuffer->SelectIb(Group->IndexBuffer, BaseVertex, 0, 0);
+    int Result = G_IndexBuffer->SelectIb(IndexBuffer, BaseVertex, 0, 0);
     if (Result >= 0)
         return Result;
-    G_IndexBuffer->DestroyIb(&Group->IndexBuffer);
-    Result = G_IndexBuffer->CreateIb(Group->IndexTotal,
-                                     (unsigned int**)(&Group->IndexBuffer), 0);
+    G_IndexBuffer->DestroyIb(&IndexBuffer);
+    Result = G_IndexBuffer->CreateIb(IndexTotal,
+                                     (unsigned int**)(&IndexBuffer), 0);
     if (Result < 0)
         return Result;
     unsigned int LockOffset = 0;
     void* LockBits = nullptr;
-    if (G_IndexBuffer->LockIb(Group->IndexBuffer, &LockOffset, &LockBits, Group->IndexTotal) >= 0)
+    if (G_IndexBuffer->LockIb(IndexBuffer, &LockOffset, &LockBits, IndexTotal) >= 0)
     {
         unsigned short* Dest = (unsigned short*)LockBits;
         unsigned long Start = 0;
@@ -367,7 +367,7 @@ int VMeshGroupEnsureIb(FVmeshGroup* Group, unsigned long BaseVertex)
         while (true)
         {
             if (Data == nullptr)
-                Data = Group->First;
+                Data = First;
             else
                 Data = Data->Next;
             if (Data == nullptr)
@@ -396,13 +396,13 @@ int VMeshGroupEnsureIb(FVmeshGroup* Group, unsigned long BaseVertex)
                 std::memcpy(Dest, Source, (size_t)Header->Indices * 2);
                 Dest += Header->Indices;
             }
-            Data->IndexBuffer = Group->IndexBuffer;
+            Data->IndexBuffer = IndexBuffer;
             Data->StartIndex = Start;
             Start += Header->Indices;
         }
-        G_IndexBuffer->UnlockIb(Group->IndexBuffer);
+        G_IndexBuffer->UnlockIb(IndexBuffer);
     }
-    return G_IndexBuffer->SelectIb(Group->IndexBuffer, BaseVertex, 0, 0);
+    return G_IndexBuffer->SelectIb(IndexBuffer, BaseVertex, 0, 0);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -410,40 +410,40 @@ int VMeshGroupEnsureIb(FVmeshGroup* Group, unsigned long BaseVertex)
 // ---------------------------------------------------------------------------------------
 
 // FUN_06c2df60 (thiscall): SizeKib = (int)Size * (double)1/1024 (DAT_06c36490) stored as float.
-static FVmeshData* VMeshDataConstruct(FVmeshData* This, const char* Name, unsigned long Size)
+FVmeshData* FVmeshData::Construct(const char* Name, unsigned long Size)
 {
-    This->SizeKib = (float)((double)((int)Size) * 0.0009765625);
-    This->Crc = 0;
-    This->Next = nullptr;
-    This->Prev = nullptr;
-    This->Group = nullptr;
-    This->VertexBuffer = nullptr;
-    This->Fvf = 0;
-    This->BaseVertex = 0;
-    This->IndexBuffer = nullptr;
-    This->StartIndex = 0;
-    This->Materials = nullptr;
-    This->Header = nullptr;
-    This->RefCount = 1;
-    This->Name = _strdup(Name);
-    This->Crc = DACOM_CRC::GetCRC32(This->Name);
-    VMeshDataMapInsert(This);
-    LogStream::LogEvent("Memory_VMeshData", This->SizeKib, 0x610);
-    return This;
+    SizeKib = (float)((double)((int)Size) * 0.0009765625);
+    Crc = 0;
+    Next = nullptr;
+    Prev = nullptr;
+    Group = nullptr;
+    VertexBuffer = nullptr;
+    Fvf = 0;
+    BaseVertex = 0;
+    IndexBuffer = nullptr;
+    StartIndex = 0;
+    Materials = nullptr;
+    Header = nullptr;
+    RefCount = 1;
+    this->Name = _strdup(Name);
+    Crc = DACOM_CRC::GetCRC32(this->Name);
+    VMeshDataMapInsert(this);
+    LogStream::LogEvent("Memory_VMeshData", SizeKib, 0x610);
+    return this;
 }
 
 // FUN_06c2df00: map entry, group membership, name, leaf bytes and the material array go (the
 // materials themselves are released by the parts, FUN_06c30980), then the negative event.
-static void VMeshDataDestruct(FVmeshData* This)
+void FVmeshData::Destruct()
 {
-    VMeshDataMapErase(This);
-    if (This->Group != nullptr)
-        VMeshGroupRemove(This->Group, This);
-    if (This->Name != nullptr)
-        std::free(This->Name);
-    delete[] (const unsigned char*)This->Header;
-    delete[] This->Materials;
-    LogStream::LogEvent("Memory_VMeshData", -This->SizeKib, 0x610);
+    VMeshDataMapErase(this);
+    if (Group != nullptr)
+        VMeshGroupRemove(Group, this);
+    if (Name != nullptr)
+        std::free(Name);
+    delete[] (const unsigned char*)Header;
+    delete[] Materials;
+    LogStream::LogEvent("Memory_VMeshData", -SizeKib, 0x610);
 }
 
 int VMeshDataAddRef(FVmeshData* Data)
@@ -453,14 +453,14 @@ int VMeshDataAddRef(FVmeshData* Data)
 }
 
 // FUN_06c2dff0: at <= 0 the object is destroyed; returns the decremented count.
-int VMeshDataRelease(FVmeshData* Data)
+int FVmeshData::Release()
 {
-    Data->RefCount -= 1;
-    const int Count = Data->RefCount;
+    RefCount -= 1;
+    const int Count = RefCount;
     if (Count <= 0)
     {
-        VMeshDataDestruct(Data);
-        delete Data;
+        Destruct();
+        delete this;
     }
     return Count;
 }
@@ -484,7 +484,7 @@ FVmeshData* VMeshDataLoad(IFileSystem* File, const char* Name)
     unsigned char* Bytes = nullptr;
     int bRead = 0;
     FFileSystemDesc Desc;
-    FileDescInit(&Desc, "VMeshData", "FileSystem");
+    Desc.Init("VMeshData", "FileSystem");
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle != -1)
     {
@@ -508,15 +508,14 @@ FVmeshData* VMeshDataLoad(IFileSystem* File, const char* Name)
         return nullptr;
     }
 
-    FVmeshData* Data = VMeshDataConstruct(new FVmeshData,
-                                          Name, Size);
+    FVmeshData* Data = (new FVmeshData)->Construct(Name, Size);
     Data->Header = (FVmeshDataHeader*)Bytes;
     if ((Data->Header->Flags & 1) == 0)
     {
         char Message[0x2000];
         std::sprintf(Message, "mesh in old format: %s", Name);
         RendCompFdumpAt(kFdumpWarning, G_FileVMeshData, 0x3A, Message);
-        VMeshDataDestruct(Data);
+        Data->Destruct();
         delete Data;
         return nullptr;
     }
@@ -679,15 +678,15 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
                 List->push_back(Data);
                 if (Group == nullptr)
                     Group = new FVmeshGroup();
-                if (!VMeshGroupAdd(Group, Data))
+                if (!Group->Add(Data))
                 {
                     if (Group->Count == 0)
                     {
-                        VMeshGroupReleaseBuffers(Group);
+                        Group->ReleaseBuffers();
                         delete Group;
                     }
                     Group = new FVmeshGroup();
-                    if (!VMeshGroupAdd(Group, Data))
+                    if (!Group->Add(Data))
                     {
                         char Message[0x2000];
                         std::sprintf(Message, "couldnt add vmesh to vmeshlibrary? %s",
@@ -695,7 +694,7 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
                         RendCompFdumpAt(kFdumpWarning, G_FileVMeshLibrary, 0xA5, Message);
                     }
                 }
-                VMeshDataRelease(Data);
+                Data->Release();
             }
         NextEntry:
             if (Child != nullptr)
@@ -714,7 +713,7 @@ void* DACOM_API FVMeshLibrary::Load(void* FileArg, int LodFilter)
     }
     if (Group != nullptr && Group->Count == 0)
     {
-        VMeshGroupReleaseBuffers(Group);
+        Group->ReleaseBuffers();
         delete Group;
     }
     return List;
@@ -731,7 +730,7 @@ void DACOM_API FVMeshLibrary::Unload(void* Handle)
         FVmeshData* Data = List->front();
         List->pop_front();
         if (Data != nullptr)
-            VMeshDataRelease(Data);
+            Data->Release();
     }
     delete List;
 }

@@ -87,6 +87,9 @@ struct FContentPlayerStats
     std::vector<unsigned int> SystemsVisited;                 // +0x58
     std::vector<unsigned int> BasesVisited;                   // +0x68
     std::vector<unsigned int> HolesVisited;                   // +0x78
+
+    // FUN_06f495f0: write the statistics block.
+    void Save(FILE* File) const;
 };
 
 // Retail FUN_06eb6be0: vtable 06fb4640 {FUN_06eacd40 AddRef, FUN_06eacd50 Release,
@@ -346,6 +349,13 @@ struct FContentPlayerState : FContentPlayerStateBase
     // FUN_06f48c60 (RET 8; caller TU34 FUN_06f00b90): TalkCount of the first vnpc
     // record {BaseId, NpcId} (+0xec), 0 when there is none.
     unsigned int GetVnpcTalkCount(unsigned int BaseId, unsigned int NpcId) const;
+
+    // Content.dll FUN_06f49440 — rank / next-rank cash from the PTough scale table.
+    void RecalculateRank();
+
+    // FUN_06ef00d0 (TU27, thiscall on the player state): the state has a ship object (+0x10).
+    // Callers in DestroyMission and TU61.
+    bool HasShip() const;
 };
 
 class INI_Reader;
@@ -373,11 +383,7 @@ void UpdateAllContentPlayerTimes(float DeltaTime);
 void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader);
 void SetContentPlayerMissionNumber(FContentPlayerState* State, unsigned int MissionNumber,
                                    unsigned int bAdvanceRank);
-// FUN_06f495f0: write the statistics block.
-void SaveContentPlayerStats(FContentPlayerStats const& Stats, FILE* File);
 
-// Content.dll FUN_06f49440 — rank / next-rank cash from the PTough scale table.
-void RecalculateContentPlayerRank(FContentPlayerState* State);
 // Content.dll FUN_06f49c50 — load [PlayerToughnessScale] / ptough_graph_pt.
 void LoadPlayerToughnessScale(INI_Reader* Reader);
 

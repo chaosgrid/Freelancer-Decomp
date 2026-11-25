@@ -113,25 +113,22 @@ static const char* const G_ParentNode = "..";
 // live in it. The port uses the current std::map; no VC6 layout is kept.
 static std::map<unsigned long, FDeformMesh*> G_MeshCache;
 
-static int MeshTotalIndexCount(FMeshArchetype* Arch);
-static int MeshVertexCapacity(FMeshArchetype* Arch);
-static unsigned char ComputeMeshBoundSphere(FMeshArchetype* Arch, float* OutRadius, float* OutCenter);
 
 // FUN_065f28e0.
-static void AddRefDeformMesh(FDeformMesh* Mesh)
+void FDeformMesh::AddRef()
 {
-    Mesh->RefCount += 1;
+    RefCount += 1;
 }
 
 // FUN_065f28f0.
-static int ReleaseDeformMesh(FDeformMesh* Mesh)
+int FDeformMesh::Release()
 {
-    Mesh->RefCount -= 1;
-    const int Remaining = Mesh->RefCount;
+    RefCount -= 1;
+    const int Remaining = RefCount;
     if (Remaining > 0)
         return Remaining;
-    G_MeshCache.erase(Mesh->NameCrc);
-    delete Mesh;
+    G_MeshCache.erase(NameCrc);
+    delete this;
     return Remaining;
 }
 
@@ -189,12 +186,12 @@ static void ReleaseFaceGroupMaterialSlot(IMaterial** MaterialSlot)
 }
 
 // FUN_065f9430. Retail does not test the list pointer for null.
-static void DestroyBoneVertexList(FBoneVertexList* List)
+void FBoneVertexList::Destroy()
 {
-    delete[] (unsigned char*)List->Start;
-    List->Start = nullptr;
-    List->Finish = nullptr;
-    List->CapacityEnd = nullptr;
+    delete[] (unsigned char*)Start;
+    Start = nullptr;
+    Finish = nullptr;
+    CapacityEnd = nullptr;
 }
 
 // FUN_065f9ba0 with flags 0 (bit 0 would also delete the list). Retail does not test the list
@@ -242,7 +239,7 @@ FMeshArchetype::~FMeshArchetype()
         int Index = Count - 1;
         while (Index >= 0)
         {
-            DestroyBoneVertexList(&BoneVerts[Index]);
+            BoneVerts[Index].Destroy();
             Index -= 1;
         }
         delete[] (unsigned char*)Header;
@@ -270,23 +267,6 @@ FMeshArchetype::~FMeshArchetype()
     UvIndices = nullptr;
     UvData = nullptr;
     UvDeform = nullptr;
-}
-
-// PTR_LAB_0660135c slot 0 (LAB_065f8b40) and slot 1 (LAB_065f8b60).
-int FMeshArchetype::GetIndexCount()
-{
-    return MeshTotalIndexCount(this);
-}
-
-int FMeshArchetype::GetVertexCapacity()
-{
-    return MeshVertexCapacity(this);
-}
-
-// Slot 4 (LAB_065f8d00).
-unsigned char FMeshArchetype::GetBoundSphere(float* OutRadius, float* OutCenter)
-{
-    return ComputeMeshBoundSphere(this, OutRadius, OutCenter);
 }
 
 void FillFileDesc(FFileSystemDesc* Desc, const char* Path)
@@ -508,38 +488,40 @@ static void BindUvBoneIdsToFaceGroups(FMeshArchetype* Arch)
     }
 }
 
+// PTR_LAB_0660135c slot 0 (LAB_065f8b40) and slot 1 (LAB_065f8b60).
 // PTR_LAB_0660135c slot 0 LAB_065f8b40. Retail does not test the mesh or the group array for
 // null.
-static int MeshTotalIndexCount(FMeshArchetype* Arch)
+int FMeshArchetype::GetIndexCount()
 {
     int Total = 0;
-    for (int Index = 0; Index < Arch->FaceGroupCount; ++Index)
-        Total += (int)(Arch->FaceGroups[Index].IndexCount);
+    for (int Index = 0; Index < FaceGroupCount; ++Index)
+        Total += (int)(FaceGroups[Index].IndexCount);
     return Total;
 }
 
 // PTR_LAB_0660135c slot 1 LAB_065f8b60: [this+0x20] + [this+0x10] (see Field_0x20). Retail
 // does not test the mesh for null.
-static int MeshVertexCapacity(FMeshArchetype* Arch)
+int FMeshArchetype::GetVertexCapacity()
 {
-    return (int)Arch->Field_0x20 + Arch->PointIndexCount;
+    return (int)Field_0x20 + PointIndexCount;
 }
 
 static void WriteVec3(float* Dest, float X, float Y, float Z);
 static void ScaleVec3(float* Out, const float* In, float Scale);
 static void SubVec3(float* Out, const float* A, const float* B);
 
+// Slot 4 (LAB_065f8d00).
 // LAB_065f8d00, the DFM mesh's slot 4.
-static unsigned char ComputeMeshBoundSphere(FMeshArchetype* Arch, float* OutRadius, float* OutCenter)
+unsigned char FMeshArchetype::GetBoundSphere(float* OutRadius, float* OutCenter)
 {
-    if (Arch->SphereReady == 0)
+    if (SphereReady == 0)
     {
-        const unsigned int Count = (unsigned int)Arch->VertexCount;
-        const float* const Points = (const float*)Arch->Vertices;
-        Arch->SphereCenter[2] = 0.0f;
-        Arch->SphereCenter[1] = 0.0f;
-        Arch->SphereCenter[0] = 0.0f;
-        Arch->SphereRadius = 0.0f;
+        const unsigned int Count = (unsigned int)VertexCount;
+        const float* const Points = (const float*)Vertices;
+        SphereCenter[2] = 0.0f;
+        SphereCenter[1] = 0.0f;
+        SphereCenter[0] = 0.0f;
+        SphereRadius = 0.0f;
         const unsigned char bNonEmpty = (Count != 0) ? 1 : 0;
         if (bNonEmpty != 0)
         {
@@ -576,14 +558,14 @@ static unsigned char ComputeMeshBoundSphere(FMeshArchetype* Arch, float* OutRadi
             Sum[2] = Points[MaxZ * 3 + 2] + Points[MinZ * 3 + 2];
             float Center[3];
             ScaleVec3(Center, Sum, 0.5f);
-            Arch->SphereCenter[0] = Center[0];
-            Arch->SphereCenter[1] = Center[1];
-            Arch->SphereCenter[2] = Center[2];
+            SphereCenter[0] = Center[0];
+            SphereCenter[1] = Center[1];
+            SphereCenter[2] = Center[2];
             float Extent = (Dx > Dy) ? Dx : Dy;
             if (!(Extent > Dz))
                 Extent = Dz;
             const double Radius = (double)Extent * 0.5;
-            Arch->SphereRadius = (float)Radius;
+            SphereRadius = (float)Radius;
             float RadiusSq = (float)(Radius * Radius);
 
             Index = 0;
@@ -591,7 +573,7 @@ static unsigned char ComputeMeshBoundSphere(FMeshArchetype* Arch, float* OutRadi
             {
                 const float* const P = Points + Index * 3;
                 float D[3];
-                SubVec3(D, P, Arch->SphereCenter);
+                SubVec3(D, P, SphereCenter);
                 const double DistSq = ((double)D[1] * D[1] + (double)D[2] * D[2]) +
                                       (double)D[0] * D[0];
                 if (DistSq > (double)RadiusSq)
@@ -599,14 +581,14 @@ static unsigned char ComputeMeshBoundSphere(FMeshArchetype* Arch, float* OutRadi
                     const double Dist = std::sqrt(DistSq);
                     const float DistF = (float)Dist;
                     const double NewRadius =
-                        (Dist + (double)Arch->SphereRadius) * 0.5;
-                    Arch->SphereRadius = (float)NewRadius;
+                        (Dist + (double)SphereRadius) * 0.5;
+                    SphereRadius = (float)NewRadius;
                     RadiusSq = (float)(NewRadius * NewRadius);
                     const float Shift = (float)((double)DistF - NewRadius);
                     float Toward[3];
                     ScaleVec3(Toward, P, Shift);
                     float Kept[3];
-                    ScaleVec3(Kept, Arch->SphereCenter, Arch->SphereRadius);
+                    ScaleVec3(Kept, SphereCenter, SphereRadius);
                     float Blend[3];
                     WriteVec3(Blend, Toward[0] + Kept[0], Toward[1] + Kept[1], Toward[2] + Kept[2]);
                     const double Inv = 1.0 / (double)DistF;
@@ -614,19 +596,19 @@ static unsigned char ComputeMeshBoundSphere(FMeshArchetype* Arch, float* OutRadi
                     WriteVec3(NewCenter, (float)((double)Blend[0] * Inv),
                               (float)((double)Blend[1] * Inv),
                               (float)((double)Blend[2] * Inv));
-                    Arch->SphereCenter[0] = NewCenter[0];
-                    Arch->SphereCenter[1] = NewCenter[1];
-                    Arch->SphereCenter[2] = NewCenter[2];
+                    SphereCenter[0] = NewCenter[0];
+                    SphereCenter[1] = NewCenter[1];
+                    SphereCenter[2] = NewCenter[2];
                 }
                 Index += 1;
             }
         }
-        Arch->SphereReady = bNonEmpty;
+        SphereReady = bNonEmpty;
     }
-    OutCenter[0] = Arch->SphereCenter[0];
-    OutCenter[1] = Arch->SphereCenter[1];
-    OutCenter[2] = Arch->SphereCenter[2];
-    *OutRadius = Arch->SphereRadius;
+    OutCenter[0] = SphereCenter[0];
+    OutCenter[1] = SphereCenter[1];
+    OutCenter[2] = SphereCenter[2];
+    *OutRadius = SphereRadius;
     return 1;
 }
 
@@ -712,34 +694,33 @@ static void Transpose3x3(const float* Source, float* Dest)
 }
 
 // FUN_065f90c0. No tests.
-static void FillMeshStreamDesc(FMeshArchetype* This, FRpVertexSrcDesc* Out)
+void FMeshArchetype::FillStreamDesc(FRpVertexSrcDesc* Out)
 {
     std::memset(Out, 0, sizeof(FRpVertexSrcDesc));
-    Out->SrcFvf = This->ParseTag;
+    Out->SrcFvf = ParseTag;
     Out->Flags = 6;
-    Out->SrcCount = This->PointIndexCount;
-    Out->Position.Base = (const unsigned char*)This->Vertices;
+    Out->SrcCount = PointIndexCount;
+    Out->Position.Base = (const unsigned char*)Vertices;
     Out->Position.ByteSize = 0xC;
     Out->Position.Stride = 0x18;
-    Out->Position.IndexArray = This->PointIndices;
-    Out->Position.Count = This->VertexCount;
-    Out->Normal.Base = (unsigned char*)This->Vertices + 0xC;
+    Out->Position.IndexArray = PointIndices;
+    Out->Position.Count = VertexCount;
+    Out->Normal.Base = (unsigned char*)Vertices + 0xC;
     Out->Normal.ByteSize = 0xC;
     Out->Normal.Stride = 0x18;
-    Out->Normal.IndexArray = This->PointIndices;
-    Out->Normal.Count = This->VertexCount;
-    if (This->UvData != nullptr)
+    Out->Normal.IndexArray = PointIndices;
+    Out->Normal.Count = VertexCount;
+    if (UvData != nullptr)
     {
-        Out->Tex[0].Base = (const unsigned char*)This->UvData;
+        Out->Tex[0].Base = (const unsigned char*)UvData;
         Out->Tex[0].ByteSize = 8;
         Out->Tex[0].Stride = 8;
-        Out->Tex[0].IndexArray = This->UvIndices;
-        Out->Tex[0].Count = This->UvCount;
+        Out->Tex[0].IndexArray = UvIndices;
+        Out->Tex[0].Count = UvCount;
     }
 }
 
 static void WriteIdentity3x3(float* Matrix);
-static void ComposeBoneWorldMatrix(FBoneRuntime* Slot, const float* InverseRoot);
 static I3DMathEngine* AcquireMathEngine();
 
 // Reuse a valid VB or recreate it at the descriptor capacity.
@@ -793,7 +774,7 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
                 }
                 else
                 {
-                    ComposeBoneWorldMatrix(Bone, InverseRoot);
+                    Bone->ComposeWorldMatrix(InverseRoot);
                     unsigned char* const Dirty = FaceFlags;
                     const unsigned short* Cursor = List->Start;
                     while (List->Finish != Cursor)
@@ -824,7 +805,7 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
     if (bForce != 0)
     {
         FRpVertexSrcDesc StreamDesc;
-        FillMeshStreamDesc(this, &StreamDesc);
+        FillStreamDesc(&StreamDesc);
         if (G_VertexBuffer->CopyVertices(
                 Vb->Listing.VertexBuffer, (unsigned int*)&Vb->Listing.BaseVertex, &StreamDesc, 0,
                 (unsigned int)PointIndexCount) < 0)
@@ -904,17 +885,17 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
 
 // FUN_065f7340 (thiscall on the face group: context, accumulated IB start). No tests of the
 // context or the material.
-static int DrawFaceGroup(FFaceGroup* Group, FMaterialSubmitContext* Context, int StartIndex)
+int FFaceGroup::Draw(FMaterialSubmitContext* Context, int StartIndex)
 {
-    if (Group->IndexCount == 0)
+    if (IndexCount == 0)
         return 0;
     const int NumVerts =
-        (int)Group->IndexMax - (int)Group->IndexMin + 1;
-    Context->MaterialContext = Group->UvBinding;
-    IMaterial* Material = Group->Material;
+        (int)IndexMax - (int)IndexMin + 1;
+    Context->MaterialContext = UvBinding;
+    IMaterial* Material = this->Material;
     Material->Bind(Context);
-    Material->Submit(Context, Group->Kind, Group->IndexMin, (unsigned long)NumVerts,
-                     (unsigned long)StartIndex, Group->IndexCount, 0x100ul);
+    Material->Submit(Context, Kind, IndexMin, (unsigned long)NumVerts,
+                     (unsigned long)StartIndex, IndexCount, 0x100ul);
     Material->Teardown(Context);
     return NumVerts;
 }
@@ -985,7 +966,7 @@ unsigned char FMeshArchetype::Draw(ICamera* Camera, FDeformPart* Part)
             Binding.Bone = &Part->Lod->BoneSlots[Record->BoneId];
             Group->UvBinding = &Binding;
         }
-        DrawFaceGroup(Group, &Context, (int)Start);
+        Group->Draw(&Context, (int)Start);
         Start += Group->IndexCount;
         GroupIndex += 1;
     }
@@ -1052,7 +1033,7 @@ void FDeformPart::Reset()
         {
             if (Meshes[Index] != nullptr)
             {
-                ReleaseDeformMesh(Meshes[Index]);
+                Meshes[Index]->Release();
                 Meshes[Index] = nullptr;
             }
             Index -= 1;
@@ -1070,17 +1051,17 @@ void FDeformPart::Reset()
 }
 
 // FUN_065f7c70. No tests.
-static void ConstructFaceGroup(FFaceGroup* Group)
+void FFaceGroup::Construct()
 {
-    Group->Kind = 4;
-    Group->MaterialCrc = 0;
-    Group->Material = nullptr;
-    Group->UvBinding = nullptr;
-    Group->IndexMin = 0;
-    Group->IndexMax = 0;
-    Group->Indices = nullptr;
-    Group->IndexCount = 0;
-    Group->UvBoneIndex = 0xFFFFFFFF;
+    Kind = 4;
+    MaterialCrc = 0;
+    Material = nullptr;
+    UvBinding = nullptr;
+    IndexMin = 0;
+    IndexMax = 0;
+    Indices = nullptr;
+    IndexCount = 0;
+    UvBoneIndex = 0xFFFFFFFF;
 }
 
 // FUN_065f7d70: tristrip -> triangle list. Count - 2 is tested unsigned, so only 0 skips and a
@@ -1159,6 +1140,15 @@ struct FMappedFileNode
     int Mapping;        // +0x08 IFileSystem +0x3C (h, 0, PAGE_READONLY, 0, 0, 0), -1 none
     void* View;         // +0x0C IFileSystem +0x40 (mapping, FILE_MAP_READ, 0, 0, 0)
     IFileSystem* Fs;    // +0x10
+
+    // FUN_065f7d10.
+    void Close();
+
+    // FUN_065f8360.
+    void Init(IFileSystem* Fs);
+
+    // FUN_065f8390.
+    int Map(const char* NodeName, unsigned long FindHandle);
 };
 
 // FUN_065f9150.
@@ -1181,23 +1171,23 @@ static void DropFileSystem(IFileSystem** Slot)
 
 // FUN_065f7d10 / FUN_065f7ca0, the node's dtor (7ca0 repeats the final release, a no-op after
 // the first).
-static void CloseMappedFileNode(FMappedFileNode* Node)
+void FMappedFileNode::Close()
 {
-    if (Node->Handle != -1)
+    if (Handle != -1)
     {
-        if (Node->Mapping != -1)
+        if (Mapping != -1)
         {
-            if (Node->View != nullptr)
+            if (View != nullptr)
             {
-                Node->Fs->UnmapFileView((unsigned long)((uintptr_t)Node->View));
-                Node->View = nullptr;
+                Fs->UnmapFileView((unsigned long)((uintptr_t)View));
+                View = nullptr;
             }
-            Node->Fs->CloseFile((unsigned long)Node->Mapping);
+            Fs->CloseFile((unsigned long)Mapping);
         }
-        Node->Fs->CloseFile((unsigned long)Node->Handle);
-        Node->Handle = -1;
+        Fs->CloseFile((unsigned long)Handle);
+        Handle = -1;
     }
-    DropFileSystem(&Node->Fs);
+    DropFileSystem(&Fs);
 }
 
 // The open-and-map sequence FUN_065f7760 inlines twice.
@@ -1217,30 +1207,30 @@ static void OpenMappedFileNode(FMappedFileNode* Node, const char* NodeName)
 }
 
 // FUN_065f8360. Mapping is not touched (every reader tests Handle first).
-static void InitMappedFileNode(FMappedFileNode* Node, IFileSystem* Fs)
+void FMappedFileNode::Init(IFileSystem* Fs)
 {
-    HoldFileSystem(&Node->Fs, Fs);
-    Node->Handle = -1;
-    Node->Size = 0;
-    Node->View = nullptr;
+    HoldFileSystem(&this->Fs, Fs);
+    Handle = -1;
+    Size = 0;
+    View = nullptr;
 }
 
 // FUN_065f8390 (name, find handle).
-static int MapFileNode(FMappedFileNode* Node, const char* NodeName, unsigned long FindHandle)
+int FMappedFileNode::Map(const char* NodeName, unsigned long FindHandle)
 {
     FFileSystemDesc Desc;
     FillFileDesc(&Desc, NodeName);
     Desc.FindHandle = FindHandle;
-    Node->Handle = Node->Fs->OpenByDesc(&Desc);
-    if (Node->Handle == -1)
+    Handle = Fs->OpenByDesc(&Desc);
+    if (Handle == -1)
         return -8;
-    Node->Size = Node->Fs->GetSize((unsigned long)Node->Handle, 0);
-    Node->Mapping = Node->Fs->CreateMapping((unsigned long)Node->Handle, 0, 2, 0, 0, 0);
-    if (Node->Mapping == -1)
+    Size = Fs->GetSize((unsigned long)Handle, 0);
+    Mapping = Fs->CreateMapping((unsigned long)Handle, 0, 2, 0, 0, 0);
+    if (Mapping == -1)
         return -6;
-    Node->View = (void*)((uintptr_t)((unsigned int)(
-        Node->Fs->MapFileView((unsigned long)Node->Mapping, 4, 0, 0, 0))));
-    if (Node->View != nullptr)
+    View = (void*)((uintptr_t)((unsigned int)(
+        Fs->MapFileView((unsigned long)Mapping, 4, 0, 0, 0))));
+    if (View != nullptr)
         return 0;
     return -1;
 }
@@ -1269,7 +1259,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
     int GroupIndex = 0;
     while (GroupIndex < Count)
     {
-        ConstructFaceGroup(&Groups[GroupIndex]);
+        Groups[GroupIndex].Construct();
         GroupIndex += 1;
     }
     Arch->FaceGroups = Groups;
@@ -1305,7 +1295,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
                 const char* MaterialName = (const char*)MaterialNode.View;
                 if (MaterialName == nullptr)
                 {
-                    CloseMappedFileNode(&MaterialNode);
+                    MaterialNode.Close();
                     DropFileSystem(&MaterialNode.Fs);
                     DropFileSystem(&Child);
                 }
@@ -1325,7 +1315,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
                               G_FdumpFileDeformablePartArchetype, 0x45,
                               FormatDeformMessage(Message, "couldnt find material %s for %s", "???",
                                                   ""));
-                        CloseMappedFileNode(&MaterialNode);
+                        MaterialNode.Close();
                         DropFileSystem(&MaterialNode.Fs);
                         DropFileSystem(&Child);
                     }
@@ -1372,8 +1362,8 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
                         }
                         Group->Kind = 4;
                         RebaseFaceIndices(Group);
-                        CloseMappedFileNode(&IndexNode);
-                        CloseMappedFileNode(&MaterialNode);
+                        IndexNode.Close();
+                        MaterialNode.Close();
                         DropFileSystem(&Child);
                     }
                 }
@@ -1392,7 +1382,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
 }
 
 // FUN_065f7e80 (thiscall on the mesh: Fs).
-static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
+bool FMeshArchetype::LoadGeometry(IFileSystem* Fs)
 {
     if (Fs->OpenNode("Geometry") == 0)
         return false;
@@ -1408,8 +1398,8 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
         unsigned long Got = 0;
         if (Fs->Read((unsigned long)IndexHandle, Indices, IndexBytes, &Got, 0) != 0)
         {
-            Arch->PointIndexCount = (int)IndexCount;
-            Arch->PointIndices = (unsigned long*)Indices;
+            PointIndexCount = (int)IndexCount;
+            PointIndices = (unsigned long*)Indices;
         }
         else
         {
@@ -1435,11 +1425,11 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     const unsigned long* NormalView = (const unsigned long*)NormalNode.View;
 
     const unsigned int VertexCount = (unsigned int)(PointNode.Size / 12);
-    Arch->VertexCount = (int)VertexCount;
+    this->VertexCount = (int)VertexCount;
     unsigned long* Vertices =
         (unsigned long*)new unsigned char[(size_t)VertexCount * 0x18];
-    Arch->Vertices = Vertices;
-    for (unsigned int Index = 0; Index < (unsigned int)Arch->VertexCount; ++Index)
+    this->Vertices = Vertices;
+    for (unsigned int Index = 0; Index < (unsigned int)this->VertexCount; ++Index)
     {
         unsigned long* Out = Vertices + Index * 6;
         Out[0] = PointView[Index * 3 + 0];
@@ -1449,9 +1439,9 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
         Out[4] = NormalView[Index * 3 + 1];
         Out[5] = NormalView[Index * 3 + 2];
     }
-    CloseMappedFileNode(&NormalNode);
+    NormalNode.Close();
     DropFileSystem(&NormalNode.Fs);
-    CloseMappedFileNode(&PointNode);
+    PointNode.Close();
     DropFileSystem(&PointNode.Fs);
 
     FillFileDesc(&Desc, "UV0_indices");
@@ -1464,7 +1454,7 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
         unsigned long Got = 0;
         if (Fs->Read((unsigned long)UvIndexHandle, UvIndices, UvIndexBytes, &Got,
                      0) != 0)
-            Arch->UvIndices = (unsigned long*)UvIndices;
+            this->UvIndices = (unsigned long*)UvIndices;
         else
             delete[] UvIndices;
         Fs->CloseFile((unsigned long)UvIndexHandle);
@@ -1480,8 +1470,8 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
         unsigned long Got = 0;
         if (Fs->Read((unsigned long)UvHandle, UvData, UvBytes, &Got, 0) != 0)
         {
-            Arch->UvCount = (int)UvCount;
-            Arch->UvData = UvData;
+            this->UvCount = (int)UvCount;
+            this->UvData = UvData;
         }
         else
         {
@@ -1491,48 +1481,48 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     }
 
     FMappedFileNode CountNode;
-    InitMappedFileNode(&CountNode, Fs);
-    MapFileNode(&CountNode, "Point_bone_count", 0xFFFFFFFF);
+    CountNode.Init(Fs);
+    CountNode.Map("Point_bone_count", 0xFFFFFFFF);
     const unsigned long* BoneCounts = (const unsigned long*)CountNode.View;
 
     FMappedFileNode IdNode;
-    InitMappedFileNode(&IdNode, Fs);
-    MapFileNode(&IdNode, "Bone_id_chain", 0xFFFFFFFF);
+    IdNode.Init(Fs);
+    IdNode.Map("Bone_id_chain", 0xFFFFFFFF);
     const unsigned long* BoneIds = (const unsigned long*)IdNode.View;
 
     FMappedFileNode WeightNode;
-    InitMappedFileNode(&WeightNode, Fs);
-    MapFileNode(&WeightNode, "Bone_weight_chain", 0xFFFFFFFF);
+    WeightNode.Init(Fs);
+    WeightNode.Map("Bone_weight_chain", 0xFFFFFFFF);
     const unsigned long* Weights = (const unsigned long*)WeightNode.View;
 
     const unsigned int PairCount = (unsigned int)(IdNode.Size >> 2);
-    Arch->SkinPairs = (FSkinPair*)new unsigned char[(size_t)PairCount * 8];
+    SkinPairs = (FSkinPair*)new unsigned char[(size_t)PairCount * 8];
     for (unsigned int Index = 0; Index < PairCount; ++Index)
     {
-        unsigned long* Pair = (unsigned long*)(&Arch->SkinPairs[Index]);
+        unsigned long* Pair = (unsigned long*)(&SkinPairs[Index]);
         Pair[0] = BoneIds[Index];
         Pair[1] = Weights[Index];
     }
 
-    FSkinPair* Cursor = Arch->SkinPairs;
-    Arch->SkinTable = (FSkinVertex*)new unsigned char[(size_t)(unsigned int)Arch->VertexCount * 8];
-    for (unsigned int Index = 0; Index < (unsigned int)Arch->VertexCount; ++Index)
+    FSkinPair* Cursor = SkinPairs;
+    SkinTable = (FSkinVertex*)new unsigned char[(size_t)(unsigned int)this->VertexCount * 8];
+    for (unsigned int Index = 0; Index < (unsigned int)this->VertexCount; ++Index)
     {
         const unsigned long Influence = BoneCounts[Index];
-        Arch->SkinTable[Index].BoneCount = (int)Influence;
-        Arch->SkinTable[Index].Pairs = Cursor;
+        SkinTable[Index].BoneCount = (int)Influence;
+        SkinTable[Index].Pairs = Cursor;
         Cursor += Influence;
     }
 
-    CloseMappedFileNode(&WeightNode);
-    CloseMappedFileNode(&IdNode);
-    CloseMappedFileNode(&CountNode);
+    WeightNode.Close();
+    IdNode.Close();
+    CountNode.Close();
     Fs->OpenNode(G_ParentNode);
     return true;
 }
 
 // FUN_065f8480 (thiscall on the mesh: Fs).
-static bool LoadUvDeformTables(FMeshArchetype* Arch, IFileSystem* Fs)
+bool FMeshArchetype::LoadUvDeformTables(IFileSystem* Fs)
 {
     if (Fs->OpenNode("Geometry") == 0)
         return false;
@@ -1569,32 +1559,32 @@ static bool LoadUvDeformTables(FMeshArchetype* Arch, IFileSystem* Fs)
     YToVNode.Handle = -1;
     YToVNode.Size = 0;
     YToVNode.View = nullptr;
-    MapFileNode(&YToVNode, "Bone_Y_to_V_scale", 0xFFFFFFFF);
+    YToVNode.Map("Bone_Y_to_V_scale", 0xFFFFFFFF);
 
     FMappedFileNode MinDuNode;
     HoldFileSystem(&MinDuNode.Fs, Fs);
     MinDuNode.Handle = -1;
     MinDuNode.Size = 0;
     MinDuNode.View = nullptr;
-    MapFileNode(&MinDuNode, "Min_du", 0xFFFFFFFF);
+    MinDuNode.Map("Min_du", 0xFFFFFFFF);
 
     FMappedFileNode MaxDuNode;
     HoldFileSystem(&MaxDuNode.Fs, Fs);
     MaxDuNode.Handle = -1;
     MaxDuNode.Size = 0;
     MaxDuNode.View = nullptr;
-    MapFileNode(&MaxDuNode, "Max_du", 0xFFFFFFFF);
+    MaxDuNode.Map("Max_du", 0xFFFFFFFF);
 
     FMappedFileNode MinDvNode;
     HoldFileSystem(&MinDvNode.Fs, Fs);
     MinDvNode.Handle = -1;
     MinDvNode.Size = 0;
     MinDvNode.View = nullptr;
-    MapFileNode(&MinDvNode, "Min_dv", 0xFFFFFFFF);
+    MinDvNode.Map("Min_dv", 0xFFFFFFFF);
 
     FMappedFileNode MaxDvNode;
-    InitMappedFileNode(&MaxDvNode, Fs);
-    MapFileNode(&MaxDvNode, "Max_dv", 0xFFFFFFFF);
+    MaxDvNode.Init(Fs);
+    MaxDvNode.Map("Max_dv", 0xFFFFFFFF);
 
     const unsigned long* const Columns[9] = {
         (const unsigned long*)BoneIdNode.View,
@@ -1607,48 +1597,48 @@ static bool LoadUvDeformTables(FMeshArchetype* Arch, IFileSystem* Fs)
         (const unsigned long*)MinDvNode.View,
         (const unsigned long*)MaxDvNode.View,
     };
-    Arch->UvDeformCount = (int)(BoneIdNode.Size >> 2);
-    if (Arch->UvDeformCount != 0)
+    UvDeformCount = (int)(BoneIdNode.Size >> 2);
+    if (UvDeformCount != 0)
     {
-        Arch->UvDeform = (FUvDeformRecord*)new unsigned char[(size_t)(unsigned int)Arch->UvDeformCount * 0x24];
-        for (unsigned int Index = 0; Index < (unsigned int)Arch->UvDeformCount; ++Index)
+        UvDeform = (FUvDeformRecord*)new unsigned char[(size_t)(unsigned int)UvDeformCount * 0x24];
+        for (unsigned int Index = 0; Index < (unsigned int)UvDeformCount; ++Index)
         {
-            unsigned long* Row = (unsigned long*)(&Arch->UvDeform[Index]);
+            unsigned long* Row = (unsigned long*)(&UvDeform[Index]);
             for (int Column = 0; Column < 9; ++Column)
                 Row[Column] = Columns[Column][Index];
         }
     }
 
-    CloseMappedFileNode(&MaxDvNode);
-    CloseMappedFileNode(&MinDvNode);
-    CloseMappedFileNode(&MaxDuNode);
-    CloseMappedFileNode(&MinDuNode);
-    CloseMappedFileNode(&YToVNode);
-    CloseMappedFileNode(&XToUNode);
-    CloseMappedFileNode(&PlaneNode);
-    CloseMappedFileNode(&VertexCountNode);
-    CloseMappedFileNode(&BoneIdNode);
+    MaxDvNode.Close();
+    MinDvNode.Close();
+    MaxDuNode.Close();
+    MinDuNode.Close();
+    YToVNode.Close();
+    XToUNode.Close();
+    PlaneNode.Close();
+    VertexCountNode.Close();
+    BoneIdNode.Close();
     Fs->OpenNode(G_ParentNode);
     return true;
 }
 
 // FUN_065f89e0 (thiscall on the mesh: Holder, Fs).
-static bool LoadMeshTables(FMeshArchetype* Mesh, FLodHolder* Holder, IFileSystem* Fs)
+bool FMeshArchetype::LoadTables(FLodHolder* Holder, IFileSystem* Fs)
 {
-    if (!LoadFaceGroups(Mesh, Fs))
+    if (!LoadFaceGroups(this, Fs))
         return false;
-    if (!LoadGeometry(Mesh, Fs))
+    if (!LoadGeometry(Fs))
         return false;
-    if (!LoadUvDeformTables(Mesh, Fs))
+    if (!LoadUvDeformTables(Fs))
         return false;
-    BindUvBoneIdsToFaceGroups(Mesh);
-    BuildVertexRemap(Mesh);
-    BuildBoneVertexLists(Mesh, Holder, Fs);
+    BindUvBoneIdsToFaceGroups(this);
+    BuildVertexRemap(this);
+    BuildBoneVertexLists(this, Holder, Fs);
 
-    Mesh->FaceFlagCount = Mesh->VertexCount;
-    Mesh->FaceFlags = new unsigned char[(size_t)Mesh->FaceFlagCount];
-    std::memset(Mesh->FaceFlags, 0, (size_t)Mesh->FaceFlagCount);
-    Mesh->ParseTag = G_ParseTagUtf;
+    FaceFlagCount = VertexCount;
+    FaceFlags = new unsigned char[(size_t)FaceFlagCount];
+    std::memset(FaceFlags, 0, (size_t)FaceFlagCount);
+    ParseTag = G_ParseTagUtf;
     return true;
 }
 
@@ -1700,20 +1690,20 @@ static FDeformMesh* LoadDeformMesh(FLodHolder* Holder, IFileSystem* MeshFs, cons
     if (Found != G_MeshCache.end())
     {
         FDeformMesh* Cached = Found->second;
-        AddRefDeformMesh(Cached);
+        Cached->AddRef();
         return Cached;
     }
 
     FDeformMesh* Result = nullptr;
     FMeshArchetype* Mesh = new FMeshArchetype(Name);
-    if (LoadMeshTables(Mesh, Holder, MeshFs))
+    if (Mesh->LoadTables(Holder, MeshFs))
     {
         Mesh->bSkinned = bSkinned;
         Result = Mesh;
     }
     else
     {
-        ReleaseDeformMesh(Mesh);
+        Mesh->Release();
         FEngineName ArchName;
         ArchName.Text = Name;
         ArchName.Crc = DACOM_CRC::GetCRC32(Name);
@@ -1774,16 +1764,16 @@ static FSkeleton* ConstructSkeleton()
 
 // FUN_065f10c0: IEngine +0x3C on each loaded bone's +0 handle, then on +0x1e80 --
 // unconditionally, -1 included (a skeleton whose FUN_065f1100 failed still passes its -1 here).
-static void DestroySkeletonHandles(FSkeleton* Skel)
+void FSkeleton::DestroyHandles()
 {
     int Index = 0;
-    while (Index < Skel->BoneCount)
+    while (Index < BoneCount)
     {
         G_Engine->ReleaseHandle(
-            (void*)((ptrdiff_t)(Skel->Bones[Index].Parent)));
+            (void*)((ptrdiff_t)(Bones[Index].Parent)));
         Index += 1;
     }
-    G_Engine->ReleaseHandle(Skel->EngineHandle);
+    G_Engine->ReleaseHandle(EngineHandle);
 }
 
 // FUN_065f1410 (thiscall).
@@ -1803,7 +1793,7 @@ static int ReleaseSkeleton(FSkeleton* Skel)
     const int Remaining = Skel->RefCount;
     if (Remaining <= 0)
     {
-        DestroySkeletonHandles(Skel);
+        Skel->DestroyHandles();
         delete Skel;
     }
     return Remaining;
@@ -1850,7 +1840,7 @@ static int ReleaseLodHolder(FLodHolder* Holder)
 }
 
 // FUN_065f1100 (thiscall on the skeleton: Name, Fs).
-static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
+bool FSkeleton::Load(const char* Name, IFileSystem* Fs)
 {
     WIN32_FIND_DATAA FindData;
     const int Finder = FsFindFirst(Fs, "*.3db", &FindData);
@@ -1866,7 +1856,7 @@ static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
                                    (void**)(&Child)) >= 0)
             {
                 const int bSkeletonNode = Child->OpenNode("DFMSkeleton");
-                FBoneSlot* Bone = &Skel->Bones[Skel->BoneCount];
+                FBoneSlot* Bone = &Bones[BoneCount];
                 float Buffer[12];
                 WriteIdentity3x4(Buffer);
                 FFileSystemDesc BoneDesc;
@@ -1895,7 +1885,7 @@ static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
                     BoneName.Crc = DACOM_CRC::GetCRC32(FindData.cFileName);
                     Bone->Parent = (int)((ptrdiff_t)(
                         G_Engine->CreateArchetypeHandle(&BoneName, Child)));
-                    Skel->BoneCount += 1;
+                    BoneCount += 1;
                 }
             }
             if (Child != nullptr)
@@ -1910,10 +1900,10 @@ static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
     FEngineName SkelName;
     SkelName.Text = Name;
     SkelName.Crc = DACOM_CRC::GetCRC32(Name);
-    Skel->EngineHandle = G_Engine->CreateArchetypeHandle(&SkelName, Fs);
+    EngineHandle = G_Engine->CreateArchetypeHandle(&SkelName, Fs);
     G_Engine->SetFilesystem(Saved);
     Saved->Release();
-    return Skel->EngineHandle != G_InvalidEngineHandle;
+    return EngineHandle != G_InvalidEngineHandle;
 }
 
 // --- FBoneRuntime : IInstanceTransform, vtable PTR_LAB_066010a0 (14 slots) ---
@@ -2078,30 +2068,30 @@ static void WriteIdentity3x3(float* Matrix)
 }
 
 // FUN_065f1030 (thiscall: InverseRoot).
-static void ComposeBoneWorldMatrix(FBoneRuntime* Slot, const float* InverseRoot)
+void FBoneRuntime::ComposeWorldMatrix(const float* InverseRoot)
 {
     float Local[12];
     AcquireMathEngine()->MulTransform(
         *(FTransform*)Local,
-        *(const FTransform*)Slot->LocalTransform,
-        *(const FTransform*)Slot->Source->BoneToRoot); // +0x1C
+        *(const FTransform*)LocalTransform,
+        *(const FTransform*)Source->BoneToRoot); // +0x1C
     float LocalCopy[12];
     std::memcpy(LocalCopy, Local, sizeof(LocalCopy));
     float World[12];
     AcquireMathEngine()->MulTransform(*(FTransform*)World,
                                       *(const FTransform*)InverseRoot,
                                       *(const FTransform*)LocalCopy); // +0x1C
-    std::memcpy(Slot->Matrix, World, sizeof(World));
+    std::memcpy(Matrix, World, sizeof(World));
 }
 
 // FUN_065f14a0 (thiscall on the holder: Index, BoneInst).
-static FBoneRuntime* BindOneBoneRuntime(FLodHolder* Holder, int Index, void* BoneInst)
+FBoneRuntime* FLodHolder::BindOneBoneRuntime(int Index, void* BoneInst)
 {
-    FBoneRuntime* Slot = &Holder->BoneSlots[Index];
+    FBoneRuntime* Slot = &BoneSlots[Index];
     unsigned char Flags = Slot->Flags;
     Flags = (unsigned char)(((Index == 0) ^ Flags) & 1 ^ Flags);
     Slot->Flags = Flags;
-    Slot->Source = &Holder->Skeleton->Bones[Index];
+    Slot->Source = &Skeleton->Bones[Index];
     G_Engine->SetInstanceTransform(BoneInst, Slot);
     return Slot;
 }
@@ -2172,7 +2162,7 @@ static double SvdNegSignOf(double Value, bool bSignNegative)
 }
 
 // FUN_065f9f00 (thiscall on the source matrix: A, W, V): Golub-Reinsch SVD.
-static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
+unsigned char FSvdMatrix::SvdCmp(float* A, float* W, float* V)
 {
     float Rv1[12];
     float G = 0.0f;
@@ -2180,21 +2170,21 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
     double Scale = 0.0;
     int L = 0;
     int I = 0;
-    while (I < Source->ColCount)
+    while (I < ColCount)
     {
         L = I + 1;
         Rv1[I] = (float)(Scale * (double)G);
         G = 0.0f;
         Scale = 0.0;
         double Sum = 0.0;
-        if (I < Source->RowCount)
+        if (I < RowCount)
         {
-            for (int K = I; K < Source->RowCount; ++K)
+            for (int K = I; K < RowCount; ++K)
                 Scale += std::fabs((double)(SvdCell(A, K, I)));
             if (Scale != 0.0)
             {
                 const double Inv = 1.0 / Scale;
-                for (int K = I; K < Source->RowCount; ++K)
+                for (int K = I; K < RowCount; ++K)
                 {
                     const double Scaled = Inv * (double)(SvdCell(A, K, I));
                     SvdCell(A, K, I) = (float)Scaled;
@@ -2204,29 +2194,29 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
                 G = (float)(SvdNegSignOf(std::sqrt(Sum), SvdSignC0(F)));
                 const double H = (double)F * (double)G - Sum;
                 SvdCell(A, I, I) = (float)((double)F - (double)G);
-                if (L < Source->ColCount)
+                if (L < ColCount)
                 {
                     const double HInv = 1.0 / H;
-                    for (int J = L; J < Source->ColCount; ++J)
+                    for (int J = L; J < ColCount; ++J)
                     {
                         double Dot = 0.0;
-                        if (I < Source->RowCount)
+                        if (I < RowCount)
                         {
-                            for (int K = I; K < Source->RowCount; ++K)
+                            for (int K = I; K < RowCount; ++K)
                                 Dot += (double)(SvdCell(A, K, J)) *
                                        (double)(SvdCell(A, K, I));
                         }
                         const float Factor = (float)(HInv * Dot);
-                        if (I < Source->RowCount)
+                        if (I < RowCount)
                         {
-                            for (int K = I; K < Source->RowCount; ++K)
+                            for (int K = I; K < RowCount; ++K)
                                 SvdCell(A, K, J) = (float)(
                                     (double)Factor * SvdCell(A, K, I) +
                                     (double)(SvdCell(A, K, J)));
                         }
                     }
                 }
-                for (int K = I; K < Source->RowCount; ++K)
+                for (int K = I; K < RowCount; ++K)
                     SvdCell(A, K, I) = (float)(Scale * (double)(SvdCell(A, K, I)));
             }
         }
@@ -2235,14 +2225,14 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
         G = 0.0f;
         Scale = 0.0;
         Sum = 0.0;
-        if (I < Source->RowCount && I != Source->ColCount && L < Source->ColCount)
+        if (I < RowCount && I != ColCount && L < ColCount)
         {
-            for (int K = L; K < Source->ColCount; ++K)
+            for (int K = L; K < ColCount; ++K)
                 Scale += std::fabs((double)(SvdCell(A, I, K)));
             if (Scale != 0.0)
             {
                 const double Inv = 1.0 / Scale;
-                for (int K = L; K < Source->ColCount; ++K)
+                for (int K = L; K < ColCount; ++K)
                 {
                     const double Scaled = Inv * (double)(SvdCell(A, I, K));
                     SvdCell(A, I, K) = (float)Scaled;
@@ -2255,35 +2245,35 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
                 const float H = (float)(Gd * (double)F -
                                                    (double)SumF);
                 SvdCell(A, I, L) = (float)((double)F - (double)G);
-                if (L < Source->ColCount)
+                if (L < ColCount)
                 {
                     const double HInv = 1.0 / (double)H;
-                    for (int K = L; K < Source->ColCount; ++K)
+                    for (int K = L; K < ColCount; ++K)
                         Rv1[K] = (float)(HInv * (double)(SvdCell(A, I, K)));
                 }
-                if (L < Source->RowCount)
+                if (L < RowCount)
                 {
-                    for (int J = L; J < Source->RowCount; ++J)
+                    for (int J = L; J < RowCount; ++J)
                     {
                         double Dot = 0.0;
-                        if (L < Source->ColCount)
+                        if (L < ColCount)
                         {
-                            for (int K = L; K < Source->ColCount; ++K)
+                            for (int K = L; K < ColCount; ++K)
                                 Dot += (double)(SvdCell(A, I, K)) *
                                        (double)(SvdCell(A, J, K));
                         }
-                        if (L < Source->ColCount)
+                        if (L < ColCount)
                         {
-                            for (int K = L; K < Source->ColCount; ++K)
+                            for (int K = L; K < ColCount; ++K)
                                 SvdCell(A, J, K) = (float)(
                                     Dot * (double)Rv1[K] +
                                     (double)(SvdCell(A, J, K)));
                         }
                     }
                 }
-                if (L < Source->ColCount)
+                if (L < ColCount)
                 {
-                    for (int K = L; K < Source->ColCount; ++K)
+                    for (int K = L; K < ColCount; ++K)
                         SvdCell(A, I, K) = (float)(Scale * (double)(SvdCell(A, I, K)));
                 }
             }
@@ -2297,35 +2287,35 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
     }
 
     // Right-hand transforms into V, i from n-1 down; g (float) and l carry.
-    I = Source->ColCount - 1;
+    I = ColCount - 1;
     while (I >= 0)
     {
-        if (I < Source->ColCount)
+        if (I < ColCount)
         {
             if (G != 0.0f)
             {
-                if (L < Source->ColCount)
+                if (L < ColCount)
                 {
                     const double GInv = 1.0 / (double)G;
-                    for (int J = L; J < Source->ColCount; ++J)
+                    for (int J = L; J < ColCount; ++J)
                         SvdCell(V, J, I) = (float)(
                             (double)(SvdCell(A, I, J)) /
                             (double)(SvdCell(A, I, L)) * GInv);
                 }
-                if (L < Source->ColCount)
+                if (L < ColCount)
                 {
-                    for (int J = L; J < Source->ColCount; ++J)
+                    for (int J = L; J < ColCount; ++J)
                     {
                         double Dot = 0.0;
-                        if (L < Source->ColCount)
+                        if (L < ColCount)
                         {
-                            for (int K = L; K < Source->ColCount; ++K)
+                            for (int K = L; K < ColCount; ++K)
                                 Dot += (double)(SvdCell(V, K, J)) *
                                        (double)(SvdCell(A, I, K));
                         }
-                        if (L < Source->ColCount)
+                        if (L < ColCount)
                         {
-                            for (int K = L; K < Source->ColCount; ++K)
+                            for (int K = L; K < ColCount; ++K)
                                 SvdCell(V, K, J) = (float)(
                                     Dot * (double)(SvdCell(V, K, I)) +
                                     (double)(SvdCell(V, K, J)));
@@ -2333,9 +2323,9 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
                     }
                 }
             }
-            if (L < Source->ColCount)
+            if (L < ColCount)
             {
-                for (int J = L; J < Source->ColCount; ++J)
+                for (int J = L; J < ColCount; ++J)
                 {
                     SvdCell(V, J, I) = 0.0f;
                     SvdCell(V, I, J) = 0.0f;
@@ -2350,56 +2340,56 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
 
     // Left-hand transforms into A, i from min(m, n)-1 down (IMIN through DAT_066032a4 /
     // DAT_066032a0).
-    G_SvdMinArg1 = Source->RowCount;
-    G_SvdMinArg2 = Source->ColCount;
+    G_SvdMinArg1 = RowCount;
+    G_SvdMinArg2 = ColCount;
     const int MinDim = (G_SvdMinArg1 < G_SvdMinArg2) ? G_SvdMinArg1 : G_SvdMinArg2;
     I = MinDim - 1;
     while (I >= 0)
     {
         L = I + 1;
         const float WVal = W[I];
-        if (L < Source->ColCount)
+        if (L < ColCount)
         {
-            for (int J = L; J < Source->ColCount; ++J)
+            for (int J = L; J < ColCount; ++J)
                 SvdCell(A, I, J) = 0.0f;
         }
         if (WVal != 0.0f)
         {
             const float GInv = (float)(1.0 / (double)WVal);
-            if (L < Source->ColCount)
+            if (L < ColCount)
             {
-                for (int J = L; J < Source->ColCount; ++J)
+                for (int J = L; J < ColCount; ++J)
                 {
                     double Dot = 0.0;
-                    if (L < Source->RowCount)
+                    if (L < RowCount)
                     {
-                        for (int K = L; K < Source->RowCount; ++K)
+                        for (int K = L; K < RowCount; ++K)
                             Dot += (double)(SvdCell(A, K, I)) *
                                    (double)(SvdCell(A, K, J));
                     }
                     const float Factor = (float)(
                         Dot / (double)(SvdCell(A, I, I)) * (double)GInv);
-                    if (I < Source->RowCount)
+                    if (I < RowCount)
                     {
-                        for (int K = I; K < Source->RowCount; ++K)
+                        for (int K = I; K < RowCount; ++K)
                             SvdCell(A, K, J) = (float)(
                                 (double)Factor * SvdCell(A, K, I) +
                                 (double)(SvdCell(A, K, J)));
                     }
                 }
             }
-            if (I < Source->RowCount)
+            if (I < RowCount)
             {
-                for (int K = I; K < Source->RowCount; ++K)
+                for (int K = I; K < RowCount; ++K)
                     SvdCell(A, K, I) = (float)((double)GInv *
                                                           (double)(SvdCell(A, K, I)));
             }
         }
         else
         {
-            if (I < Source->RowCount)
+            if (I < RowCount)
             {
-                for (int K = I; K < Source->RowCount; ++K)
+                for (int K = I; K < RowCount; ++K)
                     SvdCell(A, K, I) = 0.0f;
             }
         }
@@ -2408,7 +2398,7 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
     }
 
     // Diagonalisation, k from n-1 down, its from 1.
-    int K = Source->ColCount - 1;
+    int K = ColCount - 1;
     while (K >= 0)
     {
         int Its = 1;
@@ -2448,7 +2438,7 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
                     const double HInv = 1.0 / Hyp;
                     Cos = (float)((double)Gw * HInv);
                     Sin = -(HInv * (double)F);
-                    for (int J = 0; J < Source->RowCount; ++J)
+                    for (int J = 0; J < RowCount; ++J)
                     {
                         const double Y = (double)(SvdCell(A, J, Nm));
                         const double Z = (double)(SvdCell(A, J, Row));
@@ -2465,7 +2455,7 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
                 if ((double)Z < 0.0)
                 {
                     W[K] = -Z;
-                    for (int J = 0; J < Source->ColCount; ++J)
+                    for (int J = 0; J < ColCount; ++J)
                         SvdCell(V, J, K) = -SvdCell(V, J, K);
                 }
                 break;
@@ -2509,7 +2499,7 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
                 Gv = (float)((double)Cos * Gv - (double)X * Sin);
                 H = (float)((double)Y * Sin);
                 Y = (float)((double)Y * Cos);
-                for (int Jj = 0; Jj < Source->ColCount; ++Jj)
+                for (int Jj = 0; Jj < ColCount; ++Jj)
                 {
                     const double Vx = (double)(SvdCell(V, Jj, J));
                     const double Vz = (double)(SvdCell(V, Jj, Next));
@@ -2526,7 +2516,7 @@ static unsigned char SvdCmp(FSvdMatrix* Source, float* A, float* W, float* V)
                 }
                 F = (float)((double)Y * Sin + (double)Cos * Gv);
                 X = (float)((double)Y * Cos - (double)Sin * Gv);
-                for (int Jj = 0; Jj < Source->RowCount; ++Jj)
+                for (int Jj = 0; Jj < RowCount; ++Jj)
                 {
                     const double Ay = (double)(SvdCell(A, Jj, J));
                     const double Az = (double)(SvdCell(A, Jj, Next));
@@ -2584,11 +2574,11 @@ static void SvdMulABt(const FSvdMatrix* Left, const FSvdMatrix* Right, FSvdMatri
 }
 
 // FUN_065fadb0 (thiscall on the source matrix: Out).
-static void SvdPseudoInverse(FSvdMatrix* Source, FSvdMatrix* Out)
+void FSvdMatrix::PseudoInverse(FSvdMatrix* Out)
 {
-    Out->RowCount = Source->ColCount;
-    Out->ColCount = Source->RowCount;
-    const int N = Source->ColCount;
+    Out->RowCount = ColCount;
+    Out->ColCount = RowCount;
+    const int N = ColCount;
     float W[12];
     int Index = 0;
     while (Index < N)
@@ -2597,12 +2587,12 @@ static void SvdPseudoInverse(FSvdMatrix* Source, FSvdMatrix* Out)
         Index += 1;
     }
     FSvdMatrix V;
-    V.RowCount = Source->ColCount;
-    V.ColCount = Source->ColCount;
+    V.RowCount = ColCount;
+    V.ColCount = ColCount;
     FSvdMatrix Work;
-    std::memcpy(&Work, Source, sizeof(FSvdMatrix));
+    std::memcpy(&Work, this, sizeof(FSvdMatrix));
 
-    if (SvdCmp(Source, &Work.Cell[0][0], W, &V.Cell[0][0]) == 0)
+    if (SvdCmp(&Work.Cell[0][0], W, &V.Cell[0][0]) == 0)
         FDUMP(0x100002, "%s(%d) : WARNING:General:%s", G_FdumpFileMat, 0x2E8,
               "svdcmp: didnt approach a finite soln.");
 
@@ -2624,16 +2614,16 @@ static void SvdPseudoInverse(FSvdMatrix* Source, FSvdMatrix* Out)
 }
 
 // FUN_065f9d70 transpose; FUN_065faef0 A*B; FUN_065fafc0 A*x.
-static void SvdTranspose(const FSvdMatrix* Source, FSvdMatrix* Out)
+void FSvdMatrix::Transpose(FSvdMatrix* Out) const
 {
-    Out->RowCount = Source->ColCount;
-    Out->ColCount = Source->RowCount;
-    const int Rows = Source->RowCount;
-    const int Cols = Source->ColCount;
+    Out->RowCount = ColCount;
+    Out->ColCount = RowCount;
+    const int Rows = RowCount;
+    const int Cols = ColCount;
     for (int Row = 0; Row < Rows; ++Row)
     {
         for (int Col = 0; Col < Cols; ++Col)
-            Out->Cell[Col][Row] = Source->Cell[Row][Col];
+            Out->Cell[Col][Row] = Cell[Row][Col];
     }
 }
 
@@ -3310,16 +3300,6 @@ static bool SetIkJointCount(FIkEvent* Event, unsigned int JointCount)
     return true;
 }
 
-static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkApplyGate* Gate,
-                             float Time);
-
-// LAB_065fb540, the IK event's only table slot (06601340): EngBase's FUN_0661b420 calls it on
-// the channel owner with (sampled value, channel key, bind descriptor, time).
-int DACOM_API FIkEvent::Apply(float* Sampled, unsigned long ChannelKey, void* BindDesc, float Time)
-{
-    return IkApply(this, Sampled, (int)ChannelKey,
-                   (FIkApplyGate*)BindDesc, Time);
-}
 
 // FUN_065fbf40; vtable 06601340.
 FIkEvent::~FIkEvent()
@@ -3396,28 +3376,28 @@ static void DeleteListNode(FDeformInstance* Instance, FIkListNode* Node)
 }
 
 // FUN_065f4c80. No test of the instance.
-static void DestroyAllList(FDeformInstance* Instance)
+void FDeformInstance::DestroyAllList()
 {
-    FIkListNode* Node = Instance->ListHead;
+    FIkListNode* Node = ListHead;
     while (Node != nullptr)
     {
         FIkListNode* Next = Node->Next;
-        DeleteListNode(Instance, Node);
+        DeleteListNode(this, Node);
         Node = Next;
     }
 }
 
 // FUN_065f4d30: only the first node whose handle matches goes.
-static void DestroyListByHandle(FDeformInstance* Instance, int Handle)
+void FDeformInstance::DestroyListByHandle(int Handle)
 {
-    FIkListNode* Node = Instance->ListHead;
+    FIkListNode* Node = ListHead;
     while (Node != nullptr)
     {
         FIkListNode* Next = Node->Next;
         const int Stored = (int)((ptrdiff_t)Node->Event);
         if (Stored == Handle)
         {
-            DeleteListNode(Instance, Node);
+            DeleteListNode(this, Node);
             return;
         }
         Node = Next;
@@ -3425,9 +3405,9 @@ static void DestroyListByHandle(FDeformInstance* Instance, int Handle)
 }
 
 // FUN_065f4de0.
-static void SweepExpiredList(FDeformInstance* Instance)
+void FDeformInstance::SweepExpiredList()
 {
-    FIkListNode* Node = Instance->ListHead;
+    FIkListNode* Node = ListHead;
     while (Node != nullptr)
     {
         FIkListNode* Next = Node->Next;
@@ -3443,74 +3423,74 @@ static void SweepExpiredList(FDeformInstance* Instance)
         else if (G_Animation->FilterObjects(Node->Event) != 0)
             bDrop = true;
         if (bDrop)
-            DeleteListNode(Instance, Node);
+            DeleteListNode(this, Node);
         Node = Next;
     }
-    if (Instance->ListCount == 0)
+    if (ListCount == 0)
     {
-        Instance->RootHeightOffset = Instance->PartArray[0].Lod->BoneSlots[0].LocalTransform[10] - Instance->BaseHeight;
+        RootHeightOffset = PartArray[0].Lod->BoneSlots[0].LocalTransform[10] - BaseHeight;
     }
 }
 
 // FUN_065f6930.
-static bool SelectPartLod(FDeformPart* Part, int LodIndex)
+bool FDeformPart::SelectLod(int LodIndex)
 {
-    FDeformMesh* Old = Part->Current;
-    if (LodIndex < 0 || Part->MeshCount <= LodIndex)
+    FDeformMesh* Old = Current;
+    if (LodIndex < 0 || MeshCount <= LodIndex)
     {
-        Part->Current = nullptr;
-        Part->LodIndex = LodIndex;
-        return Old != Part->Current;
+        Current = nullptr;
+        this->LodIndex = LodIndex;
+        return Old != Current;
     }
-    FDeformMesh* Next = Part->Meshes[LodIndex];
-    Part->Current = Next;
-    if ((Part->Flags & 1) == 0 && Old == Next)
+    FDeformMesh* Next = Meshes[LodIndex];
+    Current = Next;
+    if ((Flags & 1) == 0 && Old == Next)
     {
-        Part->Flags = (unsigned char)(Part->Flags & (unsigned char)(~1));
-        Part->LodIndex = LodIndex;
-        return Old != Part->Current;
+        Flags = (unsigned char)(Flags & (unsigned char)(~1));
+        this->LodIndex = LodIndex;
+        return Old != Current;
     }
     // Retail's XOR/AND/XOR sets bit 0 whatever it was (it does not toggle).
-    Part->Flags = (unsigned char)(Part->Flags | 1);
-    Part->LodIndex = LodIndex;
-    return Old != Part->Current;
+    Flags = (unsigned char)(Flags | 1);
+    this->LodIndex = LodIndex;
+    return Old != Current;
 }
 
 // FUN_065f69c0 (thiscall; its one argument is never read). Retail returns AL = 1.
-static void MarkPartSkinDirty(FDeformPart* Part)
+void FDeformPart::MarkSkinDirty()
 {
-    Part->Flags = (unsigned char)(Part->Flags | 2);
+    Flags = (unsigned char)(Flags | 2);
 }
 
 // FUN_065f69d0 (thiscall on the part: Camera, Unused).
-static unsigned char DrawPartLive(FDeformPart* Part, ICamera* Camera, void* /*Unused*/)
+unsigned char FDeformPart::DrawLive(ICamera* Camera, void* /*Unused*/)
 {
-    if (Part->Current == nullptr)
+    if (Current == nullptr)
         return 1;
-    const bool bVbSelected = G_VertexBuffer->SelectVb(Part->Vb.Listing.VertexBuffer) >= 0;
-    const unsigned char Flags = Part->Flags;
+    const bool bVbSelected = G_VertexBuffer->SelectVb(Vb.Listing.VertexBuffer) >= 0;
+    const unsigned char Flags = this->Flags;
     const unsigned char bRebuild = ((Flags & 1) != 0 || !bVbSelected) ? 1 : 0;
     if ((Flags & 2) != 0 || bRebuild != 0)
     {
-        if (Part->Current->Skin(Part->Lod, &Part->Vb, bRebuild) == 0)
+        if (Current->Skin(Lod, &Vb, bRebuild) == 0)
             return 0;
-        if (G_VertexBuffer->SelectVb(Part->Vb.Listing.VertexBuffer) < 0)
+        if (G_VertexBuffer->SelectVb(Vb.Listing.VertexBuffer) < 0)
             return 0;
     }
     const bool bIbSelected =
-        G_IndexBuffer->SelectIb(Part->Ib.Scratch.IndexBuffer,
-                                (unsigned int)(Part->Vb.Listing.BaseVertex), 0, 0) >= 0;
-    if ((Part->Flags & 1) != 0 || !bIbSelected)
+        G_IndexBuffer->SelectIb(Ib.Scratch.IndexBuffer,
+                                (unsigned int)(Vb.Listing.BaseVertex), 0, 0) >= 0;
+    if ((this->Flags & 1) != 0 || !bIbSelected)
     {
-        if (Part->Current->FillIndexBuffer(&Part->Ib) == 0)
+        if (Current->FillIndexBuffer(&Ib) == 0)
             return 0;
-        if (G_IndexBuffer->SelectIb(Part->Ib.Scratch.IndexBuffer,
-                                    (unsigned int)(Part->Vb.Listing.BaseVertex), 0,
+        if (G_IndexBuffer->SelectIb(Ib.Scratch.IndexBuffer,
+                                    (unsigned int)(Vb.Listing.BaseVertex), 0,
                                     0) < 0)
             return 0;
     }
-    Part->Current->Draw(Camera, Part);
-    Part->Flags = (unsigned char)(Part->Flags & 0xFC);
+    Current->Draw(Camera, this);
+    this->Flags = (unsigned char)(this->Flags & 0xFC);
     return 1;
 }
 
@@ -3532,24 +3512,24 @@ static void AxisAngleToQuat(float* Quat, const float* Axis, float Angle)
 }
 
 // FUN_065f41d0 (thiscall on the instance, nine stack arguments).
-static int PlayInstanceAnim(FDeformInstance* Instance, void* Name, void* Extra, void* ArgC, void* ArgD,
-                            void* ArgE, void* ArgF, void* ArgG, void* ArgH, void* ScriptOrNull)
+int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, void* ArgE,
+                              void* ArgF, void* ArgG, void* ArgH, void* ScriptOrNull)
 {
-    SweepExpiredList(Instance);
+    SweepExpiredList();
     int BoneHandle = -1;
-    if (Instance->PartArray != nullptr)
+    if (PartArray != nullptr)
         BoneHandle = (int)(
-            (ptrdiff_t)(Instance->PartArray[0].Lod->BoneSlots[0].Instance));
+            (ptrdiff_t)(PartArray[0].Lod->BoneSlots[0].Instance));
     void* Script = ScriptOrNull;
     if (Script == nullptr)
-        Script = Instance->DefaultScript;
+        Script = DefaultScript;
     const int Handle = (int)(G_Animation->PlayScript(
         Name, AsOpaqueDword(BoneHandle), (const char*)Extra,
-        (IChannelSink*)Instance, Script));
+        (IChannelSink*)this, Script));
     if (Handle == -1)
         return -1;
 
-    FBoneRuntime* Bone = Instance->PartArray[0].Lod->BoneSlots;
+    FBoneRuntime* Bone = PartArray[0].Lod->BoneSlots;
     const float* BonePos =
         Bone->LocalTransform + 9;
     float Vec[3];
@@ -3579,9 +3559,9 @@ static int PlayInstanceAnim(FDeformInstance* Instance, void* Name, void* Extra, 
     float DurationOut = 0.0f;
     float Y = 0.0f;
     if (G_Animation->GetNamedDurationOut(Name, (const char*)Extra, &DurationOut) != 0)
-        Y = DurationOut + Instance->BaseHeight;
+        Y = DurationOut + BaseHeight;
     else
-        Y = Instance->RootHeightOffset + Instance->BaseHeight;
+        Y = RootHeightOffset + BaseHeight;
     float Pos[3];
     Pos[0] = BonePos[0] + Vec[0];
     Pos[1] = Vec[1] + Y;
@@ -3627,7 +3607,7 @@ static int PlayInstanceAnim(FDeformInstance* Instance, void* Name, void* Extra, 
 
     FIkListNode* Node = new FIkListNode;
     Node->Active = 0;
-    LinkListNode(Instance, Node);
+    LinkListNode(this, Node);
     Node->Event = (FIkEvent*)((ptrdiff_t)Handle);
     std::memcpy(&Node->StartHeight, &Y, sizeof(float));
     return Handle;
@@ -3658,9 +3638,8 @@ static void SubVec3(float* Out, const float* A, const float* B)
 }
 
 // FUN_065f4660 (thiscall: Name, Extra, Time, ArgD, ArgE, ArgF, ArgG, ArgH, Joint).
-static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Extra, void* ArgC,
-                                 void* ArgD, void* ArgE, void* ArgF, void* ArgG, void* ArgH,
-                                 void* Joint)
+int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* ArgD, void* ArgE,
+                                   void* ArgF, void* ArgG, void* ArgH, void* Joint)
 {
     const float* const JointPos = G_Engine->GetInstancePosition(Joint);
     float StartPos[3];
@@ -3669,11 +3648,11 @@ static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Ex
     StartPos[2] = JointPos[2];
 
     const int PlayHandle =
-        PlayInstanceAnim(Instance, Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, nullptr);
+        PlayAnim(Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, nullptr);
     const unsigned long Play = (unsigned long)PlayHandle;
     const float Time = FloatFromOpaqueDword(ArgC);
 
-    void* const Stop = (void*)((ptrdiff_t)(FirstBoneInstance(Instance)));
+    void* const Stop = (void*)((ptrdiff_t)(FirstBoneInstance(this)));
 
     // EngBase FAnimBindOut {Kind, Sink, SinkContext, Instance}; +0x10 of the frame is outside it.
     unsigned long Query[4];
@@ -3771,7 +3750,7 @@ static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Ex
         Index -= 1;
     }
 
-    const float* const BonePos = Instance->PartArray[0].Lod->BoneSlots[0].LocalTransform + 9;
+    const float* const BonePos = PartArray[0].Lod->BoneSlots[0].LocalTransform + 9;
     const float DiffZ = (float)((double)StartPos[2] - BonePos[2]);
     float Delta[3];
     Delta[0] = (float)((double)StartPos[0] - BonePos[0] -
@@ -3858,12 +3837,12 @@ static void IkDlsSetup(FIkDlsFrame* Frame)
 // One round after the Jacobian is built; returns whether to run another.
 static bool IkDlsRound(FIkDlsFrame* Frame, FIkEvent* Event)
 {
-    SvdTranspose(&Frame->Block.J, &Frame->Jt);
+    Frame->Block.J.Transpose(&Frame->Jt);
     SvdMulAB(&Frame->Jt, &Frame->Block.J, &Frame->JtJ);
     IkDlsDamp(&Frame->JtJ, Event->Damping);
     Frame->Pinv.RowCount = Frame->JtJ.ColCount;
     Frame->Pinv.ColCount = Frame->JtJ.RowCount;
-    SvdPseudoInverse(&Frame->JtJ, &Frame->Pinv);
+    Frame->JtJ.PseudoInverse(&Frame->Pinv);
 
     const bool bPull = ((Event->AimFlags >> 7) & 1u) == 0;
     Frame->Pull.Count = Frame->Dof;
@@ -3964,44 +3943,44 @@ static bool IkDlsRound(FIkDlsFrame* Frame, FIkEvent* Event)
 
 // FUN_065fc000 (thiscall on the event): LAB_065fb540 calls it for a chain of two or more joints
 // when StateFlags bit 1 is clear.
-static void IkSolveDls(FIkEvent* Event)
+void FIkEvent::SolveDls()
 {
     FIkDlsFrame Frame;
-    const unsigned long Flags = Event->AimFlags;
+    const unsigned long Flags = AimFlags;
     Frame.bPos = ((Flags >> 5) & 1u) != 0;
     Frame.bOri = ((Flags >> 6) & 1u) != 0;
-    const int Count = Event->JointCount;
+    const int Count = JointCount;
     Frame.Dof = (Frame.bOri ? Count : Count - 1) * 3;
     Frame.PosDim = Frame.bPos ? 3 : 0;
     Frame.TaskDim = Frame.PosDim + (Frame.bOri ? 3 : 0);
     if (Frame.bOri)
-        Frame.Dof += Event->LockCount * -3;
+        Frame.Dof += LockCount * -3;
     else if (Frame.bPos)
     {
-        int Locked = Event->LockCount;
-        if (Locked > 0 && Event->LockBytes[Count - 1] != 0)
+        int Locked = LockCount;
+        if (Locked > 0 && LockBytes[Count - 1] != 0)
             Locked -= 1;
         Frame.Dof += Locked * -3;
     }
 
-    IkDlsReadStart(Event);
+    IkDlsReadStart(this);
     int Joint = 0;
-    while (Joint < Event->JointCount)
+    while (Joint < JointCount)
     {
-        G_Engine->GetJointParams(IkJointInstance(Event->JointIds[Joint]), 0, Event->Quats + Joint * 4);
-        G_Engine->GetInstanceRelative(IkJointInstance(Event->JointIds[Joint]));
+        G_Engine->GetJointParams(IkJointInstance(JointIds[Joint]), 0, Quats + Joint * 4);
+        G_Engine->GetInstanceRelative(IkJointInstance(JointIds[Joint]));
         IkCopy3(G_IkCurPos[Joint + 1],
-                G_Engine->GetInstancePosition(IkJointInstance(Event->JointIds[Joint])));
+                G_Engine->GetInstancePosition(IkJointInstance(JointIds[Joint])));
         IkCopy9(G_IkCurRot[Joint + 1],
-                G_Engine->GetInstanceOrientation(IkJointInstance(Event->JointIds[Joint])));
+                G_Engine->GetInstanceOrientation(IkJointInstance(JointIds[Joint])));
         Joint += 1;
     }
 
-    Frame.EndIndex = Event->JointCount;
+    Frame.EndIndex = JointCount;
     if (Frame.bPos)
-        IkCopy3(Frame.TargetPos, (const float*)Event->TargetA);
+        IkCopy3(Frame.TargetPos, (const float*)TargetA);
     if (Frame.bOri)
-        IkCopy9(Frame.TargetMat, (const float*)Event->TargetB);
+        IkCopy9(Frame.TargetMat, (const float*)TargetB);
     bool bNeed = false;
     if (Frame.bPos)
     {
@@ -4021,11 +4000,11 @@ static void IkSolveDls(FIkEvent* Event)
     }
 
     IkDlsSetup(&Frame);
-    Frame.JointIters = Frame.bOri ? Event->JointCount : Event->JointCount - 1;
+    Frame.JointIters = Frame.bOri ? JointCount : JointCount - 1;
     do
     {
         float* const Cells = IkDlsCells(&Frame.Block);
-        int Limit = Event->JointCount;
+        int Limit = JointCount;
         if (Frame.bOri)
             Limit += 1;
         int Col = 0;
@@ -4035,7 +4014,7 @@ static void IkSolveDls(FIkEvent* Event)
             if (Frame.bPos)
             {
                 float Arm[3];
-                if (Link == Event->JointCount)
+                if (Link == JointCount)
                 {
                     Arm[0] = 0.0f;
                     Arm[1] = 0.0f;
@@ -4044,57 +4023,57 @@ static void IkSolveDls(FIkEvent* Event)
                 else
                 {
                     const float* Bone = (const float*)(
-                        G_Engine->GetInstanceRelative(IkJointInstance(Event->JointIds[Link])));
+                        G_Engine->GetInstanceRelative(IkJointInstance(JointIds[Link])));
                     IkMathTransform(Arm, G_IkCurRot[Link], Bone + 1);
                 }
-                if (Event->LockBytes[Link - 1] != 0)
+                if (LockBytes[Link - 1] != 0)
                     IkDlsAddSkew(Cells, Col, Arm[0], Arm[1], Arm[2]);
                 else
                     IkDlsWriteSkew(Cells, Col, Arm[0], Arm[1], Arm[2]);
             }
-            if (Frame.bOri && Event->LockBytes[Link - 1] == 0)
+            if (Frame.bOri && LockBytes[Link - 1] == 0)
                 IkDlsWriteIdentity(Cells, Col + 12 * Frame.PosDim);
-            if (Event->LockBytes[Link - 1] == 0)
+            if (LockBytes[Link - 1] == 0)
                 Col += 3;
             Link += 1;
         }
-    } while (IkDlsRound(&Frame, Event));
-    IkDlsWriteQuats(Event, Frame.JointIters);
+    } while (IkDlsRound(&Frame, this));
+    IkDlsWriteQuats(this, Frame.JointIters);
 }
 
 // FUN_065fce60 (thiscall on the event): LAB_065fb540 calls it for a chain of two or more joints
 // when StateFlags bit 1 is set.
-static void IkSolveDlsAlt(FIkEvent* Event)
+void FIkEvent::SolveDlsAlt()
 {
     FIkDlsFrame Frame;
-    const unsigned long Flags = Event->AimFlags;
+    const unsigned long Flags = AimFlags;
     Frame.bPos = ((Flags >> 5) & 1u) != 0;
     Frame.bOri = ((Flags >> 6) & 1u) != 0;
-    Frame.Dof = Event->JointCount * 3;
+    Frame.Dof = JointCount * 3;
     Frame.PosDim = Frame.bPos ? 3 : 0;
     Frame.TaskDim = Frame.PosDim + (Frame.bOri ? 3 : 0);
     if (Frame.bOri)
-        Frame.Dof += Event->LockCount * -3;
+        Frame.Dof += LockCount * -3;
     else if (Frame.bPos)
-        Frame.Dof += Event->LockCount * -3;
+        Frame.Dof += LockCount * -3;
 
-    IkDlsReadStart(Event);
+    IkDlsReadStart(this);
     int Joint = 0;
-    while (Joint < Event->JointCount)
+    while (Joint < JointCount)
     {
-        G_Engine->GetJointParams(IkJointInstance(Event->JointIds[Joint]), 0, Event->Quats + Joint * 4);
+        G_Engine->GetJointParams(IkJointInstance(JointIds[Joint]), 0, Quats + Joint * 4);
         IkCopy3(G_IkCurPos[Joint + 1],
-                G_Engine->GetInstancePosition(IkJointInstance(Event->JointIds[Joint])));
+                G_Engine->GetInstancePosition(IkJointInstance(JointIds[Joint])));
         IkCopy9(G_IkCurRot[Joint + 1],
-                G_Engine->GetInstanceOrientation(IkJointInstance(Event->JointIds[Joint])));
+                G_Engine->GetInstanceOrientation(IkJointInstance(JointIds[Joint])));
         Joint += 1;
     }
 
-    Frame.EndIndex = Event->JointCount;
+    Frame.EndIndex = JointCount;
     if (Frame.bPos)
-        IkCopy3(Frame.TargetPos, (const float*)Event->TargetA);
+        IkCopy3(Frame.TargetPos, (const float*)TargetA);
     if (Frame.bOri)
-        IkCopy9(Frame.TargetMat, (const float*)Event->TargetB);
+        IkCopy9(Frame.TargetMat, (const float*)TargetB);
     bool bNeed = false;
     if (Frame.bPos)
     {
@@ -4117,11 +4096,11 @@ static void IkSolveDlsAlt(FIkEvent* Event)
     }
 
     IkDlsSetup(&Frame);
-    Frame.JointIters = Event->JointCount;
+    Frame.JointIters = JointCount;
     do
     {
         float* const Cells = IkDlsCells(&Frame.Block);
-        const int Limit = Event->JointCount + 1;
+        const int Limit = JointCount + 1;
         int Col = 0;
         int Link = 1;
         while (Link < Limit)
@@ -4129,22 +4108,22 @@ static void IkSolveDlsAlt(FIkEvent* Event)
             if (Frame.bPos)
             {
                 const float* Bone = (const float*)(
-                    G_Engine->GetInstanceRelative(IkJointInstance(Event->JointIds[Link])));
+                    G_Engine->GetInstanceRelative(IkJointInstance(JointIds[Link])));
                 float Arm[3];
                 IkMathTransform(Arm, G_IkCurRot[Link], Bone + 1);
-                if (Event->LockBytes[Link - 1] != 0)
+                if (LockBytes[Link - 1] != 0)
                     IkDlsAddSkew(Cells, Col, Arm[0], Arm[1], Arm[2]);
                 else
                     IkDlsWriteSkew(Cells, Col, Arm[0], Arm[1], Arm[2]);
             }
-            if (Frame.bOri && Event->LockBytes[Link - 1] == 0)
+            if (Frame.bOri && LockBytes[Link - 1] == 0)
                 IkDlsWriteIdentity(Cells, Col + 12 * Frame.PosDim);
-            if (Event->LockBytes[Link - 1] == 0)
+            if (LockBytes[Link - 1] == 0)
                 Col += 3;
             Link += 1;
         }
-    } while (IkDlsRound(&Frame, Event));
-    IkDlsWriteQuats(Event, Frame.JointIters);
+    } while (IkDlsRound(&Frame, this));
+    IkDlsWriteQuats(this, Frame.JointIters);
 }
 
 // The single-joint body LAB_065fb540 inlines; Bone is the IEngine +0xC4 result.
@@ -4223,19 +4202,22 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
     IkCopy4(Event->Quats, Q);
 }
 
+// LAB_065fb540, the IK event's only table slot (06601340): EngBase's FUN_0661b420 calls it on
+// the channel owner with (sampled value, channel key, bind descriptor, time).
 // LAB_065fb540 (IK event vtable slot 0: OutQuat, MatchId, Gate, Time).
-static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkApplyGate* Gate,
-                             float Time)
+int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* BindDesc, float Time)
 {
+    int MatchId = (int)ChannelKey;
+    FIkApplyGate* Gate = (FIkApplyGate*)BindDesc;
     (void)Time;
-    if ((Event->StateFlags & 1) != 0)
+    if ((StateFlags & 1) != 0)
     {
-        for (int Index = 0; Index < Event->JointCount; ++Index)
+        for (int Index = 0; Index < JointCount; ++Index)
         {
-            if ((int)Event->Channels[Index] == MatchId)
+            if ((int)Channels[Index] == MatchId)
             {
                 G_Engine->GetJointParams(
-                    (void*)((ptrdiff_t)Event->JointIds[Index]), 0,
+                    (void*)((ptrdiff_t)JointIds[Index]), 0,
                     OutQuat);
                 return 1;
             }
@@ -4243,28 +4225,28 @@ static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkAp
         return 1;
     }
 
-    const int OldTick = Event->ApplyTick;
-    Event->ApplyTick = OldTick + 1;
+    const int OldTick = ApplyTick;
+    ApplyTick = OldTick + 1;
     if (OldTick == 0 && Gate->SkipFlag == 0)
     {
         const float* Bone = (const float*)(G_Engine->GetInstanceRelative(
             (void*)((ptrdiff_t)Gate->Joint)));
-        if (Event->JointCount == 1)
-            IkSolveSingleJoint(Event, Gate, Bone);
-        else if ((Event->StateFlags & 2) != 0)
-            IkSolveDlsAlt(Event);
+        if (JointCount == 1)
+            IkSolveSingleJoint(this, Gate, Bone);
+        else if ((StateFlags & 2) != 0)
+            SolveDlsAlt();
         else
-            IkSolveDls(Event);
+            SolveDls();
     }
 
-    if (Event->ApplyTick == Event->JointCount)
-        Event->ApplyTick = 0;
+    if (ApplyTick == JointCount)
+        ApplyTick = 0;
 
-    for (int Index = 0; Index < Event->JointCount; ++Index)
+    for (int Index = 0; Index < JointCount; ++Index)
     {
-        if ((int)Event->Channels[Index] == MatchId)
+        if ((int)Channels[Index] == MatchId)
         {
-            IkCopy4(OutQuat, Event->Quats + Index * 4);
+            IkCopy4(OutQuat, Quats + Index * 4);
             return 0;
         }
     }
@@ -4288,13 +4270,12 @@ struct FAimDesc
 static_assert(offsetof(FAimDesc, LockIds) == 0x20, "aim desc lock ids +20");
 
 // FUN_065f5400 (thiscall on the instance: Desc, PlayExtra).
-static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char* Desc,
-                                  void* PlayExtra)
+FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* PlayExtra)
 {
     const FAimDesc* const Aim = (const FAimDesc*)Desc;
     int BindB = -1;
-    if (Instance->PartArray != nullptr)
-        BindB = (int)((ptrdiff_t)(Instance->PartArray[0].Lod->BoneSlots[0].Instance));
+    if (PartArray != nullptr)
+        BindB = (int)((ptrdiff_t)(PartArray[0].Lod->BoneSlots[0].Instance));
 
     std::vector<int> Chain;
     unsigned char bSphereAxis = 0;
@@ -4350,7 +4331,7 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
     std::memset(Node, 0, sizeof(FIkListNode));
     Node->Active = 0;
     Node->Event = (FIkEvent*)((ptrdiff_t)-1);
-    LinkListNode(Instance, Node);
+    LinkListNode(this, Node);
     Node->Active = 1;
 
     // operator new 0x44 (not cleared), then the inlined constructor (vtable 06601340).
@@ -4445,10 +4426,10 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
 }
 
 // FUN_065f14f0: parent-link walk from BindCursor.
-static bool LinkBoneByParent(FLodHolder* Holder, void* BoneInst, int Parent)
+bool FLodHolder::LinkBoneByParent(void* BoneInst, int Parent)
 {
-    FSkeleton* Skel = Holder->Skeleton;
-    int Cursor = Holder->BindCursor;
+    FSkeleton* Skel = Skeleton;
+    int Cursor = BindCursor;
     if (Cursor >= Skel->BoneCount)
         return false;
 
@@ -4459,16 +4440,16 @@ static bool LinkBoneByParent(FLodHolder* Holder, void* BoneInst, int Parent)
             return false;
     }
 
-    Holder->BindCursor = Cursor;
-    FBoneRuntime* Slot = BindOneBoneRuntime(Holder, Cursor, BoneInst);
-    Holder->BindCursor = Holder->BindCursor + 1;
+    BindCursor = Cursor;
+    FBoneRuntime* Slot = BindOneBoneRuntime(Cursor, BoneInst);
+    BindCursor = BindCursor + 1;
     return Slot != nullptr;
 }
 
 // LAB_065f1450 (cdecl): forwards to the thiscall FUN_065f14f0 with the holder as this.
 static bool __cdecl BoneLinkCallbackThunk(void* BoneInst, int Parent, FLodHolder* Holder)
 {
-    return LinkBoneByParent(Holder, BoneInst, Parent);
+    return Holder->LinkBoneByParent(BoneInst, Parent);
 }
 
 // DAT_06603150 / DAT_06603154, set by FUN_065f1d90.
@@ -4521,7 +4502,7 @@ unsigned char FLodHolder::AttachSkeleton(FSkeleton* Skel)
             void* ArchHandle = (void*)(
                 (ptrdiff_t)(Skeleton->Bones[BoneIndex].Parent));
             void* BoneInst = G_Engine->CreateInstance(ArchHandle, nullptr);
-            FBoneRuntime* Slot = BindOneBoneRuntime(this, BoneIndex, BoneInst);
+            FBoneRuntime* Slot = BindOneBoneRuntime(BoneIndex, BoneInst);
             Slot->Flags = (unsigned char)(Slot->Flags | 1u);
         }
         BoneIndex += 1;
@@ -4720,10 +4701,10 @@ static bool QueryRequired(IDAComponent* Source, const char* Iid, void** Out, int
 }
 
 // FUN_065f6720. No test.
-static void ConstructPart(FDeformPart* Part)
+void FDeformPart::Construct()
 {
-    std::memset(Part, 0, sizeof(FDeformPart));
-    Part->Flags = 1;
+    std::memset(this, 0, sizeof(FDeformPart));
+    Flags = 1;
 }
 
 static GENRESULT DACOM_API StubRet8(void* /*This*/, void* /*A*/);
@@ -4810,21 +4791,21 @@ void DACOM_API FDeformInstance::OnLoop(unsigned long ChannelKey, float* Transfor
 }
 
 // FUN_065f3650
-static void ConstructInstanceBody(FDeformInstance* Instance)
+void FDeformInstance::ConstructBody()
 {
-    Instance->PartCount = 0;
-    Instance->PartArray = nullptr;
-    Instance->ListHead = nullptr;
-    Instance->ListTail = nullptr;
-    Instance->ListCount = 0;
-    Instance->ForwardSink = nullptr;
-    Instance->DefaultScript = nullptr;
-    Instance->BaseHeight = 0.0f;
-    Instance->RootHeightOffset = 0.0f;
+    PartCount = 0;
+    PartArray = nullptr;
+    ListHead = nullptr;
+    ListTail = nullptr;
+    ListCount = 0;
+    ForwardSink = nullptr;
+    DefaultScript = nullptr;
+    BaseHeight = 0.0f;
+    RootHeightOffset = 0.0f;
     if (G_DeformRate > 0.0f)
-        Instance->RateCookie = (float)(rand()) * G_DeformRate * G_RandToUnit;
+        RateCookie = (float)(rand()) * G_DeformRate * G_RandToUnit;
     else
-        Instance->RateCookie = G_DeformRate;
+        RateCookie = G_DeformRate;
 }
 
 // Context for the LAB_065f59b0 thunk.
@@ -4889,8 +4870,7 @@ static void __cdecl HardpointConnectCallback(void* BoneInst, char const* Name, v
 }
 
 // FUN_065f59d0 (thiscall on the instance: UserFn, UserData).
-static unsigned char WalkInstanceHardpoints(FDeformInstance* Instance, void* UserFn,
-                                            void* UserData)
+unsigned char FDeformInstance::WalkHardpoints(void* UserFn, void* UserData)
 {
     IHardpoint* Hardpoint = nullptr;
     if (G_Engine->QueryInterface(Iids::Hardpoint, (void**)(&Hardpoint)) < 0)
@@ -4903,9 +4883,9 @@ static unsigned char WalkInstanceHardpoints(FDeformInstance* Instance, void* Use
     }
 
     int PartIndex = 0;
-    while (PartIndex < Instance->PartCount)
+    while (PartIndex < PartCount)
     {
-        FLodHolder* Lod = Instance->PartArray[PartIndex].Lod;
+        FLodHolder* Lod = PartArray[PartIndex].Lod;
         int Bone = 0;
         while (Bone < Lod->BindCursor)
         {
@@ -4927,25 +4907,25 @@ static unsigned char WalkInstanceHardpoints(FDeformInstance* Instance, void* Use
 }
 
 // FUN_065f36c0 (thiscall on the instance: Parts, Arg3, Arg4). Returns 1.
-static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Arg3, void* Arg4)
+bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
 {
-    Instance->ForwardSink = (IChannelSink*)Arg3;
-    Instance->DefaultScript = Arg4;
-    Instance->PartCount = Parts[0];
-    int* Block = (int*)new unsigned char[(size_t)Instance->PartCount * sizeof(FDeformPart) + 4];
-    *Block = Instance->PartCount;
+    ForwardSink = (IChannelSink*)Arg3;
+    DefaultScript = Arg4;
+    PartCount = Parts[0];
+    int* Block = (int*)new unsigned char[(size_t)PartCount * sizeof(FDeformPart) + 4];
+    *Block = PartCount;
     FDeformPart* Array = (FDeformPart*)(Block + 1);
     int Index = 0;
-    while (Index < Instance->PartCount)
+    while (Index < PartCount)
     {
-        ConstructPart(&Array[Index]);
+        Array[Index].Construct();
         Index += 1;
     }
-    Instance->PartArray = Array;
+    PartArray = Array;
 
     FDeformPartDesc* Descs = *(FDeformPartDesc**)(Parts + 1);
     int PartIndex = 0;
-    while (PartIndex < Instance->PartCount)
+    while (PartIndex < PartCount)
     {
         FDeformPartDesc* Entry = &Descs[PartIndex];
         const char* Path = Entry->Path;
@@ -4985,7 +4965,7 @@ static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Ar
         _snprintf(SkelName, 0x100, "skel_%s", BaseName);
 
         FSkeleton* Skel = ConstructSkeleton();
-        if (!LoadSkeleton(Skel, SkelName, RootFs))
+        if (!Skel->Load(SkelName, RootFs))
         {
             FDUMP(0x100002, "%s(%d) : WARNING:General:%s", G_FdumpFileDeformableObject, 0xB0,
                   "couldnt load skeleton");
@@ -5091,7 +5071,7 @@ static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Ar
                         FsFindClose(RootFs, Finder);
                     }
                     Entry->LodCount = LoadedCount;
-                    if (!Instance->PartArray[PartIndex].BindMeshes(Holder, Loaded, LoadedCount))
+                    if (!PartArray[PartIndex].BindMeshes(Holder, Loaded, LoadedCount))
                     {
                         FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
                               G_FdumpFileDeformableObject, 0x11F, "warning: couldnt create part.");
@@ -5116,12 +5096,12 @@ static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Ar
         FDUMP(0x100002, "%s(%d) : WARNING:General:%s", G_FdumpFileDeformableObject, 0x2B,
               "Deform: Unable to acquire IID_IHardpoint, unable to continue");
     }
-    WalkInstanceHardpoints(Instance, (void*)(&HardpointConnectCallback), &Context);
+    WalkHardpoints((void*)(&HardpointConnectCallback), &Context);
 
     PartIndex = 0;
-    while (PartIndex < Instance->PartCount)
+    while (PartIndex < PartCount)
     {
-        FLodHolder* Lod = Instance->PartArray[PartIndex].Lod;
+        FLodHolder* Lod = PartArray[PartIndex].Lod;
         int Bone = 1;
         while (Bone < Lod->BindCursor)
         {
@@ -5145,9 +5125,9 @@ static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Ar
 }
 
 // FUN_065f3ed0 (thiscall on the instance).
-static void TeardownInstance(FDeformInstance* Instance)
+void FDeformInstance::Teardown()
 {
-    FIkListNode* Node = Instance->ListHead;
+    FIkListNode* Node = ListHead;
     while (Node != nullptr)
     {
         if (Node->Active != 0)
@@ -5163,29 +5143,29 @@ static void TeardownInstance(FDeformInstance* Instance)
         }
         Node = Node->Next;
     }
-    while (Instance->ListCount != 0)
+    while (ListCount != 0)
     {
-        FIkListNode* Head = Instance->ListHead;
-        UnlinkListNode(Instance, Head);
+        FIkListNode* Head = ListHead;
+        UnlinkListNode(this, Head);
         delete Head;
     }
 
-    if (Instance->PartArray != nullptr)
+    if (PartArray != nullptr)
     {
-        void* Root = Instance->PartArray[0].Lod->BoneSlots[0].Instance;
+        void* Root = PartArray[0].Lod->BoneSlots[0].Instance;
         if (Root != G_InvalidEngineHandle)
             G_Engine->DestroyInstance(Root);
-        int* Header = (int*)Instance->PartArray - 1;
+        int* Header = (int*)PartArray - 1;
         int Index = *Header;
         while (Index > 0)
         {
             Index -= 1;
-            Instance->PartArray[Index].Reset();
+            PartArray[Index].Reset();
         }
         delete[] (unsigned char*)Header;
-        Instance->PartArray = nullptr;
+        PartArray = nullptr;
     }
-    Instance->PartCount = 0;
+    PartCount = 0;
 }
 
 // --- inner IDAComponent @ +0x0C (FDeformableInner: LAB_065f2400 / 065fe060 / 065f24c0) ---
@@ -5258,21 +5238,20 @@ unsigned long DACOM_API FDeformableInner::Release()
 // --- IDeformable @ +0: QI/AddRef/Release delegate to [this+8] (LAB_065f2500) ---
 
 // LAB_065f2500/2510/2520: tail-jump to Controlling ([this+8]); no tests.
-static GENRESULT DACOM_API DeformableQueryInterface(FDeformableObject* This, const char* Iid,
-                                                    void** Out)
+GENRESULT DACOM_API FDeformableObject::QueryInterface(const char* Iid, void** Out)
 {
-    IDAComponent* Controlling = This->Controlling;
+    IDAComponent* Controlling = this->Controlling;
     return Controlling->QueryInterface(Iid, Out);
 }
 
-static unsigned long DACOM_API DeformableAddRef(FDeformableObject* This)
+unsigned long DACOM_API FDeformableObject::AddRef()
 {
-    return This->Controlling->AddRef();
+    return Controlling->AddRef();
 }
 
-static unsigned long DACOM_API DeformableRelease(FDeformableObject* This)
+unsigned long DACOM_API FDeformableObject::Release()
 {
-    return This->Controlling->Release();
+    return Controlling->Release();
 }
 
 // Shared fail stubs returning -1; the suffix is the retail RET size.
@@ -5318,25 +5297,25 @@ static GENRESULT DACOM_API DeformableCreate(FDeformable* /*This*/, void** OutIns
         return GR_INVALID_PARMS;
 
     // `new FDeformInstance` sets the vtable FUN_065f3650 stores first (PTR_FUN_06601308 --
-    // EngBase calls it back as the playback's script); ConstructInstanceBody does the rest.
+    // EngBase calls it back as the playback's script); FDeformInstance::ConstructBody does the rest.
     FDeformInstance* Instance = new FDeformInstance;
-    ConstructInstanceBody(Instance);
-    if (ConnectInstanceParts(Instance, Parts, Arg3, Arg4))
+    Instance->ConstructBody();
+    if (Instance->ConnectParts(Parts, Arg3, Arg4))
     {
         *OutInstance = Instance;
         return GR_OK;
     }
-    TeardownInstance(Instance);
+    Instance->Teardown();
     delete Instance;
     *OutInstance = nullptr;
     return GR_GENERIC;
 }
 
-static GENRESULT DACOM_API DeformableCreateAlias(FDeformable* This, void** OutInstance,
-                                                 int* Parts, void* Arg3, void* Arg4, void* Arg5)
+GENRESULT DACOM_API FDeformable::CreateAlias(void** OutInstance, int* Parts, void* Arg3,
+                                                   void* Arg4, void* Arg5)
 {
     // LAB_065f1860: tail-jumps to vtable+0x0C.
-    return DeformableCreate(This, OutInstance, Parts, Arg3, Arg4, Arg5);
+    return DeformableCreate(this, OutInstance, Parts, Arg3, Arg4, Arg5);
 }
 
 static GENRESULT DACOM_API DeformableDestroy(FDeformable* /*This*/, FDeformInstance* Instance)
@@ -5345,20 +5324,19 @@ static GENRESULT DACOM_API DeformableDestroy(FDeformable* /*This*/, FDeformInsta
     // emptied instance).
     if (Instance == nullptr)
         return GR_GENERIC;
-    TeardownInstance(Instance);
-    TeardownInstance(Instance);
+    Instance->Teardown();
+    Instance->Teardown();
     delete Instance;
     return GR_OK;
 }
 
-static unsigned char PartBoundSphere(FDeformPart* Part, float* OutRadius, float* OutCenter);
 
 // FUN_065f4070 (thiscall on the instance: Unused, Camera, OutLod, RenderArg, Flags).
-static void DrawInstanceParts(FDeformInstance* Instance, void* /*Unused*/, ICamera* Camera,
-                              int* OutLod, void* RenderArg, unsigned long Flags)
+void FDeformInstance::DrawParts(void* /*Unused*/, ICamera* Camera, int* OutLod, void* RenderArg,
+                                unsigned long Flags)
 {
     *OutLod = 0;
-    if (Instance->PartCount <= 0)
+    if (PartCount <= 0)
         return;
     static_assert(sizeof(ICamera*) == sizeof(float), "the radius shares the camera's slot");
     float Radius = 0.0f;
@@ -5370,8 +5348,8 @@ static void DrawInstanceParts(FDeformInstance* Instance, void* /*Unused*/, ICame
     int Index = 0;
     do
     {
-        FDeformPart* const Part = &Instance->PartArray[Index];
-        PartBoundSphere(Part, &Radius, Center);
+        FDeformPart* const Part = &PartArray[Index];
+        Part->BoundSphere(&Radius, Center);
         const float* const View = Camera->GetViewTransform();
         float ViewCenter[3];
         AcquireMathEngine()->TransformXform(*(FVector*)ViewCenter,
@@ -5383,7 +5361,7 @@ static void DrawInstanceParts(FDeformInstance* Instance, void* /*Unused*/, ICame
         Probe[2] = ViewCenter[2];
         const int Rank = Camera->ClassifySphere(Probe, Radius);
         if (Rank > 2)
-            DrawPartLive(Part, Camera, RenderArg);
+            Part->DrawLive(Camera, RenderArg);
         if (Index == 0)
             *OutLod = Rank;
         else if (*OutLod != Rank)
@@ -5394,11 +5372,11 @@ static void DrawInstanceParts(FDeformInstance* Instance, void* /*Unused*/, ICame
                 *OutLod = 3;
         }
         Index += 1;
-    } while (Index < Instance->PartCount);
+    } while (Index < PartCount);
 
     if (*OutLod < 3)
         return;
-    void* const Bone = (void*)((ptrdiff_t)(FirstBoneInstance(Instance)));
+    void* const Bone = (void*)((ptrdiff_t)(FirstBoneInstance(this)));
     // Submit the root instance and merge its renderer rank into the LOD result.
     const int Rank = G_Renderer->RenderInstance(
         Camera, Bone, 1.0f, Flags | 0x108ul, nullptr, RenderArg);
@@ -5412,13 +5390,13 @@ static void DrawInstanceParts(FDeformInstance* Instance, void* /*Unused*/, ICame
 }
 
 // FUN_065f68c0 (thiscall on the part: OutRadius, OutCenter): the first mesh's slot 4.
-static unsigned char PartBoundSphere(FDeformPart* Part, float* OutRadius, float* OutCenter)
+unsigned char FDeformPart::BoundSphere(float* OutRadius, float* OutCenter)
 {
-    const unsigned char bOk = Part->Meshes[0]->GetBoundSphere(OutRadius, OutCenter);
+    const unsigned char bOk = Meshes[0]->GetBoundSphere(OutRadius, OutCenter);
     if (bOk != 0)
     {
         I3DMathEngine* Math = AcquireMathEngine();
-        float* BoneAtC = Part->Lod->BoneSlots[0].LocalTransform;
+        float* BoneAtC = Lod->BoneSlots[0].LocalTransform;
         float Transformed[3];
         Math->TransformXform(*(FVector*)Transformed,
                              *(const FTransform*)BoneAtC,
@@ -5489,21 +5467,6 @@ static GENRESULT DACOM_API EngineCallbackTrampoline(void* /*This*/, void* Arg1, 
 }
 
 
-GENRESULT DACOM_API FDeformableObject::QueryInterface(const char* Iid, void** Out)
-{
-    return DeformableQueryInterface(this, Iid, Out);
-}
-
-unsigned long DACOM_API FDeformableObject::AddRef()
-{
-    return DeformableAddRef(this);
-}
-
-unsigned long DACOM_API FDeformableObject::Release()
-{
-    return DeformableRelease(this);
-}
-
 // FUN_065f1810; vtables 06601110 / 066010dc (066011ac is IEngineComponent's own).
 FDeformable::FDeformable()
 {
@@ -5529,12 +5492,6 @@ GENRESULT DACOM_API FDeformable::CreateUnused(void* A, void* B, void* C, void* D
     return StubRet20(this, A, B, C, D, E, F, G);
 }
 
-GENRESULT DACOM_API FDeformable::CreateAlias(void** OutInstance, int* Parts, void* Arg3,
-                                                   void* Arg4, void* Arg5)
-{
-    return DeformableCreateAlias(this, OutInstance, Parts, Arg3, Arg4, Arg5);
-}
-
 GENRESULT DACOM_API FDeformable::Destroy(void* Instance)
 {
     return DeformableDestroy(this, (FDeformInstance*)Instance);
@@ -5549,7 +5506,7 @@ GENRESULT DACOM_API FDeformable::Play(void* Instance, int* Out, void* Name, void
     if (DeformInstance == nullptr)
         return GR_GENERIC;
     const int Handle =
-        PlayInstanceAnim(DeformInstance, Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, Script);
+        DeformInstance->PlayAnim(Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, Script);
     *Out = Handle;
     if (Handle == -1)
         return GR_GENERIC;
@@ -5565,7 +5522,7 @@ GENRESULT DACOM_API FDeformable::PlayAlt(void* Instance, int* Out, void* Name, v
     if (DeformInstance == nullptr)
         return GR_GENERIC;
     const int Handle =
-        PlayInstanceAnimChain(DeformInstance, Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, Script);
+        DeformInstance->PlayAnimChain(Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, Script);
     *Out = Handle;
     if (Handle == -1)
         return GR_GENERIC;
@@ -5578,7 +5535,7 @@ GENRESULT DACOM_API FDeformable::DestroyAll(void* Instance)
     // LAB_065f1fa0 → FUN_065f4c80.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
-    DestroyAllList(DeformInstance);
+    DeformInstance->DestroyAllList();
     return GR_OK;
 }
 
@@ -5588,7 +5545,7 @@ GENRESULT DACOM_API FDeformable::DestroyHandle(void* Instance, int Handle)
     // LAB_065f1fc0 → FUN_065f4d30.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
-    DestroyListByHandle(DeformInstance, Handle);
+    DeformInstance->DestroyListByHandle(Handle);
     return GR_OK;
 }
 
@@ -5600,7 +5557,7 @@ GENRESULT DACOM_API FDeformable::StartAim(void* Instance, void** Out, unsigned c
     if (DeformInstance == nullptr)
         return GR_GENERIC;
 
-    FIkListNode* Node = AllocAimEvent(DeformInstance, AimDesc, Arg3);
+    FIkListNode* Node = DeformInstance->AllocAimEvent(AimDesc, Arg3);
     *Out = Node;
     if (Node == (FIkListNode*)((ptrdiff_t)-1))
         return GR_GENERIC;
@@ -5639,7 +5596,7 @@ GENRESULT DACOM_API FDeformable::SetLod(void* Instance, float Dt, int* LodIds)
     while (Index < DeformInstance->PartCount)
     {
         bChanged = (unsigned char)(
-            bChanged | SelectPartLod(&DeformInstance->PartArray[Index], LodIds[Index]));
+            bChanged | DeformInstance->PartArray[Index].SelectLod(LodIds[Index]));
         Index += 1;
     }
     if (bChanged != 0)
@@ -5652,7 +5609,7 @@ GENRESULT DACOM_API FDeformable::SetLod(void* Instance, float Dt, int* LodIds)
     int Part = 0;
     while (Part < DeformInstance->PartCount)
     {
-        MarkPartSkinDirty(&DeformInstance->PartArray[Part]);
+        DeformInstance->PartArray[Part].MarkSkinDirty();
         Part += 1;
     }
     return GR_OK;
@@ -5669,7 +5626,7 @@ GENRESULT DACOM_API FDeformable::Draw(void* Instance, void* Camera, void* Unused
         *OutLod = 0;
         return GR_GENERIC;
     }
-    DrawInstanceParts(DeformInstance, UnusedB, (ICamera*)Camera, OutLod, RenderArg, Flags);
+    DeformInstance->DrawParts(UnusedB, (ICamera*)Camera, OutLod, RenderArg, Flags);
     return GR_OK;
 }
 
@@ -5703,7 +5660,7 @@ GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, float* Pos3)
     // LAB_065f20f0 -> FUN_065f4f00(Pos3).
     if (DeformInstance == nullptr)
         return GR_GENERIC;
-    SweepExpiredList(DeformInstance);
+    DeformInstance->SweepExpiredList();
     float Vec[3];
     Vec[0] = Pos3[0];
     Vec[1] = Pos3[1];
@@ -5794,7 +5751,7 @@ GENRESULT DACOM_API FDeformable::SetHeight(void* Instance, float Height)
     if (DeformInstance == nullptr)
         return GR_GENERIC;
     DeformInstance->BaseHeight = Height;
-    SweepExpiredList(DeformInstance);
+    DeformInstance->SweepExpiredList();
     FIkListNode* Node = DeformInstance->ListHead;
     while (Node != nullptr)
     {
@@ -5858,7 +5815,7 @@ GENRESULT DACOM_API FDeformable::GetListCount(void* Instance, int* Out)
         *Out = 0;
         return GR_GENERIC;
     }
-    SweepExpiredList(DeformInstance);
+    DeformInstance->SweepExpiredList();
     *Out = DeformInstance->ListCount;
     return GR_OK;
 }
@@ -5932,7 +5889,7 @@ GENRESULT DACOM_API FDeformable::WalkHardpoints(void* Instance, void* UserFn, vo
     // LAB_065f21d0 -> FUN_065f59d0.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
-    WalkInstanceHardpoints(DeformInstance, UserFn, UserData);
+    DeformInstance->WalkHardpoints(UserFn, UserData);
     return GR_OK;
 }
 
@@ -5992,7 +5949,7 @@ GENRESULT DACOM_API FDeformable::GetBoundSphere(void* Instance, float* OutRadius
     FirstCenter[0] = 0.0f;
     FirstCenter[1] = 0.0f;
     FirstCenter[2] = 0.0f;
-    PartBoundSphere(&DeformInstance->PartArray[0], &BestRadius, FirstCenter);
+    DeformInstance->PartArray[0].BoundSphere(&BestRadius, FirstCenter);
 
     int Index = 0;
     while (Index < DeformInstance->PartCount)
@@ -6002,7 +5959,7 @@ GENRESULT DACOM_API FDeformable::GetBoundSphere(void* Instance, float* OutRadius
         Center[0] = 0.0f;
         Center[1] = 0.0f;
         Center[2] = 0.0f;
-        PartBoundSphere(&DeformInstance->PartArray[Index], &Radius, Center);
+        DeformInstance->PartArray[Index].BoundSphere(&Radius, Center);
         const double Dx = (double)Center[0] - (double)FirstCenter[0];
         const double Dy = (double)Center[1] - (double)FirstCenter[1];
         const double Dz = (double)Center[2] - (double)FirstCenter[2];
@@ -6111,9 +6068,14 @@ unsigned long DACOM_API FDeformableFactory::Release()
     return Remaining;
 }
 
-static GENRESULT DACOM_API FactoryCreateInstance(FDeformableFactory* This, AGGDESC* Desc,
-                                                 void** Out)
+struct FDeformableComponentFactory : FDeformableFactory
 {
+    GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Out) override;
+};
+
+GENRESULT DACOM_API FDeformableComponentFactory::CreateInstance(AGGDESC* Desc, void** Out)
+{
+    FDeformableFactory* This = this;
     // FUN_065f22f0. operator new(0x18) returns null on failure (VC6 MSVCRT), which retail tests.
     // No test of This, Desc, Out or either name.
     FAggDesc18* Extended = (FAggDesc18*)Desc;
@@ -6157,16 +6119,6 @@ static GENRESULT DACOM_API FactoryCreateInstance(FDeformableFactory* This, AGGDE
 
     *Out = Object;
     return GR_OK;
-}
-
-struct FDeformableComponentFactory : FDeformableFactory
-{
-    GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Out) override;
-};
-
-GENRESULT DACOM_API FDeformableComponentFactory::CreateInstance(AGGDESC* Desc, void** Out)
-{
-    return FactoryCreateInstance(this, Desc, Out);
 }
 
 // Saves one render state on construction and puts it back on destruction: LAB_065fdd10 keeps

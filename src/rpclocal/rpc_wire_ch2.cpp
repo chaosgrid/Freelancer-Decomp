@@ -35,6 +35,7 @@
 // [06db3000] Archetype::SmallIDToLargeID, [06db305c] SinglePlayer.
 #include "common_goods.h"
 #include "common_misc.h" // SinglePlayer
+#include "rpc_packet_classes.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -72,13 +73,18 @@
 // the directions.
 // ===========================================================================
 
-unsigned int RpcEncodeServerCreateLoot(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength) {
+// ===========================================================================
+// ch2 codec slots transcribed in rpc_wire_ch2.cpp -- see the file header there for
+// how each packet class was tied to its channel/opcode through its constructor.
+// ===========================================================================
+unsigned int FPacket_FLPACKET_SERVER_CREATELOOT::Encode(unsigned char** BufferHolder,
+                                                        unsigned int Capacity,
+                                                        unsigned int* OutLength) {
     const FPayloadServerCreateLoot* Wire =
-        reinterpret_cast<const FPayloadServerCreateLoot*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerCreateLoot*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     Stream.PutDword(Wire->OwnerId);                         // payload+0x00
     Stream.PutByte(Wire->Kind);                          // payload+0x04
 
@@ -112,16 +118,16 @@ unsigned int RpcEncodeServerCreateLoot(FPacketBase& Packet, unsigned char** Buff
     }
     *OutLength = Stream.Length();
     // The byte-statistics tail runs on the success path only.
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerCreateLoot(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATELOOT::Decode(const unsigned char* Buffer,
+                                                        unsigned int Size, unsigned int* OutLength) {
     FPayloadServerCreateLoot* Wire =
-        reinterpret_cast<FPayloadServerCreateLoot*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerCreateLoot*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // The dispatcher already consumed the two header bytes; the decoder's length excludes
     // them.
 
@@ -152,8 +158,8 @@ unsigned int RpcDecodeServerCreateLoot(FPacketBase& Packet, const unsigned char*
 
         // FUN_06d931f0 == std::list::insert(end(), record): the element is linked first
         // and filled in place, so a short buffer leaves a partially decoded element.
-        RpcPacketLootPushBack(&Packet, Fresh);
-        FRpcLootWireList* List = RpcPacketLootList(&Packet);
+        RpcPacketLootPushBack(this, Fresh);
+        FRpcLootWireList* List = RpcPacketLootList(this);
         FRpcLootWireRecord& Record = List->Head->Prev->Value;
 
         unsigned short Small = 0;
@@ -187,7 +193,7 @@ unsigned int RpcDecodeServerCreateLoot(FPacketBase& Packet, const unsigned char*
     }
     *OutLength = Stream.Length();
     // The byte-statistics tail runs on the success path only.
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -232,14 +238,15 @@ unsigned int RpcDecodeServerCreateLoot(FPacketBase& Packet, const unsigned char*
 //      terminated by a word at [buf + len*2].
 // ===========================================================================
 
-unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Encode(unsigned char** BufferHolder,
+                                                           unsigned int Capacity,
+                                                           unsigned int* OutLength) {
     // Not const: the mask is written back into payload+0x34.
     FPayloadServerSetReputation* Wire =
-        reinterpret_cast<FPayloadServerSetReputation*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerSetReputation*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
 
     const unsigned char Flag1 = (unsigned char)(Wire->MaskAffiliation & 0xffu);
     const unsigned char Flag2 = (unsigned char)(Wire->MaskNames & 0xffu);
@@ -309,16 +316,17 @@ unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** B
     }
     *OutLength = Stream.Length();
     // The byte-statistics tail runs on the success path only.
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerSetReputation(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_SETREPUTATION::Decode(const unsigned char* Buffer,
+                                                           unsigned int Size,
+                                                           unsigned int* OutLength) {
     FPayloadServerSetReputation* Wire =
-        reinterpret_cast<FPayloadServerSetReputation*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerSetReputation*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     const unsigned char Flag1 = (unsigned char)(Wire->MaskAffiliation & 0xffu);
     const unsigned char Flag2 = (unsigned char)(Wire->MaskNames & 0xffu);
@@ -424,7 +432,7 @@ unsigned int RpcDecodeServerSetReputation(FPacketBase& Packet, const unsigned ch
     }
     *OutLength = Stream.Length();
     // The byte-statistics tail runs on the success path only.
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -455,13 +463,14 @@ unsigned int RpcDecodeServerSetReputation(FPacketBase& Packet, const unsigned ch
 // ===========================================================================
 
 
-unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_MISCOBJUPDATE::Encode(unsigned char** BufferHolder,
+                                                           unsigned int Capacity,
+                                                           unsigned int* OutLength) {
     const FPayloadServerMiscObjUpdate* Wire =
-        reinterpret_cast<const FPayloadServerMiscObjUpdate*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerMiscObjUpdate*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     const unsigned short Flags = Wire->Flags;
     Stream.PutWord(Flags);
     if ((Flags & kMiscObjUpdateFlagObjectId) != 0) {         // 06d98daf TEST ...,0x8
@@ -507,16 +516,17 @@ unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** B
     }
     *OutLength = Stream.Length();
     // The byte-statistics tail runs on the success path only.
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_MISCOBJUPDATE::Decode(const unsigned char* Buffer,
+                                                           unsigned int Size,
+                                                           unsigned int* OutLength) {
     FPayloadServerMiscObjUpdate* Wire =
-        reinterpret_cast<FPayloadServerMiscObjUpdate*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerMiscObjUpdate*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     unsigned short Flags = 0;
     if (!Stream.GetWord(Flags)) {                              // 06d9913f
@@ -596,7 +606,7 @@ unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned ch
     }
     *OutLength = Stream.Length();
     // The byte-statistics tail runs on the success path only.
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -660,13 +670,14 @@ static void RpcSendCommMoveFloatBits(void* Dest, const void* Source) {
 // the count alone, re-read from payload+0x3c every pass and compared signed. A count above
 // eight walks off the end of Ids (Ids[8] is the count); the port does the same.
 
-unsigned int RpcEncodeServerSendComm(FPacketBase& Packet, unsigned char** BufferHolder,
-                                     unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_SENDCOMM::Encode(unsigned char** BufferHolder,
+                                                      unsigned int Capacity,
+                                                      unsigned int* OutLength) {
     const FPayloadServerSendComm* Wire =
-        reinterpret_cast<const FPayloadServerSendComm*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerSendComm*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
 
     Stream.PutDword(Wire->SenderId);
     Stream.PutDword(Wire->ReceiverId);
@@ -704,16 +715,16 @@ unsigned int RpcEncodeServerSendComm(FPacketBase& Packet, unsigned char** Buffer
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerSendComm(FPacketBase& Packet, const unsigned char* Buffer,
-                                     unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_SENDCOMM::Decode(const unsigned char* Buffer,
+                                                      unsigned int Size, unsigned int* OutLength) {
     FPayloadServerSendComm* Wire =
-        reinterpret_cast<FPayloadServerSendComm*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerSendComm*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -787,7 +798,7 @@ unsigned int RpcDecodeServerSendComm(FPacketBase& Packet, const unsigned char* B
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -835,13 +846,14 @@ static unsigned int RpcCreateFloatToBits(float Value) {
 // would permute the quadruple.
 // ===========================================================================
 
-unsigned int RpcEncodeServerCreateGuided(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATEGUIDED::Encode(unsigned char** BufferHolder,
+                                                          unsigned int Capacity,
+                                                          unsigned int* OutLength) {
     const FPayloadServerCreateGuided* Wire =
-        reinterpret_cast<const FPayloadServerCreateGuided*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerCreateGuided*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     Stream.PutWord(Archetype::LargeIDToSmallID(Wire->ArchetypeNickname));    // / 06da8564
     Stream.PutDword(Wire->OwnerId);
     Stream.PutWord(Wire->SubObjId);
@@ -862,16 +874,17 @@ unsigned int RpcEncodeServerCreateGuided(FPacketBase& Packet, unsigned char** Bu
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerCreateGuided(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATEGUIDED::Decode(const unsigned char* Buffer,
+                                                          unsigned int Size,
+                                                          unsigned int* OutLength) {
     FPayloadServerCreateGuided* Wire =
-        reinterpret_cast<FPayloadServerCreateGuided*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerCreateGuided*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     Wire->OwnerPlayer = 0;
     unsigned short Small16 = 0;
@@ -916,7 +929,7 @@ unsigned int RpcDecodeServerCreateGuided(FPacketBase& Packet, const unsigned cha
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -942,13 +955,14 @@ unsigned int RpcDecodeServerCreateGuided(FPacketBase& Packet, const unsigned cha
 // (three dwords) and FUN_06d8f4f0 (four dwords) as raw bytes.
 // ===========================================================================
 
-unsigned int RpcEncodeServerCreateMine(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATEMINE::Encode(unsigned char** BufferHolder,
+                                                        unsigned int Capacity,
+                                                        unsigned int* OutLength) {
     const FPayloadServerCreateMine* Wire =
-        reinterpret_cast<const FPayloadServerCreateMine*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerCreateMine*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     Stream.PutDword(Wire->ObjId);
     Stream.PutWord(Archetype::LargeIDToSmallID(Wire->ArchetypeNickname));    // / 06da9689
     Stream.PutDword(Wire->OwnerId);
@@ -965,16 +979,16 @@ unsigned int RpcEncodeServerCreateMine(FPacketBase& Packet, unsigned char** Buff
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerCreateMine(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATEMINE::Decode(const unsigned char* Buffer,
+                                                        unsigned int Size, unsigned int* OutLength) {
     FPayloadServerCreateMine* Wire =
-        reinterpret_cast<FPayloadServerCreateMine*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerCreateMine*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // 06da98fc FUN_06da13c0 -- consumes nothing.
 
     unsigned int Scratch = 0;
@@ -1008,17 +1022,18 @@ unsigned int RpcDecodeServerCreateMine(FPacketBase& Packet, const unsigned char*
         return Stream.GetError();                                     // LAB_06da9b14
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcEncodeServerCreateCounter(FPacketBase& Packet, unsigned char** BufferHolder,
-                                          unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATECOUNTER::Encode(unsigned char** BufferHolder,
+                                                           unsigned int Capacity,
+                                                           unsigned int* OutLength) {
     const FPayloadServerCreateCounter* Wire =
-        reinterpret_cast<const FPayloadServerCreateCounter*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerCreateCounter*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     Stream.PutDword(Wire->ArchetypeNickname);
     Stream.PutDword(Wire->ObjId);
     Stream.PutDword(Wire->OwnerPlayer);
@@ -1034,16 +1049,17 @@ unsigned int RpcEncodeServerCreateCounter(FPacketBase& Packet, unsigned char** B
         return Stream.GetError();                                     // LAB_06da9e28
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerCreateCounter(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_CREATECOUNTER::Decode(const unsigned char* Buffer,
+                                                           unsigned int Size,
+                                                           unsigned int* OutLength) {
     FPayloadServerCreateCounter* Wire =
-        reinterpret_cast<FPayloadServerCreateCounter*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerCreateCounter*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // 06da9e6c FUN_06da13c0 -- consumes nothing.
 
     unsigned int Scratch = 0;
@@ -1076,7 +1092,7 @@ unsigned int RpcDecodeServerCreateCounter(FPacketBase& Packet, const unsigned ch
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());         // onwards
+    RpcRecordDecodedPacket(PacketId, Stream.Length());         // onwards
     return 0;
 }
 
@@ -1104,13 +1120,14 @@ unsigned int RpcDecodeServerCreateCounter(FPacketBase& Packet, const unsigned ch
 //     decoded twice leaks the first buffer (docs/re/deviations.md).
 // ===========================================================================
 
-unsigned int RpcEncodeServerSetAddItem(FPacketBase& Packet, unsigned char** BufferHolder,
-                                       unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_SETADDITEM::Encode(unsigned char** BufferHolder,
+                                                        unsigned int Capacity,
+                                                        unsigned int* OutLength) {
     const FPayloadServerSetAddItem* Wire =
-        reinterpret_cast<const FPayloadServerSetAddItem*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerSetAddItem*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     Stream.PutDword(Wire->ArchId);
     Stream.PutDword(Wire->Id);
     Stream.PutDword((unsigned int)Wire->Count);
@@ -1128,16 +1145,16 @@ unsigned int RpcEncodeServerSetAddItem(FPacketBase& Packet, unsigned char** Buff
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerSetAddItem(FPacketBase& Packet, const unsigned char* Buffer,
-                                       unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_SETADDITEM::Decode(const unsigned char* Buffer,
+                                                        unsigned int Size, unsigned int* OutLength) {
     FPayloadServerSetAddItem* Wire =
-        reinterpret_cast<FPayloadServerSetAddItem*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerSetAddItem*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // 06d9723a FUN_06da13c0 -- consumes nothing.
 
     unsigned int Scratch = 0;
@@ -1173,7 +1190,7 @@ unsigned int RpcDecodeServerSetAddItem(FPacketBase& Packet, const unsigned char*
         return Stream.GetError();                                     // LAB_06d9745a
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());         // onwards
+    RpcRecordDecodedPacket(PacketId, Stream.Length());         // onwards
     return 0;
 }
 
@@ -1202,15 +1219,14 @@ unsigned int RpcDecodeServerSetAddItem(FPacketBase& Packet, const unsigned char*
 // sentinel. Only the list's own Size is bumped; the payload Count comes off the wire.
 // ===========================================================================
 
-unsigned int RpcEncodeServerSetMissionObjectives(FPacketBase& Packet,
-                                                 unsigned char** BufferHolder,
-                                                 unsigned int Capacity,
-                                                 unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES::Encode(unsigned char** BufferHolder,
+                                                                  unsigned int Capacity,
+                                                                  unsigned int* OutLength) {
     const FPayloadServerSetMissionObjectives* Wire =
-        reinterpret_cast<const FPayloadServerSetMissionObjectives*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerSetMissionObjectives*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     Stream.PutDword(Wire->MissionId);
     Stream.PutDword(Wire->Count);
     Stream.PutDword(Wire->MissionType);
@@ -1234,18 +1250,17 @@ unsigned int RpcEncodeServerSetMissionObjectives(FPacketBase& Packet,
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerSetMissionObjectives(FPacketBase& Packet,
-                                                 const unsigned char* Buffer,
-                                                 unsigned int Size,
-                                                 unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES::Decode(const unsigned char* Buffer,
+                                                                  unsigned int Size,
+                                                                  unsigned int* OutLength) {
     FPayloadServerSetMissionObjectives* Wire =
-        reinterpret_cast<FPayloadServerSetMissionObjectives*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerSetMissionObjectives*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // 06d8fffb FUN_06da13c0 -- consumes nothing.
 
     unsigned int Scratch = 0;
@@ -1289,14 +1304,14 @@ unsigned int RpcDecodeServerSetMissionObjectives(FPacketBase& Packet,
             return Stream.GetError();
         }
         // Insert before the sentinel, then bump the list's Size.
-        RpcMissionObjectiveListPushBack(&Wire->Objectives, Record);
+        Wire->Objectives.PushBack(Record);
     }
 
     if (Stream.Failed()) {
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -1323,13 +1338,15 @@ unsigned int RpcDecodeServerSetMissionObjectives(FPacketBase& Packet,
 // In single player packets are queued by pointer and neither slot is called.
 // ===========================================================================
 
-unsigned int RpcEncodeServerBurnFuse(FPacketBase& Packet, unsigned char** BufferHolder,
-                                     unsigned int Capacity, unsigned int* OutLength) {
+// 0x06dac3c0 / 0x06dac5c0 -- ch2 0x41 BURNFUSE, seven flat fields. In rpc_wire_ch2.cpp.
+unsigned int FPacket_FLPACKET_SERVER_BURNFUSE::Encode(unsigned char** BufferHolder,
+                                                      unsigned int Capacity,
+                                                      unsigned int* OutLength) {
     const FPayloadServerBurnFuse* Wire =
-        reinterpret_cast<const FPayloadServerBurnFuse*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerBurnFuse*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     if (!Stream.PutDword(Wire->SourceId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
@@ -1352,16 +1369,16 @@ unsigned int RpcEncodeServerBurnFuse(FPacketBase& Packet, unsigned char** Buffer
         return FRpcMarshalStream::kEncodeOverflow;
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeServerBurnFuse(FPacketBase& Packet, const unsigned char* Buffer,
-                                     unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_BURNFUSE::Decode(const unsigned char* Buffer,
+                                                      unsigned int Size, unsigned int* OutLength) {
     FPayloadServerBurnFuse* Wire =
-        reinterpret_cast<FPayloadServerBurnFuse*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerBurnFuse*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     if (!Stream.GetDword(Wire->SourceId)) {
         return Stream.GetError();
@@ -1385,6 +1402,6 @@ unsigned int RpcDecodeServerBurnFuse(FPacketBase& Packet, const unsigned char* B
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }

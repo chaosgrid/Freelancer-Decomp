@@ -185,13 +185,13 @@ void LoadPlayerToughnessScale(INI_Reader* Reader)
     }
 }
 
-void RecalculateContentPlayerRank(FContentPlayerState* State)
+void FContentPlayerState::RecalculateRank()
 {
     // FUN_06f49440 (06f49440-06f495e4).
     int Cash = 0;
     float AssetValue = 0.0f;
-    pub::Player::InspectCash(State->PlayerId, Cash);
-    pub::Player::GetAssetValue(State->PlayerId, AssetValue);
+    pub::Player::InspectCash(PlayerId, Cash);
+    pub::Player::GetAssetValue(PlayerId, AssetValue);
     unsigned int Worth = static_cast<unsigned int>(
         static_cast<int>(static_cast<double>(Cash) + static_cast<double>(AssetValue)));
 
@@ -224,14 +224,14 @@ void RecalculateContentPlayerRank(FContentPlayerState* State)
             TableRank = 0;
     }
 
-    int ReputationId = State->Reputation;
+    int ReputationId = Reputation;
     pub::Reputation::SetRank(ReputationId, static_cast<float>(TableRank));
 
-    if (State->MissionNumber != 0x2a)
+    if (MissionNumber != 0x2a)
         return;
 
     int PlayerRank = 0;
-    pub::Player::GetRank(State->PlayerId, PlayerRank);
+    pub::Player::GetRank(PlayerId, PlayerRank);
     unsigned int PlayerRankU = static_cast<unsigned int>(PlayerRank);
 
     int MoneyNeeded = 0x7fffffff;
@@ -269,9 +269,9 @@ void RecalculateContentPlayerRank(FContentPlayerState* State)
         MoneyNeeded = static_cast<int>(Remainder);
     }
 
-    pub::Player::SetMoneyNeededToNextRank(State->PlayerId, MoneyNeeded);
+    pub::Player::SetMoneyNeededToNextRank(PlayerId, MoneyNeeded);
     if (TableRank > PlayerRankU)
-        pub::Player::SetRank(State->PlayerId, static_cast<int>(TableRank));
+        pub::Player::SetRank(PlayerId, static_cast<int>(TableRank));
 }
 
 void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
@@ -375,7 +375,7 @@ void LoadContentPlayerState(FContentPlayerState* State, INI_Reader* Reader)
         }
     }
 
-    RecalculateContentPlayerRank(State);                                      // FUN_06f49440
+    State->RecalculateRank();                                      // FUN_06f49440
     Reader->set_state(SavedState);
 }
 

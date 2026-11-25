@@ -126,50 +126,50 @@ public:
 // FUN_06c31f30: drop both arrays, then CurrentLod = 0 and LodCount = Count; a non-zero Count
 // gets Count entries seeded {-1, 0} (FUN_06c31e40) and Count + 1 switch floats. Retail leaves
 // the switch floats uninitialised (operator new); the port's vector zero-fills them.
-void LodSetResize(FLodSet& Set, int Count)
+void FLodSet::Resize(int Count)
 {
-    Set.Entries.clear();
-    Set.Switch.clear();
-    Set.CurrentLod = 0;
-    Set.LodCount = Count;
+    Entries.clear();
+    Switch.clear();
+    CurrentLod = 0;
+    LodCount = Count;
     if (Count == 0)
         return;
     FLodEntry Empty;
     Empty.Handle = kNoArchetype;
     Empty.Plugin = nullptr;
-    Set.Entries.assign((size_t)Count, Empty);
-    Set.Switch.assign((size_t)Count + 1, 0.0f);
+    Entries.assign((size_t)Count, Empty);
+    Switch.assign((size_t)Count + 1, 0.0f);
 }
 
 // FUN_06c31eb0: resize to the source's count, copy every entry and switch value (the last
 // switch value too, only when the count is positive), then the flag byte.
-void LodSetAssign(FLodSet& Dest, const FLodSet& Src)
+void FLodSet::Assign(const FLodSet& Src)
 {
-    LodSetResize(Dest, Src.LodCount);
-    if (Dest.LodCount > 0)
+    Resize(Src.LodCount);
+    if (LodCount > 0)
     {
         int Index = 0;
-        for (; Index < Dest.LodCount; ++Index)
+        for (; Index < LodCount; ++Index)
         {
-            Dest.Entries[Index].Handle = Src.Entries[Index].Handle;
-            Dest.Entries[Index].Plugin = Src.Entries[Index].Plugin;
-            Dest.Switch[Index] = Src.Switch[Index];
+            Entries[Index].Handle = Src.Entries[Index].Handle;
+            Entries[Index].Plugin = Src.Entries[Index].Plugin;
+            Switch[Index] = Src.Switch[Index];
         }
-        Dest.Switch[Index] = Src.Switch[Index];
+        Switch[Index] = Src.Switch[Index];
     }
-    Dest.bFlag = Src.bFlag;
+    bFlag = Src.bFlag;
 }
 
 // FUN_06c32040: Distance < 0 (ordered) -> none. Otherwise the first LOD whose upper switch value
 // Switch[i + 1] is >= Distance (an unordered compare never matches); none -> null.
-FLodEntry* LodSetPick(FLodSet& Set, float Distance)
+FLodEntry* FLodSet::Pick(float Distance)
 {
     if (Distance < 0.0f)
         return nullptr;
-    for (int Index = 0; Index < Set.LodCount; ++Index)
+    for (int Index = 0; Index < LodCount; ++Index)
     {
-        if (Set.Switch[Index + 1] >= Distance)
-            return &Set.Entries[Index];
+        if (Switch[Index + 1] >= Distance)
+            return &Entries[Index];
     }
     return nullptr;
 }
@@ -415,7 +415,7 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
 {
     IFileSystem* File = (IFileSystem*)FileArg;
     FFileSystemDesc Desc;
-    FileDescInit(&Desc, "MultiLevel", "FileSystem");
+    Desc.Init("MultiLevel", "FileSystem");
     IFileSystem* Child = nullptr;
     FArchetypeMap::iterator Found = Archetypes.find(Id);
     if (Found == Archetypes.end() ||
@@ -428,7 +428,7 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
     FLodSet& Set = Found->second;
 
     FFileSystemDesc SwitchDesc;
-    FileDescInit(&SwitchDesc, "Switch2", "FileSystem");
+    SwitchDesc.Init("Switch2", "FileSystem");
     unsigned long SwitchCount = 0;
     float* SwitchData = nullptr;
     const int SwitchHandle = Child->OpenByDesc(&SwitchDesc);
@@ -448,13 +448,13 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
     }
     if (SwitchCount > 0)
     {
-        LodSetResize(Set, (int)(SwitchCount - 1));
+        Set.Resize((int)(SwitchCount - 1));
         std::memcpy(Set.Switch.data(), SwitchData, SwitchCount * sizeof(float));
         delete[] (const unsigned char*)SwitchData;
     }
     else
     {
-        LodSetResize(Set, 1);
+        Set.Resize(1);
     }
 
     char LevelName[16] = "Level";
@@ -466,7 +466,7 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
     {
         _itoa(Index, LevelName + 5, 10);
         FFileSystemDesc LevelDesc;
-        FileDescInit(&LevelDesc, LevelName, "FileSystem");
+        LevelDesc.Init(LevelName, "FileSystem");
         bool bClaimed = false;
         if (Level != nullptr)
         {
@@ -502,7 +502,7 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
     {
         for (int Undo = Index - 1; Undo >= 0; --Undo)
             Set.Entries[Undo].Plugin->DestroyHandle(Set.Entries[Undo].Handle);
-        LodSetResize(Set, 0);
+        Set.Resize(0);
         if (Level != nullptr)
             Level->Release();
         Child->Release();
@@ -527,7 +527,7 @@ int FRenderManager::WalkPlugins(int Id, void* File)
         if (Claimed == -1)
             continue;
         FLodSet& Set = Found->second;
-        LodSetResize(Set, 1);
+        Set.Resize(1);
         Set.Switch[0] = 0.0f;
         Set.Switch[1] = G_DefaultLodDistance;
         Set.Entries[0].Handle = (void*)((intptr_t)Claimed);
@@ -564,7 +564,7 @@ int DACOM_API FRenderManager::DuplicateArchetype(void* Arg1, void* Arg2)
     if (!Inserted.second)
         return 0;
     FLodSet& Dest = Inserted.first->second;
-    LodSetAssign(Dest, Source->second);
+    Dest.Assign(Source->second);
     const int Count = Source->second.LodCount;
     for (int Index = 0; Index < Count; ++Index)
     {
@@ -675,7 +675,7 @@ int DACOM_API FRenderManager::QueryGeometry(void* A, float Lod, void* C, void* D
     FLodSet* Set = FindSet(ArchetypeKey(A));
     if (Set == nullptr)
         return 0;
-    FLodEntry* Entry = LodSetPick(*Set, Lod);
+    FLodEntry* Entry = Set->Pick(Lod);
     if (Entry == nullptr)
         return 0;
     int LodBits = 0;
@@ -689,7 +689,7 @@ int DACOM_API FRenderManager::GetBounds(void* Id, float Lod, void* Out)
     FLodSet* Set = FindSet(ArchetypeKey(Id));
     if (Set == nullptr)
         return 0;
-    FLodEntry* Entry = LodSetPick(*Set, Lod);
+    FLodEntry* Entry = Set->Pick(Lod);
     if (Entry == nullptr)
         return 0;
     return Entry->Plugin->GetBounds(Entry->Handle, Lod, Out) & 0xFF;
@@ -701,7 +701,7 @@ int DACOM_API FRenderManager::GetCentroid(void* Id, float Lod, void* Out)
     FLodSet* Set = FindSet(ArchetypeKey(Id));
     if (Set == nullptr)
         return 0;
-    FLodEntry* Entry = LodSetPick(*Set, Lod);
+    FLodEntry* Entry = Set->Pick(Lod);
     if (Entry == nullptr)
         return 0;
     return Entry->Plugin->GetCentroid(Entry->Handle, Lod, Out) & 0xFF;
@@ -829,7 +829,7 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, void* Inst, float 
                     const float Distance = (float)(
                         (double)HalfWidth / (ZNear * XScale) / Scale * Depth * Threshold);
                     SubmitFlags &= ~kDrawPickSwitch;
-                    Entry = LodSetPick(*Set, Distance);
+                    Entry = Set->Pick(Distance);
                 }
 
                 if (Entry != nullptr)

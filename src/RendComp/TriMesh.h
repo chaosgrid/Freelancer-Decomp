@@ -69,6 +69,9 @@ struct FTriMeshGroup
     unsigned long* ExtraIndexCounts;   // +0x34 new(0x10) (FUN_06c29000): per extra stream count
     FRpVertexStream* ExtraStreams;     // +0x38 new(0x50): four streams, IMesh channels 0x4000..
     unsigned long Bucket;              // +0x3C hook-up sort key 0..4 (IMaterial flags)
+
+    // FUN_06c25e30. Defined in TriMesh.cpp.
+    const unsigned long** ChannelIndexArray(unsigned long Channel);
 };
 
 static_assert(sizeof(FTriMeshGroup) == 0x40, "TriMesh face group is 0x40 bytes");
@@ -93,6 +96,8 @@ void TriMeshStreamFree(FRpVertexStream* Stream);                             // 
 void TriMeshStreamCopy(const FRpVertexStream* Source, FRpVertexStream* Dest,
                        unsigned long IndexCount);                            // FUN_06c24c60
 void TriMeshDescFree(FRpVertexSrcDesc* Desc);                                // FUN_06c23f90
+
+class FTriMeshAnim;
 
 class FTriMeshArch : public IMesh
 {
@@ -214,4 +219,7 @@ public:
     int DACOM_API SetFaceGroupIndexCount(int Selector, int Count) override;                   // FUN_06c235a0
     int DACOM_API AddFaceGroupChannels(unsigned long Flags) override;                       // FUN_06c23970
     int DACOM_API RemoveFaceGroupChannels(unsigned long Flags) override;                       // LAB_06c23bd0
+
+    // FUN_06c25730. Defined in Plugins.cpp.
+    int CreateInstance(void* InstId, FTriMeshAnim** Out);
 };

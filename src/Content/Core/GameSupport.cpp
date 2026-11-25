@@ -538,7 +538,7 @@ namespace
         case EMessage::PlayerWorthChanged:
         {
             FPlayerIdMessage const* Message = static_cast<FPlayerIdMessage const*>(Parms);
-            RecalculateContentPlayerRank(FindContentPlayerState(Message->PlayerId));
+            FindContentPlayerState(Message->PlayerId)->RecalculateRank();
             break;
         }
         case EMessage::BaseEnter:

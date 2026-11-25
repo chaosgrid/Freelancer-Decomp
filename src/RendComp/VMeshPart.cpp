@@ -147,7 +147,7 @@ FVMeshPart::~FVMeshPart()
         }
         if (Data != nullptr)
         {
-            VMeshDataRelease(Data);
+            Data->Release();
             Data = nullptr;
         }
     }
@@ -155,7 +155,7 @@ FVMeshPart::~FVMeshPart()
     Ref = nullptr;
     if (Data != nullptr)
     {
-        VMeshDataRelease(Data);
+        Data->Release();
         Data = nullptr;
     }
 }
@@ -284,7 +284,7 @@ int FVMeshPart::HookUp()
         {
             if (Data != nullptr)
             {
-                VMeshDataRelease(Data);
+                Data->Release();
                 Data = nullptr;
             }
             Data = Found;
@@ -344,13 +344,13 @@ bool DACOM_API FVMeshPart::Prepare(void* ListingArg, void* ScratchArg)
     if (Data == nullptr || Data->Group == nullptr)
         return Result >= 0;
     FVmeshGroup* Group = Data->Group;
-    if (VMeshGroupEnsureVb(Group) < 0)
+    if (Group->EnsureVb() < 0)
         return false;
     Listing->VertexBuffer = Data->VertexBuffer;
     Listing->Fvf = Data->Fvf;
     Listing->BaseVertex = Data->BaseVertex;
     Listing->BaseVertex += Ref->VertexStart;
-    Result = VMeshGroupEnsureIb(Group, Listing->BaseVertex);
+    Result = Group->EnsureIb(Listing->BaseVertex);
     if (Result >= 0)
     {
         Scratch->IndexBuffer = Data->IndexBuffer;
@@ -931,8 +931,8 @@ public:
         Part->UseCount -= 1;
         if (Part->UseCount <= 0 && Part->Data != nullptr && Part->Data->Group != nullptr)
         {
-            VMeshGroupDestroyVb(Part->Data->Group);
-            VMeshGroupDestroyIb(Part->Data->Group);
+            Part->Data->Group->DestroyVb();
+            Part->Data->Group->DestroyIb();
         }
         return (int)(Part->Release());
     }

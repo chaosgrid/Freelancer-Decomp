@@ -41,8 +41,6 @@
 #include <string.h>
 #include <windows.h>
 
-I3DMathEngine* GTriggerMathEngine = nullptr;
-
 // DAT_06fd1c79 (see MissionScript.h).
 unsigned char GMissionScanClamp = 0;
 
@@ -235,7 +233,7 @@ namespace
 
 // FUN_06ebb850. A second Cnd_* key replaces the condition without deleting the first (a leak,
 // as retail). An unknown InitState and "repeatable = false" leave the field.
-void LoadTrigger(FTrigger* Trigger, INI_Reader* Reader)
+void FTrigger::Load(INI_Reader* Reader)
 {
     while (Reader->read_value())
     {
@@ -246,12 +244,12 @@ void LoadTrigger(FTrigger* Trigger, INI_Reader* Reader)
             FCndFactoryEntry const& Entry = GCndFactory[Index];
             if (!Reader->is_value(Entry.Name))
                 continue;
-            Cnd* const Condition = Entry.Create(Trigger->Mission);
-            Trigger->Condition = Condition;
+            Cnd* const Condition = Entry.Create(Mission);
+            this->Condition = Condition;
             Condition->Parse(*Reader);
             for (int EventIndex = 0; EventIndex < Entry.EventCount; ++EventIndex)
-                Trigger->EventIds.push_back(Entry.EventIds[EventIndex]);
-            Trigger->Condition->SetTriggerId(Trigger->Id);
+                EventIds.push_back(Entry.EventIds[EventIndex]);
+            this->Condition->SetTriggerId(Id);
             bMatched = true;
             break;
         }
@@ -263,10 +261,10 @@ void LoadTrigger(FTrigger* Trigger, INI_Reader* Reader)
             FActFactoryEntry const& Entry = GActFactory[Index];
             if (!Reader->is_value(Entry.Name))
                 continue;
-            Act* const Action = Entry.Create(Trigger->Mission);
+            Act* const Action = Entry.Create(Mission);
             Action->Parse(*Reader);
-            Trigger->Actions.push_back(Action);
-            Action->SetTriggerId(Trigger->Id);
+            Actions.push_back(Action);
+            Action->SetTriggerId(Id);
             bMatched = true;
             break;
         }
@@ -276,17 +274,17 @@ void LoadTrigger(FTrigger* Trigger, INI_Reader* Reader)
         {
             char const* const StateName = Reader->get_value_string(0);
             if (_stricmp("ACTIVE", StateName) == 0)
-                Trigger->State = G_TriggerStateActive;
+                State = G_TriggerStateActive;
             else if (_stricmp("INACTIVE", StateName) == 0)
-                Trigger->State = G_TriggerStateInactive;
+                State = G_TriggerStateInactive;
             else if (_stricmp("COMPLETE", StateName) == 0)
-                Trigger->State = G_TriggerStateComplete;
+                State = G_TriggerStateComplete;
             continue;
         }
         if (Reader->is_value("repeatable"))
         {
             if (Reader->get_value_bool(0))
-                Trigger->bRepeatable = 1;
+                bRepeatable = 1;
             continue;
         }
         // Retail tests "system" and ignores the result.
@@ -295,7 +293,7 @@ void LoadTrigger(FTrigger* Trigger, INI_Reader* Reader)
 }
 
 // FUN_06eb84c0 [Trigger] branch, after is_header("Trigger").
-void LoadMissionTriggerSection(FMissionScript* Script, INI_Reader* Reader)
+void FMissionScript::LoadTriggerSection(INI_Reader* Reader)
 {
     unsigned int TriggerId = 0;
     while (Reader->read_value())
@@ -304,44 +302,44 @@ void LoadMissionTriggerSection(FMissionScript* Script, INI_Reader* Reader)
         {
             TriggerId = CreateID(Reader->get_value_string(0));
             // A known nickname is skipped.
-            if (Script->TriggerMap.find(TriggerId) != Script->TriggerMap.end())
+            if (TriggerMap.find(TriggerId) != TriggerMap.end())
                 continue;
             FTrigger Trigger;
             Trigger.State = G_TriggerStateInactive;
             Trigger.Condition = nullptr;
-            Trigger.Mission = Script;
+            Trigger.Mission = this;
             Trigger.bRepeatable = 0;
             Trigger.Id = TriggerId;
-            LoadTrigger(&Trigger, Reader);
+            Trigger.Load(Reader);
             // The copies share the condition and action pointers.
-            Script->TriggerMap.insert(FTriggerMap::value_type(TriggerId, Trigger));
+            TriggerMap.insert(FTriggerMap::value_type(TriggerId, Trigger));
             // An InitState ACTIVE trigger also goes into +0x1e4 as {id, id}.
             if (Trigger.State == G_TriggerStateActive)
-                Script->InitiallyActive.insert(
+                InitiallyActive.insert(
                     std::map<unsigned int, unsigned int>::value_type(TriggerId, TriggerId));
             continue;
         }
         // "State" goes through vtbl +0x68 and the result is dropped.
         if (Reader->is_value("State"))
-            static_cast<void>(Script->MissionStateFromName(Reader->get_value_string(0)));
+            static_cast<void>(MissionStateFromName(Reader->get_value_string(0)));
     }
 }
 
 // FUN_06ebb830.
-void RearmTrigger(FTrigger* Trigger)
+void FTrigger::Rearm()
 {
-    Trigger->State = G_TriggerStateActive;
-    if (Trigger->Condition != nullptr)
-        Trigger->Condition->OnActivate();
+    State = G_TriggerStateActive;
+    if (Condition != nullptr)
+        Condition->OnActivate();
 }
 
 // FUN_06ebb7f0.
-void DeleteTriggerContents(FTrigger* Trigger)
+void FTrigger::DeleteContents()
 {
-    if (Trigger->Condition != nullptr)
-        delete Trigger->Condition;
-    std::list<Act*>::iterator It = Trigger->Actions.begin();
-    for (; It != Trigger->Actions.end(); ++It)
+    if (Condition != nullptr)
+        delete Condition;
+    std::list<Act*>::iterator It = Actions.begin();
+    for (; It != Actions.end(); ++It)
     {
         if (*It != nullptr)
             delete *It;
@@ -349,16 +347,16 @@ void DeleteTriggerContents(FTrigger* Trigger)
 }
 
 // FUN_06eb82c0.
-void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerId)
+void FMissionScript::ActivateTrigger(unsigned int const* TriggerId)
 {
-    FTriggerMap::iterator Found = Script->TriggerMap.find(*TriggerId);
-    if (Found == Script->TriggerMap.end())
+    FTriggerMap::iterator Found = TriggerMap.find(*TriggerId);
+    if (Found == TriggerMap.end())
         return;
 
     // The whole active list is walked (no early exit).
     bool bAlreadyActive = false;
-    std::list<FTriggerMap::iterator>::iterator ActiveIt = Script->ActiveTriggers.begin();
-    for (; ActiveIt != Script->ActiveTriggers.end(); ++ActiveIt)
+    std::list<FTriggerMap::iterator>::iterator ActiveIt = ActiveTriggers.begin();
+    for (; ActiveIt != ActiveTriggers.end(); ++ActiveIt)
     {
         if ((*ActiveIt)->first == *TriggerId)
             bAlreadyActive = true;
@@ -380,7 +378,7 @@ void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerI
         std::list<Act*>::iterator ActIt = Trigger.Actions.begin();
         for (; ActIt != Trigger.Actions.end(); ++ActIt)
             (*ActIt)->Execute();
-        // RearmTrigger inlined.
+        // FTrigger::Rearm inlined.
         if (Trigger.bRepeatable != 0)
         {
             Trigger.State = G_TriggerStateActive;
@@ -390,41 +388,40 @@ void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerI
     }
 
     if (Trigger.State != G_TriggerStateComplete)
-        Script->ActiveTriggers.push_back(Found);
+        ActiveTriggers.push_back(Found);
 }
 
 // FUN_06eb83e0.
-void DeactivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerId)
+void FMissionScript::DeactivateTrigger(unsigned int const* TriggerId)
 {
     // Only the first active node with this key whose trigger is not COMPLETE.
-    std::list<FTriggerMap::iterator>::iterator ActiveIt = Script->ActiveTriggers.begin();
-    for (; ActiveIt != Script->ActiveTriggers.end(); ++ActiveIt)
+    std::list<FTriggerMap::iterator>::iterator ActiveIt = ActiveTriggers.begin();
+    for (; ActiveIt != ActiveTriggers.end(); ++ActiveIt)
     {
         FTrigger& Trigger = (*ActiveIt)->second;
         if ((*ActiveIt)->first == *TriggerId && Trigger.State != G_TriggerStateComplete)
         {
             Trigger.State = G_TriggerStateInactive;
-            Script->ActiveTriggers.erase(ActiveIt);
+            ActiveTriggers.erase(ActiveIt);
             break;
         }
     }
 
-    std::map<unsigned int, unsigned int>::iterator PendingIt = Script->PendingActivations.begin();
-    while (PendingIt != Script->PendingActivations.end())
+    std::map<unsigned int, unsigned int>::iterator PendingIt = PendingActivations.begin();
+    while (PendingIt != PendingActivations.end())
     {
         if (PendingIt->first == *TriggerId)
-            PendingIt = Script->PendingActivations.erase(PendingIt);
+            PendingIt = PendingActivations.erase(PendingIt);
         else
             ++PendingIt;
     }
 }
 
 // FUN_06eb9af0. *EventId is the message id the caller (FUN_06eb8f50) stored in its local.
-void DispatchMissionTriggerEvent(FMissionScript* Script, EMessage const* EventId,
-                                 void const* EventParms)
+void FMissionScript::DispatchTriggerEvent(EMessage const* EventId, void const* EventParms)
 {
-    std::list<FTriggerMap::iterator>::iterator ActiveIt = Script->ActiveTriggers.begin();
-    while (ActiveIt != Script->ActiveTriggers.end())
+    std::list<FTriggerMap::iterator>::iterator ActiveIt = ActiveTriggers.begin();
+    while (ActiveIt != ActiveTriggers.end())
     {
         FTrigger& Trigger = (*ActiveIt)->second;
 
@@ -449,11 +446,11 @@ void DispatchMissionTriggerEvent(FMissionScript* Script, EMessage const* EventId
                 for (; ActIt != Trigger.Actions.end(); ++ActIt)
                     (*ActIt)->Execute();
                 if (Trigger.bRepeatable != 0)
-                    RearmTrigger(&Trigger);
+                    Trigger.Rearm();
             }
             if (Trigger.State == G_TriggerStateComplete)
             {
-                ActiveIt = Script->ActiveTriggers.erase(ActiveIt);
+                ActiveIt = ActiveTriggers.erase(ActiveIt);
                 continue;
             }
         }
@@ -462,21 +459,21 @@ void DispatchMissionTriggerEvent(FMissionScript* Script, EMessage const* EventId
 
     // Drain the pending map front to back. Retail also looks the source id up in the trigger
     // map and discards the result; that lookup has no side effect and is not reproduced.
-    while (!Script->PendingActivations.empty())
+    while (!PendingActivations.empty())
     {
-        std::map<unsigned int, unsigned int>::iterator First = Script->PendingActivations.begin();
+        std::map<unsigned int, unsigned int>::iterator First = PendingActivations.begin();
         unsigned int TargetId = First->first;
-        Script->PendingActivations.erase(First);
-        ActivateMissionTrigger(Script, &TargetId);
+        PendingActivations.erase(First);
+        ActivateTrigger(&TargetId);
     }
-    Script->PendingActivations.clear();
+    PendingActivations.clear();
 }
 
 // FUN_06eb9c60.
-void TickMissionTimers(FMissionScript* Script, float DeltaSeconds)
+void FMissionScript::TickTimers(float DeltaSeconds)
 {
-    std::list<FMissionTimer>::iterator It = Script->Timers.begin();
-    while (It != Script->Timers.end())
+    std::list<FMissionTimer>::iterator It = Timers.begin();
+    while (It != Timers.end())
     {
         It->Remaining = It->Remaining - DeltaSeconds;
         // DAT_06fb444c; unordered does not run.
@@ -484,7 +481,7 @@ void TickMissionTimers(FMissionScript* Script, float DeltaSeconds)
         {
             if (It->Action != nullptr)
                 It->Action->Execute();
-            It = Script->Timers.erase(It);
+            It = Timers.erase(It);
             continue;
         }
         ++It;
@@ -517,7 +514,7 @@ void ActivateInitialMissionTriggers(FMissionScript* Script)
 {
     std::map<unsigned int, unsigned int>::iterator It = Script->InitiallyActive.begin();
     for (; It != Script->InitiallyActive.end(); ++It)
-        ActivateMissionTrigger(Script, &It->first);
+        Script->ActivateTrigger(&It->first);
 }
 
 namespace
@@ -533,25 +530,25 @@ namespace
 }
 
 // FUN_06eba430.
-void RemoveMissionRtc(FMissionScript* Script, TString<0x80> const* Path)
+void FMissionScript::RemoveRtc(TString<0x80> const* Path)
 {
-    std::list<FMissionRtc>::iterator It = Script->RtcScripts.begin();
-    for (; It != Script->RtcScripts.end(); ++It)
+    std::list<FMissionRtc>::iterator It = RtcScripts.begin();
+    for (; It != RtcScripts.end(); ++It)
     {
         if (strcmp(It->Path, Path->Data) != 0)
             continue;
-        if (FindContentPlayerState(Script->PlayerId) == nullptr)
+        if (FindContentPlayerState(PlayerId) == nullptr)
             continue;
         // Any miss below still marks the script finished.
-        FContentBase* const Base = Script->PlayerState->GetBaseRecord();
+        FContentBase* const Base = PlayerState->GetBaseRecord();
         if (Base != nullptr)
         {
-            FBaseRoomState* const Room = Base->FindRoomState(&Script->CurrentLocationId);
+            FBaseRoomState* const Room = Base->FindRoomState(&CurrentLocationId);
             if (Room != nullptr && It->Encounter != nullptr &&
-                FindContentPlayerState(Script->PlayerId) != nullptr)
+                FindContentPlayerState(PlayerId) != nullptr)
             {
                 FBarCharacterList::iterator Character;
-                if (Room->FindCharacter(GetFirstRtcRole(It->Encounter), Script->PlayerId,
+                if (Room->FindCharacter(GetFirstRtcRole(It->Encounter), PlayerId,
                                         &Character))
                 {
                     Character->SetBehavior(static_cast<unsigned long>(-1));
@@ -563,11 +560,11 @@ void RemoveMissionRtc(FMissionScript* Script, TString<0x80> const* Path)
 }
 
 // FUN_06ebb540.
-void MoveMissionPlayer(FMissionScript* Script, Vector const* Position, float RadiusSq)
+void FMissionScript::MovePlayer(Vector const* Position, float RadiusSq)
 {
-    if (FindContentPlayerState(Script->PlayerId) == nullptr)
+    if (FindContentPlayerState(PlayerId) == nullptr)
         return;
-    FContentPlayerShip* const Ship = Script->PlayerState->ShipObject;
+    FContentPlayerShip* const Ship = PlayerState->ShipObject;
     if (Ship == nullptr)
         return;
     // Each delta is stored as a float.
@@ -587,8 +584,8 @@ void MoveMissionPlayer(FMissionScript* Script, Vector const* Position, float Rad
     Vector CurrentPosition;
     Matrix CurrentOrientation;
     pub::SpaceObj::GetLocation(Ship->SpaceObjId, CurrentPosition, CurrentOrientation);
-    unsigned int const SystemId = Script->PlayerState->GetSystemRecord()->SystemId;
-    unsigned int const ShipId = Script->PlayerState->ShipObject->SpaceObjId;
+    unsigned int const SystemId = PlayerState->GetSystemRecord()->SystemId;
+    unsigned int const ShipId = PlayerState->ShipObject->SpaceObjId;
     RelocateShip(&ShipId, &SystemId, Position, &CurrentOrientation);
 }
 
@@ -631,7 +628,7 @@ FMissionScript::~FMissionScript()
     FTriggerMap::iterator TriggerIt = TriggerMap.begin();
     while (TriggerIt != TriggerMap.end())
     {
-        DeleteTriggerContents(&TriggerIt->second);
+        TriggerIt->second.DeleteContents();
         TriggerIt = TriggerMap.erase(TriggerIt);
     }
     TriggerMap.clear();
@@ -761,7 +758,7 @@ void FMissionScript::UpdateObjectiveTimer(EMessage MessageId, void const* Messag
 void FMissionScript::OnNpcSystemEnter(void const* Parms)
 {
     EMessage EventId = EMessage::NpcSystemEnter;
-    DispatchMissionTriggerEvent(this, &EventId, Parms);
+    DispatchTriggerEvent(&EventId, Parms);
 }
 
 // FUN_06eb9aa0. OnMissionFail / OnMissionSucceed are vtbl +0x60 / +0x5c; OnMissionEvent is
@@ -861,34 +858,16 @@ void FMissionScript::EndMission()
     FMissionObject::EndMission();
 }
 
-// FUN_06eb8ef0.
-bool IsSameCostume(Costume const* A, Costume const* B)
-{
-    if (A->PartIds[0] != B->PartIds[0] || A->PartIds[1] != B->PartIds[1] ||
-        A->PartIds[2] != B->PartIds[2] || A->PartIds[3] != B->PartIds[3])
-        return false;
-    if (A->AccessoryCount != B->AccessoryCount)
-        return false;
-    // The count is signed.
-    int const Count = static_cast<int>(A->AccessoryCount);
-    for (int Index = 0; Index < Count; ++Index)
-    {
-        if (A->AccessoryIds[Index] != B->AccessoryIds[Index])
-            return false;
-    }
-    return true;
-}
-
 // Inlined by FUN_06eb84c0 and the Act_* comm senders (insert FUN_06ed1d30).
-void AddDialogCostume(FMissionScript* Script, Costume const* SpeakerCostume)
+void FMissionScript::AddDialogCostume(Costume const* SpeakerCostume)
 {
-    std::vector<Costume>::iterator It = Script->DialogCostumes.begin();
-    for (; It != Script->DialogCostumes.end(); ++It)
+    std::vector<Costume>::iterator It = DialogCostumes.begin();
+    for (; It != DialogCostumes.end(); ++It)
     {
-        if (IsSameCostume(&*It, SpeakerCostume))
+        if (*It == *SpeakerCostume) // Costume::operator==, FUN_06eb8ef0
             return;
     }
-    Script->DialogCostumes.push_back(*SpeakerCostume);
+    DialogCostumes.push_back(*SpeakerCostume);
 }
 
 // FUN_06eb84c0.
@@ -900,7 +879,7 @@ void FMissionScript::LoadMission(INI_Reader* Reader)
     {
         if (Reader->is_header("Trigger"))
         {
-            LoadMissionTriggerSection(this, Reader);
+            LoadTriggerSection(Reader);
             continue;
         }
         // DAT_06fb43a0 = "NPC".
@@ -930,7 +909,7 @@ void FMissionScript::LoadMission(INI_Reader* Reader)
                 Costume* const SpeakerCostume = GetMissionCostume(&Speaker);
                 if (SpeakerCostume == nullptr)
                     continue;
-                AddDialogCostume(this, SpeakerCostume);
+                AddDialogCostume(SpeakerCostume);
             }
         }
     }
@@ -974,7 +953,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     case EMessage::EncounterLaunched:
     case EMessage::RumorHeard:
     case EMessage::TetherObject:
-        DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+        DispatchTriggerEvent(&EventId, MessageParms);
         break;
     case EMessage::PlayerSave:
     {
@@ -1015,7 +994,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     }
     case EMessage::PlayerLaunch:
         if (Parms[0] == PlayerId)
-            DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+            DispatchTriggerEvent(&EventId, MessageParms);
         break;
     case EMessage::PlayerLogin:
     case EMessage::SystemLoaded:
@@ -1028,7 +1007,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         ActiveTriggers.clear();
         FTriggerMap::iterator TriggerIt = TriggerMap.begin();
         for (; TriggerIt != TriggerMap.end(); ++TriggerIt)
-            DeleteTriggerContents(&TriggerIt->second);
+            TriggerIt->second.DeleteContents();
         TriggerMap.clear();
         PlayerState = FindContentPlayerState(PlayerId);
         if (PlayerState == nullptr)
@@ -1042,7 +1021,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
     case EMessage::LootAcquired:
     {
         // The trigger event, then word parms+8 into the loot record's +0xf8.
-        DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+        DispatchTriggerEvent(&EventId, MessageParms);
         FMissionLoot* Found = FindLootById(Parms);
         if (Found != nullptr)
             Found->SubObjId = *reinterpret_cast<unsigned short const*>(
@@ -1059,10 +1038,10 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         // parms.
         float DeltaSeconds = *static_cast<float const*>(MessageParms);
         ElapsedTime = DeltaSeconds + ElapsedTime;
-        TickMissionTimers(this, DeltaSeconds);
-        DispatchMissionTriggerEvent(this, &EventId, &DeltaSeconds);
+        TickTimers(DeltaSeconds);
+        DispatchTriggerEvent(&EventId, &DeltaSeconds);
         EventId = EMessage::TetherObject;
-        DispatchMissionTriggerEvent(this, &EventId, nullptr);
+        DispatchTriggerEvent(&EventId, nullptr);
         break;
     }
     case EMessage::AbortMission:
@@ -1077,7 +1056,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         {
             if (PlayerState->GetBaseRecord() != nullptr)
                 CurrentLocationId = Parms[0];
-            DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+            DispatchTriggerEvent(&EventId, MessageParms);
         }
         break;
     case EMessage::LocationExit:
@@ -1105,7 +1084,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
                 }
                 bRepPopUpShown = 0;
             }
-            DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+            DispatchTriggerEvent(&EventId, MessageParms);
         }
         break;
     case EMessage::SpaceEnter:
@@ -1119,7 +1098,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         // The TU38 body first.
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
         if (Parms[1] == PlayerId)
-            DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+            DispatchTriggerEvent(&EventId, MessageParms);
         bBaseBody = false;
         break;
     case EMessage::ObjectDestroyed:
@@ -1127,7 +1106,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         break;
     case EMessage::SystemExit:
         if (Parms[2] == PlayerId)
-            DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+            DispatchTriggerEvent(&EventId, MessageParms);
         break;
     case EMessage::SystemEnter:
         // The TU38 body first.
@@ -1165,7 +1144,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         {
             RegisterNpc(MessageParms);
             SubmitNpcPersonality(Npc, 0);
-            DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+            DispatchTriggerEvent(&EventId, MessageParms);
         }
         break;
     }
@@ -1184,7 +1163,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
             && (PlayerState->GetLiveMission() == ControllerId
                 || (PlayerState->GetLiveMission() & 0x3fffffff) == 0))
             NnPath.HandleMessage(MessageId, MessageParms);
-        DispatchNagMessage(this, MessageId, MessageParms);
+        DispatchNagMessage(MessageId, MessageParms);
     }
     ApplyDesiredMissionState();
 }
@@ -1225,7 +1204,7 @@ void FMissionScript::OnBaseEnter(void const* MessageParms)
         NnPath.SendObjectives(false, false);
     }
     EMessage EventId = EMessage::BaseEnter;
-    DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, MessageParms);
 }
 
 // FUN_06eb9ef0.
@@ -1263,7 +1242,7 @@ void FMissionScript::OnBaseExit(void const* MessageParms)
         }
     }
     EMessage EventId = EMessage::BaseExit;
-    DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, MessageParms);
 }
 
 // FUN_06eba350.
@@ -1294,7 +1273,7 @@ void FMissionScript::OnCharacterSelect(void const* MessageParms)
         It->bFinished = 1;
     }
     EMessage EventId = EMessage::GFObjSelect;
-    DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, MessageParms);
 }
 
 // FUN_06eba530.
@@ -1336,7 +1315,7 @@ void FMissionScript::OnLocationExit(void const* MessageParms)
         }
     }
     EMessage EventId = EMessage::LocationExit;
-    DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, MessageParms);
 }
 
 // FUN_06eba030.
@@ -1346,7 +1325,7 @@ void FMissionScript::OnOfferResponse(void const* MessageParms)
     unsigned char const* ParmsBytes = static_cast<unsigned char const*>(MessageParms);
     if (ParmsBytes[8] == 0 || FindContentPlayerState(PlayerId) == nullptr)
     {
-        DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+        DispatchTriggerEvent(&EventId, MessageParms);
         return;
     }
     // An empty FmtStr shown with type 10, broadcast.
@@ -1355,7 +1334,7 @@ void FMissionScript::OnOfferResponse(void const* MessageParms)
         pub::Player::DisplayMissionMessage(PlayerId, EmptyMsg,
                                            static_cast<MissionMessageType>(0xa), true);
     }
-    DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, MessageParms);
     if (StoryEvents != nullptr)
         StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed), ControllerId);
     // Another live mission of the player is destroyed and left.
@@ -1399,7 +1378,7 @@ void FMissionScript::OnSpaceEnter(void const* MessageParms)
         pub::Player::LoadHint(PlayerId, &Hint);
     }
     EMessage EventId = EMessage::SpaceEnter;
-    DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, MessageParms);
     if (NnPath.bActive == 0)
     {
         RenumberAllObjectives();
@@ -1418,7 +1397,7 @@ void FMissionScript::OnObjectDestroyed(void const* MessageParms)
 {
     unsigned int const* Parms = static_cast<unsigned int const*>(MessageParms);
     EMessage EventId = EMessage::ObjectDestroyed;
-    DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, MessageParms);
     // The first friendly-fire label naming the destroyed object is dropped.
     std::list<TString<0x30>>::iterator It = FriendlyFireOffLabels.begin();
     for (; It != FriendlyFireOffLabels.end(); ++It)
@@ -1441,7 +1420,7 @@ void FMissionScript::OnSystemEnter(void const* MessageParms)
     if (Parms[2] != PlayerId || FindContentPlayerState(PlayerId) == nullptr)
         return;
     EMessage EventId = EMessage::SystemEnter;
-    DispatchMissionTriggerEvent(this, &EventId, MessageParms);
+    DispatchTriggerEvent(&EventId, MessageParms);
     FContentPlayerShip* const Ship = PlayerState->ShipObject;
     if (Ship == nullptr)
         return;
@@ -1451,7 +1430,7 @@ void FMissionScript::OnSystemEnter(void const* MessageParms)
     NpcEnterParms[1] = Parms[0];
     NpcEnterParms[2] = (Parms[1] & 0x3fffffff) != 0 ? Parms[3] : 0;
     EventId = EMessage::NpcSystemEnter;
-    DispatchMissionTriggerEvent(this, &EventId, NpcEnterParms);
+    DispatchTriggerEvent(&EventId, NpcEnterParms);
 }
 
 // FUN_06eba1f0.

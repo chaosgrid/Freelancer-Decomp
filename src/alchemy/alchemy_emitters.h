@@ -166,8 +166,7 @@ namespace AlchemyImpl
         // appearance's outer +0xB8 (TestParticleSpawn) and, when that is >= 0, +0xBC (SpawnParticle) with
         // (Six = {Pos, Vel}, AgeOffset, InitLifeSpan).
         void SubmitParticle(const float* Pos3, const float* Vel3, const float& AgeOffset,
-                            const float* PosOffset3, const float* VelIn3,
-                            I3DMathEngine*& MathSlot);
+                            const float* PosOffset3, const float* VelIn3);
 
         float PrevNodePos_[3];      // +0xa0: world translation at the last emit
         float LastEmitTime_;        // +0xac: Age at which emission was last settled

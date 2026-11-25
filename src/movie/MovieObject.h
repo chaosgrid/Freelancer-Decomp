@@ -25,6 +25,9 @@ struct FApproach2String
     char* Ptr;         // +0x04
     uint32_t Length;   // +0x08
     uint32_t Capacity; // +0x0C
+
+    // RET 4. VC6 string tidy. FreeBuffers == 0 only zeros the fields.
+    void  Release(char FreeBuffers);
 };
 
 // PTR_LAB_06ada20c. Eleven thiscall slots. Slots after the scalar delete call __amsg_exit.
@@ -103,9 +106,6 @@ void __cdecl Approach2RegisterParentClass();
 
 // Called from MediaPlayer::Shutdown when DAT_06ae0930 == 2. UnregisterClass MPMCIParent.
 void __cdecl Approach2UnregisterParentClass();
-
-// RET 4. VC6 string tidy. FreeBuffers == 0 only zeros the fields.
-void  Approach2StringRelease(FApproach2String* This, char FreeBuffers);
 
 // RET 4. VC6 basic_string grow.
 void  Approach2StringGrow(FApproach2String* This, uint32_t Size);

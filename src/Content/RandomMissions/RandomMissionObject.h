@@ -29,10 +29,6 @@ struct FContentPlayerState;
 struct FRandomMissionData;
 struct FSystemInfo;
 
-// FUN_06ef00d0 (TU27, thiscall on the player state): the state has a ship object (+0x10).
-// Callers in DestroyMission and TU61.
-bool RmPlayerHasShip(FContentPlayerState const* State);
-
 // ---------------------------------------------------------------------------------------
 // TU47 -- random mission object base (retail 0x240 bytes). Ctor FUN_06f4b0d0, dtor
 // FUN_06f4b460, deleting dtor FUN_06f4b300. Vtables: 06fbb288 (45 slots), StateMachine side

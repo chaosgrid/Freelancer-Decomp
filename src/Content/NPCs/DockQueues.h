@@ -113,10 +113,6 @@ extern float GDockHostileAttitude;                                              
 // large moors) are the last four of TU54's 16 static ids: DockQueues.cpp's private GIdCanUse*
 // copies from ContentStaticIds.h.
 
-// DAT_06fd1c70: the TU's one I3DMathEngine, filled on first use. Every retail site reads it
-// and, when null, calls FUN_06fa8fa0 (ContentAcquire3DMathEngine) and stores the result;
-// GetSpaceMathEngine is that inline sequence.
-extern I3DMathEngine* GSpaceMathEngine;
 I3DMathEngine* GetSpaceMathEngine();
 
 // FUN_06f601f0: the first entry of List whose ShipId is ShipId, or end().

@@ -68,6 +68,7 @@
 
 class StarSystem;   // server_sysdb.h -- retail GameObject+0x28 points at one
 class GameObject;
+struct PlayerData;  // common_server_playerdb.h (EqObj::player_of_ship)
 class ServerEquip;  // Server.dll's per-equipment listener (EqObj+0x70 list); defined below EqObj
 // ServerFuse (Fuse + 8 bytes, vtable .rdata:06d65724) is held BY VALUE in
 // EqObj's +0x7c list, so its full definition is needed here.
@@ -376,7 +377,7 @@ public:
 
     // +0x188 -- base .text:06ceee70 (RET 4); EqObj/Solar .text:06ceb330, Ship
     // .text:06d01a10. Applies a finished DamageList: root entries through
-    // apply_root_damage (+0x1b4), the system broadcast (StarSystem_DamageObject,
+    // apply_root_damage (+0x1b4), the system broadcast (StarSystem::damage_object,
     // FUN_06d0b800), and destroy(1, InflictorId) when the list says destroyed.
     virtual void apply_damage_list(DamageList& Damage);
 
@@ -550,6 +551,10 @@ protected:
     // create() above), so they spell their own sequence out.
     bool CreateOfClass(CObject::Class ObjectClass, Archetype::Root* Arch);
     bool FindOfClass(CObject::Class ObjectClass, unsigned int const& Id);
+
+    // The flush set_in_damage_callback and set_relative_health both inline in retail.
+    // Defined in server_gameobject.cpp.
+    void flush_pending_damage(DamageList& Pending);
 };
 
 // ---------------------------------------------------------------------------
@@ -797,6 +802,24 @@ public:
     // +0x88 -- set by light_fuse (.text:06cec626) the first time a fuse with
     // ServerFuse::bHasDestroyRoot is lit; gates controller event 0x38.
     unsigned char bDeathFuseLit;
+
+    // FUN_06ce83c0 (only caller EqObj::destroy): the CSimple's OwnerPlayer. Defined in
+    // server_gameobject.cpp.
+    unsigned int owner_player() const;
+
+    // The slot of the connected player whose CURRENT ship this is, else null. Retail inlines
+    // the test at every difficulty-scale site. Defined in server_gameobject.cpp.
+    PlayerData* player_of_ship() const;
+
+    // The CSolar narrowing retail inlines at the loot-visit sites; null for everything that
+    // is not a solar. Defined in server_gameobject.cpp.
+    CSolar* as_solar() const;
+
+    // The light / unlight pass apply_root_entry and apply_group_entry both inline in retail.
+    // Defined in server_gameobject.cpp.
+    template <typename FReadHitPts>
+    void sweep_fuses(std::vector<Archetype::FGroupFuse> const& List, FReadHitPts ReadHitPts,
+                     float After, unsigned short SubObjId, unsigned int InflictorId);
 };
 
 // ---------------------------------------------------------------------------
@@ -890,7 +913,7 @@ public:
     // destroyed equip or owner; bumps FireCount; outside single player needs
     // CELauncher::AmmoNeedsMet and calls ConsumeFireResources; and when the
     // owner is a player's current ship and the projectile needs ammo, removes one
-    // round from that player's cargo (PlayerData_RemoveCargo).
+    // round from that player's cargo (PlayerData::remove_cargo).
     bool use_ammo(Vector const& Target);
 
     int FireCount;                 // +0x0c  the factory stores 0

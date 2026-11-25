@@ -83,7 +83,7 @@ public:
         FVmeshGroup* Group = Data->Group;
         if (Group == nullptr)
             return -1;
-        if (VMeshGroupEnsureVb(Group) < 0)
+        if (Group->EnsureVb() < 0)
             return -1;
         FVbListing Listing;
         Listing.VertexBuffer = Data->VertexBuffer;

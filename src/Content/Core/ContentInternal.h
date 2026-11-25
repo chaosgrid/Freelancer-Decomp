@@ -49,6 +49,8 @@ class FContentMessageRouter;
 extern FContentMessageRouter* GMessageRouter;
 
 I3DMathEngine* __cdecl ContentAcquire3DMathEngine();
+// The module's one lazily created engine (a deviation: retail has one per source file).
+I3DMathEngine* ContentMathEngine();
 void __cdecl ContentSetGcsClampEnabled(unsigned char EnabledByte);
 bool __cdecl ContentIsGcsClampEnabled();
 void __cdecl SpacePopSetGcsClampEnabled(unsigned char EnabledByte);

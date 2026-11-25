@@ -12,7 +12,7 @@
 #include "../include/common_casteroid.h" // CmnAsteroid::CAsteroidSystem (SrvAsteroidSystem AddRef/Release/get_sys_id)
 #include "../include/common_id.h"
 #include "../include/common_server_playerdb.h"
-#include "../include/server_savegame.h" // PlayerData_CreateNewCharacter (retail FUN_06d4b790)
+#include "../include/server_savegame.h" // PlayerData::create_new_character (retail FUN_06d4b790)
 #include "../include/server_savefile.h" // Server_AccountDirName / Server_GetAccountsRoot (FUN_06d49f60)
 #include "../include/common_ini.h"
 #include "../include/common_misc.h"
@@ -153,10 +153,8 @@ PlayerData::PlayerData()
 
 // PlayerData::~PlayerData -- retail FUN_06d50e90: the slot teardown FUN_06d49230, then the
 // member destruction.
-static void PlayerData_Teardown(PlayerData& Slot);
-
 PlayerData::~PlayerData() {
-    PlayerData_Teardown(*this);
+    teardown();
 }
 
 // CiWString and std::wstring differ only in their traits type, so the few helpers that
@@ -315,7 +313,7 @@ static void InitServerAccount(CPlayerAccount& ServerAccount, unsigned int& OutSe
 // GCheatMessage / LoadCheatMessage -- retail .data:06d8d160 and FUN_06d46150, the last
 // thing PlayerDB::init does. MP only: <exe dir>\CheatMessage.txt is read as raw UTF-16
 // (at most 0x50 wchar) over the default L"Possible cheating detected: ". The consumer is
-// PlayerData_ReportCheat below.
+// PlayerData::report_cheat below.
 static wchar_t GCheatMessage[0x50] = L"Possible cheating detected: ";
 
 static void LoadCheatMessage() {
@@ -351,8 +349,8 @@ static void LoadCheatMessage() {
     fclose(File);
 }
 
-// PlayerData_ReportCheat -- retail FUN_06d4f570; its only caller is the gate
-// PlayerData_CheckForCheats (FUN_06d4ccd0, latch +0x34C, gated on the current base).
+// PlayerData::report_cheat -- retail FUN_06d4f570; its only caller is the gate
+// PlayerData::check_for_cheats (FUN_06d4ccd0, latch +0x34C, gated on the current base).
 //  (1) FDUMP "LOG: Possible cheating detected (%s) by %s (%s)!" with the reason, the
 //      character name (from the vibe, fallback L">>>BAD   NAME<<<", three spaces) and the
 //      slot's AccountName, both as NARROW copies built with a truncating (char) cast.
@@ -407,21 +405,21 @@ void Server_RdlAppend(RenderDisplayList& Rdl, const RDLNode& Node) {
     Rdl.Count++;
 }
 
-void PlayerData_ReportCheat(PlayerData& Slot, int Reason) {
+void PlayerData::report_cheat(int Reason) {
     // (1) resolve the character name off the reputation vibe.
     const wchar_t* CharacterNameWide = GCheatBadName;
     {
         FmtStr NameA;
         FmtStr NameB;
         const wchar_t* Resolved = GCheatBadName;
-        int Result = ::Reputation::Vibe::GetName(Slot.rep_vibe, NameA, NameB, Resolved);
+        int Result = ::Reputation::Vibe::GetName(rep_vibe, NameA, NameB, Resolved);
         // Retail only re-forces the fallback on -2; any other failure code
         // leaves whatever GetName wrote into the out-parameter in place.
         CharacterNameWide = (Result == -2) ? GCheatBadName : Resolved;
     }
 
     const std::string CharacterName = NarrowCopy(CharacterNameWide);
-    const std::string AccountName = NarrowCopy(Slot.AccountName);
+    const std::string AccountName = NarrowCopy(this->AccountName);
 
     // Retail indexes the reason table with no range clamp.
     const char* ReasonText = GCheatReason[Reason];
@@ -447,7 +445,7 @@ void PlayerData_ReportCheat(PlayerData& Slot, int Reason) {
         {
             FmtStr NameC;
             FmtStr NameD;
-            int const Result = ::Reputation::Vibe::GetName(Slot.rep_vibe, NameC, NameD, NodeName);
+            int const Result = ::Reputation::Vibe::GetName(rep_vibe, NameC, NameD, NodeName);
             if (Result == -2)
                 NodeName = GCheatBadName;
         }
@@ -493,7 +491,7 @@ void PlayerData_ReportCheat(PlayerData& Slot, int Reason) {
     }
 }
 
-// PlayerData_CheckForCheats -- the gate at the top of retail FUN_06d4ccd0 (the save/land
+// PlayerData::check_for_cheats -- the gate at the top of retail FUN_06d4ccd0 (the save/land
 // record writer; only the gate is ported here). Outside single player and unless the
 // +0x34C latch is set, a player in a base is checked by four detectors whose reason codes
 // line up with GCheatReason[]:
@@ -809,37 +807,37 @@ namespace {
     }
 }
 
-bool __cdecl PlayerData_CheckForCheats(PlayerData& Slot) {
+bool PlayerData::check_for_cheats() {
     if (SinglePlayer())
         return false;
 
     // One report per session.
-    if (Slot.bCheatReported == 1)
+    if (bCheatReported == 1)
         return true;
 
     // The whole check needs a base to price against.
-    if (Slot.current_base == 0)
+    if (current_base == 0)
         return false;
 
     int Reason = 0;
-    if (PlayerData_EquipmentExceedsShipSpecs(Slot)) {
+    if (PlayerData_EquipmentExceedsShipSpecs(*this)) {
         Reason = 3;
-    } else if (PlayerData_EquipmentNotSoldOnBase(Slot)) {
+    } else if (PlayerData_EquipmentNotSoldOnBase(*this)) {
         Reason = 2;
-    } else if (PlayerData_TotalEquipmentValue(Slot) > Slot.total_earned) {
+    } else if (PlayerData_TotalEquipmentValue(*this) > total_earned) {
         Reason = 1;
-    } else if (PlayerData_HoldOverCapacity(Slot)) {
+    } else if (PlayerData_HoldOverCapacity(*this)) {
         Reason = 4;
     } else {
         return false;
     }
 
-    PlayerData_ReportCheat(Slot, Reason);
-    Slot.bCheatReported = 1;
+    report_cheat(Reason);
+    bCheatReported = 1;
 
     // IClient slot 9, PushToClient(client_id, NULL), with no null test on the interface.
     if (!SinglePlayer())
-        ::g_pClientInterface->PushToClient(Slot.client_id, nullptr);
+        ::g_pClientInterface->PushToClient(client_id, nullptr);
     return true;
 }
 
@@ -849,23 +847,22 @@ bool __cdecl PlayerData_CheckForCheats(PlayerData& Slot) {
 // functions (declared in common_server_playerdb.h). Four of the six open with the MP gate
 // `!IsMPServer() || selected_character[0] != 0`.
 // ===========================================================================
-static bool PlayerData_EquipGateOpen(PlayerSlot const& Slot) {
+bool PlayerData::equip_gate_open() const {
     if (!IsMPServer())
         return true;
-    return Slot.selected_character.is_valid();
+    return selected_character.is_valid();
 }
 
 // SubObjectID::EquipIdMaker::CreateEquipID (Common.dll 0xd4560) PRE-increments, so the
 // first id after a Reset (0x21) is 0x22.
-static unsigned short PlayerData_NextEquipId(PlayerSlot& Slot) {
-    return Slot.equip_id_maker.CreateEquipID();
+unsigned short PlayerData::next_equip_id() {
+    return equip_id_maker.CreateEquipID();
 }
 
-unsigned short __cdecl PlayerData_AddEquipment(PlayerSlot& Slot, unsigned int ArchId,
-                                               CacheString const& Hardpoint, int Count,
-                                               float Health, unsigned char bEquipped,
-                                               bool bMission, bool bNotify) {
-    if (!PlayerData_EquipGateOpen(Slot))
+unsigned short PlayerData::add_equipment(unsigned int ArchId, CacheString const& Hardpoint,
+                                         int Count, float Health, unsigned char bEquipped,
+                                         bool bMission, bool bNotify) {
+    if (!equip_gate_open())
         return SUBOBJ_ID_NONE;
 
     unsigned short EquipId = 0;
@@ -875,14 +872,14 @@ unsigned short __cdecl PlayerData_AddEquipment(PlayerSlot& Slot, unsigned int Ar
         // Retail sets the combinable flag BEFORE it knows whether a stack was found, so a
         // miss still adds combinable; it just gets a fresh id.
         bCombine = true;
-        EquipDesc const* Existing = Slot.equipment.find_matching_cargo(ArchId, 0, 1.0f);
+        EquipDesc const* Existing = equipment.find_matching_cargo(ArchId, 0, 1.0f);
         if (Existing != nullptr) {
             EquipId = Existing->Id;
         } else {
-            EquipId = PlayerData_NextEquipId(Slot);
+            EquipId = next_equip_id();
         }
     } else {
-        EquipId = PlayerData_NextEquipId(Slot);
+        EquipId = next_equip_id();
     }
 
     // The six setters, in retail's order; bMission is a plain byte store (06d4f0aa).
@@ -895,58 +892,55 @@ unsigned short __cdecl PlayerData_AddEquipment(PlayerSlot& Slot, unsigned int Ar
     Desc.set_equipped(bEquipped);
     Desc.bMission = bMission;
 
-    int const Combined = Slot.equipment.add_equipment_item(Desc, bCombine);
+    int const Combined = equipment.add_equipment_item(Desc, bCombine);
 
     // FLPACKET_SERVER_SETADDITEM. The client id goes BY VALUE here.
     if (bNotify) {
-        ::g_pClientInterface->SendServerSetAddItem(Slot.client_id, Combined, Desc);
+        ::g_pClientInterface->SendServerSetAddItem(client_id, Combined, Desc);
     }
 
-    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &Slot.client_id);
+    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &client_id);
     return EquipId;
 }
 
-void __cdecl PlayerData_RemoveEquipment(PlayerSlot& Slot, unsigned short Id, int Count,
-                                        bool bNotify) {
-    if (!PlayerData_EquipGateOpen(Slot))
+void PlayerData::remove_equipment(unsigned short Id, int Count, bool bNotify) {
+    if (!equip_gate_open())
         return;
 
-    int const Result = Slot.equipment.remove_equipment_item(Id, Count);
+    int const Result = equipment.remove_equipment_item(Id, Count);
 
     // FLPACKET_SERVER_SETREMOVEITEM.
     if (bNotify) {
-        ::g_pClientInterface->SendServerSetRemoveItem(Slot.client_id, Result, Id, Count);
+        ::g_pClientInterface->SendServerSetRemoveItem(client_id, Result, Id, Count);
     }
 
-    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &Slot.client_id);
+    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &client_id);
 }
 
-// PlayerData_RemoveCargo -- retail FUN_06d4f260 (thiscall): find the matching cargo (a
+// PlayerData::remove_cargo -- retail FUN_06d4f260 (thiscall): find the matching cargo (a
 // miss FDUMPs and returns), then FUN_06d4f100's body inlined.
-void __cdecl PlayerData_RemoveCargo(PlayerSlot& Slot, unsigned int ArchId, int Count,
-                                    float Health, bool bNotify) {
-    EquipDesc const* Found = Slot.equipment.find_matching_cargo(ArchId, Count, Health);
+void PlayerData::remove_cargo(unsigned int ArchId, int Count, float Health, bool bNotify) {
+    EquipDesc const* Found = equipment.find_matching_cargo(ArchId, Count, Health);
     if (Found == nullptr) {
         FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
               "E:\\FL\\Scratch\\Source\\Server\\PlayerDB.cpp", 0xdea,
               "Tried to remove cargo player doesn't have!");
         return;
     }
-    PlayerData_RemoveEquipment(Slot, Found->Id, Count, bNotify);
+    remove_equipment(Found->Id, Count, bNotify);
 }
 
-void __cdecl PlayerData_ModifyEquipment(PlayerSlot& Slot, unsigned short Id,
-                                        CacheString const& Hardpoint, int Count,
-                                        float Health, unsigned char bEquipped) {
-    if (!PlayerData_EquipGateOpen(Slot))
+void PlayerData::modify_equipment(unsigned short Id, CacheString const& Hardpoint, int Count,
+                                  float Health, unsigned char bEquipped) {
+    if (!equip_gate_open())
         return;
 
-    EquipDesc* Item = Slot.equipment.find_equipment_item(Id);
+    EquipDesc* Item = equipment.find_equipment_item(Id);
     if (Item == nullptr) {
         FDUMP(0x100001,
               "%s(%d) : *** ERROR: PlayerData::modify_item(): CLI(%d) ID(0x%X) NEW_STATUS(%f). "
               "Couldn't find item, expect strange inventory behavior",
-              "E:\\FL\\Scratch\\Source\\Server\\PlayerDB.cpp", 0xdd7, Slot.client_id,
+              "E:\\FL\\Scratch\\Source\\Server\\PlayerDB.cpp", 0xdd7, client_id,
               (unsigned int)Id, (double)Health);
         return;
     }
@@ -958,48 +952,47 @@ void __cdecl PlayerData_ModifyEquipment(PlayerSlot& Slot, unsigned short Id,
     Item->set_equipped(bEquipped);
 
     // No IClient packet on this path, only the controller broadcast.
-    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &Slot.client_id);
+    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &client_id);
 }
 
 // PlayerData::set_relative_health -- retail FUN_06d4ed10 (thiscall, two stack arguments).
 // +0x268 is relative_health and the first argument is a FLOAT: the arch-group damage
 // walker (.text:06d0ba6a) FSTPs CSimple::get_relative_health straight into its slot.
-void __cdecl PlayerData_SetRelativeHealth(PlayerSlot& Slot, float RelativeHealth,
-                                          bool bNotify) {
-    Slot.relative_health = RelativeHealth;
+void PlayerData::set_relative_health(float RelativeHealth, bool bNotify) {
+    relative_health = RelativeHealth;
     // IClient slot 22; the health crosses as its raw bits.
     if (bNotify) {
-        ::g_pClientInterface->SendServerSetHullStatus(Slot.client_id, RelativeHealth);
+        ::g_pClientInterface->SendServerSetHullStatus(client_id, RelativeHealth);
     }
 }
 
 // PlayerData::terminate_trade -- retail FUN_06d50af0 (thiscall, no arguments); four call
 // sites, one of them StarSystem::on_object_destroyed.
-void __cdecl PlayerData_TerminateTrade(PlayerSlot& Slot) {
-    if (Slot.trade_offer == nullptr)
+void PlayerData::terminate_trade() {
+    if (trade_offer == nullptr)
         return;
-    GetServerInterface()->TerminateTrade(Slot.client_id, 0);
+    GetServerInterface()->TerminateTrade(client_id, 0);
 }
 
 // PlayerData::cancel_trade_request -- retail FUN_06d50a40 (thiscall, ONE stack argument;
 // Ghidra's `char unaff_BL` is an artifact). Tells the OUTBOUND partner (+0x3d0) the
 // request is gone (IClient slot 108), optionally removes MY client id from the partner's
 // inbound list, and clears +0x3d0.
-void __cdecl PlayerData_CancelTradeRequest(PlayerSlot& Slot, bool bDropPartnerEntry) {
-    if (Slot.trade_request_partner == 0)
+void PlayerData::cancel_trade_request(bool bDropPartnerEntry) {
+    if (trade_request_partner == 0)
         return;
 
     // MY ship object id, not the partner's.
-    ::g_pClientInterface->SendCommonPlayerTradeStopTradeRequest(Slot.trade_request_partner,
-                                                                Slot.ship_object_id);
+    ::g_pClientInterface->SendCommonPlayerTradeStopTradeRequest(trade_request_partner,
+                                                                ship_object_id);
 
     if (bDropPartnerEntry) {
-        PlayerSlot* const Partner = PlayerDB_GetPlayer(Slot.trade_request_partner);
+        PlayerSlot* const Partner = PlayerDB_GetPlayer(trade_request_partner);
         if (Partner != nullptr) {
             std::vector<unsigned int>& Requests = Partner->inbound_trade_requests;
             for (std::vector<unsigned int>::iterator It = Requests.begin();
                  It != Requests.end(); ) {
-                if (*It == Slot.client_id)
+                if (*It == client_id)
                     It = Requests.erase(It);
                 else
                     ++It;
@@ -1007,50 +1000,49 @@ void __cdecl PlayerData_CancelTradeRequest(PlayerSlot& Slot, bool bDropPartnerEn
         }
     }
 
-    Slot.trade_request_partner = 0;
+    trade_request_partner = 0;
 }
 
 // PlayerData::set_trade_request -- retail FUN_06d50920, called only from
 // IServerImpl::RequestTrade. FUN_06d50a40(true) inlined, then -- only when the TARGET slot
 // has a client (no range check on the id) -- MY client id appended to its inbound list,
 // +0x3d0 = target and IClient slot 107.
-void __cdecl PlayerData_SetTradeRequest(PlayerSlot& Slot, unsigned int TargetId) {
-    PlayerData_CancelTradeRequest(Slot, true);
+void PlayerData::set_trade_request(unsigned int TargetId) {
+    cancel_trade_request(true);
 
     PlayerData& Target = Players[TargetId];
     if (Target.client_id == 0)
         return;
 
-    Target.inbound_trade_requests.push_back(Slot.client_id);
-    Slot.trade_request_partner = TargetId;
-    ::g_pClientInterface->SendCommonPlayerTradeRequestTrade(TargetId, Slot.ship_object_id);
+    Target.inbound_trade_requests.push_back(client_id);
+    trade_request_partner = TargetId;
+    ::g_pClientInterface->SendCommonPlayerTradeRequestTrade(TargetId, ship_object_id);
 }
 
 // PlayerData::set_collision_groups -- retail FUN_06d4f320. The only writer of +0x26C other
 // than set_ship_arch. No gate (its caller has one) and no controller broadcast.
-void __cdecl PlayerData_SetCollisionGroups(PlayerSlot& Slot,
-                                           std::list<CollisionGroupDesc> const& Groups) {
-    if (&Slot.collision_groups == &Groups)
+void PlayerData::set_collision_groups(std::list<CollisionGroupDesc> const& Groups) {
+    if (&collision_groups == &Groups)
         return;
-    Slot.collision_groups = Groups;
-    ::g_pClientInterface->SendServerSetCollisionGroups(Slot.client_id, Slot.collision_groups);
+    collision_groups = Groups;
+    ::g_pClientInterface->SendServerSetCollisionGroups(client_id, collision_groups);
 }
 
 // FUN_06d4fc30.
-void __cdecl PlayerData_SnapshotEquipment(PlayerSlot& Slot) {
-    Slot.equip_snapshot_arch = Slot.ship_archetype;
-    Slot.equip_snapshot = Slot.equipment;
+void PlayerData::snapshot_equipment() {
+    equip_snapshot_arch = ship_archetype;
+    equip_snapshot = equipment;
 }
 
-// PlayerData_ResetTotalEarned -- retail FUN_06d4f560. Sole caller: IServerImpl::BaseEnter,
-// MP only, right before PlayerData_SnapshotEquipment.
-void __cdecl PlayerData_ResetTotalEarned(PlayerSlot& Slot) {
-    Slot.total_earned = PlayerData_TotalEquipmentValue(Slot);
+// PlayerData::reset_total_earned -- retail FUN_06d4f560. Sole caller: IServerImpl::BaseEnter,
+// MP only, right before PlayerData::snapshot_equipment.
+void PlayerData::reset_total_earned() {
+    total_earned = PlayerData_TotalEquipmentValue(*this);
 }
 
-// PlayerData_GetCash -- retail FUN_06d4f460: clamped on the way out, never written back.
-int __cdecl PlayerData_GetCash(PlayerSlot const& Slot) {
-    int Cash = Slot.cash;
+// PlayerData::get_cash -- retail FUN_06d4f460: clamped on the way out, never written back.
+int PlayerData::get_cash() const {
+    int Cash = cash;
     if (Cash < 0)
         return 0;
     if (Cash > 999999999)
@@ -1058,46 +1050,46 @@ int __cdecl PlayerData_GetCash(PlayerSlot const& Slot) {
     return Cash;
 }
 
-// PlayerData_SetCash -- retail FUN_06d4f480 (thiscall); the MP selected-character gate,
+// PlayerData::set_cash -- retail FUN_06d4f480 (thiscall); the MP selected-character gate,
 // then clamp and store. Caller: IServerImpl::ReqSetCash.
-void __cdecl PlayerData_SetCash(PlayerSlot& Slot, int Cash) {
-    if (IsMPServer() && !Slot.selected_character.is_valid())
+void PlayerData::set_cash(int Cash) {
+    if (IsMPServer() && !selected_character.is_valid())
         return;
     if (Cash < 0)
         Cash = 0;
     else if (Cash > 999999999)
         Cash = 999999999;
-    Slot.cash = Cash;
-    ::g_pClientInterface->SendServerSetCash(Slot.client_id, Cash);
-    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &Slot.client_id);
+    cash = Cash;
+    ::g_pClientInterface->SendServerSetCash(client_id, Cash);
+    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &client_id);
 }
 
-// PlayerData_AdjustCash -- retail FUN_06d4f4e0 (thiscall). total_earned is bumped BEFORE
+// PlayerData::adjust_cash -- retail FUN_06d4f4e0 (thiscall). total_earned is bumped BEFORE
 // the MP gate. pub::Player::AdjustCash (0x06d553c0) inlines it with true.
-void __cdecl PlayerData_AdjustCash(PlayerSlot& Slot, int Amount, bool bCountEarned) {
+void PlayerData::adjust_cash(int Amount, bool bCountEarned) {
     if (bCountEarned)
-        Slot.total_earned += Amount;
-    int NewCash = Slot.cash + Amount;
-    if (IsMPServer() && !Slot.selected_character.is_valid())
+        total_earned += Amount;
+    int NewCash = cash + Amount;
+    if (IsMPServer() && !selected_character.is_valid())
         return;
     if (NewCash < 0)
         NewCash = 0;
     else if (NewCash > 999999999)
         NewCash = 999999999;
-    Slot.cash = NewCash;
-    ::g_pClientInterface->SendServerSetCash(Slot.client_id, NewCash);
-    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &Slot.client_id);
+    cash = NewCash;
+    ::g_pClientInterface->SendServerSetCash(client_id, NewCash);
+    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &client_id);
 }
 
-// PlayerData_CheckPositionBound -- retail FUN_06d498f0 (thiscall). Outside single player, a
+// PlayerData::check_position_bound -- retail FUN_06d498f0 (thiscall). Outside single player, a
 // live ship whose squared distance from the origin is strictly greater than 750000^2
 // (DAT_06d6b450; equal or unordered passes) is destroyed and false returned. Retail sums
 // in x87 extended precision, the port in double; they can only disagree within a double
 // ulp of 5.625e11. Sole caller: IServerImpl::SPObjUpdate.
-bool __cdecl PlayerData_CheckPositionBound(PlayerSlot& Slot, Vector const* Position) {
+bool PlayerData::check_position_bound(Vector const* Position) {
     if (SinglePlayer())
         return true;
-    GameObject* const ShipObj = Server_LookupLiveObject(Slot.ship_object_id);
+    GameObject* const ShipObj = Server_LookupLiveObject(ship_object_id);
     if (ShipObj == nullptr)
         return true;
     double const X = Position->x;
@@ -1106,30 +1098,30 @@ bool __cdecl PlayerData_CheckPositionBound(PlayerSlot& Slot, Vector const* Posit
     double const DistSq = X * X + Y * Y + Z * Z;
     if (!(DistSq > 562500000000.0))
         return true;
-    ShipObj->destroy(1, Slot.ship_object_id);
+    ShipObj->destroy(1, ship_object_id);
     return false;
 }
 
-// PlayerData_ReloadShipData -- retail FUN_06d4a200 (thiscall; the name is from the FDUMP
+// PlayerData::reload_ship_data -- retail FUN_06d4a200 (thiscall; the name is from the FDUMP
 // text). In single player it FDUMPs and execution CONTINUES. Restores the base hull status
 // and collision groups from the selected character's record (operator[], so a missing
 // record is inserted default), keeps the record's mounted base equipment plus every
 // unmounted shield battery / repair kit / munition / mine / countermeasure currently
 // carried (no null test on the archetype), and writes that list back to the slot and to
 // both of the record's lists.
-void __cdecl PlayerData_ReloadShipData(PlayerSlot& Slot) {
+void PlayerData::reload_ship_data() {
     if (!IsMPServer()) {
         FDUMP(0x100001, "%s(%d) : *** ERROR: %s",
               "E:\\FL\\Scratch\\Source\\Server\\PlayerDB.cpp", 0x70e,
               "reload_ship_data() is not valid in singleplayer\n");
     }
-    Slot.current_base = Slot.last_base_id;
+    current_base = last_base_id;
 
     PlayerData::FSavedCharacter& Record =
-        Slot.saved_characters[Slot.selected_character];
+        saved_characters[selected_character];
 
-    Slot.relative_health = Record.BaseHullStatus;
-    Slot.collision_groups = Record.BaseCollisionGroups;
+    relative_health = Record.BaseHullStatus;
+    collision_groups = Record.BaseCollisionGroups;
 
     std::list<EquipDesc> Kept;
     std::list<EquipDesc>::const_iterator Base;
@@ -1139,7 +1131,7 @@ void __cdecl PlayerData_ReloadShipData(PlayerSlot& Slot) {
             Kept.push_back(*Base);
     }
     std::list<EquipDesc>::const_iterator Cur;
-    for (Cur = Slot.equipment.Items.begin(); Cur != Slot.equipment.Items.end(); ++Cur) {
+    for (Cur = equipment.Items.begin(); Cur != equipment.Items.end(); ++Cur) {
         if (Cur->bEquipped)
             continue;
         Archetype::AClassType const Class =
@@ -1153,15 +1145,15 @@ void __cdecl PlayerData_ReloadShipData(PlayerSlot& Slot) {
         }
     }
 
-    Slot.equipment.Items.clear();
-    Slot.equipment.Items.assign(Kept.begin(), Kept.end());
-    Record.BaseEquipment.Items = Slot.equipment.Items;
-    Record.Equipment.Items = Slot.equipment.Items;
+    equipment.Items.clear();
+    equipment.Items.assign(Kept.begin(), Kept.end());
+    Record.BaseEquipment.Items = equipment.Items;
+    Record.Equipment.Items = equipment.Items;
 }
 
 // FUN_06d4ec10. Slot+0x26c is the hull's undamaged collision group list
 // (Archetype::EqObj::get_undamaged_collision_group_list, IAT .rdata:06d644a0).
-void __cdecl PlayerData_SetShipArch(PlayerSlot& Slot, unsigned int ShipArch) {
+void PlayerData::set_ship_arch(unsigned int ShipArch) {
     // A non-zero archetype that does not resolve aborts the whole call, notifications
     // included.
     if (ShipArch != 0 && Archetype::GetShip(ShipArch) == nullptr)
@@ -1169,14 +1161,14 @@ void __cdecl PlayerData_SetShipArch(PlayerSlot& Slot, unsigned int ShipArch) {
 
     // Only when the archetype changes: the list is emptied (even when the archetype will
     // not resolve below), then refilled.
-    if (Slot.ship_archetype != ShipArch) {
-        Slot.collision_groups.clear();
+    if (ship_archetype != ShipArch) {
+        collision_groups.clear();
 
         // The low 30 bits, not the whole dword.
         if ((ShipArch & 0x3fffffffu) != 0) {
             Archetype::Ship* const Arch = Archetype::GetShip(ShipArch);
             if (Arch != nullptr) {
-                Arch->get_undamaged_collision_group_list(Slot.collision_groups);
+                Arch->get_undamaged_collision_group_list(collision_groups);
             } else {
                 FDUMP(0x100001, "%s(%d) : *** ERROR: Error retrieving ship type %u",
                       "E:\\FL\\Scratch\\Source\\Server\\PlayerDB.cpp", 0xd07, ShipArch);
@@ -1185,33 +1177,33 @@ void __cdecl PlayerData_SetShipArch(PlayerSlot& Slot, unsigned int ShipArch) {
     }
 
     // The store and both notifications are unconditional.
-    Slot.ship_archetype = ShipArch;
+    ship_archetype = ShipArch;
 
     // FLPACKET_SERVER_SETSHIPARCH; no null test on the interface.
-    ::g_pClientInterface->SendServerSetShipArch(Slot.client_id, ShipArch);
+    ::g_pClientInterface->SendServerSetShipArch(client_id, ShipArch);
     // Message 0x35 here, NOT the 0 every other member of this family broadcasts.
-    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerShipArchSet, &Slot.client_id);
+    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerShipArchSet, &client_id);
 }
 
 // FUN_06d4eeb0.
-void __cdecl PlayerData_LoadEquipment(PlayerSlot& Slot, EquipDescList const& NewList) {
-    if (!PlayerData_EquipGateOpen(Slot))
+void PlayerData::load_equipment(EquipDescList const& NewList) {
+    if (!equip_gate_open())
         return;
 
-    Slot.equipment = NewList;
+    equipment = NewList;
 
     // Every element that arrived carrying SUBOBJ_ID_NONE gets a fresh id.
-    for (std::list<EquipDesc>::iterator It = Slot.equipment.Items.begin();
-         It != Slot.equipment.Items.end(); ++It) {
+    for (std::list<EquipDesc>::iterator It = equipment.Items.begin();
+         It != equipment.Items.end(); ++It) {
         if (It->Id == SUBOBJ_ID_NONE) {
-            It->set_id(PlayerData_NextEquipId(Slot));
+            It->set_id(next_equip_id());
         }
     }
 
     // FLPACKET_SERVER_SETEQUIPMENT.
-    EquipDescVector Wire(Slot.equipment);
-    ::g_pClientInterface->SendServerSetEquipment(Slot.client_id, Wire);
-    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &Slot.client_id);
+    EquipDescVector Wire(equipment);
+    ::g_pClientInterface->SendServerSetEquipment(client_id, Wire);
+    Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerWorthChanged, &client_id);
 }
 
 // PlayerDB::init -- retail 0x06d510c0. The account/character directory scan is inline,
@@ -1314,43 +1306,42 @@ void PlayerDB::free() {
 // bumps +0x08. Defined in IServerImpl.cpp.
 extern ServerStats GServerStats;
 
-// PlayerData_FlushPendingVisits -- retail FUN_06d4b450 (fastcall on the slot): commits the
+// PlayerData::flush_pending_visits -- retail FUN_06d4b450 (fastcall on the slot): commits the
 // pending visit queue (+0x3b8) into the persistent visit map (+0x3a0), adding the
 // "committed" bit 0x08 and ORing in the same key's existing flags (FUN_06d15d10 is find).
-void __cdecl PlayerData_FlushPendingVisits(PlayerData& Slot) {
-    for (size_t Index = 0; Index < Slot.visited_states.size(); ++Index) {
-        const PlayerData::FVisitedState& Pending = Slot.visited_states[Index];
+void PlayerData::flush_pending_visits() {
+    for (size_t Index = 0; Index < visited_states.size(); ++Index) {
+        const PlayerData::FVisitedState& Pending = visited_states[Index];
         unsigned char Flags = static_cast<unsigned char>(Pending.visit_flags | 0x08);
 
         std::map<unsigned int, unsigned char>::iterator Found =
-            Slot.visit_map.find(Pending.system_id);
-        if (Found != Slot.visit_map.end())
+            visit_map.find(Pending.system_id);
+        if (Found != visit_map.end())
             Flags = static_cast<unsigned char>(Flags | Found->second);
-        Slot.visit_map[Pending.system_id] = Flags;
+        visit_map[Pending.system_id] = Flags;
     }
-    Slot.visited_states.clear();
+    visited_states.clear();
 }
 
-// PlayerData_ShouldQueueVisit -- retail FUN_06d4b200 (thiscall): false when the flags,
+// PlayerData::should_queue_visit -- retail FUN_06d4b200 (thiscall): false when the flags,
 // ORed with the map's entry for Key, have both 0x10 and 0x08. Callers pass
 // (solar+0xb0, CSolar::GetVisitValue()).
-bool __cdecl PlayerData_ShouldQueueVisit(PlayerData const& Slot, unsigned int Key,
-                                         unsigned char Flags) {
-    std::map<unsigned int, unsigned char>::const_iterator Found = Slot.visit_map.find(Key);
-    if (Found != Slot.visit_map.end())
+bool PlayerData::should_queue_visit(unsigned int Key, unsigned char Flags) const {
+    std::map<unsigned int, unsigned char>::const_iterator Found = visit_map.find(Key);
+    if (Found != visit_map.end())
         Flags = static_cast<unsigned char>(Flags | Found->second);
     if ((Flags & 0x10) != 0 && (Flags & 0x08) != 0)
         return false;
     return true;
 }
 
-// PlayerData_QueueVisit -- retail FUN_06d4b270 (thiscall): push_back onto the pending
+// PlayerData::queue_visit -- retail FUN_06d4b270 (thiscall): push_back onto the pending
 // vector.
-void __cdecl PlayerData_QueueVisit(PlayerData& Slot, unsigned int Key, unsigned char Flags) {
+void PlayerData::queue_visit(unsigned int Key, unsigned char Flags) {
     PlayerData::FVisitedState State;
     State.system_id = Key;
     State.visit_flags = Flags;
-    Slot.visited_states.push_back(State);
+    visited_states.push_back(State);
 }
 
 // The two teardown steps PlayerDB::cleanup and PlayerDB::logout share, retail FUN_06d00010
@@ -1386,7 +1377,7 @@ static void PlayerDB_LeaveSystem(PlayerData& Slot, unsigned int SessionId) {
 
     System.remove_player(SessionId);                               // FUN_06d08740
 
-    PlayerData_FlushPendingVisits(Slot);
+    Slot.flush_pending_visits();
 
     if (Slot.system_id != 0) {
         Slot.system_id = 0;
@@ -1511,7 +1502,7 @@ unsigned char PlayerDB::login(const SLoginInfo& Info, unsigned int SessionId) {
     return load_user_data(Info, SessionId);
 }
 
-// PlayerData_Teardown -- retail FUN_06d49230: the prologue that touches other slots and
+// PlayerData::teardown -- retail FUN_06d49230: the prologue that touches other slots and
 // subsystems, then the field wipe.
 //  (a) the OUTBOUND trade request (+0x3D0): IClient slot 108 to the partner with
 //      Players[slot->client_id].ship_object_id (indexed by client id, NOT session id),
@@ -1521,92 +1512,92 @@ unsigned char PlayerDB::login(const SLoginInfo& Info, unsigned int SessionId) {
 //  (c) the reputation vibe freed (-1, not 0, is the empty sentinel);
 //  (d) the CAccount marked logged out (m_ClientID = 0);
 //  (e) SubObjectID::EquipIdMaker::Reset (+0x3C8).
-static void PlayerData_Teardown(PlayerData& Slot) {
+void PlayerData::teardown() {
     PlayerDB& Db = Players;
 
     // (a) No bounds checks anywhere, and IClient is called with no null test.
-    if (Slot.trade_request_partner != 0) {
-        unsigned int const Partner = Slot.trade_request_partner;
+    if (trade_request_partner != 0) {
+        unsigned int const Partner = trade_request_partner;
         g_pClientInterface->SendCommonPlayerTradeStopTradeRequest(Partner,
-                                                                  Db[Slot.client_id].ship_object_id);
+                                                                  Db[client_id].ship_object_id);
         // FUN_06d571a0 = list::remove(value): EVERY node equal to our client id goes.
         std::vector<unsigned int>& PartnerInbound = Db[Partner].inbound_trade_requests;
         for (size_t Index = 0; Index < PartnerInbound.size();) {
-            if (PartnerInbound[Index] == Slot.client_id) {
+            if (PartnerInbound[Index] == client_id) {
                 PartnerInbound.erase(PartnerInbound.begin()
                                      + static_cast<std::ptrdiff_t>(Index));
             } else {
                 ++Index;
             }
         }
-        Slot.trade_request_partner = 0;
+        trade_request_partner = 0;
     }
 
     // (b) Each node's session indexes Players raw.
-    for (size_t Index = 0; Index < Slot.inbound_trade_requests.size(); ++Index) {
-        PlayerData& RequesterSlot = Db[Slot.inbound_trade_requests[Index]];
+    for (size_t Index = 0; Index < inbound_trade_requests.size(); ++Index) {
+        PlayerData& RequesterSlot = Db[inbound_trade_requests[Index]];
         if (RequesterSlot.trade_request_partner == 0) continue;
         g_pClientInterface->SendCommonPlayerTradeStopTradeRequest(RequesterSlot.trade_request_partner,
                                                                   Db[RequesterSlot.client_id].ship_object_id);
         RequesterSlot.trade_request_partner = 0;
     }
-    Slot.inbound_trade_requests.clear();
+    inbound_trade_requests.clear();
 
     // (c)
-    if (Slot.rep_vibe != -1) {
-        Reputation::Vibe::Free(Slot.rep_vibe);
-        Slot.rep_vibe = -1;
+    if (rep_vibe != -1) {
+        Reputation::Vibe::Free(rep_vibe);
+        rep_vibe = -1;
     }
 
     // The field wipe, in retail order. AccountName and both costumes get the 0xcd fill.
-    std::memset(Slot.AccountName, 0xcd, sizeof(Slot.AccountName));
-    Slot.saved_characters.clear();
-    Slot.ship_archetype = 0;
-    Slot.relative_health = 0.0f;
-    Slot.equipment.Items.clear();
-    Slot.collision_groups.clear();
-    std::memset(&Slot.com_costume, 0xcd, sizeof(Slot.com_costume));
-    Slot.voice_length = 0;
-    Slot.voice[0] = '\0';
-    std::memset(&Slot.costume, 0xcd, sizeof(Slot.costume));
+    std::memset(AccountName, 0xcd, sizeof(AccountName));
+    saved_characters.clear();
+    ship_archetype = 0;
+    relative_health = 0.0f;
+    equipment.Items.clear();
+    collision_groups.clear();
+    std::memset(&com_costume, 0xcd, sizeof(com_costume));
+    voice_length = 0;
+    voice[0] = '\0';
+    std::memset(&costume, 0xcd, sizeof(costume));
     for (int Axis = 0; Axis < 3; ++Axis)
-        Slot.initial_pos[Axis] = 0.0f;
+        initial_pos[Axis] = 0.0f;
     for (int Cell = 0; Cell < 9; ++Cell)
-        Slot.initial_ornt[Cell] = (Cell % 4 == 0) ? 1.0f : 0.0f;
+        initial_ornt[Cell] = (Cell % 4 == 0) ? 1.0f : 0.0f;
     // 0x29a (666), the retail fill value.
-    Slot.cash = 0x29a;
-    Slot.num_kills = 0;
-    Slot.num_mission_successes = 0;
-    Slot.num_mission_failures = 0;
-    Slot.bSkipNextAutosave = 0;
-    Slot.save_failure_count = 0;
-    Slot.client_id = 0;
-    Slot.bCheatReported = 0;
+    cash = 0x29a;
+    num_kills = 0;
+    num_mission_successes = 0;
+    num_mission_failures = 0;
+    bSkipNextAutosave = 0;
+    save_failure_count = 0;
+    client_id = 0;
+    bCheatReported = 0;
 
     // (d) account_ptr itself is NOT cleared.
-    CAccount* Account = static_cast<CAccount*>(Slot.account_ptr);
+    CAccount* Account = static_cast<CAccount*>(account_ptr);
     if (Account != nullptr) {
         Account->m_ClientID = 0;
     }
 
     // (e) Reset stores 0x21.
-    Slot.equip_id_maker.Reset();
+    equip_id_maker.Reset();
 
-    Slot.system_id = 0;
-    Slot.ship_object_id = 0;
-    Slot.created_ship_id = 0;
-    Slot.current_base = 0;
-    Slot.entered_base_id = 0;
-    Slot.last_base_id = 0;
-    Slot.current_location = 0;
-    Slot.character_id = 0;
-    Slot.exited_base_id = 0;
-    Slot.starting_ring = CreateID("NO WHERE");
-    Slot.selected_character.invalidate();
+    system_id = 0;
+    ship_object_id = 0;
+    created_ship_id = 0;
+    current_base = 0;
+    entered_base_id = 0;
+    last_base_id = 0;
+    current_location = 0;
+    character_id = 0;
+    exited_base_id = 0;
+    starting_ring = CreateID("NO WHERE");
+    selected_character.invalidate();
     // group_mission_id (+0x408) is left alone.
-    Slot.group_ptr = nullptr;
-    Slot.group_mission_set_by = 0;
-    Slot.visit_map.clear();
+    group_ptr = nullptr;
+    group_mission_set_by = 0;
+    visit_map.clear();
     // Not touched by retail: rank_level, +0x288, total_earned, the equipment
     // snapshot, weapon_group_name, mission_log, interface_state, the pending
     // visits vector, difficulty_scale, trade_offer, group_mission_id.
@@ -1616,11 +1607,11 @@ void PlayerDB::logout(unsigned int SessionId) {
     if (SessionId == 0 || SessionId > m_MaxPlayers || !m_PlayerArray) return;
     PlayerData& Slot = m_PlayerArray[SessionId - 1];
 
-    // (1) MP only: FUN_06d4c430, the save-game writer (PlayerData_AutoSave,
+    // (1) MP only: FUN_06d4c430, the save-game writer (PlayerData::auto_save,
     //     server_savegame.cpp) -- flush this session's character to disk before tearing
     //     the slot down. Its own gates decide whether anything is written.
     if (!SinglePlayer()) {
-        PlayerData_AutoSave(Slot);
+        Slot.auto_save();
     }
 
     // (2) The same two teardown steps cleanup() runs, in the same order.
@@ -1675,18 +1666,18 @@ void PlayerDB::logout(unsigned int SessionId) {
     }
 
     // (10) The slot teardown; clearing client_id is what frees the slot for reuse.
-    PlayerData_Teardown(Slot);
+    Slot.teardown();
 }
 
-// PlayerData_DeselectCharacter -- retail FUN_06d4a4a0 (thiscall). Leaving the world without
+// PlayerData::deselect_character -- retail FUN_06d4a4a0 (thiscall). Leaving the world without
 // logging out: logout's system / base / trade teardown, the player-list removal and event
 // 7, then the selection is dropped. `this` is only read for +0x64; everything else goes
 // through Players[SessionId].
-void __cdecl PlayerData_DeselectCharacter(PlayerData& Slot, unsigned int SessionId) {
+void PlayerData::deselect_character(unsigned int SessionId) {
     if (SinglePlayer())
         return;
     PlayerData& Owner = Players[SessionId];
-    if (!Slot.selected_character.is_valid())
+    if (!selected_character.is_valid())
         return;
 
     PlayerDB_LeaveSystem(Owner, SessionId);
@@ -1720,7 +1711,7 @@ void __cdecl PlayerData_DeselectCharacter(PlayerData& Slot, unsigned int Session
 
     Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerLogin, &SessionId);
 
-    Slot.selected_character.Buffer[0] = '\0';
+    selected_character.Buffer[0] = '\0';
 }
 
 // FUN_06d49960 (cdecl): the character list's sort order. True when New goes BEFORE
@@ -1743,16 +1734,16 @@ static bool CharacterInfo_GoesBefore(CCharacterSet::CharacterInfo const& New,
     return Order == 1;
 }
 
-// PlayerData_BuildCharacterSet -- retail FUN_06d499c0 (thiscall). Only caller:
+// PlayerData::build_character_set -- retail FUN_06d499c0 (thiscall). Only caller:
 // CharacterInfoReq, when its bool is false.
-void __cdecl PlayerData_BuildCharacterSet(PlayerData& Slot, CCharacterSet& Out) {
+void PlayerData::build_character_set(CCharacterSet& Out) {
     // IsMPServer() twice, as retail: an MP server with a selected character leaves the
     // world first.
-    if (IsMPServer() && (!IsMPServer() || Slot.selected_character.Buffer[0] != '\0')) {
-        PlayerData_AutoSave(Slot);
+    if (IsMPServer() && (!IsMPServer() || selected_character.Buffer[0] != '\0')) {
+        auto_save();
 
         // The session id is the slot's own client_id.
-        unsigned int const SessionId = Slot.client_id;
+        unsigned int const SessionId = client_id;
         PlayerData& Owner = Players[SessionId];
 
         PlayerDB_LeaveSystem(Owner, SessionId);
@@ -1778,8 +1769,8 @@ void __cdecl PlayerData_BuildCharacterSet(PlayerData& Slot, CCharacterSet& Out) 
 
     // Every record, in key order.
     for (std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::const_iterator It =
-             Slot.saved_characters.begin();
-         It != Slot.saved_characters.end(); ++It) {
+             saved_characters.begin();
+         It != saved_characters.end(); ++It) {
         PlayerData::FSavedCharacter const& Saved = It->second;
 
         CCharacterSet::CharacterInfo* Info = new CCharacterSet::CharacterInfo();   // new(0x2dc)
@@ -1833,19 +1824,18 @@ void __cdecl PlayerData_BuildCharacterSet(PlayerData& Slot, CCharacterSet& Out) 
     }
 
     // The failed-save counter travels with the list and is reset.
-    Out.SaveFailureCount = Slot.save_failure_count;
-    Slot.save_failure_count = 0;
+    Out.SaveFailureCount = save_failure_count;
+    save_failure_count = 0;
 }
 
-// PlayerData_SelectCharacter -- retail FUN_06d4a5d0 (thiscall), only caller
+// PlayerData::select_character -- retail FUN_06d4a5d0 (thiscall), only caller
 // IServerImpl::CharacterSelect. This is the head and the MP-only front; the shared tail is
-// PlayerData_LoadSelectedCharacter (server_savegame.cpp). Players[sid] is recomputed from
+// PlayerData::load_selected_character (server_savegame.cpp). Players[sid] is recomputed from
 // the argument rather than using `this`.
-bool __cdecl PlayerData_SelectCharacter(PlayerData& Slot, CHARACTER_ID const& Id,
-                                        unsigned int SessionId) {
+bool PlayerData::select_character(CHARACTER_ID const& Id, unsigned int SessionId) {
     std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::iterator Found =
-        Slot.saved_characters.find(Id);
-    if (Found == Slot.saved_characters.end())
+        saved_characters.find(Id);
+    if (Found == saved_characters.end())
         return false;
     PlayerData::FSavedCharacter const& Record = Found->second;
 
@@ -1860,7 +1850,7 @@ bool __cdecl PlayerData_SelectCharacter(PlayerData& Slot, CHARACTER_ID const& Id
             OwnGroupId = static_cast<CPlayerGroup*>(Owner.group_ptr)->GetID();
 
         // Only when a character is already selected.
-        if (Slot.selected_character.Buffer[0] != '\0') {
+        if (selected_character.Buffer[0] != '\0') {
             PlayerDB_LeaveSystem(Owner, SessionId);
             PlayerDB_LeaveBase(Owner, SessionId);
 
@@ -1877,7 +1867,7 @@ bool __cdecl PlayerData_SelectCharacter(PlayerData& Slot, CHARACTER_ID const& Id
                 GetServerInterface()->TerminateTrade(SessionId, 4);
 
             // Re-selecting the same character skips the player-list removal.
-            if (Id != Slot.selected_character) {
+            if (Id != selected_character) {
                 Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerLogout, &SessionId);
 
                 // The cached group id drops to 0.
@@ -1897,7 +1887,7 @@ bool __cdecl PlayerData_SelectCharacter(PlayerData& Slot, CHARACTER_ID const& Id
             }
         }
 
-        Slot.selected_character = Id;
+        selected_character = Id;
 
         g_pClientInterface->SendServerPlayerListClear(SessionId);
 
@@ -1951,20 +1941,19 @@ bool __cdecl PlayerData_SelectCharacter(PlayerData& Slot, CHARACTER_ID const& Id
         }
     }
 
-    return PlayerData_LoadSelectedCharacter(Slot, Record, SessionId);
+    return load_selected_character(Record, SessionId);
 }
 
-// PlayerData_DestroyCharacter -- retail FUN_06d49f60 (thiscall); only caller
+// PlayerData::destroy_character -- retail FUN_06d49f60 (thiscall); only caller
 // IServerImpl::DestroyCharacter.
-bool __cdecl PlayerData_DestroyCharacter(PlayerData& Slot, CHARACTER_ID const& Id,
-                                         unsigned int SessionId) {
+bool PlayerData::destroy_character(CHARACTER_ID const& Id, unsigned int SessionId) {
     // Deleting the selected character deselects it first.
-    if (Slot.selected_character == Id)
-        PlayerData_DeselectCharacter(Slot, SessionId);
+    if (selected_character == Id)
+        deselect_character(SessionId);
 
     std::map<CHARACTER_ID, PlayerData::FSavedCharacter>::iterator It =
-        Slot.saved_characters.find(Id);
-    if (It == Slot.saved_characters.end())
+        saved_characters.find(Id);
+    if (It == saved_characters.end())
         return false;
     PlayerData::FSavedCharacter& Record = It->second;
 
@@ -1977,9 +1966,9 @@ bool __cdecl PlayerData_DestroyCharacter(PlayerData& Slot, CHARACTER_ID const& I
     // <accts>\<account dir>\<file name>: the inline FUN_06d46370 hash in MP, wcstombs in SP.
     char AccountDirName[0x104];
     if (IsMPServer()) {
-        Server_AccountDirName(AccountDirName, Slot.AccountName);
+        Server_AccountDirName(AccountDirName, AccountName);
     } else {
-        wcstombs(AccountDirName, Slot.AccountName, 0x104);
+        wcstombs(AccountDirName, AccountName, 0x104);
     }
     // Retail reuses one buffer as both the second _makepath's dir and its output; two
     // buffers here, because the debug CRT may fill the destination first.
@@ -1996,11 +1985,11 @@ bool __cdecl PlayerData_DestroyCharacter(PlayerData& Slot, CHARACTER_ID const& I
 
     _unlink(Path);
 
-    Slot.saved_characters.erase(It);
+    saved_characters.erase(It);
 
     if (!SinglePlayer()) {
         FDUMP(0x100003, "LOG: Delete character on account %S (\"%s\")\n",
-              Slot.AccountName, Path);
+              AccountName, Path);
     }
     return true;
 }
@@ -2519,30 +2508,30 @@ void PlayerDB::logout_all() {
     }
 }
 
-// PlayerData_LoginAccount -- retail FUN_06d48e80 (thiscall), only caller
+// PlayerData::login_account -- retail FUN_06d48e80 (thiscall), only caller
 // PlayerDB::load_user_data. A locked account returns 7, a banned one 0. The name copy is an
 // unbounded wcscpy. Result 6 unless the directory is accessible; every saved character
 // loaded (FUN_06d48d50) makes it 3. In single player a missing Restart.fl is created and
 // loaded; in MP the login is logged and the account's directory path stored with no null
 // test. The account is looked up a SECOND time at the end (create_account may have
 // inserted it).
-static unsigned char PlayerData_LoginAccount(PlayerData& Slot, const char* AccountDir,
-                                             const SLoginInfo& Info, unsigned int SessionId) {
+unsigned char PlayerData::login_account(const char* AccountDir, const SLoginInfo& Info,
+                                        unsigned int SessionId) {
     {
         CiWString LoginName(Info.AccountName, wcslen(Info.AccountName));
-        Slot.account_ptr = Players.FindAccountFromName(LoginName);
+        account_ptr = Players.FindAccountFromName(LoginName);
     }
-    CAccount* Account = static_cast<CAccount*>(Slot.account_ptr);
+    CAccount* Account = static_cast<CAccount*>(account_ptr);
     if (Account != nullptr) {
         if (Account->m_bLocked)
             return 7;
         if (!Account->m_bNotBanned)
             return 0;
     }
-    Slot.client_id = SessionId;
+    client_id = SessionId;
     if (Account != nullptr)
         Account->m_ClientID = SessionId;
-    wcscpy(Slot.AccountName, Info.AccountName);
+    wcscpy(AccountName, Info.AccountName);
 
     unsigned char Result = 6;
     if (_access(AccountDir, 6) == 0) {
@@ -2556,7 +2545,7 @@ static unsigned char PlayerData_LoginAccount(PlayerData& Slot, const char* Accou
         if (FindHandle != -1) {
             int FindResult = 0;
             while (FindResult == 0) {
-                if (PlayerData_LoadSavedCharacter(Slot, AccountDir, FindData.name)) {
+                if (load_saved_character(AccountDir, FindData.name)) {
                     Result = 3;
                     if (!bFoundRestart && _stricmp(FindData.name, RestartName) == 0)
                         bFoundRestart = true;
@@ -2568,7 +2557,7 @@ static unsigned char PlayerData_LoginAccount(PlayerData& Slot, const char* Accou
 
         if (SinglePlayer()) {
             if (!bFoundRestart && Players.create_restart_file(AccountDir) &&
-                PlayerData_LoadSavedCharacter(Slot, AccountDir, RestartName)) {
+                load_saved_character(AccountDir, RestartName)) {
                 Result = 3;
             }
         } else {
@@ -2577,23 +2566,23 @@ static unsigned char PlayerData_LoginAccount(PlayerData& Slot, const char* Accou
                 FDUMP(0x100003, "LOG: Login on account %S (\"%s\")\n",
                       Info.AccountName, AccountDir);
             }
-            static_cast<CAccount*>(Slot.account_ptr)->m_DirectoryPath = AccountDir;
+            static_cast<CAccount*>(account_ptr)->m_DirectoryPath = AccountDir;
         }
     }
 
-    Slot.system_id = 0;
-    Slot.ship_object_id = 0;
-    Slot.created_ship_id = 0;
-    Slot.current_base = 0;
-    Slot.entered_base_id = 0;
-    Slot.last_base_id = 0;
-    Slot.current_location = 0;
-    Slot.character_id = 0;
+    system_id = 0;
+    ship_object_id = 0;
+    created_ship_id = 0;
+    current_base = 0;
+    entered_base_id = 0;
+    last_base_id = 0;
+    current_location = 0;
+    character_id = 0;
     {
         CiWString LoginName(Info.AccountName, wcslen(Info.AccountName));
-        Slot.account_ptr = Players.FindAccountFromName(LoginName);
+        account_ptr = Players.FindAccountFromName(LoginName);
     }
-    Slot.exited_base_id = 0;
+    exited_base_id = 0;
     return Result;
 }
 
@@ -2640,8 +2629,8 @@ unsigned char PlayerDB::load_user_data(const SLoginInfo& Info, unsigned int Sess
             return 2;
     }
 
-    return PlayerData_LoginAccount(m_PlayerArray[SessionId - 1], AccountDir, Info,
-                                   SessionId);
+    return m_PlayerArray[SessionId - 1].login_account(AccountDir, Info,
+                                                      SessionId);
 }
 
 // PlayerDB::create_account -- retail .text:06d53d50, ordinal 477. SP: build the directory
@@ -2705,7 +2694,7 @@ bool PlayerDB::create_new_character(const SCreateCharacterInfo& Info, unsigned i
         return true;
     }
 
-    if (!PlayerData_CreateNewCharacter(*Player, Info)) {
+    if (!Player->create_new_character(Info)) {
         return false;
     }
 
@@ -3022,7 +3011,7 @@ CPlayerGroup* CPlayerGroup::FromGroupID(unsigned int GroupId) {
 // non-zero +0x408 (and, in a separate scan, +0x40c); a joiner without a mission, or joining
 // a group with one, takes the group's, otherwise the joiner's mission goes to every member.
 // Then the member is added, the group id sent and stamped on the joiner's CShip, and the
-// system told (StarSystem_SendGroupChange, FUN_06d0f1c0). No IsFull test (the callers do
+// system told (StarSystem::send_group_change, FUN_06d0f1c0). No IsFull test (the callers do
 // it) and no interface null tests. FUN_06d006c0 is Server_LookupGameObject here.
 bool CPlayerGroup::AddMember(unsigned int PlayerId) {
     PlayerData& Joiner = Players[PlayerId];                                 // raw, no guard
@@ -3091,7 +3080,7 @@ bool CPlayerGroup::AddMember(unsigned int PlayerId) {
     const_cast<CShip*>(static_cast<CShip const*>(Cobj))->GroupId = m_GroupID;
     SysDB::SysMapType::iterator System = SysDB::SysMap.find(Joiner.system_id);
     if (System != SysDB::SysMap.end())
-        StarSystem_SendGroupChange(System->second, Joiner.ship_object_id);
+        System->second.send_group_change(Joiner.ship_object_id);
     return true;
 }
 
@@ -3152,7 +3141,7 @@ bool CPlayerGroup::DelMember(unsigned int PlayerId) {
     const_cast<CShip*>(static_cast<CShip const*>(Cobj))->GroupId = 0;
     SysDB::SysMapType::iterator System = SysDB::SysMap.find(Leaver.system_id);
     if (System != SysDB::SysMap.end())
-        StarSystem_SendGroupChange(System->second, Leaver.ship_object_id);
+        System->second.send_group_change(Leaver.ship_object_id);
     return true;
 }
 
@@ -3274,12 +3263,12 @@ void CPlayerGroup::StoreMemberList(std::vector<unsigned int>& OutMembers) {
     }
 }
 
-// CPlayerGroup::RewardMembers -- retail .text:06d5c2b0, ordinal 389: PlayerData_AdjustCash
+// CPlayerGroup::RewardMembers -- retail .text:06d5c2b0, ordinal 389: PlayerData::adjust_cash
 // (bCountEarned = true) on every member, indexed raw.
 void CPlayerGroup::RewardMembers(int Amount) {
     std::set<unsigned int>::const_iterator It = m_Members.begin();
     for (; It != m_Members.end(); ++It) {
-        PlayerData_AdjustCash(Players[*It], Amount, true);
+        Players[*It].adjust_cash(Amount, true);
     }
 }
 
@@ -4217,7 +4206,7 @@ void StarSystem::player_switched_out(unsigned int SessionId, unsigned int DestSy
     remove_player(SessionId);
 
     // The raw slot.
-    PlayerData_FlushPendingVisits(Players[SessionId]);
+    Players[SessionId].flush_pending_visits();
 
     if (DestSystemId != 0u)
     {
@@ -4270,7 +4259,7 @@ bool StarSystem::activate_object(GameObject* Obj, bool bOn, unsigned int Index)
     SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
     {
-        if (Solar == nullptr && !SystemPlayerView_IsObjectVisible(&Node->View, Obj))
+        if (Solar == nullptr && !Node->View.is_object_visible(Obj))
             continue;
         ::g_pClientInterface->SendServerActivateObject(Node->View.PlayerId, Rec);
     }
@@ -4340,7 +4329,7 @@ void StarSystem::send_tractor_objects(unsigned int const& SkipPlayerId, XTractor
         if (Node->View.PlayerId == SkipPlayerId)
             continue;
 
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, Info.ObjectId))
+        if (!Node->View.is_object_id_visible(Info.ObjectId))
             continue;
 
         XTractorObjects Msg;
@@ -4350,7 +4339,7 @@ void StarSystem::send_tractor_objects(unsigned int const& SkipPlayerId, XTractor
         int const Count = static_cast<int>(Info.TargetIds.size());
         for (int Index = 0; Index < Count; ++Index)
         {
-            if (SystemPlayerView_IsObjectIdVisible(&Node->View, Info.TargetIds[Index]))
+            if (Node->View.is_object_id_visible(Info.TargetIds[Index]))
                 Msg.TargetIds.push_back(Info.TargetIds[Index]);
         }
 
@@ -4429,7 +4418,7 @@ void StarSystem::tractor_loot(::Loot* LootObj, EqObj* Ship, unsigned int Space, 
     for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
          Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
     {
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, Tractored.ShipId))
+        if (!Node->View.is_object_id_visible(Tractored.ShipId))
             continue;
         ::g_pClientInterface->SendServerItemTractored(Node->View.PlayerId, Tractored);
     }
@@ -4501,7 +4490,7 @@ void StarSystem::use_item(GameObject* Obj, unsigned short EquipId, int Count)
     unsigned int const ObjId = Obj->get_id();
 
     if (OwnerPlayer != 0u && Players.is_valid_ship_owner(OwnerPlayer, ObjId))
-        PlayerData_RemoveEquipment(Players[OwnerPlayer], EquipId, Count, false);
+        Players[OwnerPlayer].remove_equipment(EquipId, Count, false);
 
     // get_id() is called again here.
     FPayloadServerUseItem Rec;
@@ -4512,7 +4501,7 @@ void StarSystem::use_item(GameObject* Obj, unsigned short EquipId, int Count)
     for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
          Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
     {
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, Rec.ObjectId))
+        if (!Node->View.is_object_id_visible(Rec.ObjectId))
             continue;
         ::g_pClientInterface->SendServerUseItem(Node->View.PlayerId, Rec);
     }
@@ -4552,7 +4541,7 @@ void StarSystem::sp_obj_update(SSPObjUpdateInfo const& Info, unsigned int Sessio
     {
         if (Player->View.PlayerId == SessionId)
             continue;
-        SystemPlayerView_SendObjectUpdate(&Player->View, &Rec);
+        Player->View.send_object_update(&Rec);
     }
 }
 
@@ -4984,7 +4973,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
     {
         Req.bMarkedBy = Wrapper->is_marked_by(Player->View.PlayerId) ? 1u : 0u;
         Req.VibeOtherGroupId = Players[Player->View.PlayerId].rep_vibe;
-        SystemPlayerView_CreateSolarForPlayer(&Player->View, &Req, Wrapper);
+        Player->View.create_solar_for_player(&Req, Wrapper);
     }
 
     return Wrapper;
@@ -5120,7 +5109,7 @@ GameObject* StarSystem::load_object(INI_Reader& Reader)
         if (Player->View.PlayerId == Copy.OwnerPlayer)
             continue;
         Copy.bMarkedBy = Wrapper->is_marked_by(Player->View.PlayerId) ? 1u : 0u;
-        SystemPlayerView_CreateShipForPlayer(&Player->View, &Copy, Wrapper);
+        Player->View.create_ship_for_player(&Copy, Wrapper);
     }
 
     return Wrapper;
@@ -5291,10 +5280,10 @@ void StarSystem::add_player(unsigned int SessionId)
                     CShipCreateInfo_Fill(&Info, Ship);
                     Info.bMarkedBy =
                         Obj->is_marked_by(SessionId) ? 1u : 0u;
-                    SystemPlayerView_CreateShipForPlayer(View, &Info, Obj);
+                    View->create_ship_for_player(&Info, Obj);
                 }
             } else if (!Obj->is_destroyed()) {
-                SystemPlayerView_AddTrackedObject(View, Obj);           // FUN_06cf7140
+                View->add_tracked_object(Obj);           // FUN_06cf7140
             }
             Node2 = Next;
         }
@@ -5351,8 +5340,7 @@ void StarSystem::add_player(unsigned int SessionId)
             Req.Pad11[2] = 0;
 
             if (Filled > 0u) {
-                SystemPlayerView_CreateLootForPlayer(
-                    View, &Req, &LootObjs[0], &LootObjs[0] + LootObjs.size());
+                View->create_loot_for_player(&Req, &LootObjs[0], &LootObjs[0] + LootObjs.size());
             }
             ::operator delete(Descs);
         } else {
@@ -5361,7 +5349,7 @@ void StarSystem::add_player(unsigned int SessionId)
                 FSystemListNode* const Next = Node2->Next;
                 GameObject* const Obj = Node2->Data;
                 if (!Obj->is_destroyed()) {
-                    SystemPlayerView_AddTrackedObject(View, Obj);
+                    View->add_tracked_object(Obj);
                 }
                 Node2 = Next;
             }
@@ -5496,7 +5484,7 @@ Observer::~Observer()
 }
 
 // FUN_06cf7140 -- the only producer the tracked-object list has in retail.
-SystemTrackedObject* SystemPlayerView_AddTrackedObject(Observer* View, GameObject* Obj)
+SystemTrackedObject* Observer::add_tracked_object(GameObject* Obj)
 {
     // No null test on the view or its list head; every Observer ctor allocates the sentinel.
 
@@ -5511,7 +5499,7 @@ SystemTrackedObject* SystemPlayerView_AddTrackedObject(Observer* View, GameObjec
     // the record counts as created the moment it exists.
     Record->bCreatedOnClient = SinglePlayer();
 
-    SystemTrackedNode* const Sentinel = View->Tracked.Head;
+    SystemTrackedNode* const Sentinel = Tracked.Head;
     SystemTrackedNode* const Node = new SystemTrackedNode;
     Node->Next = Sentinel;
     Node->Prev = Sentinel->Prev;
@@ -5519,7 +5507,7 @@ SystemTrackedObject* SystemPlayerView_AddTrackedObject(Observer* View, GameObjec
     Sentinel->Prev->Next = Node;
     Sentinel->Prev = Node;
 
-    ++View->Tracked.Size;
+    ++Tracked.Size;
 
     // Outside single player, prime the simulation with the object's current state.
     // SinglePlayer() is called a SECOND time, not reused from the flag above. The math
@@ -5529,15 +5517,15 @@ SystemTrackedObject* SystemPlayerView_AddTrackedObject(Observer* View, GameObjec
         Vector const& Position = Obj->get_position();          // slot 0
         Transform const& Xform = Obj->get_transform();         // slot 3
         Quaternion Orientation;
-        Observer_MatrixToQuat(Orientation, Xform.Rotation);
-        Record->Simulation.RemoteUpdate(Position, Orientation, View->ElapsedTime);
+        Server_MatrixToQuat(Orientation, Xform.Rotation);
+        Record->Simulation.RemoteUpdate(Position, Orientation, ElapsedTime);
     }
 
     return Record;
 }
 
 // FUN_06cf7260.
-bool SystemPlayerView_ShouldBeVisible(Observer* View, GameObject* Obj)
+bool Observer::should_be_visible(GameObject* Obj)
 {
     // A null object and single player are always "visible"; the tracker is a
     // multiplayer-only filter. No test on the view.
@@ -5551,15 +5539,15 @@ bool SystemPlayerView_ShouldBeVisible(Observer* View, GameObject* Obj)
     unsigned int const OwnerPlayer = Obj->csimple()->OwnerPlayer;
 
     // Your own ship is never filtered.
-    if (OwnerPlayer == View->PlayerId)
+    if (OwnerPlayer == PlayerId)
         return true;
 
     Vector const& ObjPos = Obj->get_position();
 
     // x87: retail keeps the squared distance on the FPU stack across the group test.
-    float const Dx = ObjPos.x - View->Position.x;
-    float const Dy = ObjPos.y - View->Position.y;
-    float const Dz = ObjPos.z - View->Position.z;
+    float const Dx = ObjPos.x - Position.x;
+    float const Dy = ObjPos.y - Position.y;
+    float const Dz = ObjPos.z - Position.z;
     float const DistSq = Dx * Dx + Dy * Dy + Dz * Dz;
 
     // An object nobody owns gets the tightest radius. Each compare is "visible when
@@ -5569,7 +5557,7 @@ bool SystemPlayerView_ShouldBeVisible(Observer* View, GameObject* Obj)
 
     // Group mates see each other further. Both slots are indexed raw (no is_valid). A group
     // mate outside 10000 falls through to the stranger test, which it then fails as well.
-    void const* const MyGroup = Players[View->PlayerId].group_ptr;
+    void const* const MyGroup = Players[PlayerId].group_ptr;
     if (MyGroup != nullptr && MyGroup == Players[OwnerPlayer].group_ptr) {
         if (DistSq <= kViewRadiusSqGroupMate)
             return true;
@@ -5581,9 +5569,9 @@ bool SystemPlayerView_ShouldBeVisible(Observer* View, GameObject* Obj)
 // (by get_id()). For a live object those agree; the id form is what survives an object
 // already being torn down, which is why the destroy path uses it. Neither tests the
 // sentinel or the records.
-static SystemTrackedNode* SystemPlayerView_FindByPointer(Observer* View, GameObject* Obj)
+SystemTrackedNode* Observer::find_by_pointer(GameObject* Obj)
 {
-    SystemTrackedNode* const Sentinel = View->Tracked.Head;
+    SystemTrackedNode* const Sentinel = Tracked.Head;
     for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
         if (Node->Data->Object == Obj)
             return Node;
@@ -5591,9 +5579,9 @@ static SystemTrackedNode* SystemPlayerView_FindByPointer(Observer* View, GameObj
     return nullptr;
 }
 
-static SystemTrackedNode* SystemPlayerView_FindById(Observer* View, unsigned int ObjId)
+SystemTrackedNode* Observer::find_by_id(unsigned int ObjId)
 {
-    SystemTrackedNode* const Sentinel = View->Tracked.Head;
+    SystemTrackedNode* const Sentinel = Tracked.Head;
     for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
         if (Node->Data->Object->get_id() == ObjId)
             return Node;
@@ -5602,7 +5590,7 @@ static SystemTrackedNode* SystemPlayerView_FindById(Observer* View, unsigned int
 }
 
 // FUN_06cf73d0.
-bool SystemPlayerView_IsObjectVisible(Observer* View, GameObject* Obj)
+bool Observer::is_object_visible(GameObject* Obj)
 {
     if (Obj == nullptr)
         return true;
@@ -5610,43 +5598,43 @@ bool SystemPlayerView_IsObjectVisible(Observer* View, GameObject* Obj)
         return true;
 
     // Your own ship again; the (& 3) narrowing is read through unguarded.
-    if (Obj->csimple()->OwnerPlayer == View->PlayerId)
+    if (Obj->csimple()->OwnerPlayer == PlayerId)
         return true;
 
     // Already tracked: the record's "created on the client" byte, verbatim.
-    SystemTrackedNode* const Node = SystemPlayerView_FindByPointer(View, Obj);
+    SystemTrackedNode* const Node = find_by_pointer(Obj);
     if (Node != nullptr)
         return Node->Data->bCreatedOnClient;
 
-    return SystemPlayerView_ShouldBeVisible(View, Obj);
+    return should_be_visible(Obj);
 }
 
 // FUN_06cf7370. FUN_06d006c0 is Server_LookupGameObject here; its null on a miss is
 // exactly what retail's miss path hands on.
-bool SystemPlayerView_IsObjectIdVisible(Observer* View, unsigned int ObjId)
+bool Observer::is_object_id_visible(unsigned int ObjId)
 {
     if (SinglePlayer())
         return true;
     GameObject* const Obj = Server_LookupGameObject(ObjId);
-    return SystemPlayerView_IsObjectVisible(View, Obj);
+    return is_object_visible(Obj);
 }
 
 // FUN_06cf65b0 (thiscall on the view); only caller StarSystem::sp_obj_update. The update
 // goes to the client only once the object was created there, but the simulation is
 // always fed.
-void SystemPlayerView_SendObjectUpdate(Observer* View, FCommonUpdateObjectInfo const* Rec)
+void Observer::send_object_update(FCommonUpdateObjectInfo const* Rec)
 {
     if (SinglePlayer())
         return;
 
-    for (SystemTrackedNode* Node = View->Tracked.Head->Next; Node != View->Tracked.Head; Node = Node->Next)
+    for (SystemTrackedNode* Node = this->Tracked.Head->Next; Node != this->Tracked.Head; Node = Node->Next)
     {
         SystemTrackedObject* const Tracked = Node->Data;
         if (Tracked->Object->get_id() != Rec->ObjectId)
             continue;
 
         if (Tracked->bCreatedOnClient)
-            ::g_pClientInterface->SendCommonUpdateObject(View->PlayerId, *Rec);
+            ::g_pClientInterface->SendCommonUpdateObject(PlayerId, *Rec);
 
         Tracked->Simulation.RemoteUpdate(Rec->Position, Rec->Orientation,
                                          static_cast<double>(Rec->Timestamp));
@@ -5657,12 +5645,12 @@ void SystemPlayerView_SendObjectUpdate(Observer* View, FCommonUpdateObjectInfo c
 // FUN_06cf70c0 (thiscall on the view); only caller FUN_06d0f1c0. Tells this view's client
 // the group id CPlayerGroup::AddMember / DelMember just stamped on a visible ship.
 // Server_LookupGameObject's null covers both of retail's lookup early-outs.
-void SystemPlayerView_SendGroupChange(Observer* View, unsigned int ObjId)
+void Observer::send_group_change(unsigned int ObjId)
 {
     GameObject* const Obj = Server_LookupGameObject(ObjId);
     if (Obj == nullptr)
         return;
-    if (!SystemPlayerView_IsObjectVisible(View, Obj))
+    if (!is_object_visible(Obj))
         return;
     CObject const* const Cobj = Obj->cobject();
     if (Cobj == nullptr)
@@ -5670,23 +5658,23 @@ void SystemPlayerView_SendGroupChange(Observer* View, unsigned int ObjId)
     if ((static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
     unsigned int const GroupId = static_cast<CShip const*>(Cobj)->GroupId;
-    g_pClientInterface->SendServerMiscObjUpdateObjectGroup(View->PlayerId, ObjId, GroupId);
+    g_pClientInterface->SendServerMiscObjUpdateObjectGroup(PlayerId, ObjId, GroupId);
 }
 
 // FUN_06d0f1c0 (thiscall on the StarSystem). Callers CPlayerGroup::AddMember and DelMember.
-void StarSystem_SendGroupChange(StarSystem& System, unsigned int ObjId)
+void StarSystem::send_group_change(unsigned int ObjId)
 {
-    SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(System.PlayerListHead);
+    SystemPlayerNode* const Sentinel = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
-        SystemPlayerView_SendGroupChange(&Node->View, ObjId);
+        Node->View.send_group_change(ObjId);
 }
 
 // FUN_06cf6730 (thiscall on the view): the ship's equipment list, only for a tracked
 // object already created on the client. NO null test on the CShip narrowing: retail calls
 // through it.
-void SystemPlayerView_SendRemoteCargoUpdate(Observer* View, GameObject* Obj)
+void Observer::send_remote_cargo_update(GameObject* Obj)
 {
-    SystemTrackedNode* const Head = View->Tracked.Head;
+    SystemTrackedNode* const Head = Tracked.Head;
     SystemTrackedNode* Node = Head->Next;
     for (; Node != Head; Node = Node->Next)
     {
@@ -5704,25 +5692,25 @@ void SystemPlayerView_SendRemoteCargoUpdate(Observer* View, GameObject* Obj)
     if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & CObject::ClassShip) == CObject::ClassShip)
         Ship = static_cast<CShip const*>(Cobj);
     Ship->get_equip_desc_list(Items);
-    g_pClientInterface->SendServerRemoteObjectCargoUpdate(View->PlayerId, Ship->Id, Items, 1u);
+    g_pClientInterface->SendServerRemoteObjectCargoUpdate(PlayerId, Ship->Id, Items, 1u);
 }
 
 // FUN_06d0b110 (thiscall on the StarSystem): every player but the owner (OwnerPlayer read
 // with no null test on the narrowing).
-void StarSystem_SendRemoteCargoUpdate(StarSystem& System, GameObject* Obj)
+void StarSystem::send_remote_cargo_update(GameObject* Obj)
 {
-    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(System.PlayerListHead)->Next;
-         Node != static_cast<SystemPlayerNode*>(System.PlayerListHead); Node = Node->Next)
+    for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
+         Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next)
     {
         if (Obj->csimple()->OwnerPlayer != Node->View.PlayerId)
-            SystemPlayerView_SendRemoteCargoUpdate(&Node->View, Obj);
+            Node->View.send_remote_cargo_update(Obj);
     }
 }
 
 // FUN_06cf7440. Only caller FUN_06d0f190 below (IServerImpl::SubmitChat's local chat).
-void SystemPlayerView_CollectCreatedOwners(Observer* View, std::set<unsigned int>* Owners)
+void Observer::collect_created_owners(std::set<unsigned int>* Owners)
 {
-    for (SystemTrackedNode* Node = View->Tracked.Head->Next; Node != View->Tracked.Head;
+    for (SystemTrackedNode* Node = Tracked.Head->Next; Node != Tracked.Head;
          Node = Node->Next) {
         SystemTrackedObject* const Record = Node->Data;
         GameObject* const Obj = Record->Object;
@@ -5739,13 +5727,12 @@ void SystemPlayerView_CollectCreatedOwners(Observer* View, std::set<unsigned int
 }
 
 // FUN_06d0f190 (thiscall on the StarSystem).
-void StarSystem_CollectCreatedOwners(StarSystem* System, unsigned int PlayerId,
-                                     std::set<unsigned int>* Owners)
+void StarSystem::collect_created_owners(unsigned int PlayerId, std::set<unsigned int>* Owners)
 {
-    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(System->PlayerListHead);
+    SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next) {
         if (Node->View.PlayerId == PlayerId) {
-            SystemPlayerView_CollectCreatedOwners(&Node->View, Owners);
+            Node->View.collect_created_owners(Owners);
             return;
         }
     }
@@ -5753,7 +5740,7 @@ void StarSystem_CollectCreatedOwners(StarSystem* System, unsigned int PlayerId,
 
 // FUN_06cf6820. Returns nothing in retail; the bool says whether the record was found and
 // dropped, which the callers ignore.
-bool SystemPlayerView_OnObjectDestroyed(Observer* View, GameObject* Obj, int Kind)
+bool Observer::on_object_destroyed(GameObject* Obj, int Kind)
 {
     // No null test on View or Obj.
 
@@ -5767,21 +5754,21 @@ bool SystemPlayerView_OnObjectDestroyed(Observer* View, GameObject* Obj, int Kin
     Wire.Pad_0x05[1] = static_cast<unsigned char>((KindDword >> 16) & 0xffu);
     Wire.Pad_0x05[2] = static_cast<unsigned char>((KindDword >> 24) & 0xffu);
 
-    SystemTrackedNode* const Node = SystemPlayerView_FindById(View, Wire.ObjectId);
+    SystemTrackedNode* const Node = find_by_id(Wire.ObjectId);
 
     if (Node == nullptr) {
         // Not tracked. Retail still tells the client when the object belonged to this very
         // player (OwnerPlayer read through the narrowing with no null test)...
         unsigned int const OwnerPlayer = Obj->csimple()->OwnerPlayer;
-        if (OwnerPlayer == View->PlayerId) {
-            g_pClientInterface->SendServerDestroyObject(View->PlayerId, Wire);
+        if (OwnerPlayer == PlayerId) {
+            g_pClientInterface->SendServerDestroyObject(PlayerId, Wire);
             return false;
         }
 
         // ...or when it is a solar other than a waypoint (kSolarTypeBits): those exist on
         // the client whether or not this player ever tracked them.
         if ((Obj->get_type_bits() & kSolarTypeBits) != 0) {
-            g_pClientInterface->SendServerDestroyObject(View->PlayerId, Wire);
+            g_pClientInterface->SendServerDestroyObject(PlayerId, Wire);
         }
         return false;
     }
@@ -5790,7 +5777,7 @@ bool SystemPlayerView_OnObjectDestroyed(Observer* View, GameObject* Obj, int Kin
     // read with no null test here; the only null test is the one before the free below.
     SystemTrackedObject* const Record = Node->Data;
     if (Record->bCreatedOnClient) {
-        g_pClientInterface->SendServerDestroyObject(View->PlayerId, Wire);
+        g_pClientInterface->SendServerDestroyObject(PlayerId, Wire);
     }
 
     // delete runs ~CRemotePhysicsSimulation, as FUN_06cf6940 does before retail frees the
@@ -5803,7 +5790,7 @@ bool SystemPlayerView_OnObjectDestroyed(Observer* View, GameObject* Obj, int Kin
     Node->Prev->Next = Node->Next;
     Node->Next->Prev = Node->Prev;
     delete Node;
-    View->Tracked.Size--;
+    Tracked.Size--;
     return true;
 }
 
@@ -5820,16 +5807,16 @@ static char const kObserverCppPath[] =
 // bCreatedOnClient, and sends only in SINGLE player (consistent, since AddTrackedObject
 // seeds the flag from SinglePlayer()). In multiplayer it only registers the ship and lets
 // the per-frame range check send the create later.
-void SystemPlayerView_CreateShipForPlayer(Observer* View, CShipCreateInfo* Info, GameObject* Obj)
+void Observer::create_ship_for_player(CShipCreateInfo* Info, GameObject* Obj)
 {
     // No test of View or Obj, nor on the (& 3) narrowing; every object here is a ship.
     unsigned int const OwnerPlayer = Obj->csimple()->OwnerPlayer;
 
     // A player is never told to create their own ship.
-    if (OwnerPlayer == View->PlayerId)
+    if (OwnerPlayer == PlayerId)
         return;
 
-    if (View->bShipGone != 0)
+    if (bShipGone != 0)
         return;
 
     if (Obj->is_destroyed()) {
@@ -5839,23 +5826,23 @@ void SystemPlayerView_CreateShipForPlayer(Observer* View, CShipCreateInfo* Info,
     }
 
     // The record is discarded here, unlike in the other four.
-    SystemPlayerView_AddTrackedObject(View, Obj);
+    add_tracked_object(Obj);
 
     if (!SinglePlayer())
         return;
 
     // Raw slot, no is_valid; the same value goes into CREATESOLAR's payload.
-    Info->VibeOtherGroupId = Players[View->PlayerId].rep_vibe;
+    Info->VibeOtherGroupId = Players[PlayerId].rep_vibe;
 
     // The player id goes by VALUE.
-    g_pClientInterface->SendServerCreateShip(View->PlayerId, *Info);
+    g_pClientInterface->SendServerCreateShip(PlayerId, *Info);
 }
 
 // FUN_06cf6bc0 -- CREATECOUNTER.
-void SystemPlayerView_CreateCounterForPlayer(Observer* View, void* Payload, GameObject* Obj)
+void Observer::create_counter_for_player(void* Payload, GameObject* Obj)
 {
     // No null test on View or Obj.
-    if (View->bShipGone != 0)
+    if (bShipGone != 0)
         return;
 
     if (Obj->is_destroyed()) {
@@ -5865,10 +5852,10 @@ void SystemPlayerView_CreateCounterForPlayer(Observer* View, void* Payload, Game
     }
 
     // The record is KEPT this time.
-    SystemTrackedObject* const Record = SystemPlayerView_AddTrackedObject(View, Obj);
+    SystemTrackedObject* const Record = add_tracked_object(Obj);
 
     // Outside single player the object has to be in range before the client hears of it.
-    if (!SinglePlayer() && !SystemPlayerView_ShouldBeVisible(View, Obj))
+    if (!SinglePlayer() && !should_be_visible(Obj))
         return;
 
     Record->bCreatedOnClient = true;
@@ -5876,14 +5863,14 @@ void SystemPlayerView_CreateCounterForPlayer(Observer* View, void* Payload, Game
     // This slot takes the ADDRESS of the player id (const unsigned int&), unlike the
     // ship / loot / mine slots.
     g_pClientInterface->SendServerCreateCounter(
-        View->PlayerId, *static_cast<const FServerCreateProjectileInfo*>(Payload));
+        PlayerId, *static_cast<const FServerCreateProjectileInfo*>(Payload));
 }
 
 // FUN_06cf6d60 -- CREATEMINE: the countermeasure one with a different FDUMP line and slot,
 // and the player id passed BY VALUE.
-void SystemPlayerView_CreateMineForPlayer(Observer* View, void* Payload, GameObject* Obj)
+void Observer::create_mine_for_player(void* Payload, GameObject* Obj)
 {
-    if (View->bShipGone != 0)
+    if (bShipGone != 0)
         return;
 
     if (Obj->is_destroyed()) {
@@ -5893,57 +5880,55 @@ void SystemPlayerView_CreateMineForPlayer(Observer* View, void* Payload, GameObj
     }
 
     SystemTrackedObject* const Record =
-        SystemPlayerView_AddTrackedObject(View, Obj);
+        add_tracked_object(Obj);
 
-    if (!SinglePlayer() && !SystemPlayerView_ShouldBeVisible(View, Obj))
+    if (!SinglePlayer() && !should_be_visible(Obj))
         return;
 
     Record->bCreatedOnClient = true;
 
     g_pClientInterface->SendServerCreateMine(
-        View->PlayerId, *static_cast<const FServerCreateProjectileInfo*>(Payload));
+        PlayerId, *static_cast<const FServerCreateProjectileInfo*>(Payload));
 }
 
 // FUN_06cf6df0 -- EXPLODEASTEROIDMINE; only caller StarSystem::send_mine_explosion.
 // Neither the IClient pointer nor the record is tested.
-void SystemPlayerView_SendMineExplosion(Observer* View, FMineExplosion* Rec)
+void Observer::send_mine_explosion(FMineExplosion* Rec)
 {
     unsigned int const MineId = Rec->MineId;
     if (!SinglePlayer()) {
         GameObject* const Obj = Server_LookupGameObject(MineId);
-        if (!SystemPlayerView_IsObjectVisible(View, Obj))
+        if (!is_object_visible(Obj))
             return;
     }
-    g_pClientInterface->SendServerExplodeAsteroidMine(View->PlayerId, *Rec);
+    g_pClientInterface->SendServerExplodeAsteroidMine(PlayerId, *Rec);
 }
 
 // FUN_06cf66f0 (thiscall on the view). A dynamic solar is sent even out of range. Unlike
 // the other notifiers a solar never gets a tracked record.
-void SystemPlayerView_CreateSolarForPlayer(Observer* View, CSolarCreateInfo* Info, GameObject* Obj)
+void Observer::create_solar_for_player(CSolarCreateInfo* Info, GameObject* Obj)
 {
-    if (View->bShipGone != 0)
+    if (bShipGone != 0)
         return;
-    if (!SystemPlayerView_ShouldBeVisible(View, Obj) && Info->bDynamic == 0)
+    if (!should_be_visible(Obj) && Info->bDynamic == 0)
         return;
-    g_pClientInterface->SendServerCreateSolar(View->PlayerId, *Info);
+    g_pClientInterface->SendServerCreateSolar(PlayerId, *Info);
 }
 
 // FUN_06cf6ac0 (thiscall on the view, 21 stack dwords; the Costume by value). Outside
 // single player both sender and receiver must be visible (SinglePlayer() is called twice).
 // Retail sets only the low byte of the own-ship flag; the marshaller reads & 0xff, so the
 // port passes 0/1.
-void SystemPlayerView_SendComm(Observer* View, unsigned int SenderId,
-                               unsigned int ReceiverId, unsigned int VoiceId,
-                               Costume const& Cost, unsigned int CaptionIds,
-                               unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
-                               float Duration)
+void Observer::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsigned int VoiceId,
+                         Costume const& Cost, unsigned int CaptionIds, unsigned int* TextIds,
+                         int TextCount, unsigned int PermutationIds, float Duration)
 {
     if (!SinglePlayer()) {
         GameObject* SenderObj = nullptr;
         StarSystem* SenderSystem = nullptr;
         if (!Server_FindObject(SenderId, SenderObj, SenderSystem))
             SenderObj = nullptr;
-        if (!SystemPlayerView_IsObjectVisible(View, SenderObj))
+        if (!is_object_visible(SenderObj))
             return;
     }
     if (!SinglePlayer()) {
@@ -5951,14 +5936,14 @@ void SystemPlayerView_SendComm(Observer* View, unsigned int SenderId,
         StarSystem* ReceiverSystem = nullptr;
         if (!Server_FindObject(ReceiverId, ReceiverObj, ReceiverSystem))
             ReceiverObj = nullptr;
-        if (!SystemPlayerView_IsObjectVisible(View, ReceiverObj))
+        if (!is_object_visible(ReceiverObj))
             return;
     }
 
     bool const bReceiverIsOwnShip =
-        ReceiverId == Players[View->PlayerId].ship_object_id;
+        ReceiverId == Players[PlayerId].ship_object_id;
     static_assert(sizeof(Costume) == 13 * sizeof(unsigned int), "Costume is 13 dwords");
-    g_pClientInterface->SendServerSendComm(View->PlayerId, SenderId, ReceiverId, VoiceId,
+    g_pClientInterface->SendServerSendComm(PlayerId, SenderId, ReceiverId, VoiceId,
                                            Cost, CaptionIds, TextIds, TextCount, PermutationIds, Duration,
                                            bReceiverIsOwnShip);
 }
@@ -5966,10 +5951,10 @@ void SystemPlayerView_SendComm(Observer* View, unsigned int SenderId,
 // FUN_06cf6c50 -- CREATELOOT. The only notifier that tracks MORE THAN ONE object per call:
 // it walks [First, Last) and sends one packet afterwards. No null tests on View, the
 // elements or the payload.
-void SystemPlayerView_CreateLootForPlayer(Observer* View, FServerCreateLootRequest* Payload,
-                                          GameObject* const* First, GameObject* const* Last)
+void Observer::create_loot_for_player(FServerCreateLootRequest* Payload, GameObject* const* First,
+                                      GameObject* const* Last)
 {
-    if (View->bShipGone != 0)
+    if (bShipGone != 0)
         return;
 
     // An empty range skips straight to the send; it does not return.
@@ -5986,9 +5971,9 @@ void SystemPlayerView_CreateLootForPlayer(Observer* View, FServerCreateLootReque
 
         // Stored INSIDE the loop, so the last element wins -- retail's own behaviour; do
         // not hoist it.
-        Payload->bMarkedBy = Obj->is_marked_by(View->PlayerId) ? 1u : 0u;
+        Payload->bMarkedBy = Obj->is_marked_by(PlayerId) ? 1u : 0u;
 
-        SystemPlayerView_AddTrackedObject(View, Obj);
+        add_tracked_object(Obj);
     }
 
     // The loot packet goes out ONLY in single player; there is no ShouldBeVisible arm and
@@ -5996,16 +5981,16 @@ void SystemPlayerView_CreateLootForPlayer(Observer* View, FServerCreateLootReque
     if (!SinglePlayer())
         return;
 
-    g_pClientInterface->SendServerCreateLoot(View->PlayerId, *Payload);
+    g_pClientInterface->SendServerCreateLoot(PlayerId, *Payload);
 }
 
 // FUN_06cf6cf0 -- CREATEGUIDED. Takes the loot one's vector but uses ONLY its first element.
-void SystemPlayerView_CreateGuidedForPlayer(Observer* View, void* Payload,
-                                            GameObject* const* First, GameObject* const* Last)
+void Observer::create_guided_for_player(void* Payload, GameObject* const* First,
+                                        GameObject* const* Last)
 {
     // No null test on View, the element or the record; the null-first and empty-range
     // exits are retail's.
-    if (View->bShipGone != 0)
+    if (bShipGone != 0)
         return;
 
     if (First == nullptr || First == Last)
@@ -6016,25 +6001,24 @@ void SystemPlayerView_CreateGuidedForPlayer(Observer* View, void* Payload,
     // No is_destroyed() guard and no FDUMP in this one -- the only member of the family
     // without them. Do not add one.
     SystemTrackedObject* const Record =
-        SystemPlayerView_AddTrackedObject(View, Obj);
+        add_tracked_object(Obj);
 
-    if (!SinglePlayer() && !SystemPlayerView_ShouldBeVisible(View, Obj))
+    if (!SinglePlayer() && !should_be_visible(Obj))
         return;
 
     Record->bCreatedOnClient = true;
 
     // Like the countermeasure slot, this one takes the ADDRESS of the player id.
     g_pClientInterface->SendServerCreateGuided(
-        View->PlayerId, *static_cast<const FServerCreateGuidedInfo*>(Payload));
+        PlayerId, *static_cast<const FServerCreateGuidedInfo*>(Payload));
 }
 
 // FUN_06cf6950 -- the per-player DAMAGEOBJECT gate, and the only writer of the deferred-
 // damage set at View+0x14. The send takes `(PlayerId, ObjId, record)`, where `record` is
 // the PRIMARY list on the visible path and the DEFERRED one on the deferred-but-non-empty
 // path -- two arguments reaching one PUSH, which Ghidra's `piVar7` hides.
-void SystemPlayerView_DamageObject(Observer* View, unsigned int ObjId,
-                                   DamageList* PrimaryRecord,
-                                   DamageList* DeferredRecord)
+void Observer::damage_object(unsigned int ObjId, DamageList* PrimaryRecord,
+                             DamageList* DeferredRecord)
 {
     // No null test on View.
     GameObject* const Obj = Server_LookupGameObject(ObjId);
@@ -6051,7 +6035,7 @@ void SystemPlayerView_DamageObject(Observer* View, unsigned int ObjId,
 
     // Visible, or a tradelane ring (TypeBits 0x80): a ring's damage state has to reach the
     // client whether or not it is in range.
-    bool bSend = SystemPlayerView_IsObjectVisible(View, Obj);
+    bool bSend = is_object_visible(Obj);
     DamageList* Record = PrimaryRecord;
     if (!bSend && Solar != nullptr && (Solar->TypeBits & 0x80u) != 0)
         bSend = true;
@@ -6069,26 +6053,24 @@ void SystemPlayerView_DamageObject(Observer* View, unsigned int ObjId,
             Record = DeferredRecord;
             bSend = true;
         } else {
-            View->PendingDamageIds.insert(ObjId);
+            PendingDamageIds.insert(ObjId);
             return;
         }
     }
 
     // The player id goes by VALUE.
-    g_pClientInterface->SendServerDamageObject(View->PlayerId, ObjId, *Record);
+    g_pClientInterface->SendServerDamageObject(PlayerId, ObjId, *Record);
 }
 
 // FUN_06cf6e60 -- "this object has left the system": the tracked-list drop, the
 // deferred-damage set CLEAR, and the bShipGone latch.
-void SystemPlayerView_OnObjectLeftSystem(Observer* View,
-                                         unsigned int const* ObjId,
-                                         unsigned int const* Destination)
+void Observer::on_object_left_system(unsigned int const* ObjId, unsigned int const* Destination)
 {
     // No null test on View, ObjId or Destination, nor on the sentinel, nodes, records or
     // their objects. The first hit ends the walk; +0x2f0 is read before the record's null
     // test, and size-- is unconditional.
     bool bWasCreatedOnClient = false;
-    SystemTrackedNode* const Sentinel = View->Tracked.Head;
+    SystemTrackedNode* const Sentinel = Tracked.Head;
     for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
         SystemTrackedObject* const Record = Node->Data;
         if (Record->Object->get_id() != *ObjId)
@@ -6098,35 +6080,33 @@ void SystemPlayerView_OnObjectLeftSystem(Observer* View,
         Node->Prev->Next = Node->Next;
         Node->Next->Prev = Node->Prev;
         delete Node;
-        --View->Tracked.Size;
+        --Tracked.Size;
         break;
     }
 
-    View->PendingDamageIds.clear();
+    PendingDamageIds.clear();
 
     // The latch: the player's own ship (raw slot, no is_valid).
-    if (*ObjId == Players[View->PlayerId].ship_object_id)
-        View->bShipGone = 1;
+    if (*ObjId == Players[PlayerId].ship_object_id)
+        bShipGone = 1;
 
     // Sent when EITHER the dropped record had been created on the client OR bShipGone is set.
-    if (bWasCreatedOnClient || View->bShipGone != 0) {
+    if (bWasCreatedOnClient || bShipGone != 0) {
         FServerSystemSwitchOutInfo Wire;
         Wire.ShipId = *ObjId;
         Wire.GateId = *Destination;
-        g_pClientInterface->SendServerSystemSwitchOut(View->PlayerId, Wire);
+        g_pClientInterface->SendServerSystemSwitchOut(PlayerId, Wire);
     }
 }
 
 // FUN_06cf6fc0 (thiscall on the view) -- "this object has landed". The LAND twin of the
 // function above: same tracked-list drop, no set clear, no latch.
-void SystemPlayerView_OnObjectLanded(Observer* View,
-                                     unsigned int const* ObjId,
-                                     unsigned int const* Arg2,
-                                     unsigned int const* Arg3)
+void Observer::on_object_landed(unsigned int const* ObjId, unsigned int const* Arg2,
+                                unsigned int const* Arg3)
 {
     // As above: one hit at most, +0x2f0 read before the null test, size-- unguarded.
     bool bWasCreatedOnClient = false;
-    SystemTrackedNode* const Sentinel = View->Tracked.Head;
+    SystemTrackedNode* const Sentinel = Tracked.Head;
     for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
         SystemTrackedObject* const Record = Node->Data;
         if (Record->Object->get_id() != *ObjId)
@@ -6136,7 +6116,7 @@ void SystemPlayerView_OnObjectLanded(Observer* View,
         Node->Prev->Next = Node->Next;
         Node->Next->Prev = Node->Prev;
         delete Node;
-        --View->Tracked.Size;
+        --Tracked.Size;
         break;
     }
 
@@ -6147,15 +6127,15 @@ void SystemPlayerView_OnObjectLanded(Observer* View,
     Wire.BaseId = *Arg3;
 
     // A record never created on the client only goes out for this player's own ship.
-    PlayerData& Owner = Players[View->PlayerId];
+    PlayerData& Owner = Players[PlayerId];
     if (!bWasCreatedOnClient && Wire.ShipId != Owner.ship_object_id)
         return;
 
     // Outside single player, the player's own ship landing autosaves the slot.
     if (!SinglePlayer() && *ObjId == Owner.ship_object_id)
-        PlayerData_AutoSave(Owner);                                 // FUN_06d4c430
+        Owner.auto_save();                                 // FUN_06d4c430
 
-    g_pClientInterface->SendServerLand(View->PlayerId, Wire);
+    g_pClientInterface->SendServerLand(PlayerId, Wire);
 }
 
 // StarSystem::create_med_asteroid / create_med_mine -- retail FUN_06d09bb0 / FUN_06d09c80.
@@ -6184,7 +6164,7 @@ void StarSystem::send_mine_explosion(FMineExplosion const& Rec)
     FMineExplosion Local = Rec;
     SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
     while (Node != static_cast<SystemPlayerNode*>(PlayerListHead)) {
-        SystemPlayerView_SendMineExplosion(&Node->View, &Local);
+        Node->View.send_mine_explosion(&Local);
         Node = Node->Next;
     }
 }
@@ -6354,18 +6334,18 @@ void StarSystem::munition_collision(SSPMunitionCollisionInfo const& Info)
 
 // FUN_06d08e80 -- FServerLootDesc's constructor. Position, orientation, velocity and +0x47
 // are left alone.
-static void ServerLootDesc_Init(FServerLootDesc* Desc)
+void FServerLootDesc::init()
 {
-    Desc->LootId = 0u;
-    Desc->ContentsNickname = 0u;
-    Desc->ContentsHitPts = 0.0f;
-    Desc->Units = 0u;
-    Desc->ContainerNickname = 0u;
-    Desc->HitPts = 0.0f;
-    Desc->NameOverride = 0u;
-    Desc->Field_0x44 = 1;
-    Desc->bTemporary = 0;
-    Desc->bMarkedBy = 0;
+    LootId = 0u;
+    ContentsNickname = 0u;
+    ContentsHitPts = 0.0f;
+    Units = 0u;
+    ContainerNickname = 0u;
+    HitPts = 0.0f;
+    NameOverride = 0u;
+    Field_0x44 = 1;
+    bTemporary = 0;
+    bMarkedBy = 0;
 }
 
 // StarSystem::create_loot -- retail FUN_06d08a40.
@@ -6374,7 +6354,7 @@ void StarSystem::create_loot(unsigned int SourceObjId, int Mode, FLootRecord con
     FServerLootDesc* const Items =
         static_cast<FServerLootDesc*>(operator new(static_cast<size_t>(Count) * sizeof(FServerLootDesc)));
     for (int Index = 0; Index < Count; ++Index)
-        ServerLootDesc_Init(&Items[Index]);
+        Items[Index].init();
 
     // The CREATELOOT request every player view gets at the end.
     FServerCreateLootRequest Request = {};
@@ -6457,7 +6437,7 @@ void StarSystem::create_loot(unsigned int SourceObjId, int Mode, FLootRecord con
     while (Node != static_cast<SystemPlayerNode*>(PlayerListHead)) {
         GameObject* const* const First = Spawned.empty() ? nullptr : &Spawned[0];
         GameObject* const* const Last = First + Spawned.size();
-        SystemPlayerView_CreateLootForPlayer(&Node->View, &Request, First, Last);
+        Node->View.create_loot_for_player(&Request, First, Last);
         Node = Node->Next;
     }
 
@@ -6536,7 +6516,7 @@ void StarSystem::create_mine(FServerLaunchRecord const& Rec)
 
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
-        SystemPlayerView_CreateMineForPlayer(&Player->View, &Info, Obj);
+        Player->View.create_mine_for_player(&Info, Obj);
 }
 
 // StarSystem::create_counter_measure -- retail FUN_06d092c0, from
@@ -6609,7 +6589,7 @@ void StarSystem::create_counter_measure(FServerLaunchRecord const& Rec)
 
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
-        SystemPlayerView_CreateCounterForPlayer(&Player->View, &Info, Obj);
+        Player->View.create_counter_for_player(&Info, Obj);
 }
 
 // StarSystem::create_guided -- retail FUN_06d09640, from SrvGun::launch_guided. Unlike
@@ -6684,7 +6664,7 @@ void StarSystem::create_guided(FServerLaunchRecord const& Rec)
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         GameObject* const* const First = &Spawned[0];
-        SystemPlayerView_CreateGuidedForPlayer(&Player->View, &Info, First, First + Spawned.size());
+        Player->View.create_guided_for_player(&Info, First, First + Spawned.size());
     }
 
     // A live CEqObj target with a behavior interface hears of the incoming missile (event 6,
@@ -6867,14 +6847,14 @@ void StarSystem::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsig
 
         if (bNoSender) {
             if (SinglePlayer() || ReceiverId == ShipId || bBroadcast)
-                SystemPlayerView_SendComm(&Node->View, SenderId, ReceiverId, VoiceId, Cost,
-                                          CaptionIds, TextIds, TextCount, PermutationIds, Duration);
+                Node->View.send_comm(SenderId, ReceiverId, VoiceId, Cost,
+                                     CaptionIds, TextIds, TextCount, PermutationIds, Duration);
             continue;
         }
 
         if (ReceiverId == ShipId) {
-            SystemPlayerView_SendComm(&Node->View, SenderId, ReceiverId, VoiceId, Cost,
-                                      CaptionIds, TextIds, TextCount, PermutationIds, Duration);
+            Node->View.send_comm(SenderId, ReceiverId, VoiceId, Cost,
+                                 CaptionIds, TextIds, TextCount, PermutationIds, Duration);
             if (!bBroadcast)
                 return;
             continue;
@@ -6892,8 +6872,8 @@ void StarSystem::send_comm(unsigned int SenderId, unsigned int ReceiverId, unsig
         double const DistSq = (Dz * Dz + Dx * Dx) + Dy * Dy;
         if (DistSq > static_cast<double>(1.0e8f))
             continue;
-        SystemPlayerView_SendComm(&Node->View, SenderId, ReceiverId, VoiceId, Cost,
-                                  CaptionIds, TextIds, TextCount, PermutationIds, Duration);
+        Node->View.send_comm(SenderId, ReceiverId, VoiceId, Cost,
+                             CaptionIds, TextIds, TextCount, PermutationIds, Duration);
     }
 }
 
@@ -6903,7 +6883,7 @@ void StarSystem::broadcast_fuse(FServerBurnFuseInfo const& Info)
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, Info.ObjectId))
+        if (!Node->View.is_object_id_visible(Info.ObjectId))
             continue;
         g_pClientInterface->SendServerBurnFuse(Node->View.PlayerId, Info);
     }
@@ -6925,7 +6905,7 @@ void StarSystem::notify_activate_equip(unsigned int const& ObjId, unsigned short
     {
         if (Node->View.PlayerId == static_cast<unsigned int>(SourceClient))
             continue;
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, ObjId))
+        if (!Node->View.is_object_id_visible(ObjId))
             continue;
         XActivateEquip Record = {};
         Record.ObjectId = ObjId;
@@ -6944,7 +6924,7 @@ void StarSystem::notify_cruise(unsigned int const& ObjId, bool bEngage, bool bAr
     {
         if (Node->View.PlayerId == static_cast<unsigned int>(SourceClient))
             continue;
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, ObjId))
+        if (!Node->View.is_object_id_visible(ObjId))
             continue;
         XActivateCruise Record = {};
         Record.ObjectId = ObjId;
@@ -6962,7 +6942,7 @@ void StarSystem::notify_thrusters(unsigned int const& ObjId, bool bActivate, int
     {
         if (Node->View.PlayerId == static_cast<unsigned int>(SourceClient))
             continue;
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, ObjId))
+        if (!Node->View.is_object_id_visible(ObjId))
             continue;
         XActivateThrusters Record = {};
         Record.ObjectId = ObjId;
@@ -6988,7 +6968,7 @@ void StarSystem::notify_set_target(unsigned int const& ObjId, unsigned short con
             continue;
         unsigned int Type = 0u;
         Obj->get_type(Type);
-        if ((Type & 0xfdffu) == 0u && !SystemPlayerView_IsObjectVisible(&Node->View, Obj))
+        if ((Type & 0xfdffu) == 0u && !Node->View.is_object_visible(Obj))
             continue;
         XSetTarget Record = {};
         Record.ObjectId = ObjId;
@@ -7006,7 +6986,7 @@ void StarSystem::notify_jettison(GameObject* Obj, unsigned short EquipId, int Co
     unsigned int const Owner = Obj->csimple()->OwnerPlayer;
     unsigned int const ObjId = Obj->get_id();
     if (Players.is_valid_ship_owner(Owner, ObjId))
-        PlayerData_RemoveEquipment(Players[Owner], EquipId, Count, false);
+        Players[Owner].remove_equipment(EquipId, Count, false);
 
     XJettisonCargo Record = {};
     Record.ObjectId = ObjId;
@@ -7016,7 +6996,7 @@ void StarSystem::notify_jettison(GameObject* Obj, unsigned short EquipId, int Co
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
-        if (!SystemPlayerView_IsObjectIdVisible(&Node->View, ObjId))
+        if (!Node->View.is_object_id_visible(ObjId))
             continue;
         g_pClientInterface->SendCommonJettisonCargo(Node->View.PlayerId, Record);
     }
@@ -7039,7 +7019,7 @@ void StarSystem::notify_fire_weapon(unsigned int const& ObjId, std::vector<unsig
     {
         if (Player->View.PlayerId == static_cast<unsigned int>(SourceClient))
             continue;
-        if (!SystemPlayerView_IsObjectIdVisible(&Player->View, ObjId))
+        if (!Player->View.is_object_id_visible(ObjId))
             continue;
         g_pClientInterface->SendCommonFireWeapon(Player->View.PlayerId, Info);
     }
@@ -7095,7 +7075,7 @@ void StarSystem::complete_dock(GameObject* ShipObj, GameObject* Dock)
     {
         unsigned int const DockId = Dock->get_id();
         unsigned int const ShipId = ShipObj->get_id();
-        SystemPlayerView_OnObjectLeftSystem(&Player->View, &ShipId, &DockId);
+        Player->View.on_object_left_system(&ShipId, &DockId);
     }
 
     DockingShip->DockedObjId = Dock->get_id();
@@ -7173,7 +7153,7 @@ void StarSystem::arrive_ship(GameObject* Obj, GameObject* JumpObj, Vector const&
     SystemPlayerNode* const Head = static_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next)
     {
-        if (!SystemPlayerView_IsObjectVisible(&Node->View, Obj))
+        if (!Node->View.is_object_visible(Obj))
             continue;
         g_pClientInterface->SendServerSystemSwitchIn(Node->View.PlayerId, Record);
     }
@@ -7191,7 +7171,7 @@ void StarSystem::remove_ship(GameObject* Obj, PhySys::CreateParms* OutParms)
     {
         if (Player->View.PlayerId == Owner)
             continue;
-        SystemPlayerView_OnObjectDestroyed(&Player->View, Obj, 0);
+        Player->View.on_object_destroyed(Obj, 0);
     }
 
     unsigned int const ObjId = Obj->get_id();
@@ -7247,7 +7227,7 @@ void StarSystem::add_ship(GameObject* Obj, PhySys::CreateParms* Parms, Vector co
     for (SystemPlayerNode* Player = Head->Next; Player != Head; Player = Player->Next)
     {
         Info.bMarkedBy = Obj->is_marked_by(Player->View.PlayerId) ? 1 : 0;
-        SystemPlayerView_CreateShipForPlayer(&Player->View, &Info, Obj);
+        Player->View.create_ship_for_player(&Info, Obj);
     }
 }
 
@@ -7343,7 +7323,7 @@ void StarSystem::notify_go_tradelane(unsigned int ShipId, unsigned int EntranceI
     {
         if (SkipPlayer == Player->View.PlayerId)
             continue;
-        if (!SystemPlayerView_IsObjectIdVisible(&Player->View, ShipId))
+        if (!Player->View.is_object_id_visible(ShipId))
             continue;
         g_pClientInterface->SendCommonGoTradeLane(Player->View.PlayerId, Record);
     }
@@ -7410,7 +7390,7 @@ void StarSystem::notify_stop_tradelane(unsigned int ShipId, unsigned int Entranc
     {
         if (SkipPlayer == Player->View.PlayerId)
             continue;
-        if (!SystemPlayerView_IsObjectIdVisible(&Player->View, ShipId))
+        if (!Player->View.is_object_id_visible(ShipId))
             continue;
         g_pClientInterface->SendCommonStopTradeLane(Player->View.PlayerId, ShipId, EntranceId, ExitId);
     }
@@ -7477,13 +7457,13 @@ void StarSystem::on_object_destroyed(GameObject* Obj, int Kind)
         // Only when the destroyed object IS the session's current ship.
         if (Slot != nullptr && Slot->ship_object_id == ObjId)
         {
-            PlayerData_TerminateTrade(*Slot);
+            Slot->terminate_trade();
             // Retail passes true (lost as `unaff_BL` in Ghidra): the partner's inbound
             // entry is dropped too.
-            PlayerData_CancelTradeRequest(*Slot, /*bDropPartnerEntry*/true);
+            Slot->cancel_trade_request(/*bDropPartnerEntry*/true);
             // Only Kind == 1 zeroes the health.
             if (Kind == 1)
-                PlayerData_SetRelativeHealth(*Slot, 0.0f, /*bNotify*/false);
+                Slot->set_relative_health(0.0f, /*bNotify*/false);
             Slot->ship_object_id = 0;
             unsigned int Payload[2];
             Payload[0] = Slot->system_id;
@@ -7497,7 +7477,7 @@ void StarSystem::on_object_destroyed(GameObject* Obj, int Kind)
     {
         for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
              Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next) {
-            SystemPlayerView_OnObjectDestroyed(&Node->View, Obj, Kind);
+            Node->View.on_object_destroyed(Obj, Kind);
         }
     }
 }
@@ -7571,9 +7551,9 @@ unsigned short StarSystem::add_cargo(GameObject* Obj, unsigned int ArchId,
         // path forces bMission and bNotify both to zero.
         if (Slot != nullptr)
         {
-            PlayerData_AddEquipment(*Slot, ArchId, EquipDesc::CARGO_BAY_HP_NAME,
-                                    (int)Count, Health, /*bEquipped*/false,
-                                    /*bMission*/false, /*bNotify*/false);
+            Slot->add_equipment(ArchId, EquipDesc::CARGO_BAY_HP_NAME,
+                                (int)Count, Health, /*bEquipped*/false,
+                                /*bMission*/false, /*bNotify*/false);
         }
     }
     else
@@ -7582,10 +7562,10 @@ unsigned short StarSystem::add_cargo(GameObject* Obj, unsigned int ArchId,
         unsigned short EquipId = SUBOBJ_ID_NONE;
         if (Slot != nullptr)
         {
-            EquipId = PlayerData_AddEquipment(*Slot, ArchId,
-                                              EquipDesc::CARGO_BAY_HP_NAME,
-                                              (int)Count, Health, /*bEquipped*/false,
-                                              bMission, /*bNotify*/false);
+            EquipId = Slot->add_equipment(ArchId,
+                                          EquipDesc::CARGO_BAY_HP_NAME,
+                                          (int)Count, Health, /*bEquipped*/false,
+                                          bMission, /*bNotify*/false);
         }
         else
         {
@@ -7625,7 +7605,7 @@ unsigned short StarSystem::add_cargo(GameObject* Obj, unsigned int ArchId,
         {
             for (SystemPlayerNode* Node = Sentinel->Next;
                  Node != Sentinel; Node = Node->Next) {
-                if (!SystemPlayerView_IsObjectVisible(&Node->View, Obj))
+                if (!Node->View.is_object_visible(Obj))
                     continue;
                 // The first argument goes by ADDRESS.
                 g_pClientInterface->SendServerObjectCargoUpdate(Node->View.PlayerId,
@@ -7673,11 +7653,11 @@ void StarSystem::remove_cargo(GameObject* Obj, unsigned short EquipId, int Count
     unsigned int const SessionId = Obj->csimple()->OwnerPlayer;
     unsigned int const ObjId = Obj->get_id();
     if (SessionId != 0u && Players.is_valid_ship_owner(SessionId, ObjId))
-        PlayerData_RemoveEquipment(Players[SessionId], EquipId, Count, /*bNotify*/false);
+        Players[SessionId].remove_equipment(EquipId, Count, /*bNotify*/false);
 
     for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
          Node != static_cast<SystemPlayerNode*>(PlayerListHead); Node = Node->Next) {
-        if (!SystemPlayerView_IsObjectVisible(&Node->View, Obj))
+        if (!Node->View.is_object_visible(Obj))
             continue;
         // The player id goes by ADDRESS.
         g_pClientInterface->SendServerObjectCargoUpdate(Node->View.PlayerId, Obj->get_id(), Wire);
@@ -8430,9 +8410,6 @@ bool Server_FindLiveObject(unsigned int Id, GameObject*& OutObj, StarSystem*& Ou
     return false;
 }
 
-// DAT_06d8d924 -- ServerSpace.cpp's own lazily fetched math engine; never null-tested.
-static I3DMathEngine* GServerSpaceMathEngine = nullptr;
-
 // Server_GetLaunchPosition -- retail FUN_06d00830 (cdecl).
 // - Leaving a base: the first dockable solar of that base. A docking ring (type 0x20) is
 //   kind 1; otherwise controller event 0x32 asks for a free terminal through the
@@ -8497,10 +8474,8 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
             OutPos->z = static_cast<float>(static_cast<double>(BasePos.z) + Off.z);
 
             Matrix const Look = LookMatrix(Dir);
-            if (GServerSpaceMathEngine == nullptr)
-                GServerSpaceMathEngine = Server_Acquire3DMathEngine();
             Quaternion Orient;
-            GServerSpaceMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
+            Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
                                                        reinterpret_cast<FMatrix const&>(Look));
             *OutOrient = Orient;
         }
@@ -8530,10 +8505,8 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
             Matrix LaunchOrient;
             RingEq->launch_pos(*OutPos, LaunchOrient, *OutKind);
 
-            if (GServerSpaceMathEngine == nullptr)
-                GServerSpaceMathEngine = Server_Acquire3DMathEngine();
             Quaternion Orient;
-            GServerSpaceMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
+            Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
                                                        reinterpret_cast<FMatrix const&>(LaunchOrient));
             *OutOrient = Orient;
         }
@@ -8559,10 +8532,8 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
         Matrix LaunchOrient;
         Solar->launch_pos(*OutPos, LaunchOrient, Kind);
 
-        if (GServerSpaceMathEngine == nullptr)
-            GServerSpaceMathEngine = Server_Acquire3DMathEngine();
         Quaternion Orient;
-        GServerSpaceMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
+        Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
                                                    reinterpret_cast<FMatrix const&>(LaunchOrient));
         *OutOrient = Orient;
         return;
@@ -8572,10 +8543,8 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
     OutPos->x = Slot.initial_pos[0];
     OutPos->y = Slot.initial_pos[1];
     OutPos->z = Slot.initial_pos[2];
-    if (GServerSpaceMathEngine == nullptr)
-        GServerSpaceMathEngine = Server_Acquire3DMathEngine();
     Quaternion Orient;
-    GServerSpaceMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
+    Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
                                                reinterpret_cast<FMatrix const&>(Slot.initial_ornt));
     *OutOrient = Orient;
 }

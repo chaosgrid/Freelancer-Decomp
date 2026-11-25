@@ -46,8 +46,6 @@ float GDockHostileAttitude = -0.6f;
 
 namespace
 {
-    // DAT_06fd1d0c: this TU's math engine, created on first use (FUN_06fa8fa0).
-    I3DMathEngine* GDockMathEngine = nullptr;
 
     bool ContainsClass(std::vector<unsigned int> const* ClassIds, unsigned int ClassId)
     {
@@ -951,10 +949,8 @@ bool __cdecl IsShipAtDockPoint(unsigned int SystemId, unsigned int const* ShipId
     Back.X = 0.0f;
     Back.Y = 0.0f;
     Back.Z = -5000.0f;
-    if (GDockMathEngine == nullptr)
-        GDockMathEngine = ContentAcquire3DMathEngine();
     FVector FarPoint;
-    GDockMathEngine->TransformXform(FarPoint, Transform, Back);
+    ContentMathEngine()->TransformXform(FarPoint, Transform, Back);
     Vector Far;
     Far.x = FarPoint.X;
     Far.y = FarPoint.Y;
@@ -1638,13 +1634,9 @@ int FGcsLaunchEvent::GetType() const
 // The dock launch queue (DAT_06fd1b84): FUN_06f60340, FUN_06f603d0, FUN_06f607e0.
 // ---------------------------------------------------------------------------------------
 
-I3DMathEngine* GSpaceMathEngine = nullptr;
-
 I3DMathEngine* GetSpaceMathEngine()
 {
-    if (GSpaceMathEngine == nullptr)
-        GSpaceMathEngine = ContentAcquire3DMathEngine();
-    return GSpaceMathEngine;
+    return ContentMathEngine();
 }
 
 namespace

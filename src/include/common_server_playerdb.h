@@ -18,6 +18,8 @@
 #include <vector>
 
 class CPlayerTradeOffer;   // common_tradeoffer.h (PlayerData::trade_offer, +0x3CC)
+class Vector;              // common_ini.h (PlayerData::check_position_bound)
+class CCharacterSet;       // server_characterset.h (PlayerData::build_character_set)
 
 // ---------------------------------------------------------------------------
 // PlayerData — retail's `struct PlayerData` (0x418 bytes, stride of the Server.dll
@@ -41,7 +43,7 @@ struct PlayerData {
     // Defined in src/Server/server_classes.cpp.
     PlayerData();
     // FUN_06d50e90 -- the element destructor PlayerDB::free runs. Its first act is the
-    // slot teardown FUN_06d49230 (PlayerData_Teardown); the member destructors follow.
+    // slot teardown FUN_06d49230 (teardown); the member destructors follow.
     ~PlayerData();
 
     // Retail has no "active" flag or in-room / in-base flags: occupancy is client_id
@@ -94,7 +96,7 @@ struct PlayerData {
     std::list<CollisionGroupDesc> collision_groups;   // +0x26C
 
     // +0x324 / +0x328: the "what the player had when they last landed" snapshot, written by
-    // FUN_06d4fc30 (PlayerData_SnapshotEquipment): ship_archetype, then a list assignment
+    // FUN_06d4fc30 (PlayerData::snapshot_equipment): ship_archetype, then a list assignment
     // from +0x278.
     unsigned int equip_snapshot_arch;  // +0x324: ship_archetype at snapshot time
     EquipDescList equip_snapshot;      // +0x328: equipment at snapshot time
@@ -153,7 +155,7 @@ struct PlayerData {
     unsigned int client_id;            // -0xd0 (+0x348): client id, 0 = slot free
 
     // +0x34C: "a cheat has already been reported for this session" latch; the cheat report
-    // path bails out when set and sets it after PlayerData_ReportCheat.
+    // path bails out when set and sets it after PlayerData::report_cheat.
     unsigned char bCheatReported;      // -0xcc (+0x34C)
 
     // +0x340: one-shot "skip the next autosave" byte. Set by FUN_06d4c5f0 and by
@@ -195,7 +197,7 @@ struct PlayerData {
     // Visit tracking, two containers:
     //   +0x3A0  std::map<unsigned int, unsigned char>  -- the persistent table
     //   +0x3B8  std::vector<pair<unsigned int, unsigned char>> -- the pending queue
-    // The flush FUN_06d4b450 (PlayerData_FlushPendingVisits) ORs `entry.flags | 8` into the
+    // The flush FUN_06d4b450 (PlayerData::flush_pending_visits) ORs `entry.flags | 8` into the
     // map's byte for each pending key (inserting when absent) and empties the vector; bit 3
     // marks "committed". FUN_06d4b520 packs the map (dword key + byte flags per entry, after
     // a dword count) and hands it to IClient vtable +0x170.
@@ -327,6 +329,223 @@ struct PlayerData {
     // a system change (events 0x3a / 0x3b); PlayerLaunch puts it in event 6's payload.
     // Reset by the internal-login clear, the slot teardown and CharacterSelect.
     unsigned int exited_base_id;       // +0x410: base left by the last BaseExit
+
+    // ---------------------------------------------------------------------------
+    // Member functions. Retail has these as thiscall members of PlayerData; none of them
+    // is exported, so the names are the port's, in the style of Server.dll's exported ones.
+    // ---------------------------------------------------------------------------
+
+    // FUN_06d4efc0. Appends one EquipDesc to the slot's list and returns the sub-object id it
+    // was given (SUBOBJ_ID_NONE when the MP gate refuses).
+    //   bMission -- stored in EquipDesc::bMission (+0x18). When clear and
+    //     arch_is_combinable(ArchId), reuses the Id of an existing stack found with
+    //     find_matching_cargo(ArchId, 0, 1.0f); otherwise mints a fresh id from
+    //     equip_id_maker. Retail then reuses that stack slot for the combinable flag it
+    //     passes to add_equipment_item (1 on the combining path, 0 otherwise).
+    //   bNotify -- fires IClient slot 26 (+0x68) with (client_id, add_equipment_item's
+    //     return, &Desc).
+    unsigned short add_equipment(unsigned int ArchId, CacheString const& Hardpoint, int Count,
+                                 float Health, unsigned char bEquipped, bool bMission,
+                                 bool bNotify);
+
+    // FUN_06d4f100. remove_equipment_item(Id, Count); IClient slot 27 (+0x6c) with
+    // (client_id, result, Id, Count) when bNotify.
+    void remove_equipment(unsigned short Id, int Count, bool bNotify);
+
+    // FUN_06d4f260. find_matching_cargo(ArchId, Count, Health), FDUMP on a miss, else
+    // PlayerData::remove_equipment(hit->Id, Count, bNotify).
+    void remove_cargo(unsigned int ArchId, int Count, float Health, bool bNotify);
+
+    // FUN_06d4f170. find_equipment_item(Id) then set_hardpoint/set_count/set_status/
+    // set_equipped; FDUMPs when the id is absent.
+    void modify_equipment(unsigned short Id, CacheString const& Hardpoint, int Count, float Health,
+                          unsigned char bEquipped);
+
+    // FUN_06d4fc30. No MP gate.
+    void snapshot_equipment();
+
+    // FUN_06d4f560, FUN_06d4f460, FUN_06d4f480, FUN_06d4f4e0: +0x320 = total equipment
+    // value; cash read with the [0, 999999999] clamp; cash set / adjusted with the MP gate,
+    // the clamp, IClient SETCASH (slot 77) and controller message 0.
+    void reset_total_earned();
+    int get_cash() const;
+    void set_cash(int Cash);
+    void adjust_cash(int Amount, bool bCountEarned);
+
+    // FUN_06d498f0: the MP position bound SPObjUpdate applies. Retail takes three stack
+    // arguments but reads only the position. Returns false after destroying the ship when the
+    // position is out of bounds.
+    bool check_position_bound(Vector const* Position);
+
+    // FUN_06d4a200, PlayerData::reload_ship_data by its FDUMP text. Puts the ship back to the
+    // selected character's last-base loadout; the save serializer calls it for a dead MP ship.
+    void reload_ship_data();
+
+    // FUN_06d4f430. Sets Health on the collision group GroupId in the list at +0x26C;
+    // silently does nothing when the id is absent. Only caller: StarSystem::damage_object.
+    void set_collision_group_health(unsigned short GroupId, float Health);
+
+    // FUN_06d4ed10. Stores the relative hull health at +0x268 and, when bNotify, fires
+    // IClient slot 22 (+0x58) with (client_id, the same dword). No MP gate.
+    void set_relative_health(float RelativeHealth, bool bNotify);
+
+    // FUN_06d50af0. With a live trade offer at +0x3CC, calls
+    // IServerImpl::TerminateTrade(client_id, 0) on the `Server` singleton.
+    void terminate_trade();
+
+    // FUN_06d50a40 (one stack argument). Cancels this session's outbound trade request:
+    // notifies the partner through IClient slot 108 (+0x1b0), optionally removes this session
+    // from the partner's inbound list, and clears +0x3D0.
+    void cancel_trade_request(bool bDropPartnerEntry);
+
+    // FUN_06d50920. Cancels any outbound request (FUN_06d50a40 with the bool set, inlined),
+    // then -- only when the target's client id is non-zero -- adds this session to the
+    // target's inbound list, sets +0x3D0 = TargetId and notifies the target through IClient
+    // slot 107 (+0x1ac).
+    void set_trade_request(unsigned int TargetId);
+
+    // FUN_06d4f320. Replaces the list at +0x26C wholesale and reports it with IClient
+    // slot 23 (+0x5c). No gate of its own.
+    void set_collision_groups(std::list<CollisionGroupDesc> const& Groups);
+
+    // FUN_06d4ec10. Validates the archetype and, when it differs from the current one,
+    // refills +0x26c with the hull's undamaged collision groups.
+    void set_ship_arch(unsigned int ShipArch);
+
+    // FUN_06d4eeb0. Replaces the slot's whole equipment list with NewList, minting a fresh
+    // EquipIdMaker id for every element that carries SUBOBJ_ID_NONE.
+    void load_equipment(EquipDescList const& NewList);
+
+    // The prologue of FUN_06d4ccd0. True when a cheat was detected, in which case retail's
+    // save refuses to run.
+    bool check_for_cheats();
+
+    // FUN_06d4b450. Drains the pending-visit queue (+0x3B8) into the committed map (+0x3A0),
+    // ORing 8 into every entry's flags. FUN_06d4ccd0 inlines the same drain before
+    // serializing the map.
+    void flush_pending_visits();
+
+    // FUN_06d4b200. Folds the committed byte for Key into Flags and answers false only when
+    // both 0x10 and 0x08 are then set.
+    bool should_queue_visit(unsigned int Key, unsigned char Flags) const;
+
+    // FUN_06d4b270. Appends {Key, Flags} to the pending-visit vector.
+    void queue_visit(unsigned int Key, unsigned char Flags);
+
+    // FUN_06d4ccd0 (server_pub.cpp). FileName is a base file name, not a path: the function
+    // builds the destination from GetUserDataPath, "Accts" / "Accts\MultiPlayer" and the
+    // account directory, and appends ".fl" in single player. False when the cheat gate fires
+    // or the file cannot be opened.
+    bool serialize_to_file(char const* FileName, wchar_t const* Description,
+                           unsigned int DescripStrId);
+
+    // Retail FUN_06d47120 (thiscall on the PlayerData, `RET 8`). Parses the
+    // character file at Path into Record. Returns true when a [Player] section was
+    // seen (the byte set at .text:06d472ea).
+    bool load_save_record(char const* Path, FSavedCharacter& Record);
+
+    // Retail FUN_06d48d50 (thiscall, `RET 8`): parse <Dir>\<FileName> into
+    // saved_characters[FileName]; on failure warn and erase the entry.
+    bool load_saved_character(char const* Dir, char const* FileName);
+
+    // Retail FUN_06d4b5a0 (thiscall, `RET 4`): re-read a file the slot has just
+    // written into its own record container.
+    void reload_saved_character(char const* FileName);
+
+    // Retail FUN_06d4c800 (thiscall, `RET 0xc`). Name "" picks a free "Save%04x".
+    bool save_game(char const* Name, wchar_t const* Description, unsigned int DescripStrId);
+
+    // Retail FUN_06d4c600 (thiscall, `RET 4`). Returns CopyFileA's result, or false
+    // when the save itself failed.
+    bool mission_save(unsigned int DescripStrId);
+
+    // Retail FUN_06d4c430 (thiscall, `RET`).
+    bool auto_save();
+
+    // Retail FUN_06d4c5f0: `MOV byte ptr [ECX + 0x340],0x1 / RET`.
+    void skip_next_autosave();
+
+    // The record -> live slot copy of retail FUN_06d4a5d0 (.text:06d4ac77 ..
+    // .text:06d4b089), including the rep-vibe rebuild. SessionId is the worker's
+    // own stack argument (.text:06d4acef `MOV ECX,[ESP + 0x192c]`).
+    void apply_saved_character(FSavedCharacter const& Record, unsigned int SessionId);
+
+    // Retail FUN_06d4b520 (thiscall, `RET 4`): the visit map packed as {count,
+    // {u32 id, u8 flags}...} into an operator-new block sent by IClient +0x170.
+    void send_visited_state(unsigned int SessionId);
+
+    // Retail FUN_06d50740 (thiscall, `RET 4`): the mission log flattened by
+    // AppendMissionLogData into an operator-new block sent by IClient +0x184.
+    void send_mission_log(unsigned int SessionId);
+
+    // The tail of retail FUN_06d4a5d0 (.text:06d4aa85 .. .text:06d4b1fa), which the
+    // SP and MP paths share: re-open the record's file, the SP [Time] / feelings
+    // load (FUN_06d44810), the record copy, the visited / weapon-group / mission-log
+    // / interface packets and controller event 5. Returns true (.text:06d4b1e2).
+    bool load_selected_character(FSavedCharacter const& Record, unsigned int SessionId);
+
+    // Retail FUN_06d4b790 (thiscall, `RET 4`), called only by
+    // PlayerDB::create_new_character (.text:06d541a0): expands the exe-side
+    // NewCharacter.fl / MPNewCharacter.fl template into
+    // <account dir>\<FUN_06d46370(Info.Name)>.fl, FLS1-encodes it, and on success
+    // reloads it into saved_characters through FUN_06d4b5a0.
+    bool create_new_character(SCreateCharacterInfo const& Info);
+
+    // Retail FUN_06d4a4a0 (thiscall, `RET 4`) -- MP only: leave the world
+    // (system, base, trade, events 0x3a / 8 / 7, group logout, player-list
+    // removal) and clear +0x64. Defined in server_classes.cpp, next to logout.
+    void deselect_character(unsigned int SessionId);
+
+    // Retail FUN_06d4a5d0 (thiscall, `RET 8`), IServerImpl::CharacterSelect's worker:
+    // find the record (miss -> false); in MP leave the world if a character is
+    // selected, drop from the player lists when the id changes, assign +0x64,
+    // IClient +0x1c0 and the reputation / player-list exchange with every session;
+    // then the shared tail PlayerData::load_selected_character. Defined in
+    // server_classes.cpp, next to PlayerData::deselect_character.
+    bool select_character(CHARACTER_ID const& Id, unsigned int SessionId);
+
+    // Retail FUN_06d499c0 (thiscall, `RET 4`), IServerImpl::CharacterInfoReq's
+    // worker (.text:06d452aa): in MP with a selected character, autosave and leave
+    // the world; then one CCharacterSet::CharacterInfo per saved character, sorted
+    // Restart.fl first, AutoSave.fl next, then newest first; the failed-save
+    // counter moves into Out.SaveFailureCount. Defined in server_classes.cpp.
+    void build_character_set(CCharacterSet& Out);
+
+    // Retail FUN_06d49f60 (thiscall, `RET 8`), IServerImpl::DestroyCharacter's
+    // worker: deselect if selected, find the record, refuse Restart.fl, drop the
+    // character from Players' id map and its account, unlink the file, erase the
+    // record, FDUMP in MP. Defined in server_classes.cpp.
+    bool destroy_character(CHARACTER_ID const& Id, unsigned int SessionId);
+
+    // FUN_06d48d20: outside single player, IClient::PushToClient(client_id, a null packet).
+    // Defined in IServerImpl.cpp.
+    void send_client_null_packet();
+
+    // FUN_06d4eda0: the character's name from its reputation vibe, or the ">>>BAD   NAME<<<"
+    // fallback. Defined in server_chat.cpp.
+    const wchar_t* get_character_name() const;
+
+    // FUN_06d4a1e0: true in single player, otherwise whether a character is selected. Defined
+    // in server_chat.cpp.
+    bool has_selected_character() const;
+
+    // The gate four of the equipment functions open with: single player, or a selected
+    // character. Inlined in retail.
+    bool equip_gate_open() const;
+
+    // FUN_06d48e80; only caller PlayerDB::load_user_data. Defined in server_classes.cpp.
+    unsigned char login_account(const char* AccountDir, const SLoginInfo& Info,
+                                unsigned int SessionId);
+
+    // equip_id_maker.CreateEquipID(); inlined in retail.
+    unsigned short next_equip_id();
+
+    // FUN_06d4f570; its only caller is the cheat gate of the save. Defined in
+    // server_classes.cpp.
+    void report_cheat(int Reason);
+
+    // FUN_06d49230: the slot teardown the destructor runs first. Defined in server_classes.cpp.
+    void teardown();
 };
 
 // Compatibility alias used by many call sites. The real type name is PlayerData, which
@@ -348,131 +567,5 @@ static_assert(sizeof(((PlayerData*)nullptr)->cash) == 4, "PlayerData::cash must 
 // sites inline `Players.operator[]`). Defined in src/Server/server_classes.cpp.
 PlayerSlot* __cdecl PlayerDB_GetPlayer(unsigned int session_id);
 
-// ---------------------------------------------------------------------------
-// The PlayerData equipment-list family: retail PlayerData member functions (thiscall),
-// spelled as free functions here. Server.dll-internal, defined in
-// src/Server/server_classes.cpp.
-//
-// All four share the MP gate `!IsMPServer() || selected_character[0] != 0`.
-// ---------------------------------------------------------------------------
-
-// FUN_06d4efc0. Appends one EquipDesc to the slot's list and returns the sub-object id it
-// was given (SUBOBJ_ID_NONE when the MP gate refuses).
-//   bMission -- stored in EquipDesc::bMission (+0x18). When clear and
-//     arch_is_combinable(ArchId), reuses the Id of an existing stack found with
-//     find_matching_cargo(ArchId, 0, 1.0f); otherwise mints a fresh id from
-//     equip_id_maker. Retail then reuses that stack slot for the combinable flag it
-//     passes to add_equipment_item (1 on the combining path, 0 otherwise).
-//   bNotify -- fires IClient slot 26 (+0x68) with (client_id, add_equipment_item's
-//     return, &Desc).
-unsigned short __cdecl PlayerData_AddEquipment(PlayerSlot& Slot, unsigned int ArchId,
-                                               CacheString const& Hardpoint, int Count,
-                                               float Health, unsigned char bEquipped,
-                                               bool bMission, bool bNotify);
-
-// FUN_06d4f100. remove_equipment_item(Id, Count); IClient slot 27 (+0x6c) with
-// (client_id, result, Id, Count) when bNotify.
-void __cdecl PlayerData_RemoveEquipment(PlayerSlot& Slot, unsigned short Id, int Count,
-                                        bool bNotify);
-
-// FUN_06d4f260. find_matching_cargo(ArchId, Count, Health), FDUMP on a miss, else
-// PlayerData_RemoveEquipment(hit->Id, Count, bNotify).
-void __cdecl PlayerData_RemoveCargo(PlayerSlot& Slot, unsigned int ArchId, int Count,
-                                    float Health, bool bNotify);
-
-// FUN_06d4f170. find_equipment_item(Id) then set_hardpoint/set_count/set_status/
-// set_equipped; FDUMPs when the id is absent.
-void __cdecl PlayerData_ModifyEquipment(PlayerSlot& Slot, unsigned short Id,
-                                        CacheString const& Hardpoint, int Count,
-                                        float Health, unsigned char bEquipped);
-
-// FUN_06d4fc30. No MP gate.
-void __cdecl PlayerData_SnapshotEquipment(PlayerSlot& Slot);
-
-// FUN_06d4f560, FUN_06d4f460, FUN_06d4f480, FUN_06d4f4e0: +0x320 = total equipment
-// value; cash read with the [0, 999999999] clamp; cash set / adjusted with the MP gate,
-// the clamp, IClient SETCASH (slot 77) and controller message 0.
-void __cdecl PlayerData_ResetTotalEarned(PlayerSlot& Slot);
-int __cdecl PlayerData_GetCash(PlayerSlot const& Slot);
-void __cdecl PlayerData_SetCash(PlayerSlot& Slot, int Cash);
-void __cdecl PlayerData_AdjustCash(PlayerSlot& Slot, int Amount, bool bCountEarned);
-
-// FUN_06d498f0: the MP position bound SPObjUpdate applies. Retail takes three stack
-// arguments but reads only the position. Returns false after destroying the ship when the
-// position is out of bounds.
-class Vector;
-bool __cdecl PlayerData_CheckPositionBound(PlayerSlot& Slot, Vector const* Position);
-
-// FUN_06d4a200, PlayerData::reload_ship_data by its FDUMP text. Puts the ship back to the
-// selected character's last-base loadout; the save serializer calls it for a dead MP ship.
-void __cdecl PlayerData_ReloadShipData(PlayerSlot& Slot);
-
-// FUN_06d4f430. Sets Health on the collision group GroupId in the list at +0x26C;
-// silently does nothing when the id is absent. Only caller: StarSystem_DamageObject.
-void __cdecl PlayerData_SetCollisionGroupHealth(PlayerSlot& Slot,
-                                                unsigned short GroupId,
-                                                float Health);
-
-// FUN_06d4ed10. Stores the relative hull health at +0x268 and, when bNotify, fires
-// IClient slot 22 (+0x58) with (client_id, the same dword). No MP gate.
-void __cdecl PlayerData_SetRelativeHealth(PlayerSlot& Slot, float RelativeHealth,
-                                          bool bNotify);
-
-// FUN_06d50af0. With a live trade offer at +0x3CC, calls
-// IServerImpl::TerminateTrade(client_id, 0) on the `Server` singleton.
-void __cdecl PlayerData_TerminateTrade(PlayerSlot& Slot);
-
-// FUN_06d50a40 (one stack argument). Cancels this session's outbound trade request:
-// notifies the partner through IClient slot 108 (+0x1b0), optionally removes this session
-// from the partner's inbound list, and clears +0x3D0.
-void __cdecl PlayerData_CancelTradeRequest(PlayerSlot& Slot, bool bDropPartnerEntry);
-
-// FUN_06d50920. Cancels any outbound request (FUN_06d50a40 with the bool set, inlined),
-// then -- only when the target's client id is non-zero -- adds this session to the
-// target's inbound list, sets +0x3D0 = TargetId and notifies the target through IClient
-// slot 107 (+0x1ac).
-void __cdecl PlayerData_SetTradeRequest(PlayerSlot& Slot, unsigned int TargetId);
-
-// FUN_06d4f320. Replaces the list at +0x26C wholesale and reports it with IClient
-// slot 23 (+0x5c). No gate of its own.
-void __cdecl PlayerData_SetCollisionGroups(PlayerSlot& Slot,
-                                           std::list<CollisionGroupDesc> const& Groups);
-
-// FUN_06d4ec10. Validates the archetype and, when it differs from the current one,
-// refills +0x26c with the hull's undamaged collision groups.
-void __cdecl PlayerData_SetShipArch(PlayerSlot& Slot, unsigned int ShipArch);
-
-// FUN_06d4eeb0. Replaces the slot's whole equipment list with NewList, minting a fresh
-// EquipIdMaker id for every element that carries SUBOBJ_ID_NONE.
-void __cdecl PlayerData_LoadEquipment(PlayerSlot& Slot, EquipDescList const& NewList);
-
-// ---------------------------------------------------------------------------
-// The save-file family: retail PlayerData members in Server.dll, not exported.
-// ---------------------------------------------------------------------------
-
-// The prologue of FUN_06d4ccd0. True when a cheat was detected, in which case retail's
-// save refuses to run.
-bool __cdecl PlayerData_CheckForCheats(PlayerSlot& Slot);
-
-// FUN_06d4b450. Drains the pending-visit queue (+0x3B8) into the committed map (+0x3A0),
-// ORing 8 into every entry's flags. FUN_06d4ccd0 inlines the same drain before
-// serializing the map.
-void __cdecl PlayerData_FlushPendingVisits(PlayerSlot& Slot);
-
-// FUN_06d4b200. Folds the committed byte for Key into Flags and answers false only when
-// both 0x10 and 0x08 are then set.
-bool __cdecl PlayerData_ShouldQueueVisit(PlayerSlot const& Slot, unsigned int Key,
-                                         unsigned char Flags);
-
-// FUN_06d4b270. Appends {Key, Flags} to the pending-visit vector.
-void __cdecl PlayerData_QueueVisit(PlayerSlot& Slot, unsigned int Key, unsigned char Flags);
-
-// FUN_06d4ccd0 (server_pub.cpp). FileName is a base file name, not a path: the function
-// builds the destination from GetUserDataPath, "Accts" / "Accts\MultiPlayer" and the
-// account directory, and appends ".fl" in single player. False when the cheat gate fires
-// or the file cannot be opened.
-bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Slot, char const* FileName,
-                                        wchar_t const* Description,
-                                        unsigned int DescripStrId);
 unsigned int __cdecl PlayerDB_GetMaxPlayers();
 bool __cdecl PlayerDB_AllowsNewPlayers();

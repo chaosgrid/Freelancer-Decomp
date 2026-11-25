@@ -43,14 +43,10 @@ std::map<unsigned int, FFormation> GFormations;
 
 namespace
 {
-    // DAT_06fcf3a0: this TU's math engine, created on first use (FUN_06fa8fa0).
-    I3DMathEngine* GFormationMath = nullptr;
 
     I3DMathEngine* GetFormationMath()
     {
-        if (GFormationMath == nullptr)
-            GFormationMath = ContentAcquire3DMathEngine();
-        return GFormationMath;
+        return ContentMathEngine();
     }
 }
 

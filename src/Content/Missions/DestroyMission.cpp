@@ -47,8 +47,6 @@ std::vector<unsigned int> GRmObjectiveZones;
 
 namespace
 {
-    // DAT_06fcf250 -- this TU's cached 3DMathEngine (FUN_06fa8fa0 on first use).
-    I3DMathEngine* GRmMissionMath = nullptr;
 
     // .rdata DAT_06fb7608: game units per range unit (300).
     float const GRmRangeScale = 300.0f;
@@ -343,7 +341,7 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
             // result.
             for (int Index = 0; Index < static_cast<int>(PlayerStates.size()); ++Index)
             {
-                if (RmPlayerHasShip(PlayerStates[Index]))
+                if (PlayerStates[Index]->HasShip())
                     break;
             }
             FRandomMissionObject::OnStateEvent(Event, GDmAnyState);
@@ -485,9 +483,9 @@ bool FDestroyMission::OnStateEvent(SMEventData const* Event, int const& State)
 }
 
 // FUN_06ef00d0.
-bool RmPlayerHasShip(FContentPlayerState const* State)
+bool FContentPlayerState::HasShip() const
 {
-    return State->ShipObject != nullptr;
+    return ShipObject != nullptr;
 }
 
 // Inlined in FUN_06eeec50: operator new(0x29c). The parms are the TU27 mission (CreateParms
@@ -767,20 +765,18 @@ void FRandomMissionLoader::CollectZonesAlongTradeLanes(unsigned int PlayerId,
             static_cast<double>(EndDz) * EndDz + static_cast<double>(EndDy) * EndDy +
             static_cast<double>(EndDx) * EndDx);
 
-        if (GRmMissionMath == nullptr)
-            GRmMissionMath = ContentAcquire3DMathEngine();
 
         // The start only when strictly nearer; unordered takes the end branch.
         float Distance = 0.0f;
         Vector Exit;
         if (StartDistSq < EndDistSq)
         {
-            GRmMissionMath->Sqrt(Distance, StartDistSq);
+            ContentMathEngine()->Sqrt(Distance, StartDistSq);
             Exit = End;
         }
         else
         {
-            GRmMissionMath->Sqrt(Distance, EndDistSq);
+            ContentMathEngine()->Sqrt(Distance, EndDistSq);
             Exit = Start;
         }
 

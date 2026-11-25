@@ -39,6 +39,7 @@
 
 #include "rpc_containers.h"
 #include "rpc_payloads.h"
+#include "rpc_packet_classes.h"
 
 #include <cstddef>
 #include <cstring>
@@ -591,14 +592,16 @@ unsigned int RpcEncodeWireBlobBufferFirst(FPacketBase& Packet, unsigned char** B
     return 0;
 }
 
+// 0x06d97730 -- allocates unconditionally.
 // 0x06d97730 -- Decode, the 0x28 form. ch2 0x1f GFUPDATEAMBIENTSCRIPT only.
 // Allocates unconditionally, exactly like shape 7's decoder.
-unsigned int RpcDecodeWireBlobBufferFirst(FPacketBase& Packet, const unsigned char* Buffer,
-                                          unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT::Decode(const unsigned char* Buffer,
+                                                                   unsigned int Size,
+                                                                   unsigned int* OutLength) {
     FPayloadServerBlobReversed* Wire =
-        reinterpret_cast<FPayloadServerBlobReversed*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerBlobReversed*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -615,22 +618,22 @@ unsigned int RpcDecodeWireBlobBufferFirst(FPacketBase& Packet, const unsigned ch
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
+// 0x06db10e0 -- skips the allocation and the run when the count is zero.
 // 0x06db10e0 -- Decode, the 0x28 form again, ch3 0x23 DBGLOADSYSTEM only.
 //
 // The same body as 0x06d97730 except that a zero count skips both the allocation and the
 // byte run, leaving the constructor's null buffer pointer.
-unsigned int RpcDecodeWireBlobBufferFirstSkipEmpty(FPacketBase& Packet,
-                                                   const unsigned char* Buffer,
-                                                   unsigned int Size,
-                                                   unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM::Decode(const unsigned char* Buffer,
+                                                           unsigned int Size,
+                                                           unsigned int* OutLength) {
     FPayloadServerBlobReversed* Wire =
-        reinterpret_cast<FPayloadServerBlobReversed*>(Packet.Payload());
+        reinterpret_cast<FPayloadServerBlobReversed*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -649,7 +652,7 @@ unsigned int RpcDecodeWireBlobBufferFirstSkipEmpty(FPacketBase& Packet,
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -691,16 +694,18 @@ unsigned int RpcDecodeWireOwnedBuffer(FPacketBase& Packet, const unsigned char* 
     return 0;
 }
 
+// 0x06da5bc0 -- the same, but allocates Size + 1 and NUL-terminates. ch1 0x11 only.
 // 0x06da5bc0 -- Decode, ch1 0x11 SET_WEAPON_GROUP only (1 .rdata slot, 06db439c).
 //
 // 0x06da62d0 plus two instructions: the block is Size + 1 bytes and Buffer[Size] = 0, so
 // SET_WEAPON_GROUP's blob is a NUL-terminated string where the family's others are not.
-unsigned int RpcDecodeWireOwnedString(FPacketBase& Packet, const unsigned char* Buffer,
-                                      unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP::Decode(const unsigned char* Buffer,
+                                                              unsigned int Size,
+                                                              unsigned int* OutLength) {
     FPayloadCommonBuffer* Wire =
-        reinterpret_cast<FPayloadCommonBuffer*>(Packet.Payload());
+        reinterpret_cast<FPayloadCommonBuffer*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (Stream.Failed()) {
         return Stream.GetError();
     }
@@ -723,7 +728,7 @@ unsigned int RpcDecodeWireOwnedString(FPacketBase& Packet, const unsigned char* 
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -773,7 +778,7 @@ unsigned int RpcDecodeWireOwnedString(FPacketBase& Packet, const unsigned char* 
 bool RpcPutEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle* const* Slot) {
     // The count is zero when the payload slot is null or the handle has no list yet.
     unsigned short Count = 0;
-    const FRpcEquipWireListHeader* Header = RpcEquipHandleGetList(*Slot);
+    const FRpcEquipWireListHeader* Header = (*Slot)->GetList();
     if (Header != nullptr) {
         Count = (unsigned short)(Header->Size & 0xffffu);
     }
@@ -782,7 +787,7 @@ bool RpcPutEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle* const* Slot
     }
     if (Count != 0) {
         // The handle is dereferenced and tested a second time.
-        const FRpcEquipWireListHeader* Walk = RpcEquipHandleGetList(*Slot);
+        const FRpcEquipWireListHeader* Walk = (*Slot)->GetList();
         if (Walk != nullptr && Walk->Head != nullptr) {
             const FRpcEquipWireNode* Node = Walk->Head->Next;
             while (Node != Walk->Head) {
@@ -889,7 +894,7 @@ bool RpcGetEquipList(FRpcMarshalStream& Stream, FRpcEquipWireHandle** Slot) {
                 return false;
             }
             // 06da26b1 FUN_06d91580 -- the list takes ownership of the record.
-            RpcEquipHandlePushBack(*Slot, Item);
+            (*Slot)->PushBack(Item);
         }
     }
     return true;
@@ -947,12 +952,15 @@ unsigned int RpcDecodeWireEquipList(FPacketBase& Packet, const unsigned char* Bu
 // Both bounds checks store the proper decoder error 0x17 (unlike PLAYER_TRADE).
 // ===========================================================================
 
+// 0x06d9a660 -- ch3 0x27 TRADERESPONSE's own decoder. Its ENCODE side is the shared
+// RpcEncodeWireDwordPair (0x06da9110); the pair does not round-trip, see rpc_wire_generic.cpp.
 // 0x06d9a660 -- Decode. The encode side is RpcEncodeWireDwordPair (0x06da9110).
-unsigned int RpcDecodeWireTradeResponse(FPacketBase& Packet, const unsigned char* Buffer,
-                                        unsigned int Size, unsigned int* OutLength) {
-    FPayloadClientBlob* Wire = reinterpret_cast<FPayloadClientBlob*>(Packet.Payload());
+unsigned int FPacket_FLPACKET_CLIENT_TRADERESPONSE::Decode(const unsigned char* Buffer,
+                                                           unsigned int Size,
+                                                           unsigned int* OutLength) {
+    FPayloadClientBlob* Wire = reinterpret_cast<FPayloadClientBlob*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     if (!Stream.GetDword(Wire->Size)) {
         return Stream.GetError();
@@ -967,6 +975,6 @@ unsigned int RpcDecodeWireTradeResponse(FPacketBase& Packet, const unsigned char
     Wire->Buffer = reinterpret_cast<void*>(static_cast<size_t>(Scratch));
 
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }

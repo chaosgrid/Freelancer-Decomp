@@ -5,8 +5,8 @@
 // Author: Giperion.
 
 // server_observer.cpp -- the per-frame observer update and the damage fan-out:
-//   FUN_06cf53e0  SystemPlayerView_Update
-//   FUN_06d0b800  StarSystem_DamageObject
+//   FUN_06cf53e0  Observer::update
+//   FUN_06d0b800  StarSystem::damage_object
 // plus the PlayerData helper FUN_06d4f430 the second one needs. These are the only two
 // callers of the Observer entry points.
 // ---------------------------------------------------------------------------
@@ -46,23 +46,6 @@ static double const kBandwidthCeiling = 0.9;
 static bool HasBandwidth(unsigned int PlayerId)
 {
     return g_pClientInterface->GetLinkSaturation(PlayerId) < kBandwidthCeiling;
-}
-
-// ---------------------------------------------------------------------------
-// Matrix -> quaternion through I3DMathEngine::MatrixToQuaternion (vt+0x50) on
-// Observer.cpp's lazily fetched engine (.data:DAT_06d8d7f8, FUN_06d5ff70). The
-// static has three users: two sites in the update here and FUN_06cf7140
-// (SystemPlayerView_AddTrackedObject, server_classes.cpp), hence not static. No
-// null test on the engine; Out is always filled by the call.
-// ---------------------------------------------------------------------------
-static I3DMathEngine* GObserverMathEngine = nullptr;   // .data:DAT_06d8d7f8
-
-void Observer_MatrixToQuat(Quaternion& Out, Matrix const& In)
-{
-    if (GObserverMathEngine == nullptr)
-        GObserverMathEngine = Server_Acquire3DMathEngine();
-    GObserverMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Out),
-                                            reinterpret_cast<FMatrix const&>(In));
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +119,7 @@ static void SendShipTargets(unsigned int PlayerId, CShip* Ship)
 // ===========================================================================
 // FUN_06cf53e0 -- Observer::update(double Dt).
 // ===========================================================================
-void SystemPlayerView_Update(Observer* View, double Dt)
+void Observer::update(double Dt)
 {
     // No test on the view (thiscall on the list element).
 
@@ -145,9 +128,9 @@ void SystemPlayerView_Update(Observer* View, double Dt)
     if (SinglePlayer())
         return;
 
-    unsigned int const PlayerId = View->PlayerId;
+    unsigned int const PlayerId = this->PlayerId;
 
-    View->ElapsedTime += Dt;
+    ElapsedTime += Dt;
 
     // Refresh the observer's position (View+0x3c) from the player's ship
     // (PlayerData::ship_object_id). No PlayerDB::is_valid: the slot is indexed raw off
@@ -156,7 +139,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         unsigned int const ShipId = Players[PlayerId].ship_object_id;
         GameObject* const Self = Server_LookupGameObject(ShipId);
         if (Self != nullptr)
-            View->Position = Self->get_position();
+            this->Position = Self->get_position();
     }
 
     // Three empty working lists (retail: FUN_06cfc340, MSVC6 std::list::_Buynode).
@@ -170,7 +153,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
     // -----------------------------------------------------------------------
     {
         // Neither a node nor its record is null-tested.
-        SystemTrackedNode* const Sentinel = View->Tracked.Head;
+        SystemTrackedNode* const Sentinel = Tracked.Head;
         for (SystemTrackedNode* Node = Sentinel->Next; Node != Sentinel;
              Node = Node->Next) {
             SystemTrackedObject* const Record = Node->Data;
@@ -197,7 +180,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         GameObject* const Obj = Record->Object;
 
         // FUN_06cf7260.
-        if (!SystemPlayerView_ShouldBeVisible(View, Obj))
+        if (!should_be_visible(Obj))
             continue;
         // The gauge is re-checked before every send.
         if (!HasBandwidth(PlayerId))
@@ -300,7 +283,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
             // SendServerCreateCounter and SendServerCreateGuided take the player id by
             // reference (&View->PlayerId, as the notifier FUN_06cf6bc0 also passes); the
             // other create slots take a value.
-            g_pClientInterface->SendServerCreateCounter(View->PlayerId, Info);
+            g_pClientInterface->SendServerCreateCounter(this->PlayerId, Info);
         } else if (bIsMine) {
             // CREATEMINE, IClient +0x0c4: the same preparation and builder (FUN_06d07c80)
             // as the countermeasure, but a by-value player id.
@@ -334,7 +317,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
             ServerCreateGuidedInfo_Fill(&Info, Guided);
 
             // By-reference player id, as for CREATECOUNTER.
-            g_pClientInterface->SendServerCreateGuided(View->PlayerId, Info);
+            g_pClientInterface->SendServerCreateGuided(this->PlayerId, Info);
 
             // One SETTARGET for the missile's own target (CGuided+0xb0 id, +0xf8
             // sub-target). Retail loads the sub-target before the null test.
@@ -372,7 +355,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         SystemTrackedObject* const Record = *It;
         GameObject* const Obj = Record->Object;
 
-        if (!SystemPlayerView_ShouldBeVisible(View, Obj)) {
+        if (!should_be_visible(Obj)) {
             // Clearing the flag lets the next frame's phase 2 create it again.
             FServerDestroyObjectInfo Msg;
             Msg.ObjectId = Obj->get_id();
@@ -387,7 +370,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
 
         Vector const& Position = Obj->get_position();
         Quaternion Orient;
-        Observer_MatrixToQuat(Orient, Obj->get_orientation());
+        Server_MatrixToQuat(Orient, Obj->get_orientation());
 
         // Only unowned objects are resynced. Retail reads +0xb4 through the CSimple
         // narrowing even when it is null (.text:06cf5d15); the port does the same.
@@ -396,7 +379,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
             continue;
 
         // Retail tests for exactly 1.
-        if (!Record->Simulation.CheckForSync(View->Position, Position, Orient))
+        if (!Record->Simulation.CheckForSync(this->Position, Position, Orient))
             continue;
 
         // Insert into Pending in descending GetSimulationTime() order (simulation
@@ -428,7 +411,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
 
         Vector const& Position = Obj->get_position();
         Quaternion Orient;
-        Observer_MatrixToQuat(Orient, Obj->get_orientation());
+        Server_MatrixToQuat(Orient, Obj->get_orientation());
 
         FCommonUpdateObjectInfo Msg;
         Msg.ObjectId = Obj->get_id();
@@ -439,7 +422,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         Msg.Orientation = Orient;
         Msg.Position = Position;
         // The observer clock crosses the wire narrowed to a float.
-        Msg.Timestamp = static_cast<float>(View->ElapsedTime);
+        Msg.Timestamp = static_cast<float>(ElapsedTime);
         // Only the ship path replaces this.
         Msg.State = 0xffu;
 
@@ -462,7 +445,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         // orientation as arg 0; a stack-adjusted read at .text:06cf5fdf makes it the
         // position. The quaternion is the one the packet carries; the clock goes as a
         // double here, unlike the float on the wire.
-        Record->Simulation.RemoteUpdate(Position, Orient, View->ElapsedTime);
+        Record->Simulation.RemoteUpdate(Position, Orient, ElapsedTime);
     }
 
     // -----------------------------------------------------------------------
@@ -473,13 +456,13 @@ void SystemPlayerView_Update(Observer* View, double Dt)
 
     // Collect the pending ids whose objects are visible again.
     std::vector<GameObject*> Retry;
-    for (std::set<unsigned int>::const_iterator It = View->PendingDamageIds.begin();
-         It != View->PendingDamageIds.end(); ++It) {
+    for (std::set<unsigned int>::const_iterator It = PendingDamageIds.begin();
+         It != PendingDamageIds.end(); ++It) {
         // FUN_06d006c0; a failed lookup becomes a null object, rejected here.
         GameObject* const Obj = Server_LookupGameObject(*It);
         if (Obj == nullptr)
             continue;
-        if (!SystemPlayerView_ShouldBeVisible(View, Obj))
+        if (!should_be_visible(Obj))
             continue;
         Retry.push_back(Obj);
     }
@@ -513,7 +496,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
 
         // Retail re-asks get_id(). The erase is unconditional, so an object with no
         // damage to report leaves the queue too.
-        View->PendingDamageIds.erase(Obj->get_id());
+        PendingDamageIds.erase(Obj->get_id());
     }
 
     // Retail: FUN_06d07690 builds a DamageList of every shield's hit points
@@ -531,12 +514,10 @@ void SystemPlayerView_Update(Observer* View, double Dt)
 // group's relative health (sole caller .text:06d0ba27 passes
 // CArchGroup::GetRelativeHealth rounded to float).
 // ===========================================================================
-void __cdecl PlayerData_SetCollisionGroupHealth(PlayerSlot& Slot,
-                                                unsigned short GroupId,
-                                                float Health)
+void PlayerData::set_collision_group_health(unsigned short GroupId, float Health)
 {
-    for (std::list<CollisionGroupDesc>::iterator It = Slot.collision_groups.begin();
-         It != Slot.collision_groups.end(); ++It) {
+    for (std::list<CollisionGroupDesc>::iterator It = collision_groups.begin();
+         It != collision_groups.end(); ++It) {
         if (It->Id == GroupId) {
             It->Health = Health;
             return;
@@ -552,7 +533,7 @@ void __cdecl PlayerData_SetCollisionGroupHealth(PlayerSlot& Slot,
 // to PlayerDB::is_valid, and the allocator byte read from the param_2 slot is an
 // MSVC6 allocator<> temporary with no value.
 // ===========================================================================
-void StarSystem_DamageObject(StarSystem* Sys, GameObject* Obj, DamageList* Damage)
+void StarSystem::damage_object(GameObject* Obj, DamageList* Damage)
 {
     // No null test on the system, the object or the damage list.
 
@@ -601,12 +582,11 @@ void StarSystem_DamageObject(StarSystem* Sys, GameObject* Obj, DamageList* Damag
                         continue;
                     // The fifth argument is Desc+0x0c (bEquipped), so damage keeps the
                     // mount state; retail's sixth argument is an unused zero, omitted.
-                    PlayerData_ModifyEquipment(
-                        Slot, Desc.get_id(), Desc.get_hardpoint(),
-                        Desc.get_count(), Desc.get_status(), Desc.is_equipped());
+                    Slot.modify_equipment(Desc.get_id(), Desc.get_hardpoint(), Desc.get_count(),
+                                          Desc.get_status(), Desc.is_equipped());
                 } else {
-                    PlayerData_RemoveEquipment(Slot, Entry.SubObjId, -1,
-                                               /*bNotify*/false);
+                    Slot.remove_equipment(Entry.SubObjId, -1,
+                                          /*bNotify*/false);
                 }
             } else if (SubObjectID::IsArchGroupID(Entry.SubObjId)) {
                 // A collision group stores the group's current relative health
@@ -616,12 +596,12 @@ void StarSystem_DamageObject(StarSystem* Sys, GameObject* Obj, DamageList* Damag
                     EqObj->ArchGroups.FindByID(Entry.SubObjId);
                 if (Group == nullptr)
                     continue;
-                PlayerData_SetCollisionGroupHealth(Slot, Entry.SubObjId,
-                                                   (float)Group->GetRelativeHealth());
+                Slot.set_collision_group_health(Entry.SubObjId,
+                                                (float)Group->GetRelativeHealth());
             } else if (Entry.SubObjId == SUBOBJ_ID_ROOT) {
                 // The hull lands in relative_health.
-                PlayerData_SetRelativeHealth(Slot, EqObj->get_relative_health(),
-                                             /*bNotify*/false);
+                Slot.set_relative_health(EqObj->get_relative_health(),
+                                         /*bNotify*/false);
             }
         }
     }
@@ -651,9 +631,9 @@ void StarSystem_DamageObject(StarSystem* Sys, GameObject* Obj, DamageList* Damag
     // embedded at node+0x08 (an address, not a load). No null test on the head or a
     // node; the walk stops only at the sentinel.
     SystemPlayerNode* const Head =
-        reinterpret_cast<SystemPlayerNode*>(Sys->PlayerListHead);
+        reinterpret_cast<SystemPlayerNode*>(PlayerListHead);
     for (SystemPlayerNode* Node = Head->Next; Node != Head; Node = Node->Next) {
-        SystemPlayerView_DamageObject(&Node->View, ObjId, Damage, &Reduced);
+        Node->View.damage_object(ObjId, Damage, &Reduced);
     }
 }
 
@@ -662,15 +642,15 @@ void StarSystem_DamageObject(StarSystem* Sys, GameObject* Obj, DamageList* Damag
 // answers false is unlinked (MetaList::remove inlined) and appended to Deferred
 // (FUN_06d11850 is Deferred's alloc_node). No null test on Data.
 // ===========================================================================
-void StarSystem_TickObjectList(ObjectList* List, float Dt, ObjectList* Deferred)
+void ObjectList::tick(float Dt, ObjectList* Deferred)
 {
     FSystemListNode* Node = nullptr;
-    while (List->traverse(Node, true))
+    while (traverse(Node, true))
     {
         if (Node->Data->update(Dt))
             continue;
         GameObject* const Data = Node->Data;
-        List->remove(Node);
+        remove(Node);
         Deferred->append(Data);
     }
 }

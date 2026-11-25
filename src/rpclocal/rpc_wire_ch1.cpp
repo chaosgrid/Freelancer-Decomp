@@ -42,6 +42,7 @@
 
 #include "rpc_containers.h"
 #include "rpc_payloads.h"
+#include "rpc_packet_classes.h"
 
 #include <new>
 
@@ -49,14 +50,18 @@
 // ch1 0x01 FLPACKET_COMMON_UPDATEOBJECT -- Encode LAB_06da49e0, Decode FUN_06da4ca0
 // ===========================================================================
 
-unsigned int RpcEncodeCommonUpdateObject(FPacketBase& Packet, unsigned char** BufferHolder,
-                                         unsigned int Capacity, unsigned int* OutLength) {
+// ===========================================================================
+// ch1 codec slots transcribed in rpc_wire_ch1.cpp.
+// ===========================================================================
+unsigned int FPacket_FLPACKET_COMMON_UPDATEOBJECT::Encode(unsigned char** BufferHolder,
+                                                          unsigned int Capacity,
+                                                          unsigned int* OutLength) {
     const FPayloadCommonUpdateObject* Wire =
-        reinterpret_cast<const FPayloadCommonUpdateObject*>(Packet.Payload());
+        reinterpret_cast<const FPayloadCommonUpdateObject*>(Payload());
 
     // The encoder's buffer argument is a pointer to the buffer pointer.
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
 
     Stream.PutByte(Wire->State);
     Stream.PutDword(Wire->ObjectId);
@@ -75,17 +80,18 @@ unsigned int RpcEncodeCommonUpdateObject(FPacketBase& Packet, unsigned char** Bu
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
-unsigned int RpcDecodeCommonUpdateObject(FPacketBase& Packet, const unsigned char* Buffer,
-                                         unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_COMMON_UPDATEOBJECT::Decode(const unsigned char* Buffer,
+                                                          unsigned int Size,
+                                                          unsigned int* OutLength) {
     FPayloadCommonUpdateObject* Wire =
-        reinterpret_cast<FPayloadCommonUpdateObject*>(Packet.Payload());
+        reinterpret_cast<FPayloadCommonUpdateObject*>(Payload());
 
     // The decoder's buffer argument is the buffer pointer itself (no second dereference).
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     // FUN_06da13c0 at the start consumes nothing: the dispatcher already ate the two header
     // bytes, which is why this side's length excludes them.
     if (Stream.Failed()) {
@@ -127,7 +133,7 @@ unsigned int RpcDecodeCommonUpdateObject(FPacketBase& Packet, const unsigned cha
         return Stream.GetError();
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
@@ -158,14 +164,17 @@ unsigned int RpcDecodeCommonUpdateObject(FPacketBase& Packet, const unsigned cha
 // In single player packets are queued by pointer and neither slot is called.
 // ===========================================================================
 
+// 0x06da7a00 / 0x06da7b90 -- ch1 0x1d TRACTOROBJECTS: dword, word, word count, then that
+// many dwords appended into the payload's own std::vector<unsigned int>.
 // 0x06da7a00 -- Encode.
-unsigned int RpcEncodeCommonTractorObjects(FPacketBase& Packet, unsigned char** BufferHolder,
-                                           unsigned int Capacity, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_COMMON_TRACTOROBJECTS::Encode(unsigned char** BufferHolder,
+                                                            unsigned int Capacity,
+                                                            unsigned int* OutLength) {
     const FPayloadCommonTractorObjects* Wire =
-        reinterpret_cast<const FPayloadCommonTractorObjects*>(Packet.Payload());
+        reinterpret_cast<const FPayloadCommonTractorObjects*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
-    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // FUN_06da1380
+    FRpcMarshalStream Stream(*this, *BufferHolder, Capacity);
+    Stream.PutHeaderUnchecked(RpcPacketHeaderWord(PacketId));   // FUN_06da1380
     if (!Stream.PutDword(Wire->ObjectId)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
@@ -184,17 +193,18 @@ unsigned int RpcEncodeCommonTractorObjects(FPacketBase& Packet, unsigned char** 
         }
     }
     *OutLength = Stream.Length();
-    RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordEncodedPacket(PacketId, Stream.Length());
     return 0;
 }
 
 // 0x06da7b90 -- Decode.
-unsigned int RpcDecodeCommonTractorObjects(FPacketBase& Packet, const unsigned char* Buffer,
-                                           unsigned int Size, unsigned int* OutLength) {
+unsigned int FPacket_FLPACKET_COMMON_TRACTOROBJECTS::Decode(const unsigned char* Buffer,
+                                                            unsigned int Size,
+                                                            unsigned int* OutLength) {
     FPayloadCommonTractorObjects* Wire =
-        reinterpret_cast<FPayloadCommonTractorObjects*>(Packet.Payload());
+        reinterpret_cast<FPayloadCommonTractorObjects*>(Payload());
 
-    FRpcMarshalStream Stream(Packet, const_cast<unsigned char*>(Buffer), Size);
+    FRpcMarshalStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
 
     if (!Stream.GetDword(Wire->ObjectId)) {
         return Stream.GetError();
@@ -215,6 +225,6 @@ unsigned int RpcDecodeCommonTractorObjects(FPacketBase& Packet, const unsigned c
         RpcRetailVectorAppend(Wire->TargetIds, Value);
     }
     *OutLength = Stream.Length();
-    RpcRecordDecodedPacket(Packet.PacketId, Stream.Length());
+    RpcRecordDecodedPacket(PacketId, Stream.Length());
     return 0;
 }

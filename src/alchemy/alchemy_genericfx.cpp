@@ -44,13 +44,9 @@ namespace AlchemyImpl
         const char kImpFxNodeCppPath[] =
             "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\ALIL\\ImpFxNode.cpp";
 
-        I3DMathEngine* G_NodeTransform3DMath = nullptr; // DAT_06257bd0.
-
         I3DMathEngine* NodeTransformMath()
         {
-            if (G_NodeTransform3DMath == nullptr)
-                G_NodeTransform3DMath = Create3DMath();
-            return G_NodeTransform3DMath;
+            return Shared3DMath();
         }
 
 #pragma optimize("", off)

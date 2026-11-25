@@ -2649,10 +2649,6 @@ bool FMissionObject::IsPlayerDead(unsigned int InPlayerId)
     return It != DeadPlayerIds.end();
 }
 
-// DAT_06fd070c: TU38's 3DMathEngine, created on first use (FUN_06fa8fa0) by the orientation
-// keys of FUN_06f172f0 / FUN_06f18eb0 and by FUN_06f15e20.
-static I3DMathEngine* GMissionMathEngine = nullptr;
-
 namespace
 {
     // The 9 dwords of a rotation copied as one block.
@@ -2833,10 +2829,8 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
                 Offset.Y = 0.0f;
                 Offset.Z = static_cast<float>(-(std::sin(static_cast<double>(Group->RelPosHeading)) *
                                                 Group->RelPosRange));
-                if (GMissionMathEngine == nullptr)
-                    GMissionMathEngine = ContentAcquire3DMathEngine();
                 FVector Position;
-                GMissionMathEngine->TransformXform(Position, Anchor, Offset);
+                ContentMathEngine()->TransformXform(Position, Anchor, Offset);
                 Local.Translation = Position;
             }
         }
@@ -3249,7 +3243,7 @@ void FMissionObject::RegisterNpc(void const* MessageParms)
 // LoadMission (slot 25, FUN_06f172f0) and its records
 // ---------------------------------------------------------------------------------------
 
-// GMissionMathEngine (DAT_06fd070c) is defined above SpawnMissionShipGroup.
+// ContentMathEngine() (DAT_06fd070c) is defined above SpawnMissionShipGroup.
 
 namespace
 {
@@ -3280,9 +3274,7 @@ namespace
         Quat.X = static_cast<float>(X * Inverse);
         Quat.Y = static_cast<float>(Y * Inverse);
         Quat.Z = static_cast<float>(Z * Inverse);
-        if (GMissionMathEngine == nullptr)
-            GMissionMathEngine = ContentAcquire3DMathEngine();
-        GMissionMathEngine->QuaternionToMatrix(*OutMatrix, Quat);
+        ContentMathEngine()->QuaternionToMatrix(*OutMatrix, Quat);
     }
 
     // [MsnLoot] values, written into the list's new last record.
@@ -3376,9 +3368,7 @@ namespace
         Quat.X = static_cast<float>(static_cast<double>(Inverse) * X);
         Quat.Y = static_cast<float>(static_cast<double>(Inverse) * Y);
         Quat.Z = static_cast<float>(static_cast<double>(Inverse) * Z);
-        if (GMissionMathEngine == nullptr)
-            GMissionMathEngine = ContentAcquire3DMathEngine();
-        GMissionMathEngine->QuaternionToMatrix(*OutMatrix, Quat);
+        ContentMathEngine()->QuaternionToMatrix(*OutMatrix, Quat);
     }
 
     // [MsnSolar] values. The nickname, faction, archetype, loadout, base and label keys read the

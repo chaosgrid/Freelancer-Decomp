@@ -19,14 +19,10 @@
 
 namespace
 {
-    // DAT_06fd3de0: this TU's math engine, created on first use (FUN_06fa8fa0).
-    I3DMathEngine* GZoneMath = nullptr;
 
     I3DMathEngine* GetZoneMath()
     {
-        if (GZoneMath == nullptr)
-            GZoneMath = ContentAcquire3DMathEngine();
-        return GZoneMath;
+        return ContentMathEngine();
     }
 }
 

@@ -33,6 +33,10 @@ struct FFileSystemDesc
     void* MemBuffer;                 // +0x34  MEM size 0x40 only (FUN_06b777f0)
     unsigned long MemSize;           // +0x38
     unsigned long MemFlags;          // +0x3C  bit0=wrap pointer, bit1=flag+1
+
+    // FUN_06c24980: the 0x34 FileSystem descriptor (Path, "FileSystem", GENERIC_READ, share 1,
+    // OPEN_EXISTING, 0x8000080, +0x30 = -1).
+    FFileSystemDesc* Init(const char* Path, const char* ComponentName);
 };
 
 // Callers fill `Size` (0x30 / 0x34 for DOS and UTF, 0x40 for MEM) and the callee reads

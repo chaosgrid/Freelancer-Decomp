@@ -388,10 +388,6 @@ namespace
     // DAT_06fb6060: degrees to radians (float).
     float const GRandEncDegToRad = 0.017453292f;
 
-    // DAT_06fd3b34: TU60's own cached math engine (FUN_06fa8fa0 on first use; the TU31 one is
-    // DAT_06fcf384, the TU53 one DAT_06fd1c70 -- one cache per TU, the same engine).
-    I3DMathEngine* GRandEncLaneMathEngine = nullptr;
-
     // DAT_06fb7b40: the turn of a spawned formation towards its target, (double)(float)pi
     // (shared with TU31).
     double const GRandEncLaneTurnAngle = 3.1415927410125732;
@@ -400,10 +396,8 @@ namespace
     // engine slot +0x2c).
     void TransformByMatrix(FVector* Out, FMatrix const* Matrix, FVector const* Source)
     {
-        if (GRandEncLaneMathEngine == nullptr)
-            GRandEncLaneMathEngine = ContentAcquire3DMathEngine();
         FVector Result;
-        GRandEncLaneMathEngine->TransformMatrix(Result, *Matrix, *Source);
+        ContentMathEngine()->TransformMatrix(Result, *Matrix, *Source);
         *Out = Result;
     }
 
@@ -411,10 +405,8 @@ namespace
     // 9 dwords.
     void MultiplyMatrices(FMatrix* Out, FMatrix const* A, FMatrix const* B)
     {
-        if (GRandEncLaneMathEngine == nullptr)
-            GRandEncLaneMathEngine = ContentAcquire3DMathEngine();
         FMatrix Result;
-        GRandEncLaneMathEngine->MulMatrix(Result, *A, *B);
+        ContentMathEngine()->MulMatrix(Result, *A, *B);
         *Out = Result;
     }
 

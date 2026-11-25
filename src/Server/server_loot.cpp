@@ -10,7 +10,7 @@
 // server_gameobject.cpp.
 
 #include "../include/server_gameobject.h"
-#include "../include/server_sysdb.h"   // StarSystem::explode / find_object, StarSystem_DamageObject
+#include "../include/server_sysdb.h"   // StarSystem::explode / find_object, StarSystem::damage_object
 #include "../include/common_misc.h"    // LOOT_UNSEEN_*, SUBOBJ_ID_ROOT / SUBOBJ_ID_POWER
 #include "../include/common_id.h"      // ID_String::IsEmpty / get_string
 #include "../include/dacom.h"          // FDUMP
@@ -198,7 +198,7 @@ void Loot::apply_damage_list(DamageList& Damage)
             }
         }
         // FUN_06d0b800.
-        StarSystem_DamageObject(OwnerSystem, this, &Damage);
+        OwnerSystem->damage_object(this, &Damage);
     }
 
     // The invincibility gate (+0x1b8) can block the kill.

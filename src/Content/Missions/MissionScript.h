@@ -28,10 +28,6 @@ struct FMissionScript;
 // (StoryMissions.cpp) derive from it.
 // ---------------------------------------------------------------------------------------
 
-// DAT_06fcf014: TU21's math engine, created on first use (FUN_06fa8fa0) by
-// Cnd_DistCircle::OnActivate and the Act_* classes that transform vectors.
-extern I3DMathEngine* GTriggerMathEngine;
-
 // DAT_06fd1c79 ("scan_clamp"): cleared by slot 22, set by the offer acceptance, loaded by
 // FUN_06ebae10, saved by FUN_06ebabb0, read by TU37.
 extern unsigned char GMissionScanClamp;
@@ -57,6 +53,16 @@ struct FTrigger
     std::vector<pub::Controller::EMessage> EventIds; // +0x18: message ids the condition listens to
     unsigned char bRepeatable; // +0x28 "repeatable"
     unsigned int Id;           // +0x2c CreateID(nickname)
+
+    // FUN_06ebb850 (thiscall on the trigger): reads the rest of the [Trigger] section
+    // into Trigger (Cnd_* / Act_* objects, InitState, repeatable).
+    void Load(INI_Reader* Reader);
+
+    // FUN_06ebb830: State = ACTIVE, then Condition->OnActivate() when set.
+    void Rearm();
+
+    // FUN_06ebb7f0: deletes Condition and every action (scalar deleting dtor, flag 1).
+    void DeleteContents();
 };
 
 typedef std::map<unsigned int, FTrigger> FTriggerMap;
@@ -252,54 +258,47 @@ struct FMissionScript : FMissionObject
     // +0x31c: costumes of the [Dialog] "line = ..., Player" speakers (FUN_06eb84c0, unique by
     // FUN_06eb8ef0), sent as CostumeHint on space enter (FUN_06eba720).
     std::vector<Costume> DialogCostumes;
+
+    // The unique push_back of a speaker costume into mission +0x31c (FUN_06eb8ef0 test,
+    // FUN_06ed1d30 insert), inlined by FUN_06eb84c0 [Dialog] and the comm Acts.
+    void AddDialogCostume(Costume const* SpeakerCostume);
+
+    // FUN_06eb84c0 [Trigger] branch: the values of one [Trigger] section
+    // ("nickname" builds and inserts a trigger through FTrigger::Load, "State" is read and dropped).
+    void LoadTriggerSection(INI_Reader* Reader);
+
+    // FUN_06eb82c0: activate the trigger with *TriggerId (no-op when unknown or already listed).
+    void ActivateTrigger(unsigned int const* TriggerId);
+
+    // FUN_06eb83e0: drop *TriggerId from the active list (State = INACTIVE) and from the
+    // pending-activation map.
+    void DeactivateTrigger(unsigned int const* TriggerId);
+
+    // FUN_06eb9af0: run message *EventId through the active triggers, then drain pending
+    // activations queued by Act_ActTrig.
+    void DispatchTriggerEvent(pub::Controller::EMessage const* EventId, void const* EventParms);
+
+    // FUN_06eba430 (thiscall): every script of RtcScripts whose path equals Path->Data
+    // is marked finished (+0x94 of the node); when the player stands in the mission's location
+    // (+0x308) of their base, the bar character named by the script's role gets its behavior
+    // cleared (-1). Act_RemoveRTC, Mission_01b.
+    void RemoveRtc(TString<0x80> const* Path);
+
+    // FUN_06ebb540 (thiscall): when the player's ship is farther than sqrt(RadiusSq) from
+    // *Position, relocate it there (FUN_06f67740). Act_MovePlayer.
+    void MovePlayer(Vector const* Position, float RadiusSq);
+
+    // FUN_06eb9c60: count the delayed-action list down by DeltaSeconds and run expired ones.
+    void TickTimers(float DeltaSeconds);
+
+    // FUN_06ecef10 (thiscall on the mission's +0x204 map, RET 8): message 0x3b moves the nags of
+    // the entering player to its system; unless NagClamp (+0x218) is set, every nag listening to
+    // MessageId gets it, and a done one is unlinked (its object is not freed).
+    void DispatchNagMessage(pub::Controller::EMessage MessageId, void const* MessageParms);
 };
 
 // FUN_06eb8ef0 (thiscall on A): the four parts, the accessory count and the first
 // count accessories are equal.
-bool IsSameCostume(Costume const* A, Costume const* B);
-
-// The unique push_back of a speaker costume into mission +0x31c (FUN_06eb8ef0 test,
-// FUN_06ed1d30 insert), inlined by FUN_06eb84c0 [Dialog] and the comm Acts.
-void AddDialogCostume(FMissionScript* Script, Costume const* SpeakerCostume);
-
-// FUN_06ebb850 (thiscall on the trigger): reads the rest of the [Trigger] section
-// into Trigger (Cnd_* / Act_* objects, InitState, repeatable).
-void LoadTrigger(FTrigger* Trigger, INI_Reader* Reader);
-
-// FUN_06eb84c0 [Trigger] branch: the values of one [Trigger] section
-// ("nickname" builds and inserts a trigger through LoadTrigger, "State" is read and dropped).
-void LoadMissionTriggerSection(FMissionScript* Script, INI_Reader* Reader);
-
-// FUN_06ebb830: State = ACTIVE, then Condition->OnActivate() when set.
-void RearmTrigger(FTrigger* Trigger);
-
-// FUN_06ebb7f0: deletes Condition and every action (scalar deleting dtor, flag 1).
-void DeleteTriggerContents(FTrigger* Trigger);
-
-// FUN_06eb82c0: activate the trigger with *TriggerId (no-op when unknown or already listed).
-void ActivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerId);
-
-// FUN_06eb83e0: drop *TriggerId from the active list (State = INACTIVE) and from the
-// pending-activation map.
-void DeactivateMissionTrigger(FMissionScript* Script, unsigned int const* TriggerId);
-
-// FUN_06eb9af0: run message *EventId through the active triggers, then drain pending
-// activations queued by Act_ActTrig.
-void DispatchMissionTriggerEvent(FMissionScript* Script, pub::Controller::EMessage const* EventId,
-                                 void const* EventParms);
-
-// FUN_06eba430 (thiscall): every script of RtcScripts whose path equals Path->Data
-// is marked finished (+0x94 of the node); when the player stands in the mission's location
-// (+0x308) of their base, the bar character named by the script's role gets its behavior
-// cleared (-1). Act_RemoveRTC, Mission_01b.
-void RemoveMissionRtc(FMissionScript* Script, TString<0x80> const* Path);
-
-// FUN_06ebb540 (thiscall): when the player's ship is farther than sqrt(RadiusSq) from
-// *Position, relocate it there (FUN_06f67740). Act_MovePlayer.
-void MoveMissionPlayer(FMissionScript* Script, Vector const* Position, float RadiusSq);
-
-// FUN_06eb9c60: count the delayed-action list down by DeltaSeconds and run expired ones.
-void TickMissionTimers(FMissionScript* Script, float DeltaSeconds);
 
 // FUN_06eb8f50 case 0x1000: activate every InitState ACTIVE trigger.
 void ActivateInitialMissionTriggers(FMissionScript* Script);

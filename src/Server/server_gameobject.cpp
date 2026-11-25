@@ -30,7 +30,7 @@
 #include "../include/DALib.h"         // DALib::Engine (Ship::create / Solar::create, IEngine +0x6c)
 #include "../include/common_ini.h"              // StringAlloc (EqObj::*_by_name / dump_cargo)
 #include "../include/common_server.h"           // Players, Server_BroadcastGroupControl (EqObj::destroy)
-#include "../include/common_server_playerdb.h"  // PlayerData_ShouldQueueVisit / PlayerData_QueueVisit
+#include "../include/common_server_playerdb.h"  // PlayerData::should_queue_visit / PlayerData::queue_visit
 #include "../include/common_server_types.h"     // ServerStats (EqObj::destroy)
 #include "../include/rpc_iclient_args.h"        // FServerBurnFuseInfo (EqObj::light_fuse)
 #include <map>                                  // ServerFuseDB::Get (EqObj::light_fuse)
@@ -294,9 +294,6 @@ bool GameObject::is_destroyed() const
 // slot order, see server_gameobject.h).
 // ---------------------------------------------------------------------------
 
-// DAT_06d8d71c -- GameObj.cpp's own lazily fetched math engine (FUN_06d5ff70).
-static I3DMathEngine* GGameObjectMathEngine = nullptr;
-
 // +0x170 -- .text:06cee6e0.
 void GameObject::enter_system(StarSystem* Sys, PhySys::CreateParms const* Parms)
 {
@@ -310,10 +307,8 @@ void GameObject::enter_system(StarSystem* Sys, PhySys::CreateParms const* Parms)
     // correction. The owner test reads the guarded CSimple without a null test.
     if (!SinglePlayer() && csimple()->OwnerPlayer != 0)
     {
-        if (GGameObjectMathEngine == nullptr)
-            GGameObjectMathEngine = Server_Acquire3DMathEngine();
         Quaternion Orientation;
-        GGameObjectMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orientation),
+        Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orientation),
                                                   reinterpret_cast<FMatrix const&>(Object->Orientation));
 
         // Angular velocity is fetched before velocity, both from the raw Object.
@@ -488,7 +483,7 @@ void GameObject::apply_damage_list(DamageList& Damage)
             if (It->SubObjId == SUBOBJ_ID_ROOT)
                 apply_root_damage(*It);
         }
-        StarSystem_DamageObject(OwnerSystem, this, &Damage);
+        OwnerSystem->damage_object(this, &Damage);
     }
 
     if (Damage.bDestroyed && !is_destroyed() && !is_damage_blocked(Damage))
@@ -507,7 +502,7 @@ bool GameObject::is_in_damage_callback() const
 // both inline: a fresh DamageList gets a copy of PendingDamage's entries and its
 // four scalars; PendingDamage's entries are erased (Count back to 0, bDestroyed
 // NOT reset), and the copy goes through apply_damage_list (vt +0x188).
-static void GameObject_FlushPendingDamage(GameObject* Obj, DamageList& Pending)
+void GameObject::flush_pending_damage(DamageList& Pending)
 {
     DamageList Local;
     Local.Entries.insert(Local.Entries.begin(), Pending.Entries.begin(), Pending.Entries.end());
@@ -518,7 +513,7 @@ static void GameObject_FlushPendingDamage(GameObject* Obj, DamageList& Pending)
     Local.InflictorOwner = Pending.InflictorOwner;
     Pending.Entries.clear();
     Pending.Count = 0;
-    Obj->apply_damage_list(Local);
+    apply_damage_list(Local);
 }
 
 // +0x190 -- .text:06ceefa0.
@@ -528,7 +523,7 @@ void GameObject::set_in_damage_callback(bool bIn)
     // Flush only when clearing, and only with a non-empty PendingDamage.
     if (bIn || PendingDamage.Count == 0)
         return;
-    GameObject_FlushPendingDamage(this, PendingDamage);
+    flush_pending_damage(PendingDamage);
 }
 
 // +0x194 -- .text:06cef0f0.
@@ -612,7 +607,7 @@ void GameObject::set_relative_health(float Relative)
     // Applied at once unless inside a callback.
     if (is_in_damage_callback())
         return;
-    GameObject_FlushPendingDamage(this, PendingDamage);
+    flush_pending_damage(PendingDamage);
 }
 
 // +0x1b0 -- .text:06ceec90.
@@ -800,9 +795,9 @@ CEqObj* EqObj::ceqobj() const
 
 // FUN_06ce83c0 (only caller EqObj::destroy): CSimple+0xb4 through the
 // (ObjectClass & 3) guard; retail dereferences the null the guard produces.
-static unsigned int EqObj_OwnerPlayer(EqObj const* Obj)
+unsigned int EqObj::owner_player() const
 {
-    return Obj->csimple()->OwnerPlayer;
+    return csimple()->OwnerPlayer;
 }
 
 // FUN_06ce7e20.
@@ -927,7 +922,7 @@ bool EqObj::destroy(int Kind, unsigned int ObjId)
             // A player's ship died in multiplayer: control message 0x14 with the
             // player's id to every active player (FUN_06d19110), counted in
             // ServerStats+0x10.
-            Server_BroadcastGroupControl(0x14, EqObj_OwnerPlayer(this));
+            Server_BroadcastGroupControl(0x14, owner_player());
             ++GServerStats.PlayerDeathCount;
         }
     }
@@ -1201,7 +1196,7 @@ void EqObj::apply_damage_list(DamageList& Damage)
             Ce->EquipManager.CleanUp();
         }
 
-        StarSystem_DamageObject(OwnerSystem, this, &Damage);      // FUN_06d0b800
+        OwnerSystem->damage_object(this, &Damage);      // FUN_06d0b800
     }
 
     // A burning death fuse holds off causes below 0x10.
@@ -1223,9 +1218,8 @@ void EqObj::apply_damage_list(DamageList& Damage)
 // fuse whose threshold lies in [Before, After). Before is re-read for every
 // node (light_fuse / unlight_fuse may change it).
 template <typename FReadHitPts>
-static void EqObj_SweepFuses(EqObj* Obj, std::vector<Archetype::FGroupFuse> const& List,
-                             FReadHitPts ReadHitPts, float After, unsigned short SubObjId,
-                             unsigned int InflictorId)
+void EqObj::sweep_fuses(std::vector<Archetype::FGroupFuse> const& List, FReadHitPts ReadHitPts,
+                        float After, unsigned short SubObjId, unsigned int InflictorId)
 {
     for (std::vector<Archetype::FGroupFuse>::const_iterator It = List.begin(); It != List.end(); ++It)
     {
@@ -1236,7 +1230,7 @@ static void EqObj_SweepFuses(EqObj* Obj, std::vector<Archetype::FGroupFuse> cons
             // Skips "less" and unordered alike.
             if (!(It->Value2 >= After))
                 continue;
-            Obj->light_fuse(InflictorId, It->Fuse, SubObjId, It->Value1, -1.0f);
+            light_fuse(InflictorId, It->Fuse, SubObjId, It->Value1, -1.0f);
         }
         else
         {
@@ -1245,7 +1239,7 @@ static void EqObj_SweepFuses(EqObj* Obj, std::vector<Archetype::FGroupFuse> cons
             // Skips "greater" and unordered alike.
             if (!(ReadHitPts() <= It->Value2))
                 continue;
-            Obj->unlight_fuse(It->Fuse, SubObjId, It->Value1);
+            unlight_fuse(It->Fuse, SubObjId, It->Value1);
         }
     }
 }
@@ -1306,9 +1300,9 @@ void EqObj::apply_root_entry(DamageList const& Damage, DamageEntry const& Entry)
     // The archetype's fuses, when the hull's hit points change.
     if (Ce->get_hit_pts() != Entry.HitPts)
     {
-        EqObj_SweepFuses(this, *ceqobj()->eqobjarch()->Fuses,
-                         [Ce]() { return Ce->get_hit_pts(); },
-                         Entry.HitPts, SUBOBJ_ID_ROOT, Damage.InflictorId);
+        sweep_fuses(*ceqobj()->eqobjarch()->Fuses,
+                    [Ce]() { return Ce->get_hit_pts(); },
+                    Entry.HitPts, SUBOBJ_ID_ROOT, Damage.InflictorId);
     }
 
     // Direct call to FUN_06ceef70, not through the vtable.
@@ -1485,9 +1479,9 @@ void EqObj::apply_group_entry(DamageList const& Damage, DamageEntry& Entry)
     // The group's fuses when its hit points change.
     if (Group->GetHitPoints() != Entry.HitPts)
     {
-        EqObj_SweepFuses(this, *Group->FuseIgnitions().Items,
-                         [Group]() { return Group->GetHitPoints(); },
-                         Entry.HitPts, Group->Arch->Id, Damage.InflictorId);
+        sweep_fuses(*Group->FuseIgnitions().Items,
+                    [Group]() { return Group->GetHitPoints(); },
+                    Entry.HitPts, Group->Arch->Id, Damage.InflictorId);
     }
 
     // A burning death fuse keeps low-cause groups attached: the entry's fate
@@ -1507,10 +1501,10 @@ void EqObj::apply_group_entry(DamageList const& Damage, DamageEntry& Entry)
 // _power): get_id() first, then CSimple+0xb4 through the (ObjectClass & 3) guard
 // (its null dereferenced, as in retail), PlayerDB::is_valid inlined, then
 // PlayerData+0x3e4 against the id. Null when any of them fails.
-static PlayerData* EqObj_PlayerOfShip(EqObj const* Obj)
+PlayerData* EqObj::player_of_ship() const
 {
-    unsigned int const Id = Obj->get_id();
-    unsigned int const Owner = Obj->csimple()->OwnerPlayer;
+    unsigned int const Id = get_id();
+    unsigned int const Owner = csimple()->OwnerPlayer;
     if (!Players.is_valid(Owner))
         return nullptr;
     PlayerData& Data = Players[Owner];
@@ -1521,18 +1515,15 @@ static PlayerData* EqObj_PlayerOfShip(EqObj const* Obj)
 
 // Retail's inlined CSolar narrowing ((ObjectClass & 0x303) == 0x303) at the
 // loot-visit sites. Null for everything that is not a solar.
-static CSolar* EqObj_Solar(EqObj const* Obj)
+CSolar* EqObj::as_solar() const
 {
-    CObject* const Raw = Obj->cobj();
+    CObject* const Raw = cobj();
     if (Raw == nullptr)
         return nullptr;
     if ((static_cast<unsigned>(Raw->ObjectClass) & CObject::ClassSolar) != CObject::ClassSolar)
         return nullptr;
     return static_cast<CSolar*>(Raw);
 }
-
-// DAT_06d8d6d4 -- EqObj.cpp's own lazily fetched math engine (FUN_06d5ff70).
-static I3DMathEngine* GEqObjMathEngine = nullptr;
 
 // The ServerEquip listening to Equip (inlined walk of ServerEquips in retail).
 // End of list -> nullptr and the "not found" flag; retail tells the two apart
@@ -1636,10 +1627,8 @@ int EqObj::fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector c
         if (!SinglePlayer() && LockTarget != nullptr)
         {
             FTransform const TargetXform = *reinterpret_cast<FTransform const*>(&LockTarget->Orientation);
-            if (GEqObjMathEngine == nullptr)
-                GEqObjMathEngine = Server_Acquire3DMathEngine();
             FVector Local;
-            GEqObjMathEngine->InverseTransform(Local, TargetXform,
+            Server_MathEngine()->InverseTransform(Local, TargetXform,
                                                *reinterpret_cast<FVector const*>(TargetPos));
             Aim = reinterpret_cast<Vector const&>(Local);
         }
@@ -2146,9 +2135,7 @@ void EqObj::process_dock_queue(float Dt)
             DALib::Engine->GetInstanceTransform(reinterpret_cast<void*>(ShipObj->get_index()));
 
         Transform Mounted;
-        if (GEqObjMathEngine == nullptr)
-            GEqObjMathEngine = Server_Acquire3DMathEngine();
-        GEqObjMathEngine->MulTransform(reinterpret_cast<FTransform&>(Mounted),
+        Server_MathEngine()->MulTransform(reinterpret_cast<FTransform&>(Mounted),
                                        *reinterpret_cast<FTransform const*>(ShipXform),
                                        reinterpret_cast<FTransform const&>(HpXform));
         // FUN_06ce7c30, a 12-dword copy.
@@ -2449,10 +2436,10 @@ bool EqObj::dump_cargo(char const* Hardpoint, DamageList& Out)
         // Dumping at a solar for a valid inflicting player asks PlayerData
         // FUN_06d4b200 first; a refusal skips the item.
         unsigned int const Inflictor = Out.InflictorOwner;
-        CSolar* const Solar = EqObj_Solar(this);
+        CSolar* const Solar = as_solar();
         if (Solar != nullptr && Players.is_valid(Inflictor))
         {
-            if (!PlayerData_ShouldQueueVisit(Players[Inflictor], Solar->Id, Solar->GetVisitValue()))
+            if (!Players[Inflictor].should_queue_visit(Solar->Id, Solar->GetVisitValue()))
                 continue;
         }
 
@@ -2472,10 +2459,10 @@ bool EqObj::dump_cargo(char const* Hardpoint, DamageList& Out)
         Out.add_damage_entry(Equip->Id, 0.0f, DamageEntry::SubObjFate::Destroyed);
 
         // The visit is recorded (FUN_06d4b270), with the owner re-read.
-        CSolar* const SolarAgain = EqObj_Solar(this);
+        CSolar* const SolarAgain = as_solar();
         unsigned int const InflictorAgain = Out.InflictorOwner;
         if (SolarAgain != nullptr && Players.is_valid(InflictorAgain))
-            PlayerData_QueueVisit(Players[InflictorAgain], SolarAgain->Id, SolarAgain->GetVisitValue());
+            Players[InflictorAgain].queue_visit(SolarAgain->Id, SolarAgain->GetVisitValue());
     }
     return bDumped;
 }
@@ -2808,10 +2795,10 @@ void EqObj::destroy_cargo(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
             // real call here) that already has this visit gets no loot.
             bool bRefused = false;
             unsigned int const Inflictor = Out.InflictorOwner;
-            CSolar* const Solar = EqObj_Solar(this);
+            CSolar* const Solar = as_solar();
             if (Solar != nullptr && Players.is_valid(Inflictor))
             {
-                if (!PlayerData_ShouldQueueVisit(Players[Inflictor], Solar->Id, Solar->GetVisitValue()))
+                if (!Players[Inflictor].should_queue_visit(Solar->Id, Solar->GetVisitValue()))
                     bRefused = true;
             }
 
@@ -2868,11 +2855,11 @@ void EqObj::destroy_cargo(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
                         OwnerSystem->create_loot(get_id(), Mode, &Record, 1);
 
                         // The visit recorded (FUN_06d4b270), owner re-read.
-                        CSolar* const SolarAgain = EqObj_Solar(this);
+                        CSolar* const SolarAgain = as_solar();
                         unsigned int const InflictorAgain = Out.InflictorOwner;
                         if (SolarAgain != nullptr && Players.is_valid(InflictorAgain))
-                            PlayerData_QueueVisit(Players[InflictorAgain], SolarAgain->Id,
-                                                  SolarAgain->GetVisitValue());
+                            Players[InflictorAgain].queue_visit(SolarAgain->Id,
+                                                                SolarAgain->GetVisitValue());
                     }
                 }
             }
@@ -2911,10 +2898,10 @@ void EqObj::destroy_equip(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
             // The solar visit test (a real PlayerDB::is_valid call).
             bool bRefused = false;
             unsigned int const Inflictor = Out.InflictorOwner;
-            CSolar* const Solar = EqObj_Solar(this);
+            CSolar* const Solar = as_solar();
             if (Solar != nullptr && Players.is_valid(Inflictor))
             {
-                if (!PlayerData_ShouldQueueVisit(Players[Inflictor], Solar->Id, Solar->GetVisitValue()))
+                if (!Players[Inflictor].should_queue_visit(Solar->Id, Solar->GetVisitValue()))
                     bRefused = true;
             }
 
@@ -2990,11 +2977,11 @@ void EqObj::destroy_equip(CEquip* Equip, DamageEntry::SubObjFate Fate, DamageLis
 
                     // On both paths, whether or not a record was built, the
                     // visit is recorded.
-                    CSolar* const SolarAgain = EqObj_Solar(this);
+                    CSolar* const SolarAgain = as_solar();
                     unsigned int const InflictorAgain = Out.InflictorOwner;
                     if (SolarAgain != nullptr && Players.is_valid(InflictorAgain))
-                        PlayerData_QueueVisit(Players[InflictorAgain], SolarAgain->Id,
-                                              SolarAgain->GetVisitValue());
+                        Players[InflictorAgain].queue_visit(SolarAgain->Id,
+                                                            SolarAgain->GetVisitValue());
                 }
             }
         }
@@ -3011,7 +2998,7 @@ bool EqObj::damage_hull(float Amount, DamageList& Damage)
     {
         // A player's current ship takes the player's difficulty scale
         // (PlayerData+0x3c4).
-        PlayerData* const Player = EqObj_PlayerOfShip(this);
+        PlayerData* const Player = player_of_ship();
         if (Player != nullptr)
             Amount = Player->difficulty_scale * Amount;
 
@@ -3050,7 +3037,7 @@ bool EqObj::damage_equip(CEquip* Equip, float Damage, DamageList& Out)
         {
             Damage = Damage / PLAYER_ATTACHED_EQUIP_HIT_PTS_SCALE;
             Applied = Damage;
-            PlayerData* const Player = EqObj_PlayerOfShip(this);
+            PlayerData* const Player = player_of_ship();
             if (Player != nullptr)
                 Applied = static_cast<double>(Player->difficulty_scale) * Damage;
         }
@@ -3117,7 +3104,7 @@ bool EqObj::damage_shield(CEShield* Shield, float Damage, DamageList& Out)
     {
         // Only the difficulty scale here.
         double Applied = Damage;
-        PlayerData* const Player = EqObj_PlayerOfShip(this);
+        PlayerData* const Player = player_of_ship();
         if (Player != nullptr)
             Applied = static_cast<double>(Player->difficulty_scale) * Damage;
         double const Left = Current - Applied;  // adj stays on the x87 stack
@@ -3210,7 +3197,7 @@ bool EqObj::damage_group(CArchGroup* Group, float Damage, DamageList& Out)
         {
             float const OwnedScaled = (float)(Scaled / PLAYER_COLLISION_GROUP_HIT_PTS_SCALE);
             Applied = OwnedScaled;
-            PlayerData* const Player = EqObj_PlayerOfShip(this);
+            PlayerData* const Player = player_of_ship();
             if (Player != nullptr)
                 Applied = (double)Player->difficulty_scale * OwnedScaled;
         }
@@ -3292,7 +3279,7 @@ bool EqObj::damage_power(float Damage, DamageList& Out)
     if (Damage > 0.0f)
     {
         double Applied = Damage;
-        PlayerData* const Player = EqObj_PlayerOfShip(this);
+        PlayerData* const Player = player_of_ship();
         if (Player != nullptr)
             Applied = static_cast<double>(Player->difficulty_scale) * Damage;
         double const Left = Current - Applied;  // adj stays on the x87 stack
@@ -3679,9 +3666,6 @@ void EqObj::decay_cargo(float Elapsed)
 // ServerEquip family -- .text:06ced2d0 .. .text:06cee2e5
 // ---------------------------------------------------------------------------
 
-// DAT_06d8d6f8 -- SrvGun::fire_forward's own lazily fetched math engine.
-static I3DMathEngine* GSrvGunMathEngine = nullptr;
-
 // .text:06ced2d0: vtable .rdata:06d65744; ConnectServerEquip with no null test.
 ServerEquip::ServerEquip(CEquip* InEquip, EqObj* InOwner)
     : Equip(InEquip)
@@ -3942,7 +3926,7 @@ bool SrvLauncher::use_ammo(Vector const& Target)
         {
             Archetype::Projectile const* const Projectile = Launcher->ProjectileArch();
             if (Projectile->bRequiresAmmo)
-                PlayerData_RemoveCargo(Player, Projectile->Nickname.Id, 1, 1.0f, false);
+                Player.remove_cargo(Projectile->Nickname.Id, 1, 1.0f, false);
         }
     }
     return true;
@@ -4154,10 +4138,8 @@ bool SrvGun::fire_forward(int SourceClient)
         static_cast<CEGun*>(Equip)->GetTarget(LockTarget, LockSubId);
         if (LockTarget != nullptr)
         {
-            if (GSrvGunMathEngine == nullptr)
-                GSrvGunMathEngine = Server_Acquire3DMathEngine();
             FVector Local;
-            GSrvGunMathEngine->InverseTransform(
+            Server_MathEngine()->InverseTransform(
                 Local, *reinterpret_cast<FTransform const*>(&LockTarget->Orientation),
                 reinterpret_cast<FVector const&>(Target));
             Target = reinterpret_cast<Vector const&>(Local);
@@ -5385,9 +5367,6 @@ void Solar::explosion_hit_hull(ExplosionDamageEvent const& Blast, DamageList& Ou
     }
 }
 
-// DAT_06d8d97c -- Solar.cpp's own lazily fetched math engine.
-static I3DMathEngine* GSolarMathEngine = nullptr;
-
 // +0x250 .text:06d03070. The type bits pick the branch:
 //   0x40 or 0x800 -- somewhere on a 500-unit ring 350 units behind the solar.
 //     vt +0x10 is ICF-folded with get_transform, so the copy is the whole
@@ -5411,10 +5390,8 @@ void Solar::ChooseSystemArrivalLocation(GameObject* Arriving, Vector& OutPos, Ma
         Local.x = static_cast<float>(cos(Angle) * 500.0);
         Local.y = static_cast<float>(sin(Angle) * 500.0);
         Local.z = -350.0f;
-        if (GSolarMathEngine == nullptr)
-            GSolarMathEngine = Server_Acquire3DMathEngine();
         Vector Out;
-        GSolarMathEngine->TransformXform(reinterpret_cast<FVector&>(Out),
+        Server_MathEngine()->TransformXform(reinterpret_cast<FVector&>(Out),
                                          reinterpret_cast<FTransform const&>(Xform),
                                          reinterpret_cast<FVector const&>(Local));
         OutPos = Out;

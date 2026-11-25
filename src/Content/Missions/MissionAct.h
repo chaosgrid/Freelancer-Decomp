@@ -585,12 +585,6 @@ public:
     int NagsLeft;                     // +0x6c (ctor 4)
 };
 
-// FUN_06ecef10 (thiscall on the mission's +0x204 map, RET 8): message 0x3b moves the nags of
-// the entering player to its system; unless NagClamp (+0x218) is set, every nag listening to
-// MessageId gets it, and a done one is unlinked (its object is not freed).
-void DispatchNagMessage(FMissionScript* Script, pub::Controller::EMessage MessageId,
-                        void const* MessageParms);
-
 // Act_NagGreet: new(0x44), ctor FUN_06ecbf90, vtable 06fb5e9c.
 class ActNagGreet : public Act
 {

@@ -182,7 +182,7 @@ namespace
             return;
         if (NextChapter == 42)
         {
-            RecalculateContentPlayerRank(PlayerState);
+            PlayerState->RecalculateRank();
             return;
         }
         SetNextRankWorth(PlayerState, NextChapter);

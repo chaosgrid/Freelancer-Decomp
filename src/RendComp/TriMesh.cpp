@@ -387,7 +387,7 @@ static const GENRESULT kTriMeshReadFailed = (GENRESULT)0x80004005;
 static GENRESULT TriMeshReadString(IFileSystem* File, const char* Name, unsigned long Size, char* Buffer)
 {
     FFileSystemDesc Desc;
-    FileDescInit(&Desc, Name, "FileSystem");
+    Desc.Init(Name, "FileSystem");
     int bOk = 0;
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle != -1)
@@ -411,7 +411,7 @@ static GENRESULT TriMeshReadString(IFileSystem* File, const char* Name, unsigned
 static GENRESULT TriMeshReadInt(IFileSystem* File, const char* Name, unsigned long* Out)
 {
     FFileSystemDesc Desc;
-    FileDescInit(&Desc, Name, "FileSystem");
+    Desc.Init(Name, "FileSystem");
     int bOk = 0;
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle != -1)
@@ -432,7 +432,7 @@ static GENRESULT TriMeshReadInt(IFileSystem* File, const char* Name, unsigned lo
 static GENRESULT TriMeshReadFloat(IFileSystem* File, const char* Name, float* Out)
 {
     FFileSystemDesc Desc;
-    FileDescInit(&Desc, Name, "FileSystem");
+    Desc.Init(Name, "FileSystem");
     int bOk = 0;
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle != -1)
@@ -457,7 +457,7 @@ static GENRESULT TriMeshReadArray(IFileSystem* File, const char* Name, unsigned 
                                   unsigned long* OutCount, ElementType** OutData)
 {
     FFileSystemDesc Desc;
-    FileDescInit(&Desc, Name, "FileSystem");
+    Desc.Init(Name, "FileSystem");
     int Result = 0;
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle != -1)
@@ -1409,7 +1409,7 @@ static bool TriMeshReadPool(IFileSystem* File, const char* Name, unsigned long E
                             ElementType** OutBuffer, unsigned long* OutCount, bool* bOutRead)
 {
     FFileSystemDesc Desc;
-    FileDescInit(&Desc, Name, "FileSystem");
+    Desc.Init(Name, "FileSystem");
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle == -1)
         return false;
@@ -1684,9 +1684,9 @@ int FTriMeshArch::Clone(FTriMeshArch** Out)
 
 // The per-vertex index array a channel locks (FUN_06c25e30 / FUN_06c26000): 1 position, 8 normal,
 // 2 tex0, 4 tex1, 0x10 diffuse; 0x4000..0x20000 extra stream 0..3. Null for anything else.
-static const unsigned long** TriMeshChannelIndexArray(FTriMeshGroup* Group, unsigned long Channel)
+const unsigned long** FTriMeshGroup::ChannelIndexArray(unsigned long Channel)
 {
-    FRpVertexSrcDesc* Desc = Group->Vertices;
+    FRpVertexSrcDesc* Desc = Vertices;
     switch (Channel)
     {
     case 0x1: return &Desc->Position.IndexArray;
@@ -1694,10 +1694,10 @@ static const unsigned long** TriMeshChannelIndexArray(FTriMeshGroup* Group, unsi
     case 0x2: return &Desc->Tex[0].IndexArray;
     case 0x4: return &Desc->Tex[1].IndexArray;
     case 0x10: return &Desc->Diffuse.IndexArray;
-    case 0x4000: return &Group->ExtraStreams[0].IndexArray;
-    case 0x8000: return &Group->ExtraStreams[1].IndexArray;
-    case 0x10000: return &Group->ExtraStreams[2].IndexArray;
-    case 0x20000: return &Group->ExtraStreams[3].IndexArray;
+    case 0x4000: return &ExtraStreams[0].IndexArray;
+    case 0x8000: return &ExtraStreams[1].IndexArray;
+    case 0x10000: return &ExtraStreams[2].IndexArray;
+    case 0x20000: return &ExtraStreams[3].IndexArray;
     default: return nullptr;
     }
 }
@@ -1711,9 +1711,9 @@ int FTriMeshArch::LockChannel(unsigned long Channel)
         if (Group->ExtraStreams == nullptr)
             Group->AllocateExtraStreams();
     }
-    // TriMeshChannelIndexArray is non-null exactly for the nine channels retail maps, and for
+    // FTriMeshGroup::ChannelIndexArray is non-null exactly for the nine channels retail maps, and for
     // those TriMeshLockedSlot gives retail's slot (never 5).
-    const unsigned long** IndexArray = TriMeshChannelIndexArray(Group, Channel);
+    const unsigned long** IndexArray = Group->ChannelIndexArray(Channel);
     if (IndexArray == nullptr)
         return -1;
     const int Slot = TriMeshLockedSlot(Channel);
@@ -1739,7 +1739,7 @@ int FTriMeshArch::UnlockChannel(unsigned long Channel)
     if (!bExtra || Group->ExtraStreams != nullptr)
     {
         // Non-null exactly for the nine mapped channels (see LockChannel).
-        const unsigned long** IndexArray = TriMeshChannelIndexArray(Group, Channel);
+        const unsigned long** IndexArray = Group->ChannelIndexArray(Channel);
         if (IndexArray != nullptr)
         {
             Dest = (unsigned long*)*IndexArray;

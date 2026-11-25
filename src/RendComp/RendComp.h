@@ -82,6 +82,10 @@ struct FRenderPluginDesc
     const char* Name;           // +0x04 the [RenderManager] line, cut at the first tab/space/';'
     IDAComponent* Parent;       // +0x08 RenderManager +0x28 (the system container)
     IEngine* Engine;            // +0x0C DAT_06c37d4c
+
+    // The object-building halves of the TriMesh (LAB_06c22210) and SphereMesh (LAB_06c2a3d0)
+    // factories, after PluginFactoryCreate's AGGDESC checks (Plugins.cpp).
+    GENRESULT CreateTriMesh(void** Out) const;
 };
 
 static_assert(sizeof(FRenderPluginDesc) == 0x10, "render plugin AGGDESC 0x10");
@@ -114,11 +118,15 @@ struct FLodSet
     std::vector<float> Switch;      // +0x10 Get/SetArchetypeLodRange, FUN_06c32040
 
     FLodSet() : LodCount(0), CurrentLod(0), bFlag(0) {}
+
+    void Resize(int Count);
+    void Assign(const FLodSet& Src);
+    FLodEntry* Pick(float Distance);
 };
 
-void LodSetResize(FLodSet& Set, int Count);             // FUN_06c31f30
-void LodSetAssign(FLodSet& Dest, const FLodSet& Src);   // FUN_06c31eb0
-FLodEntry* LodSetPick(FLodSet& Set, float Distance);    // FUN_06c32040
+             // FUN_06c31f30
+   // FUN_06c31eb0
+    // FUN_06c32040
 
 struct FVmeshGroup;
 
@@ -139,6 +147,14 @@ struct FVmeshData
     int RefCount;               // +0x2C
     float SizeKib;              // +0x30 leaf size * (1/1024), "Memory_VMeshData" LogEvent
     FVmeshDataHeader* Header;   // +0x34 the whole VMeshData leaf, owned
+
+    int Release();
+
+    // FUN_06c2df60. Defined in VMeshLibrary.cpp.
+    FVmeshData* Construct(const char* Name, unsigned long Size);
+
+    // FUN_06c2df00. Defined in VMeshLibrary.cpp.
+    void Destruct();
 };
 
 // Shared-buffer group, 0x28 bytes: operator new(0x28) + ten zero stores (LAB_06c2ee30).
@@ -154,6 +170,20 @@ struct FVmeshGroup
     FVmeshData* First;          // +0x1C
     FVmeshData* Last;           // +0x20
     int Count;                  // +0x24
+
+    int EnsureVb();
+    void DestroyVb();
+    void DestroyIb();
+
+    // FUN_06c2d460. Defined in VMeshLibrary.cpp.
+    void ReleaseBuffers();
+
+    // FUN_06c2d330. Defined in VMeshLibrary.cpp.
+    bool Add(FVmeshData* Data);
+
+                               // FUN_06c2dff0
+                           // FUN_06c2d4a0
+    int EnsureIb(unsigned long BaseVertex);
 };
 
 // The {name, crc} pair FUN_06c2e720 takes; only +4 is read.
@@ -178,9 +208,6 @@ int FileRead(void* File, int Handle, void* Buffer, unsigned long Size, unsigned 
 unsigned long FileGetSize(void* File, int Handle);
 int FileGetCurrentPath(void* File, char* Out, unsigned long MaxChars);
 int FileOpenByName(void* File, const char* ChildName);
-// FUN_06c24980: the 0x34 FileSystem descriptor (Path, "FileSystem", GENERIC_READ, share 1,
-// OPEN_EXISTING, 0x8000080, +0x30 = -1).
-FFileSystemDesc* FileDescInit(FFileSystemDesc* Desc, const char* Path, const char* ComponentName);
 
 void* QueryIid(IDAComponent* Object, const char* Iid);
 void ReleaseIf(IDAComponent* Object);
@@ -216,11 +243,9 @@ float* TransformPoint3(float* Dest3, const float* Matrix12, const float* Vec3); 
 FVmeshData* VMeshDataLoad(IFileSystem* File, const char* Name);   // FUN_06c2dd20
 FVmeshData* VMeshDataFind(const FVmeshKey* Key);                  // FUN_06c2e720
 int VMeshDataAddRef(FVmeshData* Data);                            // FUN_06c2dfe0
-int VMeshDataRelease(FVmeshData* Data);                           // FUN_06c2dff0
-int VMeshGroupEnsureVb(FVmeshGroup* Group);                       // FUN_06c2d4a0
-int VMeshGroupEnsureIb(FVmeshGroup* Group, unsigned long BaseVertex); // FUN_06c2d5a0
-void VMeshGroupDestroyVb(FVmeshGroup* Group);                     // FUN_06c2d480
-void VMeshGroupDestroyIb(FVmeshGroup* Group);                     // FUN_06c2d490
+ // FUN_06c2d5a0
+                     // FUN_06c2d480
+                     // FUN_06c2d490
 
 // DAT_06c37ce0 triples {channelId, fvfTestMask, elemByteSize}, filled lazily by the first
 // channel query (flag DAT_06c37d70).
@@ -245,9 +270,6 @@ bool VMeshFillChannelRecord(const FVmeshDataHeader* Header, unsigned long Vertex
 void VMeshBuildVertexDesc(const FVmeshDataHeader* Header, unsigned long VertexStart,
                           unsigned long VertexCount, FRpVertexSrcDesc* Out);
 
-// The object-building halves of the TriMesh (LAB_06c22210) and SphereMesh (LAB_06c2a3d0)
-// factories, after PluginFactoryCreate's AGGDESC checks (Plugins.cpp).
-GENRESULT CreateTriMeshPlugin(const FRenderPluginDesc* Desc, void** Out);
 GENRESULT CreateSphereMeshPlugin(const FRenderPluginDesc* Desc, void** Out);
 
 GENRESULT DACOM_API RenderManagerFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void** Out);

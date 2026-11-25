@@ -32,7 +32,7 @@
 #include "../include/rpc_iclient.h"
 #include "../include/rpc_iclient_args.h" // FPayloadServerSetDirective (pub::AI::SubmitDirective)
 #include "../include/server_savefile.h"   // SaveGame_Writer / ISave / Server_FLS1Transform
-#include "../include/server_savegame.h"   // pub::Save -> PlayerData_AutoSave / PlayerData_MissionSave
+#include "../include/server_savegame.h"   // pub::Save -> PlayerData::auto_save / PlayerData::mission_save
 #include "../include/common_casteroid.h"
 #include <windows.h>
 #include <cstdint>
@@ -841,7 +841,7 @@ static void Server_CopyCostumeCounted(Costume& Dst, Costume const& Src) {
         Dst.AccessoryIds[I] = Src.AccessoryIds[I];
 }
 
-// PlayerData_SerializeToFile -- retail FUN_06d4ccd0 (.text:06d4ccd0 .. .text:06d4ea4f).
+// PlayerData::serialize_to_file -- retail FUN_06d4ccd0 (.text:06d4ccd0 .. .text:06d4ea4f).
 //
 // Signature: thiscall with three dword stack arguments (every exit is `RET 0xc`),
 // returning AL; Ghidra's 15-parameter prototype is wrong. FileName is a base file name
@@ -861,38 +861,37 @@ static void Server_CopyCostumeCounted(Costume& Dst, Costume const& Src) {
 // BaseHullStatus (+0x25c), BaseEquipment (+0x260), BaseCollisionGroups (+0x26c); the
 // listing's +0x468/+0x46c/+0x478 are node offsets (record at node + 0x20c). The map key
 // is +0x64 alone (FUN_06d57da0 pairs it with a default record from FUN_06d46ab0).
-bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName,
-                                       wchar_t const* Description,
-                                       unsigned int DescripStrId) {
+bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Description,
+                                   unsigned int DescripStrId) {
     // No null test on FileName, as retail.
 
     // The cheat gate (.text:06d4cd01), returning 0 (save refused) from inside it.
-    // PlayerData_CheckForCheats (server_classes.cpp) includes the already-reported
+    // PlayerData::check_for_cheats (server_classes.cpp) includes the already-reported
     // latch at +0x34C.
-    if (PlayerData_CheckForCheats(Player))
+    if (check_for_cheats())
         return false;
 
     // A dead MP ship is put back to the last-base loadout before it is written. Retail
     // compares the hull (+0x268) with 0.0 (DAT_06d65538) so the call runs for hull <= 0
     // only; an unordered (NaN) hull skips it.
-    if (!SinglePlayer() && Player.relative_health <= 0.0f)
-        PlayerData_ReloadShipData(Player);
+    if (!SinglePlayer() && relative_health <= 0.0f)
+        reload_ship_data();
 
     // The pending-visit flush (queue at +0x3B8 into FUN_06d508a0 with flags | 8). The
     // `visit` key reads the committed map at +0x3A0, so the flush must come first or
     // the newest systems are lost.
-    PlayerData_FlushPendingVisits(Player);
+    flush_pending_visits();
 
     // The destination, built by retail itself (.text:06d4ce2b): account dir from the wide
     // account name at PlayerData+0x00, then FileName with extension "fl" (.rdata:06d6aea4)
     // in SP only -- in MP FileName carries its own extension.
     char AccountDirName[260];                                               // Stack[0x1f4], no pre-init
     if (IsMPServer()) {
-        Server_AccountDirName(AccountDirName, Player.AccountName);
+        Server_AccountDirName(AccountDirName, AccountName);
     } else {
         // No return-value test and no explicit terminator. Retail UB kept: a 260+
         // character name, or one that does not convert, leaves the buffer unterminated.
-        wcstombs(AccountDirName, Player.AccountName, 0x104);
+        wcstombs(AccountDirName, AccountName, 0x104);
     }
 
     char AccountDir[260];
@@ -916,7 +915,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
         return false;
     }
 
-    // Retail keeps the path being written in DAT_06d902f8; PlayerData_MissionSave
+    // Retail keeps the path being written in DAT_06d902f8; PlayerData::mission_save
     // (FUN_06d4c600) copies that file to AutoSave.fl afterwards.
     safe_strcpy(GServerLastSavePath, 0x104, WritePath);
 
@@ -966,7 +965,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     {
         wchar_t const* DisplayName = nullptr;
 
-        GlobalReputation::Vibe::Get(Player.rep_vibe, Affiliation, Rank, RelationCount,
+        GlobalReputation::Vibe::Get(rep_vibe, Affiliation, Rank, RelationCount,
                                     Relations, Name1, Name2, DisplayName);
 
         // `name`, unconditionally. Retail UB kept as a path: Vibe::Get writes its
@@ -981,7 +980,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
         }
 
         if (SinglePlayer())
-            Rank = Player.rank_level;
+            Rank = rank_level;
         fprintf(Out, "%s = %u\n", "rank", Rank);
 
         // The bound is the byte counter Vibe::Get filled.
@@ -1006,25 +1005,25 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     }
 
     // Retail order: money first. Offsets +0x31c, +0x334, +0x338, +0x33c.
-    fprintf(Out, "%s = %d\n", "money", Player.cash);
-    fprintf(Out, "%s = %d\n", "num_kills", Player.num_kills);
-    fprintf(Out, "%s = %d\n", "num_misn_successes", Player.num_mission_successes);
-    fprintf(Out, "%s = %d\n", "num_misn_failures", Player.num_mission_failures);
+    fprintf(Out, "%s = %d\n", "money", cash);
+    fprintf(Out, "%s = %d\n", "num_kills", num_kills);
+    fprintf(Out, "%s = %d\n", "num_misn_successes", num_mission_successes);
+    fprintf(Out, "%s = %d\n", "num_misn_failures", num_mission_failures);
 
     fprintf(Out, "\n");
 
     // The inline buffer at +0x2C4.
-    fprintf(Out, "%s = %s\n", "voice", Player.voice);
+    fprintf(Out, "%s = %s\n", "voice", voice);
 
-    Server_WriteCostume(Writer, "com_", Player.com_costume);
-    Server_WriteCostume(Writer, "", Player.costume);
+    Server_WriteCostume(Writer, "com_", com_costume);
+    Server_WriteCostume(Writer, "", costume);
 
     fprintf(Out, "\n");
 
     // `system` of PlayerData+0x3E0. Retail does not null-check get_system; the nickname
     // is ISystem+0x50 (SYSTEM vtable slot 2).
     {
-        Universe::ISystem const* Sys = Universe::get_system(Player.system_id);
+        Universe::ISystem const* Sys = Universe::get_system(system_id);
         fprintf(Out, "%s = %s\n", "system", Sys->Nickname);
     }
 
@@ -1039,10 +1038,10 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     float SavedPos[3] = { 0.0f, 0.0f, 0.0f };
     float SavedOrient[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
     {
-        if (Player.ship_object_id == 0 && (Player.current_base & 0x3fffffffu) == 0)
-            Player.current_base = Player.last_base_id;
+        if (ship_object_id == 0 && (current_base & 0x3fffffffu) == 0)
+            current_base = last_base_id;
 
-        Universe::IBase* Base = Universe::get_base(Player.current_base);
+        Universe::IBase* Base = Universe::get_base(current_base);
         if (Base != nullptr) {
             // IBase+0x8 nickname (BASE vtable slot 1); retail does not null-test it.
             fprintf(Out, "%s = %s\n", "base", Base->Nickname);
@@ -1054,10 +1053,10 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
                 // insert(pair(key, default)).first == operator[] (find or
                 // default-insert, never overwrite).
                 PlayerData::FSavedCharacter& BaseRecord =
-                    Player.saved_characters[Player.selected_character];
-                BaseRecord.BaseHullStatus = Player.relative_health;
-                BaseRecord.BaseCollisionGroups = Player.collision_groups;
-                BaseRecord.BaseEquipment.Items = Player.equipment.Items;
+                    saved_characters[selected_character];
+                BaseRecord.BaseHullStatus = relative_health;
+                BaseRecord.BaseCollisionGroups = collision_groups;
+                BaseRecord.BaseEquipment.Items = equipment.Items;
             }
         } else {
             // No base: `pos` and `rotate`, skipped (with the newline) when
@@ -1069,7 +1068,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
             //   else    : A = atan2(-M5, M4), B = atan2(-M6, H), C = 0
             // each times DAT_06d6b69c (57.2957763671875f), printed as degrees in order
             // A, B, C; the loader feeds them to EulerMatrix, which takes degrees.
-            GameObject* const LiveObj = Server_LookupLiveObject(Player.ship_object_id);
+            GameObject* const LiveObj = Server_LookupLiveObject(ship_object_id);
             if (LiveObj != nullptr) {
                 // Position source: SP -> get_position. MP -> the CShip's
                 // CRemotePhysicsController (__RTDynamicCast of the controller at ship+0x60):
@@ -1148,27 +1147,27 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     }
 
     // +0x3F8, only when non-zero.
-    if (Player.current_location != 0)
-        fprintf(Out, "%s = %u\n", "location", Player.current_location);
+    if (current_location != 0)
+        fprintf(Out, "%s = %u\n", "location", current_location);
 
     // ship_archetype / hull_status / collision_group, all gated on the archetype resolving.
-    if (Player.ship_archetype != 0) {
-        Archetype::Ship* ShipArch = Archetype::GetShip(Player.ship_archetype);
+    if (ship_archetype != 0) {
+        Archetype::Ship* ShipArch = Archetype::GetShip(ship_archetype);
         if (ShipArch != nullptr) {
             // The resolved archetype's Root::Nickname id (+0x8).
             char ArchBuf[32];
             sprintf_s(ArchBuf, "%u", ShipArch->get_id());
             fprintf(Out, "%s = %s\n", "ship_archetype", ArchBuf);
 
-            if (Player.relative_health < 1.0f) {
+            if (relative_health < 1.0f) {
                 fprintf(Out, "%s = %g\n", "hull_status",
-                        static_cast<double>(Player.relative_health));
+                        static_cast<double>(relative_health));
             }
 
             // The player's own list at +0x26C.
             for (std::list<CollisionGroupDesc>::const_iterator It =
-                     Player.collision_groups.begin();
-                 It != Player.collision_groups.end(); ++It) {
+                     collision_groups.begin();
+                 It != collision_groups.end(); ++It) {
                 if (!(It->Health < 1.0f))
                     continue;
                 Archetype::CollisionGroup const* Group = ShipArch->get_group_by_id(It->Id);
@@ -1185,8 +1184,8 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     fprintf(Out, "\n");
 
     // The equipment list: `cargo` and `equip`.
-    for (std::list<EquipDesc>::const_iterator CI = Player.equipment.Items.begin();
-         CI != Player.equipment.Items.end(); ++CI) {
+    for (std::list<EquipDesc>::const_iterator CI = equipment.Items.begin();
+         CI != equipment.Items.end(); ++CI) {
         EquipDesc const& Item = *CI;
 
         if (!::SinglePlayer() && Item.bMission)
@@ -1222,10 +1221,10 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     // last_base_id (+0x3F0) -- not the base written above. The base_* keys read the
     // selected character's record (+0x50), looked up before `last_base` is written.
     if (!SinglePlayer()) {
-        Universe::IBase* LastBase = Universe::get_base(Player.last_base_id);
+        Universe::IBase* LastBase = Universe::get_base(last_base_id);
         if (LastBase != nullptr) {
             PlayerData::FSavedCharacter const& BaseRecord =
-                Player.saved_characters[Player.selected_character];
+                saved_characters[selected_character];
 
             fprintf(Out, "%s = %s\n", "last_base", LastBase->Nickname);
             fprintf(Out, "\n");
@@ -1235,7 +1234,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
                     static_cast<double>(BaseRecord.BaseHullStatus));
 
             // GetShip(+0x264) without a null test; every group, no health filter.
-            Archetype::Ship* BaseShip = Archetype::GetShip(Player.ship_archetype);
+            Archetype::Ship* BaseShip = Archetype::GetShip(ship_archetype);
             for (std::list<CollisionGroupDesc>::const_iterator It =
                      BaseRecord.BaseCollisionGroups.begin();
                  It != BaseRecord.BaseCollisionGroups.end(); ++It) {
@@ -1289,14 +1288,14 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     // a '%' in it is interpreted with no arguments behind it.
 #pragma warning(push)
 #pragma warning(disable : 4774 6387)  // non-literal format string: retail's own call shape
-    fprintf(Out, Player.weapon_group_name.c_str());
+    fprintf(Out, weapon_group_name.c_str());
 #pragma warning(pop)
 
     fprintf(Out, "\n");
 
     // `visit`: one line per entry of the committed map at +0x3A0.
-    for (std::map<unsigned int, unsigned char>::const_iterator VI = Player.visit_map.begin();
-         VI != Player.visit_map.end(); ++VI) {
+    for (std::map<unsigned int, unsigned char>::const_iterator VI = visit_map.begin();
+         VI != visit_map.end(); ++VI) {
         char VisitBuf[64];
         sprintf_s(VisitBuf, "%u, %u", VI->first, static_cast<unsigned int>(VI->second));
         fprintf(Out, "%s = %s\n", "visit", VisitBuf);
@@ -1305,8 +1304,8 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     fprintf(Out, "\n");
 
     // `log`: one line per mission_log FmtStr (list at +0x390).
-    for (std::list<FmtStr>::const_iterator LI = Player.mission_log.begin();
-         LI != Player.mission_log.end(); ++LI) {
+    for (std::list<FmtStr>::const_iterator LI = mission_log.begin();
+         LI != mission_log.end(); ++LI) {
         // FUN_06d4ccd0's 0x1000-byte stack scratch.
         char LogText[0x1000];
         Server_FormatMissionLogEntry(LogText, *LI);
@@ -1316,7 +1315,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     fprintf(Out, "\n");
 
     // +0x39C.
-    fprintf(Out, "%s = %u\n", "interface", Player.interface_state);
+    fprintf(Out, "%s = %u\n", "interface", interface_state);
 
     fprintf(Out, "\n");
 
@@ -1326,7 +1325,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
         FILE* File;                             // the writer's +0x04
     };
     FSaveWrittenEvent SaveEvent;
-    SaveEvent.ClientId = Player.client_id;
+    SaveEvent.ClientId = client_id;
     SaveEvent.File = Out;
     Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerSave, &SaveEvent);
 
@@ -1389,44 +1388,44 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     // The relation array is then freed on both the SP and the MP path.
     if (!SinglePlayer()) {
         PlayerData::FSavedCharacter& Record =
-            Player.saved_characters[Player.selected_character];
-        Record.HullStatus = Player.relative_health;
-        Record.Equipment.Items = Player.equipment.Items;
-        Record.EquipIdMaker = Player.equip_id_maker;
-        Record.CollisionGroups = Player.collision_groups;
-        Record.Money = Player.cash;
-        Record.NumKills = Player.num_kills;
-        Record.NumMissionSuccesses = Player.num_mission_successes;
-        Record.NumMissionFailures = Player.num_mission_failures;
+            saved_characters[selected_character];
+        Record.HullStatus = relative_health;
+        Record.Equipment.Items = equipment.Items;
+        Record.EquipIdMaker = equip_id_maker;
+        Record.CollisionGroups = collision_groups;
+        Record.Money = cash;
+        Record.NumKills = num_kills;
+        Record.NumMissionSuccesses = num_mission_successes;
+        Record.NumMissionFailures = num_mission_failures;
         Record.Rank = Rank;
-        Record.Visits = Player.visit_map;
-        Record.WeaponGroups = Player.weapon_group_name;
-        Record.BaseId = Player.current_base;
-        Record.LastBaseId = Player.last_base_id;
+        Record.Visits = visit_map;
+        Record.WeaponGroups = weapon_group_name;
+        Record.BaseId = current_base;
+        Record.LastBaseId = last_base_id;
         Record.Position[0] = SavedPos[0];
         Record.Position[1] = SavedPos[1];
         Record.Position[2] = SavedPos[2];
         for (int I = 0; I < 9; ++I)
             Record.Orientation[I / 3][I % 3] = SavedOrient[I];
-        Record.ShipArchetype = Player.ship_archetype;
-        Record.LocationId = Player.current_location;
-        Record.SystemId = Player.system_id;
-        Record.MissionLog = Player.mission_log;
-        Record.StartingRing = Player.starting_ring;
+        Record.ShipArchetype = ship_archetype;
+        Record.LocationId = current_location;
+        Record.SystemId = system_id;
+        Record.MissionLog = mission_log;
+        Record.StartingRing = starting_ring;
 
-        Server_CopyCostumeCounted(Record.ComCostume, Player.com_costume);
+        Server_CopyCostumeCounted(Record.ComCostume, com_costume);
         {
             // TString<32>::operator=(char const*) inlined; its null arm cannot fire
             // (the source is an inline buffer).
-            size_t VoiceLen = strlen(Player.voice);
+            size_t VoiceLen = strlen(voice);
             if (VoiceLen >= 0x20)
                 VoiceLen = 0x1f;
-            memcpy(Record.Voice.Data, Player.voice, VoiceLen);
+            memcpy(Record.Voice.Data, voice, VoiceLen);
             Record.Voice.Data[VoiceLen] = '\0';
             Record.Voice.Length = static_cast<unsigned>(VoiceLen);
         }
-        Server_CopyCostumeCounted(Record.BaseCostume, Player.costume);
-        Record.Interface = Player.interface_state;
+        Server_CopyCostumeCounted(Record.BaseCostume, costume);
+        Record.Interface = interface_state;
 
         Record.Relations.clear();
         for (unsigned int I = 0; I < static_cast<unsigned int>(RelationCount); ++I)
@@ -1446,9 +1445,9 @@ SERVER_API int __cdecl Save(unsigned int PlayerId, unsigned int SaveType) {
     if (::SinglePlayer()) {
         PlayerData& Slot = ::Players[PlayerId];
         if (SaveType == 1)
-            PlayerData_AutoSave(Slot);
+            Slot.auto_save();
         else
-            PlayerData_MissionSave(Slot, SaveType);
+            Slot.mission_save(SaveType);
     }
     return 0;
 }
@@ -1590,19 +1589,6 @@ namespace SpaceObj {
 // down this file; forward-declare it so the call order matches retail.
 SERVER_API EQUIPMENT_RTYPE __cdecl ActivateEquipment(const unsigned int& obj_id_ref, EQInfo* eq_info);
 
-// The SpaceObj TU's own lazily filled I3DMathEngine (Server_Acquire3DMathEngine,
-// FUN_06d5ff70). Users: Create and CreateSolar (slot +0x50 MatrixToQuaternion, no null
-// test on the engine) and GetEmptyPos (slot +0x28 TransformXform).
-static I3DMathEngine* GSpaceObjMathEngine = nullptr;   // .data:DAT_06d8d868
-
-static void SpaceObj_MatrixToQuat(Quaternion& Out, Matrix const& In)
-{
-    if (GSpaceObjMathEngine == nullptr)
-        GSpaceObjMathEngine = Server_Acquire3DMathEngine();
-    GSpaceObjMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Out),
-                                            reinterpret_cast<FMatrix const&>(In));
-}
-
 // SpaceObj_BuildTransportLoadout -- retail FUN_06d5f990 (cdecl), sole caller
 // pub::SpaceObj::Create (ship archetype, &EquipIdMaker, &ShipInfo+0x5c, &request+0x70).
 // Named after its own FDUMP text ("Transport loadout aborted").
@@ -1742,7 +1728,7 @@ SERVER_API int __cdecl Create(unsigned int& out_id, const SpaceObj::ShipInfo& in
     Request.ArchetypeNickname = info.ShipArchID;
     Request.Position = info.Position;
     Quaternion ShipOrient;
-    SpaceObj_MatrixToQuat(ShipOrient, info.Orientation);
+    Server_MatrixToQuat(ShipOrient, info.Orientation);
     Request.Orientation = ShipOrient;
     Request.Velocity = info.Velocity;
     Request.AngularVelocity = info.AngularVelocity;
@@ -2511,7 +2497,7 @@ SERVER_API int __cdecl CreateSolar(unsigned int& out_id, const SpaceObj::SolarIn
         Request.VibeGroupId = solar_info.VibeGroupId;
         Request.Position = solar_info.Position;
         Quaternion SolarOrient;
-        SpaceObj_MatrixToQuat(SolarOrient, solar_info.Orientation);
+        Server_MatrixToQuat(SolarOrient, solar_info.Orientation);
         Request.Orientation = SolarOrient;
         Request.LoadoutId = solar_info.LoadoutID;
         Archetype::Solar* const SolarArch = Archetype::GetSolar(solar_info.SolarArchID);
@@ -2962,10 +2948,8 @@ SERVER_API int __cdecl GetEmptyPos(const unsigned int& system_id_ref, const Tran
                 }
             }
 
-            if (GSpaceObjMathEngine == nullptr)
-                GSpaceObjMathEngine = Server_Acquire3DMathEngine();
             Vector Candidate;
-            GSpaceObjMathEngine->TransformXform(reinterpret_cast<FVector&>(Candidate),
+            Server_MathEngine()->TransformXform(reinterpret_cast<FVector&>(Candidate),
                                                 reinterpret_cast<FTransform const&>(base_transform),
                                                 reinterpret_cast<FVector const&>(Offset));
             out_pos = Candidate;
@@ -3224,7 +3208,7 @@ SERVER_API int __cdecl GetRemainingHoldSize(const unsigned int& player_id, float
 }
 
 // Player::AddCargo -- retail 0x74e90. In space: StarSystem::add_cargo (FUN_06d0e8d0) on the
-// ship's system. Docked (no ship object): PlayerData_AddEquipment (FUN_06d4efc0) into the
+// ship's system. Docked (no ship object): PlayerData::add_equipment (FUN_06d4efc0) into the
 // cargo bay.
 // mission_flag: docked it is only FUN_06d4efc0's "do not combine with an existing stack"
 // byte; in space it also becomes EquipDesc::bMission (direct byte store at .text:06d0eadd).
@@ -3250,9 +3234,9 @@ SERVER_API int __cdecl AddCargo(const unsigned int& player_id, const unsigned in
     }
 
     unsigned int const ArchId = Good2Arch(good_id);
-    PlayerData_AddEquipment(*p, ArchId, EquipDesc::CARGO_BAY_HP_NAME,
-                            (int)quantity, health, /*bEquipped*/false,
-                            mission_flag, /*bNotify*/true);
+    p->add_equipment(ArchId, EquipDesc::CARGO_BAY_HP_NAME,
+                     (int)quantity, health, /*bEquipped*/false,
+                     mission_flag, /*bNotify*/true);
     return 0;
 }
 
@@ -3273,7 +3257,7 @@ SERVER_API int __cdecl RemoveCargo(const unsigned int& player_id, unsigned short
         return 0;
     }
 
-    PlayerData_RemoveEquipment(*p, cargo_slot, (int)quantity, /*bNotify*/true);
+    p->remove_equipment(cargo_slot, (int)quantity, /*bNotify*/true);
     return 0;
 }
 
@@ -3286,7 +3270,7 @@ SERVER_API int __cdecl SetShipAndLoadout(const unsigned int& player_id, unsigned
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
     if (!p) return -2;
 
-    PlayerData_SetShipArch(*p, ship_arch);
+    p->set_ship_arch(ship_arch);
 
     EquipDescList Fresh;
     for (EquipDesc const* It = equip_desc_vector.Begin; It != equip_desc_vector.End; ++It) {
@@ -3294,7 +3278,7 @@ SERVER_API int __cdecl SetShipAndLoadout(const unsigned int& player_id, unsigned
         Copy.set_id(SUBOBJ_ID_NONE);
         Fresh.add_equipment_item(Copy, false);
     }
-    PlayerData_LoadEquipment(*p, Fresh);
+    p->load_equipment(Fresh);
     return 0;
 }
 
@@ -3532,13 +3516,6 @@ SERVER_API int __cdecl ReturnPlayerStats(unsigned int player_id, unsigned char* 
     return 0;
 }
 
-// Player::SetCamera -- retail 0x75e60. A 0x24-byte FPayloadServerSetCamera to IClient
-// slot 88 (+0x160, FLPACKET_SERVER_SET_CAMERA), player id by address.
-// This function keeps its own lazily filled I3DMathEngine (DAT_06d902f0), acquired through
-// Server.dll's FUN_06d5ff70 (DACOM_Acquire of "3DMathEngine"; Server_Acquire3DMathEngine,
-// server_createinfo.h), not Common.dll's cache.
-static I3DMathEngine* GSetCameraMathEngine = nullptr;   // .data:DAT_06d902f0
-
 SERVER_API int __cdecl SetCamera(unsigned int player_id, const Transform& transform, float fov, float aspect) {
     if (!IsValidPlayer(player_id)) return -2;
 
@@ -3547,9 +3524,7 @@ SERVER_API int __cdecl SetCamera(unsigned int player_id, const Transform& transf
 
     // No null test on the engine and no seed for the quaternion (the call writes all
     // four dwords). Retail passes &transform, which works because Rotation is at +0x00.
-    if (GSetCameraMathEngine == nullptr)
-        GSetCameraMathEngine = Server_Acquire3DMathEngine();
-    GSetCameraMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Block.Orient),
+    Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Block.Orient),
                                              reinterpret_cast<FMatrix const&>(transform.Rotation));
 
     Block.Fov = fov;
@@ -3632,7 +3607,7 @@ SERVER_API int __cdecl RewardGroup(unsigned int player_id, int amount) {
         return 0;
     }
     if (IsValidPlayer(player_id)) {
-        PlayerData_AdjustCash(Players[player_id], amount, true);
+        Players[player_id].adjust_cash(amount, true);
     }
     return 0;
 }
@@ -4190,7 +4165,7 @@ SERVER_API float __cdecl GetRtcPerformanceSlider() {
 static unsigned int g_VibeBitmap[128] = {};
 static unsigned int g_VibeBitmapHint = 0;
 
-// Server_VibeID_Alloc -- retail FUN_06d45b60, cdecl. Callers: PlayerData_ApplySavedCharacter
+// Server_VibeID_Alloc -- retail FUN_06d45b60, cdecl. Callers: PlayerData::apply_saved_character
 // (FUN_06d4a5d0, server_savegame.h) and pub::Reputation below. Scans from hint + 1; the
 // wrap to 0 skips the hint test, and arriving back at the hint fails whatever its bit
 // says (the hint slot itself is never tried). Failure writes 0xffffffff.

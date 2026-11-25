@@ -29,8 +29,6 @@ bool __cdecl OpenContentDataIni(char const* RelativePath, INI_Reader* Reader)
 
 namespace
 {
-    // DAT_06fd0750: TU39's 3DMathEngine, created on first use (FUN_06fa8fa0) by FUN_06f243d0.
-    I3DMathEngine* GDataPathMathEngine = nullptr;
 }
 
 // FUN_06f243d0 (06f243d0-06f24601), cdecl. x87 arithmetic is kept in double (the process's
@@ -44,10 +42,8 @@ void __cdecl PlaceFacingAnchor(FTransform const* Anchor, float const* Heading, f
     Offset.Z = static_cast<float>(-(std::sin(static_cast<double>(*Heading)) * *Range));
 
     // 3DMathEngine slot +0x28.
-    if (GDataPathMathEngine == nullptr)
-        GDataPathMathEngine = ContentAcquire3DMathEngine();
     FVector Position;
-    GDataPathMathEngine->TransformXform(Position, *Anchor, Offset);
+    ContentMathEngine()->TransformXform(Position, *Anchor, Offset);
     Out->Translation = Position;
 
     // Forward = normalize(Out position - Anchor position); 1.0f = DAT_06fb5810. The sum order

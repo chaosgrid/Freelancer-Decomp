@@ -32,14 +32,6 @@ namespace AlchemyImpl
         // (0x06212d80); no instruction in the image writes it.
         unsigned char G_DustAgeMinusUpdateDt = 0;
 
-        I3DMathEngine* G_DustField3DMath = nullptr; // DAT_062579d0.
-        I3DMathEngine* G_AirField3DMath = nullptr; // DAT_062579d8.
-        I3DMathEngine* G_CollideField3DMath = nullptr; // DAT_06257a2c.
-        I3DMathEngine* G_GravityField3DMath = nullptr; // DAT_06257a40.
-
-        // DAT_06257b3c: Radial Begin owns this cache, independent of other fields.
-        I3DMathEngine* G_RadialField3DMath = nullptr;
-
         // The field sets' property tables (.data 0x06256240 gravity, 0x06255af4 air,
         // 0x062569c8 radial, 0x06256ccc turbulence, 0x06255d78 collide, 0x06255aa8 dust),
         // each enumerated after the base rows.
@@ -314,12 +306,7 @@ namespace AlchemyImpl
         float Xform12[12];
         ComputeRelativeTransform(Appearance, Xform12);
         const FVector Source = { 0.0f, -Gravity_, 0.0f };
-        I3DMathEngine* Math = G_GravityField3DMath;
-        if (Math == nullptr)
-        {
-            Math = Create3DMath();
-            G_GravityField3DMath = Math;
-        }
+        I3DMathEngine* Math = Shared3DMath();
         FVector Result;
         Math->Rotate(Result, *reinterpret_cast<const FTransform*>(Xform12), Source);
         std::memcpy(Cache_, &Result, sizeof(Result));
@@ -410,12 +397,7 @@ namespace AlchemyImpl
         float Xform12[12];
         ComputeRelativeTransform(Appearance, Xform12);
         const FVector Source = { 0.0f, Magnitude_, 0.0f };
-        I3DMathEngine* Math = G_AirField3DMath;
-        if (Math == nullptr)
-        {
-            Math = Create3DMath();
-            G_AirField3DMath = Math;
-        }
+        I3DMathEngine* Math = Shared3DMath();
         FVector Result;
         Math->Rotate(Result, *reinterpret_cast<const FTransform*>(Xform12), Source);
         std::memcpy(Cache_, &Result, sizeof(Result));
@@ -526,12 +508,7 @@ namespace AlchemyImpl
         };
         ComputeRelativeTransform(Appearance, Xform12);
         const FVector Origin = { 0.0f, 0.0f, 0.0f };
-        I3DMathEngine* Math = G_RadialField3DMath;
-        if (Math == nullptr)
-        {
-            Math = Create3DMath();
-            G_RadialField3DMath = Math;
-        }
+        I3DMathEngine* Math = Shared3DMath();
         FVector TransformedOrigin;
         Math->TransformXform(TransformedOrigin,
             *reinterpret_cast<const FTransform*>(Xform12), Origin);
@@ -763,12 +740,7 @@ namespace AlchemyImpl
         // (node+0xa8), corner (node+0xb4) and scaled normal (node+0xc0) follow.
         ComputeRelativeTransform(Appearance, BeginXform_);
         const FVector NormalSource = { 0.0f, 1.0f, 0.0f };
-        I3DMathEngine* Math = G_CollideField3DMath;
-        if (Math == nullptr)
-        {
-            Math = Create3DMath();
-            G_CollideField3DMath = Math;
-        }
+        I3DMathEngine* Math = Shared3DMath();
         FVector RotatedNormal;
         Math->Rotate(RotatedNormal, *reinterpret_cast<const FTransform*>(BeginXform_),
                      NormalSource);
@@ -782,12 +754,7 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(Normal_[1], InvLength * Normal_[1]);
         StoreAlchemyFpuFloat(Normal_[2], InvLength * Normal_[2]);
         const FVector CornerSource = { 1.0f, 0.0f, 1.0f };
-        Math = G_CollideField3DMath;
-        if (Math == nullptr)
-        {
-            Math = Create3DMath();
-            G_CollideField3DMath = Math;
-        }
+        Math = Shared3DMath();
         FVector TransformedCorner;
         Math->TransformXform(TransformedCorner, *reinterpret_cast<const FTransform*>(BeginXform_),
                              CornerSource);
@@ -958,12 +925,7 @@ namespace AlchemyImpl
     // mirrors it.
     void DACOM_API FLDustField::ApplyFieldToVel(float* PosVel6, float* Age, float /*Dt*/)
     {
-        I3DMathEngine* Math = G_DustField3DMath;
-        if (Math == nullptr)
-        {
-            Math = Create3DMath();
-            G_DustField3DMath = Math;
-        }
+        I3DMathEngine* Math = Shared3DMath();
         float Local[3] = { 0.0f, 0.0f, 0.0f };
         Math->InverseTransform(*reinterpret_cast<FVector*>(Local),
                                           *reinterpret_cast<const FTransform*>(NodeWorldXform_),

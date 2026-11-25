@@ -25,9 +25,6 @@ namespace AlchemyImpl
 {
     namespace
     {
-        I3DMathEngine* G_Perp3DMath = nullptr; // DAT_06257b38, shared by Perp's draw/fade calls.
-        I3DMathEngine* G_BasicGeometry3DMath = nullptr; // DAT_06257a28, Basic quad/triangle.
-        I3DMathEngine* G_Rect3DMath = nullptr; // DAT_06257b8c, Rect bounds and fill.
 
         // Retail FCOMP raises INVALID for quiet NaNs and still treats unordered as unequal.
         // Plain != lowers to quiet FUCOMPP, so preserve ordered relational comparisons.
@@ -1101,10 +1098,8 @@ namespace AlchemyImpl
         std::int32_t LastFrame = -1;
         for (; Particle != nullptr; Particle = Particle->Next)
         {
-            if (G_BasicGeometry3DMath == nullptr)
-                G_BasicGeometry3DMath = Create3DMath();
             float C[3];
-            G_BasicGeometry3DMath->TransformXform(*reinterpret_cast<FVector*>(C),
+            Shared3DMath()->TransformXform(*reinterpret_cast<FVector*>(C),
                 *reinterpret_cast<const FTransform*>(ViewWorld),
                 *reinterpret_cast<const FVector*>(&Particle->PosX));
             if (C[2] > 0.0f)
@@ -1152,10 +1147,8 @@ namespace AlchemyImpl
             float Py;
             if (bStreak)
             {
-                if (G_BasicGeometry3DMath == nullptr)
-                    G_BasicGeometry3DMath = Create3DMath();
                 float V[3];
-                G_BasicGeometry3DMath->TransformMatrix(*reinterpret_cast<FVector*>(V),
+                Shared3DMath()->TransformMatrix(*reinterpret_cast<FVector*>(V),
                     *reinterpret_cast<const FMatrix*>(ViewWorld),
                     *reinterpret_cast<const FVector*>(&Particle->VelX));
                 const double N0 = static_cast<double>(C[1]) * V[2] - static_cast<double>(V[1]) * C[2];
@@ -1264,10 +1257,8 @@ namespace AlchemyImpl
         const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
         const float* const View = Camera->GetViewTransform();
-        if (G_BasicGeometry3DMath == nullptr)
-            G_BasicGeometry3DMath = Create3DMath();
         FTransform ViewTemporary;
-        G_BasicGeometry3DMath->MulTransform(ViewTemporary,
+        Shared3DMath()->MulTransform(ViewTemporary,
             *reinterpret_cast<const FTransform*>(View),
             *reinterpret_cast<const FTransform*>(NodeWorldXform_));
         float ViewWorld[12];
@@ -1292,10 +1283,8 @@ namespace AlchemyImpl
                 Descriptor_->PrimarySizeRamp, AppearanceOuterTime_, InnerTime) * Scale);
             if (Alpha < FloatFromBits(0x3c23d70au))
                 continue;
-            if (G_BasicGeometry3DMath == nullptr)
-                G_BasicGeometry3DMath = Create3DMath();
             float C[3];
-            G_BasicGeometry3DMath->TransformXform(*reinterpret_cast<FVector*>(C),
+            Shared3DMath()->TransformXform(*reinterpret_cast<FVector*>(C),
                 *reinterpret_cast<const FTransform*>(ViewWorld),
                 *reinterpret_cast<const FVector*>(&Particle->PosX));
             const unsigned long Color = ForwardAppearanceColorEval(
@@ -1564,10 +1553,8 @@ namespace AlchemyImpl
                     EPerpRectBoundsDistance::RectRoundedYzx);
             }
         }
-        if (G_Rect3DMath == nullptr)
-            G_Rect3DMath = Create3DMath();
         FVector WorldCenter;
-        G_Rect3DMath->TransformXform(WorldCenter,
+        Shared3DMath()->TransformXform(WorldCenter,
             *reinterpret_cast<const FTransform*>(NodeWorldXform_),
             *reinterpret_cast<const FVector*>(OutSphere));
         float WorldSphere[4];
@@ -1689,10 +1676,8 @@ namespace AlchemyImpl
         std::int32_t LastFrame = -1;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
         const float* const CameraPosition = Camera->GetPosition();
-        if (G_Rect3DMath == nullptr)
-            G_Rect3DMath = Create3DMath();
         FVector LocalCamera;
-        G_Rect3DMath->TransformXform(LocalCamera, InvNode,
+        Shared3DMath()->TransformXform(LocalCamera, InvNode,
             *reinterpret_cast<const FVector*>(CameraPosition));
         const float Scale = static_cast<float>(ForwardAppearanceSingleEval(
             Descriptor_->EffectScaleRamp, AppearanceOuterTime_, LodInput_));
@@ -2146,10 +2131,8 @@ namespace AlchemyImpl
 
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
         const float* const View = Camera->GetViewTransform();
-        if (G_Perp3DMath == nullptr)
-            G_Perp3DMath = Create3DMath();
         FTransform ViewWorld;
-        G_Perp3DMath->MulTransform(ViewWorld, *reinterpret_cast<const FTransform*>(View),
+        Shared3DMath()->MulTransform(ViewWorld, *reinterpret_cast<const FTransform*>(View),
                                    *reinterpret_cast<const FTransform*>(NodeWorldXform_));
         FTransform Modelview;
         std::memcpy(&Modelview, &ViewWorld, sizeof(Modelview));
@@ -2262,10 +2245,8 @@ namespace AlchemyImpl
             std::memcpy(&Position, &Particle->PosX, sizeof(Position));
             if (bCameraFade)
             {
-                if (G_Perp3DMath == nullptr)
-                    G_Perp3DMath = Create3DMath();
                 FVector LocalCamera;
-                G_Perp3DMath->TransformXform(LocalCamera, InvNode, CameraPosition);
+                Shared3DMath()->TransformXform(LocalCamera, InvNode, CameraPosition);
                 FVector ToCamera;
                 ToCamera.X = static_cast<float>(static_cast<double>(LocalCamera.X) - Position.X);
                 ToCamera.Y = static_cast<float>(static_cast<double>(LocalCamera.Y) - Position.Y);
@@ -3086,7 +3067,6 @@ namespace AlchemyImpl
     // position (node+0x120) and step length (node+0x12c) even when nothing was drawn.
     namespace
     {
-        I3DMathEngine* G_Dust3DMath = nullptr; // DAT_062579c8
     }
 
 #pragma optimize("", off)
@@ -3126,9 +3106,7 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(CameraDelta[1], static_cast<double>(CameraPos[1]) - LastCameraPos_[1]);
         StoreAlchemyFpuFloat(CameraDelta[2], static_cast<double>(CameraPos[2]) - LastCameraPos_[2]);
         float Step[3];
-        if (G_Dust3DMath == nullptr)
-            G_Dust3DMath = Create3DMath();
-        G_Dust3DMath->TransformMatrix(*reinterpret_cast<FVector*>(Step),
+        Shared3DMath()->TransformMatrix(*reinterpret_cast<FVector*>(Step),
             *reinterpret_cast<const FMatrix*>(CameraView),
             *reinterpret_cast<const FVector*>(CameraDelta));
         const double SquareX = static_cast<double>(Step[0]) * Step[0];
@@ -3195,9 +3173,7 @@ namespace AlchemyImpl
                 float* LastView =
                     reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(Particle) + 0x30);
                 float C[3];
-                if (G_Dust3DMath == nullptr)
-                    G_Dust3DMath = Create3DMath();
-                G_Dust3DMath->TransformXform(*reinterpret_cast<FVector*>(C),
+                Shared3DMath()->TransformXform(*reinterpret_cast<FVector*>(C),
                     *reinterpret_cast<const FTransform*>(ViewXform_),
                     *reinterpret_cast<const FVector*>(&Particle->PosX));
 
@@ -4757,17 +4733,9 @@ namespace AlchemyImpl
             bool bReleaseOnDestruction;
         };
 
-        // DAT_06257ae8: all particle quaternion and matrix kernels share this cache.
-        I3DMathEngine* G_Particle3DMath = nullptr;
-
         I3DMathEngine* ParticleMath()
         {
-            I3DMathEngine* Math = G_Particle3DMath;
-            if (Math == nullptr)
-            {
-                Math = Create3DMath();
-                G_Particle3DMath = Math;
-            }
+            I3DMathEngine* Math = Shared3DMath();
             return Math;
         }
 

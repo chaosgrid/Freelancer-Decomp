@@ -55,6 +55,7 @@
 
 #include "rpc_containers.h"
 #include "rpc_payloads.h"
+#include "rpc_packet_classes.h"
 
 #include <ostream>
 #include <cstring>
@@ -62,11 +63,12 @@
 // DAT_06db3d88; every body below pushes this same pointer.
 static const char* const kRpcDumpEol = "\n";
 
+// Packet vtable slot +0x0c: eleven bodies serving twelve types. See rpc_packet_dump.cpp.
 // ---------------------------------------------------------------------------
 // ch2 0x01 FLPACKET_SERVER_CONNECTRESPONSE -- LAB_06da8240.
 // ---------------------------------------------------------------------------
-void RpcDumpServerConnectResponse(const FPacketBase& Packet, std::ostream& Out) {
-    const unsigned int* Fields = Packet.PayloadDwords();
+void FPacket_FLPACKET_SERVER_CONNECTRESPONSE::Dump(std::ostream& Out) const {
+    const unsigned int* Fields = PayloadDwords();
     Out << "   Client ID: ";
     Out << Fields[0];                                         // packet+0x20
     Out << kRpcDumpEol;
@@ -77,8 +79,8 @@ void RpcDumpServerConnectResponse(const FPacketBase& Packet, std::ostream& Out) 
 // The field is read as ONE BYTE and streamed through the unsigned char overload, so it
 // prints as a character, not as a number. Reproduced.
 // ---------------------------------------------------------------------------
-void RpcDumpServerLoginResponse(const FPacketBase& Packet, std::ostream& Out) {
-    const unsigned char Result = Packet.Payload()[0];         // packet+0x20
+void FPacket_FLPACKET_SERVER_LOGINRESPONSE::Dump(std::ostream& Out) const {
+    const unsigned char Result = Payload()[0];         // packet+0x20
     Out << "   Result   : ";
     Out << Result;
     Out << kRpcDumpEol;
@@ -88,8 +90,8 @@ void RpcDumpServerLoginResponse(const FPacketBase& Packet, std::ostream& Out) {
 // ch2 0x03 FLPACKET_SERVER_CHARACTERINFO -- LAB_06d93310. The only guarded dump: writes
 // nothing at all when the count is zero.
 // ---------------------------------------------------------------------------
-void RpcDumpServerCharacterInfo(const FPacketBase& Packet, std::ostream& Out) {
-    const unsigned int Count = Packet.PayloadDwords()[3];     // packet+0x2c
+void FPacket_FLPACKET_SERVER_CHARACTERINFO::Dump(std::ostream& Out) const {
+    const unsigned int Count = PayloadDwords()[3];     // packet+0x2c
     if (Count == 0) {
         return;
     }
@@ -102,9 +104,9 @@ void RpcDumpServerCharacterInfo(const FPacketBase& Packet, std::ostream& Out) {
 // ch2 0x07 FLPACKET_SERVER_LAUNCH -- FUN_06daaee0. Three floats, each on its own line;
 // packet+0x2c..+0x37 is FPayloadServerLaunch::Position.
 // ---------------------------------------------------------------------------
-void RpcDumpServerLaunch(const FPacketBase& Packet, std::ostream& Out) {
+void FPacket_FLPACKET_SERVER_LAUNCH::Dump(std::ostream& Out) const {
     const FPayloadServerLaunch* Wire =
-        reinterpret_cast<const FPayloadServerLaunch*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerLaunch*>(Payload());
     Out << "   X: ";
     Out << Wire->Position.x;
     Out << kRpcDumpEol;
@@ -124,9 +126,9 @@ void RpcDumpServerLaunch(const FPacketBase& Packet, std::ostream& Out) {
 // sender and receiver move it that way; this is the only place that treats the pair as
 // one scalar.
 // ---------------------------------------------------------------------------
-void RpcDumpServerCharSelectVerified(const FPacketBase& Packet, std::ostream& Out) {
+void FPacket_FLPACKET_SERVER_CHARSELECTVERIFIED::Dump(std::ostream& Out) const {
     const FPayloadServerCharSelectVerified* Wire =
-        reinterpret_cast<const FPayloadServerCharSelectVerified*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerCharSelectVerified*>(Payload());
     double Time = 0.0;
     ::memcpy(&Time, &Wire->ServerTimeLo, sizeof(Time));
     Out << "   RepInstance: ";
@@ -140,9 +142,9 @@ void RpcDumpServerCharSelectVerified(const FPacketBase& Packet, std::ostream& Ou
 // ch2 0x29 FLPACKET_SERVER_SETREPUTATION -- FUN_06d92860.
 // packet+0x58 / +0x5c are payload+0x38 / +0x3c of FPayloadServerSetReputation.
 // ---------------------------------------------------------------------------
-void RpcDumpServerSetReputation(const FPacketBase& Packet, std::ostream& Out) {
+void FPacket_FLPACKET_SERVER_SETREPUTATION::Dump(std::ostream& Out) const {
     const FPayloadServerSetReputation* Wire =
-        reinterpret_cast<const FPayloadServerSetReputation*>(Packet.Payload());
+        reinterpret_cast<const FPayloadServerSetReputation*>(Payload());
     Out << "   Target     : ";
     Out << Wire->VibeHandle;                                  // packet+0x58
     Out << kRpcDumpEol;
@@ -155,8 +157,8 @@ void RpcDumpServerSetReputation(const FPacketBase& Packet, std::ostream& Out) {
 // ch2 0x3c FLPACKET_SERVER_REPAIROBJECT -- FUN_06dac2b0. The third field goes through
 // operator<<(int), so it is SIGNED where the first two are unsigned. Reproduced.
 // ---------------------------------------------------------------------------
-void RpcDumpServerRepairObject(const FPacketBase& Packet, std::ostream& Out) {
-    const unsigned int* Fields = Packet.PayloadDwords();
+void FPacket_FLPACKET_SERVER_REPAIROBJECT::Dump(std::ostream& Out) const {
+    const unsigned int* Fields = PayloadDwords();
     Out << "   Object ID  : ";
     Out << Fields[0];                                         // packet+0x20
     Out << kRpcDumpEol;
@@ -172,8 +174,8 @@ void RpcDumpServerRepairObject(const FPacketBase& Packet, std::ostream& Out) {
 // ch3 0x01 FLPACKET_CLIENT_LOGIN -- LAB_06daff50. Streams the ADDRESS of the wide
 // account name at payload+0x000.
 // ---------------------------------------------------------------------------
-void RpcDumpClientLogin(const FPacketBase& Packet, std::ostream& Out) {
-    const void* Account = static_cast<const void*>(Packet.Payload());
+void FPacket_FLPACKET_CLIENT_LOGIN::Dump(std::ostream& Out) const {
+    const void* Account = static_cast<const void*>(Payload());
     Out << "   Account: ";
     Out << Account;
     Out << kRpcDumpEol;
@@ -182,8 +184,8 @@ void RpcDumpClientLogin(const FPacketBase& Packet, std::ostream& Out) {
 // ---------------------------------------------------------------------------
 // ch3 0x04 FLPACKET_CLIENT_REQUESTLAUNCH -- LAB_06daf370.
 // ---------------------------------------------------------------------------
-void RpcDumpClientRequestLaunch(const FPacketBase& Packet, std::ostream& Out) {
-    const unsigned int* Fields = Packet.PayloadDwords();
+void FPacket_FLPACKET_CLIENT_REQUESTLAUNCH::Dump(std::ostream& Out) const {
+    const unsigned int* Fields = PayloadDwords();
     Out << "   Object ID: ";
     Out << Fields[0];                                         // packet+0x20
     Out << kRpcDumpEol;
@@ -205,9 +207,9 @@ void RpcDumpWireCharacterIdDump(const FPacketBase& Packet, std::ostream& Out) {
 // one newline at the very end, in the order Name, Fac, Base, Pkg, Pilot. The name goes
 // through operator<<(void const*), the four dwords through operator<<(unsigned int).
 // ---------------------------------------------------------------------------
-void RpcDumpClientCreateNewChar(const FPacketBase& Packet, std::ostream& Out) {
+void FPacket_FLPACKET_CLIENT_CREATENEWCHAR::Dump(std::ostream& Out) const {
     const FPayloadClientCreateNewChar* Wire =
-        reinterpret_cast<const FPayloadClientCreateNewChar*>(Packet.Payload());
+        reinterpret_cast<const FPayloadClientCreateNewChar*>(Payload());
     Out << "   Name: ";
     Out << static_cast<const void*>(Wire->Name);              // the ADDRESS
     Out << "   Fac: ";

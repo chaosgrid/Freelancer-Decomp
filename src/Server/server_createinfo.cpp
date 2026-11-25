@@ -42,17 +42,22 @@ I3DMathEngine* Server_Acquire3DMathEngine()
     return static_cast<I3DMathEngine*>(Engine);
 }
 
-// DAT_06d8da08 -- StarSys.cpp's lazily fetched math engine, shared by the record builders
-// and the StarSystem create paths.
-static I3DMathEngine* GStarSysMathEngine = nullptr;
+// Deviation from retail (docs/re/deviations.md): retail keeps one lazily filled engine pointer
+// per source file -- twelve in Server.dll, each filled by its own FUN_06d5ff70 call the first
+// time that file needs it -- and every user inlines the fetch. The port keeps one.
+I3DMathEngine* Server_MathEngine()
+{
+    static I3DMathEngine* Engine = nullptr;
+    if (Engine == nullptr)
+        Engine = Server_Acquire3DMathEngine();
+    return Engine;
+}
 
 // The inlined lazy fetch plus MatrixToQuaternion (I3DMathEngine +0x50). No null test on
 // the engine.
 void Server_MatrixToQuat(Quaternion& Out, Matrix const& In)
 {
-    if (GStarSysMathEngine == nullptr)
-        GStarSysMathEngine = Server_Acquire3DMathEngine();
-    GStarSysMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Out),
+    Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Out),
                                            reinterpret_cast<FMatrix const&>(In));
 }
 
@@ -60,9 +65,7 @@ void Server_MatrixToQuat(Quaternion& Out, Matrix const& In)
 // create_ship. No null test on the engine.
 void Server_QuatToMatrix(Matrix& Out, Quaternion const& In)
 {
-    if (GStarSysMathEngine == nullptr)
-        GStarSysMathEngine = Server_Acquire3DMathEngine();
-    GStarSysMathEngine->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Out),
+    Server_MathEngine()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Out),
                                            reinterpret_cast<FQuaternion const&>(In));
 }
 

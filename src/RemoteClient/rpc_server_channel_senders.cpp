@@ -410,13 +410,12 @@ void CClientImpl::SendServerGFCompleteNewsBroadcastList(unsigned int ClientId, u
 
 // RC 06b3f970 (thiscall on the CREATESHIP packet): +0xd8 = length, +0xdc = new(2 * length + 2),
 // untested.
-static void RpcServerCreateShipSetDisplayName(FRpcServerCreateShipPacket* Packet,
-    const wchar_t* Name) {
+void FRpcServerCreateShipPacket::SetDisplayName(const wchar_t* Name) {
     if (Name == nullptr) return;
-    Packet->DisplayNameLength = static_cast<int>(std::wcslen(Name));
-    Packet->DisplayName = static_cast<wchar_t*>(::operator new(
-        static_cast<unsigned int>(Packet->DisplayNameLength) * 2u + 2u, std::nothrow));
-    std::wcscpy(Packet->DisplayName, Name);
+    DisplayNameLength = static_cast<int>(std::wcslen(Name));
+    DisplayName = static_cast<wchar_t*>(::operator new(
+        static_cast<unsigned int>(DisplayNameLength) * 2u + 2u, std::nothrow));
+    std::wcscpy(DisplayName, Name);
 }
 
 // RC 06b34ed0, IClient +0xbc: CREATESHIP. Every store is an integer move. In MP the vibe's
@@ -443,7 +442,7 @@ void CClientImpl::SendServerCreateShip(unsigned int ClientId, const CShipCreateI
         const wchar_t* DisplayName = nullptr;
         Reputation::Vibe::GetName(Typed->Object.VibeGroupId, NameA, NameB, DisplayName);
         if (DisplayName != nullptr && std::wcslen(DisplayName) != 0) {
-            RpcServerCreateShipSetDisplayName(Typed, DisplayName);
+            Typed->SetDisplayName(DisplayName);
         } else {
             Typed->NameASize = RpcGetFlattenedFmtStrSize(NameA);
             Typed->NameA = static_cast<unsigned char*>(

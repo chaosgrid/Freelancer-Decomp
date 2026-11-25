@@ -21,9 +21,6 @@ namespace AlchemyImpl
 {
     namespace
     {
-        I3DMathEngine* G_ConeEmitter3DMath = nullptr; // DAT_06257a30.
-        I3DMathEngine* G_CubeEmitter3DMath = nullptr; // DAT_06257a34.
-        I3DMathEngine* G_SphereEmitter3DMath = nullptr; // DAT_06257ba4.
 
         // Emitter property hashes (descriptor table 0x06257700, records of
         // {name, hash, kind, min, max}); descriptor-inner slot in parentheses.
@@ -488,8 +485,7 @@ namespace AlchemyImpl
     }
 
     void FFxEmitterBase::SubmitParticle(const float* Pos3, const float* Vel3, const float& AgeOffset,
-                                       const float* PosOffset3, const float* VelIn3,
-                                       I3DMathEngine*& MathSlot)
+                                       const float* PosOffset3, const float* VelIn3)
     {
         // Q = W * AgeOffset (FUN_06206ab0, each stored as float).
         float Q[3];
@@ -511,24 +507,13 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(Vel[1], static_cast<double>(Vel3[1]) + VelIn3[1]);
         StoreAlchemyFpuFloat(Vel[2], static_cast<double>(Vel3[2]) + VelIn3[2]);
 
-        I3DMathEngine* Math = MathSlot;
-        if (Math == nullptr)
-        {
-            Math = Create3DMath();
-            MathSlot = Math;
-        }
+        I3DMathEngine* Math = Shared3DMath();
         float Rotated[3] = { 0.0f, 0.0f, 0.0f };
         Math->Rotate(*reinterpret_cast<FVector*>(Rotated),
                      *reinterpret_cast<const FTransform*>(EmitterXform_),
                      *reinterpret_cast<const FVector*>(Vel)); // +0x30
         float Six[6];
         std::memcpy(Six + 3, Rotated, sizeof(Rotated));
-        Math = MathSlot;
-        if (Math == nullptr)
-        {
-            Math = Create3DMath();
-            MathSlot = Math;
-        }
         float Placed[3] = { 0.0f, 0.0f, 0.0f };
         Math->TransformXform(*reinterpret_cast<FVector*>(Placed),
                              *reinterpret_cast<const FTransform*>(EmitterXform_),
@@ -625,7 +610,7 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(Pos[1], Dir[1] * Radius);
         StoreAlchemyFpuFloat(Pos[0], Dir[0] * Radius);
         const float Vel[3] = { Dir[0] * Pressure_, Dir[1] * Pressure_, Dir[2] * Pressure_ };
-        SubmitParticle(Pos, Vel, AgeOffset, PosOffset3, Vel3, G_ConeEmitter3DMath);
+        SubmitParticle(Pos, Vel, AgeOffset, PosOffset3, Vel3);
     }
 
     // ---- FxCubeEmitter -------------------------------------------------------
@@ -714,7 +699,7 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(Pos[0], (AlchemyRand01() - 0.5) * Width_ * 2.0);
         StoreAlchemyFpuFloat(Pos[2], (AlchemyRand01() - 0.5) * Depth_ * 2.0);
         const float Vel[3] = { Dir[0] * Pressure_, Dir[1] * Pressure_, Dir[2] * Pressure_ };
-        SubmitParticle(Pos, Vel, AgeOffset, PosOffset3, Vel3, G_CubeEmitter3DMath);
+        SubmitParticle(Pos, Vel, AgeOffset, PosOffset3, Vel3);
     }
 
     // ---- FxSphereEmitter -----------------------------------------------------
@@ -789,7 +774,7 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(Pos[1], Dir[1] * Radius);
         StoreAlchemyFpuFloat(Pos[0], Dir[0] * Radius);
         const float Vel[3] = { Dir[0] * Pressure_, Dir[1] * Pressure_, Dir[2] * Pressure_ };
-        SubmitParticle(Pos, Vel, AgeOffset, PosOffset3, Vel3, G_SphereEmitter3DMath);
+        SubmitParticle(Pos, Vel, AgeOffset, PosOffset3, Vel3);
     }
 
 } // namespace AlchemyImpl

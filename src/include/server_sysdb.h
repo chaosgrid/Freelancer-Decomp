@@ -31,7 +31,7 @@ class Ship;    // server_gameobject.h (StarSystem::create_ship)
 struct FShipCreateRequest; // server_createinfo.h (StarSystem::create_ship)
 
 // common_misc.h's DamageList. Only ever used through a pointer here
-// (StarSystem_DamageObject below), so a declaration is enough and this header
+// (StarSystem::damage_object below), so a declaration is enough and this header
 // stays cheap to include.
 struct DamageList;
 
@@ -48,7 +48,7 @@ struct FServerBulletRecord;  // server_gameobject.h, SrvGun::launch_bullets' rec
 struct FCommonUpdateObjectInfo;  // rpc_iclient_args.h, the IClient SendCommonUpdateObject argument (0x2c)
 
 // The record StarSystem::send_mine_explosion (FUN_06d09270) fans out and
-// SystemPlayerView_SendMineExplosion (FUN_06cf6df0) hands to IClient +0xd0
+// Observer::send_mine_explosion (FUN_06cf6df0) hands to IClient +0xd0
 // (FLPACKET_SERVER_EXPLODEASTEROIDMINE, whose payload is these four dwords).
 // Built by MedMine::update (.text:06d04f3a .. 06d04f80): the mine's own id
 // (vt +0x20) at +0, then Direction scaled by ExplosionOffset at +4 .. +0xc.
@@ -77,7 +77,7 @@ static_assert(sizeof(FCollisionDamage) == 0x14, "FCollisionDamage is the 0x14-by
 struct FServerBurnFuseInfo;
 
 // server_createinfo.h's CREATESHIP record, the first argument of
-// SystemPlayerView_CreateShipForPlayer below. Pointer-only here as well.
+// Observer::create_ship_for_player below. Pointer-only here as well.
 struct CShipCreateInfo;
 struct Costume;           // common_reputation.h, 13 dwords (FLPACKET_SERVER_SENDCOMM)
 struct CSolarCreateInfo;  // server_createinfo.h, CREATESOLAR's record (FUN_06cf66f0)
@@ -159,6 +159,12 @@ struct ObjectList : public MetaList<GameObject> {
                                    float Radius, unsigned int TypeMask) const;
 
     ObjectList& operator=(ObjectList const&) = delete;
+
+    // FUN_06cf4f40 (.text:06cf4f40, thiscall on the block, RET 8) — walk one of
+    // StarSystem's ObjectLists, call GameObject::update(Dt) (vtable +0x16c) on each
+    // node's object, and when update returns false MetaList::remove the node and
+    // append its object to Deferred (always the +0xe8 list).
+    void tick(float Dt, ObjectList* Deferred);
 };
 
 static_assert(sizeof(ObjectList) == 0x14, "ObjectList is retail's 0x14-byte MetaList");
@@ -351,6 +357,209 @@ public:
     double ElapsedTime;               // +0x30 .. +0x37
     unsigned int PlayerId;            // +0x38
     Vector Position;                  // +0x3C
+
+    // ---------------------------------------------------------------------------
+    // Members retail does not export; the names are the port's.
+    // ---------------------------------------------------------------------------
+
+    // FUN_06cf7140 (.text:06cf7140, `RET 0x4`) -- start tracking an object for this
+    // player. Allocates the 0x2F8-byte record, constructs its
+    // CRemotePhysicsSimulation in place, seeds "created on the client" from
+    // SinglePlayer(), push_backs the record and bumps the size. Returns the record,
+    // exactly as retail does (EAX at .text:06cf723f).
+    SystemTrackedObject* add_tracked_object(GameObject* Obj);
+
+    // FUN_06cf7260 -- "this object is not tracked yet; should it become visible?"
+    // Reached only from FUN_06cf73d0's miss path (.text:06cf7420).
+    //   true  when the object is null, when COMMON.DLL::SinglePlayer(), or when the
+    //         object's own CSimple::OwnerPlayer is this view's player
+    //         (.text:06cf726a / .text:06cf7278 / .text:06cf729b)
+    //   otherwise a squared-distance test against one of three radii, chosen by
+    //   ownership and grouping:
+    //     object has no owning player            -> 2500^2 (.rdata:06d66aec = 6.25e6)
+    //     owner is in a different group, or this
+    //     player is in no group at all           -> 5000^2 (.rdata:06d66af0 = 2.5e7)
+    //     owner is in the SAME group             -> 10000^2 (.rdata:06d66af4 = 1e8)
+    //   The group value is PlayerData+0x404: retail indexes `Players + id*0x418`
+    //   and reads -0x14 off that (.text:06cf72f9/.text:06cf72ff and
+    //   .text:06cf731e/.text:06cf7324), and 0x418 - 0x14 = 0x404. It is only ever
+    //   tested for zero and compared between two players, which is exactly what
+    //   common_server_playerdb.h already names PlayerData::group_ptr, the
+    //   CPlayerGroup*.
+    bool should_be_visible(GameObject* Obj);
+
+    // FUN_06cf73d0 -- "can this player see this object right now?" `RET 0x4`.
+    bool is_object_visible(GameObject* Obj);
+
+    // FUN_06cf7370 (.text:06cf7370, `RET 0x4`) -- the same question by object id:
+    // true in single player; otherwise the id is resolved (FUN_06d006c0, the port's
+    // Server_LookupGameObject) and the answer is FUN_06cf73d0's for the object, a
+    // null object included (.text:06cf73a4 pushes 0 on the miss path).
+    bool is_object_id_visible(unsigned int ObjId);
+
+    // FUN_06cf65b0 (.text:06cf65b0, `RET 0x4`) -- multiplayer only: the tracked
+    // record for Rec->ObjectId gets FLPACKET_COMMON_UPDATEOBJECT (IClient +0xd8,
+    // SendCommonUpdateObject) when already created on the client (+0x2F0), and its
+    // CRemotePhysicsSimulation::RemoteUpdate(pos, orientation, time) either way.
+    // Only caller: StarSystem::sp_obj_update.
+    void send_object_update(FCommonUpdateObjectInfo const* Rec);
+
+    // FUN_06cf70c0 (.text:06cf70c0, `RET 0x4`) -- if ObjId is a CShip this view can
+    // see, IClient +0x1c4 (SendServerMiscObjUpdateObjectGroup)(view's PlayerId, ObjId, the ship's +0x1b4 group
+    // id). Only caller: StarSystem::send_group_change.
+    void send_group_change(unsigned int ObjId);
+
+    // FUN_06cf7440 (.text:06cf7440, `RET 0x4`) -- collect into Owners the owning
+    // player (CSimple::OwnerPlayer, +0xb4) of every tracked object this view has
+    // already created on its client (+0x2F0). Local chat's recipient list.
+    void collect_created_owners(std::set<unsigned int>* Owners);
+
+    // FUN_06cf6730 (.text:06cf6730, `RET 0x4`) -- FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE
+    // for one view. If Obj is tracked by this view and already created on its client
+    // (+0x2F0), the ship's CEqObj::get_equip_desc_list (CObject vtable +0xac) fills a
+    // local EquipDescVector and IClient +0x154 (SendServerRemoteObjectCargoUpdate) sends it with (&view->PlayerId,
+    // the ship's CSimple::Id, &vector, 1). The ship is the 0x503-classed cobject(); retail
+    // does not null-test it. Only caller: StarSystem::send_remote_cargo_update.
+    void send_remote_cargo_update(GameObject* Obj);
+
+    // FUN_06cf6820 -- "this object has been destroyed". `RET 0x8`.
+    bool on_object_destroyed(GameObject* Obj, int Kind);
+
+    // FUN_06cf6950 (.text:06cf6950, `RET 0xc`) -- the per-player
+    // FLPACKET_SERVER_DAMAGEOBJECT gate.
+    //
+    // Both records are Common's DamageList: the sole caller, FUN_06d0b800, passes its own
+    // param_2 and a list it filled on the stack. This function only tests the second one's
+    // size (DeferredRecord->Count) and hands whichever it picked to IClient
+    // SendServerDamageObject, whose rpclocal marshaller reads it as a DamageList.
+    void damage_object(unsigned int ObjId, DamageList* PrimaryRecord, DamageList* DeferredRecord);
+
+    // FUN_06cf53e0 (.text:06cf53e0, `RET 0x8` -- ONE stack argument, a `double`).
+    // The per-frame observer update (src/Server/server_observer.cpp). Ghidra types the
+    // argument as two `undefined4`s; it is one double.
+    //
+    // Everything below the top-level `if (SinglePlayer()) return;`
+    // (.text:06cf5405/.text:06cf540d) runs in five phases, each one re-checking the
+    // IClient bandwidth gauge (see the kBandwidthCeiling note in the .cpp):
+    //   1. split the tracked list in two -- already-created records get
+    //      CRemotePhysicsSimulation::Doit(Dt), not-yet-created ones are queued;
+    //   2. for every not-yet-created record that is now visible, send the matching
+    //      CREATE* packet and move it to the created list;
+    //   3. for every created record: if it is no longer visible send
+    //      DESTROYOBJECT and clear its flag, otherwise ask CheckForSync and, when
+    //      it says yes, insert the record into a third list kept in DESCENDING
+    //      CRemotePhysicsSimulation::GetSimulationTime() order;
+    //   4. drain that third list into UPDATEOBJECT packets;
+    //   5. retry the deferred-damage set (PendingDamageIds) -- resolve each id,
+    //      keep the ones that are visible again, build the object's DamageList and
+    //      send DAMAGEOBJECT, erasing the id from the set.
+    void update(double Dt);
+
+    // FUN_06cf6e60 (.text:06cf6e60, `RET 0x8`) -- "this object has left the
+    // system". Drops the object from the tracked list,
+    // CLEARS the whole deferred-damage set, latches bShipGone when the departing
+    // object is this player's own ship, and sends
+    // FLPACKET_SERVER_SYSTEM_SWITCH_OUT (IClient +0x0e4 == SendServerSystemSwitchOut) when either the
+    // record had been created on the client or bShipGone is now set.
+    //
+    // The wire payload is the two dwords { *ObjId, *Destination }; retail passes both by
+    // pointer.
+    void on_object_left_system(unsigned int const* ObjId, unsigned int const* Destination);
+
+    // FUN_06cf6fc0 (.text:06cf6fc0, `RET 0xc`) -- "this object has landed".
+    // Drops the object from the tracked list, and when the record had been created on the
+    // client or the object is this player's own ship, sends FLPACKET_SERVER_LAND (IClient
+    // +0x0ec == SendServerLand) with the payload {*ObjId, *Arg2, *Arg3}; outside single
+    // player the player's own ship landing first autosaves the slot (FUN_06d4c430). Its only
+    // caller is the per-system step FUN_06d0be50 (StarSystem::update in IServerImpl.cpp),
+    // walking the dock queue (SystemDockNode below). Arg2 is the id from a vtable +0x20
+    // get_id (0 if none) and Arg3 is the dock node's +0x18.
+    void on_object_landed(unsigned int const* ObjId, unsigned int const* Arg2,
+                          unsigned int const* Arg3);
+
+    // ---------------------------------------------------------------------------
+    // The five "tell this client the object exists" notifiers, and the six of the
+    // seven Observer::add_tracked_object call sites that live inside them.
+    //
+    // Retail has no names for them; the FDUMP each one issues when it is handed an
+    // already-destroyed object does, and it is retail's own text, from
+    // E:\FL\Scratch\Source\Server\space\Observer.cpp (the path string lives at
+    // .rdata:06d669dc and is pushed at .text:06cf66d7 as `68dc69d606`) -- so this
+    // family is NOT in StarSys.cpp, which is where the system itself lives:
+    //   FUN_06cf6630  line 0x19b  "Ship(%d) 'd..."            -> IClient +0x0bc
+    //   FUN_06cf6bc0  line 0x23c  "CounterMeasure(%d) ..."    -> IClient +0x0cc
+    //   FUN_06cf6c50  line 0x256  "Loot(%d) 'dea..."          -> IClient +0x0c0
+    //   FUN_06cf6cf0  (none)                                  -> IClient +0x0c8
+    //   FUN_06cf6d60  line 0x28a  "Mine(%d) 'd..."            -> IClient +0x0c4
+    // and those five vtable offsets are, in rpc_iclient.h's own table,
+    // SendServerCreateShip, SendServerCreateCounter, SendServerCreateLoot,
+    // SendServerCreateGuided and SendServerCreateMine. The FDUMP text and the packet name agree independently in
+    // all four cases that have both, which is what fixes FUN_06cf6cf0 as the guided
+    // one without a string of its own.
+    //
+    // All five share one body:
+    //   1. return at once when View->bShipGone is set;
+    //   2. per-object: when GameObject::is_destroyed() (retail vtable +0x160), FDUMP
+    //      and return without tracking anything;
+    //   3. Observer::add_tracked_object(View, Obj);
+    //   4. outside single player, drop out silently unless
+    //      Observer::should_be_visible(View, Obj);
+    //   5. mark the record bCreatedOnClient and hand the payload to the IClient slot.
+    // The ship one (FUN_06cf6630) is the odd one out and does NOT follow 4/5 -- see
+    // its own comment in server_classes.cpp.
+    //
+    // The first argument is the record the packet carries. Retail builds it in the
+    // caller (FUN_06d07690 for ships, FUN_06d07b90 for loot, ...) and these five
+    // only forward it. All five record types are published in
+    // src/include/server_createinfo.h, the one declaration rpclocal's marshallers
+    // read too. The ship notifier takes its CShipCreateInfo by type, because it
+    // WRITES a field of it (+0xd4, .text:06cf66a0); the other four only forward
+    // theirs and still take it as `void*`.
+    // TODO(port): type the other four once their callers build the records.
+    void create_ship_for_player(CShipCreateInfo* Info, GameObject* Obj);
+
+    // FUN_06cf66f0 (.text:06cf66f0, `RET 0x8`) -- CREATESOLAR for one view: nothing when
+    // bShipGone; otherwise IClient +0xb8 (SendServerCreateSolar)(PlayerId, Info) when the solar should
+    // be visible to this view or Info->Field_0xac is set. No tracked record is made.
+    // Only caller FUN_06d0a200 (pub::SpaceObj::CreateSolar's per-player walk).
+    void create_solar_for_player(CSolarCreateInfo* Info, GameObject* Obj);
+
+    // FUN_06cf6ac0 (.text:06cf6ac0, thiscall on the view, RET 0x54: 21 dwords) --
+    // FLPACKET_SERVER_SENDCOMM for one view. Outside single player both the sender and
+    // the receiver must be visible to the view (FUN_06d006c0 + FUN_06cf73d0 each); then
+    // IClient +0x110 (SendServerSendComm) with the view's PlayerId, the 20 caller dwords and
+    // "the receiver is this view's own ship". Only caller StarSystem::send_comm.
+    void send_comm(unsigned int SenderId, unsigned int ReceiverId, unsigned int VoiceId,
+                   Costume const& Cost, unsigned int CaptionIds, unsigned int* TextIds,
+                   int TextCount, unsigned int PermutationIds, float Duration);
+    void create_counter_for_player(void* Payload, GameObject* Obj);
+    void create_mine_for_player(void* Payload, GameObject* Obj);
+
+    // FUN_06cf6c50 / FUN_06cf6cf0 take a std::vector<GameObject*> rather than one
+    // object: .text:06cf6c60 is `MOV ESI,[EBX + 0x4]` against `CMP ESI,[EBX + 0x8]`,
+    // the vector's first/last pair. The loot one walks the whole range; the guided
+    // one uses only `*First` (.text:06cf6d13 `MOV EAX,[ESI]` after checking the
+    // range is non-empty at .text:06cf6d0a..06cf6d11). The port passes the range
+    // explicitly instead of a container so that neither the iterator-debug pointer
+    // nor a copy of the vector can creep in.
+    void create_loot_for_player(FServerCreateLootRequest* Payload, GameObject* const* First,
+                                GameObject* const* Last);
+    void create_guided_for_player(void* Payload, GameObject* const* First, GameObject* const* Last);
+
+    // FUN_06cf6df0 (.text:06cf6df0, thiscall on the view, RET 4) -- the per-player
+    // half of StarSystem::send_mine_explosion. In multiplayer the mine is resolved
+    // by id (FUN_06d006c0) and the packet goes out only when this player can see it
+    // (FUN_06cf73d0); in single player it always goes. IClient +0xd0 (SendServerExplodeAsteroidMine,
+    // FLPACKET_SERVER_EXPLODEASTEROIDMINE) with the view's player id and Rec.
+    void send_mine_explosion(FMineExplosion* Rec);
+
+    // The tracked-list search by get_id(), inlined in FUN_06cf6820. Defined in
+    // server_classes.cpp.
+    SystemTrackedNode* find_by_id(unsigned int ObjId);
+
+    // The tracked-list search by object pointer, inlined in FUN_06cf73d0. Defined in
+    // server_classes.cpp.
+    SystemTrackedNode* find_by_pointer(GameObject* Obj);
 };
 
 // The player-list node. The element really is embedded, so `View` must stay the
@@ -361,216 +570,6 @@ struct SystemPlayerNode {
     Observer View;                    // +0x08
 };
 static_assert(offsetof(SystemPlayerNode, View.PlayerId) == 0x40, "SystemPlayerNode+0x40 player id");
-
-// FUN_06cf7140 (.text:06cf7140, `RET 0x4`) -- start tracking an object for this
-// player. Allocates the 0x2F8-byte record, constructs its
-// CRemotePhysicsSimulation in place, seeds "created on the client" from
-// SinglePlayer(), push_backs the record and bumps the size. Returns the record,
-// exactly as retail does (EAX at .text:06cf723f).
-SystemTrackedObject* SystemPlayerView_AddTrackedObject(Observer* View, GameObject* Obj);
-
-// FUN_06cf7260 -- "this object is not tracked yet; should it become visible?"
-// Reached only from FUN_06cf73d0's miss path (.text:06cf7420).
-//   true  when the object is null, when COMMON.DLL::SinglePlayer(), or when the
-//         object's own CSimple::OwnerPlayer is this view's player
-//         (.text:06cf726a / .text:06cf7278 / .text:06cf729b)
-//   otherwise a squared-distance test against one of three radii, chosen by
-//   ownership and grouping:
-//     object has no owning player            -> 2500^2 (.rdata:06d66aec = 6.25e6)
-//     owner is in a different group, or this
-//     player is in no group at all           -> 5000^2 (.rdata:06d66af0 = 2.5e7)
-//     owner is in the SAME group             -> 10000^2 (.rdata:06d66af4 = 1e8)
-//   The group value is PlayerData+0x404: retail indexes `Players + id*0x418`
-//   and reads -0x14 off that (.text:06cf72f9/.text:06cf72ff and
-//   .text:06cf731e/.text:06cf7324), and 0x418 - 0x14 = 0x404. It is only ever
-//   tested for zero and compared between two players, which is exactly what
-//   common_server_playerdb.h already names PlayerData::group_ptr, the
-//   CPlayerGroup*.
-bool SystemPlayerView_ShouldBeVisible(Observer* View, GameObject* Obj);
-
-// FUN_06cf73d0 -- "can this player see this object right now?" `RET 0x4`.
-bool SystemPlayerView_IsObjectVisible(Observer* View, GameObject* Obj);
-
-// FUN_06cf7370 (.text:06cf7370, `RET 0x4`) -- the same question by object id:
-// true in single player; otherwise the id is resolved (FUN_06d006c0, the port's
-// Server_LookupGameObject) and the answer is FUN_06cf73d0's for the object, a
-// null object included (.text:06cf73a4 pushes 0 on the miss path).
-bool SystemPlayerView_IsObjectIdVisible(Observer* View, unsigned int ObjId);
-
-// FUN_06cf65b0 (.text:06cf65b0, `RET 0x4`) -- multiplayer only: the tracked
-// record for Rec->ObjectId gets FLPACKET_COMMON_UPDATEOBJECT (IClient +0xd8,
-// SendCommonUpdateObject) when already created on the client (+0x2F0), and its
-// CRemotePhysicsSimulation::RemoteUpdate(pos, orientation, time) either way.
-// Only caller: StarSystem::sp_obj_update.
-void SystemPlayerView_SendObjectUpdate(Observer* View, FCommonUpdateObjectInfo const* Rec);
-
-// FUN_06cf70c0 (.text:06cf70c0, `RET 0x4`) -- if ObjId is a CShip this view can
-// see, IClient +0x1c4 (SendServerMiscObjUpdateObjectGroup)(view's PlayerId, ObjId, the ship's +0x1b4 group
-// id). Only caller: StarSystem_SendGroupChange.
-void SystemPlayerView_SendGroupChange(Observer* View, unsigned int ObjId);
-
-// FUN_06cf7440 (.text:06cf7440, `RET 0x4`) -- collect into Owners the owning
-// player (CSimple::OwnerPlayer, +0xb4) of every tracked object this view has
-// already created on its client (+0x2F0). Local chat's recipient list.
-void SystemPlayerView_CollectCreatedOwners(Observer* View, std::set<unsigned int>* Owners);
-
-// FUN_06cf6730 (.text:06cf6730, `RET 0x4`) -- FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE
-// for one view. If Obj is tracked by this view and already created on its client
-// (+0x2F0), the ship's CEqObj::get_equip_desc_list (CObject vtable +0xac) fills a
-// local EquipDescVector and IClient +0x154 (SendServerRemoteObjectCargoUpdate) sends it with (&view->PlayerId,
-// the ship's CSimple::Id, &vector, 1). The ship is the 0x503-classed cobject(); retail
-// does not null-test it. Only caller: StarSystem_SendRemoteCargoUpdate.
-void SystemPlayerView_SendRemoteCargoUpdate(Observer* View, GameObject* Obj);
-
-// FUN_06cf6820 -- "this object has been destroyed". `RET 0x8`.
-bool SystemPlayerView_OnObjectDestroyed(Observer* View, GameObject* Obj, int Kind);
-
-// FUN_06cf6950 (.text:06cf6950, `RET 0xc`) -- the per-player
-// FLPACKET_SERVER_DAMAGEOBJECT gate.
-//
-// Both records are Common's DamageList: the sole caller, FUN_06d0b800, passes its own
-// param_2 and a list it filled on the stack. This function only tests the second one's
-// size (DeferredRecord->Count) and hands whichever it picked to IClient
-// SendServerDamageObject, whose rpclocal marshaller reads it as a DamageList.
-void SystemPlayerView_DamageObject(Observer* View, unsigned int ObjId,
-                                   DamageList* PrimaryRecord,
-                                   DamageList* DeferredRecord);
-
-// FUN_06cf53e0 (.text:06cf53e0, `RET 0x8` -- ONE stack argument, a `double`).
-// The per-frame observer update (src/Server/server_observer.cpp). Ghidra types the
-// argument as two `undefined4`s; it is one double.
-//
-// Everything below the top-level `if (SinglePlayer()) return;`
-// (.text:06cf5405/.text:06cf540d) runs in five phases, each one re-checking the
-// IClient bandwidth gauge (see the kBandwidthCeiling note in the .cpp):
-//   1. split the tracked list in two -- already-created records get
-//      CRemotePhysicsSimulation::Doit(Dt), not-yet-created ones are queued;
-//   2. for every not-yet-created record that is now visible, send the matching
-//      CREATE* packet and move it to the created list;
-//   3. for every created record: if it is no longer visible send
-//      DESTROYOBJECT and clear its flag, otherwise ask CheckForSync and, when
-//      it says yes, insert the record into a third list kept in DESCENDING
-//      CRemotePhysicsSimulation::GetSimulationTime() order;
-//   4. drain that third list into UPDATEOBJECT packets;
-//   5. retry the deferred-damage set (PendingDamageIds) -- resolve each id,
-//      keep the ones that are visible again, build the object's DamageList and
-//      send DAMAGEOBJECT, erasing the id from the set.
-void SystemPlayerView_Update(Observer* View, double Dt);
-
-// Observer.cpp's matrix -> quaternion step: the lazily filled file-static
-// .data:DAT_06d8d7f8 (Server_Acquire3DMathEngine, FUN_06d5ff70) and its
-// vtable +0x50, I3DMathEngine::MatrixToQuaternion. Its three retail users are
-// .text:06cf5ce0 / .text:06cf5eea (the update above) and .text:06cf7204
-// (SystemPlayerView_AddTrackedObject). Defined in src/Server/server_observer.cpp.
-void Observer_MatrixToQuat(Quaternion& Out, Matrix const& In);
-
-// FUN_06cf4f40 (.text:06cf4f40, thiscall on the block, RET 8) — walk one of
-// StarSystem's ObjectLists, call GameObject::update(Dt) (vtable +0x16c) on each
-// node's object, and when update returns false MetaList::remove the node and
-// append its object to Deferred (always the +0xe8 list).
-void StarSystem_TickObjectList(ObjectList* List, float Dt, ObjectList* Deferred);
-
-// FUN_06cf6e60 (.text:06cf6e60, `RET 0x8`) -- "this object has left the
-// system". Drops the object from the tracked list,
-// CLEARS the whole deferred-damage set, latches bShipGone when the departing
-// object is this player's own ship, and sends
-// FLPACKET_SERVER_SYSTEM_SWITCH_OUT (IClient +0x0e4 == SendServerSystemSwitchOut) when either the
-// record had been created on the client or bShipGone is now set.
-//
-// The wire payload is the two dwords { *ObjId, *Destination }; retail passes both by
-// pointer.
-void SystemPlayerView_OnObjectLeftSystem(Observer* View,
-                                         unsigned int const* ObjId,
-                                         unsigned int const* Destination);
-
-// FUN_06cf6fc0 (.text:06cf6fc0, `RET 0xc`) -- "this object has landed".
-// Drops the object from the tracked list, and when the record had been created on the
-// client or the object is this player's own ship, sends FLPACKET_SERVER_LAND (IClient
-// +0x0ec == SendServerLand) with the payload {*ObjId, *Arg2, *Arg3}; outside single
-// player the player's own ship landing first autosaves the slot (FUN_06d4c430). Its only
-// caller is the per-system step FUN_06d0be50 (StarSystem_Update in IServerImpl.cpp),
-// walking the dock queue (SystemDockNode below). Arg2 is the id from a vtable +0x20
-// get_id (0 if none) and Arg3 is the dock node's +0x18.
-void SystemPlayerView_OnObjectLanded(Observer* View,
-                                     unsigned int const* ObjId,
-                                     unsigned int const* Arg2,
-                                     unsigned int const* Arg3);
-
-// ---------------------------------------------------------------------------
-// The five "tell this client the object exists" notifiers, and the six of the
-// seven SystemPlayerView_AddTrackedObject call sites that live inside them.
-//
-// Retail has no names for them; the FDUMP each one issues when it is handed an
-// already-destroyed object does, and it is retail's own text, from
-// E:\FL\Scratch\Source\Server\space\Observer.cpp (the path string lives at
-// .rdata:06d669dc and is pushed at .text:06cf66d7 as `68dc69d606`) -- so this
-// family is NOT in StarSys.cpp, which is where the system itself lives:
-//   FUN_06cf6630  line 0x19b  "Ship(%d) 'd..."            -> IClient +0x0bc
-//   FUN_06cf6bc0  line 0x23c  "CounterMeasure(%d) ..."    -> IClient +0x0cc
-//   FUN_06cf6c50  line 0x256  "Loot(%d) 'dea..."          -> IClient +0x0c0
-//   FUN_06cf6cf0  (none)                                  -> IClient +0x0c8
-//   FUN_06cf6d60  line 0x28a  "Mine(%d) 'd..."            -> IClient +0x0c4
-// and those five vtable offsets are, in rpc_iclient.h's own table,
-// SendServerCreateShip, SendServerCreateCounter, SendServerCreateLoot,
-// SendServerCreateGuided and SendServerCreateMine. The FDUMP text and the packet name agree independently in
-// all four cases that have both, which is what fixes FUN_06cf6cf0 as the guided
-// one without a string of its own.
-//
-// All five share one body:
-//   1. return at once when View->bShipGone is set;
-//   2. per-object: when GameObject::is_destroyed() (retail vtable +0x160), FDUMP
-//      and return without tracking anything;
-//   3. SystemPlayerView_AddTrackedObject(View, Obj);
-//   4. outside single player, drop out silently unless
-//      SystemPlayerView_ShouldBeVisible(View, Obj);
-//   5. mark the record bCreatedOnClient and hand the payload to the IClient slot.
-// The ship one (FUN_06cf6630) is the odd one out and does NOT follow 4/5 -- see
-// its own comment in server_classes.cpp.
-//
-// The first argument is the record the packet carries. Retail builds it in the
-// caller (FUN_06d07690 for ships, FUN_06d07b90 for loot, ...) and these five
-// only forward it. All five record types are published in
-// src/include/server_createinfo.h, the one declaration rpclocal's marshallers
-// read too. The ship notifier takes its CShipCreateInfo by type, because it
-// WRITES a field of it (+0xd4, .text:06cf66a0); the other four only forward
-// theirs and still take it as `void*`.
-// TODO(port): type the other four once their callers build the records.
-void SystemPlayerView_CreateShipForPlayer(Observer* View, CShipCreateInfo* Info, GameObject* Obj);
-// FUN_06cf66f0 (.text:06cf66f0, `RET 0x8`) -- CREATESOLAR for one view: nothing when
-// bShipGone; otherwise IClient +0xb8 (SendServerCreateSolar)(PlayerId, Info) when the solar should
-// be visible to this view or Info->Field_0xac is set. No tracked record is made.
-// Only caller FUN_06d0a200 (pub::SpaceObj::CreateSolar's per-player walk).
-void SystemPlayerView_CreateSolarForPlayer(Observer* View, CSolarCreateInfo* Info, GameObject* Obj);
-// FUN_06cf6ac0 (.text:06cf6ac0, thiscall on the view, RET 0x54: 21 dwords) --
-// FLPACKET_SERVER_SENDCOMM for one view. Outside single player both the sender and
-// the receiver must be visible to the view (FUN_06d006c0 + FUN_06cf73d0 each); then
-// IClient +0x110 (SendServerSendComm) with the view's PlayerId, the 20 caller dwords and
-// "the receiver is this view's own ship". Only caller StarSystem::send_comm.
-void SystemPlayerView_SendComm(Observer* View, unsigned int SenderId,
-                               unsigned int ReceiverId, unsigned int VoiceId,
-                               Costume const& Cost, unsigned int CaptionIds,
-                               unsigned int* TextIds, int TextCount, unsigned int PermutationIds,
-                               float Duration);
-void SystemPlayerView_CreateCounterForPlayer(Observer* View, void* Payload, GameObject* Obj);
-void SystemPlayerView_CreateMineForPlayer(Observer* View, void* Payload, GameObject* Obj);
-// FUN_06cf6c50 / FUN_06cf6cf0 take a std::vector<GameObject*> rather than one
-// object: .text:06cf6c60 is `MOV ESI,[EBX + 0x4]` against `CMP ESI,[EBX + 0x8]`,
-// the vector's first/last pair. The loot one walks the whole range; the guided
-// one uses only `*First` (.text:06cf6d13 `MOV EAX,[ESI]` after checking the
-// range is non-empty at .text:06cf6d0a..06cf6d11). The port passes the range
-// explicitly instead of a container so that neither the iterator-debug pointer
-// nor a copy of the vector can creep in.
-void SystemPlayerView_CreateLootForPlayer(Observer* View, FServerCreateLootRequest* Payload,
-                                          GameObject* const* First, GameObject* const* Last);
-void SystemPlayerView_CreateGuidedForPlayer(Observer* View, void* Payload,
-                                            GameObject* const* First, GameObject* const* Last);
-
-// FUN_06cf6df0 (.text:06cf6df0, thiscall on the view, RET 4) -- the per-player
-// half of StarSystem::send_mine_explosion. In multiplayer the mine is resolved
-// by id (FUN_06d006c0) and the packet goes out only when this player can see it
-// (FUN_06cf73d0); in single player it always goes. IClient +0xd0 (SendServerExplodeAsteroidMine,
-// FLPACKET_SERVER_EXPLODEASTEROIDMINE) with the view's player id and Rec.
-void SystemPlayerView_SendMineExplosion(Observer* View, FMineExplosion* Rec);
 
 // ---------------------------------------------------------------------------
 // The element of StarSystem's second list (+0x14 .. +0x1F): one object that has
@@ -798,7 +797,7 @@ public:
     // (SessionId, the destination system id).
     //   .text:06d087f6 .. 06d087fd  remove_player(SessionId) (FUN_06d08740)
     //   .text:06d08802 .. 06d08817  FUN_06d4b450 on Players[SessionId]
-    //                               (PlayerData_FlushPendingVisits)
+    //                               (PlayerData::flush_pending_visits)
     //   .text:06d0881c .. 06d08843  DestSystemId != 0 -> controller event 0x3a
     //                               {SystemInfo->vtable[0](), DestSystemId,
     //                               SessionId}
@@ -816,7 +815,7 @@ public:
     //   .text:06d0d8f2 .. 06d0d971  ACTIVATEOBJECT {id, bOn, Index} through
     //                               IClient SendServerActivateObject to every player when
     //                               cobject() is a solar (& 0x303), else only
-    //                               where SystemPlayerView_IsObjectVisible
+    //                               where Observer::is_object_visible
     //   .text:06d0d976              true
     bool activate_object(GameObject* Obj, bool bOn, unsigned int Index);
 
@@ -876,7 +875,7 @@ public:
     // CECargo::RemoveFromStack, pushing (the EqObj, equip id, count).
     //   .text:06d0efeb .. 06d0f057  a player's ship (is_valid_ship_owner,
     //                               inlined): FUN_06d4f100(slot, id, count, 0)
-    //                               (PlayerData_RemoveEquipment)
+    //                               (PlayerData::remove_equipment)
     //   .text:06d0f05c .. 06d0f0ad  USE_ITEM {id, EquipId, count} through
     //                               IClient +0x104 (SendServerUseItem) to every player
     //                               that sees the object (FUN_06cf7370)
@@ -889,7 +888,7 @@ public:
     //                               Info.ObjectId; none -> return
     //   .text:06d0bc0f .. 06d0bc21  PhySys::RCSet(ship, pos, orientation, time)
     //   .text:06d0bc27 .. 06d0bc70  FCommonUpdateObjectInfo from Info
-    //   .text:06d0bc69 .. 06d0bc99  FUN_06cf65b0 (SystemPlayerView_SendObjectUpdate)
+    //   .text:06d0bc69 .. 06d0bc99  FUN_06cf65b0 (Observer::send_object_update)
     //                               for every player but SessionId
     void sp_obj_update(SSPObjUpdateInfo const& Info, unsigned int SessionId);
 
@@ -1087,7 +1086,7 @@ public:
     //   .text:06d0a617 .. 06d0a61d  CObject::enable_collisions_r(true)
     //   .text:06d0a623 .. 06d0a66f  every player node: Req +0xa8 = is_marked_by
     //                               (node +0x40), Req +0xb0 = Players[id].rep_vibe,
-    //                               SystemPlayerView_CreateSolarForPlayer
+    //                               Observer::create_solar_for_player
     //                               (FUN_06cf66f0)(&node->View, &Req, wrapper)
     //   .text:06d0a671 .. 06d0a74a  the parms destroyed (anim list cleared and
     //                               its head freed, the group list, the vector)
@@ -1198,7 +1197,7 @@ public:
     // ------------------------------------------------------------------
     // send_mine_explosion -- retail FUN_06d09270 (.text:06d09270, thiscall,
     // RET 4). Copies the four dwords of *Rec onto the stack (.text:06d0927b ..
-    // 06d09297) and hands that copy to SystemPlayerView_SendMineExplosion
+    // 06d09297) and hands that copy to Observer::send_mine_explosion
     // (FUN_06cf6df0) for every node of the player list at +0x0c, in list
     // order. Only caller: MedMine::update (.text:06d04f84).
     // ------------------------------------------------------------------
@@ -1595,6 +1594,63 @@ public:
     // single player only) and .text:06d1021e.
     // ------------------------------------------------------------------
     void shutdown();
+
+    // ---------------------------------------------------------------------------
+    // Members retail does not export; the names are the port's.
+    // ---------------------------------------------------------------------------
+
+    // FUN_06d0f1c0 (.text:06d0f1c0, thiscall, `RET 0x4`) -- Observer::send_group_change
+    // (FUN_06cf70c0) on every view in the system's player list. Callers
+    // CPlayerGroup::AddMember / DelMember after they stamp a ship's group id.
+    void send_group_change(unsigned int ObjId);
+
+    // FUN_06d0b110 (.text:06d0b110, thiscall, `RET 0x4`) -- Observer::send_remote_cargo_update
+    // (FUN_06cf6730) on every view in the system's player list whose PlayerId is not
+    // Obj's own CSimple::OwnerPlayer. Only caller: IServerImpl::AcceptTrade
+    // (.text:06cf1eed / .text:06cf1ef9), once per trading ship.
+    void send_remote_cargo_update(GameObject* Obj);
+
+    // FUN_06d0f190 (.text:06d0f190, `RET 0x8`, thiscall on the StarSystem) -- find
+    // PlayerId's node in the system's player list (node+0x40 == View.PlayerId) and
+    // run Observer::collect_created_owners on its view. No match: nothing.
+    void collect_created_owners(unsigned int PlayerId, std::set<unsigned int>* Owners);
+
+    // FUN_06d0b800 (.text:06d0b800, `RET 0x8`) -- "this object has just taken
+    // damage". In src/Server/server_observer.cpp.
+    //
+    // Retail's three callers (.text:06ceb4bf, .text:06ceef18, .text:06cf28bb) all
+    // reach it as a thiscall on a StarSystem with (IObjRW*, DamageList*). It does
+    // two unrelated things:
+    //   * when the damaged object IS the current ship of a valid player, it walks
+    //     the DamageList and mirrors every entry into that player's own PlayerData
+    //     -- equipment through CEquipManager::FindByID + PlayerData::modify_equipment
+    //     / PlayerData::remove_equipment, collision groups through
+    //     CArchGroupManager::FindByID + PlayerData::set_collision_group_health, and the
+    //     root subobject through PlayerData::set_relative_health;
+    //   * then it tells every player in the system, via
+    //     Observer::damage_object. For a SOLAR it first builds a reduced
+    //     DamageList holding only the entries whose Fate != None, and that reduced
+    //     list is the one a player who cannot currently see the object receives.
+    void damage_object(GameObject* Obj, DamageList* Damage);
+
+    // FUN_06ce34d0: the system's collision pass. Defined in IServerImpl.cpp.
+    void process_collisions();
+
+    // FUN_06ce3360: one side of a PhySys collision -> the wrapper and the sub-object it was hit
+    // on. Defined in IServerImpl.cpp.
+    void resolve_collision_side(CObject* Part, unsigned int PartId, GameObject** OutObj,
+                                unsigned short* OutSubObjId);
+
+    // FUN_06d0be50: one system's update for Dt seconds. Defined in IServerImpl.cpp.
+    unsigned int update(float Dt);
+
+    // The tail of FUN_06d0be50, after the per-player view update; not a function of its own in
+    // retail. Defined in IServerImpl.cpp.
+    void send_changed_affiliations();
+
+    // FUN_06d0be50's ship-proximity pass; not a function of its own in retail. Defined in
+    // IServerImpl.cpp.
+    void update_near_ships(float Step);
 };
 
 static const unsigned int STARSYSTEM_SIZE = 0x100;
@@ -1603,16 +1659,6 @@ static_assert(sizeof(StarSystem) == 0x100, "StarSystem is retail's 0x100 bytes")
 static_assert(offsetof(StarSystem, SystemInfo) == 0x04, "StarSystem+0x04 SystemInfo");
 static_assert(offsetof(StarSystem, PlayerListHead) == 0x0C, "StarSystem+0x0C player list head");
 
-// FUN_06d0f1c0 (.text:06d0f1c0, thiscall, `RET 0x4`) -- SystemPlayerView_SendGroupChange
-// (FUN_06cf70c0) on every view in the system's player list. Callers
-// CPlayerGroup::AddMember / DelMember after they stamp a ship's group id.
-void StarSystem_SendGroupChange(StarSystem& System, unsigned int ObjId);
-
-// FUN_06d0b110 (.text:06d0b110, thiscall, `RET 0x4`) -- SystemPlayerView_SendRemoteCargoUpdate
-// (FUN_06cf6730) on every view in the system's player list whose PlayerId is not
-// Obj's own CSimple::OwnerPlayer. Only caller: IServerImpl::AcceptTrade
-// (.text:06cf1eed / .text:06cf1ef9), once per trading ship.
-void StarSystem_SendRemoteCargoUpdate(StarSystem& System, GameObject* Obj);
 static_assert(offsetof(StarSystem, DockQueueHead) == 0x18, "StarSystem+0x18 dock queue head");
 static_assert(offsetof(StarSystem, Spatial) == 0x20, "StarSystem+0x20 spatial partition");
 static_assert(offsetof(StarSystem, VectorBegin) == 0x28, "StarSystem+0x28 vector _First");
@@ -1633,12 +1679,6 @@ namespace SysDB {
     typedef std::map<unsigned int, StarSystem> SysMapType;
     extern SERVER_API SysMapType SysMap;
 }
-
-// FUN_06d0f190 (.text:06d0f190, `RET 0x8`, thiscall on the StarSystem) -- find
-// PlayerId's node in the system's player list (node+0x40 == View.PlayerId) and
-// run SystemPlayerView_CollectCreatedOwners on its view. No match: nothing.
-void StarSystem_CollectCreatedOwners(StarSystem* System, unsigned int PlayerId,
-                                     std::set<unsigned int>* Owners);
 
 // SysDB lookup — equivalent of retail FUN_06d00280
 // Returns FStarSystem* for given system_id, or nullptr if not found
@@ -1696,21 +1736,3 @@ extern unsigned int GLookupCacheMisses;
 // and FUN_06d0d000 (StarSystem object removal).
 void Server_LookupCacheForget(unsigned int const& ObjId);
 
-// ---------------------------------------------------------------------------
-// FUN_06d0b800 (.text:06d0b800, `RET 0x8`) -- "this object has just taken
-// damage". In src/Server/server_observer.cpp.
-//
-// Retail's three callers (.text:06ceb4bf, .text:06ceef18, .text:06cf28bb) all
-// reach it as a thiscall on a StarSystem with (IObjRW*, DamageList*). It does
-// two unrelated things:
-//   * when the damaged object IS the current ship of a valid player, it walks
-//     the DamageList and mirrors every entry into that player's own PlayerData
-//     -- equipment through CEquipManager::FindByID + PlayerData_ModifyEquipment
-//     / PlayerData_RemoveEquipment, collision groups through
-//     CArchGroupManager::FindByID + PlayerData_SetCollisionGroupHealth, and the
-//     root subobject through PlayerData_SetRelativeHealth;
-//   * then it tells every player in the system, via
-//     SystemPlayerView_DamageObject. For a SOLAR it first builds a reduced
-//     DamageList holding only the entries whose Fate != None, and that reduced
-//     list is the one a player who cannot currently see the object receives.
-void StarSystem_DamageObject(StarSystem* Sys, GameObject* Obj, DamageList* Damage);

@@ -1406,7 +1406,7 @@ bool FRmVignetteMachine::HandleCriticalLoot(SMEventData const* Event)
         std::map<unsigned int, FContentPlayerState*>::iterator It = PlayerMap->find(PlayerId);
         if (It == PlayerMap->end())
             return false;
-        if (!RmPlayerHasShip(It->second))
+        if (!It->second->HasShip())
             return false;
         FRmRecordList Held = Loot->Query(0, 2, 0, 4, PlayerId);
         if (!Held.Records.empty())

@@ -154,18 +154,18 @@ int FileOpenByName(void* File, const char* ChildName)
 }
 
 // FUN_06c24980 (thiscall on the desc).
-FFileSystemDesc* FileDescInit(FFileSystemDesc* Desc, const char* Path, const char* ComponentName)
+FFileSystemDesc* FFileSystemDesc::Init(const char* Path, const char* ComponentName)
 {
-    std::memset(Desc, 0, sizeof(FFileSystemDesc));
-    Desc->ComponentName = ComponentName;
-    Desc->Access = 0x80000000;
-    Desc->ShareMode = 1;
-    Desc->Creation = 3;
-    Desc->Flags = 0x8000080;
-    Desc->Path = Path;
-    Desc->Size = 0x34;
-    Desc->FindHandle = 0xFFFFFFFF;
-    return Desc;
+    std::memset(this, 0, sizeof(FFileSystemDesc));
+    this->ComponentName = ComponentName;
+    Access = 0x80000000;
+    ShareMode = 1;
+    Creation = 3;
+    Flags = 0x8000080;
+    this->Path = Path;
+    Size = 0x34;
+    FindHandle = 0xFFFFFFFF;
+    return this;
 }
 
 void* QueryIid(IDAComponent* Object, const char* Iid)
@@ -279,7 +279,7 @@ GENRESULT DACOM_API PluginFactoryCreate(FDacomFactory* This, AGGDESC* Desc, void
         return GR_INTERFACE_UNSUPPORTED;
     }
     if (std::strcmp(This->Name, G_NameTriMesh) == 0)
-        return CreateTriMeshPlugin(Extended, Out);
+        return Extended->CreateTriMesh(Out);
     return CreateSphereMeshPlugin(Extended, Out);
 }
 

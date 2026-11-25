@@ -82,7 +82,7 @@ SaveGame_Writer::SaveGame_Writer()
 
 SaveGame_Writer::~SaveGame_Writer() {
     // FUN_06d4c310: if the FILE* is still set, the same encode-and-rewrite as
-    // FUN_06d4eb00 (which the inlined copy on PlayerData_SerializeToFile's
+    // FUN_06d4eb00 (which the inlined copy on PlayerData::serialize_to_file's
     // open-failure exit calls, .text:06d4cfcd).
     Close();
 }

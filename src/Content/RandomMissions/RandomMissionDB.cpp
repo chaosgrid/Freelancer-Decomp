@@ -651,8 +651,6 @@ namespace
     // DAT_06fd0e34 (static init LAB_06f58e10, atexit FUN_06f58e40).
     std::map<unsigned int, FRmSolarFormation> GRmSolarFormations;
 
-    // DAT_06fd0e48 -- this TU's cached 3DMathEngine (FUN_06fa8fa0 on first use).
-    I3DMathEngine* GRmSolarFormationMath = nullptr;
 }
 
 // DAT_06fd0ddc (static init LAB_06f57eb0, atexit FUN_06f57ee0).
@@ -892,10 +890,8 @@ void __cdecl LoadSolarFormations(INI_Reader* Reader)
                     Quat.Y = static_cast<float>(Quat.Y * InvLength);
                     Quat.Z = static_cast<float>(InvLength * LastZ);
 
-                    if (GRmSolarFormationMath == nullptr)
-                        GRmSolarFormationMath = ContentAcquire3DMathEngine();
                     FMatrix Rotation;
-                    GRmSolarFormationMath->QuaternionToMatrix(Rotation, Quat);
+                    ContentMathEngine()->QuaternionToMatrix(Rotation, Quat);
                     Slot.Orientation = Rotation;
                 }
 
@@ -1651,8 +1647,6 @@ bool FRandomMissionObject::OnStateEvent(SMEventData const* Event, int const& Sta
 
 namespace
 {
-    // DAT_06fcf384: this TU's math engine, created on first use (FUN_06fa8fa0).
-    I3DMathEngine* GRandEncMathEngine = nullptr;
 
     // DAT_06fb7b40: the turn of a spawned formation towards its target, (double)(float)pi.
     double const GRandEncTurnAngle = 3.1415927410125732;
@@ -1763,9 +1757,7 @@ void FRandEncParams::Spawn(bool bForced)
         FTransform Placement = Around;
         if (Picked != FreePositions.end())
             FreePositions.erase(Picked);
-        if (GRandEncMathEngine == nullptr)
-            GRandEncMathEngine = ContentAcquire3DMathEngine();
-        GRandEncMathEngine->MulMatrix(Placement.Rotation, Turn, Target.Rotation);
+        ContentMathEngine()->MulMatrix(Placement.Rotation, Turn, Target.Rotation);
         SpawnFormation(&Placement, -1, &LeaderDirectives.Items, nullptr, nullptr, 0, DockTarget);
     }
     FormationsToSpawn = 0;

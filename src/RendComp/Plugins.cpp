@@ -672,11 +672,11 @@ static float TickArgAsFloat(void* Arg)
 
 // FUN_06c25730 (thiscall on the archetype): operator new(0x20). A failed init returns -1
 // without freeing the instance.
-static int TriMeshCreateInstance(FTriMeshArch* Arch, void* InstId, FTriMeshAnim** Out)
+int FTriMeshArch::CreateInstance(void* InstId, FTriMeshAnim** Out)
 {
     *Out = nullptr;
     FTriMeshAnim* Anim = new FTriMeshAnim();
-    if (Anim->Init(Arch, InstId) < 0)
+    if (Anim->Init(this, InstId) < 0)
         return -1;
     *Out = Anim;
     return 0;
@@ -814,7 +814,7 @@ public:
             return 1;
         FTriMeshArch* Arch = (FTriMeshArch*)Handle;
         FTriMeshAnim* Anim = nullptr;
-        if (TriMeshCreateInstance(Arch, InstId, &Anim) < 0)
+        if (Arch->CreateInstance(InstId, &Anim) < 0)
             return 0;
         InstanceMap[InstId] = Anim;
         LastHitKey = InstId;
@@ -1019,7 +1019,7 @@ public:
 
         FFileSystemDesc Desc;
         unsigned long ReadCount = 0;
-        FileDescInit(&Desc, "Radius", "FileSystem");
+        Desc.Init("Radius", "FileSystem");
         bool bRead = false;
         int Handle = File->OpenByDesc(&Desc);
         if (Handle != -1)
@@ -1037,7 +1037,7 @@ public:
             RendCompFdumpAt(kFdumpWarning, G_FileSphereMeshArchetype, 0x5F,
                             "SphereMeshArchetype: load: no radius! invalid sphere file?");
 
-        FileDescInit(&Desc, "Sides", "FileSystem");
+        Desc.Init("Sides", "FileSystem");
         bRead = false;
         Handle = File->OpenByDesc(&Desc);
         if (Handle != -1)
@@ -1070,7 +1070,7 @@ public:
             {
                 char NodeName[0x80];
                 std::sprintf(NodeName, "M%d", (int)Index);
-                FileDescInit(&Desc, NodeName, "FileSystem");
+                Desc.Init(NodeName, "FileSystem");
                 bRead = false;
                 Handle = File->OpenByDesc(&Desc);
                 if (Handle != -1)
@@ -2412,7 +2412,7 @@ public:
 
 // LAB_06c22210 after its AGGDESC checks: calloc(1, 0x38), the ctor, then FUN_06c211a0; a
 // failure runs the dtor FUN_06c21080 and frees the plugin.
-GENRESULT CreateTriMeshPlugin(const FRenderPluginDesc* Desc, void** Out)
+GENRESULT FRenderPluginDesc::CreateTriMesh(void** Out) const
 {
     FTriMeshPlugin* Plugin = new (std::nothrow) FTriMeshPlugin();
     if (Plugin == nullptr)
@@ -2420,7 +2420,7 @@ GENRESULT CreateTriMeshPlugin(const FRenderPluginDesc* Desc, void** Out)
         *Out = nullptr;
         return GR_OUT_OF_MEMORY;
     }
-    const GENRESULT Result = Plugin->Initialize(Desc);
+    const GENRESULT Result = Plugin->Initialize(this);
     if (Result != GR_OK)
     {
         delete Plugin;

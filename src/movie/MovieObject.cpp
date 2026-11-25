@@ -334,13 +334,13 @@ bool FApproach2Player::Open(HWND Hwnd, LONG* ClientRect, const char* Path)
     }
     else if (Length == 0)
     {
-        Approach2StringRelease(Text, 1);
+        Text->Release(1);
     }
     else
     {
         if (Text->Capacity > 0x1Fu || Text->Capacity < Length)
         {
-            Approach2StringRelease(Text, 1);
+            Text->Release(1);
             Approach2StringGrow(Text, Length);
         }
         char* Dest = Text->Ptr;
@@ -449,23 +449,23 @@ uint8_t FApproach2Player::GetError()
 }
 
 // 0x06ac1500. VC6 string tidy. FreeBuffers == 0 only zeros ptr/len/cap.
-void  Approach2StringRelease(FApproach2String* This, char FreeBuffers)
+void  FApproach2String::Release(char FreeBuffers)
 {
-    if (FreeBuffers != 0 && This->Ptr != nullptr)
+    if (FreeBuffers != 0 && Ptr != nullptr)
     {
-        uint8_t Ref = (uint8_t)This->Ptr[-1];
+        uint8_t Ref = (uint8_t)Ptr[-1];
         if (Ref == 0 || Ref == 0xFFu)
         {
-            MovieOperatorDelete(This->Ptr - 1);
+            MovieOperatorDelete(Ptr - 1);
         }
         else
         {
-            This->Ptr[-1] = (char)(Ref - 1u);
+            Ptr[-1] = (char)(Ref - 1u);
         }
     }
-    This->Ptr = nullptr;
-    This->Length = 0;
-    This->Capacity = 0;
+    Ptr = nullptr;
+    Length = 0;
+    Capacity = 0;
 }
 
 // 0x06ac1550. VC6 basic_string grow.

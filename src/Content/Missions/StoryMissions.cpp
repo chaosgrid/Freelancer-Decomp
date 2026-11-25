@@ -271,10 +271,10 @@ namespace
         StoryEvents->OnMissionEvent(1, static_cast<unsigned int>(CampaignSlotSucceed),
                                     ControllerId);
         SpacePopSetAttackClamp(1);                    // DAT_06fd1c78 = 1
-        // RemoveMissionRtc = FUN_06eba430.
+        // FMissionScript::RemoveRtc = FUN_06eba430.
         TString<0x80> RtcPath;
         RtcPath = "missions\\m01a\\rtc_success.ini";
-        RemoveMissionRtc(this, &RtcPath);
+        RemoveRtc(&RtcPath);
         while (Reader->read_header())
         {
             if (!Reader->is_header("Mission01bSave"))

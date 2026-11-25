@@ -26,19 +26,14 @@
 #include <cmath>
 #include <cstdio>
 
-// .data:DAT_06d8d7c4 -- Guided.cpp's own lazily fetched math engine (FUN_06cf4a90).
-static I3DMathEngine* GGuidedMathEngine = nullptr;
-
 // ---------------------------------------------------------------------------
 // FUN_06cf4a90: Matrix * Vector through I3DMathEngine::TransformMatrix (vt+0x2c). The
 // engine is fetched once (FUN_06d5ff70) and never null-tested.
 // ---------------------------------------------------------------------------
 static Vector Guided_TransformMatrix(Matrix const& M, Vector const& V)
 {
-    if (GGuidedMathEngine == nullptr)
-        GGuidedMathEngine = Server_Acquire3DMathEngine();
     FVector Tmp;
-    GGuidedMathEngine->TransformMatrix(Tmp, reinterpret_cast<FMatrix const&>(M),
+    Server_MathEngine()->TransformMatrix(Tmp, reinterpret_cast<FMatrix const&>(M),
                                        reinterpret_cast<FVector const&>(V));
     Vector Out;
     Out.x = Tmp.X;

@@ -759,6 +759,17 @@ namespace AlchemyImpl
         return Instance;
     }
 
+    // Deviation from retail (docs/re/deviations.md): retail keeps one lazily filled engine pointer
+    // per source file, each filled by its own Create3DMath call the first time that file needs
+    // it, and every user inlines the fetch. The port keeps one.
+    I3DMathEngine* Shared3DMath()
+    {
+        static I3DMathEngine* Engine = nullptr;
+        if (Engine == nullptr)
+            Engine = Create3DMath();
+        return Engine;
+    }
+
     I3DMathEngine* Acquire3DMath()
     {
         if (G_3DMath != nullptr)
@@ -821,19 +832,11 @@ namespace AlchemyImpl
         return Camera->GetOrientation();
     }
 
-    // FUN_0622d2e0: independent DAT_06257ac0 lazy creator, unchecked native
-    // GeneralInverse(temporary, OutW, Source), then the complete 48-byte raw copy.
-    // Perp/Rect/Oriented fills use the resulting local transform for camera position.
-    static I3DMathEngine* G_Inverse3DMath = nullptr;
-    static I3DMathEngine* G_PerpBounds3DMath = nullptr; // DAT_06257978, 08640/08690.
-
     FVector* TransformPerpBoundsCenter(const FTransform& Transform, FVector& Out,
                                        const FVector& Input)
     {
-        if (G_PerpBounds3DMath == nullptr)
-            G_PerpBounds3DMath = Create3DMath();
         FVector Temporary;
-        G_PerpBounds3DMath->TransformXform(Temporary, Transform, Input);
+        Shared3DMath()->TransformXform(Temporary, Transform, Input);
         std::memcpy(&Out, &Temporary, sizeof(Out));
         return &Out;
     }
@@ -841,19 +844,15 @@ namespace AlchemyImpl
     FVector* TransformOrientedBoundsCenter(const FTransform& Transform, FVector& Out,
                                            const FVector& Input)
     {
-        if (G_Inverse3DMath == nullptr)
-            G_Inverse3DMath = Create3DMath();
-        G_Inverse3DMath->TransformXform(Out, Transform, Input);
+        Shared3DMath()->TransformXform(Out, Transform, Input);
         return &Out;
     }
 
     FTransform* ComputeGeneralInverseTransform(const FTransform& Source,
                                               FTransform& Out, float& OutW)
     {
-        if (G_Inverse3DMath == nullptr)
-            G_Inverse3DMath = Create3DMath();
         FTransform Temporary;
-        G_Inverse3DMath->GeneralInverse(Temporary, OutW, Source);
+        Shared3DMath()->GeneralInverse(Temporary, OutW, Source);
         std::memcpy(&Out, &Temporary, sizeof(Out));
         return &Out;
     }
@@ -1183,10 +1182,8 @@ namespace AlchemyImpl
     // 0x0620fd3f, basic 0x06216629, mesh 0x062253a9, oriented 0x0622d079.
     void ComposeTransform(float* Out12, const float* A12, const float* B12)
     {
-        if (G_PerpBounds3DMath == nullptr)
-            G_PerpBounds3DMath = Create3DMath();
         FTransform Result;
-        G_PerpBounds3DMath->MulTransform(Result, *reinterpret_cast<const FTransform*>(A12),
+        Shared3DMath()->MulTransform(Result, *reinterpret_cast<const FTransform*>(A12),
                                        *reinterpret_cast<const FTransform*>(B12));
         std::memcpy(Out12, &Result, sizeof(Result));
     }

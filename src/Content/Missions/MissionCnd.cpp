@@ -720,11 +720,9 @@ void CndDistCircle::OnActivate()
     Forward.X = 0.0f;
     Forward.Y = 0.0f;
     Forward.Z = -1.0f;
-    if (GTriggerMathEngine == nullptr)
-        GTriggerMathEngine = ContentAcquire3DMathEngine();
     // TransformMatrix is engine vtbl +0x2c.
     FVector Axis;
-    GTriggerMathEngine->TransformMatrix(Axis, reinterpret_cast<FMatrix const&>(Orientation),
+    ContentMathEngine()->TransformMatrix(Axis, reinterpret_cast<FMatrix const&>(Orientation),
                                         Forward);
     Normal.x = Axis.X;
     Normal.y = Axis.Y;
