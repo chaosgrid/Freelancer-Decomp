@@ -133,9 +133,9 @@ GENRESULT DACOM_API FThorn_Scene::GetReverb(float* OutEnvironment, float* OutVol
 }
 
 // FUN_00450870.
-void* FThorn_Scene::GetEngineInstance()
+InstanceIndex FThorn_Scene::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<intptr_t>(-1);
 }
 
 // LAB_00453ec0 (ICF-shared with Thorn_Psys geo slot 3).

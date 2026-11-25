@@ -242,11 +242,11 @@ static_assert(offsetof(FMeshArchetype, SphereRadius) == 0x80, "sphere radius +80
 // FUN_065fdcc0 IVMeshLibrary wrapper 0x14. Vtable PTR_LAB_066013dc.
 struct FVmeshWrapper : FDeformMesh
 {
-    FVmeshWrapper(const char* Name, void* Handle, IVMeshPart* Part);
+    FVmeshWrapper(const char* Name, ArchetypeIndex Handle, IVMeshPart* Part);
     ~FVmeshWrapper() override;
     unsigned char Draw(ICamera* Camera, FDeformPart* Part) override;
 
-    void* EngineHandle;          // +0x0C IEngine +0x30 archetype handle
+    ArchetypeIndex EngineHandle; // +0x0C IEngine +0x30 archetype handle
     // +0x10 AddRef'd in the ctor: what IEngine +0x48 answers for "1.11_IVMeshLibrary" on the
     // archetype -- RendComp's VMesh part answers that IID with its IVMeshPart face
     // (FVMeshPart::QueryInterface, LAB_06c31d10), and LAB_065fdd10 calls its +0x0C Draw.
@@ -303,7 +303,7 @@ struct FDeformable : IDeformable, IEngineComponent
                               void* Script) override;
     GENRESULT DACOM_API PlayAlt(void* Instance, int* Out, void* Name, void* Extra, void* ArgC,
                                   void* ArgD, void* ArgE, void* ArgF, void* ArgG, void* ArgH,
-                                  void* Script) override;
+                                  InstanceIndex Joint) override;
     GENRESULT DACOM_API DestroyAll(void* Instance) override;
     GENRESULT DACOM_API DestroyHandle(void* Instance, int Handle) override;
     GENRESULT DACOM_API StartAim(void* Instance, void** Out, unsigned char* AimDesc,
@@ -338,14 +338,14 @@ struct FDeformable : IDeformable, IEngineComponent
     GENRESULT DACOM_API GetMeshStats(void* Instance, unsigned int* Out) override;
     GENRESULT DACOM_API GetBoundSphere(void* Instance, float* OutRadius, float* OutCenter) override;
     int DACOM_API Initialize() override;
-    int DACOM_API CreateArchetype(void* Arg1, void* Arg2) override;
-    int DACOM_API DuplicateArchetype(void* Arg1, void* Arg2) override;
-    int DACOM_API DestroyArchetype(void* Arg1) override;
-    int DACOM_API QueryArchetype(void* Arg1, const char* Iid, void** Out) override;
-    int DACOM_API CreateInstance(void* Arg1, void* Arg2) override;
-    int DACOM_API DestroyInstance(void* Arg1) override;
-    int DACOM_API UpdateInstance(void* Arg1, void* Arg2) override;
-    int DACOM_API QueryInstance(void* Arg1, const char* Iid, void** Out) override;
+    int DACOM_API CreateArchetype(ArchetypeIndex Arg1, IFileSystem* Arg2) override;
+    int DACOM_API DuplicateArchetype(ArchetypeIndex Arg1, ArchetypeIndex Arg2) override;
+    int DACOM_API DestroyArchetype(ArchetypeIndex Arg1) override;
+    int DACOM_API QueryArchetype(ArchetypeIndex Arg1, const char* Iid, void** Out) override;
+    int DACOM_API CreateInstance(InstanceIndex Arg1, ArchetypeIndex Arg2) override;
+    int DACOM_API DestroyInstance(InstanceIndex Arg1) override;
+    int DACOM_API UpdateInstance(InstanceIndex Arg1, void* Arg2) override;
+    int DACOM_API QueryInstance(InstanceIndex Arg1, const char* Iid, void** Out) override;
     int DACOM_API Notify(void* Arg1) override;
 };
 
@@ -387,7 +387,7 @@ struct FSkeleton
     float Scale;
     int BoneCount;
     FBoneSlot Bones[150];
-    void* EngineHandle;
+    ArchetypeIndex EngineHandle;
     int RefCount;
 
     // FUN_065f10c0. Defined in Deformable.cpp.
@@ -400,33 +400,35 @@ struct FSkeleton
 static_assert(sizeof(FSkeleton) == 0x1E88, "skeleton must be 0x1e88");
 static_assert(offsetof(FSkeleton, EngineHandle) == 0x1E80, "skel handle +1e80");
 
-// Engine transform callback: local pose, dirty flags and computed world pose.
-struct FBoneRuntime : IInstanceTransform
+// Engine instance callbacks: local pose, dirty flags and computed world pose.
+struct FBoneRuntime : IEngineInstance
 {
-    void* Instance;           // +0x04 engine instance (slot 0), -1 until bound
+    InstanceIndex Instance;   // +0x04 engine instance (slot 0), -1 until bound
     FBoneSlot* Source;        // +0x08 &Skeleton->Bones[i]
     float LocalTransform[12]; // +0x0C rotation followed by position
     unsigned char Flags;
     unsigned char FlagPadding[3];
-    float Matrix[12];         // +0x40
+    float WorldMatrix[12];    // +0x40
 
     // The per-slot body of the FUN_065f1550 construct loop.
     FBoneRuntime();
 
-    GENRESULT DACOM_API Init(void* InInstance) override;                              // LAB_065f1690
-    GENRESULT DACOM_API AddRef(void* InInstance) override;                            // FUN_065f16a0
-    GENRESULT DACOM_API Release(void* InInstance) override;                           // FUN_065f16a0
-    GENRESULT DACOM_API SetPosition(void* InInstance, const float* Position) override; // LAB_065f16b0
-    float* DACOM_API GetPosition(void* InInstance) override;                          // LAB_065f16e0
-    GENRESULT DACOM_API SetOrientation(void* InInstance, const float* Rows) override;  // LAB_065f16f0
-    float* DACOM_API GetOrientation(void* InInstance) override;                       // LAB_065f1720
-    GENRESULT DACOM_API SetMatrix(void* InInstance, const float* InMatrix) override;   // LAB_065f1730
-    float* DACOM_API GetMatrix(void* InInstance) override;                            // LAB_065f1720
-    GENRESULT DACOM_API GetExtra(void* InInstance, float* OutExtra, float* OutVec) override; // LAB_065f1760
-    GENRESULT DACOM_API SetExtra(void* InInstance, float Extra, const float* Vec) override;  // LAB_065f1780
-    GENRESULT DACOM_API SetUser(void* InInstance, unsigned long User) override;       // LAB_065f1790
-    unsigned long DACOM_API GetUser(void* InInstance) override;                       // LAB_065f17a0
-    unsigned long DACOM_API MarkWorldDirty(void* InInstance) override; // LAB_065f17b0
+    void DACOM_API initialize_instance(long Inst) override;                           // LAB_065f1690
+    void DACOM_API create_instance(long Inst) override;                               // FUN_065f16a0
+    void DACOM_API destroy_instance(long Inst) override;                              // FUN_065f16a0
+    void DACOM_API set_position(long Inst, Vector const& Pos) override;               // LAB_065f16b0
+    Vector const& DACOM_API get_position(long Inst) const override;                   // LAB_065f16e0
+    void DACOM_API set_orientation(long Inst, Matrix const& Orient) override;         // LAB_065f16f0
+    Matrix const& DACOM_API get_orientation(long Inst) const override;                // LAB_065f1720
+    void DACOM_API set_transform(long Inst, Transform const& Xform) override;         // LAB_065f1730
+    Transform const& DACOM_API get_transform(long Inst) const override;               // LAB_065f1720
+    void DACOM_API get_centered_radius(long Inst, float* OutRadius,
+                                       Vector* OutCenter) const override;             // LAB_065f1760
+    void DACOM_API set_centered_radius(long Inst, float Radius,
+                                       Vector const& Center) override;                // LAB_065f1780
+    void DACOM_API set_instance_flags(long Inst, unsigned long InstFlags) override;   // LAB_065f1790
+    unsigned long DACOM_API get_instance_flags(long Inst) const override;             // LAB_065f17a0
+    bool DACOM_API joint_changed(long Inst) override;                                 // LAB_065f17b0
 
     // FUN_065f1030. Defined in Deformable.cpp.
     void ComposeWorldMatrix(const float* InverseRoot);
@@ -435,7 +437,7 @@ struct FBoneRuntime : IInstanceTransform
 static_assert(sizeof(FBoneRuntime) == 0x70, "bone runtime must be 0x70");
 static_assert(offsetof(FBoneRuntime, LocalTransform) == 0x0C, "bone local transform +0c");
 static_assert(offsetof(FBoneRuntime, Flags) == 0x3C, "bone flag byte +3c");
-static_assert(offsetof(FBoneRuntime, Matrix) == 0x40, "bone world matrix +40");
+static_assert(offsetof(FBoneRuntime, WorldMatrix) == 0x40, "bone world matrix +40");
 
 // FUN_065f1550 LOD/skel holder 0x10.
 struct FLodHolder
@@ -448,10 +450,10 @@ struct FLodHolder
     unsigned char AttachSkeleton(FSkeleton* Skel); // FUN_065f1550
 
     // FUN_065f14a0. Defined in Deformable.cpp.
-    FBoneRuntime* BindOneBoneRuntime(int Index, void* BoneInst);
+    FBoneRuntime* BindOneBoneRuntime(int Index, InstanceIndex BoneInst);
 
     // FUN_065f14f0. Defined in Deformable.cpp.
-    bool LinkBoneByParent(void* BoneInst, int Parent);
+    bool LinkBoneByParent(InstanceIndex BoneInst, int Parent);
 };
 
 static_assert(sizeof(FLodHolder) == 0x10, "LOD holder must be 0x10");
@@ -670,7 +672,7 @@ struct FDeformInstance : IChannelSink
 
     // FUN_065f4660. Defined in DeformableObject.cpp.
     int PlayAnimChain(void* Name, void* Extra, void* ArgC, void* ArgD, void* ArgE, void* ArgF,
-                      void* ArgG, void* ArgH, void* Joint);
+                      void* ArgG, void* ArgH, InstanceIndex Joint);
 
     // FUN_065f59d0. Defined in DeformableObject.cpp.
     unsigned char WalkHardpoints(void* UserFn, void* UserData);
@@ -740,7 +742,7 @@ FDeformMesh* LoadDeformMesh(FLodHolder* Holder, IFileSystem* MeshFs, const char*
 
 // DeformableObject.cpp
 void IkMathQuatToMatrix(float* Out9, const float* Quat4);
-int FirstBoneInstance(FDeformInstance* Instance);
+InstanceIndex FirstBoneInstance(FDeformInstance* Instance);
 void StopAimNode(FIkListNode* Node);
 void IkEulerRebuild(float* Out9, float Yaw, float Pitch, float Roll);
 void WriteVec3(float* Dest, float X, float Y, float Z);

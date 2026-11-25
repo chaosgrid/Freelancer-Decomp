@@ -271,11 +271,10 @@ int EqObj::fire_weapons(unsigned short const* EquipIds, unsigned Count, Vector c
         // target's frame (InverseTransform).
         if (!SinglePlayer() && LockTarget != nullptr)
         {
-            FTransform const TargetXform = *reinterpret_cast<FTransform const*>(&LockTarget->Orientation);
-            FVector Local;
-            Server_MathEngine()->InverseTransform(Local, TargetXform,
-                                               *reinterpret_cast<FVector const*>(TargetPos));
-            Aim = reinterpret_cast<Vector const&>(Local);
+            Transform const TargetXform = *reinterpret_cast<Transform const*>(&LockTarget->Orientation);
+            Vector Local;
+            Server_MathEngine()->InverseTransform(Local, TargetXform, *TargetPos);
+            Aim = Local;
         }
 
         unsigned int const ObjId = get_id();
@@ -776,13 +775,10 @@ void EqObj::process_dock_queue(float Dt)
         HpXform.Rotation = Hp.Orient;
         HpXform.Translation = Hp.Position;
 
-        float* const ShipXform =
-            DALib::Engine->GetInstanceTransform(reinterpret_cast<void*>(ShipObj->get_index()));
+        Transform const* const ShipXform = DALib::Engine->GetInstanceTransform(ShipObj->get_index());
 
         Transform Mounted;
-        Server_MathEngine()->MulTransform(reinterpret_cast<FTransform&>(Mounted),
-                                       *reinterpret_cast<FTransform const*>(ShipXform),
-                                       reinterpret_cast<FTransform const&>(HpXform));
+        Server_MathEngine()->MulTransform(Mounted, *ShipXform, HpXform);
         // FUN_06ce7c30, a 12-dword copy.
         Transform const Copy = Mounted;
 
@@ -2771,14 +2767,12 @@ bool EqObj::build_equip_loot(CAttachedEquip const* Equip, FLootRecord& Out)
 
     // IEngine slots 36 (position) and 38 (orientation) on the root instance.
     long const Instance = Equip->GetRootIndex();
-    float const* const Position =
-        DALib::Engine->GetInstancePosition(reinterpret_cast<void*>(Instance));
-    Out.Position.x = Position[0];
-    Out.Position.y = Position[1];
-    Out.Position.z = Position[2];
-    float const* const Orientation =
-        DALib::Engine->GetInstanceOrientation(reinterpret_cast<void*>(Instance));
-    memcpy(&Out.Orientation, Orientation, sizeof(Out.Orientation));
+    Vector const* const Position = DALib::Engine->GetInstancePosition(Instance);
+    Out.Position.x = Position->x;
+    Out.Position.y = Position->y;
+    Out.Position.z = Position->z;
+    Matrix const* const Orientation = DALib::Engine->GetInstanceOrientation(Instance);
+    Out.Orientation = *Orientation;
 
     // Only the second out vector is used.
     Vector Unused1;

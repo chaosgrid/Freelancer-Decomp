@@ -117,7 +117,7 @@ struct FCharacterObject : FRoomObject
 
     void SetFloorHeight(float Value) override;      // 3  LAB_004449a0
     void Update(double DeltaSeconds) override;      // 5  LAB_004449d0
-    void* GetEngineInstance() override;             // 6  LAB_00444970
+    InstanceIndex GetEngineInstance() override;             // 6  LAB_00444970
     void DrawOpaque(ICamera* Camera) override;      // 7  LAB_00445150
     void OnHotspotEnter(unsigned long Cookie, int const* Point) override; // 10 FUN_00445a90 (enter)
     void OnHotspotLeave(unsigned long Cookie, int const* Point) override; // 11 FUN_00445be0 (leave)

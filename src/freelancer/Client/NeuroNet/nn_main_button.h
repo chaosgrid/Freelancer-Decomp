@@ -77,7 +77,7 @@ public:
     void OnScaleFinished() override;
 
     // FUN_0045c7a0 (RET 8) -- PanelOrigin[slot(PanelId)] = Origin.
-    void SetPanelOrigin(int PanelId, float const* Origin);
+    void SetPanelOrigin(int PanelId, Vector const* Origin);
     // FUN_0045c820 (RET 4) -- Buttons[slot(PanelId)].
     WinControl* GetPanelButton(int PanelId) const;
     // FUN_0045ccf0 (RET 8) -- slide Button out and open panel PanelId.
@@ -122,10 +122,10 @@ public:
     WinControl* Background;          // +0x3b4
     WinControl* Buttons[7];          // +0x3b8
     WinControl* Roots[7];            // +0x3d4
-    float OpenTarget[7][3];          // +0x3f0
-    float PanelOrigin[7][3];         // +0x444
+    Vector OpenTarget[7];            // +0x3f0
+    Vector PanelOrigin[7];           // +0x444
     float PanelScale[7];             // +0x498
-    float BackgroundPosition[7][3];  // +0x4b4
+    Vector BackgroundPosition[7];    // +0x4b4
     WinControl* ScaledBackground;    // +0x508
     WinControl* ClosingButton;       // +0x50c
     int ClosingPanelId;              // +0x510

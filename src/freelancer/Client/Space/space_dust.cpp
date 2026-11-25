@@ -84,11 +84,11 @@ namespace
 
     // FUN_0054c320 (thiscall on the camera transform): Out = CamXform * Offset through the
     // file's own lazily acquired 3DMathEngine.
-    void ComposeDustXform(FTransform const* CamXform, FTransform* Out, FTransform const* Offset)
+    void ComposeDustXform(Transform const* CamXform, Transform* Out, Transform const* Offset)
     {
         if (G_SpaceDustMath == nullptr)
             G_SpaceDustMath = Acquire3DMathEngine();
-        FTransform Local;
+        Transform Local;
         G_SpaceDustMath->MulTransform(Local, *CamXform, *Offset);
         *Out = Local;
     }
@@ -114,7 +114,7 @@ namespace
 
     // Inlined three times in FUN_0054beb0: place the effect on the dust frame, set its
     // intensity, mark it (+0x08 |= 1) and link it (FUN_004f7af0).
-    void PlaceDustEffect(FParticleEffect* Effect, FTransform const& DustXform, float Intensity)
+    void PlaceDustEffect(FParticleEffect* Effect, Transform const& DustXform, float Intensity)
     {
         Effect->LocalXform = DustXform;
         Effect->SetIntensity(Intensity);
@@ -164,16 +164,16 @@ void SpaceDustUpdate(Universe::ISystem const* System, void* Camera)
         ReleaseDustEffect(&G_SystemDustEffect);
     }
 
-    FTransform Offset;
-    Win3DIdentityRotation3x3(&Offset.Rotation.D[0][0]); // FUN_004215b0
-    Offset.Translation.X = 0.0f;
-    Offset.Translation.Y = 0.0f;
-    Offset.Translation.Z = static_cast<float>(kSpaceDustOffsetZ);
-    FTransform const* const CamXform =
-        (FTransform const*)((ICamera*)Camera)->GetOrientation();
-    FTransform DustXform;
+    Transform Offset;
+    Win3DIdentityRotation3x3(&Offset.Rotation); // FUN_004215b0
+    Offset.Translation.x = 0.0f;
+    Offset.Translation.y = 0.0f;
+    Offset.Translation.z = static_cast<float>(kSpaceDustOffsetZ);
+    Transform const* const CamXform =
+        (Transform const*)((ICamera*)Camera)->GetOrientation();
+    Transform DustXform;
     ComposeDustXform(CamXform, &DustXform, &Offset);
-    Vector const& DustPos = *reinterpret_cast<Vector const*>(&DustXform.Translation);
+    Vector const& DustPos = DustXform.Translation;
 
     // The zone dust runs only when detail > 0.75 (not when unordered).
     if (GetPerfSpaceDustDetail() > kDustDetailThreshold) // DAT_00614080

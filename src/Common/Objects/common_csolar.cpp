@@ -113,7 +113,7 @@ void CSolar::init(CreateParms const& Parms)
         if (OpenAnimName[0] != '\0')
         {
             GateAnim.Index = DALib::Anim->PlayScript(AsOpaqueDword(Archetype->get_script_index()),
-                                                     AsOpaqueDword(this->EngineInstanceId),
+                                                     this->EngineInstanceId,
                                                      OpenAnimName, nullptr, nullptr);
             if (GateAnim.Index == -1)
             {
@@ -163,7 +163,7 @@ void CSolar::init_continual_anim(char const* AnimName)
 
     FAnimScriptRef& Front = ContinualAnims.front();
     Front.Index = DALib::Anim->PlayScript(AsOpaqueDword(Archetype->get_script_index()),
-                                          AsOpaqueDword(this->EngineInstanceId), AnimName,
+                                          this->EngineInstanceId, AnimName,
                                           nullptr, nullptr);
     if (Front.Index == -1)
     {
@@ -238,10 +238,9 @@ Vector CSolar::get_angular_velocity() const
     if ((TypeBits & (OBJ_MOON | OBJ_PLANET | OBJ_SUN)) != 0 && BodyPtr != nullptr)
     {
         Vector const ObjSpace = PhySys::GetAngularVelocityOS(this);
-        FVector World;
-        Acquire3DMathEngine()->TransformMatrix(World, (FMatrix const&)Orientation,
-                                               (FVector const&)ObjSpace);
-        return Vector{World.X, World.Y, World.Z};
+        Vector World;
+        Acquire3DMathEngine()->TransformMatrix(World, Orientation, ObjSpace);
+        return Vector{World.x, World.y, World.z};
     }
     return Vector{0.0f, 0.0f, 0.0f};
 }
@@ -356,17 +355,17 @@ void CSolar::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     {
         Phy.bPhysicalUnmoveable = 1;
         Phy.LinearDamping = 1.0e6f;
-        Phy.AngularDamping[0] = 1.0e6f;
-        Phy.AngularDamping[1] = 1.0e6f;
-        Phy.AngularDamping[2] = 1.0e6f;
+        Phy.AngularDamping.x = 1.0e6f;
+        Phy.AngularDamping.y = 1.0e6f;
+        Phy.AngularDamping.z = 1.0e6f;
     }
     else
     {
         Phy.bPhysicalUnmoveable = 0;
         Phy.LinearDamping = 1.0e12f;
-        Phy.AngularDamping[0] = 0.0f;
-        Phy.AngularDamping[1] = 0.0f;
-        Phy.AngularDamping[2] = 0.0f;
+        Phy.AngularDamping.x = 0.0f;
+        Phy.AngularDamping.y = 0.0f;
+        Phy.AngularDamping.z = 0.0f;
     }
 
     // No null test on the archetype.
@@ -400,7 +399,7 @@ void CSolar::configure_system_gate(char const* AnimName)
         return;
 
     GateAnim.Index = DALib::Anim->PlayScript(AsOpaqueDword(Archetype->get_script_index()),
-                                             AsOpaqueDword(this->EngineInstanceId), AnimName,
+                                             this->EngineInstanceId, AnimName,
                                              nullptr, nullptr);
     if (GateAnim.Index == -1)
     {

@@ -185,8 +185,8 @@ bool __cdecl GetShipMissionProperties(unsigned int ShipArchId,
 struct FRmSolarFormationSlot    // retail 0x38 bytes
 {
     unsigned char bMandatory;   // +0x00 "mandatory" = 1, "optional" = 0
-    FMatrix Orientation;        // +0x04 identity unless a quaternion follows the position
-    FVector Position;           // +0x28
+    Matrix Orientation;        // +0x04 identity unless a quaternion follows the position
+    Vector Position;           // +0x28
     int SolarType;              // +0x34 index in {big_solar, defensive_solar,
                                 //       killable_neutral, background_solar}
 };

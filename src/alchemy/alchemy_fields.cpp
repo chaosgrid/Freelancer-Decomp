@@ -304,11 +304,11 @@ namespace AlchemyImpl
     {
         // LAB_062241a0: the down vector in the appearance's space, cached at node+0xa4.
         float Xform12[12];
-        ComputeRelativeTransform(Appearance, Xform12);
-        const FVector Source = { 0.0f, -Gravity_, 0.0f };
+        ComputeRelativeTransform(Appearance, reinterpret_cast<Transform*>(Xform12));
+        const Vector Source = { 0.0f, -Gravity_, 0.0f };
         I3DMathEngine* Math = Shared3DMath();
-        FVector Result;
-        Math->Rotate(Result, *reinterpret_cast<const FTransform*>(Xform12), Source);
+        Vector Result;
+        Math->Rotate(Result, *reinterpret_cast<const Transform*>(Xform12), Source);
         std::memcpy(Cache_, &Result, sizeof(Result));
     }
 
@@ -395,11 +395,11 @@ namespace AlchemyImpl
     {
         // LAB_06214bf0: as Gravity, with (0, Magnitude, 0) cached at node+0xac.
         float Xform12[12];
-        ComputeRelativeTransform(Appearance, Xform12);
-        const FVector Source = { 0.0f, Magnitude_, 0.0f };
+        ComputeRelativeTransform(Appearance, reinterpret_cast<Transform*>(Xform12));
+        const Vector Source = { 0.0f, Magnitude_, 0.0f };
         I3DMathEngine* Math = Shared3DMath();
-        FVector Result;
-        Math->Rotate(Result, *reinterpret_cast<const FTransform*>(Xform12), Source);
+        Vector Result;
+        Math->Rotate(Result, *reinterpret_cast<const Transform*>(Xform12), Source);
         std::memcpy(Cache_, &Result, sizeof(Result));
     }
 
@@ -506,12 +506,12 @@ namespace AlchemyImpl
             1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
             0.0f, 0.0f, 0.0f
         };
-        ComputeRelativeTransform(Appearance, Xform12);
-        const FVector Origin = { 0.0f, 0.0f, 0.0f };
+        ComputeRelativeTransform(Appearance, reinterpret_cast<Transform*>(Xform12));
+        const Vector Origin = { 0.0f, 0.0f, 0.0f };
         I3DMathEngine* Math = Shared3DMath();
-        FVector TransformedOrigin;
+        Vector TransformedOrigin;
         Math->TransformXform(TransformedOrigin,
-            *reinterpret_cast<const FTransform*>(Xform12), Origin);
+            *reinterpret_cast<const Transform*>(Xform12), Origin);
         std::memcpy(Cache_, &TransformedOrigin, sizeof(TransformedOrigin));
     }
 
@@ -663,10 +663,11 @@ namespace AlchemyImpl
             Corner_[Index] = 0.0f;
             ScaledNormal_[Index] = 0.0f;
         }
+        float* const BeginWords = reinterpret_cast<float*>(&BeginXform_);
         for (Index = 0; Index < 12; ++Index)
-            BeginXform_[Index] = 0.0f;
+            BeginWords[Index] = 0.0f;
         // Retail calls the 3x3 identity constructor, then clears translation.
-        BeginXform_[0] = BeginXform_[4] = BeginXform_[8] = 1.0f;
+        BeginXform_.Rotation.E[0][0] = BeginXform_.Rotation.E[1][1] = BeginXform_.Rotation.E[2][2] = 1.0f;
     }
 
     FxCollideField::~FxCollideField()
@@ -738,11 +739,11 @@ namespace AlchemyImpl
     {
         // LAB_0621ab20: the field in the appearance's space (node+0xcc); the plane normal
         // (node+0xa8), corner (node+0xb4) and scaled normal (node+0xc0) follow.
-        ComputeRelativeTransform(Appearance, BeginXform_);
-        const FVector NormalSource = { 0.0f, 1.0f, 0.0f };
+        ComputeRelativeTransform(Appearance, &BeginXform_);
+        const Vector NormalSource = { 0.0f, 1.0f, 0.0f };
         I3DMathEngine* Math = Shared3DMath();
-        FVector RotatedNormal;
-        Math->Rotate(RotatedNormal, *reinterpret_cast<const FTransform*>(BeginXform_),
+        Vector RotatedNormal;
+        Math->Rotate(RotatedNormal, BeginXform_,
                      NormalSource);
         std::memcpy(Normal_, &RotatedNormal, sizeof(RotatedNormal));
         // The length stays in the FPU. No zero-length guard.
@@ -753,10 +754,10 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(Normal_[0], InvLength * Normal_[0]);
         StoreAlchemyFpuFloat(Normal_[1], InvLength * Normal_[1]);
         StoreAlchemyFpuFloat(Normal_[2], InvLength * Normal_[2]);
-        const FVector CornerSource = { 1.0f, 0.0f, 1.0f };
+        const Vector CornerSource = { 1.0f, 0.0f, 1.0f };
         Math = Shared3DMath();
-        FVector TransformedCorner;
-        Math->TransformXform(TransformedCorner, *reinterpret_cast<const FTransform*>(BeginXform_),
+        Vector TransformedCorner;
+        Math->TransformXform(TransformedCorner, BeginXform_,
                              CornerSource);
         std::memcpy(Corner_, &TransformedCorner, sizeof(TransformedCorner));
         ScaledNormal_[0] = Normal_[0] * kCollideNormalScale;
@@ -853,9 +854,10 @@ namespace AlchemyImpl
           Radius_(0.0f), RadiusSq_(0.0f), UpdateDt_(0.0f)
     {
         unsigned long Index = 0;
+        float* const BeginWords = reinterpret_cast<float*>(&BeginXform_);
         for (Index = 0; Index < 12; ++Index)
-            BeginXform_[Index] = 0.0f;
-        BeginXform_[0] = BeginXform_[4] = BeginXform_[8] = 1.0f;
+            BeginWords[Index] = 0.0f;
+        BeginXform_.Rotation.E[0][0] = BeginXform_.Rotation.E[1][1] = BeginXform_.Rotation.E[2][2] = 1.0f;
     }
 
     FLDustField::~FLDustField()
@@ -914,7 +916,7 @@ namespace AlchemyImpl
     // LAB_06212c70: node slot 7 (FUN_0623ffb0) into node+0xa8. Apply does not read it.
     void DACOM_API FLDustField::BeginField(IDAComponent* Appearance, float /*Dt*/)
     {
-        ComputeRelativeTransform(Appearance, BeginXform_);
+        ComputeRelativeTransform(Appearance, &BeginXform_);
     }
 
     // LAB_06212c90 (the outer table reaches it through LAB_06213b00): the particle position
@@ -927,9 +929,9 @@ namespace AlchemyImpl
     {
         I3DMathEngine* Math = Shared3DMath();
         float Local[3] = { 0.0f, 0.0f, 0.0f };
-        Math->InverseTransform(*reinterpret_cast<FVector*>(Local),
-                                          *reinterpret_cast<const FTransform*>(NodeWorldXform_),
-                                          *reinterpret_cast<const FVector*>(PosVel6)); // +0x3C
+        Math->InverseTransform(*reinterpret_cast<Vector*>(Local),
+                                          NodeWorldXform_,
+                                          *reinterpret_cast<const Vector*>(PosVel6)); // +0x3C
         const double DistSqExt = (static_cast<double>(Local[1]) * Local[1] +
                                   static_cast<double>(Local[0]) * Local[0]) +
                                  static_cast<double>(Local[2]) * Local[2];

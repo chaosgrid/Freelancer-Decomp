@@ -11,6 +11,7 @@
 // RoomControl builds one per RoomData+0x158 record (FUN_0044a030); the Thorn spawn FUN_0044e430
 // builds one per COMPOUND entity. Vtable 0x005cbc0c, sizeof 0x80 (operator new(0x80) in both).
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "GameFlow/anim_script_set.h"
 #include "common_csys.h"
 #include "Space/Effects/flash_light.h"
@@ -46,7 +47,7 @@ public:
     ~FObjectProp() override;
 
     void Update(double DeltaSeconds) override;      // 5  FUN_00446a60
-    void* GetEngineInstance() override;             // 6  LAB_00443870: +0x30
+    InstanceIndex GetEngineInstance() override;             // 6  LAB_00443870: +0x30
     void DrawOpaque(ICamera* Camera) override;      // 7  FUN_00446ac0
     void DrawTranslucent(ICamera* Camera) override; // 8  FUN_00446b40
 
@@ -55,14 +56,14 @@ public:
     unsigned long GetMainScript() const { return Scripts.Script; }
     char const* GetName() const { return Name.c_str(); }
 
-    void* Instance;                                // +0x30 -1 until a mesh loaded
+    InstanceIndex Instance;                        // +0x30 -1 until a mesh loaded
     int Type;                                      // +0x34 FPropData::Type
     std::string Name;                              // +0x38 FPropData::Name
     unsigned char bDetached;                       // +0x48 0; gates the draws and the release
     unsigned char bRoomMain;                       // +0x49 RoomPropInfo+0x3f (FUN_0044a030)
     FAnimScriptSet Scripts;                        // +0x4c FUN_00555a40 / FUN_00555a70
     HardpointSummary* Hardpoints;                  // +0x64 FUN_004467e0, when a loadout loaded
-    std::list<void*> Attached;                     // +0x68 loadout equipment instances
+    std::list<InstanceIndex> Attached;             // +0x68 loadout equipment instances
     FFlashLightSet Flashlights;                    // +0x74 FUN_00558180
 
 private:

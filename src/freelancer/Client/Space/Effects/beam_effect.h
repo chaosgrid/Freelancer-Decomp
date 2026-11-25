@@ -63,7 +63,7 @@ struct FBeamEffect : FEffectBase
     explicit FBeamEffect(unsigned TypeId);
     unsigned char Start(FEffectArch* EffectArch) override;
     void Kill() override;
-    float GetWorldPos(FVector* Out) override;
+    float GetWorldPos(Vector* Out) override;
     unsigned char IsAlive() override { return 1; }
     unsigned char UpdateVisibility(float Dt, FSpaceCamera* Cam) override;
     unsigned char TickDraw(float Dt, FSpaceCamera* Cam) override;
@@ -106,7 +106,7 @@ unsigned char BeamEffectStart(FBeamEffect* This, FEffectArch* EffectArch);
 void BeamEffectArmDeath(FBeamEffect* This);
 
 // LAB_004f9480 — vtable[+0x08]: world translation → Out; returns CullRadius.
-float BeamEffectGetWorldPos(FBeamEffect* This, FVector* Out);
+float BeamEffectGetWorldPos(FBeamEffect* This, Vector* Out);
 
 // LAB_004f9980 — vtable[+0x14]: frustum / pbubble visibility → Flags70 bit0.
 unsigned char BeamEffectUpdateVisibility(FBeamEffect* This, float Dt, FSpaceCamera* Cam);
@@ -116,7 +116,7 @@ unsigned char BeamEffectTickDraw(FBeamEffect* This, float Dt, FSpaceCamera* Cam)
 
 // FUN_004f7d20 — attach Watchable (+8) + EngineIndex + local transform copy.
 void BeamEffectAttach(FBeamEffect* This, void* WatchableOwner, int EngineIndex,
-                      FTransform const* LocalXform);
+                      Transform const* LocalXform);
 
 // FUN_004f7a80 / FUN_004f7a90
 void BeamEffectAddRef(FBeamEffect* This);
@@ -126,12 +126,12 @@ int BeamEffectRelease(FBeamEffect* This);
 unsigned char BeamEffectBuildGeometry(FBeamEffect* This, FSpaceCamera* Cam);
 
 // FUN_004fa270 — single-segment cross-billboard builder.
-int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform, float T,
+int BeamEffectBuildSingleSegment(FBeamEffect* This, Transform const* WorldXform, float T,
                                  float Intensity);
 
 // FUN_004fb1e0 — multi-segment builder. Retail reuses frame slots: B4 lands at ESP+0x94 through
 // a SUB ESP alias, and C3 over UvU1's slot once UvU1 is dead.
-int BeamEffectBuildMultiSegment(FBeamEffect* This, FTransform const* WorldXform, float T,
+int BeamEffectBuildMultiSegment(FBeamEffect* This, Transform const* WorldXform, float T,
                                 float Intensity);
 
 extern int G_BeamEffectLiveCount; // DAT_00674f58

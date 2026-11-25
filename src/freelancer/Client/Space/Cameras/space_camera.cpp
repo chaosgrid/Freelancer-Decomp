@@ -301,19 +301,19 @@ void SpaceCameraConstruct(FSpaceCamera* Cam)
     // +0xbd..+0xbf) as the storage held them -- SetViewport (FUN_0040fd60) fills those in.
     for (int Index = 0; Index < 9; ++Index)
     {
-        Cam->World[Index] = 0.0f;
-        Cam->View[Index] = 0.0f;
+        (&Cam->World.E[0][0])[Index] = 0.0f;
+        (&Cam->View.E[0][0])[Index] = 0.0f;
     }
-    Cam->World[0] = 1.0f;
-    Cam->World[4] = 1.0f;
-    Cam->World[8] = 1.0f;
-    Cam->View[0] = 1.0f;
-    Cam->View[4] = 1.0f;
-    Cam->View[8] = 1.0f;
+    Cam->World.E[0][0] = 1.0f;
+    Cam->World.E[1][1] = 1.0f;
+    Cam->World.E[2][2] = 1.0f;
+    Cam->View.E[0][0] = 1.0f;
+    Cam->View.E[1][1] = 1.0f;
+    Cam->View.E[2][2] = 1.0f;
     for (int Index = 0; Index < 3; ++Index)
     {
-        Cam->WorldPos[Index] = 0.0f;
-        Cam->ViewPos[Index] = 0.0f;
+        (&Cam->WorldPos.x)[Index] = 0.0f;
+        (&Cam->ViewPos.x)[Index] = 0.0f;
     }
 
     Cam->bViewDirty = 1;
@@ -367,7 +367,7 @@ void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
     float Saved[12];
     if (G_SpaceApp.ActiveCamera != nullptr)
     {
-        const float* const Src = AsCamera(G_SpaceApp.ActiveCamera)->GetOrientation();
+        const float* const Src = (const float*)AsCamera(G_SpaceApp.ActiveCamera)->GetOrientation();
         for (int I = 0; I < 12; ++I)
             Saved[I] = Src[I];
     }
@@ -435,7 +435,7 @@ void InstallSpaceCamera(FSpaceCamera* NewCam, bool bForce)
     float Current[12];
     if (NewCam != nullptr)
     {
-        const float* const Src = AsCamera(NewCam)->GetOrientation();
+        const float* const Src = (const float*)AsCamera(NewCam)->GetOrientation();
         for (int I = 0; I < 12; ++I)
             Current[I] = Src[I];
     }
@@ -670,8 +670,8 @@ void SetDockingCameraTransform(const float* Csys12)
     // FUN_0054bb90 (cdecl). The docking camera's Csys and view-dirty byte are written BEFORE
     // the guard, so they land even when no controller exists.
     FSpaceCamera* const Docking = (FSpaceCamera*)&G_SpaceApp.Docking;
-    memcpy(Docking->World, Csys12, 9 * sizeof(float));
-    memcpy(Docking->WorldPos, Csys12 + 9, 3 * sizeof(float));
+    memcpy(&Docking->World, Csys12, 9 * sizeof(float));
+    memcpy(&Docking->WorldPos, Csys12 + 9, 3 * sizeof(float));
     Docking->bViewDirty = 1;
 
     // DAT_00678ba0, the "controller exists" byte.
@@ -756,14 +756,14 @@ unsigned long DACOM_API FSpaceCamera::Release()
     return 1;
 }
 
-float const* DACOM_API FSpaceCamera::GetPosition()
+const Vector* DACOM_API FSpaceCamera::GetPosition()
 {
-    return this->WorldPos;                       // LAB_0040f370: this + 0x28
+    return &this->WorldPos;                    // LAB_0040f370: this + 0x28
 }
 
-float const* DACOM_API FSpaceCamera::GetOrientation()
+const Matrix* DACOM_API FSpaceCamera::GetOrientation()
 {
-    return this->World;                          // LAB_0040f380: this + 0x04
+    return &this->World;                 // LAB_0040f380: this + 0x04
 }
 
 int const* DACOM_API FSpaceCamera::GetViewport()
@@ -796,48 +796,48 @@ double DACOM_API FSpaceCamera::GetYScaleOverNear()
     return static_cast<double>(this->YScale) / this->ZNear; // LAB_0040f4e0
 }
 
-int DACOM_API FSpaceCamera::Project(float* OutX, float* OutY, float* OutZ, float const* World)
+int DACOM_API FSpaceCamera::Project(float* OutX, float* OutY, float* OutZ, const Vector* World)
 {
     // FUN_0040ff50 (explicit this, RET 0x14).
     if (G_CameraMathEngine == nullptr)
         G_CameraMathEngine = Acquire3DMathEngine();
-    FVector Local;
-    G_CameraMathEngine->InverseTransform(Local, *reinterpret_cast<FTransform const*>(this->World),
-                                         *reinterpret_cast<FVector const*>(World));
+    Vector Local;
+    G_CameraMathEngine->InverseTransform(Local, this->WorldXform,
+                                         *reinterpret_cast<Vector const*>(World));
 
     // Only -ZNear >= z (ordered) projects; a point exactly on the near plane does.
-    if (!(-this->ZNear >= Local.Z))
+    if (!(-this->ZNear >= Local.z))
         return 0;
 
     // InvZ (-1.0f is .rdata 0x005c7500) stays unrounded; each coordinate is rounded once.
-    const double InvZ = -1.0 / static_cast<double>(Local.Z);
-    *OutX = static_cast<float>(static_cast<double>(Local.X) * this->XScale * InvZ +
+    const double InvZ = -1.0 / static_cast<double>(Local.z);
+    *OutX = static_cast<float>(static_cast<double>(Local.x) * this->XScale * InvZ +
                                this->ScreenCenterX);
-    *OutY = static_cast<float>(static_cast<double>(Local.Y) * this->YScale * InvZ +
+    *OutY = static_cast<float>(static_cast<double>(Local.y) * this->YScale * InvZ +
                                this->ScreenCenterY);
-    *OutZ = -Local.Z;
+    *OutZ = -Local.z;
     return 1;
 }
 
-void DACOM_API FSpaceCamera::Unproject(float* OutDir, float ScreenX, float ScreenY)
+void DACOM_API FSpaceCamera::Unproject(Vector* OutDir, float ScreenX, float ScreenY)
 {
     // LAB_0040f520. Screen point -> a direction in world space (math engine slot 0x2c).
-    FVector Local;
-    Local.X = (ScreenX - this->ScreenCenterX) * (this->ZNear / this->XScale);
-    Local.Y = (ScreenY - this->ScreenCenterY) * (this->ZNear / this->YScale);
-    Local.Z = -this->ZNear;
-    FMatrix Rotation;
-    memcpy(&Rotation, this->World, sizeof(Rotation));
+    Vector Local;
+    Local.x = (ScreenX - this->ScreenCenterX) * (this->ZNear / this->XScale);
+    Local.y = (ScreenY - this->ScreenCenterY) * (this->ZNear / this->YScale);
+    Local.z = -this->ZNear;
+    Matrix Rotation;
+    memcpy(&Rotation, &this->World, sizeof(Rotation));
     if (G_CameraMathEngine == nullptr)
         G_CameraMathEngine = Acquire3DMathEngine();
-    FVector Dir;
+    Vector Dir;
     G_CameraMathEngine->TransformMatrix(Dir, Rotation, Local);
-    OutDir[0] = Dir.X;
-    OutDir[1] = Dir.Y;
-    OutDir[2] = Dir.Z;
+    OutDir->x = Dir.x;
+    OutDir->y = Dir.y;
+    OutDir->z = Dir.z;
 }
 
-int DACOM_API FSpaceCamera::ClassifySphere(float const* Center, float Radius)
+int DACOM_API FSpaceCamera::ClassifySphere(const Vector* Center, float Radius)
 {
     // FUN_0040ffe0. Classifies a sphere against the frustum and returns a CODE, not a
     // boolean: 1 = outside, 3 = straddling a plane, 4 = fully inside. The result starts at
@@ -846,8 +846,8 @@ int DACOM_API FSpaceCamera::ClassifySphere(float const* Center, float Radius)
     //
     // The camera looks down -Z, so the distance along the view axis is -z, and the sphere
     // spans [-z - Radius, -z + Radius].
-    const float NearEdge = -Center[2] - Radius;
-    const float FarEdge = Radius - Center[2];
+    const float NearEdge = -Center->z - Radius;
+    const float FarEdge = Radius - Center->z;
 
     int Result = 4;
 
@@ -858,16 +858,16 @@ int DACOM_API FSpaceCamera::ClassifySphere(float const* Center, float Radius)
 
     // The left/right pair, folded into one test by taking |x|. The distance is never rounded
     // to float.
-    const double DistX = static_cast<double>(fabsf(Center[0])) * this->PlaneX[0] +
-                         static_cast<double>(this->PlaneX[2]) * Center[2];
+    const double DistX = static_cast<double>(fabsf(Center->x)) * this->PlaneX[0] +
+                         static_cast<double>(this->PlaneX[2]) * Center->z;
     if (DistX > Radius)
         return 1;
     if (DistX > -Radius)
         Result = 3;
 
     // The top/bottom pair, same shape.
-    const double DistY = static_cast<double>(fabsf(Center[1])) * this->PlaneY[1] +
-                         static_cast<double>(this->PlaneY[2]) * Center[2];
+    const double DistY = static_cast<double>(fabsf(Center->y)) * this->PlaneY[1] +
+                         static_cast<double>(this->PlaneY[2]) * Center->z;
     if (DistY > Radius)
         return 1;
     if (DistY > -Radius)
@@ -881,43 +881,42 @@ int DACOM_API FSpaceCamera::ClassifySphere(float const* Center, float Radius)
     return Result;
 }
 
-float const* DACOM_API FSpaceCamera::GetViewTransform()
+const Transform* DACOM_API FSpaceCamera::GetViewTransform()
 {
     // LAB_0040f390. Lazily rebuilds the cached view transform {transpose(World), -R^T * p}.
     if (this->bViewDirty != 0)
     {
         if (G_CameraMathEngine == nullptr)
             G_CameraMathEngine = Acquire3DMathEngine();
-        FVector Out;
-        G_CameraMathEngine->TransposeTransform(Out, *reinterpret_cast<FMatrix const*>(this->World),
-                                               *reinterpret_cast<FVector const*>(this->WorldPos));
+        Vector Out;
+        G_CameraMathEngine->TransposeTransform(Out, this->World, this->WorldPos);
 
-        const float* R = this->World;
-        float* V = this->View;
+        const float* R = &this->World.E[0][0];
+        float* V = &this->View.E[0][0];
         V[0] = R[0]; V[1] = R[3]; V[2] = R[6];
         V[3] = R[1]; V[4] = R[4]; V[5] = R[7];
         V[6] = R[2]; V[7] = R[5]; V[8] = R[8];
-        this->ViewPos[0] = -Out.X;
-        this->ViewPos[1] = -Out.Y;
-        this->ViewPos[2] = -Out.Z;
+        this->ViewPos.x = -Out.x;
+        this->ViewPos.y = -Out.y;
+        this->ViewPos.z = -Out.z;
 
         this->bViewDirty = 0;
     }
-    return this->View;
+    return (const Transform*)(&this->View.E[0][0]);
 }
 
-int DACOM_API FSpaceCamera::ProjectVec(float* OutXYZ, float const* World)
+int DACOM_API FSpaceCamera::ProjectVec(Vector* OutXYZ, const Vector* World)
 {
     // LAB_0040f4f0: slot 0x34 through the vtable.
-    return Project(&OutXYZ[0], &OutXYZ[1], &OutXYZ[2], World);
+    return Project(&OutXYZ->x, &OutXYZ->y, &OutXYZ->z, World);
 }
 
-void FSpaceCamera::GetVelocity(float* Out)
+void FSpaceCamera::GetVelocity(Vector* Out)
 {
     // LAB_0040f5d0.
-    Out[0] = 0.0f;
-    Out[1] = 0.0f;
-    Out[2] = 0.0f;
+    Out->x = 0.0f;
+    Out->y = 0.0f;
+    Out->z = 0.0f;
 }
 
 int FSpaceCamera::SetProperty(char const* Key, char const* Value)

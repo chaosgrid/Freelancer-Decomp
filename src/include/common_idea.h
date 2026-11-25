@@ -252,7 +252,7 @@ public:
 
     // FUN_062d58f0, RET 4. TargetKind48 = 3, Direction = -(Src+0x08, Src+0x14,
     // Src+0x20) -- a foreign object's basis-vector column -- then renormalizes.
-    void SetDirectionFrom(void const* Src);
+    void SetDirectionFrom(Matrix const* Src);
 
     // FUN_062d5760, RET 4. TargetKind48 = 1 and Watcher.set(Object+8) when
     // Object is non-null, else TargetKind48 = 0 and Watcher.set(nullptr). Then
@@ -563,13 +563,12 @@ public:
     // .text:062fe34f; same fold caveat.
     void SetScale94(float Value);
 
-    // ---- Fields. ZeroBlock34 is a 3x3 Matrix kept as int[9] for its external
-    // ---- users. ----
+    // ---- Fields. ----
     BaseWatcher Watcher;             // +0x14, ends +0x1c.
     Vector Position1c;                 // +0x1c, ends +0x28. SetPosition(), tag 2.
     Vector Direction28;                  // +0x28, ends +0x34. Ctor-zeroed (three
                                           // dwords). SetDirection(), tag 3.
-    int ZeroBlock34[9];                    // +0x34..+0x57. Ctor-zeroed; SetBasis(), tag 4.
+    Matrix ZeroBlock34;                    // +0x34..+0x57. Ctor-zeroed; SetBasis(), tag 4.
     Vector Vector58;                          // +0x58, ends +0x64. SetAxis(), tag 5.
     // +0x64. Ctor-zeroed byte. Update() reads it twice: case 1 aims along the
     // watched node's up only when it is set (062d6959), case 2 takes the floats at

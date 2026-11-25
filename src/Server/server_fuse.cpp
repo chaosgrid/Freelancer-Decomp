@@ -784,16 +784,14 @@ void ImpulseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
             {
                 HardpointToWorld(Owner->get_index(), HpInfo);
 
-                FVector Offset;
-                Server_MathEngine()->TransposeTransform(Offset,
-                                                    reinterpret_cast<FMatrix const&>(HpInfo.Orient),
-                                                    reinterpret_cast<FVector const&>(PosOffset));
+                Vector Offset;
+                Server_MathEngine()->TransposeTransform(Offset, HpInfo.Orient, PosOffset);
 
                 // x87: a float sum rounded from the 53-bit register equals the plain float sum.
                 Vector BlastPos;
-                BlastPos.x = static_cast<float>(static_cast<double>(Offset.X) + HpInfo.Position.x);
-                BlastPos.y = static_cast<float>(static_cast<double>(Offset.Y) + HpInfo.Position.y);
-                BlastPos.z = static_cast<float>(static_cast<double>(Offset.Z) + HpInfo.Position.z);
+                BlastPos.x = static_cast<float>(static_cast<double>(Offset.x) + HpInfo.Position.x);
+                BlastPos.y = static_cast<float>(static_cast<double>(Offset.y) + HpInfo.Position.y);
+                BlastPos.z = static_cast<float>(static_cast<double>(Offset.z) + HpInfo.Position.z);
 
                 // A stack explosion archetype named "FuseImpulse".
                 Archetype::Explosion Blast(ID_String{CreateID("FuseImpulse")});
@@ -921,23 +919,23 @@ void TumbleAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                     Ship->AngularDragFactor = AngDragScale;
 
                     // Three random turn throttles, in x, y, z order.
-                    FVector Axis;
-                    Axis.X = RandomBetween(rand(), TurnThrottleLow.x, TurnThrottleHigh.x);
-                    Axis.Y = RandomBetween(rand(), TurnThrottleLow.y, TurnThrottleHigh.y);
-                    Axis.Z = RandomBetween(rand(), TurnThrottleLow.z, TurnThrottleHigh.z);
+                    Vector Axis;
+                    Axis.x = RandomBetween(rand(), TurnThrottleLow.x, TurnThrottleHigh.x);
+                    Axis.y = RandomBetween(rand(), TurnThrottleLow.y, TurnThrottleHigh.y);
+                    Axis.z = RandomBetween(rand(), TurnThrottleLow.z, TurnThrottleHigh.z);
 
                     // Rotated into the ship's frame (I3DMathEngine +0x30).
                     Matrix const& Orientation = Owner->get_orientation();
-                    FVector Rotated;
+                    Vector Rotated;
                     Server_MathEngine()->Rotate(Rotated,
-                                            reinterpret_cast<FTransform const&>(Orientation),
+                                            reinterpret_cast<Transform const&>(Orientation),
                                             Axis);
 
                     // Results unused.
                     Vector AxisThrottle;
-                    AxisThrottle.x = Rotated.X;
-                    AxisThrottle.y = Rotated.Y;
-                    AxisThrottle.z = Rotated.Z;
+                    AxisThrottle.x = Rotated.x;
+                    AxisThrottle.y = Rotated.y;
+                    AxisThrottle.z = Rotated.z;
                     static_cast<IObjAffect*>(Owner)->set_axis_throttle(AxisThrottle);
 
                     float const Throttle = RandomBetween(rand(), ThrottleLow, ThrottleHigh);

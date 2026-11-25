@@ -21,7 +21,7 @@
 
 namespace
 {
-    unsigned InitCrc32Table_063edcdc(unsigned (&table)[256])
+    unsigned IVP_InitCrc32Table(unsigned (&table)[256])
     {
         for (unsigned i = 0; i < 256; ++i)
         {
@@ -36,11 +36,11 @@ namespace
     }
 }
 
-unsigned g_Crc32Table_063edcdc[256];
+unsigned g_IVP_Crc32Table[256];
 
 namespace
 {
-    unsigned g_Crc32Table_063edcdc_init = InitCrc32Table_063edcdc(g_Crc32Table_063edcdc);
+    unsigned g_IVP_Crc32TableInit = IVP_InitCrc32Table(g_IVP_Crc32Table);
 }
 
 // ============================================================================
@@ -274,7 +274,7 @@ void* IVP_VHash::FindElem(void* Elem, unsigned HashIndex)
 // feeding IVP_VHash::FindElem.
 unsigned __fastcall IVP_VHash_HashPointer(unsigned Key)
 {
-    return HashKey_063edcdc(Key) | 0x80000000u;
+    return IVP_Crc32HashKey(Key) | 0x80000000u;
 }
 
 // ============================================================================
@@ -302,14 +302,14 @@ IVP_VHash_Store::IVP_VHash_Store(int InSize)
     SizeMm = InSize - 1;
     Size = InSize;
     NElems = 0;
-    Field_0x10 = nullptr;
+    PreallocatedElemsStore = nullptr;
     ElemsStore = calloc(static_cast<size_t>(InSize), 0xc);
 }
 
 // FUN_06352620 (also reached through thunk_FUN_06352620).
 IVP_VHash_Store::~IVP_VHash_Store()
 {
-    if (ElemsStore != Field_0x10 && ElemsStore != nullptr)
+    if (ElemsStore != PreallocatedElemsStore && ElemsStore != nullptr)
     {
         free(ElemsStore); // FUN_06343fb0
         ElemsStore = nullptr;
@@ -337,7 +337,7 @@ void IVP_VHash_Store::Rehash(int NewSize)
         }
     }
     NElems = savedCount;
-    if (oldBuckets != Field_0x10 && oldBuckets != nullptr)
+    if (oldBuckets != PreallocatedElemsStore && oldBuckets != nullptr)
     {
         free(oldBuckets); // FUN_06343fb0
     }
@@ -346,7 +346,7 @@ void IVP_VHash_Store::Rehash(int NewSize)
 // FUN_063526d0
 void IVP_VHash_Store::AddElem(void* Key, void* Value)
 {
-    unsigned hash = HashKey_063edcdc((unsigned)Key) | 0x80000000;
+    unsigned hash = IVP_Crc32HashKey((unsigned)Key) | 0x80000000;
     AddElem(Key, Value, hash);
 }
 
@@ -397,7 +397,7 @@ void IVP_VHash_Store::AddElem(void* Key, void* Value, unsigned HashIndex)
 // FUN_063527e0: returns the removed value (the raw erase's EAX).
 void* IVP_VHash_Store::RemoveElem(void* Key)
 {
-    unsigned hash = HashKey_063edcdc((unsigned)Key) | 0x80000000;
+    unsigned hash = IVP_Crc32HashKey((unsigned)Key) | 0x80000000;
     return RemoveElem(Key, hash);
 }
 
@@ -472,7 +472,7 @@ void* IVP_VHash_Store::RemoveElem(void* Key, unsigned HashIndex)
 // FUN_06352930
 void* IVP_VHash_Store::FindElem(void* Key)
 {
-    unsigned hash = HashKey_063edcdc((unsigned)Key) | 0x80000000;
+    unsigned hash = IVP_Crc32HashKey((unsigned)Key) | 0x80000000;
     return FindElem(Key, hash);
 }
 
@@ -508,7 +508,7 @@ void* IVP_VHash_Store::FindElem(void* Key, unsigned HashIndex)
 // IVP_Controller_Phantom to bump a per-pair reference count.
 void IVP_VHash_Store::ChangeElem(void* Key, void* NewValue)
 {
-    unsigned crc = HashKey_063edcdc((unsigned)Key);
+    unsigned crc = IVP_Crc32HashKey((unsigned)Key);
     if (Size > 0)
     {
         unsigned hash = crc | 0x80000000;

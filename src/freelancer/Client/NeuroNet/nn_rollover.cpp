@@ -66,9 +66,9 @@ NnRolloverControl::NnRolloverControl()
     // Inlined into FUN_004b6630 (0x004b66cd). Retail leaves the anchor (+0x16c) unset until
     // Create; the port zeroes it.
     ToolTipHoverReset(&Entry);
-    Anchor[0] = 0.0f;
-    Anchor[1] = 0.0f;
-    Anchor[2] = 0.0f;
+    Anchor.x = 0.0f;
+    Anchor.y = 0.0f;
+    Anchor.z = 0.0f;
     InitRolloverDefaults();
 }
 
@@ -136,9 +136,9 @@ bool NnRolloverControl::Create(Win3D* NewParent, void* /*Data*/)
     ColorIdle = 0xffe0c387u;  // +0xcc, bytes 87 c3 e0 ff
 
     // FUN_005b0880: in the intro menu +0x188, else +0x184.
-    Anchor[0] = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
-    Anchor[1] = 0.385f; // 0x3ec51eb8
-    Anchor[2] = -1.0f;  // 0xbf800000
+    Anchor.x = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
+    Anchor.y = 0.385f; // 0x3ec51eb8
+    Anchor.z = -1.0f;  // 0xbf800000
 
     LoadRolloverTable(); // FUN_004b59b0
     return true;
@@ -289,9 +289,9 @@ void NnRolloverControl::FeedHover(FToolTipHoverInfo const* Info)
         return;
     }
 
-    Anchor[0] = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
-    Anchor[1] = 0.385f;
-    Anchor[2] = -1.0f;
+    Anchor.x = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
+    Anchor.y = 0.385f;
+    Anchor.z = -1.0f;
     Entry.Ids = Record.Ids;
     Flags = static_cast<unsigned char>(Flags | kWin3DVisible);
     Entry.IdsAlt = Record.IdsAlt;
@@ -305,7 +305,7 @@ void NnRolloverControl::FeedHover(FToolTipHoverInfo const* Info)
     {
         SetText(Record.CaptionW);
     }
-    SetPosition(Anchor); // slot 5 (+0x14)
+    SetPosition(&Anchor.x); // slot 5 (+0x14)
     KnowledgeMapReveal(static_cast<unsigned>(Record.IdsAlt)); // FUN_00459930
 }
 
@@ -329,9 +329,9 @@ void NnRolloverControl::ShowHover(FToolTipHoverInfo const* Info, float Hold)
         return;
     }
 
-    Anchor[0] = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
-    Anchor[1] = 0.385f; // 0x3ec51eb8
-    Anchor[2] = -1.0f;  // 0xbf800000
+    Anchor.x = IsClientIntroEnvironment() ? AnchorXIntro : AnchorXSpace;
+    Anchor.y = 0.385f; // 0x3ec51eb8
+    Anchor.z = -1.0f;  // 0xbf800000
     HoldSeconds = Hold; // +0x164
     Flags = static_cast<unsigned char>(Flags | kWin3DVisible);
     Entry.Ids = Info->Ids;       // +0xec
@@ -346,7 +346,7 @@ void NnRolloverControl::ShowHover(FToolTipHoverInfo const* Info, float Hold)
     {
         SetText(Info->CaptionW);
     }
-    SetPosition(Anchor); // slot 5 (+0x14)
+    SetPosition(&Anchor.x); // slot 5 (+0x14)
     KnowledgeMapReveal(static_cast<unsigned>(Info->IdsAlt)); // FUN_00459930
 }
 
@@ -369,9 +369,9 @@ void NnRolloverControl::ShowHoverAt(FToolTipHoverInfo const* Info, float Hold, f
         return;
     }
 
-    Anchor[0] = AnchorX;
-    Anchor[1] = 0.385f;
-    Anchor[2] = -1.0f;
+    Anchor.x = AnchorX;
+    Anchor.y = 0.385f;
+    Anchor.z = -1.0f;
     HoldSeconds = Hold;
     Flags = static_cast<unsigned char>(Flags | kWin3DVisible);
     Entry.Ids = Info->Ids;
@@ -386,7 +386,7 @@ void NnRolloverControl::ShowHoverAt(FToolTipHoverInfo const* Info, float Hold, f
     {
         SetText(Info->CaptionW);
     }
-    SetPosition(Anchor);
+    SetPosition(&Anchor.x);
     KnowledgeMapReveal(static_cast<unsigned>(Info->IdsAlt));
 }
 
@@ -404,7 +404,7 @@ void NnRolloverControl::Draw()
     Win3DDisable(kWin3DDepthTest);   // FUN_00421ed0(0xb71)
     Win3DDisable(kWin3DCullFace);    // FUN_00421ed0(0xb44)
 
-    FontStringSetScale(&Text, 0.29f, Position[2]); // FUN_004145d0(0x3e947ae1, +0x68)
+    FontStringSetScale(&Text, 0.29f, Position.z); // FUN_004145d0(0x3e947ae1, +0x68)
     int Extent[2];
     FontStringGetExtent(&Text, Extent); // FUN_00414570
     // Both extents are widened as unsigned.
@@ -419,7 +419,7 @@ void NnRolloverControl::Draw()
 
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
-    TextWinProjectPoint(Position, &ScreenX, &ScreenY); // FUN_00417730(+0x60)
+    TextWinProjectPoint(&Position.x, &ScreenX, &ScreenY); // FUN_00417730(+0x60)
 
     if (bDrawBackground != 0)
     {

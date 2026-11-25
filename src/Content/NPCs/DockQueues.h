@@ -35,7 +35,7 @@ class FContentShipBase;
 class FContentNpcShip;
 struct I3DMathEngine;
 struct FSpaceObjPlacement;
-struct FTransform;
+class Transform;
 class Matrix;
 struct FFormation;
 class Vector;
@@ -259,7 +259,7 @@ void __cdecl DropPlayersLockedOutOfGate(unsigned int const* ShipId, unsigned int
 // block i takes slot i unless that is a player slot (then it keeps its own values; i still
 // advances), then every block is placed at its slot.
 void __cdecl PlaceFormationBlocks(std::list<FContentNpcShipParams>* Blocks, FFormation* Formation,
-                                  FTransform const* Placement);
+                                  Transform const* Placement);
 
 // FUN_06f67440: the NPC ships of System (bExcludeFromShipCount clear) within *Radius of the
 // placement, or -- when *ConeRange > 0 -- within *ConeRange and inside the 35 degree cone

@@ -4,12 +4,16 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
+#include "MovieRuntime.h"
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
 #include <stdexcept>
 #include <windows.h>
+#include <float.h>
+#include <signal.h>
 
 // movie.dll's statically linked CRT helpers.
 
@@ -1046,7 +1050,7 @@ static int MovieChooseHeapKind()
     }
 
     char Env[0x1090];
-    char Module[0x104];
+    char Module[MAX_PATH];
     DWORD Got = GetEnvironmentVariableA("__MSVCRT_HEAP_SELECT", Env, 0x1090);
     if (Got == 0)
     {
@@ -1063,7 +1067,7 @@ static int MovieChooseHeapKind()
     if (strncmp(Env, "__GLOBAL_HEAP_SELECTED", 0x16) != 0)
     {
         memset(Module, 0, sizeof(Module));
-        GetModuleFileNameA(nullptr, Module, 0x104);
+        GetModuleFileNameA(nullptr, Module, MAX_PATH);
         if (Module[0] != 0)
         {
             MovieUpperAscii(Module);
@@ -2016,8 +2020,8 @@ static void MovieRuntimeError(unsigned int Code)
     {
         return;
     }
-    char Name[0x104];
-    if (GetModuleFileNameA(nullptr, Name, 0x104) == 0)
+    char Name[MAX_PATH];
+    if (GetModuleFileNameA(nullptr, Name, MAX_PATH) == 0)
     {
         strcpy(Name, "<program name unknown>");
     }
@@ -2150,6 +2154,9 @@ struct FMovieXcptAct
     uint32_t Handler;
 };
 
+static_assert(sizeof(FMovieXcptAct) == 0xC, "FUN_06ad79e5 steps the table by 0xC");
+static_assert(offsetof(FMovieXcptAct, Signal) == 4, "FUN_06ad79e5 compares [record+4] with the signal");
+
 // DAT_06adfc80. Ten records, then the separate counts at 06adfcf8 / 06adfcfc / 06adfd04.
 static FMovieXcptAct GMovieXcptAct[0x0A] = {
     {0xC0000005u, 0x0Bu, 0},
@@ -2171,21 +2178,45 @@ static void (__cdecl* GMovieSigBreak)(int) = nullptr;
 static void (__cdecl* GMovieSigAbrt)(int) = nullptr;
 static void (__cdecl* GMovieSigTerm)(int) = nullptr;
 
-// FUN_06ad136e. The new per-thread block points at the exception-action table.
-static void MovieInitPtd(uint8_t* Ptd)
+// The 0x74-byte per-thread block FUN_06ad1381 allocates: the VC6 CRT _tiddata. Only the
+// members this module touches are named.
+struct FMovieThreadData
 {
-    *(uint32_t*)(Ptd + 0x50) = (uint32_t)(uintptr_t)GMovieXcptAct;
-    *(uint32_t*)(Ptd + 0x14) = 1;
+    uint32_t ThreadId;              // +0x00 _tid: GetCurrentThreadId
+    uint32_t ThreadHandle;          // +0x04 _thandle: ORed with 0xFFFFFFFF on creation
+    int Errno;                      // +0x08 _terrno (FUN_06ad24de)
+    uint8_t Pad_0x0C[0x8];
+    uint32_t HoldRand;              // +0x14 _holdrand: 1 on creation (FUN_06ad136e)
+    uint8_t Pad_0x18[0x38];
+    FMovieXcptAct* XcptActTab;      // +0x50 _pxcptacttab: GMovieXcptAct (FUN_06ad136e), searched by _raise
+    int XcptInfoPtrs;               // +0x54 _tpxcptinfoptrs: cleared and restored around a SIGILL/SIGFPE/SIGSEGV handler
+    int FpeCode;                    // +0x58 _tfpecode: _raise(SIGFPE) sets 0x8C and passes it to the handler
+    uint8_t Pad_0x5C[0x4];
+    void (__cdecl* Terminate)();    // +0x60 _terminate: called by FUN_06ad089c when set
+    uint8_t Pad_0x64[0x10];
+};
+
+static_assert(offsetof(FMovieThreadData, HoldRand) == 0x14, "FUN_06ad136e stores 1 at ptd+0x14");
+static_assert(offsetof(FMovieThreadData, XcptActTab) == 0x50, "FUN_06ad136e stores the table at ptd+0x50");
+static_assert(offsetof(FMovieThreadData, FpeCode) == 0x58, "_raise (FUN_06ad7863) stores 0x8C at ptd+0x58");
+static_assert(offsetof(FMovieThreadData, Terminate) == 0x60, "FUN_06ad089c reads ptd+0x60");
+static_assert(sizeof(FMovieThreadData) == 0x74, "calloc(1, 0x74) in FUN_06ad1381");
+
+// FUN_06ad136e. The new per-thread block points at the exception-action table.
+static void MovieInitPtd(FMovieThreadData* Ptd)
+{
+    Ptd->XcptActTab = GMovieXcptAct;
+    Ptd->HoldRand = 1;
 }
 
 // FUN_06ad1381. TlsGetValue of DAT_06add570. A miss allocates 0x74 bytes and stores the thread id.
-static uint8_t* MovieGetPtd()
+static FMovieThreadData* MovieGetPtd()
 {
     DWORD Saved = GetLastError();
-    uint8_t* Ptd = (uint8_t*)TlsGetValue(GMovieTlsIndex);
+    FMovieThreadData* Ptd = (FMovieThreadData*)TlsGetValue(GMovieTlsIndex);
     if (Ptd == nullptr)
     {
-        Ptd = (uint8_t*)MovieCrtCalloc(1, 0x74);
+        Ptd = (FMovieThreadData*)MovieCrtCalloc(1, sizeof(FMovieThreadData));
         if (Ptd == nullptr || TlsSetValue(GMovieTlsIndex, Ptd) == 0)
         {
             MovieAmsgExit(0x10);
@@ -2193,8 +2224,8 @@ static uint8_t* MovieGetPtd()
         else
         {
             MovieInitPtd(Ptd);
-            *(uint32_t*)(Ptd + 4) = *(uint32_t*)(Ptd + 4) | 0xFFFFFFFFu;
-            *(uint32_t*)Ptd = GetCurrentThreadId();
+            Ptd->ThreadHandle = Ptd->ThreadHandle | 0xFFFFFFFFu;
+            Ptd->ThreadId = GetCurrentThreadId();
         }
     }
     SetLastError(Saved);
@@ -2211,7 +2242,7 @@ static int MovieInitThreadData()
     {
         return 0;
     }
-    uint8_t* Ptd = (uint8_t*)MovieCrtCalloc(1, 0x74);
+    FMovieThreadData* Ptd = (FMovieThreadData*)MovieCrtCalloc(1, sizeof(FMovieThreadData));
     if (Ptd == nullptr)
     {
         return 0;
@@ -2221,39 +2252,39 @@ static int MovieInitThreadData()
         return 0;
     }
     MovieInitPtd(Ptd);
-    *(uint32_t*)(Ptd + 4) = *(uint32_t*)(Ptd + 4) | 0xFFFFFFFFu;
-    *(uint32_t*)Ptd = GetCurrentThreadId();
+    Ptd->ThreadHandle = Ptd->ThreadHandle | 0xFFFFFFFFu;
+    Ptd->ThreadId = GetCurrentThreadId();
     return 1;
 }
 
 // FUN_06ad24de. errno lives at ptd + 8.
 static int* MovieErrnoSlot()
 {
-    return (int*)(MovieGetPtd() + 8);
+    return &MovieGetPtd()->Errno;
 }
 
 // FUN_06ad79e5. 12-byte records; the signal number is at +4. A miss is 0.
-static uint8_t* MovieFindXcpt(int Signal, uint8_t* Table)
+static FMovieXcptAct* MovieFindXcpt(int Signal, FMovieXcptAct* Table)
 {
     int Count = GMovieXcptCount;
-    uint8_t* End = Table + (Count + Count * 2) * 4;
-    uint8_t* At = Table;
-    if (*(uint32_t*)(Table + 4) != (uint32_t)Signal)
+    FMovieXcptAct* End = Table + Count;
+    FMovieXcptAct* At = Table;
+    if (Table->Signal != (uint32_t)Signal)
     {
         for (;;)
         {
-            At = At + 0xC;
+            At = At + 1;
             if (At >= End)
             {
                 break;
             }
-            if (*(uint32_t*)(At + 4) == (uint32_t)Signal)
+            if (At->Signal == (uint32_t)Signal)
             {
                 break;
             }
         }
     }
-    if (At < End && *(uint32_t*)(At + 4) == (uint32_t)Signal)
+    if (At < End && At->Signal == (uint32_t)Signal)
     {
         return At;
     }
@@ -2266,8 +2297,8 @@ static int MovieRaise(int Signal)
     void (__cdecl* Handler)(int) = nullptr;
     void (__cdecl** Slot)(int) = nullptr;
     int Locked = 0;
-    uint8_t* Ptd = nullptr;
-    int Sel = Signal - 2;
+    FMovieThreadData* Ptd = nullptr;
+    int Sel = Signal - SIGINT;
     if (Sel == 0)
     {
         Handler = GMovieSigInt;
@@ -2275,25 +2306,25 @@ static int MovieRaise(int Signal)
     }
     else
     {
-        Sel = Signal - 4;
-        if (Sel == 0 || Signal == 8 || Signal == 11)
+        Sel = Signal - SIGILL;
+        if (Sel == 0 || Signal == SIGFPE || Signal == SIGSEGV)
         {
             Ptd = MovieGetPtd();
-            uint8_t* Found = MovieFindXcpt(Signal, *(uint8_t**)(Ptd + 0x50));
-            Slot = (void (__cdecl**)(int))(Found + 8);
+            FMovieXcptAct* Found = MovieFindXcpt(Signal, Ptd->XcptActTab);
+            Slot = (void (__cdecl**)(int))&Found->Handler;
             Handler = *Slot;
         }
-        else if (Signal == 15)
+        else if (Signal == SIGTERM)
         {
             Handler = GMovieSigTerm;
             Slot = &GMovieSigTerm;
         }
-        else if (Signal == 21)
+        else if (Signal == SIGBREAK)
         {
             Handler = GMovieSigBreak;
             Slot = &GMovieSigBreak;
         }
-        else if (Signal == 22)
+        else if (Signal == SIGABRT)
         {
             Handler = GMovieSigAbrt;
             Slot = &GMovieSigAbrt;
@@ -2303,12 +2334,12 @@ static int MovieRaise(int Signal)
             return -1;
         }
     }
-    if (Signal != 4 && Signal != 8 && Signal != 11)
+    if (Signal != SIGILL && Signal != SIGFPE && Signal != SIGSEGV)
     {
         Locked = 1;
         MovieLock(1);
     }
-    if (Handler == (void (__cdecl*)(int))(uintptr_t)1)
+    if (Handler == SIG_IGN)
     {
         if (Locked != 0)
         {
@@ -2316,7 +2347,7 @@ static int MovieRaise(int Signal)
         }
         return 0;
     }
-    if (Handler == nullptr)
+    if (Handler == SIG_DFL)
     {
         if (Locked != 0)
         {
@@ -2325,23 +2356,23 @@ static int MovieRaise(int Signal)
         MovieExit(3);
         return 0;
     }
-    int Saved54 = 0;
-    int Saved58 = 0;
+    int SavedXcptInfoPtrs = 0;
+    int SavedFpeCode = 0;
     int ClearSlot = 1;
-    if (Signal == 4 || Signal == 8 || Signal == 11)
+    if (Signal == SIGILL || Signal == SIGFPE || Signal == SIGSEGV)
     {
-        Saved54 = *(int*)(Ptd + 0x54);
-        *(uint32_t*)(Ptd + 0x54) = 0;
-        if (Signal == 8)
+        SavedXcptInfoPtrs = Ptd->XcptInfoPtrs;
+        Ptd->XcptInfoPtrs = 0;
+        if (Signal == SIGFPE)
         {
-            Saved58 = *(int*)(Ptd + 0x58);
-            *(uint32_t*)(Ptd + 0x58) = 0x8C;
+            SavedFpeCode = Ptd->FpeCode;
+            Ptd->FpeCode = _FPE_EXPLICITGEN;
             int Offset = GMovieFpeFirst * 12;
             int Index = GMovieFpeFirst;
             int Limit = GMovieFpeFirst + GMovieFpeSpan;
             if (Index < Limit)
             {
-                uint8_t* Table = *(uint8_t**)(Ptd + 0x50);
+                uint8_t* Table = (uint8_t*)Ptd->XcptActTab;
                 do
                 {
                     Offset = Offset + 0xC;
@@ -2361,22 +2392,22 @@ static int MovieRaise(int Signal)
     {
         MovieUnlock(1);
     }
-    if (Signal == 8)
+    if (Signal == SIGFPE)
     {
         typedef void (__cdecl* FMovieFpeHandler)(int, int);
         FMovieFpeHandler Fpe = (FMovieFpeHandler)Handler;
-        Fpe(8, *(int*)(Ptd + 0x58));
+        Fpe(SIGFPE, Ptd->FpeCode);
     }
     else
     {
         Handler(Signal);
     }
-    if (Signal == 8 || Signal == 11 || Signal == 4)
+    if (Signal == SIGFPE || Signal == SIGSEGV || Signal == SIGILL)
     {
-        *(int*)(Ptd + 0x54) = Saved54;
-        if (Signal == 8)
+        Ptd->XcptInfoPtrs = SavedXcptInfoPtrs;
+        if (Signal == SIGFPE)
         {
-            *(int*)(Ptd + 0x58) = Saved58;
+            Ptd->FpeCode = SavedFpeCode;
         }
     }
     return 0;
@@ -2388,13 +2419,13 @@ static void MovieCppTerminate()
 {
     __try
     {
-        uint8_t* Ptd = MovieGetPtd();
-        if (*(uint32_t*)(Ptd + 0x60) != 0)
+        FMovieThreadData* Ptd = MovieGetPtd();
+        if (Ptd->Terminate != nullptr)
         {
             __try
             {
                 Ptd = MovieGetPtd();
-                void (__cdecl* Hook)() = (void (__cdecl*)())*(uint32_t*)(Ptd + 0x60);
+                void (__cdecl* Hook)() = Ptd->Terminate;
                 Hook();
             }
             __except (1)
@@ -2912,7 +2943,7 @@ BOOL WINAPI DllMain(HINSTANCE Module, DWORD Reason, LPVOID Reserved)
 {
     (void)Module;
     (void)Reserved;
-    if (Reason == 1)
+    if (Reason == DLL_PROCESS_ATTACH)
     {
         if (MovieInitThreadData() == 0)
         {

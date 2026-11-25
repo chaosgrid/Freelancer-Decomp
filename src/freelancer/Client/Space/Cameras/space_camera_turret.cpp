@@ -55,10 +55,10 @@ namespace
     void StoreWorldView(FTurretCamera* Cam, const float* View12)
     {
         FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
-        memcpy(Space->World, View12, 9 * sizeof(float));
-        Space->WorldPos[0] = View12[9];
-        Space->WorldPos[1] = View12[10];
-        Space->WorldPos[2] = View12[11];
+        memcpy(&Space->World, View12, 9 * sizeof(float));
+        Space->WorldPos.x = View12[9];
+        Space->WorldPos.y = View12[10];
+        Space->WorldPos.z = View12[11];
     }
 }
 
@@ -67,9 +67,9 @@ void TurretCameraConstruct(FTurretCamera* Cam)
     // FUN_0051a210, in retail's own order: Z of the tether goes in first, then X and Y.
     HudCameraConstruct((FHudCamera*)Cam);
 
-    Cam->Tether[2] = 25.0f;      // 0x41c80000
-    Cam->Tether[0] = 0.0f;
-    Cam->Tether[1] = 5.0f;       // 0x40a00000
+    Cam->Tether.z = 25.0f;      // 0x41c80000
+    Cam->Tether.x = 0.0f;
+    Cam->Tether.y = 5.0f;       // 0x40a00000
 
     Cam->Yaw = 0.0f;
     Cam->TargetYaw = 0.0f;
@@ -236,18 +236,18 @@ bool TurretCameraComputeView(FTurretCamera* Cam, float* Out12, float DeltaSecond
     // The tether (+0x100) through the orientation, using DAT_00675220.
     if (G_FirstPersonMathEngine == nullptr)
         G_FirstPersonMathEngine = Acquire3DMathEngine();
-    FVector Offset;
-    G_FirstPersonMathEngine->TransformMatrix(Offset, *reinterpret_cast<FMatrix const*>(M),
-                                             *reinterpret_cast<FVector const*>(Cam->Tether));
+    Vector Offset;
+    G_FirstPersonMathEngine->TransformMatrix(Offset, *reinterpret_cast<Matrix const*>(M),
+                                             Cam->Tether);
 
     // Retail re-reads the watcher.
     IObjRW* const Again = static_cast<IObjRW*>(GameCameraGetTarget((FGameCamera*)Hud));
     Vector const& ShipPos = Again->get_position();
 
     memcpy(Out12, M, 9 * sizeof(float));
-    Out12[9] = Offset.X + ShipPos.x;
-    Out12[10] = Offset.Y + ShipPos.y;
-    Out12[11] = Offset.Z + ShipPos.z;
+    Out12[9] = Offset.x + ShipPos.x;
+    Out12[10] = Offset.y + ShipPos.y;
+    Out12[11] = Offset.z + ShipPos.z;
     return false;
 }
 
@@ -353,9 +353,9 @@ bool TurretCameraLoad(FTurretCamera* Cam, const char* CockpitIniPath)
                 const float X = Reader.get_value_float(0);
                 const float Y = Reader.get_value_float(1);
                 const float Z = Reader.get_value_float(2);
-                Cam->Tether[0] = X;
-                Cam->Tether[1] = Y;
-                Cam->Tether[2] = Z;
+                Cam->Tether.x = X;
+                Cam->Tether.y = Y;
+                Cam->Tether.z = Z;
             }
             else if (Reader.is_value("yaw_rotate_speed"))
             {

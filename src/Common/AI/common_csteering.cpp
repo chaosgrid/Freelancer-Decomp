@@ -229,11 +229,11 @@ void CSteering::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<I
     if (LenSq == 0.0)
         return;
 
-    FTransform const& ShipXform = (FTransform const&)(OwnerShip->get_transform());
+    Transform const& ShipXform = OwnerShip->get_transform();
     I3DMathEngine* Math = Acquire3DMathEngine();
     Vector Local;
-    Math->InverseRotate((FVector&)(Local), ShipXform,
-                        (FVector const&)(AxisThrottle)); // +0x34
+    Math->InverseRotate(Local, ShipXform,
+                        AxisThrottle); // +0x34
 
     Archetype::Ship const* ShipArch = OwnerShip->shiparch();
     Vector Scaled;
@@ -243,8 +243,8 @@ void CSteering::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<I
 
     Math = Acquire3DMathEngine();
     Vector Torque;
-    Math->Rotate((FVector&)(Torque), ShipXform,
-                 (FVector const&)(Scaled)); // +0x30
+    Math->Rotate(Torque, ShipXform,
+                 Scaled); // +0x30
     rotate(Torque, EventSim->delta_time);
 }
 
@@ -357,9 +357,9 @@ void CNudgeEngine::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vecto
 
     I3DMathEngine* Math = Acquire3DMathEngine();
     Vector World;
-    Math->Rotate((FVector&)(World),
-                 (FTransform const&)(OwnerShip->get_transform()),
-                 (FVector const&)(CurrentNudge)); // +0x30
+    Math->Rotate(World,
+                 OwnerShip->get_transform(),
+                 CurrentNudge); // +0x30
 
     float const Scale = OwnerShip->shiparch()->NudgeForce;
     Vector Force;

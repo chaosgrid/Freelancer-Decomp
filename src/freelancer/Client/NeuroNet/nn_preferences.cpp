@@ -304,7 +304,7 @@ void NnPreferences::Update()
             Angles.z = 0.0f;
             Matrix Rotation = RotateMatrix(Angles);
             DALib::Engine->SetInstanceOrientation(BigBox->MeshHolder.EngineInstance,
-                                                  reinterpret_cast<float*>(&Rotation));
+                                                  &Rotation);
             DALib::Engine->UpdateInstance(BigBox->MeshHolder.EngineInstance, 0, nullptr);
         }
     }
@@ -3494,7 +3494,7 @@ bool NnPreferences::Create(Win3D* NewParent, void* Data)
 
     // On failure +0x32c (bClosed) = 1.
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     DrawLayer = 0x64;
     DrawSubLayer = 6;
     bCreating = 0;

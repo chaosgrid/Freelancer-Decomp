@@ -97,9 +97,9 @@ void IServerImpl::SystemSwitchOutComplete(unsigned int ship_id, unsigned int ses
         PhySys::CreateParms Parms = {};
         Parms.Mass = 1.0f;                                                 // 0x3f800000
         Parms.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-        Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-        Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-        Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+        Parms.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+        Parms.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+        Parms.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
         Parms.SystemId = 0;                                                // +0x14
         Parms.Type = 2;                                                    // +0x18
         Parms.bPhysicalUnmoveable = 0;
@@ -252,12 +252,9 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
                                  &Req.Orientation);
 
         Matrix LaunchOrient;
-        Server_MathEngine()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(LaunchOrient),
-                                                reinterpret_cast<FQuaternion const&>(Req.Orientation));
+        Server_MathEngine()->QuaternionToMatrix(LaunchOrient, Req.Orientation);
         Vector HpOffset;
-        Server_MathEngine()->TransformMatrix(reinterpret_cast<FVector&>(HpOffset),
-                                             reinterpret_cast<FMatrix const&>(LaunchOrient),
-                                             reinterpret_cast<FVector const&>(HpPos));
+        Server_MathEngine()->TransformMatrix(HpOffset, LaunchOrient, HpPos);
 
         // The ship's origin sits HpMount behind the launch point (float per component).
         Req.Position.x = Req.Position.x - HpOffset.x;
@@ -324,8 +321,7 @@ void IServerImpl::PlayerLaunch(unsigned int ship_id, unsigned int session_id) {
         // Single player: the orientation matrix again and beam_object on the wrapper's raw
         // object under the (& 1) test -- called whatever that test yields, as in retail.
         if (SinglePlayer()) {
-            Server_MathEngine()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(LaunchOrient),
-                                                    reinterpret_cast<FQuaternion const&>(Req.Orientation));
+            Server_MathEngine()->QuaternionToMatrix(LaunchOrient, Req.Orientation);
             CObject* Raw = nullptr;
             if (NewShip != nullptr) {
                 CObject* const Obj = NewShip->Object;

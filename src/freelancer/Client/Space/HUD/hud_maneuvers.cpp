@@ -136,15 +136,15 @@ namespace
         Out12[11] = 0.0f;
         if (ClientMeshHolderHasInstance(&Control->MeshHolder))
         {
-            float const* const Source =
+            const Transform* const Source =
                 DALib::Engine->GetInstanceTransform(Control->MeshHolder.EngineInstance);
             memcpy(Out12, Source, 12 * sizeof(float));
         }
         else
         {
-            Out12[9] = Control->Position[0] + Control->Offset[0];
-            Out12[10] = Control->Position[1] + Control->Offset[1];
-            Out12[11] = Control->Position[2] + Control->Offset[2];
+            Out12[9] = Control->Position.x + Control->Offset[0];
+            Out12[10] = Control->Position.y + Control->Offset[1];
+            Out12[11] = Control->Position.z + Control->Offset[2];
         }
         Out12[9] = Out12[9] + Control->HitOffset[0];
         Out12[10] = Out12[10] + Control->HitOffset[1];
@@ -296,7 +296,7 @@ bool HUD_Maneuvers::Create(Win3D* NewParent, void* Data)
         RegisterEvent(Commands[i]);
 
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     return Win3D::Create(NewParent, Data);
 }
 

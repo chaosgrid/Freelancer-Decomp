@@ -269,8 +269,7 @@ void CAsteroidCube::init(Vector const& PosIn, unsigned long CubeIdValue,
 
         // I3DMathEngine +0x2c: the rock's offset from the cube centre.
         Vector LocalOffset;
-        Acquire3DMathEngine()->TransformMatrix((FVector&)LocalOffset, (FMatrix const&)Orient,
-                                               (FVector const&)Entry.Extent);
+        Acquire3DMathEngine()->TransformMatrix(LocalOffset, Orient, Entry.Extent);
 
         // The id is computed from the offset, before Pos is added.
         unsigned long AsteroidLocalId = 0;
@@ -289,8 +288,7 @@ void CAsteroidCube::init(Vector const& PosIn, unsigned long CubeIdValue,
         Parms.Pos.z = Pos.z + LocalOffset.z;
         // I3DMathEngine +0x20 MulMatrix.
         Matrix RockOrient;
-        Acquire3DMathEngine()->MulMatrix((FMatrix&)RockOrient, (FMatrix const&)Orient,
-                                         (FMatrix const&)Entry.Orient);
+        Acquire3DMathEngine()->MulMatrix(RockOrient, Orient, Entry.Orient);
         Parms.Orient = RockOrient;
         Parms.AsteroidId = AsteroidLocalId;
         Parms.bMine = Entry.bMine;

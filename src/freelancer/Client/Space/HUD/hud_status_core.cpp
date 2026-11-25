@@ -240,7 +240,7 @@ bool HUD_Core::Create(Win3D* NewParent, void* Data)
     RegisterEvent(USER_MINIMIZE_HUD);
 
     SetOffset(0.005f, -0.365f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -607,18 +607,18 @@ HUD_Status::HUD_Status(INI_Reader& /*Reader*/)
     // written before the Create call; the rest after it (Create reads none of them).
     G_HudStatus = this;
 
-    HomePosition.X = 0.295f;   // +0x4d4
-    HomePosition.Y = -0.367f;
-    HomePosition.Z = 0.0f;
+    HomePosition.x = 0.295f;   // +0x4d4
+    HomePosition.y = -0.367f;
+    HomePosition.z = 0.0f;
 
     HUDItem::Name = "Test_Status";
     HUD_Status::Create(nullptr, nullptr);   // direct (non-virtual) call
     Win3D::SetName("HUD_Status");
     ClassName = "HUD_Status";
 
-    HitCenter.X = 0.418f;      // +0x4b4
-    HitCenter.Y = -0.29f;
-    HitCenter.Z = -1.0f;
+    HitCenter.x = 0.418f;      // +0x4b4
+    HitCenter.y = -0.29f;
+    HitCenter.z = -1.0f;
     HitHalfWidth = 0.11f;      // +0x4c0
     HitHalfHeight = 0.11f;     // +0x4c4
 
@@ -677,7 +677,7 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     // The open button sits at HomePosition.
     float const OpenHalf[3] = {0.02f, 0.02f, 0.0f};
     ToggleButton = CreateButtonControl("HudStatusOpen", "interface\\hud\\hud_ShipInfo_button.3db",
-                                       nullptr, "ui_window_open", nullptr, &HomePosition.X,
+                                       nullptr, "ui_window_open", nullptr, &HomePosition.x,
                                        nullptr, OpenHalf, 0, 1, 0, 0, 0x3ff, 0, 0);
     ToggleButton->SetProperty(0x36, 1, 0);
 
@@ -767,7 +767,7 @@ bool HUD_Status::Create(Win3D* NewParent, void* Data)
     LootButton->Flags &= 0xfc;
 
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -973,27 +973,27 @@ void HUD_Status::RefreshWeaponRows()
     int CursorX = 0;
     int CursorY = 0;
     GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
-    FVector Local;
-    Local.X = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
+    Vector Local;
+    Local.x = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
                                  Cam->XScale * Cam->ZNear);
-    Local.Y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
+    Local.y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
                                  Cam->YScale * Cam->ZNear);
-    Local.Z = -Cam->ZNear;
-    FMatrix Orientation;
-    memcpy(&Orientation, Cam->World, sizeof(Orientation));
+    Local.z = -Cam->ZNear;
+    Matrix Orientation;
+    memcpy(&Orientation, &Cam->World, sizeof(Orientation));
     if (G_HudStatusMath == nullptr)
     {
         G_HudStatusMath = Acquire3DMathEngine();
     }
-    FVector World;
+    Vector World;
     G_HudStatusMath->TransformMatrix(World, Orientation, Local);
-    double const Inv = 1.0 / sqrt(static_cast<double>(World.X) * World.X +
-                                  static_cast<double>(World.Y) * World.Y +
-                                  static_cast<double>(World.Z) * World.Z);
+    double const Inv = 1.0 / sqrt(static_cast<double>(World.x) * World.x +
+                                  static_cast<double>(World.y) * World.y +
+                                  static_cast<double>(World.z) * World.z);
     float Ray[3];
-    Ray[0] = static_cast<float>(World.X * Inv);
-    Ray[1] = static_cast<float>(World.Y * Inv);
-    Ray[2] = static_cast<float>(World.Z * Inv);
+    Ray[0] = static_cast<float>(World.x * Inv);
+    Ray[1] = static_cast<float>(World.y * Inv);
+    Ray[2] = static_cast<float>(World.z * Inv);
 
     // Up to ten rows from WeaponTopRow (signed compares against Count). The active launcher's
     // row is DAT_00679bac, the rest DAT_00679bb0; a hovered row is pulsed unless the mouse pick
@@ -1096,7 +1096,7 @@ void HUD_Status::ToggleExpanded()
         // (DAT_005d8488); OnMoveFinished continues.
         ButtonMover::Start(0.3f);
         float const ToggleEnd[3] = {0.371f, -0.27f, 0.0f};
-        ButtonMover::AddButton(ToggleButton, &HomePosition.X, ToggleEnd);
+        ButtonMover::AddButton(ToggleButton, &HomePosition.x, ToggleEnd);
         float const FrameStart[3] = {0.4101f, -0.37f, -1.0f};
         float const FrameEnd[3] = {0.4101f, -0.4f, -1.0f};
         ButtonMover::AddButton(MinimizedFrame, FrameStart, FrameEnd);
@@ -1204,7 +1204,7 @@ void HUD_Status::OnScaleFinished()
     MinimizedFrame->SetProperty(kWinPropHide, 0, 0);
     ButtonMover::Start(0.3f);
     float const ToggleStart[3] = {0.371f, -0.27f, 0.0f};
-    ButtonMover::AddButton(ToggleButton, ToggleStart, &HomePosition.X);
+    ButtonMover::AddButton(ToggleButton, ToggleStart, &HomePosition.x);
     float const RepairLow[3] = {0.341f, -0.4f, 0.0f};
     RepairButton->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RepairLow), 0);
     float const RepairCountLow[3] = {0.347f, -0.4f, 0.0f};

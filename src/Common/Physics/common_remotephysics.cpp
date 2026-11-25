@@ -280,24 +280,23 @@ void CRemotePhysicsSimulation::RemoteUpdate(Vector const& Position,
                                             Quaternion const& Orientation,
                                             double Timestamp)
 {
-    // The engine is not tested for null, as in retail. Quaternion and FQuaternion are both
-    // (W,X,Y,Z).
-    FMatrix Basis;
+    // The engine is not tested for null, as in retail.
+    Matrix Basis;
     I3DMathEngine* const Math = Acquire3DMathEngine();
-    Math->QuaternionToMatrix(Basis, (FQuaternion const&)Orientation);
+    Math->QuaternionToMatrix(Basis, Orientation);
 
     m_PositionDRV.AddSample(Position, Timestamp);
 
     Vector AxisX;                                           // column 0
-    AxisX.x = Basis.D[0][0];
-    AxisX.y = Basis.D[1][0];
-    AxisX.z = Basis.D[2][0];
+    AxisX.x = Basis.E[0][0];
+    AxisX.y = Basis.E[1][0];
+    AxisX.z = Basis.E[2][0];
     m_OrientAxisXDRV.AddSample(AxisX, Timestamp);
 
     Vector AxisY;                                           // column 1
-    AxisY.x = Basis.D[0][1];
-    AxisY.y = Basis.D[1][1];
-    AxisY.z = Basis.D[2][1];
+    AxisY.x = Basis.E[0][1];
+    AxisY.y = Basis.E[1][1];
+    AxisY.z = Basis.E[2][1];
     m_OrientAxisYDRV.AddSample(AxisY, Timestamp);
 
     ++m_SampleCount;
@@ -380,13 +379,13 @@ void CRemotePhysicsSimulation::Doit(double Dt)
                (float)((double)V.y * U.x - (double)U.y * V.x));
 
     // Columns U, V and U x V: a right-handed orthonormal frame.
-    FMatrix const Basis = {{{U.x, V.x, Cross.x},
-                            {U.y, V.y, Cross.y},
-                            {U.z, V.z, Cross.z}}};
+    Matrix const Basis(U.x, V.x, Cross.x,
+                       U.y, V.y, Cross.y,
+                       U.z, V.z, Cross.z);
 
     // Written directly into m_Orientation; the engine is not tested for null.
     I3DMathEngine* const Math = Acquire3DMathEngine();
-    Math->MatrixToQuaternion((FQuaternion&)m_Orientation, Basis);
+    Math->MatrixToQuaternion(m_Orientation, Basis);
 
     m_ProjectedPosition = m_PositionDRV.ProjectedPosition;
 
@@ -464,18 +463,18 @@ bool CRemotePhysicsSimulation::CheckForSync(Vector const& Param1,
     if (!bForceSync)
     {
         // The engine is not tested for null.
-        FMatrix Basis;
+        Matrix Basis;
         I3DMathEngine* const Math = Acquire3DMathEngine();
-        Math->QuaternionToMatrix(Basis, (FQuaternion const&)Param3);
+        Math->QuaternionToMatrix(Basis, Param3);
 
         // One product reused for both axis tests.
         double const AxisThreshold = G_RemoteSyncOrientTolerance * BlendScale;
 
         // Column 0 against the world-X dead-reckoner's TrackedPosition. (Xy^2 + Xz^2) + Xx^2.
         Vector const& AxisXTracked = m_OrientAxisXDRV.TrackedPosition;
-        float const Xx = Basis.D[0][0] - AxisXTracked.x;
-        float const Xy = Basis.D[1][0] - AxisXTracked.y;
-        float const Xz = Basis.D[2][0] - AxisXTracked.z;
+        float const Xx = Basis.E[0][0] - AxisXTracked.x;
+        float const Xy = Basis.E[1][0] - AxisXTracked.y;
+        float const Xz = Basis.E[2][0] - AxisXTracked.z;
         double const AxisXError = sqrt(((double)Xy * Xy + (double)Xz * Xz) + (double)Xx * Xx);
         if (AxisXError > AxisThreshold)
         {
@@ -486,9 +485,9 @@ bool CRemotePhysicsSimulation::CheckForSync(Vector const& Param1,
             // Column 1 against the world-Y dead-reckoner. x87: only Yx is rounded to float; Yy
             // and Yz stay unrounded. (Yz^2 + Yy^2) + Yx^2.
             Vector const& AxisYTracked = m_OrientAxisYDRV.TrackedPosition;
-            float const Yx = Basis.D[0][1] - AxisYTracked.x;
-            double const Yy = (double)Basis.D[1][1] - AxisYTracked.y;
-            double const Yz = (double)Basis.D[2][1] - AxisYTracked.z;
+            float const Yx = Basis.E[0][1] - AxisYTracked.x;
+            double const Yy = (double)Basis.E[1][1] - AxisYTracked.y;
+            double const Yz = (double)Basis.E[2][1] - AxisYTracked.z;
             double const AxisYError = sqrt((Yz * Yz + Yy * Yy) + (double)Yx * Yx);
             if (AxisYError > AxisThreshold)
                 bForceSync = true;

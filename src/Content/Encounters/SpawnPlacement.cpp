@@ -29,7 +29,7 @@
 #include "Universe/SystemInfo.h"             // FSystemInfo, FSystemZone, FTradeLaneRing, DistanceSquaredToSegment
 #include "common_misc.h"            // random_inside_cylinder
 #include "common_server.h"
-#include "x86math.h"                // FVector, FMatrix
+#include "x86math.h"                // Vector, Matrix
 
 #include <algorithm>
 #include <cmath>
@@ -60,22 +60,6 @@ namespace
 
     bool const GTrue = true;
     bool const GFalse = false;
-
-    FVector ToFVector(Vector const& Source)
-    {
-        FVector Out;
-        Out.X = Source.x;
-        Out.Y = Source.y;
-        Out.Z = Source.z;
-        return Out;
-    }
-
-    FMatrix ToFMatrix(Matrix const& Source)
-    {
-        FMatrix Out;
-        std::memcpy(&Out, &Source, sizeof(Out));
-        return Out;
-    }
 
     // FUN_06f0bb50 (thiscall): sqrt((x^2 + y^2) + z^2) on the x87 stack.
     double VectorLength(Vector const& V)
@@ -303,9 +287,9 @@ namespace
                 if (IsAtSegmentEnd(OnSegment, *SegmentStart) || IsAtSegmentEnd(OnSegment, *SegmentEnd))
                     break;
 
-                if (!TestExclusionSpheres(&OutPosition->x, InsideSpheres, &GTrue, &GTrue))
+                if (!TestExclusionSpheres(OutPosition, InsideSpheres, &GTrue, &GTrue))
                     continue;
-                if (!TestExclusionSpheres(&OutPosition->x, OutsideSpheres, &GTrue, &GFalse))
+                if (!TestExclusionSpheres(OutPosition, OutsideSpheres, &GTrue, &GFalse))
                     continue;
 
                 bool bZoneFailed = false;
@@ -395,9 +379,9 @@ namespace
                     bFits = false;
                 else if (LookFrom.y - HalfHeight > OutPosition->y)
                     bFits = false;
-                if (!TestExclusionSpheres(&OutPosition->x, InsideSpheres, &GTrue, &GTrue))
+                if (!TestExclusionSpheres(OutPosition, InsideSpheres, &GTrue, &GTrue))
                     bFits = false;
-                if (TestExclusionSpheres(&OutPosition->x, OutsideSpheres, &GTrue, &GFalse) && bFits)
+                if (TestExclusionSpheres(OutPosition, OutsideSpheres, &GTrue, &GFalse) && bFits)
                     Candidates.push_back(std::make_pair(Polar, Azimuth));            // FUN_06f96770
             }
         }
@@ -725,23 +709,23 @@ namespace
                 bNearLaneEnd = RingIndex == Count - 2 || RingIndex == Count - 3;
             }
 
-            FMatrix const RingMatrix = ToFMatrix(RingOrientation);
+            Matrix const RingMatrix = RingOrientation;
             double const Dot = (static_cast<double>(LaneDirection.x) * RingOrientation.E[0][2] +
                                 static_cast<double>(LaneDirection.y) * RingOrientation.E[1][2]) +
                                static_cast<double>(LaneDirection.z) * RingOrientation.E[2][2];
             bool const bForward = Dot < 0.0;
             int const Direction = bForward ? 1 : -1;
 
-            FVector Local;
-            Local.X = 0.0f;
-            Local.Y = 0.0f;
-            Local.Z = bForward ? -*Offset : *Offset;
-            FVector Rotated;
+            Vector Local;
+            Local.x = 0.0f;
+            Local.y = 0.0f;
+            Local.z = bForward ? -*Offset : *Offset;
+            Vector Rotated;
             GetSpaceMathEngine()->TransformMatrix(Rotated, RingMatrix, Local);
             Vector ExitPoint;
-            ExitPoint.x = Rotated.X + RingPosition.x;
-            ExitPoint.y = Rotated.Y + RingPosition.y;
-            ExitPoint.z = Rotated.Z + RingPosition.z;
+            ExitPoint.x = Rotated.x + RingPosition.x;
+            ExitPoint.y = Rotated.y + RingPosition.y;
+            ExitPoint.z = Rotated.z + RingPosition.z;
 
             int LeaveDirection = Direction;
             float const LeaveTime =
@@ -766,12 +750,12 @@ namespace
                 continue;
             }
 
-            FVector Lift;
-            Lift.X = 0.0f;
+            Vector Lift;
+            Lift.x = 0.0f;
             if (bForward)
             {
-                Lift.Y = 255.0f;
-                Lift.Z = -*Offset;
+                Lift.y = 255.0f;
+                Lift.z = -*Offset;
                 *OutOrientation = RingOrientation;
             }
             else
@@ -784,14 +768,14 @@ namespace
                     OutOrientation->E[Row][0] = -RingOrientation.E[Row][0];
                     OutOrientation->E[Row][2] = -RingOrientation.E[Row][2];
                 }
-                Lift.Y = -255.0f;
-                Lift.Z = *Offset;
+                Lift.y = -255.0f;
+                Lift.z = *Offset;
             }
-            FVector Lifted;
+            Vector Lifted;
             GetSpaceMathEngine()->TransformMatrix(Lifted, RingMatrix, Lift);
-            OutPosition->x = Lifted.X + RingPosition.x;
-            OutPosition->y = Lifted.Y + RingPosition.y;
-            OutPosition->z = Lifted.Z + RingPosition.z;
+            OutPosition->x = Lifted.x + RingPosition.x;
+            OutPosition->y = Lifted.y + RingPosition.y;
+            OutPosition->z = Lifted.z + RingPosition.z;
             return;
         }
     }
@@ -855,7 +839,7 @@ namespace
         Matrix RingOrientation;
         pub::SpaceObj::GetLocation(RingId, RingPosition, RingOrientation);
         // Outside every sphere (bAll 1, bInside 0).
-        if (!TestExclusionSpheres(&RingPosition.x, &Request->ExclusionSpheres, &GTrue, &GFalse))
+        if (!TestExclusionSpheres(&RingPosition, &Request->ExclusionSpheres, &GTrue, &GFalse))
             return false;
 
         Plan->RingId = RingId;
@@ -961,7 +945,7 @@ namespace
                 }
                 AddOtherPlayerSpheres(System, Request, &Spheres);
             }
-            if (!TestExclusionSpheres(&Position.x, &Spheres, &GTrue, &GFalse))       // FUN_06f616e0
+            if (!TestExclusionSpheres(&Position, &Spheres, &GTrue, &GFalse))       // FUN_06f616e0
                 continue;
 
             Vector const& From = Request->Placement.Position;

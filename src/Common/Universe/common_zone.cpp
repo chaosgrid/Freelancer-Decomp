@@ -60,8 +60,7 @@ namespace
     // dimensions at +0x30 as half extents; the clip functions read them as their own sizes.
     struct FZoneFrame
     {
-        Matrix Orientation; // +0x00
-        Vector Pos;         // +0x24
+        Transform Xform;    // +0x00
         float Dim[3];       // +0x30
     };
     static_assert(sizeof(FZoneFrame) == 0x3c, "FZoneFrame is 0x3c bytes");
@@ -141,9 +140,7 @@ namespace
     Vector EngineTransposeTransform(Matrix const& M, Vector const& Src)
     {
         Vector Dst;
-        // Vector / Matrix and x86math's FVector / FMatrix share one layout.
-        ZoneMathEngine()->TransposeTransform(*(FVector*)&Dst, *(FMatrix const*)&M,
-                                             *(FVector const*)&Src);
+        ZoneMathEngine()->TransposeTransform(Dst, M, Src);
         return Dst;
     }
 
@@ -151,18 +148,15 @@ namespace
     Vector EngineTransformMatrix(Matrix const& M, Vector const& Src)
     {
         Vector Dst;
-        ZoneMathEngine()->TransformMatrix(*(FVector*)&Dst, *(FMatrix const*)&M,
-                                          *(FVector const*)&Src);
+        ZoneMathEngine()->TransformMatrix(Dst, M, Src);
         return Dst;
     }
 
-    // 3DMathEngine vt+0x28 through DAT_0658a9b0: Dst = Frame.Orientation * Src + Frame.Pos.
+    // 3DMathEngine vt+0x28 through DAT_0658a9b0: Dst = Frame.Xform.Rotation * Src + Frame.Xform.Translation.
     Vector EngineTransformXform(FZoneFrame const& Frame, Vector const& Src)
     {
         Vector Dst;
-        // The frame's first 0x30 bytes are the {Orientation, Pos} transform.
-        ZoneMathEngine()->TransformXform(*(FVector*)&Dst, *(FTransform const*)&Frame,
-                                         *(FVector const*)&Src);
+        ZoneMathEngine()->TransformXform(Dst, Frame.Xform, Src);
         return Dst;
     }
 
@@ -185,8 +179,8 @@ namespace
     FZoneFrame ZoneFrame(Universe::IZone const& Zone)
     {
         FZoneFrame Frame;
-        Frame.Orientation = Zone.Orientation;
-        Frame.Pos = Zone.Pos;
+        Frame.Xform.Rotation = Zone.Orientation;
+        Frame.Xform.Translation = Zone.Pos;
         Frame.Dim[0] = 0.0f;
         Frame.Dim[1] = 0.0f;
         Frame.Dim[2] = 0.0f;
@@ -333,11 +327,11 @@ namespace
     // and a hit is scaled back, rotated (engine vt+0x2c) and moved to the ellipsoid.
     bool ClipSegmentEllipsoid(FZoneFrame const& Ellipsoid, FZoneSegment const& Segment, Vector& Out)
     {
-        Vector const StartRel = Vec3Sub(Segment.Start, Ellipsoid.Pos);
-        Vector const LocalStart = EngineTransposeTransform(Ellipsoid.Orientation, StartRel);
-        Vector const EndRel = MakeVector(Segment.End.x - Ellipsoid.Pos.x, Segment.End.y - Ellipsoid.Pos.y,
-                                         Segment.End.z - Ellipsoid.Pos.z);
-        Vector const LocalEnd = EngineTransposeTransform(Ellipsoid.Orientation, EndRel);
+        Vector const StartRel = Vec3Sub(Segment.Start, Ellipsoid.Xform.Translation);
+        Vector const LocalStart = EngineTransposeTransform(Ellipsoid.Xform.Rotation, StartRel);
+        Vector const EndRel = MakeVector(Segment.End.x - Ellipsoid.Xform.Translation.x, Segment.End.y - Ellipsoid.Xform.Translation.y,
+                                         Segment.End.z - Ellipsoid.Xform.Translation.z);
+        Vector const LocalEnd = EngineTransposeTransform(Ellipsoid.Xform.Rotation, EndRel);
 
         // The inverses stay on the stack; only the end's z uses the float-rounded inverse.
         double const InvX = 1.0 / Ellipsoid.Dim[0];
@@ -359,8 +353,8 @@ namespace
         if (bHit)
         {
             Out = MakeVector(Out.x * Ellipsoid.Dim[0], Ellipsoid.Dim[1] * Out.y, Out.z * Ellipsoid.Dim[2]);
-            Out = EngineTransformMatrix(Ellipsoid.Orientation, Out);
-            Out = MakeVector(Ellipsoid.Pos.x + Out.x, Ellipsoid.Pos.y + Out.y, Ellipsoid.Pos.z + Out.z);
+            Out = EngineTransformMatrix(Ellipsoid.Xform.Rotation, Out);
+            Out = MakeVector(Ellipsoid.Xform.Translation.x + Out.x, Ellipsoid.Xform.Translation.y + Out.y, Ellipsoid.Xform.Translation.z + Out.z);
         }
         return bHit;
     }
@@ -433,12 +427,12 @@ namespace
     // FUN_06334f30 (cdecl): the cylinder clip, Dim = {radius, height}.
     bool ClipSegmentCylinder(FZoneFrame const& Cylinder, FZoneSegment const& Segment, Vector& Out)
     {
-        Vector const StartRel = MakeVector(Segment.Start.x - Cylinder.Pos.x, Segment.Start.y - Cylinder.Pos.y,
-                                           Segment.Start.z - Cylinder.Pos.z);
-        Vector const LS = EngineTransposeTransform(Cylinder.Orientation, StartRel);
-        Vector const EndRel = MakeVector(Segment.End.x - Cylinder.Pos.x, Segment.End.y - Cylinder.Pos.y,
-                                         Segment.End.z - Cylinder.Pos.z);
-        Vector const LE = EngineTransposeTransform(Cylinder.Orientation, EndRel);
+        Vector const StartRel = MakeVector(Segment.Start.x - Cylinder.Xform.Translation.x, Segment.Start.y - Cylinder.Xform.Translation.y,
+                                           Segment.Start.z - Cylinder.Xform.Translation.z);
+        Vector const LS = EngineTransposeTransform(Cylinder.Xform.Rotation, StartRel);
+        Vector const EndRel = MakeVector(Segment.End.x - Cylinder.Xform.Translation.x, Segment.End.y - Cylinder.Xform.Translation.y,
+                                         Segment.End.z - Cylinder.Xform.Translation.z);
+        Vector const LE = EngineTransposeTransform(Cylinder.Xform.Rotation, EndRel);
 
         float const HalfH = (float)((double)(Cylinder.Dim[1]) * 0.5);
         float TBest = 2.0f;
@@ -458,7 +452,7 @@ namespace
         // The two caps, with the segment direction in local space.
         Vector const Along = MakeVector(Segment.End.x - Segment.Start.x, Segment.End.y - Segment.Start.y,
                                         Segment.End.z - Segment.Start.z);
-        Vector const LD = EngineTransposeTransform(Cylinder.Orientation, Along);
+        Vector const LD = EngineTransposeTransform(Cylinder.Xform.Rotation, Along);
         double const RadiusSq = Radius * Radius;
 
         float CapT = 0.0f;
@@ -481,12 +475,12 @@ namespace
     // FUN_06335440 (cdecl): the ring clip, Dim = {outer radius, inner radius, height}.
     bool ClipSegmentRing(FZoneFrame const& Ring, FZoneSegment const& Segment, Vector& Out)
     {
-        Vector const StartRel = MakeVector(Segment.Start.x - Ring.Pos.x, Segment.Start.y - Ring.Pos.y,
-                                           Segment.Start.z - Ring.Pos.z);
-        Vector const LS = EngineTransposeTransform(Ring.Orientation, StartRel);
-        Vector const EndRel = MakeVector(Segment.End.x - Ring.Pos.x, Segment.End.y - Ring.Pos.y,
-                                         Segment.End.z - Ring.Pos.z);
-        Vector const LE = EngineTransposeTransform(Ring.Orientation, EndRel);
+        Vector const StartRel = MakeVector(Segment.Start.x - Ring.Xform.Translation.x, Segment.Start.y - Ring.Xform.Translation.y,
+                                           Segment.Start.z - Ring.Xform.Translation.z);
+        Vector const LS = EngineTransposeTransform(Ring.Xform.Rotation, StartRel);
+        Vector const EndRel = MakeVector(Segment.End.x - Ring.Xform.Translation.x, Segment.End.y - Ring.Xform.Translation.y,
+                                         Segment.End.z - Ring.Xform.Translation.z);
+        Vector const LE = EngineTransposeTransform(Ring.Xform.Rotation, EndRel);
 
         // The outer wall, as in the cylinder.
         float const HalfH = (float)((double)(Ring.Dim[2]) * 0.5);
@@ -511,7 +505,7 @@ namespace
         // The caps count between the two radii.
         Vector const Along = MakeVector(Segment.End.x - Segment.Start.x, Segment.End.y - Segment.Start.y,
                                         Segment.End.z - Segment.Start.z);
-        Vector const LD = EngineTransposeTransform(Ring.Orientation, Along);
+        Vector const LD = EngineTransposeTransform(Ring.Xform.Rotation, Along);
         double const OuterSq = Outer * Outer;
         double const InnerSq = Inner * Inner;
 
@@ -546,12 +540,12 @@ namespace
     // FUN_06335b10 (cdecl): the box clip, Dim = the full size.
     bool ClipSegmentBox(FZoneFrame const& Box, FZoneSegment const& Segment, Vector& Out)
     {
-        Vector const StartRel = MakeVector(Segment.Start.x - Box.Pos.x, Segment.Start.y - Box.Pos.y,
-                                           Segment.Start.z - Box.Pos.z);
-        Vector const LS = EngineTransposeTransform(Box.Orientation, StartRel);
-        Vector const EndRel = MakeVector(Segment.End.x - Box.Pos.x, Segment.End.y - Box.Pos.y,
-                                         Segment.End.z - Box.Pos.z);
-        Vector const LE = EngineTransposeTransform(Box.Orientation, EndRel);
+        Vector const StartRel = MakeVector(Segment.Start.x - Box.Xform.Translation.x, Segment.Start.y - Box.Xform.Translation.y,
+                                           Segment.Start.z - Box.Xform.Translation.z);
+        Vector const LS = EngineTransposeTransform(Box.Xform.Rotation, StartRel);
+        Vector const EndRel = MakeVector(Segment.End.x - Box.Xform.Translation.x, Segment.End.y - Box.Xform.Translation.y,
+                                         Segment.End.z - Box.Xform.Translation.z);
+        Vector const LE = EngineTransposeTransform(Box.Xform.Rotation, EndRel);
 
         // Retail quirk kept: a start inside the box returns the start in the box's LOCAL frame,
         // not the world. x compares the unrounded half extent.
@@ -567,7 +561,7 @@ namespace
 
         Vector const Along = MakeVector(Segment.End.x - Segment.Start.x, Segment.End.y - Segment.Start.y,
                                         Segment.End.z - Segment.Start.z);
-        Vector const LD = EngineTransposeTransform(Box.Orientation, Along);
+        Vector const LD = EngineTransposeTransform(Box.Xform.Rotation, Along);
         float TBest = 2.0f;
 
         // X faces. T is NOT compared with TBest.
@@ -686,15 +680,6 @@ namespace
         float D;       // +0x0c
     };
 
-    // The quaternion FUN_0633d150 fills (W first).
-    struct FCullQuat
-    {
-        float W; // +0x00
-        float X; // +0x04
-        float Y; // +0x08
-        float Z; // +0x0c
-    };
-
     // FUN_062e0480 / FUN_062e04a0 / FUN_062d3af0: column 0 / 1 / 2 of the frustum matrix.
     Vector FrustumColumn(Geometry::Frustum const& Frustum, int Column)
     {
@@ -726,16 +711,16 @@ namespace
     }
 
     // FUN_0633d150 (thiscall).
-    void CullQuatFromAxisAngle(FCullQuat& Quat, Vector const& Axis, float Angle)
+    void CullQuatFromAxisAngle(Quaternion& Quat, Vector const& Axis, float Angle)
     {
         double const Half = (double)(Angle) * kCullHalf;
         double const Length = sqrt(((double)(Axis.x) * Axis.x + (double)(Axis.y) * Axis.y) +
                                    (double)(Axis.z) * Axis.z);
         float const Scale = (float)(X87Sin(Half) / Length);
-        Quat.W = X87CosF(Half);
-        Quat.X = Scale * Axis.x;
-        Quat.Y = Scale * Axis.y;
-        Quat.Z = Scale * Axis.z;
+        Quat.w = X87CosF(Half);
+        Quat.x = Scale * Axis.x;
+        Quat.y = Scale * Axis.y;
+        Quat.z = Scale * Axis.z;
     }
 
     // FUN_0633d040 (cdecl, Out / Quat / V): V rotated by Quat,
@@ -743,23 +728,23 @@ namespace
     // with retail's float stores: (V x q).z, 2W, the x term of 2W (V x q), the y and z terms
     // of 2 (q . V) q, the three (2W^2 - 1) V products and the z sum are floats; the rest stays
     // on the stack.
-    Vector CullQuatRotate(FCullQuat const& Quat, Vector const& V)
+    Vector CullQuatRotate(Quaternion const& Quat, Vector const& V)
     {
-        double const CrossX = (double)Quat.Z * V.y - (double)V.z * Quat.Y;
-        double const CrossY = (double)V.z * Quat.X - (double)Quat.Z * V.x;
-        float const CrossZ = (float)((double)V.x * Quat.Y - (double)Quat.X * V.y);
-        float const TwoW = (float)((double)Quat.W + Quat.W);
+        double const CrossX = (double)Quat.z * V.y - (double)V.z * Quat.y;
+        double const CrossY = (double)V.z * Quat.x - (double)Quat.z * V.x;
+        float const CrossZ = (float)((double)V.x * Quat.y - (double)Quat.x * V.y);
+        float const TwoW = (float)((double)Quat.w + Quat.w);
         float const SpinX = (float)(CrossX * TwoW);
         double const SpinY = CrossY * TwoW;
         double const SpinZ = (double)(CrossZ) * TwoW;
 
-        double const TwoDot = (((double)Quat.Z * V.z + (double)Quat.Y * V.y) +
-                               (double)Quat.X * V.x) * 2.0;
-        double const AlongX = TwoDot * Quat.X;
-        float const AlongY = (float)(TwoDot * Quat.Y);
-        float const AlongZ = (float)(TwoDot * Quat.Z);
+        double const TwoDot = (((double)Quat.z * V.z + (double)Quat.y * V.y) +
+                               (double)Quat.x * V.x) * 2.0;
+        double const AlongX = TwoDot * Quat.x;
+        float const AlongY = (float)(TwoDot * Quat.y);
+        float const AlongZ = (float)(TwoDot * Quat.z);
 
-        double const Cos2 = ((double)Quat.W * Quat.W) * 2.0 - 1.0;
+        double const Cos2 = ((double)Quat.w * Quat.w) * 2.0 - 1.0;
         float const KeepX = (float)(Cos2 * V.x);
         float const KeepY = (float)(Cos2 * V.y);
         float const KeepZ = (float)(Cos2 * V.z);
@@ -777,22 +762,22 @@ namespace
     // (FUN_0633d040 sums z, y, x).
     Vector CullRotateAboutAxis(Vector const& V, Vector const& Axis, float Angle)
     {
-        FCullQuat Quat;
+        Quaternion Quat;
         CullQuatFromAxisAngle(Quat, Axis, Angle);
 
-        double const CrossX = (double)Quat.Z * V.y - (double)Quat.Y * V.z;
-        double const CrossY = (double)Quat.X * V.z - (double)Quat.Z * V.x;
-        double const CrossZ = (double)Quat.Y * V.x - (double)Quat.X * V.y;
-        float const TwoW = (float)((double)Quat.W + Quat.W);
+        double const CrossX = (double)Quat.z * V.y - (double)Quat.y * V.z;
+        double const CrossY = (double)Quat.x * V.z - (double)Quat.z * V.x;
+        double const CrossZ = (double)Quat.y * V.x - (double)Quat.x * V.y;
+        float const TwoW = (float)((double)Quat.w + Quat.w);
         Vector const Spin = MakeVector((float)(CrossX * TwoW), (float)(CrossY * TwoW),
                                        (float)(CrossZ * TwoW));
 
-        double const TwoDot = (((double)Quat.X * V.x + (double)Quat.Y * V.y) +
-                               (double)Quat.Z * V.z) * 2.0;
-        Vector const Along = MakeVector((float)(TwoDot * Quat.X), (float)(Quat.Y * TwoDot),
-                                        (float)(Quat.Z * TwoDot));
+        double const TwoDot = (((double)Quat.x * V.x + (double)Quat.y * V.y) +
+                               (double)Quat.z * V.z) * 2.0;
+        Vector const Along = MakeVector((float)(TwoDot * Quat.x), (float)(Quat.y * TwoDot),
+                                        (float)(Quat.z * TwoDot));
 
-        double const Cos2 = ((double)Quat.W * Quat.W) * 2.0 - 1.0;
+        double const Cos2 = ((double)Quat.w * Quat.w) * 2.0 - 1.0;
         Vector const Keep = MakeVector((float)(Cos2 * V.x), (float)(Cos2 * V.y),
                                        (float)(Cos2 * V.z));
 
@@ -838,7 +823,7 @@ namespace
             float const Angle = (Index == 2 || Index == 4)
                 ? (float)(HalfAngle - kCullHalfPi)
                 : (float)(kCullHalfPi - HalfAngle);
-            FCullQuat Quat;
+            Quaternion Quat;
             CullQuatFromAxisAngle(Quat, Axis, Angle);
             Normal = CullQuatRotate(Quat, Back);
             break;
@@ -914,7 +899,7 @@ namespace
             case 4:
             {
                 Point = Apex;
-                FCullQuat Quat;
+                Quaternion Quat;
                 CullQuatFromAxisAngle(Quat, FrustumColumn(Frustum, 0),
                                       (float)((double)Frustum.AngleY * kCullHalf - kCullHalfPi));
                 Normal = CullQuatRotate(Quat, VecNegate(FrustumColumn(Frustum, 2)));
@@ -954,8 +939,8 @@ namespace
     // the largest excess is snapped to the surface. The z coordinate stays on the stack.
     double BoxSignedDistanceSq(FZoneFrame const& Frame, Vector const& Point)
     {
-        Vector const Delta = MakeVector(Point.x - Frame.Pos.x, Point.y - Frame.Pos.y, Point.z - Frame.Pos.z);
-        Vector const Local = EngineTransposeTransform(Frame.Orientation, Delta);
+        Vector const Delta = MakeVector(Point.x - Frame.Xform.Translation.x, Point.y - Frame.Xform.Translation.y, Point.z - Frame.Xform.Translation.z);
+        Vector const Local = EngineTransposeTransform(Frame.Xform.Rotation, Delta);
 
         bool bOutside = false;
         float ClosestX = Local.x;
@@ -1097,7 +1082,7 @@ ZONE::~ZONE()
 {
     if (MeshHandle != -1)
     {
-        DALib::Engine->ReleaseHandle((void*)MeshHandle);
+        DALib::Engine->ReleaseHandle(MeshHandle);
         MeshHandle = -1;
     }
     // FUN_06391d5a is free().
@@ -1288,8 +1273,8 @@ bool ZONE::InZone(Vector const& Point, float Margin) const
         Frame.Dim[0] = Size.x * 0.5f;
         Frame.Dim[1] = Size.y * 0.5f;
         Frame.Dim[2] = Size.z * 0.5f;
-        Vector const Delta = Vec3Sub(Point, Frame.Pos);
-        Vector const Local = MathTransposeTransform(Frame.Orientation, Delta);
+        Vector const Delta = Vec3Sub(Point, Frame.Xform.Translation);
+        Vector const Local = MathTransposeTransform(Frame.Xform.Rotation, Delta);
         Vector Clamped;
         bool const bOutside = ClampToBoxSurface(Frame, Local, Clamped);
         Vector const Diff = MakeVector(Local.x - Clamped.x, Local.y - Clamped.y, Local.z - Clamped.z);
@@ -1382,12 +1367,12 @@ bool ZONE::InZoneXZ(Vector const& Point, float Margin) const
         // As slot +0x34, but the frame's position has y = 0 and the squared distance sums
         // (dy^2 + dz^2) + dx^2.
         FZoneFrame Frame = ZoneFrame(*this);
-        Frame.Pos.y = 0.0f;
+        Frame.Xform.Translation.y = 0.0f;
         Frame.Dim[0] = Size.x * 0.5f;
         Frame.Dim[1] = Size.y * 0.5f;
         Frame.Dim[2] = Size.z * 0.5f;
-        Vector const Delta = Vec3Sub(Point, Frame.Pos);
-        Vector const Local = MathTransposeTransform(Frame.Orientation, Delta);
+        Vector const Delta = Vec3Sub(Point, Frame.Xform.Translation);
+        Vector const Local = MathTransposeTransform(Frame.Xform.Rotation, Delta);
         Vector Clamped;
         bool const bOutside = ClampToBoxSurface(Frame, Local, Clamped);
         Vector const Diff = MakeVector(Local.x - Clamped.x, Local.y - Clamped.y, Local.z - Clamped.z);
@@ -1478,14 +1463,14 @@ double ZONE::GetDistance(Vector const& Point) const
             Frame.Dim[2] = Half.z;
         }
 
-        Vector const Delta = Vec3Sub(Point, Frame.Pos);
-        Vector const Local = MathTransposeTransform(Frame.Orientation, Delta);
+        Vector const Delta = Vec3Sub(Point, Frame.Xform.Translation);
+        Vector const Local = MathTransposeTransform(Frame.Xform.Rotation, Delta);
         Vector Clamped;
         ClampToBoxSurface(Frame, Local, Clamped);
         EngineTransformXform(Frame, Clamped);
 
-        Vector const Delta2 = Vec3Sub(Point, Frame.Pos);
-        Vector const Local2 = MathTransposeTransform(Frame.Orientation, Delta2);
+        Vector const Delta2 = Vec3Sub(Point, Frame.Xform.Translation);
+        Vector const Local2 = MathTransposeTransform(Frame.Xform.Rotation, Delta2);
         Vector Clamped2;
         bool const bOutside = ClampToBoxSurface(Frame, Local2, Clamped2);
         Vector const Diff = Vec3Sub(Local2, Clamped2);
@@ -1592,8 +1577,8 @@ Vector ZONE::GetSurfacePoint(Vector const& Point) const
         Frame.Dim[0] = Size.x * 0.5f;
         Frame.Dim[1] = Size.y * 0.5f;
         Frame.Dim[2] = Size.z * 0.5f;
-        Vector const Delta = Vec3Sub(Point, Frame.Pos);
-        Vector const Local = MathTransposeTransform(Frame.Orientation, Delta);
+        Vector const Delta = Vec3Sub(Point, Frame.Xform.Translation);
+        Vector const Local = MathTransposeTransform(Frame.Xform.Rotation, Delta);
         Vector Clamped;
         ClampToBoxSurface(Frame, Local, Clamped);
         return EngineTransformXform(Frame, Clamped);
@@ -1697,8 +1682,8 @@ double ZONE::ClassifyBox(Vector const& Point) const
     Frame.Dim[0] = Size.x * 0.5f;
     Frame.Dim[1] = Size.y * 0.5f;
     Frame.Dim[2] = Size.z * 0.5f;
-    Vector const Delta = Vec3Sub(Point, Frame.Pos);
-    Vector const Local = MathTransposeTransform(Frame.Orientation, Delta);
+    Vector const Delta = Vec3Sub(Point, Frame.Xform.Translation);
+    Vector const Local = MathTransposeTransform(Frame.Xform.Rotation, Delta);
     Vector Clamped;
     bool const bOutside = ClampToBoxSurface(Frame, Local, Clamped);
     Vector const Diff = Vec3Sub(Local, Clamped);
@@ -2004,8 +1989,8 @@ bool __cdecl SphereCull(Geometry::Sphere const& Sphere, Universe::IZone const* Z
         Vector const Half = MakeVector(Size.x * kCullHalf, Size.y * kCullHalf, Size.z * kCullHalf);
         Transform const& Xform = Zone->GetTransform();
         FZoneFrame Frame;
-        Frame.Orientation = Xform.Rotation;
-        Frame.Pos = Xform.Translation;
+        Frame.Xform.Rotation = Xform.Rotation;
+        Frame.Xform.Translation = Xform.Translation;
         Frame.Dim[0] = Half.x;
         Frame.Dim[1] = Half.y;
         Frame.Dim[2] = Half.z;
@@ -2021,13 +2006,13 @@ bool __cdecl SphereCull(Geometry::Sphere const& Sphere, Universe::IZone const* Z
         float const DimY = (float)((double)(Zone->GetSize().y) * 0.5);
         Transform const& Xform = Zone->GetTransform();
         FZoneFrame Frame;
-        Frame.Orientation = Xform.Rotation;
-        Frame.Pos = Xform.Translation;
+        Frame.Xform.Rotation = Xform.Rotation;
+        Frame.Xform.Translation = Xform.Translation;
         Frame.Dim[0] = DimX;
         Frame.Dim[1] = DimY;
         Frame.Dim[2] = DimZ;
-        Vector const Delta = Vec3Sub(Sphere.Center, Frame.Pos);
-        Vector const Local = MathTransposeTransform(Frame.Orientation, Delta);
+        Vector const Delta = Vec3Sub(Sphere.Center, Frame.Xform.Translation);
+        Vector const Local = MathTransposeTransform(Frame.Xform.Rotation, Delta);
         Vector Clamped;
         bool const bOutside = ClampToBoxSurface(Frame, Local, Clamped);
         Vector const Diff = Vec3Sub(Local, Clamped);

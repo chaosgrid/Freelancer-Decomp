@@ -635,8 +635,8 @@ bool PageServerSelect::Create(Win3D* NewParent, void* /*Payload*/)
     Refresh->SetSkipUpload(true);
     for (int Axis = 0; Axis < 3; ++Axis)
     {
-        InfoBoxHome[Axis] = ServerInfoBox->Position[Axis];
-        SelectBoxHome[Axis] = ServerSelectBox->Position[Axis];
+        InfoBoxHome[Axis] = (&ServerInfoBox->Position.x)[Axis];
+        SelectBoxHome[Axis] = (&ServerSelectBox->Position.x)[Axis];
     }
 
     // Retail inlines RefreshDetailsText a second time here.

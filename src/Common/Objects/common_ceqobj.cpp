@@ -430,7 +430,7 @@ void CEqObj::init_docking_points(unsigned int BaseId)
         if (Sphere.AnimName.c_str()[0] != '\0')
         {
             AnimChannel = DALib::Anim->PlayScript(AsOpaqueDword(Arch->get_script_index()),
-                                                 AsOpaqueDword(this->EngineInstanceId),
+                                                 this->EngineInstanceId,
                                                  Sphere.AnimName.c_str(), nullptr, nullptr);
             if (AnimChannel == -1)
             {
@@ -865,18 +865,14 @@ bool CEqObj::launch_pos(Vector& OutPos, Matrix& OutOrient, int HardpointIndex) c
         float const W = X87CosF(kSpreadAngle);
         double const Len = sqrt(((double)Col1.z * Col1.z + (double)Col1.x * Col1.x) + (double)Col1.y * Col1.y);
         float const Scale = (float)(X87Sin(kSpreadAngle) / Len);
-        struct FQuat
-        {
-            float W, X, Y, Z;
-        };
-        FQuat const Quat{ W, Scale * Col1.x, Scale * Col1.y, Scale * Col1.z };
+        Quaternion const Quat{ W, Scale * Col1.x, Scale * Col1.y, Scale * Col1.z };
 
         // QuaternionToMatrix +0x54, MulMatrix +0x20; no null test on the engine.
         I3DMathEngine* Math = Acquire3DMathEngine();
         Matrix SpreadMatrix;
-        Math->QuaternionToMatrix((FMatrix&)SpreadMatrix, (FQuaternion const&)Quat);
+        Math->QuaternionToMatrix(SpreadMatrix, Quat);
         Matrix Product;
-        Math->MulMatrix((FMatrix&)Product, (FMatrix const&)SpreadMatrix, (FMatrix const&)OutOrient);
+        Math->MulMatrix(Product, SpreadMatrix, OutOrient);
         OutOrient = Product;
         return true;
     }
@@ -912,8 +908,7 @@ bool CEqObj::get_explosion_dmg_bounding_sphere(float& OutRadius, Vector& OutCent
 
     // Math engine slot +0x28, never null-tested.
     Vector World;
-    Acquire3DMathEngine()->TransformXform((FVector&)World, (FTransform const&)Orientation,
-                                          (FVector const&)ExplosionDmgCenter);
+    Acquire3DMathEngine()->TransformXform(World, (Transform const&)Orientation, ExplosionDmgCenter);
     OutCenter = World;
     return true;
 }
@@ -930,15 +925,15 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     };
 
     I3DMathEngine* const Math = Acquire3DMathEngine();     // DAT_063fc2e4 cache
-    FTransform const& Xform = (FTransform const&)Orientation;   // this+0x08
-    void* const Instance = (void*)EngineInstanceId;
+    Transform const& Xform = (Transform const&)Orientation;   // this+0x08
+    const InstanceIndex Instance = EngineInstanceId;
 
     // IEngine +0x88 extent; the AABB starts as the root sphere.
     float RootRadius;
     Vector RootLocal;
-    DALib::Engine->GetInstanceExtent(Instance, 1, &RootRadius, (float*)&RootLocal);
+    DALib::Engine->GetInstanceExtent(Instance, 1, &RootRadius, &RootLocal);
     Vector RootWorld;
-    Math->TransformXform((FVector&)RootWorld, Xform, (FVector const&)RootLocal);
+    Math->TransformXform(RootWorld, Xform, RootLocal);
     float MinX = RootWorld.x - RootRadius;
     float MaxX = RootWorld.x + RootRadius;
     float MinY = RootWorld.y - RootRadius;
@@ -949,20 +944,20 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     // Every related instance (IEngine +0xd8) in the root group. Bounds fold on the unrounded
     // value; equal or NaN replaces.
     std::vector<FChildSphere> Children;
-    for (long Child = (long)DALib::Engine->GetRelatedInstance(Instance, 0, G_InvalidEngineHandle);
+    for (long Child = DALib::Engine->GetRelatedInstance(Instance, 0, InvalidInstanceIndex);
          Child != -1;
-         Child = (long)DALib::Engine->GetRelatedInstance(Instance, 0, (void*)Child))
+         Child = DALib::Engine->GetRelatedInstance(Instance, 0, Child))
     {
         if (inst_to_subobj_id(Child) != SUBOBJ_ID_ROOT)
             continue;
 
         float ChildRadius;
         Vector ChildLocal;
-        DALib::Engine->GetInstanceExtent((void*)Child, 1, &ChildRadius, (float*)&ChildLocal);
-        FTransform const& ChildXform =
-            *(FTransform const*)DALib::Engine->GetInstanceTransform((void*)Child);
+        DALib::Engine->GetInstanceExtent(Child, 1, &ChildRadius, &ChildLocal);
+        Transform const& ChildXform =
+            *DALib::Engine->GetInstanceTransform(Child);
         FChildSphere Sphere;
-        Math->TransformXform((FVector&)Sphere.Center, ChildXform, (FVector const&)ChildLocal);
+        Math->TransformXform(Sphere.Center, ChildXform, ChildLocal);
         Sphere.Radius = ChildRadius;
         Children.push_back(Sphere);
 
@@ -1025,7 +1020,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
 
     // InverseTransform (+0x3c) back to object space.
     Vector LocalCenter;
-    Math->InverseTransform((FVector&)LocalCenter, Xform, (FVector const&)OutCenter);
+    Math->InverseTransform(LocalCenter, Xform, OutCenter);
     OutCenter = LocalCenter;
 }
 

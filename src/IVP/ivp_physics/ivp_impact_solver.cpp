@@ -108,7 +108,7 @@ void IVP_Impact_Solver::PushContactPoint(const Vector* PushVector, int32_t bNorm
     Vector PushWS = Push0;
     float Denominator = 0.0f;
 
-    if ((Cores[1]->Flags & 0x0C) == 0)
+    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         IVP_U_Point PushOS;
         MWorldFCore[1]->vimult(AsPoint(&PushWS), &PushOS);
@@ -122,7 +122,7 @@ void IVP_Impact_Solver::PushContactPoint(const Vector* PushVector, int32_t bNorm
                                          (double)(PointDelta.x) * PushWS.x);
     }
 
-    if ((Cores[0]->Flags & 0x0C) == 0)
+    if ((Cores[0]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         PushWS.x = -PushWS.x;
         PushWS.y = -PushWS.y;
@@ -147,7 +147,7 @@ void IVP_Impact_Solver::PushContactPoint(const Vector* PushVector, int32_t bNorm
         return;
     }
 
-    if ((Cores[0]->Flags & 0x0C) == 0)
+    if ((Cores[0]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         const double NegMagnitude = -(double)(Magnitude);
         Vector Impulse;
@@ -166,7 +166,7 @@ void IVP_Impact_Solver::PushContactPoint(const Vector* PushVector, int32_t bNorm
         Speed0.z = SpeedDelta0.z + Speed0.z;
     }
 
-    if ((Cores[1]->Flags & 0x0C) == 0)
+    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         Vector Impulse;
         Impulse.x = Push0.x * Magnitude; // single-precision products
@@ -225,11 +225,11 @@ void IVP_Impact_Solver::PopulateEffectiveMasses(const Vector* NormalWS)
         LocalNormal.z = -LocalNormal.z;
     }
 
-    if ((Cores[0]->Flags & 0x0C) != 0)
+    if ((Cores[0]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
     {
         EffectiveMass0 = EffectiveMass1 * 100000.0f;
     }
-    if ((Cores[1]->Flags & 0x0C) != 0)
+    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
     {
         EffectiveMass1 = EffectiveMass0 * 100000.0f;
     }
@@ -257,7 +257,7 @@ void IVP_Impact_Solver::StepImpulse2(float ImpulseMagnitude)
     Impulse.z = PushDirection.z * ImpulseMagnitude;
     Impulse.x = PushDirection.x * ImpulseMagnitude;
 
-    if ((Cores[0]->Flags & 0x0C) == 0)
+    if ((Cores[0]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         Vector ImpulseOS;
         IVP_ImpactSolver_RotateWSToOSInline(MWorldFCore[0], Impulse.x, Impulse.y, Impulse.z, &ImpulseOS);
@@ -271,7 +271,7 @@ void IVP_Impact_Solver::StepImpulse2(float ImpulseMagnitude)
         Speed0.z = Speed0.z + SpeedDelta0.z;
     }
 
-    if ((Cores[1]->Flags & 0x0C) == 0)
+    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         Vector NegImpulse;
         NegImpulse.x = -Impulse.x; // * DAT_063a5498 (-1.0f)
@@ -293,7 +293,7 @@ void IVP_Impact_Solver::StepImpulse2(float ImpulseMagnitude)
 // FUN_06357340: subtracts the deltas StepImpulse2 last wrote.
 void IVP_Impact_Solver::UndoLastStepImpulse()
 {
-    if ((Cores[0]->Flags & 0x0C) == 0)
+    if ((Cores[0]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         RotSpeed0.x = RotSpeed0.x - RotSpeedDelta0.x;
         RotSpeed0.y = RotSpeed0.y - RotSpeedDelta0.y;
@@ -303,7 +303,7 @@ void IVP_Impact_Solver::UndoLastStepImpulse()
         Speed0.z = Speed0.z - SpeedDelta0.z;
     }
 
-    if ((Cores[1]->Flags & 0x0C) == 0)
+    if ((Cores[1]->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         RotSpeed1.x = RotSpeed1.x - RotSpeedDelta1.x;
         RotSpeed1.y = RotSpeed1.y - RotSpeedDelta1.y;
@@ -414,7 +414,7 @@ static void CalcRelativePointVelocity(IVP_Core* CoreA, IVP_Core* CoreB,
                                        Vector* Out)
 {
     Vector VelA;
-    if ((CoreA->Flags & 0x0C) == 0)
+    if ((CoreA->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         CoreA->calc_point_speed_ws(ArmA, LinVelA, AngVelA, &VelA);
     }
@@ -426,7 +426,7 @@ static void CalcRelativePointVelocity(IVP_Core* CoreA, IVP_Core* CoreB,
     }
 
     Vector VelB;
-    if ((CoreB->Flags & 0x0C) == 0)
+    if ((CoreB->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         CoreB->calc_point_speed_ws(ArmB, LinVelB, AngVelB, &VelB);
     }

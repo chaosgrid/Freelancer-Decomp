@@ -40,9 +40,9 @@ void FreeFlightBehavior::OnEngage()
     SetAvoidanceAllowed(Sys->Thrust.bAutoAvoidance, 3);                   // FUN_062d21d0
     GotoKind = 1;
     Flag2ea = 1;
-    SteerAxisX = 0.0f;
-    SteerAxisY = 0.0f;
-    SteerAxisZ = 0.0f;
+    SteerAxis.x = 0.0f;
+    SteerAxis.y = 0.0f;
+    SteerAxis.z = 0.0f;
     ObjInspectOf(OwnerContext)->get_throttle(UserThrottle);
     ObjInspectOf(OwnerContext)->is_cruise_active(reinterpret_cast<bool&>(Flag2e8));
     // Unordered keeps the throttle.
@@ -78,9 +78,9 @@ bool FreeFlightBehavior::OnApplyDirective(void* DirectiveOp)
 {
     (void)DirectiveOp;
     Flags28 = static_cast<unsigned char>((Flags28 & 0xfe) | 0x2);
-    SteerAxisX = 0.0f;
-    SteerAxisY = 0.0f;
-    SteerAxisZ = 0.0f;
+    SteerAxis.x = 0.0f;
+    SteerAxis.y = 0.0f;
+    SteerAxis.z = 0.0f;
     UserThrottle = 0.0f;
     Flag2e8 = 0;
     return true;

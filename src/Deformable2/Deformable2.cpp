@@ -45,7 +45,7 @@ void FsFindClose(IFileSystem* Fs, int Finder)
 // FUN_065fdc60 (via FUN_065fdca0, vtable slot 6).
 FVmeshWrapper::~FVmeshWrapper()
 {
-    if (EngineHandle != G_InvalidEngineHandle)
+    if (EngineHandle != InvalidArchetypeIndex)
         G_Engine->ReleaseHandle(EngineHandle);
     if (VMeshPart != nullptr)
     {
@@ -55,7 +55,7 @@ FVmeshWrapper::~FVmeshWrapper()
 }
 
 // FUN_065fdcc0; vtable PTR_LAB_066013dc.
-FVmeshWrapper::FVmeshWrapper(const char* Name, void* Handle, IVMeshPart* Part)
+FVmeshWrapper::FVmeshWrapper(const char* Name, ArchetypeIndex Handle, IVMeshPart* Part)
     : FDeformMesh(Name)
     , EngineHandle(Handle)
     , VMeshPart(Part)
@@ -120,7 +120,7 @@ static unsigned long G_VmeshPaletteSkinning = 1;
 unsigned char FVmeshWrapper::Draw(ICamera* Camera, FDeformPart* Part)
 {
     FLodHolder* const Holder = Part->Lod;
-    const float* const View = Camera->GetViewTransform();
+    const float* const View = (const float*)Camera->GetViewTransform();
     int bHaveView = 1;
     G_Pipeline->GetPipelineState(7, &bHaveView);
     if (VMeshPart == nullptr)
@@ -134,16 +134,16 @@ unsigned char FVmeshWrapper::Draw(ICamera* Camera, FDeformPart* Part)
             if (bHaveView != 0)
             {
                 float Composed[12];
-                AcquireMathEngine()->MulTransform(*(FTransform*)Composed,
-                                                  *(const FTransform*)View,
-                                                  *(const FTransform*)
-                                                      Bone->Matrix); // +0x1C
+                AcquireMathEngine()->MulTransform(*(Transform*)Composed,
+                                                  *(const Transform*)View,
+                                                  *(const Transform*)
+                                                      Bone->WorldMatrix); // +0x1C
                 float Copy[12];
                 VmeshCopy12(Copy, Composed);
-                G_Pipeline->SetWorldN(WorldIndex, Copy);
+                G_Pipeline->SetWorldN(WorldIndex, (const Transform*)Copy);
             }
             else
-                G_Pipeline->SetWorldN(WorldIndex, Bone->Matrix);
+                G_Pipeline->SetWorldN(WorldIndex, (const Transform*)Bone->WorldMatrix);
             WorldIndex += 1;
         } while (WorldIndex - 1 < Holder->BindCursor);
     }

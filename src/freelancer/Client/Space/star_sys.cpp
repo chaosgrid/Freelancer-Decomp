@@ -607,7 +607,7 @@ namespace
                 float Extent = 0.0f;
                 float Center[3] = {0.0f, 0.0f, 0.0f};
                 DALib::Engine->GetInstanceExtent(Layer->Holder.EngineInstance, 0, &Extent,
-                                                 Center);
+                                                 (Vector*)Center);
                 ClientMeshHolderSetPosition(&Layer->Holder, Center); // FUN_00420fd0
                 ClientMeshHolderUpdate(&Layer->Holder);              // FUN_00421070
             }

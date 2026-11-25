@@ -346,12 +346,14 @@ namespace AlchemyImpl
           Descriptor_(nullptr)
     {
         // +0x1c (raw) and +0x4c (composed) both start as identity.
+        float* const LocalWords = reinterpret_cast<float*>(&NodeLocalXform_);
+        float* const WorldWords = reinterpret_cast<float*>(&NodeWorldXform_);
         unsigned long Index = 0;
         for (Index = 0; Index < 12; ++Index)
         {
             const float Value = (Index == 0 || Index == 4 || Index == 8) ? 1.0f : 0.0f;
-            NodeLocalXform_[Index] = Value;
-            NodeWorldXform_[Index] = Value;
+            LocalWords[Index] = Value;
+            WorldWords[Index] = Value;
         }
         // Retail sets the appearance tag (+0x94) in the shared appearance init FUN_06244360
         // and the field tag (+0x96) in each of the seven field constructors. The port has
@@ -608,16 +610,16 @@ namespace AlchemyImpl
 
     // FUN_062400b0: index 0 -> world (+0x4c), 1 -> local (+0x1c).
     GENRESULT DACOM_API FGenericFxObjectBase::GetNodeTransform(unsigned long Index,
-                                                               float** OutSlot)
+                                                               Transform** OutSlot)
     {
         if (Index == 0)
         {
-            *OutSlot = NodeWorldXform_;
+            *OutSlot = &NodeWorldXform_;
             return GR_OK;
         }
         if (Index == 1)
         {
-            *OutSlot = NodeLocalXform_;
+            *OutSlot = &NodeLocalXform_;
             return GR_OK;
         }
         return static_cast<GENRESULT>(0xfffffffe);
@@ -625,17 +627,17 @@ namespace AlchemyImpl
 
     // FUN_062400f0.
     GENRESULT DACOM_API FGenericFxObjectBase::SetNodeTransform(unsigned long Index,
-                                                               const float* Source12)
+                                                               const Transform* Source)
     {
         if (Index == 0)
         {
-            std::memcpy(NodeWorldXform_, Source12, sizeof(NodeWorldXform_));
+            std::memcpy(&NodeWorldXform_, Source, sizeof(NodeWorldXform_));
             NodeFlags_ |= 0x8;
             return GR_OK;
         }
         if (Index == 1)
         {
-            std::memcpy(NodeLocalXform_, Source12, sizeof(NodeLocalXform_));
+            std::memcpy(&NodeLocalXform_, Source, sizeof(NodeLocalXform_));
             NodeFlags_ |= 0x4;
             return GR_OK;
         }
@@ -646,13 +648,13 @@ namespace AlchemyImpl
     // the second. anim = [[this+0x80]+0x24]; Mul is I3DMathEngine +0x1c (DAT_06257bd0,
     // cached independently).
     //   flag 0x8 set                  -> clear it, keep the world transform set from outside.
-    //   flag 0x4 clear, 0x2 or ident. -> raw = identity, world = *Parent12.
+    //   flag 0x4 clear, 0x2 or ident. -> raw = identity, world = *Parent.
     //   flag 0x4 clear, animated      -> raw = Evaluate(...), world = Mul(Parent, raw).
     //   flag 0x4 set,   0x2 or ident. -> world = Mul(Parent, raw).
     //   flag 0x4 set,   animated      -> world = Mul(Mul(Parent, raw), Evaluate(...)).
     // The IsIdentity call (anim+0x20) is skipped when flag 0x2 is set, as in retail.
     GENRESULT DACOM_API FGenericFxObjectBase::ComposeNodeTransform(void* /*Unused*/,
-                                                                   const float* Parent12)
+                                                                   const Transform* Parent)
     {
         const unsigned long Flags = NodeFlags_;
         if ((Flags & 0x8) != 0)
@@ -669,8 +671,9 @@ namespace AlchemyImpl
             {
                 unsigned long Index = 0;
                 for (Index = 0; Index < 12; ++Index)
-                    NodeLocalXform_[Index] = (Index == 0 || Index == 4 || Index == 8) ? 1.0f : 0.0f;
-                std::memcpy(NodeWorldXform_, Parent12, sizeof(NodeWorldXform_));
+                    reinterpret_cast<float*>(&NodeLocalXform_)[Index] =
+                        (Index == 0 || Index == 4 || Index == 8) ? 1.0f : 0.0f;
+                std::memcpy(&NodeWorldXform_, Parent, sizeof(NodeWorldXform_));
                 return GR_OK;
             }
             IAnimatedTransform* const Anim = FindNodeAnimatedTransform();
@@ -678,22 +681,20 @@ namespace AlchemyImpl
             unsigned long TimeB = 0;
             std::memcpy(&TimeB, &Age_, sizeof(TimeB));
             std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
-            Anim->Evaluate(TimeA, TimeB, NodeLocalXform_);
+            Anim->Evaluate(TimeA, TimeB, &NodeLocalXform_);
             float Composed[12];
-            NodeTransformMath()->MulTransform(*reinterpret_cast<FTransform*>(Composed),
-                                          *reinterpret_cast<const FTransform*>(Parent12),
-                                          *reinterpret_cast<const FTransform*>(NodeLocalXform_));
-            std::memcpy(NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
+            NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Composed), *Parent,
+                                              NodeLocalXform_);
+            std::memcpy(&NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
             return GR_OK;
         }
 
         if (bSkipAnim)
         {
             float Composed[12];
-            NodeTransformMath()->MulTransform(*reinterpret_cast<FTransform*>(Composed),
-                                          *reinterpret_cast<const FTransform*>(Parent12),
-                                          *reinterpret_cast<const FTransform*>(NodeLocalXform_));
-            std::memcpy(NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
+            NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Composed), *Parent,
+                                              NodeLocalXform_);
+            std::memcpy(&NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
             return GR_OK;
         }
 
@@ -703,33 +704,31 @@ namespace AlchemyImpl
         unsigned long TimeB = 0;
         std::memcpy(&TimeB, &Age_, sizeof(TimeB));
         std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
-        Anim->Evaluate(TimeA, TimeB, Local);
+        Anim->Evaluate(TimeA, TimeB, reinterpret_cast<Transform*>(Local));
         float Composed[12];
-        NodeTransformMath()->MulTransform(*reinterpret_cast<FTransform*>(Composed),
-                                      *reinterpret_cast<const FTransform*>(Parent12),
-                                      *reinterpret_cast<const FTransform*>(NodeLocalXform_));
-        std::memcpy(NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
-        NodeTransformMath()->MulTransform(*reinterpret_cast<FTransform*>(Composed),
-                                      *reinterpret_cast<const FTransform*>(NodeWorldXform_),
-                                      *reinterpret_cast<const FTransform*>(Local));
-        std::memcpy(NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
+        NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Composed), *Parent,
+                                          NodeLocalXform_);
+        std::memcpy(&NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
+        NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Composed), NodeWorldXform_,
+                                          *reinterpret_cast<const Transform*>(Local));
+        std::memcpy(&NodeWorldXform_, Composed, sizeof(NodeWorldXform_));
         return GR_OK;
     }
 
     // FUN_0623ffb0: *Out12 = inverse(Other world) * this world.
-    GENRESULT FGenericFxObjectBase::ComputeRelativeTransform(IDAComponent* Other, float* Out12)
+    GENRESULT FGenericFxObjectBase::ComputeRelativeTransform(IDAComponent* Other, Transform* Out)
     {
-        float* OtherWorld = nullptr;
+        Transform* OtherWorld = nullptr;
         AsFxNode(Other)->GetNodeTransform(0, &OtherWorld);
         float Inverse[12];
         float W;
-        NodeTransformMath()->GeneralInverse(*reinterpret_cast<FTransform*>(Inverse), W,
-                             *reinterpret_cast<const FTransform*>(OtherWorld)); // +0x5C
+        NodeTransformMath()->GeneralInverse(*reinterpret_cast<Transform*>(Inverse), W,
+                                            *OtherWorld); // +0x5C
         float Rel[12];
-        NodeTransformMath()->MulTransform(*reinterpret_cast<FTransform*>(Rel),
-                           *reinterpret_cast<const FTransform*>(Inverse),
-                           *reinterpret_cast<const FTransform*>(NodeWorldXform_)); // +0x1C
-        std::memcpy(Out12, Rel, sizeof(Rel));
+        NodeTransformMath()->MulTransform(*reinterpret_cast<Transform*>(Rel),
+                                          *reinterpret_cast<const Transform*>(Inverse),
+                                          NodeWorldXform_); // +0x1C
+        std::memcpy(Out, Rel, sizeof(Rel));
         return GR_OK;
     }
 

@@ -15,8 +15,8 @@
 
 namespace
 {
-static_assert(sizeof(FQuaternion) == 4 * sizeof(float), "quaternion transport is four floats");
-static_assert(sizeof(FMatrix) == 9 * sizeof(float), "matrix transport is nine floats");
+static_assert(sizeof(Quaternion) == 4 * sizeof(float), "quaternion transport is four floats");
+static_assert(sizeof(Matrix) == 9 * sizeof(float), "matrix transport is nine floats");
 
 enum EMixerNodeType : unsigned long
 {
@@ -95,9 +95,9 @@ void MixerBlendPosQuat(float* Out, const float* A, const float* B, float T)
     Out[1] = Local[1];
     Out[2] = Local[2];
     I3DMathEngine* Math = Acquire3DMathEngine();                 // DAT_0662b0f8
-    Math->QuatSlerp(*(FQuaternion*)(Local),
-                    *(const FQuaternion*)(A + 3),
-                    *(const FQuaternion*)(B + 3), T);
+    Math->QuatSlerp(*(Quaternion*)(Local),
+                    *(const Quaternion*)(A + 3),
+                    *(const Quaternion*)(B + 3), T);
     Out[3] = Local[0];
     Out[4] = Local[1];
     Out[5] = Local[2];
@@ -107,9 +107,9 @@ void MixerBlendPosQuat(float* Out, const float* A, const float* B, float T)
 // FUN_0661d510: both quaternions go through locals before the slerp.
 void MixerSlerpQuat(float* Out, const float* A, const float* B, float T)
 {
-    FQuaternion LocalB;
-    FQuaternion LocalA;
-    FQuaternion Result;
+    Quaternion LocalB;
+    Quaternion LocalA;
+    Quaternion Result;
     std::memcpy(&LocalB, B, sizeof(LocalB));
     std::memcpy(&LocalA, A, sizeof(LocalA));
     I3DMathEngine* Math = Acquire3DMathEngine();                 // DAT_0662b0f8
@@ -372,11 +372,11 @@ FMixerOverlay::FMixerOverlay(const FAnimBindOut* Desc)
     Type = MixerOverlayNode;
     if (Desc->Kind == 0)
     {
-        const unsigned long* Relative = G_AnimEngine->GetInstanceRelative(Desc->Instance);
+        const unsigned long* Relative = G_AnimEngine->GetInstanceRelative((InstanceIndex)Desc->Instance);
         if (Relative != nullptr)
         {
             Count = MixerJointValueCount(Relative[0]);
-            G_AnimEngine->GetJointParams(Desc->Instance, 0, Values);
+            G_AnimEngine->GetJointParams((InstanceIndex)Desc->Instance, 0, Values);
         }
         // Relative == null leaves Count as operator new handed it over; retail writes nothing
         // there either.
@@ -385,19 +385,19 @@ FMixerOverlay::FMixerOverlay(const FAnimBindOut* Desc)
     if (Desc->Kind == 1)
     {
         Count = 7;
-        const float* Position = G_AnimEngine->GetInstancePosition(Desc->Instance); // IEngine+0x90
-        Values[0] = Position[0];
-        Values[1] = Position[1];
-        Values[2] = Position[2];
-        const float* Orientation = G_AnimEngine->GetInstanceOrientation(Desc->Instance); // +0x98
+        const Vector* Position = G_AnimEngine->GetInstancePosition((InstanceIndex)Desc->Instance); // IEngine+0x90
+        Values[0] = Position->x;
+        Values[1] = Position->y;
+        Values[2] = Position->z;
+        const float* Orientation = (const float*)G_AnimEngine->GetInstanceOrientation((InstanceIndex)Desc->Instance); // +0x98
         I3DMathEngine* Math = Acquire3DMathEngine();             // DAT_0662b0f8
-        FQuaternion Quat;
+        Quaternion Quat;
         Math->MatrixToQuaternion(Quat,
-                                 *(const FMatrix*)(Orientation)); // +0x50
-        Values[3] = Quat.W;
-        Values[4] = Quat.X;
-        Values[5] = Quat.Y;
-        Values[6] = Quat.Z;
+                                 *(const Matrix*)(Orientation)); // +0x50
+        Values[3] = Quat.w;
+        Values[4] = Quat.x;
+        Values[5] = Quat.y;
+        Values[6] = Quat.z;
         return;
     }
     Count = 0;
@@ -582,7 +582,7 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
                 if ((Blend->Flags & 2) != 0)
                 {
                     FTypedChannel* PrevTyped = ((FMixerLeaf*)(Blend->Prev))->Typed;
-                    const float* Position = G_AnimEngine->GetInstancePosition(Desc->Instance);
+                    const float* Position = (const float*)G_AnimEngine->GetInstancePosition((InstanceIndex)Desc->Instance);
                     PrevTyped->SetOverlayPos(Position);
                 }
                 if ((Blend->Flags & 1) != 0)
@@ -669,7 +669,7 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
         unsigned long Kind = 0;
         if (Desc->Kind == 0)
         {
-            const unsigned long* Relative = G_AnimEngine->GetInstanceRelative(Desc->Instance);
+            const unsigned long* Relative = G_AnimEngine->GetInstanceRelative((InstanceIndex)Desc->Instance);
             if (Relative != nullptr)
                 Kind = MixerJointValueCount(Relative[0]);
         }
@@ -688,15 +688,15 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
         Stack.Evaluate(Out, Kind);
 
         if (Desc->Kind == 0)
-            G_AnimEngine->SetJointParams(Desc->Instance, 0, Out);
+            G_AnimEngine->SetJointParams((InstanceIndex)Desc->Instance, 0, Out);
         else if (Desc->Kind == 1)
         {
-            G_AnimEngine->SetInstancePosition(Desc->Instance, Out);        // IEngine+0x8C
-            FMatrix Matrix;
+            G_AnimEngine->SetInstancePosition((InstanceIndex)Desc->Instance, (const Vector*)Out); // IEngine+0x8C
+            Matrix Mat;
             I3DMathEngine* Math = Acquire3DMathEngine();                   // DAT_0662ace8
-            Math->QuaternionToMatrix(Matrix,
-                                     *(const FQuaternion*)(Out + 3)); // +0x54
-            G_AnimEngine->SetInstanceOrientation(Desc->Instance, &Matrix.D[0][0]); // IEngine+0x94
+            Math->QuaternionToMatrix(Mat,
+                                     *(const Quaternion*)(Out + 3)); // +0x54
+            G_AnimEngine->SetInstanceOrientation((InstanceIndex)Desc->Instance, &Mat); // IEngine+0x94
         }
     }
 
@@ -814,10 +814,10 @@ void MixerBlendAttach(FAnimationObject* Animation, FTypedChannel* Typed, float D
     float Predicted[3];
     Leaf->SampleDisplacement(Predicted, Duration);
     Blend->Flags |= 2;
-    const float* Start = G_AnimEngine->GetInstancePosition((void*)(Typed->Instance));
-    Blend->PoseStart[0] = Start[0];
-    Blend->PoseStart[1] = Start[1];
-    Blend->PoseStart[2] = Start[2];
+    const Vector* Start = G_AnimEngine->GetInstancePosition(Typed->Instance);
+    Blend->PoseStart[0] = Start->x;
+    Blend->PoseStart[1] = Start->y;
+    Blend->PoseStart[2] = Start->z;
     float AnchorOut[3];
     const float* Rate = Anchor->SampleDisplacement(AnchorOut, Duration);
     Blend->PoseRate[0] = Rate[0];
@@ -1017,17 +1017,17 @@ void FAnimPlayback::WriteOverlayPos(const float* Pos, FMixerDescMap* Inner)
 
 // FUN_06612b80: the orientation goes to the channels as the matrix it came in as and to the
 // overlays as a quaternion, converted once up front.
-void FAnimPlayback::WriteOverlayOrient(const float* Matrix, FMixerDescMap* Inner)
+void FAnimPlayback::WriteOverlayOrient(const float* Mat, FMixerDescMap* Inner)
 {
     I3DMathEngine* Math = Acquire3DMathEngine();                 // DAT_0662ace0
-    FQuaternion Quat;
+    Quaternion Quat;
     Math->MatrixToQuaternion(Quat,
-                             *(const FMatrix*)(Matrix));
+                             *(const Matrix*)(Mat));
     unsigned long Index = 0;
     while (Index < this->Typed.size())
     {
         FTypedChannel* Typed = this->Typed[Index];
-        Typed->SetOverlayExtra(Matrix);
+        Typed->SetOverlayExtra(Mat);
         if (Typed->Kind == 1)
         {
             FMixerDescMap::iterator Entry = Inner->find(*TypedBindDesc(Typed));
@@ -1039,10 +1039,10 @@ void FAnimPlayback::WriteOverlayOrient(const float* Matrix, FMixerDescMap* Inner
                     if (Node->Type == MixerOverlayNode)
                     {
                         FMixerOverlay* Overlay = (FMixerOverlay*)(Node);
-                        Overlay->Values[3] = Quat.W;
-                        Overlay->Values[4] = Quat.X;
-                        Overlay->Values[5] = Quat.Y;
-                        Overlay->Values[6] = Quat.Z;
+                        Overlay->Values[3] = Quat.w;
+                        Overlay->Values[4] = Quat.x;
+                        Overlay->Values[5] = Quat.y;
+                        Overlay->Values[6] = Quat.z;
                     }
                     Node = Node->Next;
                 }

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "math3d.h"
+
 // Client light object — E:\FL\Scratch\Source\Client\cmn\EngineLight.cpp.
 //
 // Retail allocates it with `operator new(200)` in FUN_00556fd0 and drives it through
@@ -369,7 +371,7 @@ struct FGameLight : FEngineLight
     int RefCount;               // +0xD0
     FGameLightAnimSlot Anim;    // +0xD4
     unsigned EngineIndex;       // +0xEC  -1 none
-    float LocalXform[12];       // +0xF0
+    Transform LocalXform;       // +0xF0
     float VelocityX;             // +0x120 free-motion velocity: FUN_005377a0 sets it,
                                  // GameLightTick adds Dt * it while EngineIndex is -1
     float VelocityY;             // +0x124

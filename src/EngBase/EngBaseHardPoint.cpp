@@ -255,7 +255,7 @@ static FHardpointMap::iterator HardpointLookup(FHardpointObject* This, FArchetyp
 }
 
 // FUN_06626350 (IHardpoint+0x0C). No argument checks.
-unsigned long DACOM_API FHardpointObject::GetHardpoint(void* InHandle, FHardpointKey const* Key,
+unsigned long DACOM_API FHardpointObject::GetHardpoint(ArchetypeIndex InHandle, FHardpointKey const* Key,
                                                        void* Out)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
@@ -275,7 +275,7 @@ unsigned long DACOM_API FHardpointObject::GetHardpoint(void* InHandle, FHardpoin
 }
 
 // LAB_066263e0 (IHardpoint+0x10). No argument checks.
-unsigned long DACOM_API FHardpointObject::AddHardpoint(void* InHandle, FHardpointKey const* Key,
+unsigned long DACOM_API FHardpointObject::AddHardpoint(ArchetypeIndex InHandle, FHardpointKey const* Key,
                                                        const void* Data)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
@@ -310,7 +310,7 @@ unsigned long DACOM_API FHardpointObject::AddHardpoint(void* InHandle, FHardpoin
 
 // FUN_06626610 (IHardpoint+0x14). No argument checks.
 GENRESULT DACOM_API FHardpointObject::EnumerateHardpoints(FHardpointEnumProc Callback,
-                                                          void* InHandle, void* Context)
+                                                          ArchetypeIndex InHandle, void* Context)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
     FHardpointMap::iterator Entry = HardpointLookup(this, Handle);
@@ -324,23 +324,23 @@ GENRESULT DACOM_API FHardpointObject::EnumerateHardpoints(FHardpointEnumProc Cal
 
 // LAB_06626690 (IHardpoint+0x18): connect InstA's hardpoint NameA to InstB's NameB with a joint.
 // Status 1/2/3 says which step failed; 0 is success.
-unsigned long DACOM_API FHardpointObject::ConnectHardpoints(void* InInstA, FHardpointKey const* NameA,
-                                                            void* InInstB, FHardpointKey const* NameB)
+unsigned long DACOM_API FHardpointObject::ConnectHardpoints(InstanceIndex InInstA, FHardpointKey const* NameA,
+                                                            InstanceIndex InInstB, FHardpointKey const* NameB)
 {
     FEngineInstance* InstA = (FEngineInstance*)InInstA;
     FEngineInstance* InstB = (FEngineInstance*)InInstB;
     IEngine* Engine = this->Engine;
-    void* HandleB = G_InvalidArchetype;
+    ArchetypeIndex HandleB = (ArchetypeIndex)G_InvalidArchetype;
     unsigned long Status = 1;
     unsigned char DataA[0x48];
     unsigned char DataB[0x48];
 
-    void* HandleA = Engine->GetInstanceArchetype(InstA);
-    if (HandleA != G_InvalidArchetype && GetHardpoint(HandleA, NameA, DataA) != 0)
+    ArchetypeIndex HandleA = Engine->GetInstanceArchetype((InstanceIndex)InstA);
+    if (HandleA != (ArchetypeIndex)G_InvalidArchetype && GetHardpoint(HandleA, NameA, DataA) != 0)
     {
         Status = 2;
-        HandleB = Engine->GetInstanceArchetype(InstB);
-        if (HandleB != G_InvalidArchetype && GetHardpoint(HandleB, NameB, DataB) != 0)
+        HandleB = Engine->GetInstanceArchetype((InstanceIndex)InstB);
+        if (HandleB != (ArchetypeIndex)G_InvalidArchetype && GetHardpoint(HandleB, NameB, DataB) != 0)
         {
             unsigned long Payload[G_EngineJointPayloadDwords];
             std::memset(Payload, 0, sizeof(Payload));
@@ -381,7 +381,7 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(void* InInstA, FHard
                 std::memcpy(PayloadF + 19, DataB + 0x40, 2 * sizeof(float));
             }
 
-            if (Engine->CreateJoint(InstA, InstB, Payload) != 0)
+            if (Engine->CreateJoint((InstanceIndex)InstA, (InstanceIndex)InstB, Payload) != 0)
                 Status = 0;
         }
     }
@@ -392,7 +392,7 @@ unsigned long DACOM_API FHardpointObject::ConnectHardpoints(void* InInstA, FHard
 }
 
 // FUN_066269b0 (IHardpoint+0x1C). No argument checks.
-char const* DACOM_API FHardpointObject::FindHardpoint(void* InHandle, unsigned long const* Crc)
+char const* DACOM_API FHardpointObject::FindHardpoint(ArchetypeIndex InHandle, unsigned long const* Crc)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
     FHardpointMap::iterator Entry = HardpointLookup(this, Handle);
@@ -625,48 +625,48 @@ int DACOM_API FHardpointObject::Initialize()
     return (int)(HardpointEngineComponentInitialize(NestedThis(this, 4)));
 }
 
-int DACOM_API FHardpointObject::CreateArchetype(void* Archetype, void* FileSystem)
+int DACOM_API FHardpointObject::CreateArchetype(ArchetypeIndex Archetype, IFileSystem* FileSystem)
 {
     return (int)(
         HardpointCreateArchetype(NestedThis(this, 4), (FArchetypeHandle*)Archetype, FileSystem));
 }
 
-int DACOM_API FHardpointObject::DuplicateArchetype(void* NewArchetype, void* OldArchetype)
+int DACOM_API FHardpointObject::DuplicateArchetype(ArchetypeIndex NewArchetype, ArchetypeIndex OldArchetype)
 {
     return (int)(
         HardpointDuplicateArchetype(NestedThis(this, 4), (FArchetypeHandle*)NewArchetype,
                                         (FArchetypeHandle*)OldArchetype));
 }
 
-int DACOM_API FHardpointObject::DestroyArchetype(void* Archetype)
+int DACOM_API FHardpointObject::DestroyArchetype(ArchetypeIndex Archetype)
 {
     return (int)(HardpointDestroyArchetype(NestedThis(this, 4),
                                                        (FArchetypeHandle*)Archetype));
 }
 
-int DACOM_API FHardpointObject::QueryArchetype(void* Archetype, const char* Iid, void** Out)
+int DACOM_API FHardpointObject::QueryArchetype(ArchetypeIndex Archetype, const char* Iid, void** Out)
 {
-    return (int)(RejectHardpointQuery(NestedThis(this, 4), Archetype, Iid, Out));
+    return (int)(RejectHardpointQuery(NestedThis(this, 4), (void*)Archetype, Iid, Out));
 }
 
-int DACOM_API FHardpointObject::CreateInstance(void* Instance, void* Archetype)
+int DACOM_API FHardpointObject::CreateInstance(InstanceIndex Instance, ArchetypeIndex Archetype)
 {
-    return (int)(NoOpHardpointInstance(NestedThis(this, 4), Instance, Archetype));
+    return (int)(NoOpHardpointInstance(NestedThis(this, 4), (void*)Instance, (void*)Archetype));
 }
 
-int DACOM_API FHardpointObject::DestroyInstance(void* Instance)
+int DACOM_API FHardpointObject::DestroyInstance(InstanceIndex Instance)
 {
-    return (int)(StubRet8(NestedThis(this, 4), Instance));
+    return (int)(StubRet8(NestedThis(this, 4), (void*)Instance));
 }
 
-int DACOM_API FHardpointObject::UpdateInstance(void* Instance, void* Arg)
+int DACOM_API FHardpointObject::UpdateInstance(InstanceIndex Instance, void* Arg)
 {
-    return (int)(StubRetC(NestedThis(this, 4), Instance, Arg));
+    return (int)(StubRetC(NestedThis(this, 4), (void*)Instance, Arg));
 }
 
-int DACOM_API FHardpointObject::QueryInstance(void* Instance, const char* Iid, void** Out)
+int DACOM_API FHardpointObject::QueryInstance(InstanceIndex Instance, const char* Iid, void** Out)
 {
-    return (int)(RejectHardpointQuery(NestedThis(this, 4), Instance, Iid, Out));
+    return (int)(RejectHardpointQuery(NestedThis(this, 4), (void*)Instance, Iid, Out));
 }
 
 int DACOM_API FHardpointObject::Notify(void* Arg)

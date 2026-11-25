@@ -29,7 +29,7 @@ struct FTurretCamera : FHudCamera
     bool OnEvent(unsigned MsgId) override;
 
 
-    float Tether[3];             // +0x100  [TurretCamera] tether, default (0, 5, 25)
+    Vector Tether;               // +0x100  [TurretCamera] tether, default (0, 5, 25)
     float Yaw;              // +0x10c  zeroed by the ctor; the current yaw FUN_0051a7d0 turns by
     float TargetYaw;              // +0x110  zeroed; the yaw it eases towards (wrapped by 2*pi)
     float Pitch;              // +0x114  zeroed; the current pitch

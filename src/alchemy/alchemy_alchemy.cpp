@@ -71,7 +71,7 @@ namespace AlchemyImpl
         // DAT_06257880: the 12-float parent transform the node walk hands to every node's
         // compose. Seeded to identity by the static initializer LAB_06201060 and re-seeded
         // by LAB_062016c0.
-        float G_NodeWalkXform[12] = {1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f};
+        Transform G_NodeWalkXform = {Matrix(1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f), {0.f, 0.f, 0.f}};
 
         // FUN_06201620 (__thiscall on IAlchemy): for Node and each following sibling,
         // compose against G_NodeWalkXform; a node with children replaces the accumulator
@@ -81,17 +81,17 @@ namespace AlchemyImpl
             while (Node != nullptr)
             {
                 IGenericFx* const Fx = AsFxNode(Node);
-                Fx->ComposeNodeTransform(A, G_NodeWalkXform);
+                Fx->ComposeNodeTransform(A, &G_NodeWalkXform);
                 IDAComponent* const Child = Fx->GetFirstChild();
                 if (Child != nullptr)
                 {
-                    float* World = nullptr;
+                    Transform* World = nullptr;
                     Fx->GetNodeTransform(0, &World);
-                    float Saved[12];
-                    std::memcpy(Saved, G_NodeWalkXform, sizeof(Saved));
-                    std::memcpy(G_NodeWalkXform, World, sizeof(G_NodeWalkXform));
+                    Transform Saved;
+                    std::memcpy(&Saved, &G_NodeWalkXform, sizeof(Saved));
+                    std::memcpy(&G_NodeWalkXform, World, sizeof(G_NodeWalkXform));
                     PropagateNodeChainTransform(Child, A);
-                    std::memcpy(G_NodeWalkXform, Saved, sizeof(G_NodeWalkXform));
+                    std::memcpy(&G_NodeWalkXform, &Saved, sizeof(G_NodeWalkXform));
                 }
                 Node = Fx->GetNextSibling();
             }
@@ -381,12 +381,12 @@ namespace AlchemyImpl
             StartNode = G_RootNode;
         static const float kIdentityXform12[12] = {1.f, 0.f, 0.f, 0.f, 1.f, 0.f,
                                                    0.f, 0.f, 1.f, 0.f, 0.f, 0.f};
-        std::memcpy(G_NodeWalkXform, kIdentityXform12, sizeof(G_NodeWalkXform));
+        std::memcpy(&G_NodeWalkXform, kIdentityXform12, sizeof(G_NodeWalkXform));
         IGenericFx* const StartFx = AsFxNode(StartNode);
-        StartFx->ComposeNodeTransform(A, G_NodeWalkXform);
-        float* World = nullptr;
+        StartFx->ComposeNodeTransform(A, &G_NodeWalkXform);
+        Transform* World = nullptr;
         StartFx->GetNodeTransform(0, &World);
-        std::memcpy(G_NodeWalkXform, World, sizeof(G_NodeWalkXform));
+        std::memcpy(&G_NodeWalkXform, World, sizeof(G_NodeWalkXform));
         PropagateNodeChainTransform(StartFx->GetFirstChild(), A);
         return GR_OK;
     }

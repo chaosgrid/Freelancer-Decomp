@@ -143,10 +143,10 @@ UiScroll::UiScroll()
         Rects[Index]->bHot = false;
     }
     for (int Index = 0; Index < 12; ++Index)
-        InverseLayout_[Index] = 0.0f;
-    InverseLayout_[0] = 1.0f;
-    InverseLayout_[4] = 1.0f;
-    InverseLayout_[8] = 1.0f;
+        (&InverseLayout_.Rotation.E[0][0])[Index] = 0.0f;
+    InverseLayout_.Rotation.E[0][0] = 1.0f;
+    InverseLayout_.Rotation.E[1][1] = 1.0f;
+    InverseLayout_.Rotation.E[2][2] = 1.0f;
     ScrollOffset_[0] = 0.0f;
     ScrollOffset_[1] = 0.0f;
     ScrollOffset_[2] = 0.0f;
@@ -185,17 +185,17 @@ void UiScroll::SetPosition(float const* NewPosition)
     double const SumX = static_cast<double>(Offset[0]) + ScrollOffset_[0];
     double const SumY = static_cast<double>(Offset[1]) + ScrollOffset_[1];
     float const SumZ = static_cast<float>(static_cast<double>(Offset[2]) + ScrollOffset_[2]);
-    float Local[3];
-    Local[0] = static_cast<float>(SumX + NewPosition[0]);
-    Local[1] = static_cast<float>(static_cast<double>(NewPosition[1]) + SumY);
-    Local[2] = static_cast<float>(static_cast<double>(NewPosition[2]) + SumZ);
-    WinControl::SetPosition(Local);
+    Vector Local;
+    Local.x = static_cast<float>(SumX + NewPosition[0]);
+    Local.y = static_cast<float>(static_cast<double>(NewPosition[1]) + SumY);
+    Local.z = static_cast<float>(static_cast<double>(NewPosition[2]) + SumZ);
+    WinControl::SetPosition(&Local.x);
 
-    FTransform Inverse;
+    Transform Inverse;
     float Scratch = 0.0f;
     UiScrollMath()->GeneralInverse(Inverse, Scratch,
-                                   *reinterpret_cast<FTransform const*>(Orientation));
-    memcpy(InverseLayout_, &Inverse, sizeof(InverseLayout_));
+                                   Placement);
+    memcpy(&InverseLayout_, &Inverse, sizeof(InverseLayout_));
 }
 
 bool UiScroll::Create(Win3D* NewParent, void* Payload)
@@ -444,40 +444,39 @@ void UiScroll::SetScrollOffset(float const Offset[3])
     ScrollOffset_[0] = Offset[0];
     ScrollOffset_[1] = Offset[1];
     ScrollOffset_[2] = Offset[2];
-    float const DeltaZ = static_cast<float>(static_cast<double>(Position[2]) - OldZ);
-    float Moved[3];
-    Moved[0] = static_cast<float>(static_cast<double>(Position[0]) - OldX + ScrollOffset_[0]);
-    Moved[1] = static_cast<float>(static_cast<double>(Position[1]) - OldY + ScrollOffset_[1]);
-    Moved[2] = static_cast<float>(static_cast<double>(DeltaZ) + ScrollOffset_[2]);
-    WinControl::SetPosition(Moved);
+    float const DeltaZ = static_cast<float>(static_cast<double>(Position.z) - OldZ);
+    Vector Moved;
+    Moved.x = static_cast<float>(static_cast<double>(Position.x) - OldX + ScrollOffset_[0]);
+    Moved.y = static_cast<float>(static_cast<double>(Position.y) - OldY + ScrollOffset_[1]);
+    Moved.z = static_cast<float>(static_cast<double>(DeltaZ) + ScrollOffset_[2]);
+    WinControl::SetPosition(&Moved.x);
 }
 
-FVector UiScroll::RayToLocal(float const* Ray) const
+Vector UiScroll::RayToLocal(float const* Ray) const
 {
     // The ray scaled onto the z = Position.z plane (the quotient stays double), then through the
     // +0x3dc inverse.
-    double const Scale = static_cast<double>(Position[2]) / Ray[2];
-    FVector Scaled;
-    Scaled.X = static_cast<float>(Ray[0] * Scale);
-    Scaled.Y = static_cast<float>(Ray[1] * Scale);
-    Scaled.Z = static_cast<float>(Ray[2] * Scale);
-    FVector Local;
-    UiScrollMath()->TransformXform(
-        Local, *reinterpret_cast<FTransform const*>(InverseLayout_), Scaled);
+    double const Scale = static_cast<double>(Position.z) / Ray[2];
+    Vector Scaled;
+    Scaled.x = static_cast<float>(Ray[0] * Scale);
+    Scaled.y = static_cast<float>(Ray[1] * Scale);
+    Scaled.z = static_cast<float>(Ray[2] * Scale);
+    Vector Local;
+    UiScrollMath()->TransformXform(Local, InverseLayout_, Scaled);
     return Local;
 }
 
-FVector UiScroll::RayToLocalViaHud(float const* Ray) const
+Vector UiScroll::RayToLocalViaHud(float const* Ray) const
 {
     // As RayToLocal, but the transform goes through HUD_Target_Base's math engine
     // (DAT_00674b1c), not DAT_0067d9fc.
-    double const Scale = static_cast<double>(Position[2]) / Ray[2];
-    FVector Scaled;
-    Scaled.X = static_cast<float>(Ray[0] * Scale);
-    Scaled.Y = static_cast<float>(Ray[1] * Scale);
-    Scaled.Z = static_cast<float>(Ray[2] * Scale);
-    FVector Local;
-    HudTransformPoint(reinterpret_cast<FTransform const*>(InverseLayout_), &Local, &Scaled);
+    double const Scale = static_cast<double>(Position.z) / Ray[2];
+    Vector Scaled;
+    Scaled.x = static_cast<float>(Ray[0] * Scale);
+    Scaled.y = static_cast<float>(Ray[1] * Scale);
+    Scaled.z = static_cast<float>(Ray[2] * Scale);
+    Vector Local;
+    HudTransformPoint(&InverseLayout_, &Local, &Scaled);
     return Local;
 }
 
@@ -497,8 +496,8 @@ void UiScroll::NotifyParent()
 bool UiScroll::HitTest(float const* Ray)
 {
     // LAB_005971e0 (RET 4).
-    FVector const Local = RayToLocal(Ray);
-    if (!ScrollInsideBox(Local.X, Local.Y, Width_, Height_))
+    Vector const Local = RayToLocal(Ray);
+    if (!ScrollInsideBox(Local.x, Local.y, Width_, Height_))
         return false;
     if (Parent != nullptr)
     {
@@ -515,11 +514,11 @@ void UiScroll::Update()
     Win3D::Update();
     float Ray[3];
     Win3DGetMouseRay(Ray);
-    FVector const Local = RayToLocal(Ray);
+    Vector const Local = RayToLocal(Ray);
     for (size_t Index = 0; Index < HitRects_.size(); ++Index)
     {
         FScrollHitRect* const Rect = HitRects_[Index];
-        Rect->bHot = ScrollRectContains(*Rect, Local.X, Local.Y);
+        Rect->bHot = ScrollRectContains(*Rect, Local.x, Local.y);
     }
     if (bDragging_)
         Thumb_.bHot = true;
@@ -527,7 +526,7 @@ void UiScroll::Update()
 
 void UiScroll::BeginDraw()
 {
-    Win3DBindModelview(nullptr, Orientation);
+    Win3DBindModelview(nullptr, &Placement);
     DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 0);
     DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
     DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
@@ -804,21 +803,21 @@ void UiScroll::MouseOver(float const* Ray)
     // value (step mode: no grab offset and a truncated value), and on a change apply and notify.
     if (!bDragging_ || !bActive_)
         return;
-    FVector const Local = RayToLocal(Ray);
+    Vector const Local = RayToLocal(Ray);
     double const Range = static_cast<double>(RangeMax_) - RangeMin_;
     double Numerator = 0.0;
     double Denominator = 0.0;
     if (bHorizontal_)
     {
-        double const Along = bStepMode_ ? static_cast<double>(Local.X)
-                                        : static_cast<double>(Local.X) + DragOffset_;
+        double const Along = bStepMode_ ? static_cast<double>(Local.x)
+                                        : static_cast<double>(Local.x) + DragOffset_;
         Numerator = Range * (static_cast<double>(TrackBefore_.X0) - Along);
         Denominator = static_cast<double>(TrackBefore_.X0) - TrackAfter_.X1;
     }
     else
     {
-        double const Along = bStepMode_ ? static_cast<double>(Local.Y)
-                                        : static_cast<double>(Local.Y) + DragOffset_;
+        double const Along = bStepMode_ ? static_cast<double>(Local.y)
+                                        : static_cast<double>(Local.y) + DragOffset_;
         Numerator = Range * (static_cast<double>(TrackBefore_.Y0) - Along);
         Denominator = static_cast<double>(TrackBefore_.Y0) - TrackAfter_.Y1;
     }
@@ -851,7 +850,7 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
     bool bHandled = false;
     float Ray[3];
     Win3DGetMouseRay(Ray);
-    FVector const Local = RayToLocalViaHud(Ray);
+    Vector const Local = RayToLocalViaHud(Ray);
     DragPart_ = -1;
     int const Kind = Event->Action;
     bool const bPress = Kind == kWin3DMousePress || Kind == kWin3DMouseDoubleClick;
@@ -862,15 +861,15 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
             Owner->SetProperty(kWinNotifyRelease, reinterpret_cast<uintptr_t>(AsWinControl()), 0);
     }
 
-    if (ScrollInsideBox(Local.X, Local.Y, Width_, Height_))
+    if (ScrollInsideBox(Local.x, Local.y, Width_, Height_))
     {
-        if (ScrollRectContains(Thumb_, Local.X, Local.Y))
+        if (ScrollRectContains(Thumb_, Local.x, Local.y))
         {
             // Press on the thumb: start dragging it, keeping the grab offset.
             if (bPress)
             {
                 bDragging_ = true;
-                DragOffset_ = bHorizontal_ ? Thumb_.X0 - Local.X : Thumb_.Y0 - Local.Y;
+                DragOffset_ = bHorizontal_ ? Thumb_.X0 - Local.x : Thumb_.Y0 - Local.y;
                 if (Win3DGetCapture() != this)
                     Win3DPushCapture(this);
             }
@@ -879,19 +878,19 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
         {
             bool bChanged = true;
             double NewValue = 0.0;
-            if (ScrollRectContains(TopArrow_, Local.X, Local.Y))
+            if (ScrollRectContains(TopArrow_, Local.x, Local.y))
             {
                 DragPart_ = 0;
                 NewValue = static_cast<double>(Value_) - Step_;
                 RepeatTimer_ = kScrollRepeatDelay;
             }
-            else if (ScrollRectContains(BottomArrow_, Local.X, Local.Y))
+            else if (ScrollRectContains(BottomArrow_, Local.x, Local.y))
             {
                 NewValue = static_cast<double>(Step_) + Value_;
                 DragPart_ = 1;
                 RepeatTimer_ = kScrollRepeatDelay;
             }
-            else if (ScrollRectContains(TrackBefore_, Local.X, Local.Y))
+            else if (ScrollRectContains(TrackBefore_, Local.x, Local.y))
             {
                 if (bStepMode_)
                 {
@@ -909,7 +908,7 @@ bool UiScroll::MouseEvent(FWin3DMouseEvent const* Event)
                     NewValue = static_cast<double>(Value_) - Page_;
                 }
             }
-            else if (ScrollRectContains(TrackAfter_, Local.X, Local.Y))
+            else if (ScrollRectContains(TrackAfter_, Local.x, Local.y))
             {
                 if (bStepMode_)
                 {
@@ -972,19 +971,19 @@ intptr_t UiScroll::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         ScrollOffset_[1] = NewOffset[1];
         ScrollOffset_[2] = NewOffset[2];
         float Base[3];
-        Base[0] = static_cast<float>(static_cast<double>(Position[0]) - Old[0]);
-        Base[1] = static_cast<float>(static_cast<double>(Position[1]) - Old[1]);
-        Base[2] = static_cast<float>(static_cast<double>(Position[2]) - Old[2]);
-        float Moved[3];
-        Moved[0] = static_cast<float>(static_cast<double>(Base[0]) + ScrollOffset_[0]);
-        Moved[1] = static_cast<float>(static_cast<double>(Base[1]) + ScrollOffset_[1]);
-        Moved[2] = static_cast<float>(static_cast<double>(Base[2]) + ScrollOffset_[2]);
-        WinControl::SetPosition(Moved);
-        FTransform Inverse;
+        Base[0] = static_cast<float>(static_cast<double>(Position.x) - Old[0]);
+        Base[1] = static_cast<float>(static_cast<double>(Position.y) - Old[1]);
+        Base[2] = static_cast<float>(static_cast<double>(Position.z) - Old[2]);
+        Vector Moved;
+        Moved.x = static_cast<float>(static_cast<double>(Base[0]) + ScrollOffset_[0]);
+        Moved.y = static_cast<float>(static_cast<double>(Base[1]) + ScrollOffset_[1]);
+        Moved.z = static_cast<float>(static_cast<double>(Base[2]) + ScrollOffset_[2]);
+        WinControl::SetPosition(&Moved.x);
+        Transform Inverse;
         float Scratch = 0.0f;
         UiScrollMath()->GeneralInverse(Inverse, Scratch,
-                                       *reinterpret_cast<FTransform const*>(Orientation));
-        memcpy(InverseLayout_, &Inverse, sizeof(InverseLayout_));
+                                       Placement);
+        memcpy(&InverseLayout_, &Inverse, sizeof(InverseLayout_));
         return 1;
     }
     case kScrollPropSetRange:
@@ -1077,18 +1076,18 @@ bool UiCycle::MouseEvent(FWin3DMouseEvent const* Event)
         return false;
     float Ray[3];
     Win3DGetMouseRay(Ray);
-    FVector const Local = RayToLocal(Ray);
+    Vector const Local = RayToLocal(Ray);
     DragPart_ = -1;
-    if (!ScrollInsideBox(Local.X, Local.Y, Width_, Height_))
+    if (!ScrollInsideBox(Local.x, Local.y, Width_, Height_))
         return WinControl::MouseEvent(Event);
     if (Event->Action != kWin3DMousePress)
         return true;
-    if (ScrollRectContains(TopArrow_, Local.X, Local.Y))
+    if (ScrollRectContains(TopArrow_, Local.x, Local.y))
     {
         DragPart_ = 0;
         Value_ = static_cast<float>(static_cast<double>(Value_) - Step_);
     }
-    else if (ScrollRectContains(BottomArrow_, Local.X, Local.Y))
+    else if (ScrollRectContains(BottomArrow_, Local.x, Local.y))
     {
         DragPart_ = 1;
         Value_ = static_cast<float>(static_cast<double>(Step_) + Value_);

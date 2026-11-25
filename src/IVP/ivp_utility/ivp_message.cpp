@@ -6,7 +6,9 @@
 
 // The IVP library's error-message sink, FUN_06356960. C linkage because the
 // vendored qhull sources call it (declared in src/qhull/vendor/mem.h); C++
-// callers declare it extern "C" (ivp_environment.cpp).
+// callers include ivp_message.h.
+
+#include "ivp_message.h"
 
 #include <cstdarg>
 #include <cstdio>

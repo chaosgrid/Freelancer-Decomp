@@ -73,8 +73,8 @@ struct PlayerData {
 
     // Initial spawn position/orientation (SetInitialPos/SetInitialOrnt). The ctor and the
     // teardown store a zero Vector and a 3x3 identity.
-    float initial_pos[3];              // -0xc8 (+0x350): initial position vector
-    float initial_ornt[9];             // -0xbc (+0x35C): initial orientation matrix (3x3)
+    Vector initial_pos;                // -0xc8 (+0x350): initial position vector
+    Matrix initial_ornt;               // -0xbc (+0x35C): initial orientation matrix (3x3)
 
     // ------------------------------------------------------------------
     // +0x278: the session's EquipDescList -- mounted equipment and cargo alike. Server.dll

@@ -16,7 +16,7 @@
 #include "common_cobject.h" // CShip::bIsPlayer / GroupId
 #include "common_csys.h"  // Matrix, Transform
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
-#include "x86math.h"      // FVector, FMatrix
+#include "x86math.h"      // Vector, Matrix
 #include "common_pathfind.h" // PathfindManager
 #include "common_dockbehavior.h" // DockBehavior::SetDestPointOffset (FUN_062c50c0)
 

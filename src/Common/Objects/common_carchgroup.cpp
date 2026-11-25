@@ -125,17 +125,17 @@ void CArchGroup::AttachDamageObjs(CObject* Target, Archetype::DamageObjInfoList 
         FHardpointKey ParentKey;
         ParentKey.Name = Info.Hardpoint.Value;
         ParentKey.Crc = DACOM_CRC::GetCRC32(Info.Hardpoint.Value);
-        if (DALib::Hardpoint->ConnectHardpoints((void*)Handle, &ParentKey,
-                                                (void*)Obj->EngineInstanceId, &ChildKey) == 0)
+        if (DALib::Hardpoint->ConnectHardpoints(Handle, &ParentKey,
+                                                Obj->EngineInstanceId, &ChildKey) == 0)
         {
-            DALib::Engine->UpdateInstance((void*)Obj->EngineInstanceId, 0, nullptr);
+            DALib::Engine->UpdateInstance(Obj->EngineInstanceId, 0, nullptr);
 
             PhySys::CreateParms Phy;
             Phy.Mass = Simple->Mass;
             Phy.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-            Phy.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-            Phy.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-            Phy.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+            Phy.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+            Phy.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+            Phy.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
             Phy.SystemId = Owner->PhysicsSystemId;
             Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
             Phy.bPhysicalUnmoveable = 0;
@@ -185,7 +185,7 @@ void CArchGroup::Destroy()
     {
         AttachDamageObjs(Owner, ParentDamageObjs());                      // Arch+0x40
         // IEngine +0xd4; the result is not used.
-        (void)DALib::Engine->GetInstanceParent((void*)RootIndex);
+        (void)DALib::Engine->GetInstanceParent(RootIndex);
 
         if (Fate == 2)
         {
@@ -301,7 +301,7 @@ bool CArchGroup::GetVelocity(Vector& Out) const
     Out.z = 0.0f;
     if (State == STATE_DESTROYED || RootIndex == -1)
         return false;
-    Out = PhySys::GetVelocity((CObject const*)DALib::Engine->GetInstanceUserData((void*)RootIndex));
+    Out = PhySys::GetVelocity((CObject const*)DALib::Engine->GetInstanceUserData(RootIndex));
     return true;
 }
 
@@ -310,7 +310,7 @@ namespace
     // The 16-byte element GetBoundingSphere collects (vector insert FUN_062a0ee0).
     struct FArchGroupChildSphere
     {
-        FVector Center;
+        Vector Center;
         float Radius;
     };
 
@@ -330,30 +330,30 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
 
     // Retail does not pre-set the outputs; every GetExtra path writes both.
     float RootExtent = 0.0f;
-    FVector RootLocal = { 0.0f, 0.0f, 0.0f };
-    DALib::Engine->GetInstanceExtent((void*)RootInst, 1, &RootExtent, &RootLocal.X);
+    Vector RootLocal = { 0.0f, 0.0f, 0.0f };
+    DALib::Engine->GetInstanceExtent(RootInst, 1, &RootExtent, &RootLocal);
 
     // The root transform is copied; the tail reuses the copy.
-    FTransform const RootXform =
-        *(FTransform const*)DALib::Engine->GetInstanceTransform((void*)RootInst);
+    Transform const RootXform =
+        *DALib::Engine->GetInstanceTransform(RootInst);
     I3DMathEngine* const Math = Acquire3DMathEngine();
 
-    FVector RootCenter;
+    Vector RootCenter;
     Math->TransformXform(RootCenter, RootXform, RootLocal);   // slot +0x28
 
-    float MinX = (float)((double)RootCenter.X - RootExtent);
-    float MaxX = (float)((double)RootCenter.X + RootExtent);
-    float MinY = (float)((double)RootCenter.Y - RootExtent);
-    float MaxY = (float)((double)RootCenter.Y + RootExtent);
-    float MinZ = (float)((double)RootCenter.Z - RootExtent);
-    float MaxZ = (float)((double)RootCenter.Z + RootExtent);
+    float MinX = (float)((double)RootCenter.x - RootExtent);
+    float MaxX = (float)((double)RootCenter.x + RootExtent);
+    float MinY = (float)((double)RootCenter.y - RootExtent);
+    float MaxY = (float)((double)RootCenter.y + RootExtent);
+    float MinZ = (float)((double)RootCenter.z - RootExtent);
+    float MaxZ = (float)((double)RootCenter.z + RootExtent);
 
     std::vector<FArchGroupChildSphere> ChildSpheres;
 
-    for (long Child = (long)DALib::Engine->GetRelatedInstance((void*)RootInst, 0,
-                                                              G_InvalidEngineHandle);
+    for (long Child = DALib::Engine->GetRelatedInstance(RootInst, 0,
+                                                              InvalidInstanceIndex);
          Child != -1;
-         Child = (long)DALib::Engine->GetRelatedInstance((void*)RootInst, 0, (void*)Child))
+         Child = DALib::Engine->GetRelatedInstance(RootInst, 0, Child))
     {
         // Only instances the owner maps to this group (16-bit compare).
         if (Owner->inst_to_subobj_id(Child) != Arch->Id)
@@ -361,12 +361,12 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
 
         // The radius output is pre-zeroed, the centre output is not.
         float ChildExtent = 0.0f;
-        FVector ChildLocal;
-        DALib::Engine->GetInstanceExtent((void*)Child, 1, &ChildExtent, &ChildLocal.X);
+        Vector ChildLocal;
+        DALib::Engine->GetInstanceExtent(Child, 1, &ChildExtent, &ChildLocal);
 
-        FTransform const* const ChildXform =
-            (FTransform const*)DALib::Engine->GetInstanceTransform((void*)Child);
-        FVector ChildCenter;
+        Transform const* const ChildXform =
+            DALib::Engine->GetInstanceTransform(Child);
+        Vector ChildCenter;
         Math->TransformXform(ChildCenter, *ChildXform, ChildLocal);
 
         FArchGroupChildSphere Entry;
@@ -375,22 +375,22 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
         ChildSpheres.push_back(Entry);
 
         // Folds on the unrounded candidate; equal or unordered stores it.
-        double const CandMinX = (double)ChildCenter.X - ChildExtent;
+        double const CandMinX = (double)ChildCenter.x - ChildExtent;
         if (!(MinX < CandMinX))
             MinX = (float)CandMinX;
-        double const CandMaxX = (double)ChildCenter.X + ChildExtent;
+        double const CandMaxX = (double)ChildCenter.x + ChildExtent;
         if (!(MaxX > CandMaxX))
             MaxX = (float)CandMaxX;
-        double const CandMinY = (double)ChildCenter.Y - ChildExtent;
+        double const CandMinY = (double)ChildCenter.y - ChildExtent;
         if (!(MinY < CandMinY))
             MinY = (float)CandMinY;
-        double const CandMaxY = (double)ChildCenter.Y + ChildExtent;
+        double const CandMaxY = (double)ChildCenter.y + ChildExtent;
         if (!(MaxY > CandMaxY))
             MaxY = (float)CandMaxY;
-        double const CandMinZ = (double)ChildCenter.Z - ChildExtent;
+        double const CandMinZ = (double)ChildCenter.z - ChildExtent;
         if (!(MinZ < CandMinZ))
             MinZ = (float)CandMinZ;
-        double const CandMaxZ = (double)ChildCenter.Z + ChildExtent;
+        double const CandMaxZ = (double)ChildCenter.z + ChildExtent;
         if (!(MaxZ > CandMaxZ))
             MaxZ = (float)CandMaxZ;
     }
@@ -415,9 +415,9 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
 
     // Grow to cover the root sphere (compared with the unrounded half, sum order dz, dy, dx).
     {
-        double const Dx = (double)OutCenter.x - RootCenter.X;
-        double const Dy = (double)OutCenter.y - RootCenter.Y;
-        double const Dz = (double)OutCenter.z - RootCenter.Z;
+        double const Dx = (double)OutCenter.x - RootCenter.x;
+        double const Dy = (double)OutCenter.y - RootCenter.y;
+        double const Dz = (double)OutCenter.z - RootCenter.z;
         double const Reach = std::sqrt((Dz * Dz + Dy * Dy) + Dx * Dx) + RootExtent;
         if (Reach > HalfSpan)
             OutRadius = (float)Reach;
@@ -427,21 +427,21 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
     std::vector<FArchGroupChildSphere>::const_iterator It = ChildSpheres.begin();
     for (; It != ChildSpheres.end(); ++It)
     {
-        double const Dx = (double)It->Center.X - OutCenter.x;
-        double const Dy = (double)It->Center.Y - OutCenter.y;
-        double const Dz = (double)It->Center.Z - OutCenter.z;
+        double const Dx = (double)It->Center.x - OutCenter.x;
+        double const Dy = (double)It->Center.y - OutCenter.y;
+        double const Dz = (double)It->Center.z - OutCenter.z;
         double const Reach = std::sqrt((Dz * Dz + Dy * Dy) + Dx * Dx) + It->Radius;
         if (Reach > OutRadius)
             OutRadius = (float)Reach;
     }
 
     // InverseTransform (slot +0x3c) into the root's local frame; the radius is not transformed.
-    FVector const ParentCenter = { OutCenter.x, OutCenter.y, OutCenter.z };
-    FVector LocalCenter;
+    Vector const ParentCenter = { OutCenter.x, OutCenter.y, OutCenter.z };
+    Vector LocalCenter;
     Math->InverseTransform(LocalCenter, RootXform, ParentCenter);
-    OutCenter.x = LocalCenter.X;
-    OutCenter.y = LocalCenter.Y;
-    OutCenter.z = LocalCenter.Z;
+    OutCenter.x = LocalCenter.x;
+    OutCenter.y = LocalCenter.y;
+    OutCenter.z = LocalCenter.z;
 }
 
 bool CArchGroup::GetCenterOfMass(Vector& Out) const
@@ -462,15 +462,15 @@ bool CArchGroup::GetCenterOfMass(Vector& Out) const
 
     // BoundCenter is cached in the root's local frame, so it goes back out through the root
     // transform (IEngine +0xa0, math singleton DAT_063fc26c slot +0x28). No null tests.
-    FTransform const* const Xform =
-        (FTransform const*)DALib::Engine->GetInstanceTransform((void*)RootIndex);
+    Transform const* const Xform =
+        DALib::Engine->GetInstanceTransform(RootIndex);
     I3DMathEngine* const Math = Acquire3DMathEngine();
 
-    FVector World;
-    Math->TransformXform(World, *Xform, (FVector const&)BoundCenter);
-    Out.x = World.X;
-    Out.y = World.Y;
-    Out.z = World.Z;
+    Vector World;
+    Math->TransformXform(World, *Xform, BoundCenter);
+    Out.x = World.x;
+    Out.y = World.y;
+    Out.z = World.z;
     return true;
 }
 

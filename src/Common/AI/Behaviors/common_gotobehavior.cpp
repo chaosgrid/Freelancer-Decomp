@@ -8,7 +8,7 @@
 #include "common_iface.h"   // IObjInspect / IObjRW, ObjInspectOf, ObjRwFromWatchable
 #include "common_csys.h"          // Transform, Matrix, Acquire3DMathEngine
 #include "common_systemmanager.h" // SystemManager: CachedPhysicalCenter/Radius, Flags1578, ExternalIface
-#include "x86math.h"              // I3DMathEngine::TransformMatrix, FVector, FMatrix
+#include "x86math.h"              // I3DMathEngine::TransformMatrix, Vector, Matrix
 #include "common_pathfind.h"      // PathfindManager::IsCruiseUnobstructed (FUN_062de160)
 
 #include <cmath>
@@ -22,9 +22,7 @@ GotoBehavior::GotoBehavior(int InTypeId)
     , Move()
     , Face()
     , SplineMove()
-    , SteerAxisX(0)
-    , SteerAxisY(0)
-    , SteerAxisZ(0)
+    , SteerAxis{0, 0, 0}
     , UserThrottle(0)
     , Flag2e8(0)
     , Flag2e9(1)
@@ -395,11 +393,9 @@ bool FFormationLeaderState::ComputeFormationFollowerEnvelope(FormationFollowerEn
 
         RefreshCachedPhysicalExtents(Sys);
 
-        // Retail passes the Transform where an FMatrix is expected: rotate only.
+        // Retail passes the Transform where an Matrix is expected: rotate only.
         Vector RotatedOffset;
-        Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(RotatedOffset),
-                                               reinterpret_cast<FMatrix const&>(HoistedXform->Rotation),
-                                               reinterpret_cast<FVector const&>(FormationOffset));
+        Acquire3DMathEngine()->TransformMatrix(RotatedOffset, HoistedXform->Rotation, FormationOffset);
 
         Vector const DesiredPos = { RotatedOffset.x + Sys->SelfTarget.CachedPos.x,
                                     RotatedOffset.y + Sys->SelfTarget.CachedPos.y,
@@ -761,7 +757,7 @@ int GotoBehavior::Update()
 
             // A non-zero steering triple makes the FaceIdea face that axis, otherwise it
             // faces the point ahead.
-            Vector const& Steer = *reinterpret_cast<Vector const*>(&SteerAxisX);
+            Vector const& Steer = SteerAxis;
             if (LengthSquaredXyz(Steer) > 0.0)
                 Face.SetAxis(Steer);
             else
@@ -841,7 +837,7 @@ int GotoBehavior::Update()
         {
             // Here the FaceIdea faces the steering triple unconditionally.
             Vector const Dir = NegatedColumn2(Elem->Iface->get_transform().Rotation);
-            Face.SetAxis(*reinterpret_cast<Vector const*>(&SteerAxisX));
+            Face.SetAxis(SteerAxis);
             Move.SetDirection(Dir);
 
             if (Clearance < ArrivalRange)
@@ -1202,21 +1198,21 @@ void GotoBehavior::set_direction(Vector const& Dir)
     }
 
     Flag2ea = 1;
-    SteerAxisX = -Dir.y;
-    SteerAxisZ = 0.0f;
-    SteerAxisY = -Dir.x;
+    SteerAxis.x = -Dir.y;
+    SteerAxis.z = 0.0f;
+    SteerAxis.y = -Dir.x;
     // Only a strictly positive factor scales; the reciprocal stays on the x87 stack and each
     // product is rounded once.
     double const Factor = BehaviorMgr->get_turn_sensitivity_factor();
     if (Factor > 0.0)
     {
         double const InvFactor = 1.0 / Factor;
-        SteerAxisX = static_cast<float>(InvFactor * SteerAxisX);
-        SteerAxisY = static_cast<float>(InvFactor * SteerAxisY);
+        SteerAxis.x = static_cast<float>(InvFactor * SteerAxis.x);
+        SteerAxis.y = static_cast<float>(InvFactor * SteerAxis.y);
     }
-    SteerAxisX = GotoClampUnit(SteerAxisX);
-    SteerAxisY = GotoClampUnit(SteerAxisY);
-    SteerAxisZ = -Dir.z;
+    SteerAxis.x = GotoClampUnit(SteerAxis.x);
+    SteerAxis.y = GotoClampUnit(SteerAxis.y);
+    SteerAxis.z = -Dir.z;
 }
 
 // Slot 13, LAB_062feae0.

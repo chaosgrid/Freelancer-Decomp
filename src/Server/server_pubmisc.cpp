@@ -228,7 +228,7 @@ SERVER_API int __cdecl FindHardpoint(char const* Name, unsigned int ShipArchId,
 
     bool bFound = HardpointPositionA(EngineIndex, Name, &OutPos, &OutRot);
     // IEngine::ReleaseHandle (+0x3C) straight on DALib::Engine, no null check.
-    DALib::Engine->ReleaseHandle(reinterpret_cast<void*>(EngineIndex));
+    DALib::Engine->ReleaseHandle(EngineIndex);
     return bFound ? 0 : -3;
 }
 

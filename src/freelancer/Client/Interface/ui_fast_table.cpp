@@ -306,11 +306,12 @@ UiFastTable::UiFastTable()
     // FUN_0058c6e0 after BaseRichTextWin's ctor (FUN_005793e0): empty vectors, +0x504 identity
     // with zero translation, the stores above (+0x548 is written as the integer 0), then an
     // inlined erase of the whole (empty) tip vector -- a no-op -- and +0x570 = +0x574 = 2.
+    float* const InverseFloats = &InverseTransform.Rotation.E[0][0];
     for (int Index = 0; Index < 12; ++Index)
-        InverseTransform[Index] = 0.0f;
-    InverseTransform[0] = 1.0f;
-    InverseTransform[4] = 1.0f;
-    InverseTransform[8] = 1.0f;
+        InverseFloats[Index] = 0.0f;
+    InverseTransform.Rotation.E[0][0] = 1.0f;
+    InverseTransform.Rotation.E[1][1] = 1.0f;
+    InverseTransform.Rotation.E[2][2] = 1.0f;
 }
 
 UiFastTable::~UiFastTable()
@@ -321,17 +322,16 @@ UiFastTable::~UiFastTable()
     // order -- then BaseRichTextWin's (FUN_00579620).
 }
 
-FVector UiFastTable::RayToLocal(float const* Ray) const
+Vector UiFastTable::RayToLocal(float const* Ray) const
 {
     // Position.z / Ray.z stays on the x87 stack; the three products are stored as floats.
-    double const Scale = static_cast<double>(Position[2]) / Ray[2];
-    FVector Scaled;
-    Scaled.X = static_cast<float>(Ray[0] * Scale);
-    Scaled.Y = static_cast<float>(Ray[1] * Scale);
-    Scaled.Z = static_cast<float>(Ray[2] * Scale);
-    FVector Local;
-    UiFastTableMath()->TransformXform(
-        Local, *reinterpret_cast<FTransform const*>(InverseTransform), Scaled);
+    double const Scale = static_cast<double>(Position.z) / Ray[2];
+    Vector Scaled;
+    Scaled.x = static_cast<float>(Ray[0] * Scale);
+    Scaled.y = static_cast<float>(Ray[1] * Scale);
+    Scaled.z = static_cast<float>(Ray[2] * Scale);
+    Vector Local;
+    UiFastTableMath()->TransformXform(Local, InverseTransform, Scaled);
     return Local;
 }
 
@@ -729,25 +729,25 @@ bool UiFastTable::Relayout()
     int ViewH = 0;
     DALib::Pipeline->GetViewportRect(&ViewX, &ViewY, &ViewW, &ViewH);
 
-    FTransform const& Xform = *reinterpret_cast<FTransform const*>(Orientation);
+    Transform const& Xform = Placement;
 
     // Column edges: (edge, 0, 0) into world space, then the projection's x and w rows.
     for (int Index = 0; Index < ColCount; ++Index)
     {
-        FVector Local;
-        Local.X = ColEdges[static_cast<unsigned>(Index)];
-        Local.Y = 0.0f;
-        Local.Z = 0.0f;
-        FVector World;
+        Vector Local;
+        Local.x = ColEdges[static_cast<unsigned>(Index)];
+        Local.y = 0.0f;
+        Local.z = 0.0f;
+        Vector World;
         UiFastTableMath()->TransformXform(World, Xform, Local);
         // w = (M12 x + M14 z) + M13 y + M15, rounded to float.
         float const W = static_cast<float>(
-            (static_cast<double>(M[12]) * World.X + static_cast<double>(M[14]) * World.Z)
-            + static_cast<double>(M[13]) * World.Y + M[15]);
+            (static_cast<double>(M[12]) * World.x + static_cast<double>(M[14]) * World.z)
+            + static_cast<double>(M[13]) * World.y + M[15]);
         // x = (M2 z + M1 y) + M0 x + M3, kept double.
         double const ClipX =
-            (static_cast<double>(M[2]) * World.Z + static_cast<double>(M[1]) * World.Y)
-            + static_cast<double>(M[0]) * World.X + M[3];
+            (static_cast<double>(M[2]) * World.z + static_cast<double>(M[1]) * World.y)
+            + static_cast<double>(M[0]) * World.x + M[3];
         if (W == 0.0f)
         {
             PixCols[static_cast<unsigned>(Index)] =
@@ -767,20 +767,20 @@ bool UiFastTable::Relayout()
     // Row edges: (0, edge, 0), the projection's y and w rows.
     for (int Index = 0; Index < RowCount; ++Index)
     {
-        FVector Local;
-        Local.X = 0.0f;
-        Local.Y = RowEdges[static_cast<unsigned>(Index)];
-        Local.Z = 0.0f;
-        FVector World;
+        Vector Local;
+        Local.x = 0.0f;
+        Local.y = RowEdges[static_cast<unsigned>(Index)];
+        Local.z = 0.0f;
+        Vector World;
         UiFastTableMath()->TransformXform(World, Xform, Local);
         // w = (M12 x + M13 y) + M14 z + M15, rounded to float (a different order from x's).
         float const W = static_cast<float>(
-            (static_cast<double>(M[12]) * World.X + static_cast<double>(M[13]) * World.Y)
-            + static_cast<double>(M[14]) * World.Z + M[15]);
+            (static_cast<double>(M[12]) * World.x + static_cast<double>(M[13]) * World.y)
+            + static_cast<double>(M[14]) * World.z + M[15]);
         // y = (M4 x + M5 y) + M6 z + M7.
         double const ClipY =
-            (static_cast<double>(M[4]) * World.X + static_cast<double>(M[5]) * World.Y)
-            + static_cast<double>(M[6]) * World.Z + M[7];
+            (static_cast<double>(M[4]) * World.x + static_cast<double>(M[5]) * World.y)
+            + static_cast<double>(M[6]) * World.z + M[7];
         if (W == 0.0f)
         {
             PixRows[static_cast<unsigned>(Index)] =
@@ -867,18 +867,18 @@ bool UiFastTable::Create(Win3D* NewParent, void* Data)
     return bResult;
 }
 
-void UiFastTable::SetTransform(float const* Transform)
+void UiFastTable::SetTransform(Transform const* NewXform)
 {
     // LAB_0058e470: slot 7 and slot 5 (both virtual), +0x504 = GeneralInverse(+0x3c) (the W
     // out-parameter lands in the argument slot), then the layout dirtied when the grid is not
     // empty.
-    SetOrientation(Transform);
-    SetPosition(Transform + 9);
+    SetOrientation(&NewXform->Rotation);
+    SetPosition(&NewXform->Translation.x);
     float W = 0.0f;
-    FTransform Inverse;
+    Transform Inverse;
     UiFastTableMath()->GeneralInverse(Inverse, W,
-                                      *reinterpret_cast<FTransform const*>(Orientation));
-    *reinterpret_cast<FTransform*>(InverseTransform) = Inverse;
+                                      Placement);
+    InverseTransform = Inverse;
     if (!RowEdges.empty() && RowEdges.size() > 0 && !ColEdges.empty() && ColEdges.size() > 0)
         MarkDirty(true, true);
 }
@@ -889,10 +889,10 @@ void UiFastTable::SetPosition(float const* NewPosition)
     // test as SetTransform.
     BaseRichTextWin::SetPosition(NewPosition);
     float W = 0.0f;
-    FTransform Inverse;
+    Transform Inverse;
     UiFastTableMath()->GeneralInverse(Inverse, W,
-                                      *reinterpret_cast<FTransform const*>(Orientation));
-    *reinterpret_cast<FTransform*>(InverseTransform) = Inverse;
+                                      Placement);
+    InverseTransform = Inverse;
     if (!RowEdges.empty() && RowEdges.size() > 0 && !ColEdges.empty() && ColEdges.size() > 0)
         MarkDirty(true, true);
 }
@@ -907,15 +907,15 @@ void UiFastTable::Update()
         // Dragging an edge: follow the mouse with the grab offset kept.
         float Ray[3];
         Win3DGetMouseRay(Ray);
-        FVector const Local = RayToLocal(Ray);
+        Vector const Local = RayToLocal(Ray);
         if (bDragColumn != 0)
         {
-            SetColumnEdge(DragEdge, static_cast<float>(static_cast<double>(Local.X) + DragOffset));
+            SetColumnEdge(DragEdge, static_cast<float>(static_cast<double>(Local.x) + DragOffset));
             MouseSetCursor("Stretch", false);
         }
         else
         {
-            SetRowEdge(DragEdge, static_cast<float>(static_cast<double>(Local.Y) + DragOffset));
+            SetRowEdge(DragEdge, static_cast<float>(static_cast<double>(Local.y) + DragOffset));
             MouseSetCursor("Arrow", false);
         }
         return;
@@ -925,20 +925,20 @@ void UiFastTable::Update()
 
     float Ray[3];
     Win3DGetMouseRay(Ray);
-    FVector const Local = RayToLocal(Ray);
+    Vector const Local = RayToLocal(Ray);
     HoverColumn = 0xffffffffu;
     HoverRow = 0xffffffffu;
     bHovered = 0;
     bDragArmed = 0;
     bDragging = 0;
-    if (!(Local.X >= 0.0f))
+    if (!(Local.x >= 0.0f))
         return;
-    if (!(Local.X < Width))
+    if (!(Local.x < Width))
         return;
-    if (!(Local.Y <= 0.0f))
+    if (!(Local.y <= 0.0f))
         return;
     float const Bottom = -Height;
-    if (!(Local.Y > Bottom))
+    if (!(Local.y > Bottom))
         return;
 
     // The column under x. The first edge is read without an emptiness test; the count is taken
@@ -950,7 +950,7 @@ void UiFastTable::Update()
     for (unsigned Index = 0; Index < ColCount; ++Index)
     {
         ColNext = Index + 1 < ColCount ? ColData[Index + 1] : Width;
-        if (Local.X >= ColPrev && Local.X < ColNext)
+        if (Local.x >= ColPrev && Local.x < ColNext)
         {
             HoverColumn = Index;
             break;
@@ -966,7 +966,7 @@ void UiFastTable::Update()
     for (unsigned Index = 0; Index < RowCount; ++Index)
     {
         RowNext = Index + 1 < RowCount ? RowData[Index + 1] : Bottom;
-        if (Local.Y <= RowPrev && Local.Y > RowNext)
+        if (Local.y <= RowPrev && Local.y > RowNext)
         {
             HoverRow = Index;
             break;
@@ -1013,11 +1013,11 @@ void UiFastTable::Update()
     if (bColumnsResizable != 0 && HoverRow >= HeaderRows)
     {
         unsigned const Column = HoverColumn;
-        if (Column > 0 && static_cast<double>(Local.X) - ColPrev < GrabDistance)
+        if (Column > 0 && static_cast<double>(Local.x) - ColPrev < GrabDistance)
         {
             // The column's left edge.
             MouseSetCursor("Stretch", false);
-            DragOffset = static_cast<float>(static_cast<double>(ColPrev) - Local.X);
+            DragOffset = static_cast<float>(static_cast<double>(ColPrev) - Local.x);
             bDragArmed = 1;
             DragEdge = Column;
             bDragColumn = 1;
@@ -1029,7 +1029,7 @@ void UiFastTable::Update()
             if (Column < Count - 2)
             {
                 // The column's right edge; the offset keeps the distance rounded to float.
-                double const Distance = static_cast<double>(ColNext) - Local.X;
+                double const Distance = static_cast<double>(ColNext) - Local.x;
                 if (Distance < GrabDistance)
                 {
                     MouseSetCursor("Stretch", false);
@@ -1049,7 +1049,7 @@ void UiFastTable::Update()
         if (Row > 0)
         {
             // The row's top edge.
-            double const Distance = static_cast<double>(RowPrev) - Local.Y;
+            double const Distance = static_cast<double>(RowPrev) - Local.y;
             if (Distance < GrabDistance)
             {
                 MouseSetCursor("Stretch", false);
@@ -1068,7 +1068,7 @@ void UiFastTable::Update()
                 // The row's bottom edge. Retail bug kept: the offset is y - edge, the opposite
                 // sign of the three other cases, so a drag of this edge starts twice the grab
                 // distance away from it.
-                double const Distance = static_cast<double>(Local.Y) - RowNext;
+                double const Distance = static_cast<double>(Local.y) - RowNext;
                 if (Distance < GrabDistance)
                 {
                     MouseSetCursor("Stretch", false);
@@ -1113,7 +1113,7 @@ void UiFastTable::DrawRowQuad(unsigned long const* Rgba, unsigned Row) const
 void UiFastTable::Draw()
 {
     // LAB_0058eb30
-    Win3DBindModelview(nullptr, Orientation);   // FUN_00422690(0, this + 0x3c)
+    Win3DBindModelview(nullptr, &Placement);   // FUN_00422690(0, this + 0x3c)
     UiFastTableSetDrawStates();
     if (bRowHighlights != 0)
     {
@@ -1125,7 +1125,7 @@ void UiFastTable::Draw()
 
     BaseRichTextWin::Draw();   // FUN_0057ab10
 
-    Win3DBindModelview(nullptr, Orientation);
+    Win3DBindModelview(nullptr, &Placement);
     UiFastTableSetDrawStates();
     Win3DColor4ubv(reinterpret_cast<unsigned char const*>(&FrameRgba));
     if (bDrawBorder != 0)
@@ -1288,14 +1288,14 @@ bool UiFastTable::HitTest(float const* Ray)
 {
     // LAB_0058f3e0: the given ray on the table plane, in table space, inside
     // [0, Width) x (-Height, 0].
-    FVector const Local = RayToLocal(Ray);
-    if (!(Local.X >= 0.0f))
+    Vector const Local = RayToLocal(Ray);
+    if (!(Local.x >= 0.0f))
         return false;
-    if (!(Local.X < Width))
+    if (!(Local.x < Width))
         return false;
-    if (!(Local.Y <= 0.0f))
+    if (!(Local.y <= 0.0f))
         return false;
-    if (!(-Height < Local.Y))
+    if (!(-Height < Local.y))
         return false;
     return true;
 }
@@ -1376,15 +1376,15 @@ void UiScrollTable::SetScrollBarGap(float Gap)
     ScrollBarGap = Gap;
     if (ScrollBar == nullptr)
         return;
-    FVector Local;
-    Local.X = static_cast<float>(static_cast<double>(Gap) + NormWidth);
-    Local.Y = 0.0f;
-    Local.Z = 0.0f;
-    FVector Offset;
-    UiFastTableMath()->TransformMatrix(Offset, *reinterpret_cast<FMatrix const*>(Orientation),
+    Vector Local;
+    Local.x = static_cast<float>(static_cast<double>(Gap) + NormWidth);
+    Local.y = 0.0f;
+    Local.z = 0.0f;
+    Vector Offset;
+    UiFastTableMath()->TransformMatrix(Offset, Orientation,
                                        Local);
-    ScrollBar->SetOffset(Offset.X, Offset.Y, Offset.Z);
-    ScrollBar->SetTransform(Orientation);
+    ScrollBar->SetOffset(Offset.x, Offset.y, Offset.z);
+    ScrollBar->SetTransform(&Placement);
 }
 
 bool UiScrollTable::ProcessMessage(unsigned Msg, unsigned A, unsigned B)

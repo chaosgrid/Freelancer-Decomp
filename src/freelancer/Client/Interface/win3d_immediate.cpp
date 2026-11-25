@@ -633,12 +633,12 @@ void Win3DSetProjection(float Left, float Right, float Bottom, float Top, float 
 
     if (PipelineState != 0)
     {
-        Pipe->SetModelview(GWin3DModelview);
+        Pipe->SetModelview((const Transform*)GWin3DModelview);
     }
     else
     {
-        Pipe->SetWorld(GWin3DModelview);
-        Pipe->SetView(GWin3DModelview);
+        Pipe->SetWorld((const Transform*)GWin3DModelview);
+        Pipe->SetView((const Transform*)GWin3DModelview);
     }
 
     if (G_bProjectionCacheEnabled != 0)
@@ -795,7 +795,7 @@ void Win3DEnd()
         Pipe->GetRenderState(kRsLighting, &SavedLighting);
         Pipe->SetRenderState(kRsLighting, G_bLighting);
 
-        Pipe->SetModelview(GWin3DModelview);
+        Pipe->SetModelview((const Transform*)GWin3DModelview);
 
         const unsigned VertexCount = static_cast<unsigned>(G_VertexCount);
 
@@ -1028,13 +1028,13 @@ void Win3DDrawSphereGrid(const float* Points, int Cols, int Rows)
     }
 }
 
-void Win3DDrawWireSphere(void* Camera, float const* Xform12, float Radius, int Cols, int Rows)
+void Win3DDrawWireSphere(void* Camera, Transform const* Xform, float Radius, int Cols, int Rows)
 {
     // FUN_00423180. DAT_006649c8 is a function static with an empty destructor; 0x3000 bytes,
     // 0x400 points.
     static float Points[0xc00];
     Win3DBuildSpherePoints(Points, Radius, Cols, Rows);
-    Win3DBindModelview(Camera, Xform12);
+    Win3DBindModelview(Camera, Xform);
     Win3DDrawSphereGrid(Points, Cols, Rows);
 }
 
@@ -1290,7 +1290,7 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
     float Axis[3];
     FuzzyCross(Axis, FromCentre, ToEnd);
 
-    FVector const Source = {FromCentre[0], FromCentre[1], FromCentre[2]};
+    Vector const Source = {FromCentre[0], FromCentre[1], FromCentre[2]};
 
     if (Line->Texture == nullptr)
     {
@@ -1309,22 +1309,22 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
             double const AxisLength = sqrt(static_cast<double>(Axis[0]) * Axis[0] +
                                            static_cast<double>(Axis[2]) * Axis[2] +
                                            static_cast<double>(Axis[1]) * Axis[1]);
-            FQuaternion Rotation;
-            Rotation.W = static_cast<float>(cos(HalfAngle));
+            Quaternion Rotation;
+            Rotation.w = static_cast<float>(cos(HalfAngle));
             float Vec[3];
             ScaleVec3(Vec, Axis, static_cast<float>(sin(HalfAngle) / AxisLength));
-            Rotation.X = Vec[0];
-            Rotation.Y = Vec[1];
-            Rotation.Z = Vec[2];
+            Rotation.x = Vec[0];
+            Rotation.y = Vec[1];
+            Rotation.z = Vec[2];
 
             // Through DAT_006679d8 directly.
-            FMatrix Matrix;
-            Win3DTransformMathEngine()->QuaternionToMatrix(Matrix, Rotation);
-            FVector Rotated;
-            Win3DTransformMathEngine()->TransformMatrix(Rotated, Matrix, Source);
+            Matrix Mat;
+            Win3DTransformMathEngine()->QuaternionToMatrix(Mat, Rotation);
+            Vector Rotated;
+            Win3DTransformMathEngine()->TransformMatrix(Rotated, Mat, Source);
 
-            float const OnArc[3] = {Rotated.X + Line->Control[0], Rotated.Y + Line->Control[1],
-                                    Rotated.Z + Line->Control[2]};
+            float const OnArc[3] = {Rotated.x + Line->Control[0], Rotated.y + Line->Control[1],
+                                    Rotated.z + Line->Control[2]};
             float Point[3];
             FuzzyJitter(Point, OnArc, Jitter);
             Win3DVertex3f(Point[0], Point[1], Point[2]);
@@ -1355,19 +1355,19 @@ void Win3DDrawFuzzyArc(FWin3DFuzzyLine const* Line)
             double const HalfAngleExt = static_cast<double>(Index) * Step * 0.5f;
             float const HalfAngle = static_cast<float>(HalfAngleExt);
             float const Sine = static_cast<float>(sin(HalfAngleExt));
-            FQuaternion Rotation;
-            Rotation.W = static_cast<float>(cos(static_cast<double>(HalfAngle)));
+            Quaternion Rotation;
+            Rotation.w = static_cast<float>(cos(static_cast<double>(HalfAngle)));
             float Vec[3];
             ScaleVec3(Vec, Axis, static_cast<float>(Sine / FuzzyVecLength(Axis)));
-            Rotation.X = Vec[0];
-            Rotation.Y = Vec[1];
-            Rotation.Z = Vec[2];
+            Rotation.x = Vec[0];
+            Rotation.y = Vec[1];
+            Rotation.z = Vec[2];
 
-            FMatrix Matrix;
-            Win3DTransformMathEngine()->QuaternionToMatrix(Matrix, Rotation);
-            FVector Rotated;
-            Win3DTransformByMatrix(Rotated, Matrix, Source);
-            float const RotatedXyz[3] = {Rotated.X, Rotated.Y, Rotated.Z};
+            Matrix Mat;
+            Win3DTransformMathEngine()->QuaternionToMatrix(Mat, Rotation);
+            Vector Rotated;
+            Win3DTransformByMatrix(Rotated, Mat, Source);
+            float const RotatedXyz[3] = {Rotated.x, Rotated.y, Rotated.z};
             float OnArc[3];
             Win3DVec3Add(OnArc, Line->Control, RotatedXyz);
             FuzzyJitter(Next, OnArc, Jitter);

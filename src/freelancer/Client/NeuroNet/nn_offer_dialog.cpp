@@ -137,8 +137,8 @@ bool NnOfferDialog::Create(Win3D* NewParent, void* Data)
                                   NnFloatBits(0x3fc00000), 0x3a1, 1, 0, 1);
 
     // {0, 0, -1.288}
-    float const WindowPosition[3] = {0.0f, 0.0f, NnFloatBits(0xbfa4dd2f)};
-    SetPosition(WindowPosition);
+    Vector const WindowPosition = {0.0f, 0.0f, NnFloatBits(0xbfa4dd2f)};
+    SetPosition(&WindowPosition.x);
 
     RegisterEvent(USER_CANCEL);
 

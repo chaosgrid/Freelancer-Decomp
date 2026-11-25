@@ -333,11 +333,11 @@ namespace
 
             // d = zone - camera, kept unrounded.
             Universe::IZone* const Zone = Field->GetZone();
-            float const* const CamPos = Camera->GetPosition();
+            const Vector* const CamPos = Camera->GetPosition();
             float const* const ZonePos = &Zone->GetPos().x;
-            const double Dz = static_cast<double>(ZonePos[2]) - CamPos[2];
-            const double Dy = static_cast<double>(ZonePos[1]) - CamPos[1];
-            const double Dx = static_cast<double>(ZonePos[0]) - CamPos[0];
+            const double Dz = static_cast<double>(ZonePos[2]) - CamPos->z;
+            const double Dy = static_cast<double>(ZonePos[1]) - CamPos->y;
+            const double Dx = static_cast<double>(ZonePos[0]) - CamPos->x;
 
             // |d| by one Newton step of the 0x5f3759df estimate; the sum and Dist are stored as
             // floats.
@@ -376,7 +376,7 @@ namespace
                 continue;
             }
 
-            const float Enclose = Field->ZoneExteriorFactor(Camera->GetPosition());
+            const float Enclose = Field->ZoneExteriorFactor((const float*)Camera->GetPosition());
 
             // Fully inside: quality 2, the queue emptied (FUN_0051ed20), done.
             if (Enclose >= 1.0f)
@@ -425,7 +425,7 @@ namespace
     // FUN_00533880 -- QI DALib::Engine (no null test) for IFLAppearance; a failed QI still
     // releases a non-null local. Then Slot3 with no null test on the interface. The local is a
     // smart pointer in retail; nothing between QI and the release can throw.
-    bool SetAppearanceInstanceValue(void* InstId, void* ArchPath)
+    bool SetAppearanceInstanceValue(InstanceIndex InstId, void* ArchPath)
     {
         IFLAppearance* Ifl = nullptr;
         if (DALib::Engine->QueryInterface(Iids::FLAppearance, reinterpret_cast<void**>(&Ifl)) < 0)
@@ -434,7 +434,7 @@ namespace
                 Ifl->Release();
             return false;
         }
-        bool const bOk = Ifl->SetInstanceValue(static_cast<int>(reinterpret_cast<intptr_t>(InstId)), ArchPath) >= 0;
+        bool const bOk = Ifl->SetInstanceValue(static_cast<int>(InstId), ArchPath) >= 0;
         if (Ifl != nullptr)
             Ifl->Release();
         return bOk;
@@ -1045,10 +1045,10 @@ namespace
 
         // The difference built through FUN_00422b80 from three float-rounded components
         // (z, y, x in that order).
-        float const* const CamPosPtr = Camera->GetPosition();
-        const float CamX = CamPosPtr[0];
-        const float CamY = CamPosPtr[1];
-        const float CamZ = CamPosPtr[2];
+        const Vector* const CamPosPtr = Camera->GetPosition();
+        const float CamX = CamPosPtr->x;
+        const float CamY = CamPosPtr->y;
+        const float CamZ = CamPosPtr->z;
         Vector const& ObjPos = Go->get_position();
         const float Dz = static_cast<float>(static_cast<double>(ObjPos.z) - CamZ);
         const float Dy = static_cast<float>(static_cast<double>(ObjPos.y) - CamY);
@@ -1787,7 +1787,7 @@ namespace
                     float const ZoneX = ZonePos.x;
                     float const ZoneY = ZonePos.y;
                     float const ZoneZ = ZonePos.z;
-                    float const* const CamPos =
+                    const float* const CamPos = (const float*)
                         LocalCam->GetPosition();
                     float const Dz = ZoneZ - CamPos[2];
                     float const Dy = ZoneY - CamPos[1];
@@ -1836,10 +1836,10 @@ namespace
                 }
 
                 // A count <= 0 enqueues nothing.
-                float const* const CamPos =
+                const float* const CamPos = (const float*)
                     LocalCam->GetPosition();
-                FTransform const* const View =
-                    (FTransform const*)LocalCam->GetViewTransform();
+                Transform const* const View =
+                    LocalCam->GetViewTransform();
                 for (int Piece = 0; Piece < Pieces; ++Piece)
                 {
                     // FUN_00524740; the result is not tested.
@@ -1848,15 +1848,15 @@ namespace
 
                     if (G_PanelPieceMath == nullptr)
                         G_PanelPieceMath = Acquire3DMathEngine();
-                    FVector ViewPoint;
+                    Vector ViewPoint;
                     G_PanelPieceMath->TransformXform(ViewPoint, *View,
-                                                     *reinterpret_cast<FVector const*>(World));
-                    float ViewPoint3[3] = {ViewPoint.X, ViewPoint.Y, ViewPoint.Z};
+                                                     *reinterpret_cast<Vector const*>(World));
+                    float ViewPoint3[3] = {ViewPoint.x, ViewPoint.y, ViewPoint.z};
 
                     // FUN_005247f0 radius; a sphere class below 3 skips the piece.
                     float const Radius = CliAsteroidGetPieceRadius(Field, Piece);
                     unsigned short const Class =
-                        static_cast<unsigned short>(LocalCam->ClassifySphere(ViewPoint3, Radius));
+                        static_cast<unsigned short>(LocalCam->ClassifySphere((const Vector*)ViewPoint3, Radius));
                     if (Class < 3)
                         continue;
 
@@ -1916,7 +1916,7 @@ namespace
             if (Pieces == 1)
             {
                 // The difference built as a float Vector (FUN_00422b80).
-                float const* const CamPos = Cam->GetPosition();
+                const float* const CamPos = (const float*)Cam->GetPosition();
                 Vector const& ZonePos = Zone->GetPos();
                 float const Dx = ZonePos.x - CamPos[0];
                 float const Dy = ZonePos.y - CamPos[1];
@@ -1961,8 +1961,8 @@ namespace
                 continue;
             }
 
-            float const* const CamPos = Cam->GetPosition();
-            FTransform const* const View = (FTransform const*)Cam->GetViewTransform();
+            const Vector* const CamPos = Cam->GetPosition();
+            Transform const* const View = Cam->GetViewTransform();
             for (int Piece = 0; Piece < Pieces; ++Piece)
             {
                 // A null centre is only reported -- retail goes on and reads through it.
@@ -1977,19 +1977,19 @@ namespace
                 // A sphere class below 3 (unsigned) skips the piece.
                 if (G_PanelPieceMath == nullptr)
                     G_PanelPieceMath = Acquire3DMathEngine();
-                FVector ViewCenter;
+                Vector ViewCenter;
                 G_PanelPieceMath->TransformXform(ViewCenter, *View,
-                                                 *reinterpret_cast<FVector const*>(Center));
-                float ViewCenter3[3] = {ViewCenter.X, ViewCenter.Y, ViewCenter.Z};
+                                                 *reinterpret_cast<Vector const*>(Center));
+                float ViewCenter3[3] = {ViewCenter.x, ViewCenter.y, ViewCenter.z};
                 unsigned short const Class =
-                    static_cast<unsigned short>(Cam->ClassifySphere(ViewCenter3, Radius));
+                    static_cast<unsigned short>(Cam->ClassifySphere((const Vector*)ViewCenter3, Radius));
                 if (Class < 3)
                     continue;
 
                 // Kept as a double.
-                double const Px = static_cast<double>(Center[0]) - CamPos[0];
-                double const Py = static_cast<double>(Center[1]) - CamPos[1];
-                double const Pz = static_cast<double>(Center[2]) - CamPos[2];
+                double const Px = static_cast<double>(Center[0]) - CamPos->x;
+                double const Py = static_cast<double>(Center[1]) - CamPos->y;
+                double const Pz = static_cast<double>(Center[2]) - CamPos->z;
                 double const DistSq = Px * Px + Pz * Pz + Py * Py;
 
                 // Strictly past the threshold -> bucket 2.
@@ -2066,24 +2066,24 @@ unsigned* GameobjPickLodRetail(FClientGameobj* Self, unsigned* OutLod, void* Cam
 
     // Center into view space through DAT_006789d0.
     ICamera* const Cam = static_cast<ICamera*>(Camera);
-    FTransform const* const View = reinterpret_cast<FTransform const*>(Cam->GetViewTransform());
+    Transform const* const View = Cam->GetViewTransform();
     I3DMathEngine* const Math = GameobjMathEngine();
-    FVector Local;
-    Math->TransformXform(Local, *View, reinterpret_cast<FVector const&>(Center));
-    const FVector ViewPoint = Local;
+    Vector Local;
+    Math->TransformXform(Local, *View, Center);
+    const Vector ViewPoint = Local;
 
     // ClassifySphere -> low word; the high word is 0xffff and stays so when the class is below
     // 3.
-    const int Classify = Cam->ClassifySphere(&ViewPoint.X, Radius);
+    const int Classify = Cam->ClassifySphere(&ViewPoint, Radius);
     unsigned short LodLow = static_cast<unsigned short>(Classify);
     unsigned short LodHigh = 0xffffu;
     if (LodLow >= 3)
     {
         LodHigh = 0;
         const float DistSq = static_cast<float>(
-            static_cast<double>(ViewPoint.Y) * ViewPoint.Y +
-            static_cast<double>(ViewPoint.Z) * ViewPoint.Z +
-            static_cast<double>(ViewPoint.X) * ViewPoint.X);
+            static_cast<double>(ViewPoint.y) * ViewPoint.y +
+            static_cast<double>(ViewPoint.z) * ViewPoint.z +
+            static_cast<double>(ViewPoint.x) * ViewPoint.x);
 
         // The archetype's companion, or 0 without an object or an archetype; its +0x08 / +0x0c
         // are read with no further test.
@@ -2159,7 +2159,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
         }
         else
         {
-            BindRendererLods(reinterpret_cast<void*>(static_cast<intptr_t>(Self->get_index())), 1,
+            BindRendererLods(static_cast<intptr_t>(Self->get_index()), 1,
                              nullptr);
             Flags = 0x80u;
         }
@@ -2193,13 +2193,13 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
             char const* const Envmap = Archetype::CliObjEnvmapMaterial(NameCompanion);
 
             if (GetAppearanceOverrideMaterial(4u, &Extra))
-                SetAppearanceInstanceValue(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)),
+                SetAppearanceInstanceValue(static_cast<intptr_t>(Inst),
                                    const_cast<char*>(Envmap));
         }
     }
 
     // Renderer Slot7; no test of the renderer.
-    int const Result = DALib::Renderer->RenderInstance(Camera, reinterpret_cast<void*>(static_cast<intptr_t>(Inst)),
+    int const Result = DALib::Renderer->RenderInstance(Camera, static_cast<intptr_t>(Inst),
                                               1.0f, Flags, SubmitMatrix, Extra);
 
     // Signed compare.
@@ -2238,7 +2238,7 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
         long const Inst = Self->get_index();
         void* OpacityBits = nullptr;
         memcpy(&OpacityBits, &Opacity, sizeof(float));
-        SetAppearanceInstanceValue(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), OpacityBits);
+        SetAppearanceInstanceValue(static_cast<intptr_t>(Inst), OpacityBits);
 
         // A non-nomad archetype -> FUN_00533930(3, &Extra), the result ignored.
         CEqObj* const Again = EquippedObjEqObj(Self);
@@ -2402,7 +2402,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
         {
             Geometry::Sphere Query;
             Query.Radius = kObjDbFillRange;
-            float const* const CamPos = Camera->GetPosition();
+            const float* const CamPos = (const float*)Camera->GetPosition();
             Query.Center.x = CamPos[0];
             Query.Center.y = CamPos[1];
             Query.Center.z = CamPos[2];
@@ -2515,7 +2515,7 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
             {
                 // FUN_00422440 with a black fog colour; the fog end is evaluated first.
                 float Rgb[3] = {0.0f, 0.0f, 0.0f};
-                float* const CamPos = const_cast<float*>(Camera->GetPosition());
+                float* const CamPos = (float*)Camera->GetPosition();
                 const float FogEnd =
                     G_FieldController->FogFactor(CamPos);
                 const float FogStart =

@@ -152,14 +152,14 @@ namespace
         // them: Sound::Source and Sound::StreamedSource carry the shared "unsupported" stubs
         // (LAB_0044fce0 for slot 15, LAB_00454190 for the rest), and only Sound::Source3D has
         // bodies. FSpatialSource overrides all five below.
-        GENRESULT DACOM_API GetPosition(FVec3* Out) override;
+        GENRESULT DACOM_API GetPosition(Vector* Out) override;
         GENRESULT DACOM_API GetMinDistance(float* Out) override;
         GENRESULT DACOM_API GetMaxDistance(float* Out) override;
         GENRESULT DACOM_API GetConeAngles(unsigned long* Inside,
                                           unsigned long* Outside) override;
-        GENRESULT DACOM_API GetConeOrientation(FVec3* Out) override;
+        GENRESULT DACOM_API GetConeOrientation(Vector* Out) override;
         GENRESULT DACOM_API GetConeOutsideVolume(float* Out) override;
-        GENRESULT DACOM_API GetVelocity(FVec3* Out) override;
+        GENRESULT DACOM_API GetVelocity(Vector* Out) override;
         GENRESULT DACOM_API GetEaxEnvironment(unsigned long* Out) override;
         GENRESULT DACOM_API GetSoundMode(unsigned long* Out) override;
         GENRESULT DACOM_API GetApplyMode(unsigned long* Out) override;
@@ -174,7 +174,7 @@ namespace
         unsigned long __thiscall IsPaused() override { return PauseTick != 0 ? 1u : 0u; }
         unsigned char __thiscall IsFinished() override;
         unsigned long __thiscall GetDurationMs() override;
-        void __thiscall ComputeMixerScore(const float* Listener) override;
+        void __thiscall ComputeMixerScore(const Vector* Listener) override;
         void __thiscall SetAttenuation(float Attenuation) override;
         void __thiscall SetPan(float NewPan) override;
         void __thiscall SetLooping(unsigned char bLooping) override
@@ -185,8 +185,8 @@ namespace
         // do-nothings IDPMsgHandler::OnAddHost (RET 4, slots 35 and 36) and
         // IDPMsgHandler::OnReceive (RET 8, slot 37); only Sound::Source3D has bodies.
         unsigned long __thiscall SetPosition(void* /*Arg*/) override { return 0; }
-        void __thiscall SetVelocity(const float* /*Velocity*/) override {}
-        void __thiscall SetPose(int /*AttachHandle*/, const float* /*Transform*/) override {}
+        void __thiscall SetVelocity(const Vector* /*Velocity*/) override {}
+        void __thiscall SetPose(int /*AttachHandle*/, const Transform* /*Transform*/) override {}
         void __thiscall SetPitch(float NewPitch) override;
         // FUN_00450870: not attached.
         int __thiscall GetAttachHandle() override { return -1; }
@@ -196,7 +196,7 @@ namespace
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override;
         // FUN_00429690 (RET 8): slot 31 with the listener, then the negation of slot 29. The
         // time step is not read.
-        unsigned char __thiscall Update(const float* Listener, float /*DeltaSeconds*/) override
+        unsigned char __thiscall Update(const Vector* Listener, float /*DeltaSeconds*/) override
         {
             ComputeMixerScore(Listener);
             return IsFinished() == 0 ? 1u : 0u;
@@ -282,7 +282,7 @@ namespace
         void __thiscall SetLooping(unsigned char bLooping) override;
         unsigned char __thiscall IsFadedOut() override;
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override;
-        unsigned char __thiscall Update(const float* Listener, float DeltaSeconds) override;
+        unsigned char __thiscall Update(const Vector* Listener, float DeltaSeconds) override;
 
         void* StreamHandle;     // +0x30  IStreamer2 handle (0 / -1 = none)
         float FadeTargetDb;     // +0x34  the dB the fade runs to
@@ -311,22 +311,22 @@ namespace
         unsigned char DACOM_API Is3d() override { return 1; }
 
         // The five slots only Sound::Source3D implements.
-        GENRESULT DACOM_API GetPosition(FVec3* Out) override;
+        GENRESULT DACOM_API GetPosition(Vector* Out) override;
         GENRESULT DACOM_API GetConeAngles(unsigned long* Inside,
                                           unsigned long* Outside) override;
-        GENRESULT DACOM_API GetConeOrientation(FVec3* Out) override;
+        GENRESULT DACOM_API GetConeOrientation(Vector* Out) override;
         GENRESULT DACOM_API GetConeOutsideVolume(float* Out) override;
-        GENRESULT DACOM_API GetVelocity(FVec3* Out) override;
+        GENRESULT DACOM_API GetVelocity(Vector* Out) override;
         // Slot 35 (+0x8c), LAB_00429ca0: the world position setter (see the body).
         unsigned long __thiscall SetPosition(void* Arg) override;
-        void __thiscall SetVelocity(const float* Velocity) override;
-        void __thiscall SetPose(int AttachHandle, const float* Transform) override;
+        void __thiscall SetVelocity(const Vector* Velocity) override;
+        void __thiscall SetPose(int AttachHandle, const Transform* Pose) override;
         // LAB_00428810 -- slot 39.
         int __thiscall GetAttachHandle() override { return Source3dId; }
         void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override;
 
         // LAB_0042a020 (RET 8).
-        unsigned char __thiscall Update(const float* Listener, float DeltaSeconds) override
+        unsigned char __thiscall Update(const Vector* Listener, float DeltaSeconds) override
         {
             if (Source3dId != -1)
             {
@@ -396,7 +396,7 @@ namespace
     float G_DuckCurrentDb = 0.f;  // _DAT_00667ca4
     int G_DuckRefCount = 0;       // DAT_00667ca8
     float G_DuckTimer = -1.f;     // _DAT_00610904
-    float G_MixerListener[3] = {0.f, 0.f, 0.f}; // _DAT_00667c5c/60/64
+    Vector G_MixerListener = {0.f, 0.f, 0.f};   // _DAT_00667c5c/60/64
     static const unsigned kMixerMaxEntries = 0x80;
     FSoundSource* G_MixerRanked[kMixerMaxEntries] = {}; // DAT_00667a58
     unsigned G_MixerRankedCount = 0;                    // DAT_00667cb8
@@ -765,7 +765,7 @@ namespace
 
     // Slot 12 in the two non-3D vtables is LAB_00454190, "unsupported". Same for 15..18.
     // The mixer guards all five with Is3d(), so a flat source is never asked.
-    GENRESULT DACOM_API FSoundSource::GetPosition(FVec3* /*Out*/)
+    GENRESULT DACOM_API FSoundSource::GetPosition(Vector* /*Out*/)
     {
         return kGrNoValue;
     }
@@ -776,7 +776,7 @@ namespace
         return kGrNoValue;
     }
 
-    GENRESULT DACOM_API FSoundSource::GetConeOrientation(FVec3* /*Out*/)
+    GENRESULT DACOM_API FSoundSource::GetConeOrientation(Vector* /*Out*/)
     {
         return kGrNoValue;
     }
@@ -786,7 +786,7 @@ namespace
         return kGrNoValue;
     }
 
-    GENRESULT DACOM_API FSoundSource::GetVelocity(FVec3* /*Out*/)
+    GENRESULT DACOM_API FSoundSource::GetVelocity(Vector* /*Out*/)
     {
         return kGrNoValue;
     }
@@ -803,26 +803,26 @@ namespace
 
     // LAB_00429d30 — slot 12. When Source3dId != -1: IEngine+0xa0 GetInstanceTransform +
     // I3DMathEngine+0x28 TransformXform(local +0x30 → world Out). Else copy Spatial[0..2].
-    GENRESULT DACOM_API FSpatialSource::GetPosition(FVec3* Out)
+    GENRESULT DACOM_API FSpatialSource::GetPosition(Vector* Out)
     {
         // RET 8. No test of Out, the engine, the transform or the math engine.
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
-            FTransform const* const InstXform =
-                reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
+            const InstanceIndex Instance = Source3dId;
+            Transform const* const InstXform =
+                DALib::Engine->GetInstanceTransform(Instance);
             I3DMathEngine* const Math = AcquireSoundMathEngine();
-            FVector const Local = {Spatial[0], Spatial[1], Spatial[2]};
-            FVector World;
+            Vector const Local = {Spatial[0], Spatial[1], Spatial[2]};
+            Vector World;
             Math->TransformXform(World, *InstXform, Local);
-            Out->X = World.X;
-            Out->Y = World.Y;
-            Out->Z = World.Z;
+            Out->x = World.x;
+            Out->y = World.y;
+            Out->z = World.z;
             return GR_OK;
         }
-        Out->X = Spatial[0];
-        Out->Y = Spatial[1];
-        Out->Z = Spatial[2];
+        Out->x = Spatial[0];
+        Out->y = Spatial[1];
+        Out->z = Spatial[2];
         return GR_OK;
     }
 
@@ -833,22 +833,22 @@ namespace
     // this slot onto a no-op.
     unsigned long __thiscall FSpatialSource::SetPosition(void* Arg)
     {
-        FVector const* const WorldPos = static_cast<FVector const*>(Arg);
+        Vector const* const WorldPos = static_cast<Vector const*>(Arg);
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
-            FTransform const* const InstXform =
-                reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
-            FVector Local;
+            const InstanceIndex Instance = Source3dId;
+            Transform const* const InstXform =
+                DALib::Engine->GetInstanceTransform(Instance);
+            Vector Local;
             AcquireSoundMathEngine()->InverseTransform(Local, *InstXform, *WorldPos);
-            Spatial[0] = Local.X;
-            Spatial[1] = Local.Y;
-            Spatial[2] = Local.Z;
+            Spatial[0] = Local.x;
+            Spatial[1] = Local.y;
+            Spatial[2] = Local.z;
             return 0;
         }
-        Spatial[0] = WorldPos->X;
-        Spatial[1] = WorldPos->Y;
-        Spatial[2] = WorldPos->Z;
+        Spatial[0] = WorldPos->x;
+        Spatial[1] = WorldPos->y;
+        Spatial[2] = WorldPos->z;
         return 0;
     }
 
@@ -896,28 +896,28 @@ namespace
 
     // LAB_00429f60 — slot 16. Cone gate first; then +0x60 == -1 → raw Spatial[3..5], else
     // IEngine+0x98 GetInstanceOrientation + I3DMathEngine+0x2c TransformMatrix.
-    GENRESULT DACOM_API FSpatialSource::GetConeOrientation(FVec3* Out)
+    GENRESULT DACOM_API FSpatialSource::GetConeOrientation(Vector* Out)
     {
         // RET 8. No test of Out, the engine, the orientation or the math engine.
         if (!SourceHasCone(this))
             return kGrNoValue;
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
-            FMatrix const* const Orient =
-                reinterpret_cast<FMatrix const*>(DALib::Engine->GetInstanceOrientation(Instance));
+            const InstanceIndex Instance = Source3dId;
+            Matrix const* const Orient =
+                DALib::Engine->GetInstanceOrientation(Instance);
             I3DMathEngine* const Math = AcquireSoundMathEngine();
-            FVector const Local = {Spatial[3], Spatial[4], Spatial[5]};
-            FVector World;
+            Vector const Local = {Spatial[3], Spatial[4], Spatial[5]};
+            Vector World;
             Math->TransformMatrix(World, *Orient, Local);
-            Out->X = World.X;
-            Out->Y = World.Y;
-            Out->Z = World.Z;
+            Out->x = World.x;
+            Out->y = World.y;
+            Out->z = World.z;
             return GR_OK;
         }
-        Out->X = Spatial[3];
-        Out->Y = Spatial[4];
-        Out->Z = Spatial[5];
+        Out->x = Spatial[3];
+        Out->y = Spatial[4];
+        Out->z = Spatial[5];
         return GR_OK;
     }
 
@@ -933,29 +933,29 @@ namespace
     // LAB_00429de0 — slot 18. `+0x60 == -1` → Spatial[6..8]; else IEngine+0x80
     // GetInstanceUserData → CObject::get_velocity (vtable +0x54, Vector by value). Null
     // userdata → zero vector (LAB_00429e2e).
-    GENRESULT DACOM_API FSpatialSource::GetVelocity(FVec3* Out)
+    GENRESULT DACOM_API FSpatialSource::GetVelocity(Vector* Out)
     {
         // RET 8. No test of Out or the engine; only the user-data pointer is tested.
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            const InstanceIndex Instance = Source3dId;
             CObject* const User = (CObject*)DALib::Engine->GetInstanceUserData(Instance);
             if (User == nullptr)
             {
-                Out->X = 0.f;
-                Out->Y = 0.f;
-                Out->Z = 0.f;
+                Out->x = 0.f;
+                Out->y = 0.f;
+                Out->z = 0.f;
                 return GR_OK;
             }
             Vector const Velocity = User->get_velocity();
-            Out->X = Velocity.x;
-            Out->Y = Velocity.y;
-            Out->Z = Velocity.z;
+            Out->x = Velocity.x;
+            Out->y = Velocity.y;
+            Out->z = Velocity.z;
             return GR_OK;
         }
-        Out->X = Spatial[6];
-        Out->Y = Spatial[7];
-        Out->Z = Spatial[8];
+        Out->x = Spatial[6];
+        Out->y = Spatial[7];
+        Out->z = Spatial[8];
         return GR_OK;
     }
 
@@ -977,23 +977,23 @@ namespace
     }
 
     // LAB_00429dc0 (RET 4) — slot 36: three dwords to +0x48. No test of the pointer.
-    void __thiscall FSpatialSource::SetVelocity(const float* Velocity)
+    void __thiscall FSpatialSource::SetVelocity(const Vector* Velocity)
     {
-        Spatial[6] = Velocity[0];
-        Spatial[7] = Velocity[1];
-        Spatial[8] = Velocity[2];
+        Spatial[6] = Velocity->x;
+        Spatial[7] = Velocity->y;
+        Spatial[8] = Velocity->z;
     }
 
     // FUN_00429e70 (RET 8) — slot 37. The second argument is a Transform: a 3x3 orientation at
     // +0x00 and the world position at +0x24 (as the call site at 0052d9de builds it). Retail
     // keeps only the position; the orientation is re-fetched from the attached object when it needs
     // one. +0x60 first, then the three dwords; no test of the pointer.
-    void __thiscall FSpatialSource::SetPose(int AttachHandle, const float* Transform)
+    void __thiscall FSpatialSource::SetPose(int AttachHandle, const Transform* Pose)
     {
         Source3dId = AttachHandle;
-        Spatial[0] = Transform[9];  // +0x24
-        Spatial[1] = Transform[10]; // +0x28
-        Spatial[2] = Transform[11]; // +0x2c
+        Spatial[0] = Pose->Translation.x;  // +0x24
+        Spatial[1] = Pose->Translation.y; // +0x28
+        Spatial[2] = Pose->Translation.z; // +0x2c
     }
 
     // LAB_004299a0 — slot 38: the pitch percentage, clamped to [-100, 100]
@@ -1271,7 +1271,7 @@ namespace
         Source->Flags = static_cast<unsigned char>(Source->Flags | 8u);
     }
 
-    void __thiscall FSoundSource::ComputeMixerScore(const float* Listener)
+    void __thiscall FSoundSource::ComputeMixerScore(const Vector* Listener)
     {
         if (Arch != nullptr)
         {
@@ -1346,7 +1346,7 @@ namespace
             return;
         }
 
-        FVec3 Pos;
+        Vector Pos;
         GetPosition(&Pos);
         float DistSq;
         // No intermediate float stores: retail adds Z squared, Y squared, then X squared.
@@ -1464,7 +1464,7 @@ namespace
     // below zero it becomes -1 and the dB is the target (+0x34); otherwise (NaN included) the
     // power-ratio blend from the +0x1c dB to the target. The result, clamped to -96.0 (double
     // DAT_005ca210) .. 0.0 (DAT_005c8ba8), goes to +0x1c. Then FUN_0042a420 and true.
-    unsigned char __thiscall FStreamedSource::Update(const float* Listener, float DeltaSeconds)
+    unsigned char __thiscall FStreamedSource::Update(const Vector* Listener, float DeltaSeconds)
     {
         ComputeMixerScore(Listener);
         if (IsFinished() != 0)
@@ -2431,11 +2431,11 @@ namespace
         // LAB_0052f3d0 -- slot 6.
         unsigned char DACOM_API Is3d() override { return bExterior; }
         // LAB_0052f3e0 -- slot 12.
-        GENRESULT DACOM_API GetPosition(FVec3* Out) override
+        GENRESULT DACOM_API GetPosition(Vector* Out) override
         {
-            Out->X = ThrusterPosition[0];
-            Out->Y = ThrusterPosition[1];
-            Out->Z = ThrusterPosition[2];
+            Out->x = ThrusterPosition[0];
+            Out->y = ThrusterPosition[1];
+            Out->z = ThrusterPosition[2];
             return GR_OK;
         }
         // LAB_0052f430 -- slot 15.
@@ -2446,12 +2446,12 @@ namespace
             return GR_OK;
         }
         // LAB_0052f460 -- slot 16: the third column of the ship's rotation.
-        GENRESULT DACOM_API GetConeOrientation(FVec3* Out) override
+        GENRESULT DACOM_API GetConeOrientation(Vector* Out) override
         {
             Transform const& Xform = Ship->get_transform();
-            Out->X = Xform.Rotation.E[0][2];
-            Out->Y = Xform.Rotation.E[1][2];
-            Out->Z = Xform.Rotation.E[2][2];
+            Out->x = Xform.Rotation.E[0][2];
+            Out->y = Xform.Rotation.E[1][2];
+            Out->z = Xform.Rotation.E[2][2];
             return GR_OK;
         }
         // LAB_0052f4b0 -- slot 17.
@@ -2461,12 +2461,12 @@ namespace
             return GR_OK;
         }
         // LAB_0052f400 -- slot 18.
-        GENRESULT DACOM_API GetVelocity(FVec3* Out) override
+        GENRESULT DACOM_API GetVelocity(Vector* Out) override
         {
             Vector const Velocity = Ship->get_velocity();
-            Out->X = Velocity.x;
-            Out->Y = Velocity.y;
-            Out->Z = Velocity.z;
+            Out->x = Velocity.x;
+            Out->y = Velocity.y;
+            Out->z = Velocity.z;
             return GR_OK;
         }
         // FUN_0052f080 -- slot 41, body FUN_0052f0a0.
@@ -3216,26 +3216,26 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
     if (Camera != nullptr)
     {
         ICamera* const Cam = static_cast<ICamera*>(Camera);
-        float const* const Pos = Cam->GetPosition();
-        G_MixerListener[0] = Pos[0];
-        G_MixerListener[1] = Pos[1];
-        G_MixerListener[2] = Pos[2];
+        const Vector* const Pos = Cam->GetPosition();
+        G_MixerListener.x = Pos->x;
+        G_MixerListener.y = Pos->y;
+        G_MixerListener.z = Pos->z;
         if (Sound != nullptr)
         {
-            Sound->SetOrientationFromMatrix(const_cast<float*>(Cam->GetOrientation()));
-            Sound->SetListenerPosition(reinterpret_cast<FVector*>(G_MixerListener));
+            Sound->SetOrientationFromMatrix(Cam->GetOrientation());
+            Sound->SetListenerPosition(&G_MixerListener);
             void* const VelSrc = G_SoundListenerObject;
             if (VelSrc != nullptr)
             {
                 float Vel[3] = {};
-                static_cast<ICamera*>(VelSrc)->GetVelocity(Vel);
-                Sound->SetListenerVelocity(reinterpret_cast<FVector*>(Vel));
+                static_cast<ICamera*>(VelSrc)->GetVelocity((Vector*)Vel);
+                Sound->SetListenerVelocity(reinterpret_cast<Vector*>(Vel));
             }
         }
     }
     else if (Sound != nullptr)
     {
-        Sound->GetListenerPosition(reinterpret_cast<FVector*>(G_MixerListener));
+        Sound->GetListenerPosition(&G_MixerListener);
     }
 
     // (3) The voice budget: 0x80, or `max_submitted_sounds` (FUN_005b3860) when [AUDIO] is
@@ -3264,7 +3264,7 @@ void TickClientSoundMixer(void* Camera, float DeltaSeconds)
             FSoundSource* const Source = Walk->Value;
             if (Source->IsPaused() != 0)
                 continue;
-            if (Source->Update(G_MixerListener, DeltaSeconds) == 0)
+            if (Source->Update(&G_MixerListener, DeltaSeconds) == 0)
                 continue;
             unsigned char const Flags = Source->Flags;
             if ((Flags & 4u) == 0)
@@ -3471,10 +3471,10 @@ void SetClientSoundSourceConeOutsideVolume(void* SourcePtr, float Volume)
     Source->Spatial[11] = Volume;
 }
 
-void SetClientSoundSourcePose(void* SourcePtr, int AttachHandle, float const* Transform)
+void SetClientSoundSourcePose(void* SourcePtr, int AttachHandle, Transform const* Pose)
 {
     // Slot 37 (vt+0x94) on the source.
-    static_cast<ISoundSource*>(SourcePtr)->SetPose(AttachHandle, Transform);
+    static_cast<ISoundSource*>(SourcePtr)->SetPose(AttachHandle, Pose);
 }
 
 void SetClientSoundSourceType(void* SourcePtr, int Type)

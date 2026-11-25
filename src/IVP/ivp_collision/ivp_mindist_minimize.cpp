@@ -664,9 +664,9 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PK(IVP_Compact_Edge* 
     ToOpposite.k[0] = (float)((double)(S->X) - K0->X);
 
     IVP_U_Point NormalK; // local_c8
-    IVP_CalcCrossProduct(&NormalK, &EdgeVec, &ToThird);
+    NormalK.calc_cross_product(&EdgeVec, &ToThird);
     IVP_U_Point NormalOpposite; // local_b8
-    IVP_CalcCrossProduct(&NormalOpposite, &ToOpposite, &EdgeVec);
+    NormalOpposite.calc_cross_product(&ToOpposite, &EdgeVec);
 
     const float HeightK = (float)(
         ((double)(Delta.k[2]) * NormalK.k[2] + (double)(Delta.k[1]) * NormalK.k[1]) +
@@ -702,7 +702,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PK(IVP_Compact_Edge* 
     }
 
     IVP_U_Point Perpendicular; // local_118
-    IVP_CalcCrossProduct(&Perpendicular, &EdgeVec, &Delta);
+    Perpendicular.calc_cross_product(&EdgeVec, &Delta);
     const float InvQuadEdge = (float)(
         1.0 / (((double)(EdgeVec.k[0]) * EdgeVec.k[0] + (double)(EdgeVec.k[2]) * EdgeVec.k[2]) +
                (double)(EdgeVec.k[1]) * EdgeVec.k[1])); // local_128
@@ -717,7 +717,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_PK(IVP_Compact_Edge* 
     {
         const float InvDist = (float)(IVP_InvSqrtFloat(QuadDist)); // local_11c
         Mindist->SeparationGap = (float)((double)(InvDist) * QuadDist - Mindist->CombinedRadius);
-        IVP_CalcCrossProduct(&Perpendicular, &EdgeVec, &Perpendicular);
+        Perpendicular.calc_cross_product(&EdgeVec, &Perpendicular);
         IVP_RotateSlotToWorldSpace(CacheK->cache_object, &Perpendicular, &Perpendicular); // 0634d9d0, in place
         const double Scale = -((double)(InvDist) * InvQuadEdge);
         Mindist->SeparatingNormal.y = (float)(Perpendicular.k[1] * Scale);
@@ -1437,9 +1437,9 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_BK(IVP_Cache_Ball* Ba
     ToOpposite.k[0] = (float)((double)(S->X) - K0->X);
 
     IVP_U_Point NormalK; // local_60
-    IVP_CalcCrossProduct(&NormalK, &EdgeVec, &ToThird);
+    NormalK.calc_cross_product(&EdgeVec, &ToThird);
     IVP_U_Point NormalOpposite; // local_50
-    IVP_CalcCrossProduct(&NormalOpposite, &ToOpposite, &EdgeVec);
+    NormalOpposite.calc_cross_product(&ToOpposite, &EdgeVec);
 
     const float HeightK = (float)(
         ((double)(Delta.k[2]) * NormalK.k[2] + (double)(Delta.k[1]) * NormalK.k[1]) +
@@ -1473,7 +1473,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_BK(IVP_Cache_Ball* Ba
     }
 
     IVP_U_Point Perpendicular; // local_a8
-    IVP_CalcCrossProduct(&Perpendicular, &EdgeVec, &Delta);
+    Perpendicular.calc_cross_product(&EdgeVec, &Delta);
     const float InvQuadEdge = (float)(
         1.0 / (((double)(EdgeVec.k[2]) * EdgeVec.k[2] + (double)(EdgeVec.k[1]) * EdgeVec.k[1]) +
                (double)(EdgeVec.k[0]) * EdgeVec.k[0])); // local_b4
@@ -1485,7 +1485,7 @@ IVP_MRC_TYPE IVP_Mindist_Minimize_Solver::p_minimize_Leave_BK(IVP_Cache_Ball* Ba
 
     IVP_Ledge_Mindist* const Mindist = mindist;
     Mindist->SeparationGap = (float)((double)(InvDist) * QuadDist - Mindist->CombinedRadius);
-    IVP_CalcCrossProduct(&Perpendicular, &EdgeVec, &Perpendicular);
+    Perpendicular.calc_cross_product(&EdgeVec, &Perpendicular);
     IVP_RotateSlotToWorldSpace(CacheK->cache_object, &Perpendicular, &Perpendicular); // 0634d9d0, in place
     const double Scale = -((double)(InvDist) * InvQuadEdge);
     Mindist->SeparatingNormal.y = (float)(Perpendicular.k[1] * Scale);

@@ -574,15 +574,15 @@ Vector __cdecl random_sphere_constrained(Vector const& Dir, float Angle)
     float const AxisZ = (float)((double)(ZeroX) - ZeroY);
 
     double const HalfAngle = acos((double)(ZeroY) + ZeroX + Dir.z) * GRandHalf;
-    FQuaternion Rotation;
-    Rotation.W = X87CosF(HalfAngle);
+    Quaternion Rotation;
+    Rotation.w = X87CosF(HalfAngle);
     float const AxisScale = (float)(X87Sin(HalfAngle) /
         sqrt((double)(AxisZ) * AxisZ + (double)(AxisY) * AxisY +
              (double)(AxisX) * AxisX));
     // FUN_06288830: each product rounded to float.
-    Rotation.X = AxisScale * AxisX;
-    Rotation.Y = AxisScale * AxisY;
-    Rotation.Z = AxisScale * AxisZ;
+    Rotation.x = AxisScale * AxisX;
+    Rotation.y = AxisScale * AxisY;
+    Rotation.z = AxisScale * AxisZ;
 
     // One rounding (negation is exact).
     float const NegSinAngle = -X87SinF((double)(Angle));
@@ -590,20 +590,20 @@ Vector __cdecl random_sphere_constrained(Vector const& Dir, float Angle)
     float const Phi = (float)(RandUnit() * GRandTwoPi);
     double const Ring = X87Cos(asin((double)(Height)));
 
-    FVector Point;
-    Point.X = (float)(X87Cos((double)(Phi)) * Ring);
-    Point.Y = (float)(X87Sin((double)(Phi)) * Ring);
-    Point.Z = Height;
+    Vector Point;
+    Point.x = (float)(X87Cos((double)(Phi)) * Ring);
+    Point.y = (float)(X87Sin((double)(Phi)) * Ring);
+    Point.z = Height;
 
-    FMatrix Frame;
+    Matrix Frame;
     Acquire3DMathEngine()->QuaternionToMatrix(Frame, Rotation);
-    FVector Rotated;
+    Vector Rotated;
     Acquire3DMathEngine()->TransposeTransform(Rotated, Frame, Point);
 
     Vector Result;
-    Result.x = Rotated.X;
-    Result.y = Rotated.Y;
-    Result.z = Rotated.Z;
+    Result.x = Rotated.x;
+    Result.y = Rotated.y;
+    Result.z = Rotated.z;
     return Result;
 }
 
@@ -614,28 +614,28 @@ Vector __cdecl random_sphere_constrained_2(Vector const& Dir, float MinAngle, fl
     // (NaN included), when the spun vector is returned as is. Retail retakes cos of the
     // unrounded phi but sin of the float-rounded one.
     double const AngleValue = RandUnit() * ((double)(MaxAngle) - MinAngle) + MinAngle;
-    FVector Cone;
-    Cone.X = X87SinF(AngleValue);
-    Cone.Y = 0.0f;
-    Cone.Z = X87CosF(AngleValue);
+    Vector Cone;
+    Cone.x = X87SinF(AngleValue);
+    Cone.y = 0.0f;
+    Cone.z = X87CosF(AngleValue);
 
     // One rounding each into the float matrix.
     double const PhiRaw = RandUnit() * GRandTwoPi;
     float const PhiStored = (float)(PhiRaw);
     float const CosPhi = X87CosF(PhiRaw);
     float const SinPhi = X87SinF((double)(PhiStored));
-    FMatrix Spin;
-    Spin.D[0][0] = CosPhi;
-    Spin.D[0][1] = -SinPhi;
-    Spin.D[0][2] = 0.0f;
-    Spin.D[1][0] = SinPhi;
-    Spin.D[1][1] = CosPhi;
-    Spin.D[1][2] = 0.0f;
-    Spin.D[2][0] = 0.0f;
-    Spin.D[2][1] = 0.0f;
-    Spin.D[2][2] = 1.0f;
+    Matrix Spin;
+    Spin.E[0][0] = CosPhi;
+    Spin.E[0][1] = -SinPhi;
+    Spin.E[0][2] = 0.0f;
+    Spin.E[1][0] = SinPhi;
+    Spin.E[1][1] = CosPhi;
+    Spin.E[1][2] = 0.0f;
+    Spin.E[2][0] = 0.0f;
+    Spin.E[2][1] = 0.0f;
+    Spin.E[2][2] = 1.0f;
 
-    FVector Spun;
+    Vector Spun;
     Acquire3DMathEngine()->TransformMatrix(Spun, Spin, Cone);
 
     double const ZeroY = (double)(Dir.y) * GRandZero;
@@ -646,9 +646,9 @@ Vector __cdecl random_sphere_constrained_2(Vector const& Dir, float MinAngle, fl
     Vector Result;
     if (!(Dot < GRandAlignedDot))
     {
-        Result.x = Spun.X;
-        Result.y = Spun.Y;
-        Result.z = Spun.Z;
+        Result.x = Spun.x;
+        Result.y = Spun.y;
+        Result.z = Spun.z;
         return Result;
     }
 
@@ -662,20 +662,20 @@ Vector __cdecl random_sphere_constrained_2(Vector const& Dir, float MinAngle, fl
         sqrt((double)(AxisZ) * AxisZ + (double)(AxisY) * AxisY +
              (double)(AxisX) * AxisX);
 
-    FQuaternion Rotation;
-    Rotation.W = X87CosF(HalfAngle);
-    Rotation.X = (float)((double)(AxisX) * AxisScale);
-    Rotation.Y = (float)((double)(AxisY) * AxisScale);
-    Rotation.Z = (float)((double)(AxisZ) * AxisScale);
+    Quaternion Rotation;
+    Rotation.w = X87CosF(HalfAngle);
+    Rotation.x = (float)((double)(AxisX) * AxisScale);
+    Rotation.y = (float)((double)(AxisY) * AxisScale);
+    Rotation.z = (float)((double)(AxisZ) * AxisScale);
 
-    FMatrix Frame;
+    Matrix Frame;
     Acquire3DMathEngine()->QuaternionToMatrix(Frame, Rotation);
-    FVector Rotated;
+    Vector Rotated;
     Acquire3DMathEngine()->TransposeTransform(Rotated, Frame, Spun);
 
-    Result.x = Rotated.X;
-    Result.y = Rotated.Y;
-    Result.z = Rotated.Z;
+    Result.x = Rotated.x;
+    Result.y = Rotated.y;
+    Result.z = Rotated.z;
     return Result;
 }
 
@@ -1023,15 +1023,14 @@ float __cdecl GetSphereIntersectVol(float Dist, float RadiusA, float RadiusB)
 long __cdecl get_projected_bounding_sphere(ICamera* Camera, Vector const& Center, float Radius, float& Out1, float& Out2, float& Out3, float& Out4)
 {
     // The centre in view space (the math engine cached in DAT_063fce08).
-    float const* const CameraXform = Camera->GetOrientation();
-    FVector View;
-    Acquire3DMathEngine()->InverseTransform(View, *reinterpret_cast<FTransform const*>(CameraXform),
-                                           reinterpret_cast<FVector const&>(Center));
+    const float* const CameraXform = (const float*)Camera->GetOrientation();
+    Vector View;
+    Acquire3DMathEngine()->InverseTransform(View, *reinterpret_cast<Transform const*>(CameraXform), Center);
 
     // Behind the near plane (or unordered) -> 0.
-    if (!(-(double)(Camera->GetZNear()) >= (double)(View.Z)))
+    if (!(-(double)(Camera->GetZNear()) >= (double)(View.z)))
         return 0;
-    Out4 = -View.Z;
+    Out4 = -View.z;
 
     // The viewport centre (0.5f is DAT_0639c13c); InvZ = -1.0 (DAT_063a03f0) / z.
     int const* const Viewport = Camera->GetViewport();
@@ -1041,8 +1040,8 @@ long __cdecl get_projected_bounding_sphere(ICamera* Camera, Vector const& Center
     float const CenterY = (float)(
         (double)(Viewport[3] - Viewport[1]) * (double)(0.5f) +
         (double)(Viewport[1]));
-    float const InvZ = (float)(-1.0 / (double)(View.Z));
-    float const XOverZ = (float)((double)(View.X) * (double)(InvZ));
+    float const InvZ = (float)(-1.0 / (double)(View.z));
+    float const XOverZ = (float)((double)(View.x) * (double)(InvZ));
 
     float const XScale = (float)(Camera->GetXScaleOverNear());
     Out1 = (float)((double)(Camera->GetZNear()) * (double)(XScale) *
@@ -1052,13 +1051,13 @@ long __cdecl get_projected_bounding_sphere(ICamera* Camera, Vector const& Center
     // y * InvZ stays unrounded; the unrounded ScreenY also feeds DeltaY below.
     float const YScale = (float)(Camera->GetYScaleOverNear());
     double const ScreenY = (double)(Camera->GetZNear()) * (double)(YScale) *
-                               ((double)(View.Y) * (double)(InvZ)) +
+                               ((double)(View.y) * (double)(InvZ)) +
                            (double)(CenterY);
     Out2 = (float)(ScreenY);
 
-    double const X = (double)(View.X);
-    double const Y = (double)(View.Y);
-    double const Z = (double)(View.Z);
+    double const X = (double)(View.x);
+    double const Y = (double)(View.y);
+    double const Z = (double)(View.z);
     float const Dist = (float)(std::sqrt((X * X + Z * Z) + Y * Y));
     // A radius beyond the distance is cut to it (unordered keeps it).
     if (Radius > Dist)
@@ -1132,55 +1131,55 @@ namespace
 
 void __cdecl ComputeExplosiveImpulses(long EngineHandle, Vector& OutLinear, Vector& OutAngular1, Vector& OutAngular2)
 {
-    void* const Instance = (void*)EngineHandle;
-    void* const Parent = DALib::Engine->GetInstanceParent(Instance);
+    const InstanceIndex Instance = EngineHandle;
+    const InstanceIndex Parent = DALib::Engine->GetInstanceParent(Instance);
     unsigned long* const Relative = DALib::Engine->GetInstanceRelative(Instance);
     int const Count = (int)Relative[0];
-    FVector const* const Items = (FVector const*)(Relative + 1);
+    Vector const* const Items = (Vector const*)(Relative + 1);
 
     // Signed; 1..4 takes the first branch.
     if (Count > 0 && Count <= 4)
     {
         // Items[1] by the instance's orientation, plus its position.
-        FMatrix const* const Orient = (FMatrix const*)DALib::Engine->GetInstanceOrientation(Instance);
-        FVector Local;
+        Matrix const* const Orient = DALib::Engine->GetInstanceOrientation(Instance);
+        Vector Local;
         Acquire3DMathEngine()->TransformMatrix(Local, *Orient, Items[1]);
-        OutAngular2.x = Local.X;
-        OutAngular2.y = Local.Y;
-        OutAngular2.z = Local.Z;
-        float const* Pos = DALib::Engine->GetInstancePosition(Instance);
-        OutAngular2.x = Pos[0] + OutAngular2.x;
-        OutAngular2.y = Pos[1] + OutAngular2.y;
-        OutAngular2.z = Pos[2] + OutAngular2.z;
+        OutAngular2.x = Local.x;
+        OutAngular2.y = Local.y;
+        OutAngular2.z = Local.z;
+        const Vector* Pos = DALib::Engine->GetInstancePosition(Instance);
+        OutAngular2.x = Pos->x + OutAngular2.x;
+        OutAngular2.y = Pos->y + OutAngular2.y;
+        OutAngular2.z = Pos->z + OutAngular2.z;
 
         // Items[0] by the parent's orientation.
-        FMatrix const* const ParentOrient = (FMatrix const*)DALib::Engine->GetInstanceOrientation(Parent);
+        Matrix const* const ParentOrient = DALib::Engine->GetInstanceOrientation(Parent);
         Acquire3DMathEngine()->TransformMatrix(Local, *ParentOrient, Items[0]);
-        OutAngular1.x = Local.X;
-        OutAngular1.y = Local.Y;
-        OutAngular1.z = Local.Z;
+        OutAngular1.x = Local.x;
+        OutAngular1.y = Local.y;
+        OutAngular1.z = Local.z;
         NormalizeExplosionVector(OutAngular1);
 
         Pos = DALib::Engine->GetInstancePosition(Instance);
-        OutLinear.x = OutAngular2.x - Pos[0];
-        OutLinear.y = OutAngular2.y - Pos[1];
-        OutLinear.z = OutAngular2.z - Pos[2];
+        OutLinear.x = OutAngular2.x - Pos->x;
+        OutLinear.y = OutAngular2.y - Pos->y;
+        OutLinear.z = OutAngular2.z - Pos->z;
         NormalizeExplosionVector(OutLinear);
         return;
     }
 
-    float const* const Pos = DALib::Engine->GetInstancePosition(Instance);
-    OutAngular2.x = Pos[0];
-    OutAngular2.y = Pos[1];
-    OutAngular2.z = Pos[2];
+    const Vector* const Pos = DALib::Engine->GetInstancePosition(Instance);
+    OutAngular2.x = Pos->x;
+    OutAngular2.y = Pos->y;
+    OutAngular2.z = Pos->z;
 
     // Items[1] by the parent's orientation.
-    FMatrix const* const ParentOrient = (FMatrix const*)DALib::Engine->GetInstanceOrientation(Parent);
-    FVector Local;
+    Matrix const* const ParentOrient = DALib::Engine->GetInstanceOrientation(Parent);
+    Vector Local;
     Acquire3DMathEngine()->TransformMatrix(Local, *ParentOrient, Items[1]);
-    OutAngular1.x = Local.X;
-    OutAngular1.y = Local.Y;
-    OutAngular1.z = Local.Z;
+    OutAngular1.x = Local.x;
+    OutAngular1.y = Local.y;
+    OutAngular1.z = Local.z;
     NormalizeExplosionVector(OutAngular1);
 
     OutLinear.x = -OutAngular1.x;

@@ -56,26 +56,26 @@ namespace
         int const Count = 6 - static_cast<int>(Index);
         double const Offset = static_cast<double>(Count) * 0.1; // DAT_005c7720
         double const SlideX = Offset + Self->AnimTime - 0.45500001311302185; // DAT_005e28d0
-        float Position[3];
-        Position[1] = static_cast<float>(static_cast<double>(kColumnTopY) -
+        Vector Position;
+        Position.y = static_cast<float>(static_cast<double>(kColumnTopY) -
                                          static_cast<double>(Index) *
                                              static_cast<double>(kColumnStepY));
-        Position[2] = kColumnZ;
-        float StaticOffset[3] = {0.0f, 0.0f, 0.0f};
+        Position.z = kColumnZ;
+        Vector StaticOffset = {0.0f, 0.0f, 0.0f};
         // DAT_005e28c8: at or left of -0.455 (or unordered) the button follows the slide and
         // the mesh is pushed by Offset + AnimTime; right of it the button rests at -0.455 and
         // the mesh at its origin.
         if (SlideX > -0.45500001311302185)
         {
-            Position[0] = kSlideX;
+            Position.x = kSlideX;
         }
         else
         {
-            Position[0] = static_cast<float>(SlideX);
-            StaticOffset[0] = static_cast<float>(Offset + Self->AnimTime);
+            Position.x = static_cast<float>(SlideX);
+            StaticOffset.x = static_cast<float>(Offset + Self->AnimTime);
         }
-        Self->Buttons[Index].SetPosition(Position);
-        Self->Statics[Index]->SetPosition(StaticOffset);
+        Self->Buttons[Index].SetPosition(&Position.x);
+        Self->Statics[Index]->SetPosition(&StaticOffset.x);
     }
 
     TypeSelect G_TypeSelect; // DAT_0067b780

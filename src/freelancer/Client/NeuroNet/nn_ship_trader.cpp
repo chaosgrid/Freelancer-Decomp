@@ -451,7 +451,7 @@ bool NnShipTrader::Create(Win3D* NewParent, void* Data)
 
     DrawLayer = 100;
     SetOffset(-0.64f, 0.33f, -1.288f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
 
     BaseFeeling = NnDealer::GetBaseFactionFeeling(); // FUN_00483df0
     if (SinglePlayer())

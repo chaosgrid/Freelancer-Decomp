@@ -37,9 +37,9 @@ void RearViewCameraConstruct(FRearViewCamera* Cam)
     // FUN_0051ad30.
     HudCameraConstruct((FHudCamera*)Cam);
 
-    Cam->ViewPosition[0] = 0.0f;
-    Cam->ViewPosition[1] = 5.0f;
-    Cam->ViewPosition[2] = 20.0f;
+    Cam->ViewPosition.x = 0.0f;
+    Cam->ViewPosition.y = 5.0f;
+    Cam->ViewPosition.z = 20.0f;
 
     // Retail's face table 0x005dbe18 has the same one slot as HUDCamera's 0x005dc084
     // (FUN_0051d7f0); the port shares it.
@@ -84,21 +84,21 @@ void RearViewCameraUpdate(FRearViewCamera* Cam, float DeltaSeconds)
         // math engine cache DAT_00675220.
         if (G_FirstPersonMathEngine == nullptr)
             G_FirstPersonMathEngine = Acquire3DMathEngine();
-        FVector Offset;
+        Vector Offset;
         G_FirstPersonMathEngine->TransformMatrix(
-            Offset, *reinterpret_cast<FMatrix const*>(Orientation),
-            *reinterpret_cast<FVector const*>(Cam->ViewPosition));
+            Offset, *reinterpret_cast<Matrix const*>(Orientation),
+            Cam->ViewPosition);
 
         Vector const& ShipPos = Object->get_position();
         float Position[3];
-        Position[0] = Offset.X + ShipPos.x;
-        Position[1] = Offset.Y + ShipPos.y;
-        Position[2] = Offset.Z + ShipPos.z;
+        Position[0] = Offset.x + ShipPos.x;
+        Position[1] = Offset.y + ShipPos.y;
+        Position[2] = Offset.z + ShipPos.z;
 
-        memcpy(Space->World, Orientation, 9 * sizeof(float));
-        Space->WorldPos[0] = Position[0];
-        Space->WorldPos[1] = Position[1];
-        Space->WorldPos[2] = Position[2];
+        memcpy(&Space->World, Orientation, 9 * sizeof(float));
+        Space->WorldPos.x = Position[0];
+        Space->WorldPos.y = Position[1];
+        Space->WorldPos.z = Position[2];
         Space->bViewDirty = 1;
     }
 
@@ -142,9 +142,9 @@ bool RearViewCameraLoad(FRearViewCamera* Cam, const char* CockpitIniPath)
             const float Y = Reader.get_value_float(1);
             const float Z = Reader.get_value_float(2);
 
-            Cam->ViewPosition[0] = X;
-            Cam->ViewPosition[1] = Y;
-            Cam->ViewPosition[2] = Z;
+            Cam->ViewPosition.x = X;
+            Cam->ViewPosition.y = Y;
+            Cam->ViewPosition.z = Z;
         }
     }
 

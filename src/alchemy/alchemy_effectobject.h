@@ -30,15 +30,15 @@ namespace AlchemyImpl
 
         // FUN_0621f610: when TransformExtra_ (this+0x18) is set, only that node's
         // SetTransform (vtable+0x3C) runs and its result is returned. Otherwise every
-        // node not disabled (vtable+0x1C) gets SetTransform(A, B), each failure FDUMPs
+        // node not disabled (vtable+0x1C) gets SetTransform(unsigned long, const Transform*), each failure FDUMPs
         // "Failed to set node transform. Continuing." (0x100002), and the result is
         // GR_OK. This slot never writes this+0x18. A is the node transform slot index
         // (0 composed, 1 raw -- FUN_062400f0), B the 12-float source; ScriptPsys Tick
         // passes (1, Xform).
-        GENRESULT DACOM_API SetTransform(void* A, void* B) override;
+        GENRESULT DACOM_API SetTransform(unsigned long A, const Transform* B) override;
         // LAB_0621f6a0: TransformExtra_'s node IFxNode+0x40 (A, B) when set, else the
         // first list node's; no count or null test.
-        GENRESULT DACOM_API GetTransform(void* A, void* B) override;
+        GENRESULT DACOM_API GetTransform(unsigned long A, Transform** B) override;
         GENRESULT DACOM_API SetAge(float Age) override;
         GENRESULT DACOM_API SetOuterTime(float OuterTime) override;
         GENRESULT DACOM_API ComposeTransforms(void* Arg) override;

@@ -77,11 +77,11 @@ namespace
         return G_ScriptCameraMathEngine;
     }
 
-    // A {Orientation[9], Position[3]} pair laid out back to back is exactly x86math's FTransform
+    // A {Orientation[9], Position[3]} pair laid out back to back is exactly x86math's Transform
     // (0x30 bytes); retail hands the engine the address of the orientation.
-    FTransform const& AsTransform(const float* Orientation9)
+    Transform const& AsTransform(const float* Orientation9)
     {
-        return *reinterpret_cast<FTransform const*>(Orientation9);
+        return *reinterpret_cast<Transform const*>(Orientation9);
     }
 
     void Transpose3x3(float* Dst, const float* Src)
@@ -190,32 +190,32 @@ unsigned long DACOM_API FScriptCamSink::Release()
 
 // ------------------------------------------------------------------ camera sink slots
 
-GENRESULT DACOM_API FScriptCamTransform::SetPosition(float* Position3)
+GENRESULT DACOM_API FScriptCamTransform::SetPosition(const Vector* Position3)
 {
     // LAB_0051e080.
-    Position[0] = Position3[0];
-    Position[1] = Position3[1];
-    Position[2] = Position3[2];
+    Position[0] = Position3->x;
+    Position[1] = Position3->y;
+    Position[2] = Position3->z;
     return GR_OK;
 }
 
-GENRESULT DACOM_API FScriptCamTransform::SetOrientation(float* Orientation9)
+GENRESULT DACOM_API FScriptCamTransform::SetOrientation(const Matrix* Orientation9)
 {
     // LAB_0051e0a0.
     memcpy(Orientation, Orientation9, 9 * sizeof(float));
     return GR_OK;
 }
 
-GENRESULT DACOM_API FScriptCamTransform::GetPosition(float* OutPosition3)
+GENRESULT DACOM_API FScriptCamTransform::GetPosition(Vector* OutPosition3)
 {
     // LAB_0051e0c0.
-    OutPosition3[0] = Position[0];
-    OutPosition3[1] = Position[1];
-    OutPosition3[2] = Position[2];
+    OutPosition3->x = Position[0];
+    OutPosition3->y = Position[1];
+    OutPosition3->z = Position[2];
     return GR_OK;
 }
 
-GENRESULT DACOM_API FScriptCamTransform::GetOrientation(float* OutOrientation9)
+GENRESULT DACOM_API FScriptCamTransform::GetOrientation(Matrix* OutOrientation9)
 {
     // LAB_0051e0e0.
     memcpy(OutOrientation9, Orientation, 9 * sizeof(float));
@@ -232,19 +232,19 @@ FScriptCamObjectTransform::FScriptCamObjectTransform()
     SetIdentity(OrientationB, PositionB);
 }
 
-GENRESULT DACOM_API FScriptCamObjectTransform::SetPosition(float* /*Position3*/)
+GENRESULT DACOM_API FScriptCamObjectTransform::SetPosition(const Vector* /*Position3*/)
 {
     // LAB_00451370, a `return 0` stub shared by both setters: the object sink discards writes.
     return GR_OK;
 }
 
-GENRESULT DACOM_API FScriptCamObjectTransform::SetOrientation(float* /*Orientation9*/)
+GENRESULT DACOM_API FScriptCamObjectTransform::SetOrientation(const Matrix* /*Orientation9*/)
 {
     // LAB_00451370.
     return GR_OK;
 }
 
-GENRESULT DACOM_API FScriptCamObjectTransform::GetPosition(float* OutPosition3)
+GENRESULT DACOM_API FScriptCamObjectTransform::GetPosition(Vector* OutPosition3)
 {
     // LAB_0051e250.
     void* const Object = WatchedObjectOf(Watched);
@@ -259,16 +259,16 @@ GENRESULT DACOM_API FScriptCamObjectTransform::GetPosition(float* OutPosition3)
 
     // That position in the FIRST transform's frame. The cache is used even with no object, so
     // a sink that lost its object keeps reporting the last place it saw it.
-    FVector Local;
+    Vector Local;
     ScriptCameraMathEngine()->InverseTransform(Local, AsTransform(OrientationA),
-                                               *reinterpret_cast<FVector const*>(PositionB));
-    OutPosition3[0] = Local.X;
-    OutPosition3[1] = Local.Y;
-    OutPosition3[2] = Local.Z;
+                                               *reinterpret_cast<Vector const*>(PositionB));
+    OutPosition3->x = Local.x;
+    OutPosition3->y = Local.y;
+    OutPosition3->z = Local.z;
     return GR_OK;
 }
 
-GENRESULT DACOM_API FScriptCamObjectTransform::GetOrientation(float* OutOrientation9)
+GENRESULT DACOM_API FScriptCamObjectTransform::GetOrientation(Matrix* OutOrientation9)
 {
     // LAB_0051e2e0.
     void* const Object = WatchedObjectOf(Watched);
@@ -282,9 +282,9 @@ GENRESULT DACOM_API FScriptCamObjectTransform::GetOrientation(float* OutOrientat
     // transpose(first orientation) x cached one.
     float Transposed[9];
     Transpose3x3(Transposed, OrientationA);
-    FMatrix Product;
-    ScriptCameraMathEngine()->MulMatrix(Product, *reinterpret_cast<FMatrix const*>(Transposed),
-                                        *reinterpret_cast<FMatrix const*>(OrientationB));
+    Matrix Product;
+    ScriptCameraMathEngine()->MulMatrix(Product, *reinterpret_cast<Matrix const*>(Transposed),
+                                        *reinterpret_cast<Matrix const*>(OrientationB));
     memcpy(OutOrientation9, &Product, 9 * sizeof(float));
     return GR_OK;
 }
@@ -543,20 +543,20 @@ void ScriptCameraUpdate(FScriptCamera* Cam, float DeltaSeconds)
     // The camera sink (+0xfc, no null test) is read back through its slots, not off the fields.
     float LocalPosition[3];
     float LocalOrientation[9];
-    Cam->CameraTransform->GetPosition(LocalPosition);        // 0x14
-    Cam->CameraTransform->GetOrientation(LocalOrientation);  // 0x18
+    Cam->CameraTransform->GetPosition((Vector*)LocalPosition);        // 0x14
+    Cam->CameraTransform->GetOrientation((Matrix*)LocalOrientation);  // 0x18
 
     // The script's transform is composed ONTO the stored starting one, so a script written
     // around the origin lands wherever the setup put the camera.
-    FTransform Local;
+    Transform Local;
     memcpy(&Local.Rotation, LocalOrientation, 9 * sizeof(float));
     memcpy(&Local.Translation, LocalPosition, 3 * sizeof(float));
-    FTransform World;
+    Transform World;
     ScriptCameraMathEngine()->MulTransform(World, AsTransform(Cam->Orientation), Local);
 
     FSpaceCamera* const Base = (FSpaceCamera*)Cam;
-    memcpy(Base->World, &World.Rotation, 9 * sizeof(float));
-    memcpy(Base->WorldPos, &World.Translation, 3 * sizeof(float));
+    memcpy(&Base->World, &World.Rotation, 9 * sizeof(float));
+    memcpy(&Base->WorldPos, &World.Translation, 3 * sizeof(float));
     Base->bViewDirty = 1;
 }
 

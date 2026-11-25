@@ -192,14 +192,14 @@ bool BaseRichTextWin::HitTest(float const* Ray)
     // stays double.
     if (bNeverHit != 0)
         return false;
-    double const T = static_cast<double>(Position[2]) / Ray[2];
+    double const T = static_cast<double>(Position.z) / Ray[2];
     float const PointY = static_cast<float>(T * Ray[1]);
-    double const DeltaX = T * Ray[0] - Position[0];
+    double const DeltaX = T * Ray[0] - Position.x;
     if (DeltaX < 0.0)
         return false;
     if (!(DeltaX <= static_cast<double>(WorldRect[2]) - WorldRect[0]))
         return false;
-    double const DeltaY = static_cast<double>(Position[1]) - PointY;
+    double const DeltaY = static_cast<double>(Position.y) - PointY;
     if (DeltaY < 0.0)
         return false;
     if (!(DeltaY <= static_cast<double>(WorldRect[1]) - WorldRect[3]))
@@ -411,7 +411,7 @@ void BaseRichTextWin::Draw()
             DALib::Pipeline->SetRenderState(D3DRS_ZENABLE, 0);
             DALib::Pipeline->SetRenderState(D3DRS_ZWRITEENABLE, 0);
             DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
-            Win3DBindModelview(nullptr, Orientation);
+            Win3DBindModelview(nullptr, &Placement);
             Win3DColor4ubv(FrameColor);
             Win3DDisable(kWin3DTexture2D);
             Win3DBegin(kWin3DLineLoop);
@@ -624,15 +624,15 @@ UiScroll* BaseRichTextWin::CreateScrollBarV()
     if (Created != nullptr)
     {
         // Beside the text: the gap plus the width along the control's x axis.
-        FVector Along;
-        Along.X = ScrollBarGap + NormWidth;
-        Along.Y = 0.0f;
-        Along.Z = 0.0f;
-        FVector Offset;
-        RichTextMathEngine()->TransformMatrix(Offset, *reinterpret_cast<FMatrix const*>(Orientation),
+        Vector Along;
+        Along.x = ScrollBarGap + NormWidth;
+        Along.y = 0.0f;
+        Along.z = 0.0f;
+        Vector Offset;
+        RichTextMathEngine()->TransformMatrix(Offset, Orientation,
                                               Along);
-        Created->SetOffset(Offset.X, Offset.Y, Offset.Z);
-        Created->SetTransform(Orientation);
+        Created->SetOffset(Offset.x, Offset.y, Offset.z);
+        Created->SetTransform(&Placement);
     }
     return Created;
 }
@@ -670,12 +670,12 @@ void BaseRichTextWin::SetAttachOffset(float const* NewOffset)
     AttachOffset[0] = NewOffset[0];
     AttachOffset[1] = NewOffset[1];
     AttachOffset[2] = NewOffset[2];
-    float Moved[3];
-    float const DeltaZ = Position[2] - Old[2];
-    Moved[0] = static_cast<float>(static_cast<double>(Position[0]) - Old[0] + AttachOffset[0]);
-    Moved[1] = static_cast<float>(static_cast<double>(Position[1]) - Old[1] + AttachOffset[1]);
-    Moved[2] = DeltaZ + AttachOffset[2];
-    WinControl::SetPosition(Moved);
+    Vector Moved;
+    float const DeltaZ = Position.z - Old[2];
+    Moved.x = static_cast<float>(static_cast<double>(Position.x) - Old[0] + AttachOffset[0]);
+    Moved.y = static_cast<float>(static_cast<double>(Position.y) - Old[1] + AttachOffset[1]);
+    Moved.z = DeltaZ + AttachOffset[2];
+    WinControl::SetPosition(&Moved.x);
 }
 
 void BaseRichTextWin::SetNormSize(float Width, float Height)
@@ -686,30 +686,30 @@ void BaseRichTextWin::SetNormSize(float Width, float Height)
     if (ScrollBarV != nullptr)
     {
         ScrollBarV->SetSize(ScrollBarWidth, Height);
-        FTransform Beside;
+        Transform Beside;
         memset(&Beside, 0, sizeof(Beside));
-        Beside.Rotation.D[0][0] = 1.0f;
-        Beside.Rotation.D[1][1] = 1.0f;
-        Beside.Rotation.D[2][2] = 1.0f;
-        Beside.Translation.X = NormWidth;
-        FTransform Placed;
-        RichTextMathEngine()->MulTransform(Placed, *reinterpret_cast<FTransform const*>(Orientation),
+        Beside.Rotation.E[0][0] = 1.0f;
+        Beside.Rotation.E[1][1] = 1.0f;
+        Beside.Rotation.E[2][2] = 1.0f;
+        Beside.Translation.x = NormWidth;
+        Transform Placed;
+        RichTextMathEngine()->MulTransform(Placed, Placement,
                                            Beside);
-        ScrollBarV->SetTransform(reinterpret_cast<float const*>(&Placed));
+        ScrollBarV->SetTransform(&Placed);
     }
     if (ScrollBarH != nullptr)
     {
         ScrollBarH->SetSize(NormWidth, ScrollBarWidth);
-        FTransform Below;
+        Transform Below;
         memset(&Below, 0, sizeof(Below));
-        Below.Rotation.D[0][0] = 1.0f;
-        Below.Rotation.D[1][1] = 1.0f;
-        Below.Rotation.D[2][2] = 1.0f;
-        Below.Translation.Y = NormHeight;
-        FTransform Placed;
-        RichTextMathEngine()->MulTransform(Placed, *reinterpret_cast<FTransform const*>(Orientation),
+        Below.Rotation.E[0][0] = 1.0f;
+        Below.Rotation.E[1][1] = 1.0f;
+        Below.Rotation.E[2][2] = 1.0f;
+        Below.Translation.y = NormHeight;
+        Transform Placed;
+        RichTextMathEngine()->MulTransform(Placed, Placement,
                                            Below);
-        ScrollBarH->SetTransform(reinterpret_cast<float const*>(&Placed));
+        ScrollBarH->SetTransform(&Placed);
     }
 }
 
@@ -724,22 +724,22 @@ void BaseRichTextWin::EnsureSurface()
     float M[16];
     DALib::Pipeline->GetProjection(M);
 
-    FTransform const& Xform = *reinterpret_cast<FTransform const*>(Orientation);
+    Transform const& Xform = Placement;
 
     // The top-left corner (0, 0, 0) into world space, then through the projection; each row sums
     // z, y, x, then the constant, as retail.
-    FVector Corner0;
-    Corner0.X = 0.0f;
-    Corner0.Y = 0.0f;
-    Corner0.Z = 0.0f;
-    FVector World0;
+    Vector Corner0;
+    Corner0.x = 0.0f;
+    Corner0.y = 0.0f;
+    Corner0.z = 0.0f;
+    Vector World0;
     RichTextMathEngine()->TransformXform(World0, Xform, Corner0);
     float Clip0[4];
     for (int Row = 0; Row < 4; ++Row)
     {
-        double Sum = static_cast<double>(M[Row * 4 + 2]) * World0.Z;
-        Sum += static_cast<double>(M[Row * 4 + 1]) * World0.Y;
-        Sum += static_cast<double>(M[Row * 4 + 0]) * World0.X;
+        double Sum = static_cast<double>(M[Row * 4 + 2]) * World0.z;
+        Sum += static_cast<double>(M[Row * 4 + 1]) * World0.y;
+        Sum += static_cast<double>(M[Row * 4 + 0]) * World0.x;
         Sum += M[Row * 4 + 3];
         Clip0[Row] = static_cast<float>(Sum);
     }
@@ -750,25 +750,25 @@ void BaseRichTextWin::EnsureSurface()
     float const NdcY0 = static_cast<float>(InvW0 * Clip0[1]);
 
     // The bottom-right corner (w, -h, 0). The w row sums y, x, z here; the other rows z, y, x.
-    FVector Corner1;
-    Corner1.X = NormWidth;
-    Corner1.Y = -NormHeight;
-    Corner1.Z = 0.0f;
-    FVector World1;
+    Vector Corner1;
+    Corner1.x = NormWidth;
+    Corner1.y = -NormHeight;
+    Corner1.z = 0.0f;
+    Vector World1;
     RichTextMathEngine()->TransformXform(World1, Xform, Corner1);
     float Clip1[4];
     for (int Row = 0; Row < 3; ++Row)
     {
-        double Sum = static_cast<double>(M[Row * 4 + 2]) * World1.Z;
-        Sum += static_cast<double>(M[Row * 4 + 1]) * World1.Y;
-        Sum += static_cast<double>(M[Row * 4 + 0]) * World1.X;
+        double Sum = static_cast<double>(M[Row * 4 + 2]) * World1.z;
+        Sum += static_cast<double>(M[Row * 4 + 1]) * World1.y;
+        Sum += static_cast<double>(M[Row * 4 + 0]) * World1.x;
         Sum += M[Row * 4 + 3];
         Clip1[Row] = static_cast<float>(Sum);
     }
     {
-        double Sum = static_cast<double>(M[13]) * World1.Y;
-        Sum += static_cast<double>(M[12]) * World1.X;
-        Sum += static_cast<double>(M[14]) * World1.Z;
+        double Sum = static_cast<double>(M[13]) * World1.y;
+        Sum += static_cast<double>(M[12]) * World1.x;
+        Sum += static_cast<double>(M[14]) * World1.z;
         Sum += M[15];
         Clip1[3] = static_cast<float>(Sum);
     }
@@ -776,10 +776,10 @@ void BaseRichTextWin::EnsureSurface()
         return;
     double const InvW1 = 1.0 / Clip1[3];
 
-    WorldRect[0] = World0.X;
-    WorldRect[1] = World0.Y;
-    WorldRect[2] = World1.X;
-    WorldRect[3] = World1.Y;
+    WorldRect[0] = World0.x;
+    WorldRect[1] = World0.y;
+    WorldRect[2] = World1.x;
+    WorldRect[3] = World1.y;
 
     double const NdcX1 = Clip1[0] * InvW1;
     float const NdcY1 = static_cast<float>(InvW1 * Clip1[1]);

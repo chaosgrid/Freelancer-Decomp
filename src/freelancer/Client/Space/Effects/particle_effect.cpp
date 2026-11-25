@@ -100,14 +100,14 @@ unsigned char FParticleTunnel::TickDraw(float Dt, FSpaceCamera* Cam)
     FParticleTunnel* const Self = this;
     // LAB_00513510: the world orientation with the camera's position becomes the local
     // transform; then the particle's own tick, whose answer is returned.
-    FTransform World;
+    Transform World;
     EffectGetWorldTransform(reinterpret_cast<FEffectBase const*>(Self), &World);
-    float const* const CamPos = AsCamera(Cam)->GetPosition();
-    FTransform Local;
+    const Vector* const CamPos = AsCamera(Cam)->GetPosition();
+    Transform Local;
     Local.Rotation = World.Rotation;
-    Local.Translation.X = CamPos[0];
-    Local.Translation.Y = CamPos[1];
-    Local.Translation.Z = CamPos[2];
+    Local.Translation.x = CamPos->x;
+    Local.Translation.y = CamPos->y;
+    Local.Translation.z = CamPos->z;
     Self->LocalXform = Local;
     return ParticleEffectTickDraw(Self, Dt, Cam);
 }
@@ -132,9 +132,9 @@ FParticleEffectCruise::FParticleEffectCruise() : FParticleEffect(0)
     CruiseScale = 1.0f;
 }
 
-float FParticleEffect::GetWorldPos(FVector* Out)
+float FParticleEffect::GetWorldPos(Vector* Out)
 {
-    FTransform World;
+    Transform World;
     EffectGetWorldTransform(this, &World);
     *Out = World.Translation;
     return Radius74;
@@ -414,15 +414,15 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
                 if (DrawStateA != static_cast<unsigned>(reinterpret_cast<uintptr_t>(Field)))
                     return 0;
 
-                FTransform World;
+                Transform World;
                 EffectGetWorldTransform(Base, &World);
-                float const* const CamPos = CamIface->GetPosition();
+                const Vector* const CamPos = CamIface->GetPosition();
 
                 // Each difference is rounded to a float, the sum is unrounded; only strictly
                 // beyond the radius (DAT_00675248) hides the effect.
-                float const Dx = World.Translation.X - CamPos[0];
-                float const Dy = World.Translation.Y - CamPos[1];
-                float const Dz = World.Translation.Z - CamPos[2];
+                float const Dx = World.Translation.x - CamPos->x;
+                float const Dy = World.Translation.y - CamPos->y;
+                float const Dz = World.Translation.z - CamPos->z;
                 double const DistSq = (static_cast<double>(Dz) * Dz + static_cast<double>(Dy) * Dy) +
                                       static_cast<double>(Dx) * Dx;
                 if (DistSq > static_cast<double>(GetSpaceFieldRadiusSq()))
@@ -435,16 +435,16 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     if (!(This->Priority >= GetPerfGenericEffectPerf()))
         return static_cast<unsigned char>(This->Flags7C & 1u);
 
-    FVector WorldPos;
+    Vector WorldPos;
     float const Radius = This->GetWorldPos(&WorldPos);
 
-    FTransform const* const ViewXform =
-        reinterpret_cast<FTransform const*>(CamIface->GetViewTransform());
-    FVector ViewPos;
+    Transform const* const ViewXform =
+        CamIface->GetViewTransform();
+    Vector ViewPos;
     ParticleMath()->TransformXform(ViewPos, *ViewXform, WorldPos);
 
     // On only when ZNear is strictly (ordered) below the far edge.
-    float const NegZ = -ViewPos.Z;
+    float const NegZ = -ViewPos.z;
     float const FarEdge = NegZ + Radius;
     if (!(CamIface->GetZNear() < FarEdge))
         return static_cast<unsigned char>(This->Flags7C & 1u);
@@ -473,13 +473,13 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
     }
 
     // The two side planes against the radius; inside only when the distance is below or equal.
-    double const DistX = std::fabs(static_cast<double>(ViewPos.X)) * Cam->PlaneX[0] +
-                         static_cast<double>(ViewPos.Z) * Cam->PlaneX[2];
+    double const DistX = std::fabs(static_cast<double>(ViewPos.x)) * Cam->PlaneX[0] +
+                         static_cast<double>(ViewPos.z) * Cam->PlaneX[2];
     unsigned char Inside = 0;
     if (DistX <= Radius)
     {
-        double const DistY = std::fabs(static_cast<double>(ViewPos.Y)) * Cam->PlaneY[1] +
-                             static_cast<double>(ViewPos.Z) * Cam->PlaneY[2];
+        double const DistY = std::fabs(static_cast<double>(ViewPos.y)) * Cam->PlaneY[1] +
+                             static_cast<double>(ViewPos.z) * Cam->PlaneY[2];
         if (DistY <= Radius)
             Inside = 1;
     }
@@ -551,11 +551,11 @@ unsigned char FParticleEffect::TickDraw(float Dt, FSpaceCamera* Cam)
 
     if (This->FxEffect != nullptr)
     {
-        FTransform World;
+        Transform World;
         EffectGetWorldTransform(AsEffectBase(This), &World);
         This->SetLod(This->Float80);
         IFxEffect* const Fx = This->FxEffect;
-        Fx->SetTransform(nullptr, &World);
+        Fx->SetTransform(0, &World);
         Fx->ComposeTransforms(nullptr);
         Fx->Update(FloatArg(Dt));
     }
@@ -609,7 +609,7 @@ void ParticleEffectSetLod(FParticleEffect* This, float Lod)
     This->FParticleEffect::SetLod(Lod);
 }
 
-float FParticleEffectCruise::GetWorldPos(FVector* Out)
+float FParticleEffectCruise::GetWorldPos(Vector* Out)
 {
     FParticleEffectCruise* const This = this;
     // FUN_004f91c0. The unrounded product strictly below 10.0 becomes 10.0f.
@@ -618,13 +618,13 @@ float FParticleEffectCruise::GetWorldPos(FVector* Out)
     if (Product < 10.0)
         Radius = 10.0f;
 
-    FTransform World;
+    Transform World;
     EffectGetWorldTransform(AsEffectBase(This), &World);
     *Out = World.Translation;
     return Radius;
 }
 
-float ParticleEffectCruiseGetWorldPos(FParticleEffectCruise* This, FVector* Out)
+float ParticleEffectCruiseGetWorldPos(FParticleEffectCruise* This, Vector* Out)
 {
     return This->FParticleEffectCruise::GetWorldPos(Out);
 }
@@ -720,7 +720,7 @@ int ParticleEffectRelease(FParticleEffect* This)
 
 
 void ParticleEffectAttach(FParticleEffect* This, void* WatchableOwner, int EngineIndex,
-                          FTransform const* LocalXform)
+                          Transform const* LocalXform)
 {
     // FUN_004f7d20, the shared Effect attach.
     This->Attach(WatchableOwner, EngineIndex, LocalXform);
@@ -787,7 +787,7 @@ unsigned char FCameraParticles::Start(FEffectArch* Arch)
 {
     FCameraParticles* const Self = this;
     // LAB_004f8e10.
-    FTransform World;
+    Transform World;
     EffectGetWorldTransform(Self, &World);
 
     // Stored before the test.
@@ -795,11 +795,11 @@ unsigned char FCameraParticles::Start(FEffectArch* Arch)
     Self->Camera = Camera;
     if (Camera != nullptr)
     {
-        float const* const CamPos =
+        const Vector* const CamPos =
             ((ICamera*)Camera)->GetPosition();
-        float const Dx = CamPos[0] - World.Translation.X;
-        float const Dy = CamPos[1] - World.Translation.Y;
-        float const Dz = CamPos[2] - World.Translation.Z;
+        float const Dx = CamPos->x - World.Translation.x;
+        float const Dy = CamPos->y - World.Translation.y;
+        float const Dz = CamPos->z - World.Translation.z;
         float const Distance = std::sqrt(Dz * Dz + Dx * Dx + Dy * Dy);
         float const Factor = (Distance - kCameraParticlesNearDistance) /
                              (kCameraParticlesFarDistance - kCameraParticlesNearDistance);
@@ -823,13 +823,13 @@ unsigned char FCameraParticles::Start(FEffectArch* Arch)
     return EffectBaseStart(Self, Arch);
 }
 
-float FCameraParticles::GetWorldPos(FVector* Out)
+float FCameraParticles::GetWorldPos(Vector* Out)
 {
     FCameraParticles* const Self = this;
     // LAB_004f8df0.
-    Out->X = 0.0f;
-    Out->Y = 0.0f;
-    Out->Z = 0.0f;
+    Out->x = 0.0f;
+    Out->y = 0.0f;
+    Out->z = 0.0f;
     return 100.0f;
 }
 
@@ -938,7 +938,7 @@ unsigned char CreateEffectCompanionAlive(void* CompanionLocal)
 }
 
 unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, void* ListOwner,
-                                     int EngineIndex, FTransform const* LocalXform,
+                                     int EngineIndex, Transform const* LocalXform,
                                      void* CompanionOut)
 {
     return CliCreateEffectOneShotOn(&G_CliEffectFactoryC60, EffectArch, ListOwner, EngineIndex,
@@ -947,7 +947,7 @@ unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, void* ListOwner,
 
 unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffectArch* EffectArch,
                                        void* ListOwner, int EngineIndex,
-                                       FTransform const* LocalXform, void* CompanionOut)
+                                       Transform const* LocalXform, void* CompanionOut)
 {
     // FUN_00503070 (on the factory).
     if (GetGameOption(kGameOptEffectsGroup) == 0 || EffectArch == nullptr)
@@ -971,7 +971,7 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
     if (Particle != nullptr)
         EffectAttach(Particle, ListOwner, EngineIndex, LocalXform);
     if (Sound != nullptr && LocalXform != nullptr)
-        Sound->SetPose(EngineIndex, reinterpret_cast<float const*>(LocalXform));
+        Sound->SetPose(EngineIndex, LocalXform);
     if (Light != nullptr && LocalXform != nullptr)
         CliExplosionAttachLocalXform(Light, EngineIndex, LocalXform);
 
@@ -1061,7 +1061,7 @@ unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffect
     return 1;
 }
 
-unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, FTransform const* LocalXform,
+unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, Transform const* LocalXform,
                                           float const* Pos3, void* CompanionOut)
 {
     return CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryC60, EffectArch, LocalXform, Pos3,
@@ -1069,7 +1069,7 @@ unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, FTransform co
 }
 
 unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
-                                            FEffectArch* EffectArch, FTransform const* LocalXform,
+                                            FEffectArch* EffectArch, Transform const* LocalXform,
                                             float const* Pos3, void* CompanionOut)
 {
     // FUN_00503f40. The effects option off and a null EffectArch return 0; neither pointer
@@ -1092,25 +1092,25 @@ unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
         Light = Factory->CreateLight();
 
     if (Particle != nullptr)
-        std::memcpy(&Particle->LocalXform, LocalXform, sizeof(FTransform));
+        std::memcpy(&Particle->LocalXform, LocalXform, sizeof(Transform));
 
     // A plain (non-3D) Source from DAT_00674c5c's factory ignores the position.
     if (Sound != nullptr)
     {
-        Sound->SetPosition(const_cast<float*>(&LocalXform->Translation.X));
-        Sound->SetVelocity(Pos3);
+        Sound->SetPosition(const_cast<float*>(&LocalXform->Translation.x));
+        Sound->SetVelocity((const Vector*)Pos3);
     }
 
     if (Light != nullptr)
     {
         if (static_cast<int>(Light->EngineIndex) == -1)
         {
-            EngineLightSetTransform((FEngineLight*)Light, &LocalXform->Rotation.D[0][0],
-                                    &LocalXform->Translation.X);
+            EngineLightSetTransform((FEngineLight*)Light, &LocalXform->Rotation.E[0][0],
+                                    &LocalXform->Translation.x);
         }
         else
         {
-            std::memcpy(Light->LocalXform, LocalXform, sizeof(FTransform));
+            std::memcpy(&Light->LocalXform, LocalXform, sizeof(Transform));
         }
         GameLightSetFreeMotionOffset(Light, Pos3);
     }

@@ -169,7 +169,7 @@ intptr_t NnConfirm::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(Position);
+        SetPosition(&Position.x);
         return 0;
     }
     if (Msg == kWinMsgEscape)

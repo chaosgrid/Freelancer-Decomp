@@ -22,7 +22,7 @@ static void ReplaceSearchPath(FEngineObject* This, IDAComponent* NewPath);
 static void EngineComposeAncestors(FEngineInstance* Instance);
 
 static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetypeHandle* Handle,
-                                                IInstanceTransform* Transform);
+                                                IEngineInstance* Callbacks);
 
 static void EraseChildNodes(FEngineChildNode* First, FEngineChildNode* Last, unsigned long* Count);
 static void InsertRootInstance(FEngineObject* Engine, FEngineInstance* Instance);
@@ -63,16 +63,16 @@ static_assert(offsetof(FEngineInstance, JointState) == 0xB8, "instance.JointStat
 static_assert(offsetof(FEngineInstance, bWorldDirty) == 0xD4, "instance.bWorldDirty");
 static_assert(offsetof(FEngineInstance, PartChild) == 0xE8, "instance.PartChild");
 static_assert(sizeof(FInstanceTransform) == G_TransformObjectSize, "transform size");
-static_assert(offsetof(FInstanceTransform, Matrix) == 0x04, "transform.Matrix");
-static_assert(offsetof(FInstanceTransform, Extra) == 0x34, "transform.Extra");
-static_assert(offsetof(FInstanceTransform, User) == 0x44, "transform.User");
+static_assert(offsetof(FInstanceTransform, Xform) == 0x04, "transform.Xform");
+static_assert(offsetof(FInstanceTransform, Radius) == 0x34, "transform.Radius");
+static_assert(offsetof(FInstanceTransform, InstanceFlags) == 0x44, "transform.InstanceFlags");
 
 static void EngineUpdateInstanceTree(FEngineObject* This, FEngineInstance* Instance,
                                     unsigned long Flags, void* Arg);
 
 static FArchetypeHandle* DACOM_API EngineCreateArchetypeHandle(FEngineObject* This,
                                                               FArchetypeName* Name,
-                                                              void* FileSystem);
+                                                              IFileSystem* FileSystem);
 
 static FEngineInstance* DACOM_API EngineCreateInstance(FEngineObject* This,
                                                       FArchetypeHandle* Handle, void* Transform);
@@ -92,7 +92,7 @@ unsigned long FArchetypeHandle::AddRef(FEngineObject* Engine)
     RefCount += 1;
     for (std::vector<FArchetypeChild>::iterator Child = Children.begin();
          Child != Children.end(); ++Child)
-        Engine->AddRefHandle(Child->Handle);
+        Engine->AddRefHandle((ArchetypeIndex)Child->Handle);
     return RefCount;
 }
 
@@ -102,7 +102,7 @@ unsigned long FArchetypeHandle::Release(FEngineObject* Engine)
     RefCount -= 1;
     for (std::vector<FArchetypeChild>::iterator Child = Children.begin();
          Child != Children.end(); ++Child)
-        Engine->ReleaseHandle(Child->Handle);
+        Engine->ReleaseHandle((ArchetypeIndex)Child->Handle);
     return RefCount;
 }
 
@@ -134,9 +134,9 @@ static FEngineInstance* AllocEngineInstance(FArchetypeHandle* Handle)
 static float G_IdentityMatrix[12] = {
     1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
 
-static void InitIdentity3x4(float* Matrix)
+static void InitIdentity3x4(void* Dest)
 {
-    std::memcpy(Matrix, G_IdentityMatrix, sizeof(G_IdentityMatrix));
+    std::memcpy(Dest, G_IdentityMatrix, sizeof(G_IdentityMatrix));
 }
 
 static void InitInstanceMatrix(FEngineInstance* Instance)
@@ -201,7 +201,7 @@ void FEngineInstance::SetExtentAndInvalidate(float Extent, const float* Vec, uns
 {
     if (bXform != 0)
     {
-        Transform->SetExtra(this, Extent, Vec);
+        Callbacks->set_centered_radius((long)this, Extent, *(const Vector*)Vec);
         InvalidateExtentChain(bXform);
         return;
     }
@@ -215,7 +215,7 @@ void FEngineInstance::SetExtentAndInvalidate(float Extent, const float* Vec, uns
 // FUN_0661ed40: the transform at +4, slot 9. No checks.
 void FEngineInstance::TransformExtra(float* OutExtent, float* OutVec)
 {
-    Transform->GetExtra(this, OutExtent, OutVec);
+    Callbacks->get_centered_radius((long)this, OutExtent, (Vector*)OutVec);
 }
 
 // FUN_0661ed60: walk up the parents (+0x10), writing -1 to the extent (+0xD8) until one already
@@ -265,14 +265,14 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
         return;
     }
 
-    float* WorldXf = Transform->GetMatrix(this);
+    const Transform* WorldXf = &Callbacks->get_transform((long)this);
     float OwnR = 0.0f;
     float OwnLocal[3];
     TransformExtra(&OwnR, OwnLocal);
     float OwnWorld[3];
-    Acquire3DMathEngine()->TransformXform(*(FVector*)OwnWorld,
-                                                  *(const FTransform*)WorldXf,
-                                                  *(const FVector*)OwnLocal);
+    Acquire3DMathEngine()->TransformXform(*(Vector*)OwnWorld,
+                                                  *WorldXf,
+                                                  *(const Vector*)OwnLocal);
 
     float MinV[3];
     float MaxV[3];
@@ -285,14 +285,14 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
     FEngineInstance* Child = FirstChild;
     while (Child != nullptr)
     {
-        float* ChildXf = Child->Transform->GetMatrix(Child);
+        const Transform& ChildXf = Child->Callbacks->get_transform((long)Child);
         float ChildR = 0.0f;
         float ChildLocal[3];
         Child->ComputeInstanceExtent(1, &ChildR, ChildLocal);
         float ChildWorld[3];
-        Acquire3DMathEngine()->TransformXform(*(FVector*)ChildWorld,
-                                                      *(const FTransform*)ChildXf,
-                                                      *(const FVector*)ChildLocal);
+        Acquire3DMathEngine()->TransformXform(*(Vector*)ChildWorld,
+                                                      ChildXf,
+                                                      *(const Vector*)ChildLocal);
         for (unsigned long Axis = 0; Axis < 3; ++Axis)
         {
             const float Lo = ChildWorld[Axis] - ChildR;
@@ -323,14 +323,14 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
     Child = FirstChild;
     while (Child != nullptr)
     {
-        float* ChildXf = Child->Transform->GetMatrix(Child);
+        const Transform& ChildXf = Child->Callbacks->get_transform((long)Child);
         float ChildR = 0.0f;
         float ChildLocal[3];
         Child->ComputeInstanceExtent(1, &ChildR, ChildLocal);
         float ChildWorld[3];
-        Acquire3DMathEngine()->TransformXform(*(FVector*)ChildWorld,
-                                                      *(const FTransform*)ChildXf,
-                                                      *(const FVector*)ChildLocal);
+        Acquire3DMathEngine()->TransformXform(*(Vector*)ChildWorld,
+                                                      ChildXf,
+                                                      *(const Vector*)ChildLocal);
         const float ChildSphere =
             (float)(ExtentDistance(ChildWorld, CenterW) + (double)ChildR);
         if (ChildSphere > Radius)
@@ -339,9 +339,9 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
     }
 
     float LocalCenter[3];
-    Acquire3DMathEngine()->InverseTransform(*(FVector*)LocalCenter,
-                                                    *(const FTransform*)WorldXf,
-                                                    *(const FVector*)CenterW);
+    Acquire3DMathEngine()->InverseTransform(*(Vector*)LocalCenter,
+                                                    *WorldXf,
+                                                    *(const Vector*)CenterW);
     Extent = Radius;
     ExtentVec[0] = LocalCenter[0];
     ExtentVec[1] = LocalCenter[1];
@@ -355,7 +355,7 @@ void FEngineInstance::ComputeInstanceExtent(unsigned char bRecursive, float* Out
 // The transform's vtable +0x34 with the instance; its AL decides the FUN_0661f210 recursion.
 static unsigned char MarkInstanceWorldDirty(FEngineInstance* Instance)
 {
-    return (unsigned char)Instance->Transform->MarkWorldDirty(Instance);
+    return (unsigned char)Instance->Callbacks->joint_changed((long)Instance);
 }
 
 // FUN_0661f210. No tests.
@@ -377,16 +377,16 @@ unsigned char FEngineInstance::ComposeWorld()
     if (Parent == nullptr)
         return 0;
     const unsigned long bApplied = ApplyJointToLocal(this, 0);
-    const float* ParentWorld = Parent->Transform->GetMatrix(Parent);
+    const Transform& ParentWorld = Parent->Callbacks->get_transform((long)Parent);
     if (G_ComposeMath == nullptr)
         G_ComposeMath = Create3DMathEngine();
     float Composed[12];
-    G_ComposeMath->MulTransform(*(FTransform*)Composed, // +0x1C
-                                        *(const FTransform*)ParentWorld,
-                                        *(const FTransform*)(Matrix));
+    G_ComposeMath->MulTransform(*(Transform*)Composed, // +0x1C
+                                        ParentWorld,
+                                        *(const Transform*)(Matrix));
     float Copy[12];
     std::memcpy(Copy, Composed, sizeof(Copy));
-    Transform->SetMatrix(this, Copy);
+    Callbacks->set_transform((long)this, *(const Transform*)Copy);
     if ((bApplied & 0xFF) != 0)
     {
         InvalidateExtentChain(1);
@@ -409,10 +409,10 @@ static FInstanceTransform* AllocInstanceTransform()
 }
 
 // LAB_0661f320 (slot 13): returns 0.
-unsigned long DACOM_API FInstanceTransform::MarkWorldDirty(void* Instance)
+bool DACOM_API FInstanceTransform::joint_changed(long Inst)
 {
-    (void)Instance;
-    return 0;
+    (void)Inst;
+    return false;
 }
 
 // FUN_0661f330 (dtor: vtable back to 066295d0) + FUN_0661f300 (block back to DAT_0662b114).
@@ -424,112 +424,105 @@ void FInstanceTransform::Free()
 
 // Engine-owned transform.
 
-// LAB_0661f340 (slot 0). +0x44 (user) is NOT touched.
-GENRESULT DACOM_API FInstanceTransform::Init(void* Instance)
+// LAB_0661f340 (slot 0). +0x44 (the instance flags) is NOT touched.
+void DACOM_API FInstanceTransform::initialize_instance(long Inst)
 {
-    (void)Instance;
-    InitIdentity3x4(Matrix);
-    Extra = 0.0f;
-    ExtraVec[0] = 0.0f;
-    ExtraVec[1] = 0.0f;
-    ExtraVec[2] = 0.0f;
-    return GR_OK;
+    (void)Inst;
+    InitIdentity3x4(&Xform);
+    Radius = 0.0f;
+    Center.x = 0.0f;
+    Center.y = 0.0f;
+    Center.z = 0.0f;
 }
 
 // LAB_06612160 (slots 1 and 2): no body.
-GENRESULT DACOM_API FInstanceTransform::AddRef(void* Instance)
+void DACOM_API FInstanceTransform::create_instance(long Inst)
 {
-    (void)Instance;
-    return GR_OK;
+    (void)Inst;
 }
 
-GENRESULT DACOM_API FInstanceTransform::Release(void* Instance)
+void DACOM_API FInstanceTransform::destroy_instance(long Inst)
 {
-    (void)Instance;
-    return GR_OK;
+    (void)Inst;
 }
 
 // LAB_0661f380 (slot 3): +0x28.
-GENRESULT DACOM_API FInstanceTransform::SetPosition(void* Instance, const float* Position)
+void DACOM_API FInstanceTransform::set_position(long Inst, Vector const& Pos)
 {
-    (void)Instance;
-    Matrix[9] = Position[0];
-    Matrix[10] = Position[1];
-    Matrix[11] = Position[2];
-    return GR_OK;
+    (void)Inst;
+    Xform.Translation.x = Pos.x;
+    Xform.Translation.y = Pos.y;
+    Xform.Translation.z = Pos.z;
 }
 
 // LAB_0661f3a0 (slot 4): +0x28.
-float* DACOM_API FInstanceTransform::GetPosition(void* Instance)
+Vector const& DACOM_API FInstanceTransform::get_position(long Inst) const
 {
-    (void)Instance;
-    return Matrix + 9;
+    (void)Inst;
+    return Xform.Translation;
 }
 
 // LAB_0661f3b0 (slot 5): nine dwords to +4.
-GENRESULT DACOM_API FInstanceTransform::SetOrientation(void* Instance, const float* Rows)
+void DACOM_API FInstanceTransform::set_orientation(long Inst, Matrix const& Orient)
 {
-    (void)Instance;
-    std::memcpy(Matrix, Rows, 9 * sizeof(float));
-    return GR_OK;
+    (void)Inst;
+    std::memcpy(&Xform.Rotation, &Orient, 9 * sizeof(float));
 }
 
 // LAB_0661f3d0 (slots 6 and 8): +4.
-float* DACOM_API FInstanceTransform::GetOrientation(void* Instance)
+Matrix const& DACOM_API FInstanceTransform::get_orientation(long Inst) const
 {
-    (void)Instance;
-    return Matrix;
+    (void)Inst;
+    return Xform.Rotation;
 }
 
-float* DACOM_API FInstanceTransform::GetMatrix(void* Instance)
+Transform const& DACOM_API FInstanceTransform::get_transform(long Inst) const
 {
-    (void)Instance;
-    return Matrix;
+    (void)Inst;
+    return Xform;
 }
 
 // LAB_0661f3e0 (slot 7): twelve dwords to +4.
-GENRESULT DACOM_API FInstanceTransform::SetMatrix(void* Instance, const float* NewMatrix)
+void DACOM_API FInstanceTransform::set_transform(long Inst, Transform const& NewXform)
 {
-    (void)Instance;
-    std::memcpy(Matrix, NewMatrix, 12 * sizeof(float));
-    return GR_OK;
+    (void)Inst;
+    std::memcpy(&Xform, &NewXform, 12 * sizeof(float));
 }
 
 // LAB_0661f400 (slot 9): +0x34, +0x38..+0x40.
-GENRESULT DACOM_API FInstanceTransform::GetExtra(void* Instance, float* OutExtra, float* OutVec)
+void DACOM_API FInstanceTransform::get_centered_radius(long Inst, float* OutRadius,
+                                                       Vector* OutCenter) const
 {
-    (void)Instance;
-    *OutExtra = Extra;
-    OutVec[0] = ExtraVec[0];
-    OutVec[1] = ExtraVec[1];
-    OutVec[2] = ExtraVec[2];
-    return GR_OK;
+    (void)Inst;
+    *OutRadius = Radius;
+    OutCenter->x = Center.x;
+    OutCenter->y = Center.y;
+    OutCenter->z = Center.z;
 }
 
 // LAB_0661f430 (slot 10).
-GENRESULT DACOM_API FInstanceTransform::SetExtra(void* Instance, float NewExtra, const float* Vec)
+void DACOM_API FInstanceTransform::set_centered_radius(long Inst, float NewRadius,
+                                                       Vector const& NewCenter)
 {
-    (void)Instance;
-    Extra = NewExtra;
-    ExtraVec[0] = Vec[0];
-    ExtraVec[1] = Vec[1];
-    ExtraVec[2] = Vec[2];
-    return GR_OK;
+    (void)Inst;
+    Radius = NewRadius;
+    Center.x = NewCenter.x;
+    Center.y = NewCenter.y;
+    Center.z = NewCenter.z;
 }
 
 // LAB_0661f460 (slot 11).
-GENRESULT DACOM_API FInstanceTransform::SetUser(void* Instance, unsigned long NewUser)
+void DACOM_API FInstanceTransform::set_instance_flags(long Inst, unsigned long Flags)
 {
-    (void)Instance;
-    User = NewUser;
-    return GR_OK;
+    (void)Inst;
+    InstanceFlags = Flags;
 }
 
 // LAB_0661f470 (slot 12).
-unsigned long DACOM_API FInstanceTransform::GetUser(void* Instance)
+unsigned long DACOM_API FInstanceTransform::get_instance_flags(long Inst) const
 {
-    (void)Instance;
-    return User;
+    (void)Inst;
+    return InstanceFlags;
 }
 
 // The list sentinel the ctor FUN_0661f550 builds for +0x48 and +0x54 (operator new(0x3c)).
@@ -608,7 +601,7 @@ void FEngineObject::Destruct()
 }
 
 FArchetypeHandle* const G_InvalidArchetype =
-    (FArchetypeHandle*)G_InvalidEngineHandle;
+    (FArchetypeHandle*)InvalidArchetypeIndex;
 
 // FUN_0661f8b0: find(Crc) in the map at +0x30 (lower_bound FUN_0661a260).
 FArchetypeHandle* FEngineObject::LookupArchetype(FArchetypeName* Name)
@@ -894,7 +887,7 @@ GENRESULT DACOM_API FEngineObject::QuerySearchPath(char* Dest, unsigned long Max
 }
 
 // LAB_0661ff90 (IEngine+0x24). No checks.
-GENRESULT DACOM_API FEngineObject::GetSearchPath(void** Out)
+GENRESULT DACOM_API FEngineObject::GetSearchPath(IDAComponent** Out)
 {
     *Out = SearchPath;
     if (*Out == nullptr)
@@ -929,7 +922,7 @@ static bool IsAbsoluteFilePath(const char* Path)
 }
 
 // LAB_0661ffc0 (IEngine +0x28).
-GENRESULT DACOM_API FEngineObject::CreateFileSystem(const char* Path, void** Out, void* Factory)
+GENRESULT DACOM_API FEngineObject::CreateFileSystem(const char* Path, IFileSystem** Out, IComponentFactory* Factory)
 {
     if (Path == nullptr || Out == nullptr)
         return GR_INVALID_PARMS;
@@ -953,14 +946,14 @@ GENRESULT DACOM_API FEngineObject::CreateFileSystem(const char* Path, void** Out
             Creator = (IComponentFactory*)((void*)(SearchPath));
         }
     }
-    return Creator->CreateInstance((AGGDESC*)(&Desc), Out);
+    return Creator->CreateInstance((AGGDESC*)(&Desc), (void**)Out);
 }
 
 static const char* const G_AnonymousFormat = "anonymous-%d";
 static unsigned long G_AnonymousIndex = 0;
 
 // LAB_066200c0 (IEngine +0x2C).
-void* DACOM_API FEngineObject::CreateCompoundArchetype(FEngineName* InName)
+ArchetypeIndex DACOM_API FEngineObject::CreateCompoundArchetype(FEngineName* InName)
 {
     FArchetypeName* Name = InName;
     DACOM_CRC::GetCRC32(nullptr);
@@ -987,8 +980,8 @@ void* DACOM_API FEngineObject::CreateCompoundArchetype(FEngineName* InName)
     if (Block != nullptr)
         Handle = new (Block) FArchetypeHandle(&Local);
     Archetypes.insert(FArchetypeMap::value_type(Local.Crc, Handle));
-    AddRefHandle(Handle);
-    return Handle;
+    AddRefHandle((ArchetypeIndex)Handle);
+    return (ArchetypeIndex)Handle;
 }
 
 // The resize(n) back to the size before a failed FUN_066201b0 (erase, FUN_066230f0).
@@ -1022,12 +1015,12 @@ static bool ReadPartNameField(IFileSystem* Fs, const char* Field, char* Buffer)
 
 // FUN_066201b0. Retries CreateFileSystem without the parent FS when the first attempt fails.
 static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, void* CmpndFs,
-                                    unsigned long FindHandle, void* ParentFs, FArchetypeChild* Child)
+                                    unsigned long FindHandle, IFileSystem* ParentFs, FArchetypeChild* Child)
 {
     FEngBaseFileSystemDesc PartDesc;
     FillFileSystemDesc(&PartDesc, Name, nullptr);
     PartDesc.FindHandle = FindHandle;
-    void* FileFs = nullptr;
+    IFileSystem* FileFs = nullptr;
     void* PartFs = nullptr;
     GENRESULT ObjectResult = (GENRESULT)0xFFFFFFFF;
     GENRESULT FileResult = (GENRESULT)0xFFFFFFFF;
@@ -1064,8 +1057,8 @@ static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, vo
     FArchetypeName Nested;
     Nested.Text = FileName;
     Nested.Crc = DACOM_CRC::GetCRC32(FileName);
-    void* PartHandle = Engine->CreateArchetypeHandle(&Nested, FileFs); // +0x30
-    if (PartHandle == G_InvalidArchetype)
+    ArchetypeIndex PartHandle = Engine->CreateArchetypeHandle(&Nested, FileFs); // +0x30
+    if (PartHandle == (ArchetypeIndex)G_InvalidArchetype)
     {
         if (FileFs != nullptr)
             ((IDAComponent*)FileFs)->Release();
@@ -1242,7 +1235,7 @@ static const char* const G_CmpndPartFailText =
 
 // FUN_06620500.
 static GENRESULT ParseCmpndChildren(FEngineObject* Engine, FArchetypeHandle* Handle, void* CmpndFs,
-                                   void* ParentFs)
+                                   IFileSystem* ParentFs)
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return GR_E_FAIL;
@@ -1282,17 +1275,17 @@ static GENRESULT ParseCmpndChildren(FEngineObject* Engine, FArchetypeHandle* Han
 }
 
 // The Engine +0x58 walk of LAB_06621150: CreateArchetype on every engine component. No checks.
-static void FanoutIecCreateArchetype(FEngineObject* This, FArchetypeHandle* Handle, void* FileSystem)
+static void FanoutIecCreateArchetype(FEngineObject* This, FArchetypeHandle* Handle, IFileSystem* FileSystem)
 {
     FEngineChildNode* Sentinel = This->EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
-        AsEngineComponent(Node->Object)->CreateArchetype(Handle, FileSystem);
+        AsEngineComponent(Node->Object)->CreateArchetype((ArchetypeIndex)Handle, FileSystem);
 }
 
 // LAB_06621150 (IEngine +0x30).
 static FArchetypeHandle* DACOM_API EngineCreateArchetypeHandle(FEngineObject* This,
                                                               FArchetypeName* Name,
-                                                              void* FileSystem)
+                                                              IFileSystem* FileSystem)
 {
     FEngBaseFileSystemDesc Desc;
     FillFileSystemDesc(&Desc, G_NameCmpnd, nullptr);
@@ -1303,7 +1296,7 @@ static FArchetypeHandle* DACOM_API EngineCreateArchetypeHandle(FEngineObject* Th
     FArchetypeHandle* Existing = This->LookupArchetype(Name);
     if (Existing != G_InvalidArchetype)
     {
-        This->AddRefHandle(Existing); // +0x38
+        This->AddRefHandle((ArchetypeIndex)Existing); // +0x38
         return Existing;
     }
     if (FileSystem == nullptr)
@@ -1328,35 +1321,35 @@ static void FanoutIecDuplicateArchetype(FEngineObject* This, FArchetypeHandle* N
     // IEC +0x14 on every node of +0x54, no tests.
     FEngineChildNode* Sentinel = This->EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
-        AsEngineComponent(Node->Object)->DuplicateArchetype(NewHandle, OldHandle);
+        AsEngineComponent(Node->Object)->DuplicateArchetype((ArchetypeIndex)NewHandle, (ArchetypeIndex)OldHandle);
 }
 
 // LAB_066212c0 (IEngine+0x34).
-void* DACOM_API FEngineObject::DuplicateArchetype(void* InArchIn, FEngineName* InName)
+ArchetypeIndex DACOM_API FEngineObject::DuplicateArchetype(ArchetypeIndex InArchIn, FEngineName* InName)
 {
     FArchetypeHandle* ArchIn = (FArchetypeHandle*)InArchIn;
     FArchetypeName* Name = InName;
     if (ArchIn == G_InvalidArchetype)
-        return G_InvalidArchetype;
+        return (ArchetypeIndex)G_InvalidArchetype;
     if (ArchIn != nullptr && ArchIn->Children.size() != 0)
     {
         EngBaseFdump(kFdumpWarning, G_FdumpFileEngine, 0x42A, "WARNING",
                      "Engine: duplicate_archetype: arch_index is a compound archetype (not valid).");
-        return G_InvalidArchetype;
+        return (ArchetypeIndex)G_InvalidArchetype;
     }
     if (LookupArchetype(Name) != G_InvalidArchetype)
     {
         EngBaseFdump(kFdumpWarning, G_FdumpFileEngine, 0x42F, "WARNING",
                      "Engine: duplicate_archetype: archetype name already exists in duplicate_archetype().");
-        return G_InvalidArchetype;
+        return (ArchetypeIndex)G_InvalidArchetype;
     }
 
     FArchetypeHandle* NewHandle =
         (FArchetypeHandle*)(CreateCompoundArchetype(Name)); // vtable +0x2C
     if (NewHandle == G_InvalidArchetype)
-        return G_InvalidArchetype;
+        return (ArchetypeIndex)G_InvalidArchetype;
     FanoutIecDuplicateArchetype(this, NewHandle, ArchIn);
-    return NewHandle;
+    return (ArchetypeIndex)NewHandle;
 }
 
 // LAB_066213b0 (IEngine +0x38). Retail leaves EAX unwritten for an invalid handle; the port
@@ -1379,7 +1372,7 @@ static unsigned long DACOM_API EngineReleaseHandle(FEngineObject* This, FArchety
 
     FEngineChildNode* Sentinel = This->EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
-        AsEngineComponent(Node->Object)->DestroyArchetype(Handle);
+        AsEngineComponent(Node->Object)->DestroyArchetype((ArchetypeIndex)Handle);
 
     if (This->Archetypes.erase(Handle->Crc) == 0)
     {
@@ -1396,32 +1389,33 @@ static unsigned long DACOM_API EngineReleaseHandle(FEngineObject* This, FArchety
 
 static void CallEngineSlot14(FEngineObject* This, FArchetypeHandle* Handle)
 {
-    This->AddRefHandle(Handle);
+    This->AddRefHandle((ArchetypeIndex)Handle);
 }
 
 // LAB_06621530 (IEngine+0x44): lookup + slot 14.
-void* DACOM_API FEngineObject::FindArchetype(FEngineName* InName)
+ArchetypeIndex DACOM_API FEngineObject::FindArchetype(FEngineName* InName)
 {
     FArchetypeName* Name = InName;
     FArchetypeHandle* Handle = LookupArchetype(Name);
     if (Handle != G_InvalidArchetype)
         CallEngineSlot14(this, Handle);
-    return Handle;
+    return (ArchetypeIndex)Handle;
 }
 
 // FUN_06621560 (IEngine+0x48): IEC+0x1C on every engine component; the first hr >= 0 wins.
 // Out is not tested.
-GENRESULT DACOM_API FEngineObject::QueryEngineComponent(int Id, void* Name, void** Out)
+GENRESULT DACOM_API FEngineObject::QueryEngineComponent(ArchetypeIndex Archetype,
+                                                         const char* Iid, void** Out)
 {
     *Out = nullptr;
-    if (Id == -1 || Name == nullptr)
+    if (Archetype == InvalidArchetypeIndex || Iid == nullptr)
         return GR_INVALID_PARMS;
 
     FEngineChildNode* Sentinel = EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
     {
         const GENRESULT Result = AsEngineComponent(Node->Object)->QueryArchetype(
-            (void*)((ptrdiff_t)Id), (const char*)Name, Out);
+            Archetype, Iid, Out);
         if (Result >= 0)
             return GR_OK;
     }
@@ -1429,33 +1423,33 @@ GENRESULT DACOM_API FEngineObject::QueryEngineComponent(int Id, void* Name, void
 }
 
 static FEngineInstance* const G_InvalidInstance =
-    (FEngineInstance*)G_InvalidEngineHandle;
+    (FEngineInstance*)InvalidInstanceIndex;
 
 // LAB_066215d0 (IEngine+0x58): slot 12, slot 23, slot 15.
-void* DACOM_API FEngineObject::CreateInstanceFromName(FEngineName* InName, void* FileSystem,
-                                                      void* Transform)
+InstanceIndex DACOM_API FEngineObject::CreateInstanceFromName(FEngineName* InName, IFileSystem* FileSystem,
+                                                      IEngineInstance* Transform)
 {
     FArchetypeName* Name = InName;
     FArchetypeHandle* Handle = EngineCreateArchetypeHandle(this, Name, FileSystem);
     if (Handle == G_InvalidArchetype)
-        return G_InvalidInstance;
+        return (InstanceIndex)G_InvalidInstance;
     FEngineInstance* Instance = EngineCreateInstance(this, Handle, Transform);
     EngineReleaseHandle(this, Handle);
-    return Instance;
+    return (InstanceIndex)Instance;
 }
 
 
 // FUN_06621630's leaf path. No failure branch and no instance-map insert.
 static FEngineInstance* EngineCreateInstanceSimple(FEngineObject* This, FArchetypeHandle* Handle,
-                                                  IInstanceTransform* Transform)
+                                                  IEngineInstance* Callbacks)
 {
-    This->AddRefHandle(Handle);
+    This->AddRefHandle((ArchetypeIndex)Handle);
     FEngineInstance* Instance = AllocEngineInstance(Handle);
-    This->SetInstanceTransform(Instance, Transform);
+    This->SetInstanceTransform((InstanceIndex)Instance, Callbacks);
     FEngineChildNode* Sentinel = This->EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
-        AsEngineComponent(Node->Object)->CreateInstance(Instance, Handle);
-    Instance->Transform->AddRef(Instance);
+        AsEngineComponent(Node->Object)->CreateInstance((InstanceIndex)Instance, (ArchetypeIndex)Handle);
+    Instance->Callbacks->create_instance((long)Instance);
     return Instance;
 }
 
@@ -1466,13 +1460,13 @@ static FEngineInstance* DACOM_API EngineCreateInstance(FEngineObject* This,
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return G_InvalidInstance;
-    IInstanceTransform* Xf = (IInstanceTransform*)Transform;
+    IEngineInstance* Xf = (IEngineInstance*)Transform;
     if (Handle->Children.size() != 0)
     {
         FEngineInstance* Root = EngineCreateInstanceTree(This, Handle, Xf);
         if (Root == G_InvalidInstance)
             return Root;
-        Root->Transform->AddRef(Root);
+        Root->Callbacks->create_instance((long)Root);
         return Root;
     }
     return EngineCreateInstanceSimple(This, Handle, Xf);
@@ -1483,25 +1477,25 @@ void FEngineObject::DestroyInstanceBody(FEngineInstance* Instance)
 {
     while (Instance->FirstChild != nullptr)
         DestroyInstanceBody(Instance->FirstChild);
-    Instance->Transform->Release(Instance);
+    Instance->Callbacks->destroy_instance((long)Instance);
     if (Instance->Parent != nullptr)
         Instance->Parent->UnlinkChild(Instance);
     FEngineChildNode* Sentinel = EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
-        AsEngineComponent(Node->Object)->DestroyInstance(Instance);
-    if ((Instance->Flags & G_InstanceFlagOwnedTransform) != 0 && Instance->Transform != nullptr)
-        ((FInstanceTransform*)(Instance->Transform))->Free(); // flag 2: ours
-    Instance->Transform = nullptr;
+        AsEngineComponent(Node->Object)->DestroyInstance((InstanceIndex)Instance);
+    if ((Instance->Flags & G_InstanceFlagOwnedTransform) != 0 && Instance->Callbacks != nullptr)
+        ((FInstanceTransform*)(Instance->Callbacks))->Free(); // flag 2: ours
+    Instance->Callbacks = nullptr;
     EraseRootInstance(this, Instance);
-    ReleaseHandle(Instance->Archetype);
+    ReleaseHandle((ArchetypeIndex)Instance->Archetype);
     if (Instance->ParentArchetype != nullptr)
-        ReleaseHandle(Instance->ParentArchetype);
+        ReleaseHandle((ArchetypeIndex)Instance->ParentArchetype);
     G_InstancePool.Free(Instance);
 }
 
 // LAB_06621830 (IEngine+0x60): an invalid instance is returned as the result, as retail leaves
 // the argument in EAX on that path.
-GENRESULT DACOM_API FEngineObject::DestroyInstance(void* InInstance)
+GENRESULT DACOM_API FEngineObject::DestroyInstance(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (Instance == G_InvalidInstance || Instance == nullptr)
@@ -1511,7 +1505,7 @@ GENRESULT DACOM_API FEngineObject::DestroyInstance(void* InInstance)
 }
 
 // LAB_06621850 (IEngine+0x40). No null test on Out.
-FEngineName* DACOM_API FEngineObject::GetArchetypeName(FEngineName* Out, void* InHandle)
+FEngineName* DACOM_API FEngineObject::GetArchetypeName(FEngineName* Out, ArchetypeIndex InHandle)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
     if (Handle == G_InvalidArchetype || Handle == nullptr)
@@ -1527,39 +1521,39 @@ FEngineName* DACOM_API FEngineObject::GetArchetypeName(FEngineName* Out, void* I
 }
 
 // FUN_066218a0 (IEngine+0x64): inst+8, slot 14.
-void* DACOM_API FEngineObject::GetInstanceArchetype(void* InInstance)
+ArchetypeIndex DACOM_API FEngineObject::GetInstanceArchetype(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (Instance == G_InvalidInstance || Instance == nullptr)
-        return G_InvalidArchetype;
+        return (ArchetypeIndex)G_InvalidArchetype;
     EngineAddRefHandle(this, Instance->Archetype);
-    return Instance->Archetype;
+    return (ArchetypeIndex)Instance->Archetype;
 }
 
-static void CopyTransformState(IInstanceTransform* Dest, IInstanceTransform* Source,
+static void CopyTransformState(IEngineInstance* Dest, IEngineInstance* Source,
                                FEngineInstance* Instance)
 {
-    // Always through the interface on both sides. No tests. The two locals of the extra pair
-    // are uninitialised in retail; the port zeroes them.
-    Dest->SetMatrix(Instance, Source->GetMatrix(Instance));
+    // Always through the interface on both sides. No tests. The two locals of the centered
+    // radius pair are uninitialised in retail; the port zeroes them.
+    Dest->set_transform((long)Instance, Source->get_transform((long)Instance));
     float Extra = 0.0f;
     float ExtraVec[3] = {0.0f, 0.0f, 0.0f};
-    Source->GetExtra(Instance, &Extra, ExtraVec);
-    Dest->SetExtra(Instance, Extra, ExtraVec);
-    const unsigned long User = Source->GetUser(Instance);
-    Dest->SetUser(Instance, User);
+    Source->get_centered_radius((long)Instance, &Extra, (Vector*)ExtraVec);
+    Dest->set_centered_radius((long)Instance, Extra, *(const Vector*)ExtraVec);
+    const unsigned long User = Source->get_instance_flags((long)Instance);
+    Dest->set_instance_flags((long)Instance, User);
 }
 
 // LAB_066218d0 (IEngine +0x70), in retail order.
-GENRESULT DACOM_API FEngineObject::SetInstanceTransform(void* InInstance, void* Transform)
+GENRESULT DACOM_API FEngineObject::SetInstanceTransform(InstanceIndex InInstance, IEngineInstance* Transform)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
-    IInstanceTransform* NewTransform = (IInstanceTransform*)Transform;
+    IEngineInstance* NewTransform = (IEngineInstance*)Transform;
     if (Instance == G_InvalidInstance || Instance == nullptr)
         return GR_OK;
     const unsigned long OldFlags = Instance->Flags;
-    IInstanceTransform* Old = Instance->Transform;
-    IInstanceTransform* Attached = NewTransform;
+    IEngineInstance* Old = Instance->Callbacks;
+    IEngineInstance* Attached = NewTransform;
     if (Attached == nullptr)
     {
         Instance->Flags = OldFlags | G_InstanceFlagOwnedTransform;
@@ -1573,33 +1567,33 @@ GENRESULT DACOM_API FEngineObject::SetInstanceTransform(void* InInstance, void* 
     if (Attached == Old)
         return GR_OK;
 
-    Attached->Init(Instance);
+    Attached->initialize_instance((long)Instance);
     if (Old != nullptr)
     {
         CopyTransformState(Attached, Old, Instance);
-        Old->Release(Instance);
+        Old->destroy_instance((long)Instance);
     }
     if ((OldFlags & G_InstanceFlagOwnedTransform) != 0 && Old != nullptr)
         ((FInstanceTransform*)Old)->Free(); // flag 2: ours
-    Instance->Transform = Attached;
+    Instance->Callbacks = Attached;
     return GR_OK;
 }
 
 // LAB_066219b0 (IEngine +0x74): only -1 is tested. Retail returns Out in EAX; the port
 // returns 0.
-GENRESULT DACOM_API FEngineObject::GetInstanceTransformObject(void* InInstance, void** InOut)
+GENRESULT DACOM_API FEngineObject::GetInstanceTransformObject(InstanceIndex InInstance, IEngineInstance** InOut)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
-    IInstanceTransform** Out = (IInstanceTransform**)InOut;
+    IEngineInstance** Out = (IEngineInstance**)InOut;
     *Out = nullptr;
     if (Instance != G_InvalidInstance)
-        *Out = Instance->Transform;
+        *Out = Instance->Callbacks;
     return GR_OK;
 }
 
 // FUN_066219d0 (IEngine+0x78): IEC+0x2C on every engine component. Out is not tested; only
 // instance -1 is rejected.
-GENRESULT DACOM_API FEngineObject::QueryInstance(void* InInstance, const char* Iid, void** Out)
+GENRESULT DACOM_API FEngineObject::QueryInstance(InstanceIndex InInstance, const char* Iid, void** Out)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     *Out = nullptr;
@@ -1608,7 +1602,7 @@ GENRESULT DACOM_API FEngineObject::QueryInstance(void* InInstance, const char* I
     FEngineChildNode* Sentinel = EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
     {
-        const GENRESULT Result = AsEngineComponent(Node->Object)->QueryInstance(Instance, Iid, Out);
+        const GENRESULT Result = AsEngineComponent(Node->Object)->QueryInstance((InstanceIndex)Instance, Iid, Out);
         if (Result >= 0)
             return GR_OK;
     }
@@ -1617,7 +1611,7 @@ GENRESULT DACOM_API FEngineObject::QueryInstance(void* InInstance, const char* I
 
 // LAB_06621a40 (IEngine +0x7C): inst+0x28. Retail returns the instance argument; the port
 // returns 0.
-GENRESULT DACOM_API FEngineObject::SetInstanceUserData(void* InInstance, void* Value)
+GENRESULT DACOM_API FEngineObject::SetInstanceUserData(InstanceIndex InInstance, void* Value)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (Instance != G_InvalidInstance && Instance != nullptr)
@@ -1626,7 +1620,7 @@ GENRESULT DACOM_API FEngineObject::SetInstanceUserData(void* InInstance, void* V
 }
 
 // LAB_06621a60 (IEngine +0x80): inst+0x28.
-void* DACOM_API FEngineObject::GetInstanceUserData(void* InInstance)
+void* DACOM_API FEngineObject::GetInstanceUserData(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (Instance == G_InvalidInstance || Instance == nullptr)
@@ -1636,13 +1630,13 @@ void* DACOM_API FEngineObject::GetInstanceUserData(void* InInstance)
 
 // LAB_06621a80 (IEngine +0x84): FUN_0661ece0. Retail leaves the callee's EAX; the port
 // returns 0.
-GENRESULT DACOM_API FEngineObject::SetInstanceExtent(void* InInstance, unsigned long Flags, float Extent,
-                                                      const float* Vec)
+GENRESULT DACOM_API FEngineObject::SetInstanceExtent(InstanceIndex InInstance, unsigned long Flags, float Extent,
+                                                      const Vector* Center)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (Instance == G_InvalidInstance || Instance == nullptr)
         return GR_OK;
-    Instance->SetExtentAndInvalidate(Extent, Vec, (unsigned char)(Flags & 1));
+    Instance->SetExtentAndInvalidate(Extent, (const float*)Center, (unsigned char)(Flags & 1));
     return GR_OK;
 }
 
@@ -1652,78 +1646,79 @@ static bool IsValidInstance(FEngineInstance* Instance)
 }
 
 // LAB_06621ab0, IEngine slot 34 (+0x88).
-GENRESULT DACOM_API FEngineObject::GetInstanceExtent(void* InInstance, unsigned long Flags,
-                                                      float* OutExtent, float* OutVec)
+GENRESULT DACOM_API FEngineObject::GetInstanceExtent(InstanceIndex InInstance, unsigned long Flags,
+                                                      float* OutExtent, Vector* OutCenter)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
     {
         *OutExtent = -1.0f;
-        OutVec[2] = 0.0f;
-        OutVec[1] = 0.0f;
-        OutVec[0] = 0.0f;
+        OutCenter->z = 0.0f;
+        OutCenter->y = 0.0f;
+        OutCenter->x = 0.0f;
         return GR_OK;
     }
+    // FEngineInstance keeps the centre as three floats.
     if ((Flags & 1) != 0)
     {
-        Instance->ComputeInstanceExtent(0, OutExtent, OutVec);
+        Instance->ComputeInstanceExtent(0, OutExtent, (float*)OutCenter);
         return GR_OK;
     }
-    Instance->ComputeInstanceExtent(1, OutExtent, OutVec);
+    Instance->ComputeInstanceExtent(1, OutExtent, (float*)OutCenter);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FEngineObject::SetInstancePosition(void* InInstance, void* Position)
+void DACOM_API FEngineObject::SetInstancePosition(InstanceIndex InInstance, const Vector* Position)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return GR_OK;
-    return Instance->Transform->SetPosition(Instance, (const float*)Position);
+        return;
+    Instance->Callbacks->set_position((long)Instance, *Position);
 }
 
 // LAB_06621b40 (IEngine +0x90) -> transform +0x10; fallback [DAT_0662b124].
-float* DACOM_API FEngineObject::GetInstancePosition(void* InInstance)
+const Vector* DACOM_API FEngineObject::GetInstancePosition(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return G_IdentityMatrix + 9;
-    return Instance->Transform->GetPosition(Instance);
+        return (const Vector*)(G_IdentityMatrix + 9);
+    return &Instance->Callbacks->get_position((long)Instance);
 }
 
 // LAB_06621b70 (IEngine +0x94) -> transform +0x14.
-GENRESULT DACOM_API FEngineObject::SetInstanceOrientation(void* InInstance, void* Rows)
+void DACOM_API FEngineObject::SetInstanceOrientation(InstanceIndex InInstance, const Matrix* Rows)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return GR_OK;
-    return Instance->Transform->SetOrientation(Instance, (const float*)Rows);
+        return;
+    Instance->Callbacks->set_orientation((long)Instance, *Rows);
 }
 
 // LAB_06621ba0 (IEngine +0x98) -> transform +0x18; fallback [DAT_0662b110].
-float* DACOM_API FEngineObject::GetInstanceOrientation(void* InInstance)
+const Matrix* DACOM_API FEngineObject::GetInstanceOrientation(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return G_IdentityMatrix;
-    return Instance->Transform->GetOrientation(Instance);
+        return (const Matrix*)G_IdentityMatrix;
+    return &Instance->Callbacks->get_orientation((long)Instance);
 }
 
 // LAB_06621bd0 (IEngine +0x9C) -> transform +0x1C.
-GENRESULT DACOM_API FEngineObject::SetInstanceMatrix(void* InInstance, void* Matrix)
+void DACOM_API FEngineObject::SetInstanceMatrix(InstanceIndex InInstance, const Transform* Xform)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return GR_OK;
-    return Instance->Transform->SetMatrix(Instance, (const float*)Matrix);
+        return;
+    Instance->Callbacks->set_transform((long)Instance, *Xform);
 }
 
 // LAB_06621c00 (IEngine +0xA0) -> transform +0x20; fallback DAT_0662b128 itself.
-float* DACOM_API FEngineObject::GetInstanceTransform(void* InInstance)
+const Transform* DACOM_API FEngineObject::GetInstanceTransform(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return G_IdentityMatrix;
-    return Instance->Transform->GetMatrix(Instance);
+        return (const Transform*)G_IdentityMatrix;
+    return &Instance->Callbacks->get_transform((long)Instance);
 }
 
 // LAB_06621c30 (IEngine +0xA8 and +0xB0): return [DAT_0662b124] -- the zero
@@ -1736,22 +1731,22 @@ static float* DACOM_API EngineGetIdentityMatrix(FEngineObject* This, void* Unuse
 }
 
 // LAB_06621c40 (IEngine +0xB4) -> transform +0x2C.
-GENRESULT DACOM_API FEngineObject::SetTransformUser(void* InInstance, unsigned long InUser)
+void DACOM_API FEngineObject::SetTransformUser(InstanceIndex InInstance, unsigned long InUser)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     void* User = (void*)InUser;
     if (!IsValidInstance(Instance))
-        return GR_OK;
-    return Instance->Transform->SetUser(Instance, (unsigned long)User);
+        return;
+    Instance->Callbacks->set_instance_flags((long)Instance, (unsigned long)User);
 }
 
 // LAB_06621c70 (IEngine +0xB8) -> transform +0x30.
-unsigned long DACOM_API FEngineObject::GetTransformUser(void* InInstance)
+unsigned long DACOM_API FEngineObject::GetTransformUser(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
         return 0;
-    return Instance->Transform->GetUser(Instance);
+    return Instance->Callbacks->get_instance_flags((long)Instance);
 }
 
 // LAB_06621ca0: the {iid, offset} table at 06629608, then each aggregated component.
@@ -1780,7 +1775,7 @@ static void FanoutIecUpdateInstance(FEngineObject* This, FEngineInstance* Instan
 {
     FEngineChildNode* Sentinel = This->EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
-        AsEngineComponent(Node->Object)->UpdateInstance(Instance, Arg);
+        AsEngineComponent(Node->Object)->UpdateInstance((InstanceIndex)Instance, Arg);
 }
 
 
@@ -1815,7 +1810,7 @@ GENRESULT DACOM_API FEngineObject::NotifyEngineComponents(void* Arg)
 }
 
 // FUN_06621e60 (IEngine+0x6C): compose ancestors, IEC+0x28, walk children.
-GENRESULT DACOM_API FEngineObject::UpdateInstance(void* InInstance, unsigned long Flags, void* Arg)
+GENRESULT DACOM_API FEngineObject::UpdateInstance(InstanceIndex InInstance, unsigned long Flags, void* Arg)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
@@ -1836,7 +1831,7 @@ static void EngineComposeAncestors(FEngineInstance* Instance)
 }
 
 // LAB_06621f90 (IEngine+0xBC).
-unsigned long DACOM_API FEngineObject::CreateJoint(void* InParent, void* InChild,
+unsigned long DACOM_API FEngineObject::CreateJoint(InstanceIndex InParent, InstanceIndex InChild,
                                                      const unsigned long* Payload)
 {
     FEngineInstance* Parent = (FEngineInstance*)InParent;
@@ -1868,12 +1863,12 @@ unsigned long DACOM_API FEngineObject::CreateJoint(void* InParent, void* InChild
     Parent->ConnectChild(Child, Payload);
     if (Parent->ChildCount == 1 && Parent->Parent == nullptr)
         InsertRootInstance(this, Parent);
-    UpdateInstance(Child, 0, nullptr);
+    UpdateInstance((InstanceIndex)Child, 0, nullptr);
     return 1;
 }
 
 // LAB_06622140 (IEngine+0xC0). The instance acted on is Child; Parent only feeds the messages.
-unsigned long DACOM_API FEngineObject::DestroyJoint(void* InParent, void* InChild)
+unsigned long DACOM_API FEngineObject::DestroyJoint(InstanceIndex InParent, InstanceIndex InChild)
 {
     FEngineInstance* Parent = (FEngineInstance*)InParent;
     FEngineInstance* Child = (FEngineInstance*)InChild;
@@ -1921,15 +1916,14 @@ static long EngineInstanceKey(FEngineInstance* Instance)
 }
 
 // LAB_066222a0 (IEngine+0xD0): iterate the instance-root map. No checks.
-void* DACOM_API FEngineObject::FindMappedInstance(void* InInstance)
+InstanceIndex DACOM_API FEngineObject::FindMappedInstance(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (Instance == G_InvalidInstance)
     {
         if (Instances.empty())
-            return G_InvalidInstance;
-        return (FEngineInstance*)(
-            (intptr_t)(Instances.begin()->first));
+            return (InstanceIndex)G_InvalidInstance;
+        return Instances.begin()->first;
     }
     const long Key = EngineInstanceKey(Instance);
     InstanceLookupCount += 1;
@@ -1949,16 +1943,16 @@ void* DACOM_API FEngineObject::FindMappedInstance(void* InInstance)
         }
     }
     if (It == Instances.end())
-        return G_InvalidInstance;
+        return (InstanceIndex)G_InvalidInstance;
     ++It;
     if (It == Instances.end())
-        return G_InvalidInstance;
-    return (FEngineInstance*)((intptr_t)(It->first));
+        return (InstanceIndex)G_InvalidInstance;
+    return It->first;
 }
 
 // LAB_06622360 (IEngine +0x50): the argument is an archetype handle; only -1 is tested.
 GENRESULT DACOM_API FEngineObject::EnumerateArchetypeConstraints(
-    void* InHandle, int(__cdecl* Callback)(void*, void*, void*, void*), void* Context)
+    ArchetypeIndex InHandle, int(__cdecl* Callback)(ArchetypeIndex, ArchetypeIndex, void*, void*), void* Context)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
     if (Handle == G_InvalidArchetype)
@@ -1967,9 +1961,9 @@ GENRESULT DACOM_API FEngineObject::EnumerateArchetypeConstraints(
     FConstraintRecord* const End = Record + Handle->Constraints.size();
     while (Record != End)
     {
-        if ((unsigned char)(Callback(Record->ParentPart->Handle,
-                                                Record->ChildPart->Handle, &Record->Payload[0],
-                                                Context)) == 0)
+        if ((unsigned char)(Callback((ArchetypeIndex)Record->ParentPart->Handle,
+                                     (ArchetypeIndex)Record->ChildPart->Handle,
+                                     &Record->Payload[0], Context)) == 0)
             break;
         Record += 1;
     }
@@ -1978,7 +1972,7 @@ GENRESULT DACOM_API FEngineObject::EnumerateArchetypeConstraints(
 
 // FUN_066223b0 (IEngine +0x54): only -1 is tested.
 GENRESULT DACOM_API FEngineObject::EnumerateArchetypeChildren(
-    void* InHandle, int(__cdecl* Callback)(void*, void*, int, void*), void* Context)
+    ArchetypeIndex InHandle, int(__cdecl* Callback)(ArchetypeIndex, ArchetypeIndex, int, void*), void* Context)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
     if (Handle == G_InvalidArchetype)
@@ -1987,7 +1981,8 @@ GENRESULT DACOM_API FEngineObject::EnumerateArchetypeChildren(
     FArchetypeChild* const End = Child + Handle->Children.size();
     while (Child != End)
     {
-        if ((unsigned char)(Callback(Handle, Child->Handle, 0, Context)) == 0)
+        if ((unsigned char)(Callback((ArchetypeIndex)Handle, (ArchetypeIndex)Child->Handle, 0,
+                                     Context)) == 0)
             break;
         Child += 1;
     }
@@ -1995,7 +1990,7 @@ GENRESULT DACOM_API FEngineObject::EnumerateArchetypeChildren(
 }
 
 // LAB_06622400 (IEngine+0x4C).
-unsigned long DACOM_API FEngineObject::IsCompoundArchetype(void* InHandle)
+unsigned long DACOM_API FEngineObject::IsCompoundArchetype(ArchetypeIndex InHandle)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
     if (Handle == G_InvalidArchetype || Handle == nullptr)
@@ -2004,7 +1999,7 @@ unsigned long DACOM_API FEngineObject::IsCompoundArchetype(void* InHandle)
 }
 
 // LAB_06622450 (IEngine+0xE0): find the archetype child record by nested handle.
-void* DACOM_API FEngineObject::FindArchetypeChild(void* InHandle, void* InChildHandle)
+void* DACOM_API FEngineObject::FindArchetypeChild(ArchetypeIndex InHandle, ArchetypeIndex InChildHandle)
 {
     FArchetypeHandle* Handle = (FArchetypeHandle*)InHandle;
     FArchetypeHandle* ChildHandle = (FArchetypeHandle*)InChildHandle;
@@ -2022,54 +2017,54 @@ void* DACOM_API FEngineObject::FindArchetypeChild(void* InHandle, void* InChildH
 }
 
 // LAB_06622480 (IEngine+0xDC): walk +0x10 to root.
-void* DACOM_API FEngineObject::GetInstanceRoot(void* InInstance)
+InstanceIndex DACOM_API FEngineObject::GetInstanceRoot(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance))
-        return G_InvalidInstance;
+        return (InstanceIndex)G_InvalidInstance;
     while (Instance->Parent != nullptr)
         Instance = Instance->Parent;
-    return Instance;
+    return (InstanceIndex)Instance;
 }
 
 // LAB_066224b0 (IEngine+0xD4): inst+0x10.
-void* DACOM_API FEngineObject::GetInstanceParent(void* InInstance)
+InstanceIndex DACOM_API FEngineObject::GetInstanceParent(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance) || Instance->Parent == nullptr)
-        return G_InvalidInstance;
-    return Instance->Parent;
+        return (InstanceIndex)G_InvalidInstance;
+    return (InstanceIndex)Instance->Parent;
 }
 
 // LAB_066224d0 (IEngine+0xD8): first child / next sibling / parent-walk.
-void* DACOM_API FEngineObject::GetRelatedInstance(void* InFrom, unsigned long Flags, void* InCursor)
+InstanceIndex DACOM_API FEngineObject::GetRelatedInstance(InstanceIndex InFrom, unsigned long Flags, InstanceIndex InCursor)
 {
     FEngineInstance* From = (FEngineInstance*)InFrom;
     FEngineInstance* Cursor = (FEngineInstance*)InCursor;
     FEngineInstance* Root = IsValidInstance(From) ? From : nullptr;
     FEngineInstance* Node = IsValidInstance(Cursor) ? Cursor : nullptr;
     if (Root == nullptr)
-        return G_InvalidInstance;
+        return (InstanceIndex)G_InvalidInstance;
     if (Node == nullptr)
-        return Root->FirstChild != nullptr ? Root->FirstChild : G_InvalidInstance;
+        return (InstanceIndex)(Root->FirstChild != nullptr ? Root->FirstChild : G_InvalidInstance);
     if ((Flags & 1) != 0)
-        return Node->NextSibling != nullptr ? Node->NextSibling : G_InvalidInstance;
+        return (InstanceIndex)(Node->NextSibling != nullptr ? Node->NextSibling : G_InvalidInstance);
     if (Node->FirstChild != nullptr)
-        return Node->FirstChild;
+        return (InstanceIndex)Node->FirstChild;
     while (Node != nullptr)
     {
         if (Node->NextSibling != nullptr)
-            return Node->NextSibling;
+            return (InstanceIndex)Node->NextSibling;
         Node = Node->Parent;
         if (Node == Root)
             break;
     }
-    return G_InvalidInstance;
+    return (InstanceIndex)G_InvalidInstance;
 }
 
 // LAB_06622530 (IEngine+0x68): Text is the part child (+0xE8, whose name leads the record),
 // Crc its +0x40. A root instance (+0xC == 0) gets the empty name.
-FEngineName* DACOM_API FEngineObject::GetInstanceName(FEngineName* Out, void* InInstance)
+FEngineName* DACOM_API FEngineObject::GetInstanceName(FEngineName* Out, InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (Out == nullptr)
@@ -2089,7 +2084,7 @@ FEngineName* DACOM_API FEngineObject::GetInstanceName(FEngineName* Out, void* In
 }
 
 // LAB_06622580 (IEngine+0xC4): inst+0x5C, or 0 for a root.
-unsigned long* DACOM_API FEngineObject::GetInstanceRelative(void* InInstance)
+unsigned long* DACOM_API FEngineObject::GetInstanceRelative(InstanceIndex InInstance)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance) || Instance->Parent == nullptr)
@@ -2110,7 +2105,7 @@ static void CopyJointFloats(float* Dest, const float* Source, unsigned long Coun
 }
 
 // LAB_066225b0 (IEngine+0xCC): get stored joint state. No solver.
-unsigned long DACOM_API FEngineObject::GetJointParams(void* InInstance, unsigned long Index, float* Out)
+unsigned long DACOM_API FEngineObject::GetJointParams(InstanceIndex InInstance, unsigned long Index, float* Out)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
     if (!IsValidInstance(Instance) || Instance->Parent == nullptr || Out == nullptr)
@@ -2151,7 +2146,7 @@ unsigned long DACOM_API FEngineObject::GetJointParams(void* InInstance, unsigned
 }
 
 // LAB_066226e0 (IEngine+0xC8): set stored joint state. No solver.
-unsigned long DACOM_API FEngineObject::SetJointParams(void* InInstance, unsigned long Index,
+unsigned long DACOM_API FEngineObject::SetJointParams(InstanceIndex InInstance, unsigned long Index,
                                                       const float* Values)
 {
     FEngineInstance* Instance = (FEngineInstance*)InInstance;
@@ -2204,7 +2199,7 @@ unsigned long DACOM_API FEngineObject::SetJointParams(void* InInstance, unsigned
 
 // FUN_06622860, called only from FUN_06621630 for compound archetypes.
 static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetypeHandle* Handle,
-                                                IInstanceTransform* Transform)
+                                                IEngineInstance* Callbacks)
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return G_InvalidInstance;
@@ -2213,20 +2208,20 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
 
     // The caller's transform goes to every child until the first one is created
     // successfully; every later part then gets its own engine-owned transform.
-    IInstanceTransform* ChildTransform = Transform;
+    IEngineInstance* ChildTransform = Callbacks;
     FArchetypeChild* Child = Handle->Children.data();
     while (Child != Handle->Children.data() + Handle->Children.size())
     {
         // No filtering: slot 23 itself answers -1 for a -1/null handle.
         FEngineInstance* ChildInst =
-            (FEngineInstance*)(This->CreateInstance(Child->Handle, ChildTransform));
+            (FEngineInstance*)(This->CreateInstance((ArchetypeIndex)Child->Handle, ChildTransform));
         if (ChildInst != G_InvalidInstance)
         {
             ChildInst->ParentArchetype = Handle; // +0xC
             ChildInst->PartChild = Child;        // +0xE8
             // Overwrites an existing entry with the same CRC, as operator[] does.
             Parts[Child->Crc] = ChildInst;
-            This->AddRefHandle(Handle);
+            This->AddRefHandle((ArchetypeIndex)Handle);
             ChildTransform = nullptr;
         }
         Child += 1;
@@ -2244,7 +2239,7 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
             if (ChildIt == Parts.end())
             {
                 FEngineName ArchName;
-                const char* ArchText = This->GetArchetypeName(&ArchName, Handle)->Text;
+                const char* ArchText = This->GetArchetypeName(&ArchName, (ArchetypeIndex)Handle)->Text;
                 if (ArchText == nullptr)
                     ArchText = "";               // DAT_0662ace4
                 char Message[0x2000];
@@ -2261,7 +2256,7 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
                 if (ParentIt == Parts.end())
                 {
                     FEngineName ArchName;
-                    const char* ArchText = This->GetArchetypeName(&ArchName, Handle)->Text;
+                    const char* ArchText = This->GetArchetypeName(&ArchName, (ArchetypeIndex)Handle)->Text;
                     if (ArchText == nullptr)
                         ArchText = "";           // DAT_0662ace4
                     char Message[0x2000];
@@ -2652,24 +2647,24 @@ void FEngBaseFreeList::Drain()
     FreeHead = nullptr;
 }
 
-void* DACOM_API FEngineObject::CreateArchetypeHandle(FEngineName* Name, void* FileSystem)
+ArchetypeIndex DACOM_API FEngineObject::CreateArchetypeHandle(FEngineName* Name, IFileSystem* FileSystem)
 {
-    return EngineCreateArchetypeHandle(this, Name, FileSystem);
+    return (ArchetypeIndex)(EngineCreateArchetypeHandle(this, Name, FileSystem));
 }
 
-unsigned long DACOM_API FEngineObject::AddRefHandle(void* Handle)
+unsigned long DACOM_API FEngineObject::AddRefHandle(ArchetypeIndex Handle)
 {
     return EngineAddRefHandle(this, (FArchetypeHandle*)Handle);
 }
 
-unsigned long DACOM_API FEngineObject::ReleaseHandle(void* Handle)
+unsigned long DACOM_API FEngineObject::ReleaseHandle(ArchetypeIndex Handle)
 {
     return EngineReleaseHandle(this, (FArchetypeHandle*)Handle);
 }
 
-void* DACOM_API FEngineObject::CreateInstance(void* Handle, void* Transform)
+InstanceIndex DACOM_API FEngineObject::CreateInstance(ArchetypeIndex Handle, IEngineInstance* Transform)
 {
-    return EngineCreateInstance(this, (FArchetypeHandle*)Handle, Transform);
+    return (InstanceIndex)(EngineCreateInstance(this, (FArchetypeHandle*)Handle, Transform));
 }
 
 GENRESULT DACOM_API FEngineObject::NoOp41(void* A, void* B)

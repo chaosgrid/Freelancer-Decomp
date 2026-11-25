@@ -43,19 +43,19 @@ namespace
         return G_ThornCompoundMath;
     }
 
-    FVector const& AsMathVector(Vector const& Value)
+    Vector const& AsMathVector(Vector const& Value)
     {
-        return *reinterpret_cast<FVector const*>(&Value);
+        return Value;
     }
 
-    FMatrix const& AsMathMatrix(Matrix const& Value)
+    Matrix const& AsMathMatrix(Matrix const& Value)
     {
-        return *reinterpret_cast<FMatrix const*>(&Value);
+        return Value;
     }
 
-    Matrix const& AsMatrix(FMatrix const& Value)
+    Matrix const& AsMatrix(Matrix const& Value)
     {
-        return *reinterpret_cast<Matrix const*>(&Value);
+        return Value;
     }
 
     // The transposed copy LAB_004517b0 / LAB_00451930 / LAB_00451a00 build.
@@ -77,42 +77,42 @@ namespace
     // to_frame(instance position) - R * Offset.Pos.
     void LocalFromInstance(FThornCompound const& Self, Vector& OutPos, Matrix& OutOrient)
     {
-        void* const Instance = InstancePointer(Self.Instance);
+        const InstanceIndex Instance = Self.Instance;
         Vector const LocalPos = Self.Frame.trans_to_frame(
-            *reinterpret_cast<Vector const*>(DALib::Engine->GetInstancePosition(Instance)));
+            *DALib::Engine->GetInstancePosition(Instance));
         Matrix const LocalOrient = Self.Frame.trans_to_frame(
-            *reinterpret_cast<Matrix const*>(DALib::Engine->GetInstanceOrientation(Instance)));
+            *DALib::Engine->GetInstanceOrientation(Instance));
         Matrix const OffsetTransposed = Transposed(Self.Offset.Orient);
 
-        FMatrix Product;
+        Matrix Product;
         ThornCompoundMath()->MulMatrix(Product, AsMathMatrix(LocalOrient),
                                        AsMathMatrix(OffsetTransposed));
-        FVector Rotated;
+        Vector Rotated;
         ThornCompoundMath()->TransformMatrix(Rotated, Product, AsMathVector(Self.Offset.Pos));
 
-        OutPos.x = LocalPos.x - Rotated.X;
-        OutPos.y = LocalPos.y - Rotated.Y;
-        OutPos.z = LocalPos.z - Rotated.Z;
+        OutPos.x = LocalPos.x - Rotated.x;
+        OutPos.y = LocalPos.y - Rotated.y;
+        OutPos.z = LocalPos.z - Rotated.z;
         OutOrient = AsMatrix(Product);
     }
 
     // Local.Orient * Offset.Pos + Local.Pos (LAB_004514f0 / LAB_00451660).
     Vector InstancePosFromLocal(FThornCompound const& Self)
     {
-        FVector Rotated;
+        Vector Rotated;
         ThornCompoundMath()->TransformMatrix(Rotated, AsMathMatrix(Self.Local.Orient),
                                              AsMathVector(Self.Offset.Pos));
         Vector World;
-        World.x = Rotated.X + Self.Local.Pos.x;
-        World.y = Rotated.Y + Self.Local.Pos.y;
-        World.z = Rotated.Z + Self.Local.Pos.z;
+        World.x = Rotated.x + Self.Local.Pos.x;
+        World.y = Rotated.y + Self.Local.Pos.y;
+        World.z = Rotated.z + Self.Local.Pos.z;
         return World;
     }
 
     // Local.Orient * Offset.Orient (LAB_004515b0 / LAB_00451660).
     Matrix InstanceOrientFromLocal(FThornCompound const& Self)
     {
-        FMatrix Product;
+        Matrix Product;
         ThornCompoundMath()->MulMatrix(Product, AsMathMatrix(Self.Local.Orient),
                                        AsMathMatrix(Self.Offset.Orient));
         return AsMatrix(Product);
@@ -174,7 +174,7 @@ GENRESULT DACOM_API FThornCompound::StartMotion(void* DescArg)
     EventId[Slot] = Desc->Common.UniqueId;
     bPlaying[Slot] = 1;
     unsigned long const PlaybackId = DALib::Anim->PlayScript(
-        AnimScript, InstancePointer(Instance), Desc->Animation, nullptr, nullptr);
+        AnimScript, Instance, Desc->Animation, nullptr, nullptr);
     Playback[Slot] = PlaybackId;
     if (PlaybackId != kCompoundNoPlayback)
     {
@@ -266,19 +266,17 @@ GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const
                 return GR_GENERIC;
             long const HpInstance = Hardpoints.get_instance(Index);
             HardpointInfo const Info = Hardpoints.get_info(Index);
-            Vector const InstPos = *reinterpret_cast<Vector const*>(
-                DALib::Engine->GetInstancePosition(InstancePointer(HpInstance)));
-            Matrix const InstOrient = *reinterpret_cast<Matrix const*>(
-                DALib::Engine->GetInstanceOrientation(InstancePointer(HpInstance)));
+            Vector const InstPos = *DALib::Engine->GetInstancePosition(HpInstance);
+            Matrix const InstOrient = *DALib::Engine->GetInstanceOrientation(HpInstance);
 
-            FVector Rotated;
+            Vector Rotated;
             ThornCompoundMath()->TransformMatrix(Rotated, AsMathMatrix(InstOrient),
                                                  AsMathVector(Info.Position));
             Vector World;
-            World.x = Rotated.X + InstPos.x;
-            World.y = Rotated.Y + InstPos.y;
-            World.z = Rotated.Z + InstPos.z;
-            FMatrix Product;
+            World.x = Rotated.x + InstPos.x;
+            World.y = Rotated.y + InstPos.y;
+            World.z = Rotated.z + InstPos.z;
+            Matrix Product;
             ThornCompoundMath()->MulMatrix(Product, AsMathMatrix(InstOrient),
                                            AsMathMatrix(Info.Orient));
             Out->Translation = World;
@@ -295,15 +293,13 @@ GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const
 
     if (Instance == -1)
         return GR_GENERIC;
-    Out->Translation = *reinterpret_cast<Vector const*>(
-        DALib::Engine->GetInstancePosition(InstancePointer(Instance)));
-    Out->Rotation = *reinterpret_cast<Matrix const*>(
-        DALib::Engine->GetInstanceOrientation(InstancePointer(Instance)));
+    Out->Translation = *DALib::Engine->GetInstancePosition(Instance);
+    Out->Rotation = *DALib::Engine->GetInstanceOrientation(Instance);
     return GR_OK;
 }
 
 // LAB_00451660. Position first, then orientation, then Engine slot 27.
-GENRESULT DACOM_API FThornCompound::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornCompound::SetTransform(const Transform* Transform12)
 {
     Transform const* In = reinterpret_cast<Transform const*>(Transform12);
     Local.Pos = In->Translation;
@@ -311,7 +307,7 @@ GENRESULT DACOM_API FThornCompound::SetTransform(float const* Transform12)
     Vector const World = InstancePosFromLocal(*this);
     Matrix const WorldOrient = InstanceOrientFromLocal(*this);
 
-    void* const Inst = InstancePointer(Instance);
+    const InstanceIndex Inst = Instance;
     Vector EnginePos = Frame.trans_from_frame(World);
     DALib::Engine->SetInstancePosition(Inst, &EnginePos);
     Matrix EngineOrient = Frame.trans_from_frame(WorldOrient);
@@ -321,7 +317,7 @@ GENRESULT DACOM_API FThornCompound::SetTransform(float const* Transform12)
 }
 
 // LAB_00451a00.
-GENRESULT DACOM_API FThornCompound::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornCompound::GetTransform(Transform* OutTransform12)
 {
     Transform* Out = reinterpret_cast<Transform*>(OutTransform12);
     Vector Pos;
@@ -333,11 +329,11 @@ GENRESULT DACOM_API FThornCompound::GetTransform(float* OutTransform12)
 }
 
 // LAB_004514f0.
-GENRESULT DACOM_API FThornCompound::SetPosition(float* Position)
+GENRESULT DACOM_API FThornCompound::SetPosition(const Vector* Position)
 {
     Local.Pos = *reinterpret_cast<Vector const*>(Position);
     Vector const World = InstancePosFromLocal(*this);
-    void* const Inst = InstancePointer(Instance);
+    const InstanceIndex Inst = Instance;
     Vector EnginePos = Frame.trans_from_frame(World);
     DALib::Engine->SetInstancePosition(Inst, &EnginePos);
     DALib::Engine->UpdateInstance(Inst, 0, nullptr);
@@ -345,18 +341,18 @@ GENRESULT DACOM_API FThornCompound::SetPosition(float* Position)
 }
 
 // LAB_004515b0.
-GENRESULT DACOM_API FThornCompound::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornCompound::SetOrientation(const Matrix* Orient9)
 {
     Local.Orient = *reinterpret_cast<Matrix const*>(Orient9);
     Matrix EngineOrient = Frame.trans_from_frame(InstanceOrientFromLocal(*this));
-    void* const Inst = InstancePointer(Instance);
+    const InstanceIndex Inst = Instance;
     DALib::Engine->SetInstanceOrientation(Inst, &EngineOrient);
     DALib::Engine->UpdateInstance(Inst, 0, nullptr);
     return GR_OK;
 }
 
 // LAB_004517b0.
-GENRESULT DACOM_API FThornCompound::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornCompound::GetPosition(Vector* OutPosition)
 {
     Vector Pos;
     Matrix Orient;
@@ -366,13 +362,13 @@ GENRESULT DACOM_API FThornCompound::GetPosition(float* OutPosition)
 }
 
 // LAB_00451930. Only the orientation half: no position is read.
-GENRESULT DACOM_API FThornCompound::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornCompound::GetOrientation(Matrix* OutOrient9)
 {
-    void* const Inst = InstancePointer(Instance);
+    const InstanceIndex Inst = Instance;
     Matrix const LocalOrient = Frame.trans_to_frame(
-        *reinterpret_cast<Matrix const*>(DALib::Engine->GetInstanceOrientation(Inst)));
+        *DALib::Engine->GetInstanceOrientation(Inst));
     Matrix const OffsetTransposed = Transposed(Offset.Orient);
-    FMatrix Product;
+    Matrix Product;
     ThornCompoundMath()->MulMatrix(Product, AsMathMatrix(LocalOrient),
                                    AsMathMatrix(OffsetTransposed));
     *reinterpret_cast<Matrix*>(OutOrient9) = AsMatrix(Product);
@@ -405,9 +401,9 @@ void FThornCompound::Stop()
 }
 
 // LAB_00451360 -- +0x70. (ShipObject's slot 6, 0x005cbe08, is the same folded body.)
-void* FThornCompound::GetEngineInstance()
+InstanceIndex FThornCompound::GetEngineInstance()
 {
-    return InstancePointer(Instance);
+    return Instance;
 }
 
 // LAB_00451ed0 -- only with a room object and bUseScene.

@@ -40,9 +40,9 @@ namespace
 
     // DALib::Engine vt+0x8c SetInstancePosition then vt+0x6c UpdateInstance(inst, 0, 0), the
     // pair every WinControl slot below issues after moving its instance.
-    void SetInstancePositionAndUpdate(void* Instance, float* Position)
+    void SetInstancePositionAndUpdate(InstanceIndex Instance, float* Position)
     {
-        DALib::Engine->SetInstancePosition(Instance, Position);
+        DALib::Engine->SetInstancePosition(Instance, (const Vector*)Position);
         DALib::Engine->UpdateInstance(Instance, 0, nullptr);
     }
 
@@ -50,7 +50,7 @@ namespace
     {
         // Several slots inline this test instead of calling FUN_00420d60.
         return Control->MeshHolder.EngineInstance !=
-               reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+               InvalidInstanceIndex;
     }
 }
 
@@ -66,10 +66,10 @@ WinControl::WinControl()
     MeshHolder.UserFloats[4] = 1.0f;
     MeshHolder.AnimOrArchIndex = -1;
 
-    SetIdentity3x3(AttachOrientation);
-    AttachPosition[2] = 0.0f;
-    AttachPosition[1] = 0.0f;
-    AttachPosition[0] = 0.0f;
+    SetIdentity3x3(&AttachOrientation.E[0][0]);
+    AttachPosition.z = 0.0f;
+    AttachPosition.y = 0.0f;
+    AttachPosition.x = 0.0f;
 
     Offset[0] = 0.0f;
     Offset[1] = 0.0f;
@@ -140,14 +140,14 @@ bool WinControl::HitTest(float const* Ray)
     Transform[11] = 0.0f;
     if (ClientMeshHolderHasInstance(&MeshHolder))
     {
-        float const* const Source = DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance);
+        const void* const Source = DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance);
         memcpy(Transform, Source, sizeof(Transform));
     }
     else
     {
-        Transform[9] = Position[0] + Offset[0];
-        Transform[10] = Position[1] + Offset[1];
-        Transform[11] = Position[2] + Offset[2];
+        Transform[9] = Position.x + Offset[0];
+        Transform[10] = Position.y + Offset[1];
+        Transform[11] = Position.z + Offset[2];
     }
     Transform[9] = Transform[9] + HitOffset[0];
     Transform[10] = Transform[10] + HitOffset[1];
@@ -183,39 +183,39 @@ bool WinControl::HitTest(float const* Ray)
 void WinControl::SetPosition(float const* NewPosition)
 {
     // FUN_005a0880.
-    Position[0] = NewPosition[0];
-    Position[1] = NewPosition[1];
-    Position[2] = NewPosition[2];
+    Position.x = NewPosition[0];
+    Position.y = NewPosition[1];
+    Position.z = NewPosition[2];
     if (HasInstance(this))
     {
         float Placed[3];
         if ((PositionFlags & 1) != 0)
         {
-            Placed[0] = Offset[0] + Position[0];
-            Placed[1] = Position[1] + Offset[1];
-            Placed[2] = Position[2] + Offset[2];
+            Placed[0] = Offset[0] + Position.x;
+            Placed[1] = Position.y + Offset[1];
+            Placed[2] = Position.z + Offset[2];
         }
         else
         {
-            Placed[0] = Position[0];
-            Placed[1] = Position[1];
-            Placed[2] = Position[2];
+            Placed[0] = Position.x;
+            Placed[1] = Position.y;
+            Placed[2] = Position.z;
         }
         SetInstancePositionAndUpdate(MeshHolder.EngineInstance, Placed);
     }
 
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
-        Child->SetPosition(Position);
+        Child->SetPosition(&Position.x);
 }
 
-void WinControl::SetOrientation(float const* NewOrientation)
+void WinControl::SetOrientation(Matrix const* NewOrientation)
 {
     // FUN_005a0950.
-    memmove(Orientation, NewOrientation, sizeof(Orientation));
+    memmove(&Orientation, NewOrientation, sizeof(Orientation));
     if (ClientMeshHolderHasInstance(&MeshHolder))
     {
         DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance,
-                                              const_cast<float*>(NewOrientation));
+                                              const_cast<Matrix*>(NewOrientation));
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
     for (Win3D* Child = ChildHead; Child != nullptr; Child = Child->NextSibling)
@@ -304,7 +304,7 @@ bool WinControl::ProcessMessage(unsigned Msg, unsigned /*A*/, unsigned /*B*/)
     if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
-            SetPosition(Parent->Position);
+            SetPosition(&Parent->Position.x);
         Flags = static_cast<unsigned char>(Flags | kWin3DActive | kWin3DVisible);
         return true;
     }
@@ -353,9 +353,9 @@ void WinControl::LoadIni(char const* Path)
             if (ClientMeshHolderHasInstance(&MeshHolder))
             {
                 float Placed[3];
-                Placed[2] = Offset[2] + Position[2];
-                Placed[1] = Offset[1] + Position[1];
-                Placed[0] = Offset[0] + Position[0];
+                Placed[2] = Offset[2] + Position.z;
+                Placed[1] = Offset[1] + Position.y;
+                Placed[0] = Offset[0] + Position.x;
                 SetInstancePositionAndUpdate(MeshHolder.EngineInstance, Placed);
             }
             continue;
@@ -429,9 +429,9 @@ void WinControl::SetOffset(float X, float Y, float Z)
             ChildControl->AddAttachOffset(Delta);
     }
     if (Parent != nullptr)
-        SetPosition(Parent->Position);
+        SetPosition(&Parent->Position.x);
     else
-        SetPosition(Position);
+        SetPosition(&Position.x);
 }
 
 void WinControl::CaptureMouse()
@@ -477,27 +477,27 @@ void WinControl::RefreshAttachment()
     }
     if (Parent != nullptr)
     {
-        SetIdentity3x3(AttachOrientation);
-        AttachPosition[2] = 0.0f;
-        AttachPosition[1] = 0.0f;
-        AttachPosition[0] = 0.0f;
+        SetIdentity3x3(&AttachOrientation.E[0][0]);
+        AttachPosition.z = 0.0f;
+        AttachPosition.y = 0.0f;
+        AttachPosition.x = 0.0f;
         WinControl* const ParentControl = Parent->AsWinControl();
         if (ParentControl != nullptr)
-            bAttached = ParentControl->GetHardpointTransform(HardpointName, AttachOrientation)
+            bAttached = ParentControl->GetHardpointTransform(HardpointName, &AttachXform)
                             ? 1
                             : 0;
     }
     if (Parent != nullptr)
-        Parent->SetPosition(Parent->Position);
+        Parent->SetPosition(&Parent->Position.x);
 }
 
-bool WinControl::GetHardpointTransform(char const* Name, float* OutTransform12)
+bool WinControl::GetHardpointTransform(char const* Name, Transform* OutXform)
 {
-    // FUN_005a0a70 (RET 8). OutTransform12 is 3x3 orientation then position; the position
-    // always has +0xa8 added.
+    // FUN_005a0a70 (RET 8). *OutXform is 3x3 orientation then position; the position always has
+    // +0xa8 added.
     if (ClientMeshHolderHasInstance(&MeshHolder))
     {
-        void* const Archetype = DALib::Engine->GetInstanceArchetype(MeshHolder.EngineInstance);
+        const ArchetypeIndex Archetype = DALib::Engine->GetInstanceArchetype(MeshHolder.EngineInstance);
         DALib::Engine->ReleaseHandle(Archetype);
         FHardpointKey Key;
         Key.Name = Name;
@@ -506,23 +506,23 @@ bool WinControl::GetHardpointTransform(char const* Name, float* OutTransform12)
         if (static_cast<unsigned char>(DALib::Hardpoint->GetHardpoint(Archetype, &Key, Blob)) != 0)
         {
             // Blob +0x04 position, +0x10 orientation.
-            float Local[12];
-            memcpy(Local, Blob + 0x10, 9 * sizeof(float));
-            memcpy(Local + 9, Blob + 0x04, 3 * sizeof(float));
-            memcpy(OutTransform12, Local, sizeof(Local));
-            OutTransform12[9] = Offset[0] + OutTransform12[9];
-            OutTransform12[10] = Offset[1] + OutTransform12[10];
-            OutTransform12[11] = Offset[2] + OutTransform12[11];
+            Transform Local;
+            memcpy(&Local.Rotation, Blob + 0x10, sizeof(Local.Rotation));
+            memcpy(&Local.Translation, Blob + 0x04, sizeof(Local.Translation));
+            memcpy(OutXform, &Local, sizeof(Local));
+            OutXform->Translation.x = Offset[0] + OutXform->Translation.x;
+            OutXform->Translation.y = Offset[1] + OutXform->Translation.y;
+            OutXform->Translation.z = Offset[2] + OutXform->Translation.z;
             return true;
         }
     }
-    SetIdentity3x3(OutTransform12);
-    OutTransform12[11] = 0.0f;
-    OutTransform12[10] = 0.0f;
-    OutTransform12[9] = 0.0f;
-    OutTransform12[9] = Offset[0] + OutTransform12[9];
-    OutTransform12[10] = Offset[1] + OutTransform12[10];
-    OutTransform12[11] = Offset[2] + OutTransform12[11];
+    SetIdentity3x3(&OutXform->Rotation.E[0][0]);
+    OutXform->Translation.z = 0.0f;
+    OutXform->Translation.y = 0.0f;
+    OutXform->Translation.x = 0.0f;
+    OutXform->Translation.x = Offset[0] + OutXform->Translation.x;
+    OutXform->Translation.y = Offset[1] + OutXform->Translation.y;
+    OutXform->Translation.z = Offset[2] + OutXform->Translation.z;
     return false;
 }
 
@@ -550,10 +550,10 @@ void WinControl::SetMesh(char const* Path, char const* MaterialPath)
     {
         float Matrix[12];
         SetIdentity3x3(Matrix);
-        Matrix[9] = Offset[0] + Position[0];
-        Matrix[10] = Offset[1] + Position[1];
-        Matrix[11] = Offset[2] + Position[2];
-        DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, Matrix);
+        Matrix[9] = Offset[0] + Position.x;
+        Matrix[10] = Offset[1] + Position.y;
+        Matrix[11] = Offset[2] + Position.z;
+        DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, (const Transform*)Matrix);
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
     RefreshAttachment();
@@ -564,32 +564,32 @@ void WinControl::PostDraw()
     // FUN_00401e90.
 }
 
-void WinControl::GetAttachOrientation(float* OutOrientation9)
+void WinControl::GetAttachOrientation(Matrix* OutOrientation)
 {
     // FUN_005a1670.
     if (Parent != nullptr && bAttached != 0 && Parent->AsWinControl() != nullptr)
     {
-        memcpy(OutOrientation9, AttachOrientation, sizeof(AttachOrientation));
+        memcpy(OutOrientation, &AttachOrientation, sizeof(AttachOrientation));
         return;
     }
-    float Identity[9];
-    SetIdentity3x3(Identity);
-    memcpy(OutOrientation9, Identity, sizeof(Identity));
+    Matrix Identity;
+    SetIdentity3x3(&Identity.E[0][0]);
+    memcpy(OutOrientation, &Identity, sizeof(Identity));
 }
 
-void WinControl::GetAttachPosition(float* OutPosition3)
+void WinControl::GetAttachPosition(Vector* OutPosition)
 {
     // FUN_005a1750.
     if (Parent != nullptr && bAttached != 0 && Parent->AsWinControl() != nullptr)
     {
-        OutPosition3[0] = AttachPosition[0];
-        OutPosition3[1] = AttachPosition[1];
-        OutPosition3[2] = AttachPosition[2];
+        OutPosition->x = AttachPosition.x;
+        OutPosition->y = AttachPosition.y;
+        OutPosition->z = AttachPosition.z;
         return;
     }
-    OutPosition3[0] = 0.0f;
-    OutPosition3[1] = 0.0f;
-    OutPosition3[2] = 0.0f;
+    OutPosition->x = 0.0f;
+    OutPosition->y = 0.0f;
+    OutPosition->z = 0.0f;
 }
 
 intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
@@ -626,15 +626,15 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             float Placed[3];
             if ((PositionFlags & 1) != 0)
             {
-                Placed[0] = Offset[0] + Position[0];
-                Placed[1] = Offset[1] + Position[1];
-                Placed[2] = Offset[2] + Position[2];
+                Placed[0] = Offset[0] + Position.x;
+                Placed[1] = Offset[1] + Position.y;
+                Placed[2] = Offset[2] + Position.z;
             }
             else
             {
-                Placed[0] = Position[0];
-                Placed[1] = Position[1];
-                Placed[2] = Position[2];
+                Placed[0] = Position.x;
+                Placed[1] = Position.y;
+                Placed[2] = Position.z;
             }
             SetInstancePositionAndUpdate(MeshHolder.EngineInstance, Placed);
         }
@@ -653,10 +653,10 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         {
             float Matrix[12];
             memcpy(Matrix, reinterpret_cast<float const*>(A), 9 * sizeof(float));
-            Matrix[9] = Position[0] + Offset[0];
-            Matrix[10] = Position[1] + Offset[1];
-            Matrix[11] = Position[2] + Offset[2];
-            DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, Matrix);
+            Matrix[9] = Position.x + Offset[0];
+            Matrix[10] = Position.y + Offset[1];
+            Matrix[11] = Position.z + Offset[2];
+            DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, (const Transform*)Matrix);
             DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
         }
         return 1;
@@ -664,7 +664,7 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Field2d2 = (A != 0) ? 1 : 0;
         return 1;
     case kWinPropGetInstance:
-        return reinterpret_cast<intptr_t>(MeshHolder.EngineInstance);
+        return static_cast<intptr_t>(MeshHolder.EngineInstance);
     case kWinPropGetMeshPath:
         strncpy(reinterpret_cast<char*>(A), MeshPath, static_cast<size_t>(B));
         return 0;
@@ -676,9 +676,9 @@ intptr_t WinControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 void WinControl::AddAttachOffset(float const* Delta)
 {
     // FUN_005a1380.
-    AttachPosition[0] = AttachPosition[0] + Delta[0];
-    AttachPosition[1] = Delta[1] + AttachPosition[1];
-    AttachPosition[2] = Delta[2] + AttachPosition[2];
+    AttachPosition.x = AttachPosition.x + Delta[0];
+    AttachPosition.y = Delta[1] + AttachPosition.y;
+    AttachPosition.z = Delta[2] + AttachPosition.z;
 }
 
 bool WinControl::NameEquals(char const* OtherName)

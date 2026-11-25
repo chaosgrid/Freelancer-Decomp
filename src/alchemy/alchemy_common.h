@@ -234,9 +234,9 @@ namespace AlchemyImpl
     void* EmitOneParticle(FAppearancePool* Pool, FGenericFxObjectBase* Appearance, const float* Six, float Age,
                           float Duration);
     void FillIdentity3x3(float* Nine);
-    // 12-float FTransform (I3DMathEngine layout): Rotate (+0x30) / TransformXform (+0x28).
-    void TransformDirection(const float* Xform12, float X, float Y, float Z, float* Out);
-    void TransformPoint(const float* Xform12, float X, float Y, float Z, float* Out);
+    // 12-float Transform (I3DMathEngine layout): Rotate (+0x30) / TransformXform (+0x28).
+    void TransformDirection(const Transform* Xform, float X, float Y, float Z, Vector* Out);
+    void TransformPoint(const Transform* Xform, float X, float Y, float Z, Vector* Out);
     void LerpVel3(float* Vel, const float* Target, float Alpha);
     void LerpVel3(float* Vel, double TargetX, float TargetY, float TargetZ, float Alpha);
     double AlchemyRand01(); // FUN_0623f1f0: the x87 product, unrounded
@@ -249,17 +249,17 @@ namespace AlchemyImpl
     I3DMathEngine* Shared3DMath();
     I3DMathEngine* Acquire3DMath();
     ICamera* DrawCameraFromCookie();
-    bool GetDrawCameraPosition(float* Out);
+    bool GetDrawCameraPosition(Vector* Out);
     const float* GetDrawCameraTransform();
     const float* GetDrawCameraOrientation();
     // ComputeGeneralInverseTransform is FUN_0622d2e0: I3DMathEngine::GeneralInverse
     // (vtable+0x5c) on a 12-float transform; used by oriented/perp/rect.
-    FVector* TransformOrientedBoundsCenter(const FTransform& Transform, FVector& Out,
-                                           const FVector& Input);
-    FVector* TransformPerpBoundsCenter(const FTransform& Transform, FVector& Out,
-                                       const FVector& Input);
-    FTransform* ComputeGeneralInverseTransform(const FTransform& Source,
-                                              FTransform& Out, float& OutW);
+    Vector* TransformOrientedBoundsCenter(const Transform& Xform, Vector& Out,
+                                           const Vector& Input);
+    Vector* TransformPerpBoundsCenter(const Transform& Xform, Vector& Out,
+                                       const Vector& Input);
+    Transform* ComputeGeneralInverseTransform(const Transform& Source,
+                                              Transform& Out, float& OutW);
     // The node-transform cache (FUN_062400b0 / FUN_062400f0 / FUN_062401a0: node+0x4
     // flags, +0x1c raw, +0x4c composed, provider +0x80 -> Node_Transform) lives in
     // FGenericFxObjectBase (GetNodeTransform / SetNodeTransform / ComposeNodeTransform,
@@ -295,7 +295,7 @@ namespace AlchemyImpl
     GENRESULT CallDrawIndexed(IDAComponent* Draw, unsigned long Prim, unsigned int MinIndex,
                               unsigned int NumVerts, unsigned int StartIndex, unsigned int Count);
     // FUN_06208640: Out = I3DMathEngine::MulTransform(A, B), 12-float transforms.
-    void ComposeTransform(float* Out12, const float* A12, const float* B12);
+    void ComposeTransform(float* Out12, const float* A12, const Transform& B);
     unsigned short AlSubmitVertex(FAlDrawContext& Context, float X, float Y, float Z,
                                   unsigned long Diffuse, float U, float V);
     void AlSubmitQuadIndices(FAlDrawContext& Context, unsigned short I0, unsigned short I1,

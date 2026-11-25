@@ -45,7 +45,7 @@ bool CounterMeasure::create(Archetype::Root* Arch)
 
     Arch->create_instance(static_cast<IEngineInstance*>(Object));
 
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Object->EngineInstanceId), 0, nullptr);
+    DALib::Engine->UpdateInstance(Object->EngineInstanceId, 0, nullptr);
 
     // The (& 3) narrowing is not null-tested.
     CObject* Narrowed = Object;

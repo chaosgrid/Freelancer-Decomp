@@ -48,16 +48,16 @@ namespace
 
     // The transform every ScrollControl field starts as, and what a "<part>_hp" key resets
     // before asking the parent for the hardpoint.
-    void SetIdentityTransform(FTransform* Xform)
+    void SetIdentityTransform(Transform* Xform)
     {
-        Win3DIdentityRotation3x3(&Xform->Rotation.D[0][0]);
-        Xform->Translation.Z = 0.0f;
-        Xform->Translation.Y = 0.0f;
-        Xform->Translation.X = 0.0f;
+        Win3DIdentityRotation3x3(&Xform->Rotation);
+        Xform->Translation.z = 0.0f;
+        Xform->Translation.y = 0.0f;
+        Xform->Translation.x = 0.0f;
     }
 
     // The instance-bound test plus SetInstanceMatrix / UpdateInstance pair every slot inlines.
-    void PushInstanceMatrix(FClientMeshHolder* Holder, FTransform* Xform)
+    void PushInstanceMatrix(FClientMeshHolder* Holder, Transform* Xform)
     {
         if (!ClientMeshHolderHasInstance(Holder))
             return;
@@ -66,7 +66,7 @@ namespace
     }
 
     // The same with SetInstancePosition (the "<part>_offset" keys).
-    void PushInstancePosition(FClientMeshHolder* Holder, FVector* Position)
+    void PushInstancePosition(FClientMeshHolder* Holder, Vector* Position)
     {
         if (!ClientMeshHolderHasInstance(Holder))
             return;
@@ -76,7 +76,7 @@ namespace
 
     // The "<part>_mesh" sequence.
     void LoadPartMesh(ScrollControl* Control, FClientMeshHolder* Holder, char const* Path,
-                      FTransform* Xform)
+                      Transform* Xform)
     {
         ClientUiMeshHolderRelease(Holder);
         if (Path[0] != '\0')
@@ -86,23 +86,23 @@ namespace
     }
 
     // The "<part>_hp" sequence with a non-null Parent.
-    void AskHardpoint(Win3D* Parent, char const* Name, FTransform* Xform)
+    void AskHardpoint(Win3D* Parent, char const* Name, Transform* Xform)
     {
         WinControl* const Owner = Parent->AsWinControl();
         if (Owner == nullptr)
             return;
-        Owner->GetHardpointTransform(Name, reinterpret_cast<float*>(Xform));
+        Owner->GetHardpointTransform(Name, Xform);
     }
 
     // The three floats of a vector key, read in retail's order (index 1, 0, 2).
-    void ReadVector(INI_Reader* Reader, FVector* Out)
+    void ReadVector(INI_Reader* Reader, Vector* Out)
     {
         float const Y = Reader->get_value_float(1);
         float const X = Reader->get_value_float(0);
         float const Z = Reader->get_value_float(2);
-        Out->X = X;
-        Out->Y = Y;
-        Out->Z = Z;
+        Out->x = X;
+        Out->y = Y;
+        Out->z = Z;
     }
 
     // A flag key: get_value_float(0) != 0.0.
@@ -144,44 +144,45 @@ namespace
     }
 
     // z * z + y * y + x * x in that order (every call site here sums from z).
-    double SquaredLengthZyx(FVector const& V)
+    double SquaredLengthZyx(Vector const& V)
     {
-        return (static_cast<double>(V.Z) * V.Z + static_cast<double>(V.Y) * V.Y) +
-               static_cast<double>(V.X) * V.X;
+        return (static_cast<double>(V.z) * V.z + static_cast<double>(V.y) * V.y) +
+               static_cast<double>(V.x) * V.x;
     }
 
     // FUN_00423b60 (cdecl).
-    FVector Subtract(FVector const& A, FVector const& B)
+    Vector Subtract(Vector const& A, Vector const& B)
     {
-        FVector Out;
-        Out.X = A.X - B.X;
-        Out.Y = A.Y - B.Y;
-        Out.Z = A.Z - B.Z;
+        Vector Out;
+        Out.x = A.x - B.x;
+        Out.y = A.y - B.y;
+        Out.z = A.z - B.z;
         return Out;
     }
 
     // FUN_00423b30 (cdecl).
-    FVector Add(FVector const& A, FVector const& B)
+    Vector Add(Vector const& A, Vector const& B)
     {
-        FVector Out;
-        Out.X = A.X + B.X;
-        Out.Y = A.Y + B.Y;
-        Out.Z = A.Z + B.Z;
+        Vector Out;
+        Out.x = A.x + B.x;
+        Out.y = A.y + B.y;
+        Out.z = A.z + B.z;
         return Out;
     }
 
     // Through the Win3D camera (DAT_0067dbf8); only the low byte of the result is tested.
-    bool ProjectToScreen(FVector const& World, FVector* OutScreen)
+    bool ProjectToScreen(Vector const& World, Vector* OutScreen)
     {
         ICamera* const Camera = AsCamera(Win3DGetCamera());
         return static_cast<unsigned char>(
-                   Camera->Project(&OutScreen->X, &OutScreen->Y, &OutScreen->Z, &World.X)) != 0;
+                   Camera->Project(&OutScreen->x, &OutScreen->y, &OutScreen->z,
+                                   reinterpret_cast<Vector const*>(&World.x))) != 0;
     }
 
     // FUN_005a1130 (thiscall on the half extents, RET 8).
-    bool RayHits(FVector const& HalfExtents, FTransform const& Xform, float const* Ray)
+    bool RayHits(Vector const& HalfExtents, Transform const& Xform, float const* Ray)
     {
-        return Win3DRayHitsAabbHalfExtents(&HalfExtents.X,
+        return Win3DRayHitsAabbHalfExtents(&HalfExtents.x,
                                            reinterpret_cast<float const*>(&Xform), Ray);
     }
 
@@ -297,17 +298,17 @@ void ScrollControl::UpdateThumb()
     ThumbXform = ThumbStart;
 
     // dz is rounded to float before its product, dx * t is rounded to float, dy * t stays double.
-    double const Dx = static_cast<double>(ThumbEnd.Translation.X) - ThumbStart.Translation.X;
-    double const Dy = static_cast<double>(ThumbEnd.Translation.Y) - ThumbStart.Translation.Y;
-    float const Dz = static_cast<float>(static_cast<double>(ThumbEnd.Translation.Z) -
-                                        ThumbStart.Translation.Z);
+    double const Dx = static_cast<double>(ThumbEnd.Translation.x) - ThumbStart.Translation.x;
+    double const Dy = static_cast<double>(ThumbEnd.Translation.y) - ThumbStart.Translation.y;
+    float const Dz = static_cast<float>(static_cast<double>(ThumbEnd.Translation.z) -
+                                        ThumbStart.Translation.z);
     float const Dxt = static_cast<float>(Dx * T);
     float const Dzt = static_cast<float>(static_cast<double>(Dz) * T);
-    ThumbXform.Translation.X = static_cast<float>(static_cast<double>(Dxt) +
-                                                  ThumbStart.Translation.X);
-    ThumbXform.Translation.Y = static_cast<float>(Dy * T + ThumbStart.Translation.Y);
-    ThumbXform.Translation.Z = static_cast<float>(static_cast<double>(Dzt) +
-                                                  ThumbStart.Translation.Z);
+    ThumbXform.Translation.x = static_cast<float>(static_cast<double>(Dxt) +
+                                                  ThumbStart.Translation.x);
+    ThumbXform.Translation.y = static_cast<float>(Dy * T + ThumbStart.Translation.y);
+    ThumbXform.Translation.z = static_cast<float>(static_cast<double>(Dzt) +
+                                                  ThumbStart.Translation.z);
 
     PushInstanceMatrix(&ThumbHolder, &ThumbXform);
 }
@@ -319,39 +320,39 @@ void ScrollControl::UpdateLayout()
     // and end add in a different order, as retail.
     if (Parent != nullptr && Parent->AsWinControl() != nullptr)
     {
-        FVector const Position = {Win3D::Position[0], Win3D::Position[1], Win3D::Position[2]};
-        FVector const ControlOffset = {Offset[0], Offset[1], Offset[2]};
+        Vector const Position = {Win3D::Position.x, Win3D::Position.y, Win3D::Position.z};
+        Vector const ControlOffset = {Offset[0], Offset[1], Offset[2]};
 
         Back.Xform = Back.Hp;
-        FVector Moved = Add(Add(Back.Offset, Position), ControlOffset);
-        Back.Xform.Translation.X += Moved.X;
-        Back.Xform.Translation.Y += Moved.Y;
-        Back.Xform.Translation.Z += Moved.Z;
+        Vector Moved = Add(Add(Back.Offset, Position), ControlOffset);
+        Back.Xform.Translation.x += Moved.x;
+        Back.Xform.Translation.y += Moved.y;
+        Back.Xform.Translation.z += Moved.z;
 
         Next.Xform = Next.Hp;
         Moved = Add(Add(Next.Offset, Position), ControlOffset);
-        Next.Xform.Translation.X += Moved.X;
-        Next.Xform.Translation.Y += Moved.Y;
-        Next.Xform.Translation.Z += Moved.Z;
+        Next.Xform.Translation.x += Moved.x;
+        Next.Xform.Translation.y += Moved.y;
+        Next.Xform.Translation.z += Moved.z;
 
         // Retail's second sum for prev goes through FUN_00422b80.
         Prev.Xform = Prev.Hp;
         Moved = Add(Add(Prev.Offset, Position), ControlOffset);
-        Prev.Xform.Translation.X += Moved.X;
-        Prev.Xform.Translation.Y += Moved.Y;
-        Prev.Xform.Translation.Z += Moved.Z;
+        Prev.Xform.Translation.x += Moved.x;
+        Prev.Xform.Translation.y += Moved.y;
+        Prev.Xform.Translation.z += Moved.z;
 
         ThumbStart = ThumbHp0;
         Moved = Add(Add(Position, ThumbOffset0), ControlOffset);
-        ThumbStart.Translation.X += Moved.X;
-        ThumbStart.Translation.Y += Moved.Y;
-        ThumbStart.Translation.Z += Moved.Z;
+        ThumbStart.Translation.x += Moved.x;
+        ThumbStart.Translation.y += Moved.y;
+        ThumbStart.Translation.z += Moved.z;
 
         ThumbEnd = ThumbHp1;
         Moved = Add(Add(ThumbOffset1, Position), ControlOffset);
-        ThumbEnd.Translation.X += Moved.X;
-        ThumbEnd.Translation.Y += Moved.Y;
-        ThumbEnd.Translation.Z += Moved.Z;
+        ThumbEnd.Translation.x += Moved.x;
+        ThumbEnd.Translation.y += Moved.y;
+        ThumbEnd.Translation.z += Moved.z;
     }
 
     PushInstanceMatrix(&Back.Holder, &Back.Xform);
@@ -369,8 +370,8 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
         bPageTowardMin = 1;
 
     // The pixel converts as unsigned.
-    FVector const Mouse = {static_cast<float>(ScreenX), static_cast<float>(ScreenY), 0.0f};
-    FVector const Zero = {0.0f, 0.0f, 0.0f};
+    Vector const Mouse = {static_cast<float>(ScreenX), static_cast<float>(ScreenY), 0.0f};
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
 
     int const ToMax = abs(MaxRange - Value);
     int const ToMin = abs(MinRange - Value);
@@ -378,20 +379,20 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
     {
         // Nearer the top. Is the cursor, seen from the thumb's start, at least as far along the
         // start->thumb line as the thumb itself?
-        FVector Current;
-        FVector Start;
+        Vector Current;
+        Vector Start;
         HudTransformPoint(&ThumbXform, &Current, &Zero);
         HudTransformPoint(&ThumbStart, &Start, &Zero);
-        FVector CurrentScreen;
-        FVector StartScreen;
+        Vector CurrentScreen;
+        Vector StartScreen;
         if (!ProjectToScreen(Current, &CurrentScreen) || !ProjectToScreen(Start, &StartScreen))
         {
             bPageTowardMin = 1;
             return;
         }
-        FVector const Track = Subtract(CurrentScreen, StartScreen);
+        Vector const Track = Subtract(CurrentScreen, StartScreen);
         float const TrackLength = FastLengthExtended(SquaredLengthZyx(Track));
-        FVector const ToMouse = Subtract(Mouse, StartScreen);
+        Vector const ToMouse = Subtract(Mouse, StartScreen);
         float const MouseLength = FastLengthExtended(SquaredLengthZyx(ToMouse));
         if (TrackLength == 0.0f || MouseLength == 0.0f)
         {
@@ -400,8 +401,8 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
         }
         float TrackDir[3];
         float MouseDir[3];
-        HudVec3ScaleByInverse(TrackDir, &Track.X, TrackLength);
-        HudVec3ScaleByInverse(MouseDir, &ToMouse.X, MouseLength);
+        HudVec3ScaleByInverse(TrackDir, &Track.x, TrackLength);
+        HudVec3ScaleByInverse(MouseDir, &ToMouse.x, MouseLength);
         double const Dot = (static_cast<double>(MouseDir[2]) * TrackDir[2] +
                             static_cast<double>(MouseDir[1]) * TrackDir[1]) +
                            static_cast<double>(MouseDir[0]) * TrackDir[0];
@@ -412,24 +413,24 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
 
     // Nearer the bottom (or halfway): the same test from the thumb's end, through this TU's math
     // engine.
-    FVector Current;
-    FVector End;
+    Vector Current;
+    Vector End;
     ScrollControlMath()->TransformXform(Current, ThumbXform, Zero);
     ScrollControlMath()->TransformXform(End, ThumbEnd, Zero);
-    FVector CurrentScreen;
-    FVector EndScreen;
+    Vector CurrentScreen;
+    Vector EndScreen;
     if (!ProjectToScreen(Current, &CurrentScreen) || !ProjectToScreen(End, &EndScreen))
     {
         bPageTowardMin = 1;
         return;
     }
-    FVector const Track = Subtract(CurrentScreen, EndScreen);
+    Vector const Track = Subtract(CurrentScreen, EndScreen);
     float const TrackLength = FastLengthExtended(SquaredLengthZyx(Track));
     // z is the negated end z (the cursor's z is 0).
-    FVector ToMouse;
-    ToMouse.X = Mouse.X - EndScreen.X;
-    ToMouse.Y = Mouse.Y - EndScreen.Y;
-    ToMouse.Z = -EndScreen.Z;
+    Vector ToMouse;
+    ToMouse.x = Mouse.x - EndScreen.x;
+    ToMouse.y = Mouse.y - EndScreen.y;
+    ToMouse.z = -EndScreen.z;
     float const MouseLength = FastLengthExtended(SquaredLengthZyx(ToMouse));
     if (TrackLength == 0.0f || MouseLength == 0.0f)
     {
@@ -437,12 +438,12 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
         return;
     }
     float TrackDir[3];
-    HudVec3ScaleByInverse(TrackDir, &Track.X, TrackLength);
+    HudVec3ScaleByInverse(TrackDir, &Track.x, TrackLength);
     // The reciprocal stays double, the products are rounded to float.
     double const InvMouse = 1.0 / static_cast<double>(MouseLength);
-    float const MouseDir[3] = {static_cast<float>(ToMouse.X * InvMouse),
-                               static_cast<float>(ToMouse.Y * InvMouse),
-                               static_cast<float>(ToMouse.Z * InvMouse)};
+    float const MouseDir[3] = {static_cast<float>(ToMouse.x * InvMouse),
+                               static_cast<float>(ToMouse.y * InvMouse),
+                               static_cast<float>(ToMouse.z * InvMouse)};
     double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
                         static_cast<double>(MouseDir[1]) * TrackDir[1]) +
                        static_cast<double>(MouseDir[2]) * TrackDir[2];
@@ -453,33 +454,33 @@ void ScrollControl::ChoosePageDirection(unsigned ScreenX, unsigned ScreenY)
 void ScrollControl::PageStep()
 {
     // FUN_00580d00. The cursor is read straight from DAT_00616840 / DAT_00616844, as signed.
-    FVector const Zero = {0.0f, 0.0f, 0.0f};
-    FVector const Mouse = {static_cast<float>(CursorPixelX()), static_cast<float>(CursorPixelY()),
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Vector const Mouse = {static_cast<float>(CursorPixelX()), static_cast<float>(CursorPixelY()),
                            0.0f};
 
     if (bPageTowardMin != 0)
     {
         // Towards the start while the cursor lies short of the thumb.
-        FVector Current;
-        FVector Start;
+        Vector Current;
+        Vector Start;
         HudTransformPoint(&ThumbXform, &Current, &Zero);
         HudTransformPoint(&ThumbStart, &Start, &Zero);
-        FVector CurrentScreen;
-        FVector StartScreen;
+        Vector CurrentScreen;
+        Vector StartScreen;
         if (!ProjectToScreen(Current, &CurrentScreen))
             return;
         if (!ProjectToScreen(Start, &StartScreen))
             return;
-        FVector const Track = Subtract(CurrentScreen, StartScreen);
+        Vector const Track = Subtract(CurrentScreen, StartScreen);
         float const TrackLength = FastLengthStored(SquaredLengthZyx(Track));
-        FVector const ToMouse = Subtract(Mouse, StartScreen);
+        Vector const ToMouse = Subtract(Mouse, StartScreen);
         float const MouseLength = FastLengthStored(SquaredLengthZyx(ToMouse));
         if (TrackLength == 0.0f || MouseLength == 0.0f)
             return;
         float TrackDir[3];
         float MouseDir[3];
-        HudVec3ScaleByInverse(TrackDir, &Track.X, TrackLength);
-        HudVec3ScaleByInverse(MouseDir, &ToMouse.X, MouseLength);
+        HudVec3ScaleByInverse(TrackDir, &Track.x, TrackLength);
+        HudVec3ScaleByInverse(MouseDir, &ToMouse.x, MouseLength);
         double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
                             static_cast<double>(TrackDir[1]) * MouseDir[1]) +
                            static_cast<double>(TrackDir[2]) * MouseDir[2];
@@ -493,26 +494,26 @@ void ScrollControl::PageStep()
     else
     {
         // Towards the end.
-        FVector Current;
-        FVector End;
+        Vector Current;
+        Vector End;
         HudTransformPoint(&ThumbXform, &Current, &Zero);
         HudTransformPoint(&ThumbEnd, &End, &Zero);
-        FVector CurrentScreen;
-        FVector EndScreen;
+        Vector CurrentScreen;
+        Vector EndScreen;
         if (!ProjectToScreen(Current, &CurrentScreen))
             return;
         if (!ProjectToScreen(End, &EndScreen))
             return;
-        FVector const Track = Subtract(CurrentScreen, EndScreen);
+        Vector const Track = Subtract(CurrentScreen, EndScreen);
         float const TrackLength = FastLengthStored(SquaredLengthZyx(Track));
-        FVector const ToMouse = Subtract(Mouse, EndScreen);
+        Vector const ToMouse = Subtract(Mouse, EndScreen);
         float const MouseLength = FastLengthExtended(SquaredLengthZyx(ToMouse));
         if (TrackLength == 0.0f || MouseLength == 0.0f)
             return;
         float TrackDir[3];
         float MouseDir[3];
-        HudVec3ScaleByInverse(TrackDir, &Track.X, TrackLength);
-        HudVec3ScaleByInverse(MouseDir, &ToMouse.X, MouseLength);
+        HudVec3ScaleByInverse(TrackDir, &Track.x, TrackLength);
+        HudVec3ScaleByInverse(MouseDir, &ToMouse.x, MouseLength);
         double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
                             static_cast<double>(TrackDir[1]) * MouseDir[1]) +
                            static_cast<double>(TrackDir[2]) * MouseDir[2];
@@ -531,22 +532,22 @@ void ScrollControl::DragThumb(unsigned ScreenX, unsigned ScreenY)
 {
     // FUN_005811b0 (RET 8). The cursor projected on the start->end track of the thumb, as a
     // fraction of the range.
-    FVector const Zero = {0.0f, 0.0f, 0.0f};
-    FVector Start;
-    FVector End;
+    Vector const Zero = {0.0f, 0.0f, 0.0f};
+    Vector Start;
+    Vector End;
     ScrollControlMath()->TransformXform(Start, ThumbStart, Zero);
     ScrollControlMath()->TransformXform(End, ThumbEnd, Zero);
-    FVector StartScreen;
-    FVector EndScreen;
+    Vector StartScreen;
+    Vector EndScreen;
     if (!ProjectToScreen(Start, &StartScreen))
         return;
     if (!ProjectToScreen(End, &EndScreen))
         return;
 
-    FVector const Mouse = {static_cast<float>(ScreenX), static_cast<float>(ScreenY), 0.0f};
-    FVector const Track = Subtract(EndScreen, StartScreen);
+    Vector const Mouse = {static_cast<float>(ScreenX), static_cast<float>(ScreenY), 0.0f};
+    Vector const Track = Subtract(EndScreen, StartScreen);
     float const TrackLength = FastLengthExtended(SquaredLengthZyx(Track));
-    FVector const ToMouse = Subtract(Mouse, StartScreen);
+    Vector const ToMouse = Subtract(Mouse, StartScreen);
     float const MouseLength = FastLengthExtended(SquaredLengthZyx(ToMouse));
     if (TrackLength == 0.0f || MouseLength == 0.0f)
         return;
@@ -555,13 +556,13 @@ void ScrollControl::DragThumb(unsigned ScreenX, unsigned ScreenY)
     // float and that float is used again below.
     double const InvTrack = 1.0 / static_cast<double>(TrackLength);
     float const InvTrackFloat = static_cast<float>(InvTrack);
-    float const TrackDir[3] = {static_cast<float>(Track.X * InvTrack),
-                               static_cast<float>(Track.Y * InvTrack),
-                               static_cast<float>(Track.Z * InvTrack)};
+    float const TrackDir[3] = {static_cast<float>(Track.x * InvTrack),
+                               static_cast<float>(Track.y * InvTrack),
+                               static_cast<float>(Track.z * InvTrack)};
     double const InvMouse = 1.0 / static_cast<double>(MouseLength);
-    float const MouseDir[3] = {static_cast<float>(ToMouse.X * InvMouse),
-                               static_cast<float>(ToMouse.Y * InvMouse),
-                               static_cast<float>(ToMouse.Z * InvMouse)};
+    float const MouseDir[3] = {static_cast<float>(ToMouse.x * InvMouse),
+                               static_cast<float>(ToMouse.y * InvMouse),
+                               static_cast<float>(ToMouse.z * InvMouse)};
     double const Dot = (static_cast<double>(TrackDir[0]) * MouseDir[0] +
                         static_cast<double>(TrackDir[1]) * MouseDir[1]) +
                        static_cast<double>(TrackDir[2]) * MouseDir[2];
@@ -740,7 +741,7 @@ bool ScrollControl::Create(Win3D* NewParent, void* Data)
     // The linked parent re-applies its own position.
     Win3D* const LinkedParent = Parent;
     if (LinkedParent != nullptr)
-        LinkedParent->SetPosition(LinkedParent->Position);
+        LinkedParent->SetPosition(&LinkedParent->Position.x);
     return true;
 }
 
@@ -852,10 +853,10 @@ void ScrollControl::SetPosition(float const* NewPosition)
     UpdateLayout();
 }
 
-void ScrollControl::SetOrientation(float const* NewOrientation)
+void ScrollControl::SetOrientation(Matrix const* NewOrientation)
 {
     // FUN_00582ac0: straight into Win3D's orientation (not WinControl's SetOrientation).
-    memcpy(Orientation, NewOrientation, sizeof(Orientation));
+    memcpy(&Orientation, NewOrientation, sizeof(Orientation));
     UpdateLayout();
 }
 
@@ -1074,23 +1075,23 @@ bool ScrollControl::MouseEvent(FWin3DMouseEvent const* Event)
     FSpaceCamera* const Cam = Win3DGetCamera();
     int const CursorX = CursorPixelX();
     int const CursorY = CursorPixelY();
-    FVector Local;
-    Local.X = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
+    Vector Local;
+    Local.x = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
                                  Cam->XScale * Cam->ZNear);
-    Local.Y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
+    Local.y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
                                  Cam->YScale * Cam->ZNear);
-    Local.Z = -Cam->ZNear;
-    FMatrix CamOrientation;
-    memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation));
-    FVector World;
+    Local.z = -Cam->ZNear;
+    Matrix CamOrientation;
+    memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation));
+    Vector World;
     ScrollControlMath()->TransformMatrix(World, CamOrientation, Local);
-    double const Inv = 1.0 / sqrt((static_cast<double>(World.X) * World.X +
-                                   static_cast<double>(World.Y) * World.Y) +
-                                  static_cast<double>(World.Z) * World.Z);
+    double const Inv = 1.0 / sqrt((static_cast<double>(World.x) * World.x +
+                                   static_cast<double>(World.y) * World.y) +
+                                  static_cast<double>(World.z) * World.z);
     float Ray[3];
-    Ray[0] = static_cast<float>(World.X * Inv);
-    Ray[1] = static_cast<float>(World.Y * Inv);
-    Ray[2] = static_cast<float>(World.Z * Inv);
+    Ray[0] = static_cast<float>(World.x * Inv);
+    Ray[1] = static_cast<float>(World.y * Inv);
+    Ray[2] = static_cast<float>(World.z * Inv);
 
     bool bStartDrag = false;
     if (bThumbValid != 0 && RayHits(ThumbMouse, ThumbXform, Ray))
@@ -1234,21 +1235,21 @@ void ScrollControl::AddAttachOffset(float const* Delta)
 {
     // LAB_00583390 (RET 4): Delta onto the translation of every hardpoint transform; nothing
     // is re-laid out.
-    Back.Hp.Translation.X += Delta[0];
-    Back.Hp.Translation.Y += Delta[1];
-    Back.Hp.Translation.Z += Delta[2];
-    Next.Hp.Translation.X += Delta[0];
-    Next.Hp.Translation.Y += Delta[1];
-    Next.Hp.Translation.Z += Delta[2];
-    Prev.Hp.Translation.X += Delta[0];
-    Prev.Hp.Translation.Y += Delta[1];
-    Prev.Hp.Translation.Z += Delta[2];
-    ThumbHp0.Translation.X += Delta[0];
-    ThumbHp0.Translation.Y += Delta[1];
-    ThumbHp0.Translation.Z += Delta[2];
-    ThumbHp1.Translation.X += Delta[0];
-    ThumbHp1.Translation.Y += Delta[1];
-    ThumbHp1.Translation.Z += Delta[2];
+    Back.Hp.Translation.x += Delta[0];
+    Back.Hp.Translation.y += Delta[1];
+    Back.Hp.Translation.z += Delta[2];
+    Next.Hp.Translation.x += Delta[0];
+    Next.Hp.Translation.y += Delta[1];
+    Next.Hp.Translation.z += Delta[2];
+    Prev.Hp.Translation.x += Delta[0];
+    Prev.Hp.Translation.y += Delta[1];
+    Prev.Hp.Translation.z += Delta[2];
+    ThumbHp0.Translation.x += Delta[0];
+    ThumbHp0.Translation.y += Delta[1];
+    ThumbHp0.Translation.z += Delta[2];
+    ThumbHp1.Translation.x += Delta[0];
+    ThumbHp1.Translation.y += Delta[1];
+    ThumbHp1.Translation.z += Delta[2];
 }
 
 WinControl* WinControl::CreateScrollControl(

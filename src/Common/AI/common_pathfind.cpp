@@ -549,9 +549,7 @@ void MathTransposeTransformVia3DMathEngine(Vector* Out, Matrix const* M, Vector 
     I3DMathEngine* const Engine = Acquire3DMathEngine();
 
     Vector Scratch;
-    Engine->TransposeTransform(*reinterpret_cast<FVector*>(&Scratch),
-                               *reinterpret_cast<FMatrix const*>(M),
-                               *reinterpret_cast<FVector const*>(Src));
+    Engine->TransposeTransform(Scratch, *M, *Src);
     *Out = Scratch;
 }
 

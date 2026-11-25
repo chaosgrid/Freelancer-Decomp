@@ -7,6 +7,7 @@
 #pragma once
 
 #include "dacom.h"
+#include "math3d.h"
 #include "Common/Audio/sound_archetype.h"
 
 // Client SoundArch table (SoundArch.cpp). FUN_0042b030 loads [Sound] from
@@ -137,7 +138,7 @@ void SetClientSoundListenerObject(void* CameraOrNull);
 // is a 3x3 orientation followed by the world position at +0x24.
 void SetClientSoundSourceCone(void* SourcePtr, float InnerAngle, float OuterAngle);
 void SetClientSoundSourceConeOutsideVolume(void* SourcePtr, float Volume);
-void SetClientSoundSourcePose(void* SourcePtr, int AttachHandle, float const* Transform);
+void SetClientSoundSourcePose(void* SourcePtr, int AttachHandle, Transform const* Pose);
 // The source's +0x04 category (0 sfx, 1 interface, 2/5 voice, 3 music, 4 ambient), written
 // directly by callers after FUN_00428680 (HUD_Comm stores 2).
 void SetClientSoundSourceType(void* SourcePtr, int Type);

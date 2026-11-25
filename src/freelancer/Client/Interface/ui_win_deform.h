@@ -36,7 +36,7 @@ public:
     // slot 5 (+0x14) -- LAB_0059bb40.
     void SetPosition(float const* NewPosition) override;
     // slot 8 (+0x20) -- LAB_0059b8f0.
-    void SetTransform(float const* Transform) override;
+    void SetTransform(Transform const* NewXform) override;
     // slot 9 (+0x24) -- LAB_0059b8a0.
     bool Create(Win3D* NewParent, void* Payload) override;
     // slot 11 (+0x2c) -- LAB_0059bc30.

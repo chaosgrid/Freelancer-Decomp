@@ -24,21 +24,21 @@ static FEngineInstance* AnimEngineFindInstanceByName(FEngineInstance* From, cons
     FEngineInstance* const Invalid =
         (FEngineInstance*)((ptrdiff_t)(-1));
     FArchetypeName Out;
-    const char* Text = G_AnimEngine->GetInstanceName(&Out, From)->Text;
+    const char* Text = G_AnimEngine->GetInstanceName(&Out, (InstanceIndex)From)->Text;
     if (Text == nullptr)
         Text = "";
     if (std::strcmp(Text, Name) == 0)
         return From;
     FEngineInstance* Cursor =
-        (FEngineInstance*)(G_AnimEngine->GetRelatedInstance(From, 0, Invalid));
+        (FEngineInstance*)(G_AnimEngine->GetRelatedInstance((InstanceIndex)From, 0, (InstanceIndex)Invalid));
     while (Cursor != Invalid)
     {
-        Text = G_AnimEngine->GetInstanceName(&Out, Cursor)->Text;
+        Text = G_AnimEngine->GetInstanceName(&Out, (InstanceIndex)Cursor)->Text;
         if (Text == nullptr)
             Text = "";
         if (std::strcmp(Text, Name) == 0)
             return Cursor;
-        Cursor = (FEngineInstance*)(G_AnimEngine->GetRelatedInstance(From, 0, Cursor));
+        Cursor = (FEngineInstance*)(G_AnimEngine->GetRelatedInstance((InstanceIndex)From, 0, (InstanceIndex)Cursor));
     }
     return Invalid;
 }
@@ -62,7 +62,7 @@ static unsigned long ReadUtfNameCrc(void* FileSystem, const char* Name, char** O
 }
 
 // FUN_06611350. No checks.
-void FAnimTrack::LoadChannelNode(void* FileSystem)
+void FAnimTrack::LoadChannelNode(IFileSystem* FileSystem)
 {
     IFileSystem* Fs = AsFileSystem(FileSystem);
     if (Fs->OpenNode(G_NameChannel) == 0) // +0x60
@@ -131,8 +131,8 @@ void FAnimNameEntry::LoadScriptMaps(const char* Name, void* FileSystem)
         FEngBaseFileSystemDesc Desc;
         FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
         Desc.FindHandle = (unsigned long)FindHandle;
-        void* MapFs = nullptr;
-        Fs->CreateInstance((AGGDESC*)(&Desc), &MapFs); // +0xC
+        IFileSystem* MapFs = nullptr;
+        Fs->CreateInstance((AGGDESC*)(&Desc), (void**)&MapFs); // +0xC
         if (std::strncmp(FindData.cFileName, G_NameEventMap, G_EventMapLength) != 0)
         {
             Tracks.resize(Tracks.size() + 1, FAnimTrack());
@@ -393,11 +393,11 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         *Already = bMapped ? 1 : 0;
         if (bMapped)
             return 0;
-        FEngineInstance* Parent = (FEngineInstance*)(G_AnimEngine->GetInstanceParent(Inst));
+        FEngineInstance* Parent = (FEngineInstance*)(G_AnimEngine->GetInstanceParent((InstanceIndex)Inst));
         if (Parent == Invalid)
             return 0;
         FArchetypeName NameOut;
-        if (Track->ParentCrc != G_AnimEngine->GetInstanceName(&NameOut, Parent)->Crc)
+        if (Track->ParentCrc != G_AnimEngine->GetInstanceName(&NameOut, (InstanceIndex)Parent)->Crc)
             return 0;
         Out->Kind = 0;
         Out->Instance = Inst;

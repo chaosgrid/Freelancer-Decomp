@@ -340,7 +340,7 @@ bool NeuroNetMissionMessage::Create(Win3D* NewParent, void* Data)
 
     // (0, 0.076, -1.288)
     SetOffset(0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f));
-    SetPosition(Position);
+    SetPosition(&Position.x);
 
     NnMainButtonOnModalOpen();
     NavBarCloseService(true);

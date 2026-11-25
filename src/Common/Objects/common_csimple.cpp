@@ -121,12 +121,11 @@ void CSimple::cache_physical_props()
         return;
     }
 
-    DALib::Engine->GetInstanceExtent((void*)EngineInstanceId, 0, &CachedRadius,
-                                     (float*)&CachedCenterOfMass);
+    DALib::Engine->GetInstanceExtent(EngineInstanceId, 0, &CachedRadius,
+                                     &CachedCenterOfMass);
     Vector World;
     // this+0x08: Orientation followed by WorldPosition, one Transform.
-    Acquire3DMathEngine()->TransformXform((FVector&)World, *(FTransform const*)&Orientation,
-                                          (FVector const&)CachedCenterOfMass);
+    Acquire3DMathEngine()->TransformXform(World, *(Transform const*)&Orientation, CachedCenterOfMass);
     CachedCenterOfMass = World;
 }
 
@@ -261,7 +260,7 @@ void CSimple::init(CreateParms const& Parms)
     CopyMatrix9(Orientation, Parms.Orient);
 
     // The engine instance was made by whoever created this object (see CSimple::open).
-    DALib::Engine->UpdateInstance((void*)EngineInstanceId, 0, nullptr);
+    DALib::Engine->UpdateInstance(EngineInstanceId, 0, nullptr);
 
     init_physics(Parms.Velocity, Parms.AngularVelocity);   // vtable +0x9c
 }

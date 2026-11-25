@@ -448,8 +448,8 @@ public:
     float TargetOrient[9];
     float CapturePos[3];
     float CaptureOrient[9];
-    FQuaternion TargetQuat;
-    FQuaternion CaptureQuat;
+    Quaternion TargetQuat;
+    Quaternion CaptureQuat;
     int SpatialMask;
     FThornSpatialEventDesc SpatialDesc;
     float AxisRotAngle;
@@ -610,7 +610,7 @@ public:
     GENRESULT GetEntityOrient(int Index, float* OutMat9);
     GENRESULT Attach(int Index, void* EngineObj);
     GENRESULT Detach(int Index);
-    void PushBoundGeoFromScene(const FTransform& OldInverse, bool bOrient);
+    void PushBoundGeoFromScene(const Transform& OldInverse, bool bOrient);
     GENRESULT UserProp(void* Handle, const char* Key, char** Out);
     GENRESULT SetUserProp(int Index, const char* Key, const char* Value);
     GENRESULT AddEntityFromDesc(void* Desc, int* OutIndex);

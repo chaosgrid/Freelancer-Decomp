@@ -86,16 +86,6 @@ namespace
         return 0;
     }
 
-    void* HandleOf(long Instance)
-    {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
-    }
-
-    long InstanceOf(void* Handle)
-    {
-        return static_cast<long>(reinterpret_cast<intptr_t>(Handle));
-    }
-
     IRenderPipeline* ShipViewPipeline()
     {
         return DALib::Pipeline;
@@ -133,7 +123,7 @@ namespace
     // is bound, then by ~FClientMeshHolder, which finds nothing.
     void DeleteMountHolder(FClientMeshHolder* Holder)
     {
-        if (InstanceOf(Holder->EngineInstance) != -1)
+        if (Holder->EngineInstance != -1)
             ClientUiMeshHolderRelease(Holder);
         delete Holder;
     }
@@ -405,20 +395,20 @@ bool ShipViewControl::Create(Win3D* NewParent, void* Data)
         else if (Ini->is_value("hardpoint"))
         {
             // The NEW parent's hardpoint, then copied into AttachPos.
-            SetIdentity9(AttachOrientation);
-            AttachPosition[2] = 0.0f;
-            AttachPosition[1] = 0.0f;
-            AttachPosition[0] = 0.0f;
+            SetIdentity9(&AttachOrientation.E[0][0]);
+            AttachPosition.z = 0.0f;
+            AttachPosition.y = 0.0f;
+            AttachPosition.x = 0.0f;
             if (NewParent != nullptr)
             {
                 WinControl* const ParentControl = NewParent->AsWinControl();
                 if (ParentControl != nullptr)
                 {
                     ParentControl->GetHardpointTransform(Ini->get_value_string(),
-                                                         AttachOrientation);
-                    AttachPos[0] = AttachPosition[0];
-                    AttachPos[1] = AttachPosition[1];
-                    AttachPos[2] = AttachPosition[2];
+                                                         &AttachXform);
+                    AttachPos[0] = AttachPosition.x;
+                    AttachPos[1] = AttachPosition.y;
+                    AttachPos[2] = AttachPosition.z;
                 }
             }
         }
@@ -480,19 +470,19 @@ void ShipViewControl::Init(float const* NewRotSpeed, float const* NewOffset, flo
     ViewSize[2] = NewViewSize[2];
     if (Hardpoint != nullptr)
     {
-        SetIdentity9(AttachOrientation);
-        AttachPosition[2] = 0.0f;
-        AttachPosition[1] = 0.0f;
-        AttachPosition[0] = 0.0f;
+        SetIdentity9(&AttachOrientation.E[0][0]);
+        AttachPosition.z = 0.0f;
+        AttachPosition.y = 0.0f;
+        AttachPosition.x = 0.0f;
         if (Parent != nullptr)
         {
             WinControl* const ParentControl = Parent->AsWinControl();
             if (ParentControl != nullptr)
             {
-                ParentControl->GetHardpointTransform(Hardpoint, AttachOrientation);
-                AttachPos[0] = AttachPosition[0];
-                AttachPos[1] = AttachPosition[1];
-                AttachPos[2] = AttachPosition[2];
+                ParentControl->GetHardpointTransform(Hardpoint, &AttachXform);
+                AttachPos[0] = AttachPosition.x;
+                AttachPos[1] = AttachPosition.y;
+                AttachPos[2] = AttachPosition.z;
             }
         }
     }
@@ -545,7 +535,7 @@ void ShipViewControl::Draw()
     Pipe->SetRenderState(D3DRS_ZFUNC, 4);
     Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
     // 0x300 is the flag word (rendcomp LAB_06c32a80).
-    DALib::Renderer->RenderInstance(ViewCamera, HandleOf(Instance), 1.0f, 0x300u, nullptr, nullptr);
+    DALib::Renderer->RenderInstance(ViewCamera, Instance, 1.0f, 0x300u, nullptr, nullptr);
     Win3DDisable(0xb71);
     Pipe->SetRenderState(D3DRS_ZENABLE, 0);
     Pipe->SetRenderState(D3DRS_ZFUNC, 8);
@@ -598,12 +588,12 @@ void ShipViewControl::Update()
             RotAccum[1] = Step1 + RotAccum[1];
             RotAccum[2] = Step2 + RotAccum[2];
 
-            FTransform Turned;
-            float* const M = &Turned.Rotation.D[0][0];
+            Transform Turned;
+            float* const M = &Turned.Rotation.E[0][0];
             HudMatrixRotationY(M, (ObjectYpr[0] + RotAccum[0]) * kDegToRad);
             HudMatrixRotateRows12(M, (RotAccum[1] + ObjectYpr[1]) * kDegToRad);
             HudMatrixRotateRows01(M, (RotAccum[2] + ObjectYpr[2]) * kDegToRad);
-            DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, M);
+            DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, (const Matrix*)M);
             ClientMeshHolderUpdate(&ShipHolder);
 
             // With no equipment shown, re-centre the hull on its longest axis.
@@ -611,15 +601,15 @@ void ShipViewControl::Update()
             Axis[0] = 0.0f;
             Axis[1] = 0.0f;
             Axis[2] = 0.0f;
-            if (InstanceOf(ShipHolder.EngineInstance) == -1 || Visuals != nullptr)
+            if (ShipHolder.EngineInstance == -1 || Visuals != nullptr)
             {
-                ComputeScreenRect(Position, true);
+                ComputeScreenRect(&Position.x, true);
                 return;
             }
-            void* const Arch = DALib::Engine->GetInstanceArchetype(ShipHolder.EngineInstance);
-            if (InstanceOf(Arch) == -1)
+            const ArchetypeIndex Arch = DALib::Engine->GetInstanceArchetype(ShipHolder.EngineInstance);
+            if (Arch == -1)
             {
-                ComputeScreenRect(Position, true);
+                ComputeScreenRect(&Position.x, true);
                 return;
             }
             float Box[6];
@@ -651,37 +641,37 @@ void ShipViewControl::Update()
             }
             else
             {
-                ComputeScreenRect(Position, true);
+                ComputeScreenRect(&Position.x, true);
                 return;
             }
 
             // The framed instance's sphere; the point Radius along the axis through
             // {turned, centre}; the ship moved by half its offset from the centre.
             float Radius;
-            FVector Centre;
-            DALib::Engine->GetInstanceExtent(HandleOf(Instance), 0, &Radius, &Centre.X);
+            Vector Centre;
+            DALib::Engine->GetInstanceExtent(Instance, 0, &Radius, &Centre);
             Turned.Translation = Centre;
-            FVector Along;
-            Along.X = Radius * Axis[0];
-            Along.Y = Axis[1] * Radius;
-            Along.Z = Axis[2] * Radius;
-            FVector Tip;
+            Vector Along;
+            Along.x = Radius * Axis[0];
+            Along.y = Axis[1] * Radius;
+            Along.z = Axis[2] * Radius;
+            Vector Tip;
             GetShipViewMath()->TransformXform(Tip, Turned, Along);
-            FTransform Moved;
+            Transform Moved;
             Moved.Rotation = Turned.Rotation;
-            Moved.Translation.X = (Tip.X - Centre.X) * 0.5f;
-            Moved.Translation.Y = (Tip.Y - Centre.Y) * 0.5f;
-            Moved.Translation.Z = (Tip.Z - Centre.Z) * 0.5f;
+            Moved.Translation.x = (Tip.x - Centre.x) * 0.5f;
+            Moved.Translation.y = (Tip.y - Centre.y) * 0.5f;
+            Moved.Translation.z = (Tip.z - Centre.z) * 0.5f;
             DALib::Engine->SetInstanceMatrix(ShipHolder.EngineInstance, &Moved);
             DALib::Engine->UpdateInstance(ShipHolder.EngineInstance, 0, nullptr);
         }
         else
         {
-            DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, ObjectOrientation);
+            DALib::Engine->SetInstanceOrientation(ShipHolder.EngineInstance, (const Matrix*)ObjectOrientation);
             ClientMeshHolderUpdate(&ShipHolder);
         }
     }
-    ComputeScreenRect(Position, true);
+    ComputeScreenRect(&Position.x, true);
 }
 
 bool ShipViewControl::HitTest(float const* Ray)
@@ -695,7 +685,7 @@ bool ShipViewControl::HitTest(float const* Ray)
     float X;
     float Y;
     float Z;
-    AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, World);
+    AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, (const Vector*)World);
     return static_cast<double>(ScreenRect[0]) < X && static_cast<double>(ScreenRect[2]) > X &&
            static_cast<double>(ScreenRect[1]) < Y && static_cast<double>(ScreenRect[3]) > Y;
 }
@@ -712,7 +702,7 @@ void ShipViewControl::DragRotate(bool bStart)
     float X;
     float Y;
     float Z;
-    AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, World);
+    AsCamera(Win3DGetCamera())->Project(&X, &Y, &Z, (const Vector*)World);
 
     // Strictly inside the rect; left / top are rounded to float first.
     float const Left = static_cast<float>(ScreenRect[0]);
@@ -865,54 +855,54 @@ void ShipViewControl::SetInstance(long NewInstance, bool bFixedDistance)
         return;
     }
     Instance = NewInstance;
-    void* const Handle = HandleOf(NewInstance);
+    const InstanceIndex Handle = NewInstance;
 
     // The instance's sphere centre into world space and back into its own transform's frame.
-    FTransform Xform;
+    Transform Xform;
     memcpy(&Xform, DALib::Engine->GetInstanceTransform(Handle), sizeof(Xform));
     float Radius = 0.0f;
-    FVector Centre;
-    DALib::Engine->GetInstanceExtent(Handle, 0, &Radius, &Centre.X);
+    Vector Centre;
+    DALib::Engine->GetInstanceExtent(Handle, 0, &Radius, &Centre);
     // The transform is fetched again, and the point goes through HUD_Target_Base's math engine
     // (DAT_00674b1c), not this file's.
-    FVector World;
+    Vector World;
     HudTransformPoint(
-        reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Handle)), &World,
+        DALib::Engine->GetInstanceTransform(Handle), &World,
         &Centre);
-    FVector Local;
+    Vector Local;
     HudInverseTransformPoint(&Xform, &Local, &World);
 
     // The root sphere as a box (retail recomputes Local between the two halves), then every
     // child folded in.
     FHudInstanceBounds Bounds;
-    Bounds.Min.X = Local.X - Radius;
-    Bounds.Min.Y = Local.Y - Radius;
-    Bounds.Min.Z = Local.Z - Radius;
+    Bounds.Min.x = Local.x - Radius;
+    Bounds.Min.y = Local.y - Radius;
+    Bounds.Min.z = Local.z - Radius;
     HudInverseTransformPoint(&Xform, &Local, &World);
-    Bounds.Max.X = Local.X + Radius;
-    Bounds.Max.Y = Local.Y + Radius;
-    Bounds.Max.Z = Local.Z + Radius;
+    Bounds.Max.x = Local.x + Radius;
+    Bounds.Max.y = Local.y + Radius;
+    Bounds.Max.z = Local.z + Radius;
     Bounds.ExpandChildren(Handle, &Xform, true);
 
     // The centre, then half the wider of x and z (the half-diagonal is computed and discarded,
     // as retail).
-    Center[0] = (Bounds.Max.X + Bounds.Min.X) * 0.5f;
-    Center[1] = (Bounds.Max.Y + Bounds.Min.Y) * 0.5f;
-    Center[2] = (Bounds.Max.Z + Bounds.Min.Z) * 0.5f;
-    float const HalfX = Bounds.Max.X - Center[0];
-    float const HalfY = Bounds.Max.Y - Center[1];
-    float const HalfZ = Bounds.Max.Z - Center[2];
+    Center[0] = (Bounds.Max.x + Bounds.Min.x) * 0.5f;
+    Center[1] = (Bounds.Max.y + Bounds.Min.y) * 0.5f;
+    Center[2] = (Bounds.Max.z + Bounds.Min.z) * 0.5f;
+    float const HalfX = Bounds.Max.x - Center[0];
+    float const HalfY = Bounds.Max.y - Center[1];
+    float const HalfZ = Bounds.Max.z - Center[2];
     Distance = sqrtf(HalfX * HalfX + HalfY * HalfY + HalfZ * HalfZ);
-    float const SpanX = Bounds.Max.X - Bounds.Min.X;
-    float const SpanZ = Bounds.Max.Z - Bounds.Min.Z;
+    float const SpanX = Bounds.Max.x - Bounds.Min.x;
+    float const SpanZ = Bounds.Max.z - Bounds.Min.z;
     Distance = static_cast<float>(static_cast<double>(SpanX > SpanZ ? SpanX : SpanZ) * 0.5);
 
     // Plus the length of the extent centre; 14 when fixed.
     float ExtentRadius = Distance;
-    FVector ExtentCentre;
-    DALib::Engine->GetInstanceExtent(HandleOf(Instance), 0, &ExtentRadius, &ExtentCentre.X);
-    Distance = sqrtf(ExtentCentre.Y * ExtentCentre.Y + ExtentCentre.Z * ExtentCentre.Z +
-                     ExtentCentre.X * ExtentCentre.X) +
+    Vector ExtentCentre;
+    DALib::Engine->GetInstanceExtent(Instance, 0, &ExtentRadius, &ExtentCentre);
+    Distance = sqrtf(ExtentCentre.y * ExtentCentre.y + ExtentCentre.z * ExtentCentre.z +
+                     ExtentCentre.x * ExtentCentre.x) +
                Distance;
     if (bFixedDistance)
         Distance = 14.0f;
@@ -945,39 +935,38 @@ void ShipViewControl::PlaceCamera(int PlaceMode)
         Reach = (Scaled < 2.0) ? 2.0f : static_cast<float>(Scaled);
     }
 
-    FTransform Eye;
-    FVector Focus;
+    Transform Eye;
+    Vector Focus;
     if (PlaceMode == 1)
     {
         // The instance transform turned -pi/2 about its x axis, the focus through the untouched
         // engine transform.
-        memcpy(&Eye, DALib::Engine->GetInstanceTransform(HandleOf(Instance)), sizeof(Eye));
+        memcpy(&Eye, DALib::Engine->GetInstanceTransform(Instance), sizeof(Eye));
         double const Cos = cos(-1.5707963705062866); // DAT_005d8ec0, a float's pi/2 as double
         double const Sin = sin(-1.5707963705062866);
         for (int Row = 0; Row < 3; ++Row)
         {
-            double const M1 = Eye.Rotation.D[Row][1];
-            double const M2 = Eye.Rotation.D[Row][2];
-            Eye.Rotation.D[Row][1] = static_cast<float>(Sin * M2 + M1 * Cos);
-            Eye.Rotation.D[Row][2] = static_cast<float>(Cos * M2 - M1 * Sin);
+            double const M1 = Eye.Rotation.E[Row][1];
+            double const M2 = Eye.Rotation.E[Row][2];
+            Eye.Rotation.E[Row][1] = static_cast<float>(Sin * M2 + M1 * Cos);
+            Eye.Rotation.E[Row][2] = static_cast<float>(Cos * M2 - M1 * Sin);
         }
-        FVector CenterVec;
-        CenterVec.X = Center[0];
-        CenterVec.Y = Center[1];
-        CenterVec.Z = Center[2];
+        Vector CenterVec;
+        CenterVec.x = Center[0];
+        CenterVec.y = Center[1];
+        CenterVec.z = Center[2];
         GetShipViewMath()->TransformXform(
             Focus,
-            *reinterpret_cast<FTransform const*>(
-                DALib::Engine->GetInstanceTransform(HandleOf(Instance))),
+            *DALib::Engine->GetInstanceTransform(Instance),
             CenterVec);
     }
     else if (PlaceMode == 0)
     {
-        memcpy(&Eye, DALib::Engine->GetInstanceTransform(HandleOf(Instance)), sizeof(Eye));
-        FVector CenterVec;
-        CenterVec.X = Center[0];
-        CenterVec.Y = Center[1];
-        CenterVec.Z = Center[2];
+        memcpy(&Eye, DALib::Engine->GetInstanceTransform(Instance), sizeof(Eye));
+        Vector CenterVec;
+        CenterVec.x = Center[0];
+        CenterVec.y = Center[1];
+        CenterVec.z = Center[2];
         GetShipViewMath()->TransformXform(Focus, Eye, CenterVec);
     }
     else
@@ -986,14 +975,14 @@ void ShipViewControl::PlaceCamera(int PlaceMode)
     }
 
     // Eye = focus + Reach * column 2.
-    float const BackX = Eye.Rotation.D[0][2] * Reach;
-    float const BackY = Eye.Rotation.D[1][2] * Reach;
-    float const BackZ = Eye.Rotation.D[2][2] * Reach;
-    Eye.Translation.X = Focus.X + BackX;
-    Eye.Translation.Y = Focus.Y + BackY;
-    Eye.Translation.Z = Focus.Z + BackZ;
+    float const BackX = Eye.Rotation.E[0][2] * Reach;
+    float const BackY = Eye.Rotation.E[1][2] * Reach;
+    float const BackZ = Eye.Rotation.E[2][2] * Reach;
+    Eye.Translation.x = Focus.x + BackX;
+    Eye.Translation.y = Focus.y + BackY;
+    Eye.Translation.z = Focus.z + BackZ;
     Camera.bViewDirty = 1;                         // +0x3bc
-    memcpy(Camera.World, &Eye, sizeof(Eye));       // +0x38c: World[9] and WorldPos[3]
+    memcpy(&Camera.World, &Eye, sizeof(Eye));       // +0x38c: World[9] and WorldPos[3]
 }
 
 bool ShipViewControl::LoadMesh(char const* Path, char const* MaterialPath, bool bFixedDistance,
@@ -1007,22 +996,22 @@ bool ShipViewControl::LoadMesh(char const* Path, char const* MaterialPath, bool 
         // The player ship's damaged parts.
         if (bDpConnect)
             GfShipApplyCollisionDamage(ShipHolder.EngineInstance);
-        SetInstance(InstanceOf(ShipHolder.EngineInstance), bFixedDistance);
+        SetInstance(ShipHolder.EngineInstance, bFixedDistance);
 
         // Move the ship so that its sphere centre sits at the origin of the framed transform.
         float Radius;
-        FVector ExtentCentre;
-        DALib::Engine->GetInstanceExtent(HandleOf(Instance), 0, &Radius, &ExtentCentre.X);
-        FTransform Framed;
-        memcpy(&Framed, DALib::Engine->GetInstanceTransform(HandleOf(Instance)), sizeof(Framed));
-        FVector Delta;
-        Delta.X = ExtentCentre.X - Framed.Translation.X;
-        Delta.Y = ExtentCentre.Y - Framed.Translation.Y;
-        Delta.Z = ExtentCentre.Z - Framed.Translation.Z;
-        FVector Local;
+        Vector ExtentCentre;
+        DALib::Engine->GetInstanceExtent(Instance, 0, &Radius, &ExtentCentre);
+        Transform Framed;
+        memcpy(&Framed, DALib::Engine->GetInstanceTransform(Instance), sizeof(Framed));
+        Vector Delta;
+        Delta.x = ExtentCentre.x - Framed.Translation.x;
+        Delta.y = ExtentCentre.y - Framed.Translation.y;
+        Delta.z = ExtentCentre.z - Framed.Translation.z;
+        Vector Local;
         GetShipViewMath()->TransposeTransform(Local, Framed.Rotation, Delta);
-        FTransform Placed;
-        SetIdentity9(&Placed.Rotation.D[0][0]);
+        Transform Placed;
+        SetIdentity9(&Placed.Rotation.E[0][0]);
         Placed.Translation = Local;
         DALib::Engine->SetInstanceMatrix(ShipHolder.EngineInstance, &Placed);
         DALib::Engine->UpdateInstance(ShipHolder.EngineInstance, 0, nullptr);
@@ -1057,11 +1046,11 @@ void ShipViewControl::SelectInstance(long NewSelection, bool bFlag, int Unused)
     SelInstance = NewSelection;
     float Radius;
     float Centre[3];
-    DALib::Engine->GetInstanceExtent(HandleOf(NewSelection), 0, &Radius, Centre);
+    DALib::Engine->GetInstanceExtent(NewSelection, 0, &Radius, (Vector*)Centre);
     SelRadius = Radius;
     SelExtent = Radius;
-    void* const Arch = DALib::Engine->GetInstanceArchetype(HandleOf(NewSelection));
-    if (InstanceOf(Arch) == -1)
+    const ArchetypeIndex Arch = DALib::Engine->GetInstanceArchetype(NewSelection);
+    if (Arch == -1)
         return;
     float Box[6];
     Box[0] = 0.0f;
@@ -1289,13 +1278,13 @@ void ShipViewControl::ComputeScreenRect(float const* Where, bool bSetCamera)
     Corner[0] = PointX - ViewSize[0];
     Corner[1] = PointY - ViewSize[1];
     Corner[2] = PointZ - ViewSize[2];
-    WinCamera->Project(&X, &Y, &Z, Corner);
+    WinCamera->Project(&X, &Y, &Z, (const Vector*)Corner);
     ScreenRect[0] = static_cast<int>(X);
     ScreenRect[1] = static_cast<int>(Y);
     Corner[0] = PointX + ViewSize[0];
     Corner[1] = PointY + ViewSize[1];
     Corner[2] = PointZ + ViewSize[2];
-    WinCamera->Project(&X, &Y, &Z, Corner);
+    WinCamera->Project(&X, &Y, &Z, (const Vector*)Corner);
     ScreenRect[2] = static_cast<int>(X);
     ScreenRect[3] = static_cast<int>(Y);
 

@@ -36,34 +36,34 @@ bool FSystemZone::GetPathEnds(Vector* OutFirst, Vector* OutSecond)
     pub::Zone::GetOrientation(ZoneId, Orientation);
 
     // The zone transform and (0, y/2, 0); 0.5f = DAT_06fb605c.
-    FTransform Placement;
+    Transform Placement;
     for (int Row = 0; Row < 3; ++Row)
     {
         for (int Column = 0; Column < 3; ++Column)
-            Placement.Rotation.D[Row][Column] = Orientation.E[Row][Column];
+            Placement.Rotation.E[Row][Column] = Orientation.E[Row][Column];
     }
-    Placement.Translation.X = Position.x;
-    Placement.Translation.Y = Position.y;
-    Placement.Translation.Z = Position.z;
+    Placement.Translation.x = Position.x;
+    Placement.Translation.y = Position.y;
+    Placement.Translation.z = Position.z;
 
-    FVector Offset;
-    Offset.X = 0.0f;
-    Offset.Y = Size.y * 0.5f;
-    Offset.Z = 0.0f;
-    FVector Transformed;
+    Vector Offset;
+    Offset.x = 0.0f;
+    Offset.y = Size.y * 0.5f;
+    Offset.z = 0.0f;
+    Vector Transformed;
     GetZoneMath()->TransformXform(Transformed, Placement, Offset);     // slot +0x28
-    OutFirst->x = Transformed.X;
-    OutFirst->y = Transformed.Y;
-    OutFirst->z = Transformed.Z;
+    OutFirst->x = Transformed.x;
+    OutFirst->y = Transformed.y;
+    OutFirst->z = Transformed.z;
 
     // (0, y * -0.5f, 0), DAT_06fbd6c4.
-    Offset.X = 0.0f;
-    Offset.Y = Size.y * -0.5f;
-    Offset.Z = 0.0f;
+    Offset.x = 0.0f;
+    Offset.y = Size.y * -0.5f;
+    Offset.z = 0.0f;
     GetZoneMath()->TransformXform(Transformed, Placement, Offset);
-    OutSecond->x = Transformed.X;
-    OutSecond->y = Transformed.Y;
-    OutSecond->z = Transformed.Z;
+    OutSecond->x = Transformed.x;
+    OutSecond->y = Transformed.y;
+    OutSecond->z = Transformed.z;
     return true;
 }
 

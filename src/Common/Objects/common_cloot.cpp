@@ -79,9 +79,9 @@ void CLoot::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     PhySys::CreateParms Phy;
     memset(&Phy, 0, sizeof(Phy));
     Phy.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-    Phy.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-    Phy.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-    Phy.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+    Phy.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+    Phy.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+    Phy.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
     Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     Phy.bEnableCollisions = 1;
     Phy.Mass = Archetype->Mass;

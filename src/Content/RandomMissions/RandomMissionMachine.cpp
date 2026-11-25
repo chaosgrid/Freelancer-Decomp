@@ -1524,7 +1524,7 @@ bool FRmRuntimeMachine::SpawnSolar(FRmSolarSpawn* Solar)
     Info.SystemID = System != nullptr ? System->SystemId : 0;
     Info.Position = Solar->Position;
     Info.HitPts = Solar->Hitpoints;
-    std::memcpy(&Info.Orientation, &Solar->Orientation, sizeof(FMatrix));
+    Info.Orientation = Solar->Orientation;
     Info.LoadoutID = Solar->LoadoutId;
     Info.VoiceId = Solar->VoiceId;
     Info.DockingBaseId = Solar->BaseId;
@@ -1732,7 +1732,7 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
         ApplyNpcShipArchById(Block, &Ship->Npc.NpcShipArch.Id, nullptr, nullptr);
         ApplyNpcShipFaction(Ship->Npc.Affiliation, Name.Gender, Block);
         Block->CreationType = 1;
-        std::memcpy(&Block->Orientation, &Group->Orientation, sizeof(FMatrix));
+        std::memcpy(&Block->Orientation, &Group->Orientation, sizeof(Matrix));
         Block->ControllerId = Mission->ControllerId;
         Block->LabelIds = Ship->LabelIds;
         Block->DockIndex = Group->ArrivalDockIndex;
@@ -1782,14 +1782,14 @@ bool FRmRuntimeMachine::SpawnShipGroup(FRmShipGroup* Group, bool bNotFirst)
     // Retail does not test FindFormation's (FUN_06efd1a0) result here.
     if (!Group->Formation.IsEmpty())
     {
-        FTransform Placement;
+        Transform Placement;
         std::memset(&Placement.Rotation, 0, sizeof(Placement.Rotation));
-        Placement.Rotation.D[0][0] = 1.0f;
-        Placement.Rotation.D[1][1] = 1.0f;
-        Placement.Rotation.D[2][2] = 1.0f;
-        Placement.Translation.X = SpawnPoint.x;
-        Placement.Translation.Y = SpawnPoint.y;
-        Placement.Translation.Z = SpawnPoint.z;
+        Placement.Rotation.E[0][0] = 1.0f;
+        Placement.Rotation.E[1][1] = 1.0f;
+        Placement.Rotation.E[2][2] = 1.0f;
+        Placement.Translation.x = SpawnPoint.x;
+        Placement.Translation.y = SpawnPoint.y;
+        Placement.Translation.z = SpawnPoint.z;
         PlaceFormationBlocks(&Blocks, FindFormation(&Group->Formation.Id), &Placement);
     }
 

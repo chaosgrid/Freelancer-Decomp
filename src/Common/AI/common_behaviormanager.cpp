@@ -15,7 +15,7 @@
 #include "common_aisteer.h" // IsWithinInterceptRangeOfIface -- UpdateBehaviorTick real-body pass
 #include "common_cobjdb.h"
 #include "common_csys.h"   // Acquire3DMathEngine, MatrixColumn2 (update_current_behavior_direction)
-#include "x86math.h"       // I3DMathEngine::TransposeTransform, FVector, FMatrix
+#include "x86math.h"       // I3DMathEngine::TransposeTransform, Vector, Matrix
 #include "common_goods.h"
 #include "common_iustategraph.h" // GetAiTargetList / GetClosestTrailingShipDistance --
                                   // the SystemManager+0x34 AI target list that
@@ -718,7 +718,7 @@ void IBehaviorManager::update_current_behavior_direction(Vector const& Dir)
             IObjInspect const* const Ship = ObjInspectOf(ObjRwFromWatchable(WatchablePtr));
             Matrix const ShipRotation = Ship->get_transform().Rotation;
 
-            Matrix Frame{};
+            Matrix Frame;
             Frame.E[0][0] = 1.0f;
             Frame.E[1][1] = 1.0f;
             Frame.E[2][2] = 1.0f;
@@ -767,19 +767,19 @@ void IBehaviorManager::update_current_behavior_direction(Vector const& Dir)
             {
                 // ShipRotation^T applied to Frame's columns 0 and 1 (engine slot +0x38).
                 I3DMathEngine* const Math = Acquire3DMathEngine();
-                FVector const Column0{ Frame.E[0][0], Frame.E[1][0], Frame.E[2][0] };
-                FVector Local0;
-                Math->TransposeTransform(Local0, reinterpret_cast<FMatrix const&>(ShipRotation), Column0);
-                FVector const Column1{ Frame.E[0][1], Frame.E[1][1], Frame.E[2][1] };
-                FVector Local1;
-                Math->TransposeTransform(Local1, reinterpret_cast<FMatrix const&>(ShipRotation), Column1);
+                Vector const Column0{ Frame.E[0][0], Frame.E[1][0], Frame.E[2][0] };
+                Vector Local0;
+                Math->TransposeTransform(Local0, ShipRotation, Column0);
+                Vector const Column1{ Frame.E[0][1], Frame.E[1][1], Frame.E[2][1] };
+                Vector Local1;
+                Math->TransposeTransform(Local1, ShipRotation, Column1);
 
                 // Retail also computes z = L1.z + L0.z and then overwrites it with the
                 // clamped z.
-                Steer.x = static_cast<float>(static_cast<double>(Local0.X) * Clamped.x -
-                                             static_cast<double>(Local1.X) * Clamped.y);
-                Steer.y = static_cast<float>(static_cast<double>(Local1.Y) * Clamped.y -
-                                             static_cast<double>(Local0.Y) * Clamped.x);
+                Steer.x = static_cast<float>(static_cast<double>(Local0.x) * Clamped.x -
+                                             static_cast<double>(Local1.x) * Clamped.y);
+                Steer.y = static_cast<float>(static_cast<double>(Local1.y) * Clamped.y -
+                                             static_cast<double>(Local0.y) * Clamped.x);
                 Steer.z = Clamped.z;
             }
             else

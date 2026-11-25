@@ -1652,11 +1652,11 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
     }
     This->bNebulaLookupPending = 0;
 
-    float const* const Pos3 = AsCamera(Cam)->GetPosition();
+    const Vector* const Pos3 = AsCamera(Cam)->GetPosition();
     Vector CamPos;
-    CamPos.x = Pos3[0];
-    CamPos.y = Pos3[1];
-    CamPos.z = Pos3[2];
+    CamPos.x = Pos3->x;
+    CamPos.y = Pos3->y;
+    CamPos.z = Pos3->z;
 
     if (GetGameOption(kGameOptAsteroids) == 0)
         return;
@@ -1926,7 +1926,7 @@ namespace
         ICamera* const Camera = AsCamera(Cam);
 
         // The orientation's third column times Scale, each product stored as a float.
-        float const* const Orient = Camera->GetOrientation();
+        const float* const Orient = (const float*)Camera->GetOrientation();
         float const AxisX = Orient[2] * Scale;
         float const AxisY = Orient[5] * Scale;
         float const AxisZ = Orient[8] * Scale;
@@ -1952,7 +1952,7 @@ namespace
         // Port-only, FREELANCER_RP9: while the Direct3D 9 volumetric nebula draws the
         // controller, StarSysApplyObjectLighting skips its fog block
         // (NebulaVolume::ReplacesObjectFog); the ambient lerp stays.
-        float const* const CamPos = Camera->GetPosition();
+        const float* const CamPos = (const float*)Camera->GetPosition();
         float Point[3];
         Point[0] = AxisX + CamPos[0];
         Point[1] = AxisY + CamPos[1];
@@ -2072,7 +2072,7 @@ namespace
                 IRenderableMesh* RMesh = nullptr;
 
                 int const EngineIndex = static_cast<int>(Arch->EngineIndex);
-                if (DALib::Engine->QueryEngineComponent(EngineIndex, const_cast<char*>(Iids::Mesh),
+                if (DALib::Engine->QueryEngineComponent(EngineIndex, Iids::Mesh,
                                                         reinterpret_cast<void**>(&Mesh)) < 0)
                 {
                     FDUMP(kFdumpError, "%s(%d) : *** ERROR: IMesh query failed, on asteroid arch (%s)",
@@ -2092,16 +2092,16 @@ namespace
                     // The LOD clamped to [0, count - 1] and kept for the next archetype.
                     int LodCount = 0;
                     DALib::Renderer->GetArchetypeLodCount(
-                        reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)), &LodCount);
+                        static_cast<intptr_t>(EngineIndex), &LodCount);
                     if (Lod + 1 > LodCount)
                         Lod = LodCount - 1;
                     if (Lod < 0)
                         Lod = 0;
                     DALib::Renderer->SetArchetypeLod(
-                        reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)), Lod);
+                        static_cast<intptr_t>(EngineIndex), Lod);
 
                     if (DALib::Engine->QueryEngineComponent(
-                            EngineIndex, const_cast<char*>(Iids::RenderableMesh),
+                            EngineIndex, Iids::RenderableMesh,
                             reinterpret_cast<void**>(&RMesh)) < 0)
                     {
                         FDUMP(kFdumpError,
@@ -2135,20 +2135,20 @@ namespace
                         {
                             float* const Vert =
                                 reinterpret_cast<float*>(Chunk.Verts + Vi * kCubeVertStride);
-                            FVector OutPos;
+                            Vector OutPos;
                             CliAsteroidMathEngine()->TransformMatrix(
-                                OutPos, reinterpret_cast<FMatrix const&>(Entry.Orient),
-                                *reinterpret_cast<FVector const*>(Vert));
-                            Vert[0] = OutPos.X;
-                            Vert[1] = OutPos.Y;
-                            Vert[2] = OutPos.Z;
-                            FVector OutNrm;
+                                OutPos, Entry.Orient,
+                                *reinterpret_cast<Vector const*>(Vert));
+                            Vert[0] = OutPos.x;
+                            Vert[1] = OutPos.y;
+                            Vert[2] = OutPos.z;
+                            Vector OutNrm;
                             CliAsteroidMathEngine()->TransformMatrix(
-                                OutNrm, reinterpret_cast<FMatrix const&>(Entry.Orient),
-                                *reinterpret_cast<FVector const*>(Vert + 3));
-                            Vert[3] = OutNrm.X;
-                            Vert[4] = OutNrm.Y;
-                            Vert[5] = OutNrm.Z;
+                                OutNrm, Entry.Orient,
+                                *reinterpret_cast<Vector const*>(Vert + 3));
+                            Vert[3] = OutNrm.x;
+                            Vert[4] = OutNrm.y;
+                            Vert[5] = OutNrm.z;
                             Vert[0] = Entry.Extent.x + Vert[0];
                             Vert[1] = Vert[1] + Entry.Extent.y;
                             Vert[2] = Vert[2] + Entry.Extent.z;
@@ -2315,22 +2315,22 @@ namespace
     // Inlined twice in the near-field draw: pipeline state 7 (read into a local seeded with 1)
     // picks the combined view * cube transform through SetModelview; otherwise SetWorld then
     // SetView.
-    void AsteroidBindCubeTransform(FTransform const& CubeXform, FTransform const& ViewXform)
+    void AsteroidBindCubeTransform(Transform const& CubeXform, Transform const& ViewXform)
     {
         IRenderPipeline* const Pipe = DALib::Pipeline;
         int Combined = 1;
         Pipe->GetPipelineState(7, &Combined);
         if (Combined != 0)
         {
-            FTransform Product;
+            Transform Product;
             CliAsteroidMathEngine()->MulTransform(Product, ViewXform, CubeXform);
-            FTransform const Copy = Product;
-            Pipe->SetModelview(reinterpret_cast<float const*>(&Copy));
+            Transform const Copy = Product;
+            Pipe->SetModelview(&Copy);
         }
         else
         {
-            Pipe->SetWorld(reinterpret_cast<float const*>(&CubeXform));
-            Pipe->SetView(reinterpret_cast<float const*>(&ViewXform));
+            Pipe->SetWorld(&CubeXform);
+            Pipe->SetView(&ViewXform);
         }
     }
 
@@ -2389,7 +2389,7 @@ namespace
         ICamera* const Camera = AsCamera(Cam);
         CmnAsteroid::CAsteroidField* const Cmn = Field->CmnField;
 
-        FTransform ViewXform;
+        Transform ViewXform;
         memcpy(&ViewXform, Camera->GetViewTransform(), sizeof(ViewXform));
 
         // DAT_006753b0 bits 0 and 1 guard two function-local statics whose atexit destructors
@@ -2421,7 +2421,7 @@ namespace
         // Retail calls GetHalfFovXDeg once more and discards the result.
         float Orient9[9];
         memcpy(Orient9, Camera->GetOrientation(), sizeof(Orient9));
-        float const* const Pos3 = Camera->GetPosition();
+        const float* const Pos3 = (const float*)Camera->GetPosition();
         Vector const CamPos = AsteroidVec(Pos3[0], Pos3[1], Pos3[2]);
         Camera->GetHalfFovXDeg();
 
@@ -2671,11 +2671,11 @@ namespace
                             return;
                     }
 
-                    FTransform CubeXform;
+                    Transform CubeXform;
                     memcpy(&CubeXform.Rotation, &Orient, sizeof(CubeXform.Rotation));
-                    CubeXform.Translation.X = CubePos.x;
-                    CubeXform.Translation.Y = CubePos.y;
-                    CubeXform.Translation.Z = CubePos.z;
+                    CubeXform.Translation.x = CubePos.x;
+                    CubeXform.Translation.y = CubePos.y;
+                    CubeXform.Translation.z = CubePos.z;
                     AsteroidBindCubeTransform(CubeXform, ViewXform);
 
                     // Past the fade start (ordered less) the alpha fades over half a cube; at or
@@ -2734,11 +2734,11 @@ namespace
                 {
                     if (bFirst != 0 && !AsteroidUploadMesh(Field, &Desc, 0x580))
                         return;
-                    FTransform CubeXform;
+                    Transform CubeXform;
                     memcpy(&CubeXform.Rotation, &Orient, sizeof(CubeXform.Rotation));
-                    CubeXform.Translation.X = PlayerPos.x;
-                    CubeXform.Translation.Y = PlayerPos.y;
-                    CubeXform.Translation.Z = PlayerPos.z;
+                    CubeXform.Translation.x = PlayerPos.x;
+                    CubeXform.Translation.y = PlayerPos.y;
+                    CubeXform.Translation.z = PlayerPos.z;
                     AsteroidBindCubeTransform(CubeXform, ViewXform);
                     Material[3] = Field->MaxAlpha;
                     AsteroidDrawCube(Field, Material, &bBlendState, &Desc);
@@ -2788,11 +2788,11 @@ namespace
     void CliAsteroidTickOne(FCliAsteroid* Field, FSpaceCamera* Cam)
     {
         unsigned char bAmbientDone = 0;
-        float const* const Pos3 = AsCamera(Cam)->GetPosition();
+        const Vector* const Pos3 = AsCamera(Cam)->GetPosition();
         Vector CamPos;
-        CamPos.x = Pos3[0];
-        CamPos.y = Pos3[1];
-        CamPos.z = Pos3[2];
+        CamPos.x = Pos3->x;
+        CamPos.y = Pos3->y;
+        CamPos.z = Pos3->z;
 
 #ifdef FREELANCER_RP9
         // Port-only: under the Direct3D 9 volumetric nebula (nebula_volume.cpp) the haze is far
@@ -2996,11 +2996,11 @@ namespace
         // GetSize again, then the orientation and the position.
         Size = Zone->GetSize();
         Matrix const& Orient = Zone->GetOrientation();
-        FMatrix MathOrient;
+        Matrix MathOrient;
         for (int R = 0; R < 3; ++R)
         {
             for (int C = 0; C < 3; ++C)
-                MathOrient.D[R][C] = Orient.E[R][C];
+                MathOrient.E[R][C] = Orient.E[R][C];
         }
         Vector const ZonePos = Zone->GetPos();
         if (Size.z < 0.1f)
@@ -3030,21 +3030,21 @@ namespace
             // DAT_005da774).
             double const Angle =
                 (static_cast<double>(I) / Band->ParticleCount) * 6.28318548f;
-            FVector Local;
-            Local.X = static_cast<float>(cos(Angle) * RadiusX);
-            Local.Y = 0.0f;
-            Local.Z = static_cast<float>(sin(Angle) * RadiusZ);
-            Part->Pos[0] = Local.X;
-            Part->Pos[1] = Local.Y;
-            Part->Pos[2] = Local.Z;
+            Vector Local;
+            Local.x = static_cast<float>(cos(Angle) * RadiusX);
+            Local.y = 0.0f;
+            Local.z = static_cast<float>(sin(Angle) * RadiusZ);
+            Part->Pos[0] = Local.x;
+            Part->Pos[1] = Local.y;
+            Part->Pos[2] = Local.z;
             // Retail tests DAT_00679860 inside the loop and acquires it when still null.
             if (G_CloudsMath == nullptr)
                 G_CloudsMath = Acquire3DMathEngine();
-            FVector World;
+            Vector World;
             G_CloudsMath->TransformMatrix(World, MathOrient, Local);
-            Part->Pos[0] = World.X + ZonePos.x;
-            Part->Pos[1] = World.Y + ZonePos.y;
-            Part->Pos[2] = World.Z + ZonePos.z;
+            Part->Pos[0] = World.x + ZonePos.x;
+            Part->Pos[1] = World.y + ZonePos.y;
+            Part->Pos[2] = World.z + ZonePos.z;
             Part->HalfHeight = Band->Height;
         }
 

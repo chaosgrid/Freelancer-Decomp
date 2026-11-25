@@ -2159,11 +2159,11 @@ namespace AlchemyImpl
     // +0x2C LAB_06243a60. The ramp's outer time is TimeA. Rotation children are
     // evaluated in the order 4, 5, 3, then FUN_06243c50(Out; child3, child5, child4).
     void DACOM_API FFxAnimatedTransform::Evaluate(unsigned long TimeA, unsigned long TimeB,
-                                                  float* Out12)
+                                                  Transform* Out)
     {
         const unsigned long IdentityBits[12] = {
             0x3F800000, 0, 0, 0, 0x3F800000, 0, 0, 0, 0x3F800000, 0, 0, 0};
-        std::memcpy(Out12, IdentityBits, sizeof(IdentityBits));
+        std::memcpy(Out, IdentityBits, sizeof(IdentityBits));
 
         if (ChannelFlags_ == 0x1FFu)
             return;
@@ -2186,29 +2186,29 @@ namespace AlchemyImpl
             StoreAlchemyFpuFloat(Rotate4, ForwardAppearanceSingleEval(Child4, TimeAf, TimeBf));
             StoreAlchemyFpuFloat(Rotate5, ForwardAppearanceSingleEval(Child5, TimeAf, TimeBf));
             StoreAlchemyFpuFloat(Rotate3, ForwardAppearanceSingleEval(Child3, TimeAf, TimeBf));
-            BuildEulerRotation3x3(Out12, Rotate3, Rotate5, Rotate4);
+            BuildEulerRotation3x3(&Out->Rotation.E[0][0], Rotate3, Rotate5, Rotate4);
         }
 
         // Scale on a local identity's diagonal; the 3DMathEngine (DAT_06257c58, created
         // on first use) composes Scale * Out.
         if ((ChannelFlags_ & 0x1C0u) != 0x1C0u)
         {
-            float ScaleXform12[12];
-            std::memcpy(ScaleXform12, IdentityBits, sizeof(IdentityBits));
-            StoreAlchemyFpuFloat(ScaleXform12[0],
+            Transform ScaleXform;
+            std::memcpy(&ScaleXform, IdentityBits, sizeof(IdentityBits));
+            StoreAlchemyFpuFloat(ScaleXform.Rotation.E[0][0],
                                  ForwardAppearanceSingleEval(Children_[6], TimeAf, TimeBf));
-            StoreAlchemyFpuFloat(ScaleXform12[4],
+            StoreAlchemyFpuFloat(ScaleXform.Rotation.E[1][1],
                                  ForwardAppearanceSingleEval(Children_[7], TimeAf, TimeBf));
-            StoreAlchemyFpuFloat(ScaleXform12[8],
+            StoreAlchemyFpuFloat(ScaleXform.Rotation.E[2][2],
                                  ForwardAppearanceSingleEval(Children_[8], TimeAf, TimeBf));
 
             I3DMathEngine* Math = Shared3DMath();
-            float Composed[12];
+            Transform Composed;
             Math->MulTransform( // +0x1C
-                *reinterpret_cast<FTransform*>(Composed),
-                *reinterpret_cast<const FTransform*>(ScaleXform12),
-                *reinterpret_cast<const FTransform*>(Out12));
-            std::memcpy(Out12, Composed, sizeof(Composed));
+                Composed,
+                ScaleXform,
+                *Out);
+            std::memcpy(Out, &Composed, sizeof(Composed));
         }
 
         // Translation children are evaluated in the order 2, 1, 0.
@@ -2221,9 +2221,9 @@ namespace AlchemyImpl
             float Translate1;
             StoreAlchemyFpuFloat(Translate2, ForwardAppearanceSingleEval(Child2, TimeAf, TimeBf));
             StoreAlchemyFpuFloat(Translate1, ForwardAppearanceSingleEval(Child1, TimeAf, TimeBf));
-            StoreAlchemyFpuFloat(Out12[9], ForwardAppearanceSingleEval(Child0, TimeAf, TimeBf));
-            std::memcpy(Out12 + 10, &Translate1, sizeof(Translate1));
-            std::memcpy(Out12 + 11, &Translate2, sizeof(Translate2));
+            StoreAlchemyFpuFloat(Out->Translation.x, ForwardAppearanceSingleEval(Child0, TimeAf, TimeBf));
+            std::memcpy(&Out->Translation.y, &Translate1, sizeof(Translate1));
+            std::memcpy(&Out->Translation.z, &Translate2, sizeof(Translate2));
         }
     }
 #pragma float_control(pop)

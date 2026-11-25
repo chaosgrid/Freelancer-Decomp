@@ -177,6 +177,10 @@ public:
 };
 static_assert(sizeof(IVP_Compact_Triangle) == 16, "IVP_Compact_Triangle must be 16 bytes");
 
+// The IVP_Compact_Triangle constructor (FUN_0635aa20, 16 zero bytes) on raw memory; defined in
+// ivp_collision/ivp_mindist_limiter.cpp.
+extern "C" void* IVP_Compact_Triangle_Init(void* Memory);
+
 // Variable-length compact ledge (convex sub-mesh / hull)
 class alignas(16) IVP_Compact_Ledge
 {

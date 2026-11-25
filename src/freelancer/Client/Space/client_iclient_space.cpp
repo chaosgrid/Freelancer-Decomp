@@ -367,8 +367,8 @@ namespace
         Parms.Pos = Info->Position;
         Parms.OwnerPlayer = 0;
 
-        IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Parms.Orient),
-                                           reinterpret_cast<FQuaternion const&>(Info->Orientation));
+        IClientSMath()->QuaternionToMatrix(Parms.Orient,
+                                           Info->Orientation);
 
         // The accessory count is not clamped.
         Parms.VibeId = static_cast<unsigned>(Info->VibeGroupId);
@@ -521,8 +521,8 @@ namespace
         Parms.OwnerPlayer = Info->OwnerPlayer;
         Parms.Pos = Info->Position;
 
-        IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Parms.Orient),
-                                           reinterpret_cast<FQuaternion const&>(Info->Orientation));
+        IClientSMath()->QuaternionToMatrix(Parms.Orient,
+                                           Info->Orientation);
 
         // The accessory count is not clamped.
         Parms.Velocity = Info->Velocity;
@@ -678,8 +678,8 @@ namespace
             Parms.ObjDb = GetClientObjDb();
             Parms.OwnerPlayer = Info->OwnerPlayer;
             Parms.Pos = Info->Position;
-            IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Parms.Orient),
-                                               reinterpret_cast<FQuaternion const&>(Info->Orientation));
+            IClientSMath()->QuaternionToMatrix(Parms.Orient,
+                                               Info->Orientation);
             Parms.Velocity = Info->Velocity;
             Parms.AngularVelocity = Info->AngularVelocity;
             Parms.OwnerId = Info->OwnerId;
@@ -752,8 +752,8 @@ void IClientImpl::SendServerCreateLoot(unsigned int /*ClientId*/, const FServerC
             Parms.OwnerPlayer = 0;
             Parms.HitPts = Desc->HitPts;
             Parms.Pos = Desc->Position;
-            IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Parms.Orient),
-                                               reinterpret_cast<FQuaternion const&>(Desc->Orientation));
+            IClientSMath()->QuaternionToMatrix(Parms.Orient,
+                                               Desc->Orientation);
             Parms.Velocity = Desc->Velocity;
             Parms.AngularVelocity.x = 0.0f;
             Parms.AngularVelocity.y = 0.0f;
@@ -836,8 +836,8 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
         Parms.Id = Info.ObjId;
         Parms.ObjDb = GetClientObjDb();
         Parms.Pos = Info.Position;
-        IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Parms.Orient),
-                                           reinterpret_cast<FQuaternion const&>(Info.Orientation));
+        IClientSMath()->QuaternionToMatrix(Parms.Orient,
+                                           Info.Orientation);
         Parms.OwnerId = Info.OwnerId;
         FClientGameobj* const TargetGo = ClientObjDb_FindObject(Info.TargetId, 0);
         Parms.SubTarget = Info.TargetSubObjId;
@@ -863,8 +863,8 @@ void IClientImpl::SendServerCreateGuided(const unsigned int& /*ClientId*/, const
         return;
     }
     Matrix Orient;
-    IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Orient),
-                                       reinterpret_cast<FQuaternion const&>(Info.Orientation));
+    IClientSMath()->QuaternionToMatrix(Orient,
+                                       Info.Orientation);
     float const FarX = static_cast<float>(-static_cast<double>(Orient.E[0][2]) * kIClientFarScale);
     float const FarY = static_cast<float>(-static_cast<double>(Orient.E[1][2]) * kIClientFarScale);
     Vector Target;
@@ -1055,8 +1055,8 @@ void IClientImpl::SendServerSystemSwitchIn(unsigned int /*ClientId*/, const FPay
 
     // Retail converts the orientation on both paths.
     Matrix Orient;
-    IClientSMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Orient),
-                                       reinterpret_cast<FQuaternion const&>(Info.Orientation));
+    IClientSMath()->QuaternionToMatrix(Orient,
+                                       Info.Orientation);
 
     // Jump type bits 0x40 or 0x800 -> the jump in; otherwise the airlock.
     if ((Info.JumpObjTypeBits & OBJ_JUMP_GATE) != 0 || (Info.JumpObjTypeBits & OBJ_JUMP_HOLE) != 0)
@@ -1125,8 +1125,8 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
         {
             Matrix Orient;
             IClientSMath()->QuaternionToMatrix(
-                reinterpret_cast<FMatrix&>(Orient),
-                reinterpret_cast<FQuaternion const&>(Info.Orientation));
+                Orient,
+                Info.Orientation);
             NarrowGameobj(Ship, CObject::ClassObject)->beam_object(Info.Position, Orient, false);
         }
         Ship->LaunchFromDock(ClientObjDb_FindObject(Info.LaunchObjId, 0),
@@ -1136,8 +1136,8 @@ void IClientImpl::SendServerLaunch(unsigned int /*ClientId*/, const FServerLaunc
     {
         Matrix Orient;
         IClientSMath()->QuaternionToMatrix(
-            reinterpret_cast<FMatrix&>(Orient),
-            reinterpret_cast<FQuaternion const&>(Info.Orientation));
+            Orient,
+            Info.Orientation);
         NarrowGameobj(Ship, CObject::ClassObject)->beam_object(Info.Position, Orient, false);
     }
 
@@ -1463,8 +1463,8 @@ void IClientImpl::SendServerBurnFuse(const unsigned int& /*ClientId*/, const FSe
 // read.
 void IClientImpl::SendServerSetCamera(const unsigned int& /*ClientId*/, const FPayloadServerSetCamera& Info)
 {
-    FMatrix Orientation;
-    IClientSMath()->QuaternionToMatrix(Orientation, reinterpret_cast<FQuaternion const&>(Info.Orient));
+    Matrix Orientation;
+    IClientSMath()->QuaternionToMatrix(Orientation, Info.Orient);
     float Csys[12];
     memcpy(Csys, &Orientation, 9 * sizeof(float));
     Csys[9] = Info.Position.x;

@@ -65,10 +65,10 @@ namespace
     I3DMathEngine* G_GateTunnelMath = nullptr;
 
     // The draw-side face of the csys transform the tunnel keeps at +0x230 (same 0x30 layout).
-    static_assert(sizeof(Transform) == sizeof(FTransform), "Transform and FTransform share 0x30");
-    FTransform const* AsFTransform(Transform const* Xform)
+    static_assert(sizeof(Transform) == sizeof(Transform), "Transform and Transform share 0x30");
+    Transform const* AsFTransform(Transform const* Xform)
     {
-        return reinterpret_cast<FTransform const*>(Xform);
+        return Xform;
     }
 
     // The inlined draw `rand() * DAT_005da778 * (Maximum - Minimum) + Minimum`, rounded to float.
@@ -80,10 +80,10 @@ namespace
     }
 
     // FUN_00410190 -- sqrt((x*x + y*y) + z*z), unrounded.
-    double VectorLength(FVector const* V)
+    double VectorLength(Vector const* V)
     {
-        return sqrt(static_cast<double>(V->X) * V->X + static_cast<double>(V->Y) * V->Y +
-                    static_cast<double>(V->Z) * V->Z);
+        return sqrt(static_cast<double>(V->x) * V->x + static_cast<double>(V->y) * V->y +
+                    static_cast<double>(V->z) * V->z);
     }
 
     // EmitLayer's inlined Brightness sample: the curve at T as
@@ -279,12 +279,12 @@ FGateTunnel::FGateTunnel()
     Id.Id = CreateID("default");
     MaxRadius = 50.0f;
     MinRadius = 50.0f;
-    MinRgb.X = 0.0f;
-    MinRgb.Y = 0.0f;
-    MinRgb.Z = 0.0f;
-    MaxRgb.X = 0.0f;
-    MaxRgb.Y = 0.0f;
-    MaxRgb.Z = 0.0f;
+    MinRgb.x = 0.0f;
+    MinRgb.y = 0.0f;
+    MinRgb.z = 0.0f;
+    MaxRgb.x = 0.0f;
+    MaxRgb.y = 0.0f;
+    MaxRgb.z = 0.0f;
     bWriteDepthBuffer = 1;
     NumSplineControlPoints = 11;
     ZRange = 0.0f;
@@ -481,9 +481,9 @@ void FGateTunnel::RebuildColorOffsets(int Shift)
         ColorOffsetB.Scroll(ScrollShift);
         return;
     }
-    ColorOffsetR.Randomize(NumSplineControlPoints, MinRgb.X, MaxRgb.X, 0, 0);
-    ColorOffsetG.Randomize(NumSplineControlPoints, MinRgb.Y, MaxRgb.Y, 0, 0);
-    ColorOffsetB.Randomize(NumSplineControlPoints, MinRgb.Z, MaxRgb.Z, 0, 0);
+    ColorOffsetR.Randomize(NumSplineControlPoints, MinRgb.x, MaxRgb.x, 0, 0);
+    ColorOffsetG.Randomize(NumSplineControlPoints, MinRgb.y, MaxRgb.y, 0, 0);
+    ColorOffsetB.Randomize(NumSplineControlPoints, MinRgb.z, MaxRgb.z, 0, 0);
 }
 
 void FGateTunnel::Update(float Dt)
@@ -540,75 +540,75 @@ void FGateTunnel::Update(float Dt)
 
         if (bMoveAlongPath)
         {
-            FTransform const* const World = AsFTransform(&Frame);
+            Transform const* const World = AsFTransform(&Frame);
 
             // The ship's point on the path (sampled Z, Y, X).
             float const Ahead = static_cast<float>(static_cast<double>(kShipLookAhead) + Phase);
             float const Here = Phase;
-            FVector Local;
-            Local.Z = static_cast<float>(PathZ.Sample(Here));
-            Local.Y = static_cast<float>(PathY.Sample(Here));
-            Local.X = static_cast<float>(PathX.Sample(Here));
-            FVector Point;
+            Vector Local;
+            Local.z = static_cast<float>(PathZ.Sample(Here));
+            Local.y = static_cast<float>(PathY.Sample(Here));
+            Local.x = static_cast<float>(PathX.Sample(Here));
+            Vector Point;
             HudTransformPoint(World, &Point, &Local);
-            ShipPosition.x = Point.X;
-            ShipPosition.y = Point.Y;
-            ShipPosition.z = Point.Z;
+            ShipPosition.x = Point.x;
+            ShipPosition.y = Point.y;
+            ShipPosition.z = Point.z;
 
-            Local.Z = static_cast<float>(PathZ.Sample(Ahead));
-            Local.Y = static_cast<float>(PathY.Sample(Ahead));
-            Local.X = static_cast<float>(PathX.Sample(Ahead));
-            FVector AheadPoint;
+            Local.z = static_cast<float>(PathZ.Sample(Ahead));
+            Local.y = static_cast<float>(PathY.Sample(Ahead));
+            Local.x = static_cast<float>(PathX.Sample(Ahead));
+            Vector AheadPoint;
             HudTransformPoint(World, &AheadPoint, &Local);
 
-            FVector Dir;
-            Dir.X = AheadPoint.X - ShipPosition.x;
-            Dir.Y = AheadPoint.Y - ShipPosition.y;
-            Dir.Z = AheadPoint.Z - ShipPosition.z;
+            Vector Dir;
+            Dir.x = AheadPoint.x - ShipPosition.x;
+            Dir.y = AheadPoint.y - ShipPosition.y;
+            Dir.z = AheadPoint.z - ShipPosition.z;
             double const InvDirLength = 1.0 / VectorLength(&Dir);
-            Dir.X = static_cast<float>(Dir.X * InvDirLength);
-            Dir.Y = static_cast<float>(Dir.Y * InvDirLength);
-            Dir.Z = static_cast<float>(Dir.Z * InvDirLength);
+            Dir.x = static_cast<float>(Dir.x * InvDirLength);
+            Dir.y = static_cast<float>(Dir.y * InvDirLength);
+            Dir.z = static_cast<float>(Dir.z * InvDirLength);
 
             // FUN_00411350: the back axis N = -Dir.
-            FVector Back;
-            Back.X = -Dir.X;
-            Back.Y = -Dir.Y;
-            Back.Z = -Dir.Z;
+            Vector Back;
+            Back.x = -Dir.x;
+            Back.y = -Dir.y;
+            Back.z = -Dir.z;
 
             // N x (0, 1, 0), negated -- the right axis (retail multiplies by the zeros).
-            FVector Cross;
-            Cross.X = static_cast<float>(static_cast<double>(Back.Y) * 0.0 - Back.Z);
-            Cross.Y = static_cast<float>(static_cast<double>(Back.Z) * 0.0 -
-                                         static_cast<double>(Back.X) * 0.0);
-            Cross.Z = static_cast<float>(Back.X - static_cast<double>(Back.Y) * 0.0);
-            FVector Right;
-            Right.X = -Cross.X;
-            Right.Y = -Cross.Y;
-            Right.Z = -Cross.Z;
+            Vector Cross;
+            Cross.x = static_cast<float>(static_cast<double>(Back.y) * 0.0 - Back.z);
+            Cross.y = static_cast<float>(static_cast<double>(Back.z) * 0.0 -
+                                         static_cast<double>(Back.x) * 0.0);
+            Cross.z = static_cast<float>(Back.x - static_cast<double>(Back.y) * 0.0);
+            Vector Right;
+            Right.x = -Cross.x;
+            Right.y = -Cross.y;
+            Right.z = -Cross.z;
 
             // up = N x R.
-            FVector Up;
-            Up.X = static_cast<float>(static_cast<double>(Right.Z) * Back.Y -
-                                      static_cast<double>(Right.Y) * Back.Z);
-            Up.Y = static_cast<float>(static_cast<double>(Back.Z) * Right.X -
-                                      static_cast<double>(Right.Z) * Back.X);
-            Up.Z = static_cast<float>(static_cast<double>(Right.Y) * Back.X -
-                                      static_cast<double>(Back.Y) * Right.X);
+            Vector Up;
+            Up.x = static_cast<float>(static_cast<double>(Right.z) * Back.y -
+                                      static_cast<double>(Right.y) * Back.z);
+            Up.y = static_cast<float>(static_cast<double>(Back.z) * Right.x -
+                                      static_cast<double>(Right.z) * Back.x);
+            Up.z = static_cast<float>(static_cast<double>(Right.y) * Back.x -
+                                      static_cast<double>(Back.y) * Right.x);
 
             // The columns of +0x280, each normalised.
             double const InvRight = 1.0 / VectorLength(&Right);
-            ShipOrientation.E[0][0] = static_cast<float>(Right.X * InvRight);
-            ShipOrientation.E[1][0] = static_cast<float>(Right.Y * InvRight);
-            ShipOrientation.E[2][0] = static_cast<float>(Right.Z * InvRight);
+            ShipOrientation.E[0][0] = static_cast<float>(Right.x * InvRight);
+            ShipOrientation.E[1][0] = static_cast<float>(Right.y * InvRight);
+            ShipOrientation.E[2][0] = static_cast<float>(Right.z * InvRight);
             double const InvUp = 1.0 / VectorLength(&Up);
-            ShipOrientation.E[0][1] = static_cast<float>(Up.X * InvUp);
-            ShipOrientation.E[1][1] = static_cast<float>(Up.Y * InvUp);
-            ShipOrientation.E[2][1] = static_cast<float>(Up.Z * InvUp);
+            ShipOrientation.E[0][1] = static_cast<float>(Up.x * InvUp);
+            ShipOrientation.E[1][1] = static_cast<float>(Up.y * InvUp);
+            ShipOrientation.E[2][1] = static_cast<float>(Up.z * InvUp);
             double const InvBack = 1.0 / VectorLength(&Back);
-            ShipOrientation.E[0][2] = static_cast<float>(Back.X * InvBack);
-            ShipOrientation.E[1][2] = static_cast<float>(Back.Y * InvBack);
-            ShipOrientation.E[2][2] = static_cast<float>(Back.Z * InvBack);
+            ShipOrientation.E[0][2] = static_cast<float>(Back.x * InvBack);
+            ShipOrientation.E[1][2] = static_cast<float>(Back.y * InvBack);
+            ShipOrientation.E[2][2] = static_cast<float>(Back.z * InvBack);
 
             // The ship's CObject narrowed by 0x503 (null otherwise, and then called anyway) is
             // beamed there.
@@ -719,7 +719,7 @@ void FGateTunnel::Draw(FSpaceCamera* Camera)
     Win3DDisable(kWin3DBlend);
 }
 
-void FGateTunnel::BuildFrame(FTransform* Out, float T) const
+void FGateTunnel::BuildFrame(Transform* Out, float T) const
 {
     // FUN_004ffbb0. The look-ahead parameter steps back when stepping forward passes 1 (tested
     // on the unrounded sum; NaN keeps it).
@@ -728,63 +728,63 @@ void FGateTunnel::BuildFrame(FTransform* Out, float T) const
     if (AheadSum > 1.0)
         Ahead = static_cast<float>(static_cast<double>(T) - kFrameEps);
 
-    FTransform const* const World = AsFTransform(&Frame);
+    Transform const* const World = AsFTransform(&Frame);
 
     // The point at T (sampled Z, Y, X), then at the look-ahead.
-    FVector Local;
-    Local.Z = static_cast<float>(PathZ.Sample(T));
-    Local.Y = static_cast<float>(PathY.Sample(T));
-    Local.X = static_cast<float>(PathX.Sample(T));
-    FVector Point;
+    Vector Local;
+    Local.z = static_cast<float>(PathZ.Sample(T));
+    Local.y = static_cast<float>(PathY.Sample(T));
+    Local.x = static_cast<float>(PathX.Sample(T));
+    Vector Point;
     HudTransformPoint(World, &Point, &Local);
 
-    Local.Z = static_cast<float>(PathZ.Sample(Ahead));
-    Local.Y = static_cast<float>(PathY.Sample(Ahead));
-    Local.X = static_cast<float>(PathX.Sample(Ahead));
-    FVector AheadPoint;
+    Local.z = static_cast<float>(PathZ.Sample(Ahead));
+    Local.y = static_cast<float>(PathY.Sample(Ahead));
+    Local.x = static_cast<float>(PathX.Sample(Ahead));
+    Vector AheadPoint;
     HudTransformPoint(World, &AheadPoint, &Local);
 
     // forward = -(Ahead - Point) / |Ahead - Point|.
-    FVector Delta;
-    Delta.X = AheadPoint.X - Point.X;
-    Delta.Y = AheadPoint.Y - Point.Y;
-    Delta.Z = AheadPoint.Z - Point.Z;
+    Vector Delta;
+    Delta.x = AheadPoint.x - Point.x;
+    Delta.y = AheadPoint.y - Point.y;
+    Delta.z = AheadPoint.z - Point.z;
     double const InvLength = 1.0 / VectorLength(&Delta);
-    FVector Forward;
-    Forward.X = static_cast<float>(-(Delta.X * InvLength));
-    Forward.Y = static_cast<float>(-(Delta.Y * InvLength));
-    Forward.Z = static_cast<float>(-(Delta.Z * InvLength));
+    Vector Forward;
+    Forward.x = static_cast<float>(-(Delta.x * InvLength));
+    Forward.y = static_cast<float>(-(Delta.y * InvLength));
+    Forward.z = static_cast<float>(-(Delta.z * InvLength));
 
     // F x (0, 1, 0), negated -- the left axis (not normalised).
-    FVector Cross;
-    Cross.X = static_cast<float>(static_cast<double>(Forward.Y) * 0.0 - Forward.Z);
-    Cross.Y = static_cast<float>(static_cast<double>(Forward.Z) * 0.0 -
-                                 static_cast<double>(Forward.X) * 0.0);
-    Cross.Z = static_cast<float>(Forward.X - static_cast<double>(Forward.Y) * 0.0);
-    FVector Left;
-    Left.X = -Cross.X;
-    Left.Y = -Cross.Y;
-    Left.Z = -Cross.Z;
+    Vector Cross;
+    Cross.x = static_cast<float>(static_cast<double>(Forward.y) * 0.0 - Forward.z);
+    Cross.y = static_cast<float>(static_cast<double>(Forward.z) * 0.0 -
+                                 static_cast<double>(Forward.x) * 0.0);
+    Cross.z = static_cast<float>(Forward.x - static_cast<double>(Forward.y) * 0.0);
+    Vector Left;
+    Left.x = -Cross.x;
+    Left.y = -Cross.y;
+    Left.z = -Cross.z;
 
     // up = F x L.
-    FVector Up;
-    Up.X = static_cast<float>(static_cast<double>(Left.Z) * Forward.Y -
-                              static_cast<double>(Left.Y) * Forward.Z);
-    Up.Y = static_cast<float>(static_cast<double>(Forward.Z) * Left.X -
-                              static_cast<double>(Left.Z) * Forward.X);
-    Up.Z = static_cast<float>(static_cast<double>(Left.Y) * Forward.X -
-                              static_cast<double>(Forward.Y) * Left.X);
+    Vector Up;
+    Up.x = static_cast<float>(static_cast<double>(Left.z) * Forward.y -
+                              static_cast<double>(Left.y) * Forward.z);
+    Up.y = static_cast<float>(static_cast<double>(Forward.z) * Left.x -
+                              static_cast<double>(Left.z) * Forward.x);
+    Up.z = static_cast<float>(static_cast<double>(Left.y) * Forward.x -
+                              static_cast<double>(Forward.y) * Left.x);
 
     // Columns (left, up, forward), the point as translation.
-    Out->Rotation.D[0][0] = Left.X;
-    Out->Rotation.D[0][1] = Up.X;
-    Out->Rotation.D[0][2] = Forward.X;
-    Out->Rotation.D[1][0] = Left.Y;
-    Out->Rotation.D[1][1] = Up.Y;
-    Out->Rotation.D[1][2] = Forward.Y;
-    Out->Rotation.D[2][0] = Left.Z;
-    Out->Rotation.D[2][1] = Up.Z;
-    Out->Rotation.D[2][2] = Forward.Z;
+    Out->Rotation.E[0][0] = Left.x;
+    Out->Rotation.E[0][1] = Up.x;
+    Out->Rotation.E[0][2] = Forward.x;
+    Out->Rotation.E[1][0] = Left.y;
+    Out->Rotation.E[1][1] = Up.y;
+    Out->Rotation.E[1][2] = Forward.y;
+    Out->Rotation.E[2][0] = Left.z;
+    Out->Rotation.E[2][1] = Up.z;
+    Out->Rotation.E[2][2] = Forward.z;
     Out->Translation = Point;
 }
 
@@ -875,9 +875,9 @@ void FGateTunnel::EmitLayer(float T0, float T1, FGateTunnelLayer* Layer, int Lay
         float const Size1 =
             static_cast<float>((Radius1 * FarRadiusFactor - Radius1) * Fraction1 + Radius1);
 
-        FTransform Frame0;
+        Transform Frame0;
         BuildFrame(&Frame0, T);
-        FTransform Frame1;
+        Transform Frame1;
         BuildFrame(&Frame1, Next);
 
         // Alpha from near to far (swapped for a backward step), cubed.
@@ -913,12 +913,12 @@ void FGateTunnel::EmitLayer(float T0, float T1, FGateTunnelLayer* Layer, int Lay
         double const OffsetB1 = ColorOffsetR.Sample(Next);
         float Colour0[3];
         float Colour1[3];
-        Colour0[0] = static_cast<float>(static_cast<double>(Layer->Color.X) + OffsetR0);
-        Colour0[1] = static_cast<float>(static_cast<double>(Layer->Color.Y) + OffsetG0);
-        Colour0[2] = static_cast<float>(static_cast<double>(Layer->Color.Z) + OffsetB0);
-        Colour1[0] = static_cast<float>(static_cast<double>(Layer->Color.X) + OffsetR1);
-        Colour1[1] = static_cast<float>(static_cast<double>(Layer->Color.Y) + OffsetG1);
-        Colour1[2] = static_cast<float>(static_cast<double>(Layer->Color.Z) + OffsetB1);
+        Colour0[0] = static_cast<float>(static_cast<double>(Layer->Color.x) + OffsetR0);
+        Colour0[1] = static_cast<float>(static_cast<double>(Layer->Color.y) + OffsetG0);
+        Colour0[2] = static_cast<float>(static_cast<double>(Layer->Color.z) + OffsetB0);
+        Colour1[0] = static_cast<float>(static_cast<double>(Layer->Color.x) + OffsetR1);
+        Colour1[1] = static_cast<float>(static_cast<double>(Layer->Color.y) + OffsetG1);
+        Colour1[2] = static_cast<float>(static_cast<double>(Layer->Color.z) + OffsetB1);
 
         // Scaled by the brightness curve.
         double const Brightness0 = SampleWithFloatFraction(&Brightness, T);
@@ -940,40 +940,40 @@ void FGateTunnel::EmitLayer(float T0, float T1, FGateTunnelLayer* Layer, int Lay
             double const Radians = static_cast<double>(Angle) * kTwoPi;
             double const CosA = cos(Radians);
             double const SinA = sin(Radians);
-            FVector Ring0;
-            Ring0.X = static_cast<float>(Size0 * CosA);
-            Ring0.Y = static_cast<float>(Size0 * SinA);
-            Ring0.Z = 0.0f;
-            FVector Ring1;
-            Ring1.X = static_cast<float>(Size1 * CosA);
-            Ring1.Y = static_cast<float>(Size1 * SinA);
-            Ring1.Z = 0.0f;
+            Vector Ring0;
+            Ring0.x = static_cast<float>(Size0 * CosA);
+            Ring0.y = static_cast<float>(Size0 * SinA);
+            Ring0.z = 0.0f;
+            Vector Ring1;
+            Ring1.x = static_cast<float>(Size1 * CosA);
+            Ring1.y = static_cast<float>(Size1 * SinA);
+            Ring1.z = 0.0f;
 
             // Each site acquires the engine when null.
             if (G_GateTunnelMath == nullptr)
                 G_GateTunnelMath = Acquire3DMathEngine();
-            FVector Rotated0;
+            Vector Rotated0;
             G_GateTunnelMath->Rotate(Rotated0, Frame0, Ring0);
             if (G_GateTunnelMath == nullptr)
                 G_GateTunnelMath = Acquire3DMathEngine();
-            FVector Rotated1;
+            Vector Rotated1;
             G_GateTunnelMath->Rotate(Rotated1, Frame1, Ring1);
 
             Win3DTexCoord2f(static_cast<float>(static_cast<double>(Angle) + Layer->UOffset),
                             static_cast<float>(static_cast<double>(T) * Layer->VScale +
                                                Layer->VOffset));
             Win3DColor4f(Colour0[0], Colour0[1], Colour0[2], Alpha0);
-            Win3DVertex3f(static_cast<float>(static_cast<double>(Frame0.Translation.X) + Rotated0.X),
-                          static_cast<float>(static_cast<double>(Frame0.Translation.Y) + Rotated0.Y),
-                          static_cast<float>(static_cast<double>(Frame0.Translation.Z) + Rotated0.Z));
+            Win3DVertex3f(static_cast<float>(static_cast<double>(Frame0.Translation.x) + Rotated0.x),
+                          static_cast<float>(static_cast<double>(Frame0.Translation.y) + Rotated0.y),
+                          static_cast<float>(static_cast<double>(Frame0.Translation.z) + Rotated0.z));
 
             Win3DTexCoord2f(static_cast<float>(static_cast<double>(Angle) + Layer->UOffset),
                             static_cast<float>(static_cast<double>(Next) * Layer->VScale +
                                                Layer->VOffset));
             Win3DColor4f(Colour1[0], Colour1[1], Colour1[2], Alpha1);
-            Win3DVertex3f(static_cast<float>(static_cast<double>(Frame1.Translation.X) + Rotated1.X),
-                          static_cast<float>(static_cast<double>(Frame1.Translation.Y) + Rotated1.Y),
-                          static_cast<float>(static_cast<double>(Frame1.Translation.Z) + Rotated1.Z));
+            Win3DVertex3f(static_cast<float>(static_cast<double>(Frame1.Translation.x) + Rotated1.x),
+                          static_cast<float>(static_cast<double>(Frame1.Translation.y) + Rotated1.y),
+                          static_cast<float>(static_cast<double>(Frame1.Translation.z) + Rotated1.z));
 
             double const AngleSum = static_cast<double>(Angle) + RingStep;
             ++G_GateTunnelRingVertCount;
@@ -1085,9 +1085,9 @@ void GateTunnelIniLoad(char const* Path)
                         static_cast<double>(Reader.get_value_int(1)) * kInv255);
                     float const Red = static_cast<float>(
                         static_cast<double>(Reader.get_value_int(0)) * kInv255);
-                    Tunnel->MinRgb.X = Red;
-                    Tunnel->MinRgb.Y = Green;
-                    Tunnel->MinRgb.Z = Blue;
+                    Tunnel->MinRgb.x = Red;
+                    Tunnel->MinRgb.y = Green;
+                    Tunnel->MinRgb.z = Blue;
                 }
                 else if (Reader.is_value("max_rgb"))
                 {
@@ -1097,9 +1097,9 @@ void GateTunnelIniLoad(char const* Path)
                         static_cast<double>(Reader.get_value_int(1)) * kInv255);
                     float const Red = static_cast<float>(
                         static_cast<double>(Reader.get_value_int(0)) * kInv255);
-                    Tunnel->MaxRgb.X = Red;
-                    Tunnel->MaxRgb.Y = Green;
-                    Tunnel->MaxRgb.Z = Blue;
+                    Tunnel->MaxRgb.x = Red;
+                    Tunnel->MaxRgb.y = Green;
+                    Tunnel->MaxRgb.z = Blue;
                 }
                 // Any other key is ignored.
             }
@@ -1132,9 +1132,9 @@ void GateTunnelIniLoad(char const* Path)
             // The next layer, with its defaults.
             FGateTunnelLayer* const Layer = &Tunnel->Layers[Tunnel->LayerCount];
             ++Tunnel->LayerCount;
-            Layer->Color.X = 0.5f;
-            Layer->Color.Y = 0.5f;
-            Layer->Color.Z = 0.5f;
+            Layer->Color.x = 0.5f;
+            Layer->Color.y = 0.5f;
+            Layer->Color.z = 0.5f;
             Layer->NearAlpha = 1.0f;
             Layer->RadiusFactor = 1.0f;
             Layer->FarAlpha = 0.0f;
@@ -1155,9 +1155,9 @@ void GateTunnelIniLoad(char const* Path)
                         static_cast<double>(Reader.get_value_int(1)) * kInv255);
                     float const Red = static_cast<float>(
                         static_cast<double>(Reader.get_value_int(0)) * kInv255);
-                    Layer->Color.X = Red;
-                    Layer->Color.Y = Green;
-                    Layer->Color.Z = Blue;
+                    Layer->Color.x = Red;
+                    Layer->Color.y = Green;
+                    Layer->Color.z = Blue;
                 }
                 if (Reader.is_value("near_alpha"))
                     Layer->NearAlpha = Reader.get_value_float(0);

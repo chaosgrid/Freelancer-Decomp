@@ -342,8 +342,8 @@ public:
     void recalc_all_exact_wheel_mindist();
 
     // FUN_0634f210: the library's recalc_all_exact_mindists_events:
-    // IVP_RescheduleCollisionEvent(mindist, 1, 1) over the exact list. Called
-    // by IVP_Environment_Simulate_Psi.
+    // IVP_Ledge_Mindist::RescheduleCollisionEvent(mindist, 1, 1) over the exact list. Called
+    // by IVP_Environment::simulate_psi.
     void recalc_all_exact_mindists_events();
 };
 static_assert(offsetof(IVP_Mindist_Manager, environment) == 0x04, "IVP_Mindist_Manager+0x04");

@@ -122,7 +122,7 @@ struct FMissionShipGroup
 
     TString<0x30> Nickname;                           // +0x00 "nickname"
     FSystemInfo* System;                              // +0x34 "system" (FUN_06f75f30, only when found)
-    FMatrix Orientation;                              // +0x38 "orientation"
+    Matrix Orientation;                              // +0x38 "orientation"
     Vector Position;                                  // +0x5c "position"
     float RelPosHeading;                              // +0x68 "rel_pos" value 0 in radians
     TString<0x30> RelPosObj;                          // +0x6c "rel_pos" value 1
@@ -188,7 +188,7 @@ struct FMissionSolar
     unsigned char bPilot;                             // +0x3e0 1 when the pilot was found
     float Radius;                                     // +0x3e4 "radius" (default 150.0f)
     TString<0x30> Nickname;                           // +0x3e8 "nickname"
-    FMatrix Orientation;                              // +0x41c "orientation"
+    Matrix Orientation;                              // +0x41c "orientation"
     Vector Position;                                  // +0x440 "position"
     unsigned int ArchetypeId;                         // +0x44c "archetype" (pub::GetNicknameId)
     unsigned int SystemId;                            // +0x450 "system" (pub::GetSystemID)
@@ -280,7 +280,7 @@ struct FMissionRandEncRespawn
     // +0x04: the NPC ships' +0x154 (the formation group they were created in); ships of one
     // group add to the same record.
     unsigned int FormationRef;
-    FTransform Placement;                             // +0x08 SpawnFormation's placement
+    Transform Placement;                             // +0x08 SpawnFormation's placement
     int Count;                                        // +0x38 SpawnFormation's ship count
     // +0x3c: SpawnFormation's per-ship classes: one {ship's ClassIds, 1.0f} per ship (the
     // element dtor FUN_06f1f980 frees the vector at its head).
@@ -876,7 +876,7 @@ public:
     // FUN_06f171e0 (callers Act_SpawnSolar, FUN_06f0f150 with null):
     // SpawnMissionSolarRecord for every [MsnSolar] named Name (stricmp), at Placement when given
     // (the record's own transform restored afterwards); the last result.
-    bool SpawnMissionSolar(TString<0x30> const* Name, FTransform const* Placement);
+    bool SpawnMissionSolar(TString<0x30> const* Name, Transform const* Placement);
     // FUN_06f171a0: every +0xc4 solar record's +4 = 0, then the player's system record destroys
     // its mission objects (TU58 FUN_06f746f0). Called from TU21.
     void DestroyMissionObjects();

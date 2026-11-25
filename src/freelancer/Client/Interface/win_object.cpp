@@ -37,10 +37,10 @@ WinObject::~WinObject()
 void WinObject::SetPosition(float const* NewPosition)
 {
     // FUN_004c91a0: tail-jumps into FUN_00420fd0 (SetInstancePosition only, no UpdateInstance).
-    Position[0] = NewPosition[0];
-    Position[1] = NewPosition[1];
-    Position[2] = NewPosition[2];
-    ClientMeshHolderSetPosition(&MeshHolder, NewPosition);
+    Position.x = NewPosition[0];
+    Position.y = NewPosition[1];
+    Position.z = NewPosition[2];
+    ClientMeshHolderSetPosition(&MeshHolder, &NewPosition[0]);
 }
 
 void WinObject::Destroy()
@@ -68,7 +68,8 @@ void WinObject::Update()
             Child->UpdateInactive();
         Child = Next;
     }
-    DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance, Orientation);
+    DALib::Engine->SetInstanceMatrix(MeshHolder.EngineInstance,
+                                     reinterpret_cast<const Transform*>(&Orientation));
 }
 
 bool WinObject::LoadMeshAndCreate(Win3D* Parent, char const* MeshPath,

@@ -22,6 +22,7 @@
 // CONSTRUCTION. The Gf script spawn FUN_0044ed90 and its factories FUN_0044d630..FUN_0044e3c0
 // (gf_script_spawn.cpp) new the concrete class per entity type.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_csys.h"
 #include "thorn_controls.h"
 #include "thorn_iface.h"
@@ -39,12 +40,6 @@ static const GENRESULT kThornSlotNotImplemented = static_cast<GENRESULT>(0xFFFFF
 
 // The answer of a camera / light reference whose referenced entity is missing.
 static const GENRESULT kThornReferenceMissing = static_cast<GENRESULT>(-1);
-
-// An engine instance id (a long) as the void* the DALib interfaces take.
-inline void* InstancePointer(long Instance)
-{
-    return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
-}
 
 struct FThornComponent : ICompoundControl,
                          ISoundControl,
@@ -82,8 +77,8 @@ struct FThornComponent : ICompoundControl,
     GENRESULT DACOM_API GetHardpointXform(int TargetType, char const* Name,
                                           float* OutXform12) override;    // 9  LAB_0044fcd0
     GENRESULT DACOM_API GetFloorHeight(float* OutHeight) override;        // 10 LAB_0044fcb0
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override;  // 11 LAB_00454190
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;     // 12 LAB_00454190
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override;  // 11 LAB_00454190
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;     // 12 LAB_00454190
 
     // --- ISoundControl defaults (0x005cc6ac..0x005cc6c8) --------------------------------------
     GENRESULT DACOM_API StartSound(void* Desc, int TimeMs) override;      // 3  LAB_0044fce0
@@ -101,10 +96,10 @@ struct FThornComponent : ICompoundControl,
     GENRESULT DACOM_API UpdateIk(void* Desc, float* Position, float* Orientation) override; // LAB_0044fcd0
 
     // --- IGeoTransformControl defaults (all LAB_00454190) ------------------------------------
-    GENRESULT DACOM_API SetPosition(float* Position) override;
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;
 
     // --- ICameraControl defaults (all LAB_00454190) ------------------------------------------
     GENRESULT DACOM_API SetFov(const float* Fov) override;
@@ -163,7 +158,7 @@ struct FThornComponent : ICompoundControl,
     // 16 (+0x40) -- the actor named Name, if this entity is it. Base: false.
     virtual bool FindActor(char const* ActorName, void** OutActorField, void** OutActor);
     // 17 (+0x44) -- the engine instance the entity moves. Base: _purecall.
-    virtual void* GetEngineInstance() = 0;
+    virtual InstanceIndex GetEngineInstance() = 0;
     // 18 (+0x48) -- the effects pass (FUN_0044f970, per spawned entity). Base: RET 4.
     virtual void DrawEffects(ICamera* Camera);
     // 19 (+0x4c) -- the scene entity whose ambient override the room object takes (RoomObject

@@ -661,16 +661,16 @@ unsigned char ScreenQuadEnqueueFlare(ICamera* Cam, float const* Position, float 
                                      float const* GlowColor, float BulbSize, float GlowSize)
 {
     // FUN_004038f0 (cdecl). Sole caller FUN_004fdda0. No argument is null-checked in retail.
-    float const* const View = Cam->GetViewTransform();
+    const float* const View = (const float*)Cam->GetViewTransform();
     I3DMathEngine* const Math = AcquireScreenQuadMath();
-    FVector CamSpace;
-    Math->TransformXform(CamSpace, *reinterpret_cast<FTransform const*>(View),
-                         *reinterpret_cast<FVector const*>(Position));
+    Vector CamSpace;
+    Math->TransformXform(CamSpace, *reinterpret_cast<Transform const*>(View),
+                         *reinterpret_cast<Vector const*>(Position));
 
     // Depth z - z * 0.001 (double DAT_005c75f8), stored as a float; only in front of the near
     // plane (unordered continues).
-    float const Depth = static_cast<float>(static_cast<double>(CamSpace.Z) -
-                                           static_cast<double>(CamSpace.Z) * 0.001);
+    float const Depth = static_cast<float>(static_cast<double>(CamSpace.z) -
+                                           static_cast<double>(CamSpace.z) * 0.001);
     if (static_cast<double>(Depth) - static_cast<double>(Cam->GetZNear()) >= 0.0)
         return 0;
 
@@ -704,11 +704,11 @@ unsigned char ScreenQuadEnqueueFlare(ICamera* Cam, float const* Position, float 
     int const* const Rect = Cam->GetViewport();
     double const HalfSpanX = static_cast<double>(Rect[2] - Rect[0]) * static_cast<double>(0.5f);
     float const ScreenX = static_cast<float>(
-        (HalfSpanX + static_cast<double>(CamSpace.X) * ScaleX * InvDepth) +
+        (HalfSpanX + static_cast<double>(CamSpace.x) * ScaleX * InvDepth) +
         static_cast<double>(Rect[0]));
     double const HalfSpanY = static_cast<double>(Rect[3] - Rect[1]) * static_cast<double>(0.5f);
     float const ScreenY = static_cast<float>(
-        (HalfSpanY + static_cast<double>(CamSpace.Y) * ScaleY * InvDepth) +
+        (HalfSpanY + static_cast<double>(CamSpace.y) * ScaleY * InvDepth) +
         static_cast<double>(Rect[1]));
 
     float const DepthA = static_cast<float>(
@@ -1081,18 +1081,18 @@ unsigned char ScreenQuadProjectObjectExtent(ICamera* Cam, float const* Position,
                                             float* OutInvDepth)
 {
     // FUN_00403350.
-    float const* const View = Cam->GetViewTransform();
+    const float* const View = (const float*)Cam->GetViewTransform();
     I3DMathEngine* const Math = AcquireScreenQuadMath();
-    FVector CamSpace;
-    Math->TransformXform(CamSpace, *reinterpret_cast<FTransform const*>(View),
-                         *reinterpret_cast<FVector const*>(Position));
+    Vector CamSpace;
+    Math->TransformXform(CamSpace, *reinterpret_cast<Transform const*>(View),
+                         *reinterpret_cast<Vector const*>(Position));
 
     // Only in front of the near plane (unordered continues).
-    if (static_cast<double>(CamSpace.Z) - static_cast<double>(Cam->GetZNear()) >= 0.0)
+    if (static_cast<double>(CamSpace.z) - static_cast<double>(Cam->GetZNear()) >= 0.0)
         return 0;
 
     // DAT_005c7500 = -1; each value stored as a float.
-    float const InvDepth = static_cast<float>(-1.0 / static_cast<double>(CamSpace.Z));
+    float const InvDepth = static_cast<float>(-1.0 / static_cast<double>(CamSpace.z));
     *OutInvDepth = InvDepth;
     float const XScaleOverNear = static_cast<float>(Cam->GetXScaleOverNear());
     float const ScaleX = static_cast<float>(static_cast<double>(Cam->GetZNear()) * XScaleOverNear);
@@ -1115,10 +1115,10 @@ unsigned char ScreenQuadProjectObjectExtent(ICamera* Cam, float const* Position,
     double const HalfSpanY = static_cast<double>(Rect[3] - Rect[1]) * static_cast<double>(0.5f);
     double const HalfSpanX = static_cast<double>(Rect[2] - Rect[0]) * static_cast<double>(0.5f);
     *OutScreenX = static_cast<float>(
-        (HalfSpanX + static_cast<double>(CamSpace.X) * ScaleX * InvDepth) +
+        (HalfSpanX + static_cast<double>(CamSpace.x) * ScaleX * InvDepth) +
         static_cast<double>(Rect[0]));
     *OutScreenY = static_cast<float>(
-        (static_cast<double>(CamSpace.Y) * ScaleY * InvDepth + static_cast<double>(Rect[1])) +
+        (static_cast<double>(CamSpace.y) * ScaleY * InvDepth + static_cast<double>(Rect[1])) +
         HalfSpanY);
     return 1;
 }

@@ -63,52 +63,52 @@ void FThornPsys::BindVisEffect(char const* EffectName)
 }
 
 // LAB_00453f00. No script-frame transform.
-GENRESULT DACOM_API FThornPsys::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornPsys::SetTransform(const Transform* Transform12)
 {
-    Local.Pos.x = Transform12[9];
-    Local.Pos.y = Transform12[10];
-    Local.Pos.z = Transform12[11];
+    Local.Pos.x = Transform12->Translation.x;
+    Local.Pos.y = Transform12->Translation.y;
+    Local.Pos.z = Transform12->Translation.z;
     memcpy(&Local.Orient, Transform12, sizeof(Local.Orient));
     return GR_OK;
 }
 
 // LAB_00453f60.
-GENRESULT DACOM_API FThornPsys::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornPsys::GetTransform(Transform* OutTransform12)
 {
     memcpy(OutTransform12, &Local.Orient, sizeof(Local.Orient));
-    OutTransform12[9] = Local.Pos.x;
-    OutTransform12[10] = Local.Pos.y;
-    OutTransform12[11] = Local.Pos.z;
+    OutTransform12->Translation.x = Local.Pos.x;
+    OutTransform12->Translation.y = Local.Pos.y;
+    OutTransform12->Translation.z = Local.Pos.z;
     return GR_OK;
 }
 
 // LAB_00453ec0.
-GENRESULT DACOM_API FThornPsys::SetPosition(float* Position)
+GENRESULT DACOM_API FThornPsys::SetPosition(const Vector* Position)
 {
-    Local.Pos.x = Position[0];
-    Local.Pos.y = Position[1];
-    Local.Pos.z = Position[2];
+    Local.Pos.x = Position->x;
+    Local.Pos.y = Position->y;
+    Local.Pos.z = Position->z;
     return GR_OK;
 }
 
 // LAB_00453ee0.
-GENRESULT DACOM_API FThornPsys::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornPsys::SetOrientation(const Matrix* Orient9)
 {
     memcpy(&Local.Orient, Orient9, sizeof(Local.Orient));
     return GR_OK;
 }
 
 // LAB_00454770.
-GENRESULT DACOM_API FThornPsys::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornPsys::GetPosition(Vector* OutPosition)
 {
-    OutPosition[0] = Local.Pos.x;
-    OutPosition[1] = Local.Pos.y;
-    OutPosition[2] = Local.Pos.z;
+    OutPosition->x = Local.Pos.x;
+    OutPosition->y = Local.Pos.y;
+    OutPosition->z = Local.Pos.z;
     return GR_OK;
 }
 
 // LAB_00453f40.
-GENRESULT DACOM_API FThornPsys::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornPsys::GetOrientation(Matrix* OutOrient9)
 {
     memcpy(OutOrient9, &Local.Orient, sizeof(Local.Orient));
     return GR_OK;
@@ -140,7 +140,7 @@ GENRESULT DACOM_API FThornPsys::Tick(int DeltaMs)
         Xform[9] = Local.Pos.x;
         Xform[10] = Local.Pos.y;
         Xform[11] = Local.Pos.z;
-        Particles.Effect->SetTransform(reinterpret_cast<void*>(1), Xform);
+        Particles.Effect->SetTransform(1, (const Transform*)Xform);
         Particles.Effect->ComposeTransforms(FloatArg(Dt));
         Particles.Effect->Update(FloatArg(Dt));
     }
@@ -173,9 +173,9 @@ void FThornPsys::Stop()
 }
 
 // FUN_00450870.
-void* FThornPsys::GetEngineInstance()
+InstanceIndex FThornPsys::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<intptr_t>(-1);
 }
 
 // LAB_00453e50 -- FUN_005574d0 on +0x6c.
@@ -238,7 +238,7 @@ void FThornPlayerEnginePsys::Stop()
 }
 
 // LAB_00454140 -- answers 0xfffffff9, the "not implemented" code, not -1.
-void* FThornPlayerEnginePsys::GetEngineInstance()
+InstanceIndex FThornPlayerEnginePsys::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(kThornSlotNotImplemented));
+    return static_cast<intptr_t>(kThornSlotNotImplemented);
 }

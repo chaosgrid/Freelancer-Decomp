@@ -783,10 +783,10 @@ void PlayerData::apply_saved_character(PlayerData::FSavedCharacter const& Record
     for (int I = 0; I < static_cast<int>(costume.AccessoryCount); ++I)
         costume.AccessoryIds[I] = Record.BaseCostume.AccessoryIds[I];
 
-    initial_pos[0] = Record.Position[0];
-    initial_pos[1] = Record.Position[1];
-    initial_pos[2] = Record.Position[2];
-    memcpy(initial_ornt, Record.Orientation, sizeof(initial_ornt));
+    initial_pos.x = Record.Position[0];
+    initial_pos.y = Record.Position[1];
+    initial_pos.z = Record.Position[2];
+    memcpy(&initial_ornt, Record.Orientation, sizeof(initial_ornt));
 
     ship_archetype = Record.ShipArchetype;                         // +0x264
     relative_health = Record.HullStatus;                           // +0x268

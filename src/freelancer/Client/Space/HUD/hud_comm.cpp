@@ -709,22 +709,22 @@ FCommWindow::FCommWindow()
     Rect[2] = 1;
     Rect[3] = 1;
     memset(Unknown14, 0, sizeof(Unknown14)); // port-only: retail never writes +0x14..+0x23
-    WinPos.X = 0.3f;
-    WinPos.Y = 0.3f;
-    WinPos.Z = -1.0f;
-    BtnPos.X = 0.0f;
-    BtnPos.Y = 0.0f;
-    BtnPos.Z = -2.0f;
+    WinPos.x = 0.3f;
+    WinPos.y = 0.3f;
+    WinPos.z = -1.0f;
+    BtnPos.x = 0.0f;
+    BtnPos.y = 0.0f;
+    BtnPos.z = -2.0f;
     WinSizeX = 0.2f;
     WinSizeY = 0.2f;
     // FUN_0048e600 on +0x50 is the holder's own member initialisation.
     for (int Index = 0; Index < 4; ++Index)
     {
         // FUN_004b5150: identity rotation, zero translation.
-        Win3DIdentityRotation3x3(&CornerXform[Index].Rotation.D[0][0]);
-        CornerXform[Index].Translation.X = 0.0f;
-        CornerXform[Index].Translation.Y = 0.0f;
-        CornerXform[Index].Translation.Z = 0.0f;
+        Win3DIdentityRotation3x3(&CornerXform[Index].Rotation);
+        CornerXform[Index].Translation.x = 0.0f;
+        CornerXform[Index].Translation.y = 0.0f;
+        CornerXform[Index].Translation.z = 0.0f;
     }
 }
 
@@ -757,9 +757,9 @@ bool FCommWindow::ReadIni(INI_Reader& Reader)
         float const Y = Reader.get_value_float(1);
         float const X = Reader.get_value_float(0);
         float const Z = Reader.get_value_float(2);
-        BtnPos.X = X;
-        BtnPos.Y = Y;
-        BtnPos.Z = Z;
+        BtnPos.x = X;
+        BtnPos.y = Y;
+        BtnPos.z = Z;
         return true;
     }
     if (Reader.is_value("win_pos"))
@@ -767,9 +767,9 @@ bool FCommWindow::ReadIni(INI_Reader& Reader)
         float const Y = Reader.get_value_float(1);
         float const X = Reader.get_value_float(0);
         float const Z = Reader.get_value_float(2);
-        WinPos.X = X;
-        WinPos.Y = Y;
-        WinPos.Z = Z;
+        WinPos.x = X;
+        WinPos.y = Y;
+        WinPos.z = Z;
         return true;
     }
     if (Reader.is_value("win_size"))
@@ -815,26 +815,26 @@ void FCommWindow::Layout(ICamera* Cam)
     }
 
     // P = BtnPos + (WinPos - BtnPos) * Grow.
-    FVector Delta;
-    Delta.X = WinPos.X - BtnPos.X;
-    Delta.Y = WinPos.Y - BtnPos.Y;
-    Delta.Z = WinPos.Z - BtnPos.Z;
-    FVector Scaled;
-    Scaled.X = static_cast<float>(static_cast<double>(Delta.X) * Grow);
-    Scaled.Y = static_cast<float>(static_cast<double>(Delta.Y) * Grow);
-    Scaled.Z = static_cast<float>(static_cast<double>(Delta.Z) * Grow);
-    FVector Centre;
-    Centre.X = BtnPos.X + Scaled.X;
-    Centre.Y = BtnPos.Y + Scaled.Y;
-    Centre.Z = BtnPos.Z + Scaled.Z;
+    Vector Delta;
+    Delta.x = WinPos.x - BtnPos.x;
+    Delta.y = WinPos.y - BtnPos.y;
+    Delta.z = WinPos.z - BtnPos.z;
+    Vector Scaled;
+    Scaled.x = static_cast<float>(static_cast<double>(Delta.x) * Grow);
+    Scaled.y = static_cast<float>(static_cast<double>(Delta.y) * Grow);
+    Scaled.z = static_cast<float>(static_cast<double>(Delta.z) * Grow);
+    Vector Centre;
+    Centre.x = BtnPos.x + Scaled.x;
+    Centre.y = BtnPos.y + Scaled.y;
+    Centre.z = BtnPos.z + Scaled.z;
     float const HalfW = static_cast<float>(static_cast<double>(Size) * WinSizeX * kHalf);
     float const HalfH = static_cast<float>(static_cast<double>(Size) * WinSizeY * kHalf);
 
     // Corner 0: identity, upper left.
-    Win3DIdentityRotation3x3(&CornerXform[0].Rotation.D[0][0]);
-    CornerXform[0].Translation.X = Centre.X + -HalfW;
-    CornerXform[0].Translation.Y = Centre.Y + HalfH;
-    CornerXform[0].Translation.Z = Centre.Z + 0.0f;
+    Win3DIdentityRotation3x3(&CornerXform[0].Rotation);
+    CornerXform[0].Translation.x = Centre.x + -HalfW;
+    CornerXform[0].Translation.y = Centre.y + HalfH;
+    CornerXform[0].Translation.z = Centre.z + 0.0f;
 
     Vector Angles;
     Matrix Rotation;
@@ -844,36 +844,36 @@ void FCommWindow::Layout(ICamera* Cam)
     Angles.y = 180.0f;
     Angles.z = 0.0f;
     Rotation = EulerMatrix(Angles);
-    memcpy(&CornerXform[1].Rotation, &Rotation, sizeof(FMatrix));
-    CornerXform[1].Translation.X = static_cast<float>(static_cast<double>(Centre.X) + HalfW);
-    CornerXform[1].Translation.Y = static_cast<float>(static_cast<double>(Centre.Y) + HalfH);
-    CornerXform[1].Translation.Z = Centre.Z;
+    memcpy(&CornerXform[1].Rotation, &Rotation, sizeof(Matrix));
+    CornerXform[1].Translation.x = static_cast<float>(static_cast<double>(Centre.x) + HalfW);
+    CornerXform[1].Translation.y = static_cast<float>(static_cast<double>(Centre.y) + HalfH);
+    CornerXform[1].Translation.z = Centre.z;
 
     // Corner 2: turned 180 about X, lower left.
     Angles.x = 180.0f;
     Angles.y = 0.0f;
     Angles.z = 0.0f;
     Rotation = EulerMatrix(Angles);
-    memcpy(&CornerXform[2].Rotation, &Rotation, sizeof(FMatrix));
-    CornerXform[2].Translation.X = static_cast<float>(static_cast<double>(-HalfW) + Centre.X);
-    CornerXform[2].Translation.Y = static_cast<float>(static_cast<double>(-HalfH) + Centre.Y);
-    CornerXform[2].Translation.Z = Centre.Z;
+    memcpy(&CornerXform[2].Rotation, &Rotation, sizeof(Matrix));
+    CornerXform[2].Translation.x = static_cast<float>(static_cast<double>(-HalfW) + Centre.x);
+    CornerXform[2].Translation.y = static_cast<float>(static_cast<double>(-HalfH) + Centre.y);
+    CornerXform[2].Translation.z = Centre.z;
 
     // Corner 3: turned 180 about X and Y, lower right.
     Angles.x = 180.0f;
     Angles.y = 180.0f;
     Angles.z = 0.0f;
     Rotation = EulerMatrix(Angles);
-    memcpy(&CornerXform[3].Rotation, &Rotation, sizeof(FMatrix));
-    CornerXform[3].Translation.X = static_cast<float>(static_cast<double>(Centre.X) + HalfW);
-    CornerXform[3].Translation.Y = static_cast<float>(static_cast<double>(-HalfH) + Centre.Y);
-    CornerXform[3].Translation.Z = Centre.Z;
+    memcpy(&CornerXform[3].Rotation, &Rotation, sizeof(Matrix));
+    CornerXform[3].Translation.x = static_cast<float>(static_cast<double>(Centre.x) + HalfW);
+    CornerXform[3].Translation.y = static_cast<float>(static_cast<double>(-HalfH) + Centre.y);
+    CornerXform[3].Translation.z = Centre.z;
 
     // Corners 0 and 3 projected, truncated.
     float Projected0[3];
     float Projected3[3];
-    Cam->ProjectVec(Projected0, &CornerXform[0].Translation.X);
-    Cam->ProjectVec(Projected3, &CornerXform[3].Translation.X);
+    Cam->ProjectVec((Vector*)Projected0, &CornerXform[0].Translation);
+    Cam->ProjectVec((Vector*)Projected3, &CornerXform[3].Translation);
     Rect[0] = static_cast<int>(Projected0[0]);
     Rect[1] = static_cast<int>(Projected0[1]);
     Rect[2] = static_cast<int>(Projected3[0]);
@@ -1020,11 +1020,11 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
         if (Body != nullptr)
         {
             int const Gender = GetCostumeDescriptions()->get_costume_gender(SpeakerCostume);
-            FTransform Pose;
-            Win3DIdentityRotation3x3(&Pose.Rotation.D[0][0]); // FUN_004215b0, then overwritten
-            Pose.Translation.X = 0.0f;
-            Pose.Translation.Y = 0.0f;
-            Pose.Translation.Z = 0.0f;
+            Transform Pose;
+            Win3DIdentityRotation3x3(&Pose.Rotation); // FUN_004215b0, then overwritten
+            Pose.Translation.x = 0.0f;
+            Pose.Translation.y = 0.0f;
+            Pose.Translation.z = 0.0f;
             Pose.Rotation = SpeakerRotate;
             if (Gender == 1)
             {
@@ -1043,9 +1043,9 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
             // IDeformable slots 24 (only with an instance), 19 and 20 (always).
             if (Body->Deformable != nullptr)
             {
-                DALib::Deform->SetHeight(Body->Deformable, Pose.Translation.Y);
+                DALib::Deform->SetHeight(Body->Deformable, Pose.Translation.y);
             }
-            DALib::Deform->SetPosePos(Body->Deformable, &Pose.Translation.X);
+            DALib::Deform->SetPosePos(Body->Deformable, &Pose.Translation.x);
             DALib::Deform->SetPoseOri(Body->Deformable, &Pose.Rotation);
 
             // One pass over the voice's scripts.
@@ -1053,7 +1053,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
             for (std::list<std::string>::iterator It = Scripts.begin(); It != Scripts.end(); ++It)
             {
                 char const* const ScriptName = It->c_str();
-                FTransform Root;
+                Transform Root;
                 Body->GetRootTransform(&Root); // inlined: slot 18, IEngine slot 40
                 Body->RootTransform = Root;
                 if (ScriptName[0] != 0)
@@ -1104,7 +1104,7 @@ void FCommChannel::Appearance(CObject* SpeakerObject, CObject* ReceiverUnused,
             for (std::list<std::string>::iterator It = Scripts.begin(); It != Scripts.end(); ++It)
             {
                 char const* const ScriptName = It->c_str();
-                FTransform Root;
+                Transform Root;
                 Body->GetRootTransform(&Root); // FUN_004cba10
                 Body->RootTransform = Root;
                 if (ScriptName[0] != 0)
@@ -1367,8 +1367,8 @@ void FCommChannel::WindowTick(float Dt, FGameCamera* Cam)
     Window.Layout(AsCamera(Win3DGetCamera())); // &DAT_0067dbf8
 
     // Cam's viewport is the screen rect of corners 0 and 3.
-    FVector const Upper = Window.CornerXform[0].Translation;
-    FVector const Lower = Window.CornerXform[3].Translation;
+    Vector const Upper = Window.CornerXform[0].Translation;
+    Vector const Lower = Window.CornerXform[3].Translation;
     int Projected[4];
     int const* const Screen = HudProjectScreenRect(Projected, &Upper, &Lower); // FUN_004c71b0
     int ViewRect[4] = {Screen[0], Screen[1], Screen[2], Screen[3]};
@@ -1426,15 +1426,15 @@ void FCommChannel::DrawFrame()
     DALib::Pipeline->SetRenderState(D3DRS_AMBIENT, -1);
     DALib::Pipeline->SetRenderState(D3DRS_CULLMODE, 1);
 
-    float const WinX = Window.WinPos.X;
-    float const WinY = Window.WinPos.Y;
-    float const WinZ = Window.WinPos.Z;
-    float Model[12];
-    Win3DIdentityRotation3x3(Model);
-    Model[9] = 0.0f;
-    Model[10] = 0.0f;
-    Model[11] = 0.0f;
-    Win3DBindModelview(nullptr, Model); // FUN_00422690
+    float const WinX = Window.WinPos.x;
+    float const WinY = Window.WinPos.y;
+    float const WinZ = Window.WinPos.z;
+    Transform Model;
+    Win3DIdentityRotation3x3(&Model.Rotation);
+    Model.Translation.x = 0.0f;
+    Model.Translation.y = 0.0f;
+    Model.Translation.z = 0.0f;
+    Win3DBindModelview(nullptr, &Model); // FUN_00422690
 
     Win3DDisable(0xb71);
     Win3DDisable(0xb44);
@@ -1613,18 +1613,18 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
             float const X = Reader.get_value_float(0);
             float const Y = Reader.get_value_float(1);
             float const Z = Reader.get_value_float(2);
-            MaleOffset.X = X;
-            MaleOffset.Y = Y;
-            MaleOffset.Z = Z;
+            MaleOffset.x = X;
+            MaleOffset.y = Y;
+            MaleOffset.z = Z;
         }
         else if (Reader.is_value("female_speaker_offset"))
         {
             float const X = Reader.get_value_float(0);
             float const Y = Reader.get_value_float(1);
             float const Z = Reader.get_value_float(2);
-            FemaleOffset.X = X;
-            FemaleOffset.Y = Y;
-            FemaleOffset.Z = Z;
+            FemaleOffset.x = X;
+            FemaleOffset.y = Y;
+            FemaleOffset.z = Z;
         }
         else if (Reader.is_value("speaker_rotate"))
         {
@@ -1633,7 +1633,7 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
             Angles.y = Reader.get_value_float(1);
             Angles.z = Reader.get_value_float(2);
             Matrix const Rotation = EulerMatrix(Angles);
-            memcpy(&SpeakerRotate, &Rotation, sizeof(FMatrix));
+            memcpy(&SpeakerRotate, &Rotation, sizeof(Matrix));
         }
         else if (Reader.is_value("video_fovx"))
         {
@@ -1668,9 +1668,9 @@ HUD_Receiver::HUD_Receiver(INI_Reader& Reader) : Light(nullptr), LowEndCommButto
     ChannelA.SpeakerRotate = SpeakerRotate;
     ChannelA.MaleOffset = MaleOffset;
     ChannelA.FemaleOffset = FemaleOffset;
-    ChannelA.Window.WinPos.X = -1.068f;
-    ChannelA.Window.WinPos.Y = 0.65f;
-    ChannelA.Window.WinPos.Z = -2.392f;
+    ChannelA.Window.WinPos.x = -1.068f;
+    ChannelA.Window.WinPos.y = 0.65f;
+    ChannelA.Window.WinPos.z = -2.392f;
 
     SlotA.Channel = &ChannelA;
     SlotA.Inbox = &G_CommInboxPlayer;

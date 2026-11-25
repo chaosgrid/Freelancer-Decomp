@@ -55,62 +55,57 @@ I3DMathEngine* ThornAcquire3DMathEngine()
     return MathEngine;
 }
 
-GENRESULT ThornMathTransform(I3DMathEngine* Math, float* OutVec3, const float* Xform12,
-                             const float* InVec3)
+GENRESULT ThornMathTransform(I3DMathEngine* Math, Vector* Out, const Transform* Xform,
+                             const Vector* In)
 {
-    if (Math == nullptr || OutVec3 == nullptr || Xform12 == nullptr || InVec3 == nullptr)
+    if (Math == nullptr || Out == nullptr || Xform == nullptr || In == nullptr)
         return GR_GENERIC;
-    return Math->TransformXform(*reinterpret_cast<FVector*>(OutVec3), // +0x28
-                                *reinterpret_cast<const FTransform*>(Xform12),
-                                *reinterpret_cast<const FVector*>(InVec3));
+    return Math->TransformXform(*Out, // +0x28
+                                *Xform, *In);
 }
 
-GENRESULT ThornMathMulMatrix(I3DMathEngine* Math, float* Out9, const float* Left9,
-                             const float* Right9)
+GENRESULT ThornMathMulMatrix(I3DMathEngine* Math, Matrix* Out, const Matrix* Left,
+                             const Matrix* Right)
 {
-    if (Math == nullptr || Out9 == nullptr || Left9 == nullptr || Right9 == nullptr)
+    if (Math == nullptr || Out == nullptr || Left == nullptr || Right == nullptr)
         return GR_GENERIC;
-    return Math->MulMatrix(*reinterpret_cast<FMatrix*>(Out9), // +0x20
-                           *reinterpret_cast<const FMatrix*>(Left9),
-                           *reinterpret_cast<const FMatrix*>(Right9));
+    return Math->MulMatrix(*Out, // +0x20
+                           *Left, *Right);
 }
 
-GENRESULT ThornMathMulTransform(I3DMathEngine* Math, float* Out12, const float* Left12,
-                                const float* Right12)
+GENRESULT ThornMathMulTransform(I3DMathEngine* Math, Transform* Out, const Transform* Left,
+                                const Transform* Right)
 {
-    if (Math == nullptr || Out12 == nullptr || Left12 == nullptr || Right12 == nullptr)
+    if (Math == nullptr || Out == nullptr || Left == nullptr || Right == nullptr)
         return GR_GENERIC;
-    return Math->MulTransform(*reinterpret_cast<FTransform*>(Out12), // +0x1C
-                              *reinterpret_cast<const FTransform*>(Left12),
-                              *reinterpret_cast<const FTransform*>(Right12));
+    return Math->MulTransform(*Out, // +0x1C
+                              *Left, *Right);
 }
 
-GENRESULT ThornMathRotate(I3DMathEngine* Math, float* OutVec3, const float* Xform12,
-                          const float* InVec3)
+GENRESULT ThornMathRotate(I3DMathEngine* Math, Vector* Out, const Transform* Xform,
+                          const Vector* In)
 {
-    if (Math == nullptr || OutVec3 == nullptr || Xform12 == nullptr || InVec3 == nullptr)
+    if (Math == nullptr || Out == nullptr || Xform == nullptr || In == nullptr)
         return GR_GENERIC;
-    return Math->Rotate(*reinterpret_cast<FVector*>(OutVec3), // +0x30
-                        *reinterpret_cast<const FTransform*>(Xform12),
-                        *reinterpret_cast<const FVector*>(InVec3));
+    return Math->Rotate(*Out, // +0x30
+                        *Xform, *In);
 }
 
-GENRESULT ThornMatrixToQuat(I3DMathEngine* Math, FQuat& Dst, const float* Src9)
+GENRESULT ThornMatrixToQuat(I3DMathEngine* Math, Quaternion& Dst, const Matrix* Src)
 {
-    if (Math == nullptr || Src9 == nullptr)
+    if (Math == nullptr || Src == nullptr)
         return GR_GENERIC;
-    return Math->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Dst), // +0x50
-                                    *reinterpret_cast<const FMatrix*>(Src9));
+    return Math->MatrixToQuaternion(Dst, // +0x50
+                                    *Src);
 }
 
-GENRESULT ThornMathTransposeTransform(I3DMathEngine* Math, float* OutVec3, const float* Matrix9,
-                                      const float* InVec3)
+GENRESULT ThornMathTransposeTransform(I3DMathEngine* Math, Vector* Out, const Matrix* Orientation,
+                                      const Vector* In)
 {
-    if (Math == nullptr || OutVec3 == nullptr || Matrix9 == nullptr || InVec3 == nullptr)
+    if (Math == nullptr || Out == nullptr || Orientation == nullptr || In == nullptr)
         return GR_GENERIC;
-    return Math->TransposeTransform(*reinterpret_cast<FVector*>(OutVec3), // +0x38
-                                    *reinterpret_cast<const FMatrix*>(Matrix9),
-                                    *reinterpret_cast<const FVector*>(InVec3));
+    return Math->TransposeTransform(*Out, // +0x38
+                                    *Orientation, *In);
 }
 
 namespace
@@ -390,14 +385,14 @@ namespace
 
         void* DACOM_API GetEntityDesc(int Index) override { return Scene_.EntitySnap(Index); }
 
-        GENRESULT DACOM_API GetEntityPosition(int Index, float* OutVec3) override
+        GENRESULT DACOM_API GetEntityPosition(int Index, Vector* OutVec3) override
         {
-            return Scene_.GetEntityPos(Index, OutVec3);
+            return Scene_.GetEntityPos(Index, &OutVec3->x);
         }
 
-        GENRESULT DACOM_API GetEntityOrientation(int Index, float* OutMat9) override
+        GENRESULT DACOM_API GetEntityOrientation(int Index, Matrix* OutMat9) override
         {
-            return Scene_.GetEntityOrient(Index, OutMat9);
+            return Scene_.GetEntityOrient(Index, &OutMat9->E[0][0]);
         }
 
         GENRESULT DACOM_API AttachEntity(int Index, void* EngineObj) override
@@ -639,11 +634,11 @@ namespace
 
         // Slot 3, LAB_06f3b530: snapshot the inverse csys, raw-copy three dwords into the
         // forward position, rebuild the inverse and push it to the bound entities.
-        GENRESULT DACOM_API SetPosition(float* Position) override
+        GENRESULT DACOM_API SetPosition(const Vector* Position) override
         {
-            FTransform OldInverse;
+            Transform OldInverse;
             std::memcpy(&OldInverse, SceneCsys(), sizeof(OldInverse));
-            const float* Source = Position;
+            const float* Source = (const float*)Position;
             // The three raw forward stores are sequential, matching overlapping input.
             for (int Index = 0; Index < 3; ++Index)
             {
@@ -657,11 +652,11 @@ namespace
         }
 
         // Slot 4, LAB_06f3b6c0: the same for the nine orientation dwords.
-        GENRESULT DACOM_API SetOrientation(float* Orient9) override
+        GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override
         {
-            FTransform OldInverse;
+            Transform OldInverse;
             std::memcpy(&OldInverse, SceneCsys(), sizeof(OldInverse));
-            const float* Source = Orient9;
+            const float* Source = &Orient9->E[0][0];
             // A forward raw copy, with no floating-point conversion.
             for (int Index = 0; Index < 9; ++Index)
             {
@@ -675,14 +670,14 @@ namespace
         }
 
         // Slot 5, LAB_06f3b860: three dwords from facet+0x54. Nothing is null-tested.
-        GENRESULT DACOM_API GetPosition(float* OutPosition) override
+        GENRESULT DACOM_API GetPosition(Vector* OutPosition) override
         {
             std::memcpy(OutPosition, ScenePos(), 3 * sizeof(float));
             return GR_OK;
         }
 
         // Slot 6, LAB_06f3b880: nine dwords from facet+0x30.
-        GENRESULT DACOM_API GetOrientation(float* OutOrient9) override
+        GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override
         {
             std::memcpy(OutOrient9, SceneOrient(), 9 * sizeof(float));
             return GR_OK;

@@ -416,12 +416,11 @@ void SystemManagerGunGroupManager::ComputeLeadFirePosition(Vector* OutPos, IObjR
 }
 
 // FUN_062eb020: thiscall on a Transform, RET 8. The math engine's InverseTransform
-// (+0x3c) writes a local that is copied to *Out. Vector / Transform and x86math's
-// FVector / FTransform share layouts.
+// (+0x3c) writes a local that is copied to *Out.
 Vector* TransformInversePoint(Transform const* Self, Vector* Out, Vector const* In)
 {
     Vector Local;
-    Acquire3DMathEngine()->InverseTransform((FVector&)Local, *(FTransform const*)Self, *(FVector const*)In);
+    Acquire3DMathEngine()->InverseTransform(Local, *Self, *In);
     *Out = Local;
     return Out;
 }
@@ -526,8 +525,7 @@ int SystemManagerGunGroupManager::UpdateGunFireState()
     TargetXform.Translation = TargetPos;
 
     Vector World;
-    Acquire3DMathEngine()->TransformXform((FVector&)World, (FTransform const&)TargetXform,
-                                          (FVector const&)AimOffset);
+    Acquire3DMathEngine()->TransformXform(World, TargetXform, AimOffset);
     Vector const FirePos = World;
 
     OwnShip()->fire_weapons(FireIds, (unsigned)Count, &FirePos, -1);

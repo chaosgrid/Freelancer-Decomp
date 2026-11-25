@@ -57,16 +57,14 @@ I3DMathEngine* Server_MathEngine()
 // the engine.
 void Server_MatrixToQuat(Quaternion& Out, Matrix const& In)
 {
-    Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Out),
-                                           reinterpret_cast<FMatrix const&>(In));
+    Server_MathEngine()->MatrixToQuaternion(Out, In);
 }
 
 // QuaternionToMatrix (+0x54) through the same engine, as inlined in create_solar /
 // create_ship. No null test on the engine.
 void Server_QuatToMatrix(Matrix& Out, Quaternion const& In)
 {
-    Server_MathEngine()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Out),
-                                           reinterpret_cast<FQuaternion const&>(In));
+    Server_MathEngine()->QuaternionToMatrix(Out, In);
 }
 
 // CEqObjCreateInfo / CShipCreateInfo / CSolarCreateInfo's ctor, dtor and clear() are INLINE

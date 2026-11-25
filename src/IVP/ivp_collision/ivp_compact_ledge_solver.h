@@ -152,4 +152,4 @@ public:
 };
 static_assert(sizeof(void*) != 4 || sizeof(IVP_KK_Input) == 0x68, "IVP_KK_Input is 0x68 bytes in retail");
 
-// FUN_0628bed0 (IVP_CalcCrossProduct) lives in ../ivp_utility/ivp_math.h.
+// FUN_0628bed0 (IVP_U_Point::calc_cross_product) lives in ../ivp_utility/ivp_math.h.

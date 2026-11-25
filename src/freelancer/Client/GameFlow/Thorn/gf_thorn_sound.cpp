@@ -215,22 +215,22 @@ void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
 }
 
 // LAB_00457400.
-GENRESULT DACOM_API FThornSound::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornSound::SetTransform(const Transform* Transform12)
 {
-    Local.Pos.x = Transform12[9];
-    Local.Pos.y = Transform12[10];
-    Local.Pos.z = Transform12[11];
+    Local.Pos.x = Transform12->Translation.x;
+    Local.Pos.y = Transform12->Translation.y;
+    Local.Pos.z = Transform12->Translation.z;
     memcpy(&Local.Orient, Transform12, sizeof(Local.Orient));
     RefreshSound();
     return GR_OK;
 }
 
 // LAB_00457490.
-GENRESULT DACOM_API FThornSound::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornSound::GetTransform(Transform* OutTransform12)
 {
-    OutTransform12[9] = Local.Pos.x;
-    OutTransform12[10] = Local.Pos.y;
-    OutTransform12[11] = Local.Pos.z;
+    OutTransform12->Translation.x = Local.Pos.x;
+    OutTransform12->Translation.y = Local.Pos.y;
+    OutTransform12->Translation.z = Local.Pos.z;
     memcpy(OutTransform12, &Local.Orient, sizeof(Local.Orient));
     return GR_OK;
 }
@@ -374,33 +374,33 @@ GENRESULT DACOM_API FThornSound::GetAudioProps(float* Props8, int Mask)
 }
 
 // LAB_004573b0.
-GENRESULT DACOM_API FThornSound::SetPosition(float* Position)
+GENRESULT DACOM_API FThornSound::SetPosition(const Vector* Position)
 {
-    Local.Pos.x = Position[0];
-    Local.Pos.y = Position[1];
-    Local.Pos.z = Position[2];
+    Local.Pos.x = Position->x;
+    Local.Pos.y = Position->y;
+    Local.Pos.z = Position->z;
     RefreshSound();
     return GR_OK;
 }
 
 // LAB_004573e0. No RefreshSound here.
-GENRESULT DACOM_API FThornSound::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornSound::SetOrientation(const Matrix* Orient9)
 {
     memcpy(&Local.Orient, Orient9, sizeof(Local.Orient));
     return GR_OK;
 }
 
 // LAB_00457440.
-GENRESULT DACOM_API FThornSound::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornSound::GetPosition(Vector* OutPosition)
 {
-    OutPosition[0] = Local.Pos.x;
-    OutPosition[1] = Local.Pos.y;
-    OutPosition[2] = Local.Pos.z;
+    OutPosition->x = Local.Pos.x;
+    OutPosition->y = Local.Pos.y;
+    OutPosition->z = Local.Pos.z;
     return GR_OK;
 }
 
 // LAB_00457470.
-GENRESULT DACOM_API FThornSound::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornSound::GetOrientation(Matrix* OutOrient9)
 {
     memcpy(OutOrient9, &Local.Orient, sizeof(Local.Orient));
     return GR_OK;
@@ -435,9 +435,9 @@ void FThornSound::SetSpawnTable(FThornComponent** Table, int Count)
 }
 
 // FUN_00450870.
-void* FThornSound::GetEngineInstance()
+InstanceIndex FThornSound::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<intptr_t>(-1);
 }
 
 // LAB_00457630. GetClientAudioFade is FUN_0042adf0 (DAT_0066d2d0 +0x10); 100.0 is the double
@@ -536,9 +536,9 @@ void FThornPlayerEngineSound::Stop()
 }
 
 // FUN_00450870.
-void* FThornPlayerEngineSound::GetEngineInstance()
+InstanceIndex FThornPlayerEngineSound::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<intptr_t>(-1);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -566,13 +566,13 @@ FThornSoundReference::~FThornSoundReference()
 }
 
 // LAB_00457c00.
-GENRESULT DACOM_API FThornSoundReference::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornSoundReference::SetTransform(const Transform* Transform12)
 {
     return ThornReferenceSetTransform(Target, Transform12);
 }
 
 // LAB_00457c20.
-GENRESULT DACOM_API FThornSoundReference::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornSoundReference::GetTransform(Transform* OutTransform12)
 {
     return ThornReferenceGetTransform(Target, OutTransform12);
 }
@@ -638,25 +638,25 @@ GENRESULT DACOM_API FThornSoundReference::GetAudioProps(float* Props8, int Mask)
 }
 
 // LAB_00457bc0.
-GENRESULT DACOM_API FThornSoundReference::SetPosition(float* Position)
+GENRESULT DACOM_API FThornSoundReference::SetPosition(const Vector* Position)
 {
     return ThornReferenceSetPosition(Target, Position);
 }
 
 // LAB_00457be0.
-GENRESULT DACOM_API FThornSoundReference::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornSoundReference::SetOrientation(const Matrix* Orient9)
 {
     return ThornReferenceSetOrientation(Target, Orient9);
 }
 
 // LAB_00453560.
-GENRESULT DACOM_API FThornSoundReference::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornSoundReference::GetPosition(Vector* OutPosition)
 {
     return ThornReferenceGetPosition(Target, OutPosition);
 }
 
 // LAB_00453580.
-GENRESULT DACOM_API FThornSoundReference::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornSoundReference::GetOrientation(Matrix* OutOrient9)
 {
     return ThornReferenceGetOrientation(Target, OutOrient9);
 }
@@ -668,7 +668,7 @@ void FThornSoundReference::Stop()
 }
 
 // LAB_00453550.
-void* FThornSoundReference::GetEngineInstance()
+InstanceIndex FThornSoundReference::GetEngineInstance()
 {
     return ThornReferenceGetEngineInstance(Target);
 }

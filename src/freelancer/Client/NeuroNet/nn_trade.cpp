@@ -195,10 +195,10 @@ namespace
         Pipe->SetRenderState(D3DRS_ZENABLE, 1);
         Pipe->SetRenderState(D3DRS_ZFUNC, 8);
         Pipe->SetRenderState(D3DRS_ZWRITEENABLE, 1);
-        float Transform[12];
-        memcpy(Transform, DALib::Engine->GetInstanceTransform(Bar->MeshHolder.EngineInstance),
+        Transform Transform;
+        memcpy(&Transform, DALib::Engine->GetInstanceTransform(Bar->MeshHolder.EngineInstance),
                sizeof(Transform)); // IEngine +0xa0
-        Win3DBindModelview(nullptr, Transform); // FUN_00422690(0, &Transform)
+        Win3DBindModelview(nullptr, &Transform); // FUN_00422690(0, &Transform)
         Win3DDisable(kWin3DTexture2D);          // FUN_00421ed0(0xde1)
         Win3DEnable(kWin3DBlend);               // FUN_00421dd0(0xbe2)
         Win3DSetBlendFunc(2, 4);                // FUN_004220c0
@@ -339,12 +339,12 @@ bool NnTrade::OnEvent(unsigned MsgId)
     return true;
 }
 
-bool NnTrade::GetHardpointTransform(char const* Name, float* OutTransform12)
+bool NnTrade::GetHardpointTransform(char const* Name, Transform* OutXform)
 {
     // LAB_004bfe00 (RET 8).
     if (ClientMeshHolderHasInstance(&MeshHolder)) // FUN_00420d60
     {
-        void* const Archetype = DALib::Engine->GetInstanceArchetype(MeshHolder.EngineInstance);
+        const ArchetypeIndex Archetype = DALib::Engine->GetInstanceArchetype(MeshHolder.EngineInstance);
         DALib::Engine->ReleaseHandle(Archetype);
         FHardpointKey Key;
         Key.Name = Name;
@@ -354,30 +354,30 @@ bool NnTrade::GetHardpointTransform(char const* Name, float* OutTransform12)
         {
             // Blob +0x10 orientation, +0x04 position; this window's +0xa8 is added, then the z
             // translation is overwritten with 0.
-            float Local[12];
-            memcpy(Local, Blob + 0x10, 9 * sizeof(float));
-            memcpy(Local + 9, Blob + 0x04, 3 * sizeof(float));
-            memcpy(OutTransform12, Local, sizeof(Local));
-            OutTransform12[9] = Offset[0] + OutTransform12[9];
-            OutTransform12[10] = Offset[1] + OutTransform12[10];
-            OutTransform12[11] = 0.0f;
+            Transform Local;
+            memcpy(&Local.Rotation, Blob + 0x10, sizeof(Local.Rotation));
+            memcpy(&Local.Translation, Blob + 0x04, sizeof(Local.Translation));
+            memcpy(OutXform, &Local, sizeof(Local));
+            OutXform->Translation.x = Offset[0] + OutXform->Translation.x;
+            OutXform->Translation.y = Offset[1] + OutXform->Translation.y;
+            OutXform->Translation.z = 0.0f;
             return true;
         }
     }
 
     // Identity, no translation, no offset.
-    OutTransform12[8] = 1.0f;
-    OutTransform12[4] = 1.0f;
-    OutTransform12[0] = 1.0f;
-    OutTransform12[7] = 0.0f;
-    OutTransform12[6] = 0.0f;
-    OutTransform12[5] = 0.0f;
-    OutTransform12[3] = 0.0f;
-    OutTransform12[2] = 0.0f;
-    OutTransform12[1] = 0.0f;
-    OutTransform12[11] = 0.0f;
-    OutTransform12[10] = 0.0f;
-    OutTransform12[9] = 0.0f;
+    OutXform->Rotation.E[2][2] = 1.0f;
+    OutXform->Rotation.E[1][1] = 1.0f;
+    OutXform->Rotation.E[0][0] = 1.0f;
+    OutXform->Rotation.E[2][1] = 0.0f;
+    OutXform->Rotation.E[2][0] = 0.0f;
+    OutXform->Rotation.E[1][2] = 0.0f;
+    OutXform->Rotation.E[1][0] = 0.0f;
+    OutXform->Rotation.E[0][2] = 0.0f;
+    OutXform->Rotation.E[0][1] = 0.0f;
+    OutXform->Translation.z = 0.0f;
+    OutXform->Translation.y = 0.0f;
+    OutXform->Translation.x = 0.0f;
     return false;
 }
 
@@ -496,16 +496,16 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
 
     // The quantity panel's item row, 0.015 right and 0.032 down (DAT_005d1f04, DAT_005d69c0) of
     // the centre list's hardpoint.
-    float Centre[12];
-    Win3DIdentityRotation3x3(Centre);
-    Centre[9] = 0.0f;
-    Centre[10] = 0.0f;
-    Centre[11] = 0.0f;
-    GetHardpointTransform("hp_center_inventory_list", Centre);
+    Transform Centre;
+    Win3DIdentityRotation3x3(&Centre.Rotation);
+    Centre.Translation.x = 0.0f;
+    Centre.Translation.y = 0.0f;
+    Centre.Translation.z = 0.0f;
+    GetHardpointTransform("hp_center_inventory_list", &Centre);
     float RowAt[3];
-    RowAt[0] = Centre[9] + 0.015f;
-    RowAt[1] = Centre[10] - 0.032f;
-    RowAt[2] = Centre[11];
+    RowAt[0] = Centre.Translation.x + 0.015f;
+    RowAt[1] = Centre.Translation.y - 0.032f;
+    RowAt[2] = Centre.Translation.z;
     QuantityLine = new CTradeEquipListLine(nullptr); // operator_new(0x2c), ctor inlined
     QuantityLine->Init(this, RowAt);
 
@@ -546,10 +546,10 @@ bool NnTrade::Create(Win3D* NewParent, void* Data)
         "hp_center_quantity_left", Zero, false, kQuantityHandleMesh, Zero, Zero,
         "hp_center_quantity_thumb_left", "hp_center_quantity_thumb_right", Zero, false, 0, 100, 1,
         false, false));
-    WinControlHalfExtentsFromMesh(&QuantityBar->Back.MouseSize.X, &QuantityBar->Back.Holder);
-    WinControlHalfExtentsFromMesh(&QuantityBar->Next.MouseSize.X, &QuantityBar->Next.Holder);
-    WinControlHalfExtentsFromMesh(&QuantityBar->Prev.MouseSize.X, &QuantityBar->Prev.Holder);
-    WinControlHalfExtentsFromMesh(&QuantityBar->ThumbMouse.X, &QuantityBar->ThumbHolder);
+    WinControlHalfExtentsFromMesh(&QuantityBar->Back.MouseSize.x, &QuantityBar->Back.Holder);
+    WinControlHalfExtentsFromMesh(&QuantityBar->Next.MouseSize.x, &QuantityBar->Next.Holder);
+    WinControlHalfExtentsFromMesh(&QuantityBar->Prev.MouseSize.x, &QuantityBar->Prev.Holder);
+    WinControlHalfExtentsFromMesh(&QuantityBar->ThumbMouse.x, &QuantityBar->ThumbHolder);
 
     // The "accept trade" box (+0x331 bit 0 set) and its caption filling it.
     FormatTradeWidgetName("AcceptTradeFrame");

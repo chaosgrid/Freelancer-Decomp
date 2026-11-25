@@ -8,6 +8,8 @@
 
 #include "common_exports.h"
 
+#include "math3d.h"
+
 #include <cmath>
 #include <string>
 
@@ -15,13 +17,6 @@
 // Decorated exports match retail Common.dll (linked into freelancer.exe).
 // Object layout is NOT retail-compatible (no MSVCP60 std::string). See docs/re/common.md (INI).
 
-class Vector
-{
-public:
-    float x;
-    float y;
-    float z;
-};
 
 // 0x0628b030 -- Vector assign (this->x=a, this->y=b, this->z=c). Not exported; 273 call sites.
 inline void Vec3Assign(Vector* Dst, float X, float Y, float Z)
@@ -200,7 +195,7 @@ inline Vector* VecCosineProject3(Vector* Out, Vector const* A, Vector const* B)
 // (float)((N.z*Basis[2].z + N.y*Basis[1].z) + N.x*Basis[0].z) (the FXCH chain at
 // 062e1ec6-062e1ee5); > 1.0f -> 1.0f, else < -1.0f (TEST AH,0x5 + JP keeps >=) -> -1.0f;
 // returns FABS(_CIacos(Dot)) in ST0, i.e. a double the callers FCOMP unrounded.
-inline double AngleToBasisZColumn3(Vector const* Basis, Vector const* A, Vector const* B)
+inline double AngleToBasisZColumn3(Matrix const* Basis, Vector const* A, Vector const* B)
 {
     float const Dx = A->x - B->x;
     float const Dy = A->y - B->y;
@@ -217,7 +212,7 @@ inline double AngleToBasisZColumn3(Vector const* Basis, Vector const* A, Vector 
         Nz = (double)Dz * Inv;
     }
 
-    float Dot = (float)((Nz * Basis[2].z + Ny * Basis[1].z) + Nx * Basis[0].z);
+    float Dot = (float)((Nz * Basis->E[2][2] + Ny * Basis->E[1][2]) + Nx * Basis->E[0][2]);
     if (Dot > 1.0f)
         Dot = 1.0f;
     else if (Dot < -1.0f)

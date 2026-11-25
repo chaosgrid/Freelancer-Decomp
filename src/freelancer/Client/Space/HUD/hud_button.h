@@ -16,7 +16,7 @@
 // the constructor, and slot 0 is WinObject's FUN_004c9210.
 //
 // WinButton layout (after WinObject's 0xac):
-//   +0xac  FTransform rest pose (FUN_004b5150: identity rotation, zero translation). Slot 7
+//   +0xac  Transform rest pose (FUN_004b5150: identity rotation, zero translation). Slot 7
 //          snapshots the live orientation + position into it, slot 5 rebuilds the live
 //          transform from it; +0xd0 is its translation
 //   +0xdc  bHover -- slot 14 stores the hit test, slot 16 clears it
@@ -52,7 +52,7 @@ struct WinButton : public WinObject
     void SetPosition(float const* NewPosition) override;
     // slot 7 LAB_004c92e0 -- orientation into +0x3c, then the live transform becomes the rest
     // pose
-    void SetOrientation(float const* NewOrientation) override;
+    void SetOrientation(Matrix const* NewOrientation) override;
     // slot 11 FUN_0059f360
     void Update() override;
     // slot 13 FUN_0059f510
@@ -64,9 +64,9 @@ struct WinButton : public WinObject
 
     // FUN_004c92b0 -- the twelve dwords into +0x3c, then the holder's
     // instance matrix (FUN_00421050) and FUN_00421070. The rest pose is left alone.
-    void SetTransform(FTransform const* NewTransform);
+    void SetTransform(Transform const& NewTransform);
 
-    FTransform RestPose;         // +0xac
+    Transform RestPose;         // +0xac
     unsigned char bHover;        // +0xdc
     unsigned char PadDD[3];
     float SpinAngle;             // +0xe0

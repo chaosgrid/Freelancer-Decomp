@@ -43,9 +43,9 @@
 namespace
 {
     // The 9 dwords of a rotation copied as one block.
-    void CopyRotation(FMatrix* Dest, Matrix const* Source)
+    void CopyRotation(Matrix* Dest, Matrix const* Source)
     {
-        std::memcpy(Dest, Source, sizeof(FMatrix));
+        *Dest = *Source;
     }
 
     // The inlined label walk: the NPC's +0x17c list holds LabelId.
@@ -106,13 +106,13 @@ namespace
     }
 
     // FUN_06eb70f0 / FUN_06eb7130.
-    void ReadPlacement(FContentNpcShip const* Npc, FTransform* Out)
+    void ReadPlacement(FContentNpcShip const* Npc, Transform* Out)
     {
         Vector Position;
         Npc->GetPosition(&Position);
-        Out->Translation.X = Position.x;
-        Out->Translation.Y = Position.y;
-        Out->Translation.Z = Position.z;
+        Out->Translation.x = Position.x;
+        Out->Translation.y = Position.y;
+        Out->Translation.z = Position.z;
         Matrix Orientation;
         Npc->GetOrientation(&Orientation);
         CopyRotation(&Out->Rotation, &Orientation);
@@ -128,14 +128,14 @@ namespace
     }
 
     // The nine rotation floats as doubles, in memory order.
-    void PrintOrientation(FILE* File, FMatrix const* Rotation)
+    void PrintOrientation(FILE* File, Matrix const* Rotation)
     {
         std::fprintf(File, "orientation = %f,%f,%f, %f,%f,%f, %f,%f,%f\n",
-                     static_cast<double>(Rotation->D[0][0]), static_cast<double>(Rotation->D[0][1]),
-                     static_cast<double>(Rotation->D[0][2]), static_cast<double>(Rotation->D[1][0]),
-                     static_cast<double>(Rotation->D[1][1]), static_cast<double>(Rotation->D[1][2]),
-                     static_cast<double>(Rotation->D[2][0]), static_cast<double>(Rotation->D[2][1]),
-                     static_cast<double>(Rotation->D[2][2]));
+                     static_cast<double>(Rotation->E[0][0]), static_cast<double>(Rotation->E[0][1]),
+                     static_cast<double>(Rotation->E[0][2]), static_cast<double>(Rotation->E[1][0]),
+                     static_cast<double>(Rotation->E[1][1]), static_cast<double>(Rotation->E[1][2]),
+                     static_cast<double>(Rotation->E[2][0]), static_cast<double>(Rotation->E[2][1]),
+                     static_cast<double>(Rotation->E[2][2]));
     }
 
     // A ship with a guide writes the guide's [MetaBehavior] line; retail passes the chars at
@@ -181,9 +181,9 @@ FMissionRandEncRespawn::FMissionRandEncRespawn()
     EncounterId.clear();
     // FUN_06f143d0.
     std::memset(&Placement, 0, sizeof(Placement));
-    Placement.Rotation.D[0][0] = 1.0f;
-    Placement.Rotation.D[1][1] = 1.0f;
-    Placement.Rotation.D[2][2] = 1.0f;
+    Placement.Rotation.E[0][0] = 1.0f;
+    Placement.Rotation.E[1][1] = 1.0f;
+    Placement.Rotation.E[2][2] = 1.0f;
 }
 
 // FUN_06f15790: per record, first its nickname, then each ship's.
@@ -733,9 +733,9 @@ void FMissionObject::SaveMission(FILE* File)
         std::fprintf(File, "\n[MsnRandEncSave]\n");
         std::fprintf(File, "rand_enc_owner = %u\n", RecordIt->EncounterId.Id);
         std::fprintf(File, "position = %f, %f, %f\n",
-                     static_cast<double>(RecordIt->Placement.Translation.X),
-                     static_cast<double>(RecordIt->Placement.Translation.Y),
-                     static_cast<double>(RecordIt->Placement.Translation.Z));
+                     static_cast<double>(RecordIt->Placement.Translation.x),
+                     static_cast<double>(RecordIt->Placement.Translation.y),
+                     static_cast<double>(RecordIt->Placement.Translation.z));
         PrintOrientation(File, &RecordIt->Placement.Rotation);
         std::fprintf(File, "num_ships = %d\n", RecordIt->Count);
         std::fprintf(File, "ol_priority = %d\n", RecordIt->Priority);
@@ -818,18 +818,18 @@ void FMissionObject::SaveRandEncs(FILE* File)
 namespace
 {
     // The nine "orientation" floats (values 0..8) in memory order.
-    void ReadOrientation(INI_Reader* Reader, FMatrix* Out)
+    void ReadOrientation(INI_Reader* Reader, Matrix* Out)
     {
-        FMatrix Read;
-        Read.D[0][0] = Reader->get_value_float(0);
-        Read.D[0][1] = Reader->get_value_float(1);
-        Read.D[0][2] = Reader->get_value_float(2);
-        Read.D[1][0] = Reader->get_value_float(3);
-        Read.D[1][1] = Reader->get_value_float(4);
-        Read.D[1][2] = Reader->get_value_float(5);
-        Read.D[2][0] = Reader->get_value_float(6);
-        Read.D[2][1] = Reader->get_value_float(7);
-        Read.D[2][2] = Reader->get_value_float(8);
+        Matrix Read;
+        Read.E[0][0] = Reader->get_value_float(0);
+        Read.E[0][1] = Reader->get_value_float(1);
+        Read.E[0][2] = Reader->get_value_float(2);
+        Read.E[1][0] = Reader->get_value_float(3);
+        Read.E[1][1] = Reader->get_value_float(4);
+        Read.E[1][2] = Reader->get_value_float(5);
+        Read.E[2][0] = Reader->get_value_float(6);
+        Read.E[2][1] = Reader->get_value_float(7);
+        Read.E[2][2] = Reader->get_value_float(8);
         *Out = Read;
     }
 
@@ -927,9 +927,9 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
                 }
                 else if (Reader->is_value("position"))
                 {
-                    Record.Placement.Translation.X = Reader->get_value_float(0);
-                    Record.Placement.Translation.Y = Reader->get_value_float(1);
-                    Record.Placement.Translation.Z = Reader->get_value_float(2);
+                    Record.Placement.Translation.x = Reader->get_value_float(0);
+                    Record.Placement.Translation.y = Reader->get_value_float(1);
+                    Record.Placement.Translation.z = Reader->get_value_float(2);
                 }
                 else if (Reader->is_value("ol_priority"))
                 {

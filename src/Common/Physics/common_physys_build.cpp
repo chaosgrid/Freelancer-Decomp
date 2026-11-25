@@ -145,9 +145,9 @@ namespace
     {
         Template.MassInput = Parms.Mass;                        // +0x1c <- +0x00
         Template.SpeedDampInput = Parms.LinearDamping;          // +0x38 <- +0x04
-        Template.RotSpeedDampInputX = Parms.AngularDamping[0];  // +0x3c <- +0x08
-        Template.RotSpeedDampInputY = Parms.AngularDamping[1];  // +0x40 <- +0x0c
-        Template.RotSpeedDampInputZ = Parms.AngularDamping[2];  // +0x44 <- +0x10
+        Template.RotSpeedDampInputX = Parms.AngularDamping.x;  // +0x3c <- +0x08
+        Template.RotSpeedDampInputY = Parms.AngularDamping.y;  // +0x40 <- +0x0c
+        Template.RotSpeedDampInputZ = Parms.AngularDamping.z;  // +0x44 <- +0x10
     }
 
     // FUN_06289100, retail's BuildPartIVP_Real (cdecl).
@@ -216,7 +216,7 @@ namespace
 
         // The part id is the CRC half of the instance name.
         FEngineName Name;
-        Engine->GetInstanceName(&Name, PhySys_InstanceHandle(Instance));
+        Engine->GetInstanceName(&Name, Instance);
         unsigned const PartId = Name.Crc;
 
         PhyArch::Part const* const Part = Owner->Archetype->get_phy_part(PartId);
@@ -225,7 +225,7 @@ namespace
         {
             CObject* const New = CObject::Alloc(CObject::ClassObject);   // Alloc(1)
             New->open(Owner->Archetype);                                 // vtbl +0x4c
-            Engine->SetInstanceTransform(PhySys_InstanceHandle(Instance), New); // IEngine +0x70
+            Engine->SetInstanceTransform(Instance, New); // IEngine +0x70
             PhySys_SetInstanceObject(Instance, New);                     // IEngine +0x7c
             PhySys_AppendPart(New, PartId, Instance);                    // FUN_0628f700
             PhySys_BuildPartIVP_Real(New, Part, Parms);                  // FUN_06289100
@@ -259,7 +259,7 @@ void __cdecl PhySys::BuildIVP_Real(CObject* Object, CreateParms const& Parms)
 
     // The root part id, registered in the object's part map.
     FEngineName Name;
-    DALib::Engine->GetInstanceName(&Name, PhySys_InstanceHandle(Instance));
+    DALib::Engine->GetInstanceName(&Name, Instance);
     PhySys_AppendPart(Object, Name.Crc, Instance);
 
     PhyArch::Part const* Part = Object->Archetype->get_phy_part(Name.Crc);
@@ -284,17 +284,17 @@ void __cdecl PhySys::BuildIVP_Real(CObject* Object, CreateParms const& Parms)
     {
         ChildParms.Mass = GOLEM_CHILD_MASS;
         ChildParms.LinearDamping = GOLEM_CHILD_LINEAR_DAMP;
-        ChildParms.AngularDamping[0] = GOLEM_CHILD_ANGULAR_DAMP.x;
-        ChildParms.AngularDamping[1] = GOLEM_CHILD_ANGULAR_DAMP.y;
-        ChildParms.AngularDamping[2] = GOLEM_CHILD_ANGULAR_DAMP.z;
+        ChildParms.AngularDamping.x = GOLEM_CHILD_ANGULAR_DAMP.x;
+        ChildParms.AngularDamping.y = GOLEM_CHILD_ANGULAR_DAMP.y;
+        ChildParms.AngularDamping.z = GOLEM_CHILD_ANGULAR_DAMP.z;
     }
     else if (Parms.Type == PhySys::ANIM_TECHNIQUE_MERGED)
     {
         ChildParms.Mass = 1.0f;
         ChildParms.LinearDamping = DEFAULT_LINEAR_DAMPING;
-        ChildParms.AngularDamping[0] = DEFAULT_ANGULAR_DAMPING.x;
-        ChildParms.AngularDamping[1] = DEFAULT_ANGULAR_DAMPING.y;
-        ChildParms.AngularDamping[2] = DEFAULT_ANGULAR_DAMPING.z;
+        ChildParms.AngularDamping.x = DEFAULT_ANGULAR_DAMPING.x;
+        ChildParms.AngularDamping.y = DEFAULT_ANGULAR_DAMPING.y;
+        ChildParms.AngularDamping.z = DEFAULT_ANGULAR_DAMPING.z;
     }
 
     for (long Child = PhySys_RelatedInstance(Instance, 1, -1); Child != -1;
@@ -320,9 +320,9 @@ void __cdecl PhySys::BuildIVP_Sphere(CObject* Object, float Radius, CreateParms 
     Template.MassInput = Parms.Mass;                        // +0x1c <- +0x00
     Template.FlagsHi = Parms.bPhysicalUnmoveable;           // +0x0c <- +0x1c
     Template.SpeedDampInput = Parms.LinearDamping;          // +0x38 <- +0x04
-    Template.RotSpeedDampInputX = Parms.AngularDamping[0];  // +0x3c <- +0x08
-    Template.RotSpeedDampInputY = Parms.AngularDamping[1];  // +0x40 <- +0x0c
-    Template.RotSpeedDampInputZ = Parms.AngularDamping[2];  // +0x44 <- +0x10
+    Template.RotSpeedDampInputX = Parms.AngularDamping.x;  // +0x3c <- +0x08
+    Template.RotSpeedDampInputY = Parms.AngularDamping.y;  // +0x40 <- +0x0c
+    Template.RotSpeedDampInputZ = Parms.AngularDamping.z;  // +0x44 <- +0x10
     // Retail stores an unwritten stack float at +0x48; the port keeps the constructor's zero.
 
     // No miss test: a miss builds into the map head node's unconstructed storage (retail
@@ -842,12 +842,12 @@ static CObject* PhySys_SplitInstance(CObject* Owner, long Instance, PhySys::Deta
     IEngine* const Engine = DALib::Engine;
 
     CObject* const New = CObject::Alloc(CObject::ClassObject);
-    Engine->SetInstanceTransform(PhySys_InstanceHandle(Instance), New);
+    Engine->SetInstanceTransform(Instance, New);
     New->open(Owner->Archetype);
 
     // The part of Instance, or the default part.
     FEngineName Name;
-    Engine->GetInstanceName(&Name, PhySys_InstanceHandle(Instance));
+    Engine->GetInstanceName(&Name, Instance);
     PhyArch::Part const* Part = Owner->Archetype->get_phy_part(Name.Crc);
     if (Part == nullptr)
         Part = PhyArch::GetDefaultPart();
@@ -915,7 +915,7 @@ static CObject* PhySys_SplitInstance(CObject* Owner, long Instance, PhySys::Deta
 void __cdecl DetachInstanceInPlace(long InstanceId)
 {
     long const ParentId = PhySys_InstanceParent(InstanceId);
-    DALib::Engine->DestroyJoint(PhySys_InstanceHandle(ParentId), PhySys_InstanceHandle(InstanceId));
+    DALib::Engine->DestroyJoint(ParentId, InstanceId);
     CObject* const Owner = PhySys_InstanceObject(InstanceId);
 
     if (Owner->EngineInstanceId == InstanceId)
@@ -934,14 +934,14 @@ void __cdecl DetachInstanceInPlace(long InstanceId)
         else
             ++Entry;
     }
-    DALib::Engine->DestroyInstance(PhySys_InstanceHandle(InstanceId));
+    DALib::Engine->DestroyInstance(InstanceId);
 }
 
 // FUN_0628a050
 CObject* __cdecl DetachInstance(long InstanceId, PhySys::DetachParms const& Parms)
 {
     long const ParentId = PhySys_InstanceParent(InstanceId);
-    DALib::Engine->DestroyJoint(PhySys_InstanceHandle(ParentId), PhySys_InstanceHandle(InstanceId));
+    DALib::Engine->DestroyJoint(ParentId, InstanceId);
     CObject* const Owner = PhySys_InstanceObject(InstanceId);
     if (Owner->EngineInstanceId == InstanceId)
     {

@@ -17,7 +17,7 @@
 #include "Interface/ui_scroll.h"              // UiScroll : WinControl
 #include "Interface/win3d.h"                  // kWin3DVisible
 #include "common_universe.h"
-#include "x86math.h"                // FTransform
+#include "x86math.h"                // Transform
 
 #include <string.h>
 
@@ -108,15 +108,15 @@ void NeuroNetNavMap::SetMapMeshTransform(int View, float Alpha)
         // The zoomed mesh (+0x378), placed at +0x828 plus the scaled pan,
         // its rotation's [0][0] / [1][1] = ZoomScale * 5/43 (the rest of the rotation kept).
         float const Scale = static_cast<float>(Zoom * static_cast<double>(kNavMapZoomedMeshScale));
-        FTransform Transform;
-        memcpy(&Transform, Engine->GetInstanceTransform(ZoomedMapMesh2.EngineInstance),
-               sizeof(Transform));
-        Transform.Rotation.D[0][0] = Scale;
-        Transform.Rotation.D[1][1] = Scale;
-        Transform.Translation.X = static_cast<float>(static_cast<double>(ZoomedMeshPosition[0]) + PanX);
-        Transform.Translation.Y = static_cast<float>(static_cast<double>(ZoomedMeshPosition[1]) + PanY);
-        Transform.Translation.Z = ZoomedMeshPosition[2];
-        Engine->SetInstanceMatrix(ZoomedMapMesh2.EngineInstance, &Transform);
+        Transform Xform;
+        memcpy(&Xform, Engine->GetInstanceTransform(ZoomedMapMesh2.EngineInstance),
+               sizeof(Xform));
+        Xform.Rotation.E[0][0] = Scale;
+        Xform.Rotation.E[1][1] = Scale;
+        Xform.Translation.x = static_cast<float>(static_cast<double>(ZoomedMeshPosition[0]) + PanX);
+        Xform.Translation.y = static_cast<float>(static_cast<double>(ZoomedMeshPosition[1]) + PanY);
+        Xform.Translation.z = ZoomedMeshPosition[2];
+        Engine->SetInstanceMatrix(ZoomedMapMesh2.EngineInstance, &Xform);
 
         // White, the alpha through a byte.
         ZoomedMapMesh2.UserFloats[0] = 1.0f;
@@ -129,15 +129,15 @@ void NeuroNetNavMap::SetMapMeshTransform(int View, float Alpha)
     // The flat mesh (+0x350) at MeshPosition plus the scaled pan, scale
     // ZoomScale * 1.5.
     float const Scale = static_cast<float>(Zoom * static_cast<double>(kNavMapFlatMeshScale));
-    FTransform Transform;
-    memcpy(&Transform, Engine->GetInstanceTransform(ZoomedMapMesh.EngineInstance),
-           sizeof(Transform));
-    Transform.Rotation.D[0][0] = Scale;
-    Transform.Rotation.D[1][1] = Scale;
-    Transform.Translation.X = static_cast<float>(static_cast<double>(MeshPosition[0]) + PanX);
-    Transform.Translation.Y = static_cast<float>(static_cast<double>(MeshPosition[1]) + PanY);
-    Transform.Translation.Z = MeshPosition[2];
-    Engine->SetInstanceMatrix(ZoomedMapMesh.EngineInstance, &Transform);
+    Transform Xform;
+    memcpy(&Xform, Engine->GetInstanceTransform(ZoomedMapMesh.EngineInstance),
+           sizeof(Xform));
+    Xform.Rotation.E[0][0] = Scale;
+    Xform.Rotation.E[1][1] = Scale;
+    Xform.Translation.x = static_cast<float>(static_cast<double>(MeshPosition[0]) + PanX);
+    Xform.Translation.y = static_cast<float>(static_cast<double>(MeshPosition[1]) + PanY);
+    Xform.Translation.z = MeshPosition[2];
+    Engine->SetInstanceMatrix(ZoomedMapMesh.EngineInstance, &Xform);
 
     ZoomedMapMesh.UserFloats[0] = 1.0f;
     ZoomedMapMesh.UserFloats[1] = 1.0f;

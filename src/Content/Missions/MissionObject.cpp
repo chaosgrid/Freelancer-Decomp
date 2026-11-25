@@ -2652,20 +2652,20 @@ bool FMissionObject::IsPlayerDead(unsigned int InPlayerId)
 namespace
 {
     // The 9 dwords of a rotation copied as one block.
-    void CopyRotation(FMatrix* Dest, Matrix const* Source)
+    void CopyRotation(Matrix* Dest, Matrix const* Source)
     {
-        std::memcpy(Dest, Source, sizeof(FMatrix));
+        *Dest = *Source;
     }
 }
 
 // FUN_06f15e20.
 void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
 {
-    FTransform Placement;
+    Transform Placement;
     Placement.Rotation = Group->Orientation;
-    Placement.Translation.X = Group->Position.x;
-    Placement.Translation.Y = Group->Position.y;
-    Placement.Translation.Z = Group->Position.z;
+    Placement.Translation.x = Group->Position.x;
+    Placement.Translation.y = Group->Position.y;
+    Placement.Translation.z = Group->Position.z;
     // Set when the record's formation is unknown; nothing is created then.
     bool bNoFormation = false;
     std::list<FContentNpcShipParams> Blocks;
@@ -2770,27 +2770,27 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             }
         }
 
-        FTransform Local;
+        Transform Local;
         std::memset(&Local, 0, sizeof(Local));
-        Local.Rotation.D[0][0] = 1.0f;
-        Local.Rotation.D[1][1] = 1.0f;
-        Local.Rotation.D[2][2] = 1.0f;
+        Local.Rotation.E[0][0] = 1.0f;
+        Local.Rotation.E[1][1] = 1.0f;
+        Local.Rotation.E[2][2] = 1.0f;
         if (Group->bRelPos == 0)
         {
             Local.Rotation = Group->Orientation;
-            Local.Translation.X = Group->Position.x;
-            Local.Translation.Y = Group->Position.y;
-            Local.Translation.Z = Group->Position.z;
+            Local.Translation.x = Group->Position.x;
+            Local.Translation.y = Group->Position.y;
+            Local.Translation.z = Group->Position.z;
         }
         else
         {
             // The anchor: the player's ship or the NPC named by rel_pos; identity and zero when
             // there is none.
-            FTransform Anchor;
+            Transform Anchor;
             std::memset(&Anchor, 0, sizeof(Anchor));
-            Anchor.Rotation.D[0][0] = 1.0f;
-            Anchor.Rotation.D[1][1] = 1.0f;
-            Anchor.Rotation.D[2][2] = 1.0f;
+            Anchor.Rotation.E[0][0] = 1.0f;
+            Anchor.Rotation.E[1][1] = 1.0f;
+            Anchor.Rotation.E[2][2] = 1.0f;
             FContentSpaceObj* AnchorObject = nullptr;
             if (_stricmp(Group->RelPosObj.Data, "Player") == 0)
             {
@@ -2806,9 +2806,9 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
                 // FUN_06eb70f0 / FUN_06eb7130.
                 Vector AnchorPosition;
                 AnchorObject->GetPosition(&AnchorPosition);
-                Anchor.Translation.X = AnchorPosition.x;
-                Anchor.Translation.Y = AnchorPosition.y;
-                Anchor.Translation.Z = AnchorPosition.z;
+                Anchor.Translation.x = AnchorPosition.x;
+                Anchor.Translation.y = AnchorPosition.y;
+                Anchor.Translation.z = AnchorPosition.z;
                 Matrix AnchorOrientation;
                 AnchorObject->GetOrientation(&AnchorOrientation);
                 CopyRotation(&Anchor.Rotation, &AnchorOrientation);
@@ -2823,13 +2823,13 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             {
                 // The position only (TransformXform is slot +0x28); the rotation stays
                 // identity.
-                FVector Offset;
-                Offset.X = static_cast<float>(std::cos(static_cast<double>(Group->RelPosHeading)) *
+                Vector Offset;
+                Offset.x = static_cast<float>(std::cos(static_cast<double>(Group->RelPosHeading)) *
                                               Group->RelPosRange);
-                Offset.Y = 0.0f;
-                Offset.Z = static_cast<float>(-(std::sin(static_cast<double>(Group->RelPosHeading)) *
+                Offset.y = 0.0f;
+                Offset.z = static_cast<float>(-(std::sin(static_cast<double>(Group->RelPosHeading)) *
                                                 Group->RelPosRange));
-                FVector Position;
+                Vector Position;
                 ContentMathEngine()->TransformXform(Position, Anchor, Offset);
                 Local.Translation = Position;
             }
@@ -2844,22 +2844,22 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
             {
                 unsigned int SystemId = PlayerSystem->SystemId;
                 Vector Position;
-                Position.x = Local.Translation.X;
-                Position.y = Local.Translation.Y;
-                Position.z = Local.Translation.Z;
+                Position.x = Local.Translation.x;
+                Position.y = Local.Translation.y;
+                Position.z = Local.Translation.z;
                 bool bEmpty = true;
                 pub::SpaceObj::IsPosEmpty(SystemId, Position, Ship->Radius, bEmpty);
                 if (!bEmpty)
                 {
                     Transform Base;
-                    std::memcpy(&Base.Rotation, &Local.Rotation, sizeof(FMatrix));
+                    Base.Rotation = Local.Rotation;
                     Base.Translation = Position;
                     pub::SpaceObj::PosSelectionType const Selection = pub::SpaceObj::POS_SEL_3D_VOLUME;
                     pub::SpaceObj::GetEmptyPos(SystemId, Base, Ship->Radius, Ship->Radius, Selection,
                                                Position);
-                    Local.Translation.X = Position.x;
-                    Local.Translation.Y = Position.y;
-                    Local.Translation.Z = Position.z;
+                    Local.Translation.x = Position.x;
+                    Local.Translation.y = Position.y;
+                    Local.Translation.z = Position.z;
                 }
             }
         }
@@ -2868,10 +2868,10 @@ void FMissionObject::SpawnMissionShipGroup(FMissionShipGroup* Group)
         if (Ship == Group->Ships.begin())
             Placement = Local;
 
-        Params->Position.x = Local.Translation.X;
-        Params->Position.y = Local.Translation.Y;
-        Params->Position.z = Local.Translation.Z;
-        std::memcpy(&Params->Orientation, &Local.Rotation, sizeof(FMatrix));
+        Params->Position.x = Local.Translation.x;
+        Params->Position.y = Local.Translation.y;
+        Params->Position.z = Local.Translation.z;
+        Params->Orientation = Local.Rotation;
         Params->CreationType = 0;
         Params->ControllerId = ControllerId;
         Params->LabelIds = Ship->LabelIds;
@@ -2994,7 +2994,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
         if (!bEmpty)
         {
             Transform Base;
-            std::memcpy(&Base.Rotation, &Solar->Orientation, sizeof(FMatrix));
+            Base.Rotation = Solar->Orientation;
             Base.Translation = Solar->Position;
             pub::SpaceObj::PosSelectionType const Selection = pub::SpaceObj::POS_SEL_3D_VOLUME;
             GenderSlot = static_cast<int>(Selection);
@@ -3006,7 +3006,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     Info.Position = Position;
     Info.LoadoutID = Solar->LoadoutId;
     Info.VibeGroupId = static_cast<int>(Solar->VibeGroupId);
-    std::memcpy(&Info.Orientation, &Solar->Orientation, sizeof(FMatrix));
+    Info.Orientation = Solar->Orientation;
     Info.DockingBaseId = Solar->BaseId;
     Info.VisitValue = Solar->Visit;
     Info.CostumeHead = Solar->SpaceCostume.PartIds[0];
@@ -3174,7 +3174,7 @@ void FMissionObject::SpawnMissionLoot(FMissionLoot* Loot)
 }
 
 // FUN_06f171e0.
-bool FMissionObject::SpawnMissionSolar(TString<0x30> const* Name, FTransform const* Placement)
+bool FMissionObject::SpawnMissionSolar(TString<0x30> const* Name, Transform const* Placement)
 {
     bool bResult = false;
     std::list<FMissionSolar>::iterator Solar = MissionSolars.begin();
@@ -3185,12 +3185,12 @@ bool FMissionObject::SpawnMissionSolar(TString<0x30> const* Name, FTransform con
             continue;
         // A given placement replaces the record's transform for the spawn only.
         Vector const SavedPosition = Solar->Position;
-        FMatrix const SavedOrientation = Solar->Orientation;
+        Matrix const SavedOrientation = Solar->Orientation;
         if (Placement != nullptr)
         {
-            Solar->Position.x = Placement->Translation.X;
-            Solar->Position.y = Placement->Translation.Y;
-            Solar->Position.z = Placement->Translation.Z;
+            Solar->Position.x = Placement->Translation.x;
+            Solar->Position.y = Placement->Translation.y;
+            Solar->Position.z = Placement->Translation.z;
             Solar->Orientation = Placement->Rotation;
         }
         bResult = SpawnMissionSolarRecord(&*Solar);
@@ -3260,7 +3260,7 @@ namespace
     // The orientation keys of FUN_06f172f0 and FUN_06f18eb0: values read in the order 2, 1,
     // 0, 3 (W v0, X v1, Y v2, Z v3), scaled by 1 / FUN_06f18be0 (x87 sum W^2 + X^2 + Y^2 + Z^2)
     // with each product stored as float.
-    void ReadMissionOrientation(INI_Reader* Reader, FMatrix* OutMatrix)
+    void ReadMissionOrientation(INI_Reader* Reader, Matrix* OutMatrix)
     {
         float const Y = Reader->get_value_float(2);
         float const X = Reader->get_value_float(1);
@@ -3269,11 +3269,11 @@ namespace
         double const Length = std::sqrt(static_cast<double>(W) * W + static_cast<double>(X) * X +
                                         static_cast<double>(Y) * Y + static_cast<double>(Z) * Z);
         double const Inverse = 1.0 / Length;
-        FQuaternion Quat;
-        Quat.W = static_cast<float>(W * Inverse);
-        Quat.X = static_cast<float>(X * Inverse);
-        Quat.Y = static_cast<float>(Y * Inverse);
-        Quat.Z = static_cast<float>(Z * Inverse);
+        Quaternion Quat;
+        Quat.w = static_cast<float>(W * Inverse);
+        Quat.x = static_cast<float>(X * Inverse);
+        Quat.y = static_cast<float>(Y * Inverse);
+        Quat.z = static_cast<float>(Z * Inverse);
         ContentMathEngine()->QuaternionToMatrix(*OutMatrix, Quat);
     }
 
@@ -3316,9 +3316,9 @@ namespace
             }
             else if (Reader->is_value("orientation"))
             {
-                FMatrix Rotation;
+                Matrix Rotation;
                 ReadMissionOrientation(Reader, &Rotation);
-                std::memcpy(&Loot->Info.Orientation, &Rotation, sizeof(Rotation));
+                Loot->Info.Orientation = Rotation;
             }
             else if (Reader->is_value("velocity"))
             {
@@ -3354,7 +3354,7 @@ namespace
     // The [MsnSolar] orientation key inlines its own normalisation, which differs in x87
     // order: the sum runs W^2 + Z^2 + Y^2 + X^2 and 1 / length is stored as float before the
     // products.
-    void ReadMissionSolarOrientation(INI_Reader* Reader, FMatrix* OutMatrix)
+    void ReadMissionSolarOrientation(INI_Reader* Reader, Matrix* OutMatrix)
     {
         float const Y = Reader->get_value_float(2);
         float const X = Reader->get_value_float(1);
@@ -3363,11 +3363,11 @@ namespace
         double const Sum = static_cast<double>(W) * W + static_cast<double>(Z) * Z +
                            static_cast<double>(Y) * Y + static_cast<double>(X) * X;
         float const Inverse = static_cast<float>(1.0 / std::sqrt(Sum));
-        FQuaternion Quat;
-        Quat.W = static_cast<float>(static_cast<double>(W) * Inverse);
-        Quat.X = static_cast<float>(static_cast<double>(Inverse) * X);
-        Quat.Y = static_cast<float>(static_cast<double>(Inverse) * Y);
-        Quat.Z = static_cast<float>(static_cast<double>(Inverse) * Z);
+        Quaternion Quat;
+        Quat.w = static_cast<float>(static_cast<double>(W) * Inverse);
+        Quat.x = static_cast<float>(static_cast<double>(Inverse) * X);
+        Quat.y = static_cast<float>(static_cast<double>(Inverse) * Y);
+        Quat.z = static_cast<float>(static_cast<double>(Inverse) * Z);
         ContentMathEngine()->QuaternionToMatrix(*OutMatrix, Quat);
     }
 
@@ -3587,9 +3587,9 @@ namespace
             {
                 // The [MsnSolar] normalisation, not the [MsnLoot] one.
                 Group->bOrientation = 1;
-                FMatrix Rotation;
+                Matrix Rotation;
                 ReadMissionSolarOrientation(Reader, &Rotation);
-                std::memcpy(&Group->Orientation, &Rotation, sizeof(Rotation));
+                Group->Orientation = Rotation;
             }
             else if (Reader->is_value("arrival_obj"))
             {
@@ -3683,9 +3683,9 @@ FMissionSolar::FMissionSolar()
     Nickname.Length = 0;
     Nickname.Data[0] = '\0';
     std::memset(&Orientation, 0, sizeof(Orientation));
-    Orientation.D[0][0] = 1.0f;
-    Orientation.D[1][1] = 1.0f;
-    Orientation.D[2][2] = 1.0f;
+    Orientation.E[0][0] = 1.0f;
+    Orientation.E[1][1] = 1.0f;
+    Orientation.E[2][2] = 1.0f;
     Position.x = 0.0f;
     Position.y = 0.0f;
     Position.z = 0.0f;
@@ -3809,9 +3809,9 @@ FMissionShipGroup::FMissionShipGroup()
     Nickname.Length = 0;
     Nickname.Data[0] = '\0';
     std::memset(&Orientation, 0, sizeof(Orientation));
-    Orientation.D[0][0] = 1.0f;
-    Orientation.D[1][1] = 1.0f;
-    Orientation.D[2][2] = 1.0f;
+    Orientation.E[0][0] = 1.0f;
+    Orientation.E[1][1] = 1.0f;
+    Orientation.E[2][2] = 1.0f;
     Position.x = 0.0f;
     Position.y = 0.0f;
     Position.z = 0.0f;

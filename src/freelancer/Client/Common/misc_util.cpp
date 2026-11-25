@@ -447,7 +447,7 @@ int FmtStrSprintf(FmtStr const* Fmt, wchar_t* Dest, int DestChars)
     return static_cast<int>(Cursor - Dest);
 }
 
-void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimScriptSet* Scripts,
+InstanceIndex MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimScriptSet* Scripts,
                                  void* /*Unused*/,
                                  Archetype::FCliVc6Vector<Archetype::FCliMaterialPathPair> const*
                                      MaterialPaths,
@@ -455,18 +455,18 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
                                  long* OutHandle)
 {
     // FUN_0041c540.
-    void* Instance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    InstanceIndex Instance = InvalidInstanceIndex;
     FEngineName Key;
     Key.Text = File;
     Key.Crc = DACOM_CRC::GetCRC32(File);
-    void* const Found = DALib::Engine->FindArchetype(&Key);
+    const ArchetypeIndex Found = DALib::Engine->FindArchetype(&Key);
 
-    if (Found != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (Found != InvalidArchetypeIndex)
     {
         // Already loaded.
         if (OutHandle != nullptr)
             *OutHandle = reinterpret_cast<long>(Found);
-        void* const Created = DALib::Engine->CreateInstance(Found, nullptr);
+        const InstanceIndex Created = DALib::Engine->CreateInstance(Found, nullptr);
         DALib::Engine->ReleaseHandle(Found);
         // The scripts through a fresh file system, which retail does not test.
         if (Scripts != nullptr)
@@ -506,8 +506,8 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
 
     if (OutHandle != nullptr)
         *OutHandle = Handle;
-    Instance = DALib::Engine->CreateInstance(reinterpret_cast<void*>(Handle), nullptr);
-    DALib::Engine->ReleaseHandle(reinterpret_cast<void*>(Handle));
+    Instance = DALib::Engine->CreateInstance(Handle, nullptr);
+    DALib::Engine->ReleaseHandle(Handle);
 
     if (Scripts != nullptr)
         Scripts->Load(reinterpret_cast<unsigned long>(DALib::Anim->OpenScript(Filesys)));
@@ -538,15 +538,15 @@ namespace
 // FUN_0041c8d0.
 bool MiscUtilSphereInView(ICamera* Camera, float const* Center, float Radius)
 {
-    float const* const View = Camera->GetViewTransform();
+    const float* const View = (const float*)Camera->GetViewTransform();
     if (G_MiscUtilMath == nullptr)
         G_MiscUtilMath = Acquire3DMathEngine();
-    FVector InView;
-    G_MiscUtilMath->TransformXform(InView, *reinterpret_cast<FTransform const*>(View),
-                                   *reinterpret_cast<FVector const*>(Center));
+    Vector InView;
+    G_MiscUtilMath->TransformXform(InView, *reinterpret_cast<Transform const*>(View),
+                                   *reinterpret_cast<Vector const*>(Center));
     float Local[3];
-    Local[0] = InView.X;
-    Local[1] = InView.Y;
-    Local[2] = InView.Z;
-    return Camera->ClassifySphere(Local, Radius) >= 3;
+    Local[0] = InView.x;
+    Local[1] = InView.y;
+    Local[2] = InView.z;
+    return Camera->ClassifySphere((const Vector*)Local, Radius) >= 3;
 }

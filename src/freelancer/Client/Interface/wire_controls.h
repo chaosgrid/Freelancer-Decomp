@@ -94,7 +94,7 @@ public:
     // slot 5 LAB_005a3950
     void SetPosition(float const* NewPosition) override;
     // slot 7 LAB_005a3a30
-    void SetOrientation(float const* NewOrientation) override;
+    void SetOrientation(Matrix const* NewOrientation) override;
     // slot 9 FUN_005a3ea0 (RET 8)
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 11 FUN_005a3aa0

@@ -135,11 +135,11 @@ namespace
         Root->SetProperty(0x36, 1, 0);
     }
 
-    void NnSetVector(float* Out, unsigned XBits, unsigned YBits, unsigned ZBits)
+    void NnSetVector(Vector* Out, unsigned XBits, unsigned YBits, unsigned ZBits)
     {
-        Out[0] = NnFloatBits(XBits);
-        Out[1] = NnFloatBits(YBits);
-        Out[2] = NnFloatBits(ZBits);
+        Out->x = NnFloatBits(XBits);
+        Out->y = NnFloatBits(YBits);
+        Out->z = NnFloatBits(ZBits);
     }
 }
 
@@ -255,29 +255,29 @@ bool NN_MainButton::Create(Win3D* NewParent, void* Data)
     Roots[6] = GroupRoot;
 
     // Where each button slides to when its panel opens.
-    NnSetVector(OpenTarget[0], 0x00000000, 0x3d75c28f, 0xbfa00000); // (0, 0.06, -1.25)
-    NnSetVector(OpenTarget[1], 0x00000000, 0x3d8f5c29, 0xbfa00000); // (0, 0.07, -1.25)
-    NnSetVector(OpenTarget[2], 0x00000000, 0x3d8f5c29, 0xbfa00000);
-    NnSetVector(OpenTarget[3], 0x00000000, 0x3da3d70a, 0xbfa00000); // (0, 0.08, -1.25)
-    NnSetVector(OpenTarget[4], 0x00000000, 0x3da3d70a, 0xbfa00000);
-    NnSetVector(OpenTarget[5], 0x00000000, 0x3d6147ae, 0xbf800000); // (0, 0.055, -1)
-    NnSetVector(OpenTarget[6], 0x00000000, 0x3d4ccccd, 0xbf800000); // (0, 0.05, -1)
+    NnSetVector(&OpenTarget[0], 0x00000000, 0x3d75c28f, 0xbfa00000); // (0, 0.06, -1.25)
+    NnSetVector(&OpenTarget[1], 0x00000000, 0x3d8f5c29, 0xbfa00000); // (0, 0.07, -1.25)
+    NnSetVector(&OpenTarget[2], 0x00000000, 0x3d8f5c29, 0xbfa00000);
+    NnSetVector(&OpenTarget[3], 0x00000000, 0x3da3d70a, 0xbfa00000); // (0, 0.08, -1.25)
+    NnSetVector(&OpenTarget[4], 0x00000000, 0x3da3d70a, 0xbfa00000);
+    NnSetVector(&OpenTarget[5], 0x00000000, 0x3d6147ae, 0xbf800000); // (0, 0.055, -1)
+    NnSetVector(&OpenTarget[6], 0x00000000, 0x3d4ccccd, 0xbf800000); // (0, 0.05, -1)
     // Where the open button sits while its panel shows (FUN_0045c7a0 overrides them).
-    NnSetVector(PanelOrigin[0], 0xbf1eb852, 0x3e99999a, 0xbfa00000); // (-0.62, 0.3, -1.25)
-    NnSetVector(PanelOrigin[1], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f); // (0, 0.076, -1.288)
-    NnSetVector(PanelOrigin[2], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
-    NnSetVector(PanelOrigin[3], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
-    NnSetVector(PanelOrigin[4], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
-    NnSetVector(PanelOrigin[5], 0x00000000, 0x00000000, 0xbf800000); // (0, 0, -1)
-    NnSetVector(PanelOrigin[6], 0x00000000, 0x00000000, 0xbf800000);
+    NnSetVector(&PanelOrigin[0], 0xbf1eb852, 0x3e99999a, 0xbfa00000); // (-0.62, 0.3, -1.25)
+    NnSetVector(&PanelOrigin[1], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f); // (0, 0.076, -1.288)
+    NnSetVector(&PanelOrigin[2], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
+    NnSetVector(&PanelOrigin[3], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
+    NnSetVector(&PanelOrigin[4], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
+    NnSetVector(&PanelOrigin[5], 0x00000000, 0x00000000, 0xbf800000); // (0, 0, -1)
+    NnSetVector(&PanelOrigin[6], 0x00000000, 0x00000000, 0xbf800000);
     // "ScaledBackground" positions.
-    NnSetVector(BackgroundPosition[0], 0x00000000, 0x3d8f5c29, 0xbfbc28f6); // (0, 0.07, -1.47)
-    NnSetVector(BackgroundPosition[1], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f); // (0, 0.076, -1.288)
-    NnSetVector(BackgroundPosition[2], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
-    NnSetVector(BackgroundPosition[3], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
-    NnSetVector(BackgroundPosition[4], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
-    NnSetVector(BackgroundPosition[5], 0x00000000, 0x3d6147ae, 0xbf800000); // (0, 0.055, -1)
-    NnSetVector(BackgroundPosition[6], 0x00000000, 0x3d4ccccd, 0xbf800000); // (0, 0.05, -1)
+    NnSetVector(&BackgroundPosition[0], 0x00000000, 0x3d8f5c29, 0xbfbc28f6); // (0, 0.07, -1.47)
+    NnSetVector(&BackgroundPosition[1], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f); // (0, 0.076, -1.288)
+    NnSetVector(&BackgroundPosition[2], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
+    NnSetVector(&BackgroundPosition[3], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
+    NnSetVector(&BackgroundPosition[4], 0x00000000, 0x3d9ba5e3, 0xbfa4dd2f);
+    NnSetVector(&BackgroundPosition[5], 0x00000000, 0x3d6147ae, 0xbf800000); // (0, 0.055, -1)
+    NnSetVector(&BackgroundPosition[6], 0x00000000, 0x3d4ccccd, 0xbf800000); // (0, 0.05, -1)
     // The background's collapsed scale per slot.
     PanelScale[0] = NnFloatBits(0x3da3d70a); // 0.08
     PanelScale[1] = NnFloatBits(0x3d4ccccd); // 0.05
@@ -529,8 +529,8 @@ void NN_MainButton::OnScaleFinished()
         {
             ButtonMover::Start(kAnimSeconds);
         }
-        float const Zero[3] = {0.0f, 0.0f, 0.0f};
-        ClosingButton->SetPosition(Zero);
+        Vector const Zero = {0.0f, 0.0f, 0.0f};
+        ClosingButton->SetPosition(&Zero.x);
         ButtonMover::AddButton(ClosingButton, ClosingStart, ClosingButton->HomeOffset);
         ClosingButton->ToolTipIds = ClosingToolTipIds;
         HudRemoveCancelHandler(AsHudCmdHandler(), 0);
@@ -585,7 +585,7 @@ void NN_MainButton::OnScaleFinished()
         return;
     }
 
-    OpenButton->SetPosition(PanelOrigin[NnPanelSlot(OpenPanelId)]);
+    OpenButton->SetPosition(&PanelOrigin[NnPanelSlot(OpenPanelId)].x);
     Window->ProcessMessage(kWinMsgShow, 0, 0);
     Window->Flags = static_cast<unsigned char>(Window->Flags | 3);
     PlayOrRewindUiSoundSlot(2);
@@ -593,13 +593,13 @@ void NN_MainButton::OnScaleFinished()
     UpdateRootHighlights();
 }
 
-void NN_MainButton::SetPanelOrigin(int PanelId, float const* Origin)
+void NN_MainButton::SetPanelOrigin(int PanelId, Vector const* Origin)
 {
     // FUN_0045c7a0 (RET 8).
-    float* const Out = PanelOrigin[NnPanelSlot(PanelId)];
-    Out[0] = Origin[0];
-    Out[1] = Origin[1];
-    Out[2] = Origin[2];
+    Vector* const Out = &PanelOrigin[NnPanelSlot(PanelId)];
+    Out->x = Origin->x;
+    Out->y = Origin->y;
+    Out->z = Origin->z;
 }
 
 WinControl* NN_MainButton::GetPanelButton(int PanelId) const
@@ -659,9 +659,9 @@ void NN_MainButton::OpenPanel(WinControl* Button, int PanelId)
     }
     else
     {
-        Target[0] = OpenTarget[Slot][0];
-        Target[1] = OpenTarget[Slot][1];
-        Target[2] = OpenTarget[Slot][2];
+        Target[0] = OpenTarget[Slot].x;
+        Target[1] = OpenTarget[Slot].y;
+        Target[2] = OpenTarget[Slot].z;
     }
     ButtonMover::AddButton(Button, Button->HomeOffset, Target);
     OpenButton = Button;
@@ -712,9 +712,9 @@ void NN_MainButton::ClosePanel()
     else
     {
         int const Slot = NnPanelSlot(OpenPanelId);
-        ClosingStart[0] = OpenTarget[Slot][0];
-        ClosingStart[1] = OpenTarget[Slot][1];
-        ClosingStart[2] = OpenTarget[Slot][2];
+        ClosingStart[0] = OpenTarget[Slot].x;
+        ClosingStart[1] = OpenTarget[Slot].y;
+        ClosingStart[2] = OpenTarget[Slot].z;
     }
 
     Win3D* const Window = Win3DFindByName(Name);
@@ -757,33 +757,33 @@ void NN_MainButton::MakeScaledBackground(float Scale)
     else
     {
         ScaledBackground = CreateStaticControl("ScaledBackground", kScaledBackgroundMeshes[Slot],
-                                               BackgroundPosition[Slot], nullptr, HalfExtents, 0,
+                                               &BackgroundPosition[Slot].x, nullptr, HalfExtents, 0,
                                                0, 0, 1, 0, 0, 1, 0, 0, 0, Zero338);
     }
 
     // The rotation becomes identity scaled by Scale, the translation is kept. No null or -1
     // test on the instance.
-    void* const Instance = ScaledBackground->MeshHolder.EngineInstance;
-    FTransform Transform;
-    Transform.Rotation.D[0][0] = 1.0f;
-    Transform.Rotation.D[0][1] = 0.0f;
-    Transform.Rotation.D[0][2] = 0.0f;
-    Transform.Rotation.D[1][0] = 0.0f;
-    Transform.Rotation.D[1][1] = 1.0f;
-    Transform.Rotation.D[1][2] = 0.0f;
-    Transform.Rotation.D[2][0] = 0.0f;
-    Transform.Rotation.D[2][1] = 0.0f;
-    Transform.Rotation.D[2][2] = 1.0f;
-    float const* const Current = DALib::Engine->GetInstanceTransform(Instance);
-    Transform.Translation.X = Current[9];
-    Transform.Translation.Y = Current[10];
-    Transform.Translation.Z = Current[11];
+    const InstanceIndex Instance = ScaledBackground->MeshHolder.EngineInstance;
+    Transform Xform;
+    Xform.Rotation.E[0][0] = 1.0f;
+    Xform.Rotation.E[0][1] = 0.0f;
+    Xform.Rotation.E[0][2] = 0.0f;
+    Xform.Rotation.E[1][0] = 0.0f;
+    Xform.Rotation.E[1][1] = 1.0f;
+    Xform.Rotation.E[1][2] = 0.0f;
+    Xform.Rotation.E[2][0] = 0.0f;
+    Xform.Rotation.E[2][1] = 0.0f;
+    Xform.Rotation.E[2][2] = 1.0f;
+    const Transform* const Current = DALib::Engine->GetInstanceTransform(Instance);
+    Xform.Translation.x = Current->Translation.x;
+    Xform.Translation.y = Current->Translation.y;
+    Xform.Translation.z = Current->Translation.z;
     if (G_NnMainButtonMath == nullptr)
     {
         G_NnMainButtonMath = Acquire3DMathEngine();
     }
-    G_NnMainButtonMath->Scale(Transform.Rotation, Transform.Rotation, Scale);
-    DALib::Engine->SetInstanceMatrix(Instance, &Transform);
+    G_NnMainButtonMath->Scale(Xform.Rotation, Xform.Rotation, Scale);
+    DALib::Engine->SetInstanceMatrix(Instance, &Xform);
     DALib::Engine->UpdateInstance(Instance, 0, nullptr);
 }
 
@@ -823,26 +823,25 @@ void NN_MainButton::SetGroupButtonMesh(int Mode)
     // One transform buffer for both controls: identity with zero translation, overwritten by a
     // bound instance's current transform (12 dwords) before the mesh is swapped and put back
     // after. The root reuses whatever the button left in it.
-    FTransform Saved;
-    Saved.Rotation.D[0][0] = 1.0f;
-    Saved.Rotation.D[0][1] = 0.0f;
-    Saved.Rotation.D[0][2] = 0.0f;
-    Saved.Rotation.D[1][0] = 0.0f;
-    Saved.Rotation.D[1][1] = 1.0f;
-    Saved.Rotation.D[1][2] = 0.0f;
-    Saved.Rotation.D[2][0] = 0.0f;
-    Saved.Rotation.D[2][1] = 0.0f;
-    Saved.Rotation.D[2][2] = 1.0f;
-    Saved.Translation.X = 0.0f;
-    Saved.Translation.Y = 0.0f;
-    Saved.Translation.Z = 0.0f;
-    void* const NoInstance = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    Transform Saved;
+    Saved.Rotation.E[0][0] = 1.0f;
+    Saved.Rotation.E[0][1] = 0.0f;
+    Saved.Rotation.E[0][2] = 0.0f;
+    Saved.Rotation.E[1][0] = 0.0f;
+    Saved.Rotation.E[1][1] = 1.0f;
+    Saved.Rotation.E[1][2] = 0.0f;
+    Saved.Rotation.E[2][0] = 0.0f;
+    Saved.Rotation.E[2][1] = 0.0f;
+    Saved.Rotation.E[2][2] = 1.0f;
+    Saved.Translation.x = 0.0f;
+    Saved.Translation.y = 0.0f;
+    Saved.Translation.z = 0.0f;
 
     WinControl* const Controls[2] = {GroupButton, GroupRoot};
     for (int Index = 0; Index < 2; ++Index)
     {
         WinControl* const Control = Controls[Index];
-        if (Control->MeshHolder.EngineInstance != NoInstance)
+        if (Control->MeshHolder.EngineInstance != InvalidInstanceIndex)
         {
             memcpy(&Saved, DALib::Engine->GetInstanceTransform(Control->MeshHolder.EngineInstance),
                    sizeof(Saved));
@@ -850,8 +849,8 @@ void NN_MainButton::SetGroupButtonMesh(int Mode)
         strcpy(Control->MeshPath, Path);
         ClientUiMeshHolderRelease(&Control->MeshHolder);
         ClientMeshLoadFromPath(&Control->MeshHolder, Path, 0, false);
-        void* const Instance = Control->MeshHolder.EngineInstance;
-        if (Instance != NoInstance)
+        const InstanceIndex Instance = Control->MeshHolder.EngineInstance;
+        if (Instance != InvalidInstanceIndex)
         {
             DALib::Engine->SetInstanceMatrix(Instance, &Saved);
             DALib::Engine->UpdateInstance(Instance, 0, nullptr);

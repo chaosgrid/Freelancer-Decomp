@@ -105,7 +105,7 @@ public:
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     unsigned long DACOM_API AddRef() override;
     unsigned long DACOM_API Release() override;
-    bool DACOM_API Draw(ICamera* Camera, void* Inst, unsigned long Flags, const void* Matrix,
+    bool DACOM_API Draw(ICamera* Camera, InstanceIndex Inst, unsigned long Flags, const void* Matrix,
                         IMaterial* Override) override;
     bool DACOM_API Prepare(void* Listing, void* Scratch) override;
     FVmeshRef* DACOM_API GetRef() override;
@@ -360,46 +360,46 @@ bool DACOM_API FVMeshPart::Prepare(void* ListingArg, void* ScratchArg)
     return Result >= 0;
 }
 
-bool DACOM_API FVMeshPart::Draw(ICamera* Camera, void* Inst, unsigned long Flags,
+bool DACOM_API FVMeshPart::Draw(ICamera* Camera, InstanceIndex Inst, unsigned long Flags,
                                 const void* Matrix, IMaterial* Override)
 {
     if (Data == nullptr)
         return false;
-    const FTransform* View = (const FTransform*)(Camera->GetViewTransform());
-    const FTransform* World = (const FTransform*)(G_Engine->GetInstanceTransform(Inst));
-    const FTransform* MatrixXf = (const FTransform*)Matrix;
+    const Transform* View = (Camera->GetViewTransform());
+    const Transform* World = (const Transform*)(G_Engine->GetInstanceTransform(Inst));
+    const Transform* MatrixXf = (const Transform*)Matrix;
     if ((Flags & 0x200) == 0)
     {
         int State = 1;
         G_Pipeline->GetPipelineState(7, &State);
         if (State != 0)
         {
-            FTransform Product;
+            Transform Product;
             if (MatrixXf != nullptr)
             {
-                FTransform Local;
+                Transform Local;
                 MathEngineCached(G_MathVMesh)->MulTransform(Local, *MatrixXf, *World);
-                const FTransform LocalCopy = Local;
+                const Transform LocalCopy = Local;
                 MathEngineCached(G_MathVMesh)->MulTransform(Product, *View, LocalCopy);
             }
             else
                 MathEngineCached(G_MathVMesh)->MulTransform(Product, *View, *World);
-            const FTransform ProductCopy = Product;
-            const FTransform Modelview = ProductCopy;
-            G_Pipeline->SetModelview((const float*)(&Modelview));
+            const Transform ProductCopy = Product;
+            const Transform Modelview = ProductCopy;
+            G_Pipeline->SetModelview(&Modelview);
         }
         else if (MatrixXf != nullptr)
         {
-            FTransform Local;
+            Transform Local;
             MathEngineCached(G_MathVMesh)->MulTransform(Local, *MatrixXf, *World);
-            const FTransform Unused = Local;
+            const Transform Unused = Local;
             (void)Unused;
-            G_Pipeline->SetWorld((const float*)World);
+            G_Pipeline->SetWorld(World);
         }
         else
         {
-            G_Pipeline->SetWorld((const float*)World);
-            G_Pipeline->SetView((const float*)View);
+            G_Pipeline->SetWorld(World);
+            G_Pipeline->SetView(View);
         }
     }
     Flags |= 0x10C;
@@ -409,8 +409,8 @@ bool DACOM_API FVMeshPart::Draw(ICamera* Camera, void* Inst, unsigned long Flags
     FIbScratch Scratch;
     FMaterialSubmitContext Context;
     Context.Inst = Inst;
-    Context.World = (FTransform*)World;
-    Context.View = (FTransform*)View;
+    Context.World = World;
+    Context.View = View;
     Context.SourceVertices = &VertexDesc;
     Context.Indices = (unsigned short*)(
         (unsigned char*)((const unsigned char*)Header) + 0x10 +
@@ -898,7 +898,7 @@ public:
         return ((FVMeshPart*)Handle)->QueryInterface(Iid, Out);
     }
 
-    int DACOM_API CreateMeshInstance(void* InstId, void* Handle) override
+    int DACOM_API CreateMeshInstance(InstanceIndex InstId, void* Handle) override
     {
         if (!VMeshHandleValid(Handle))
             return 0;
@@ -911,19 +911,19 @@ public:
         const uint32_t HandleBits = (uint32_t)((uintptr_t)Handle);
         std::memcpy(&Radius, &HandleBits, sizeof(Radius));
         float Center[3];
-        G_Engine->GetInstanceExtent(InstId, 1, &Radius, Center);
+        G_Engine->GetInstanceExtent(InstId, 1, &Radius, (Vector*)Center);
         if (Radius <= 0.0f)
         {
             Center[0] = Part->Ref->Center[0];
             Center[1] = Part->Ref->Center[1];
             Center[2] = Part->Ref->Center[2];
             Radius = Part->Ref->Radius;
-            G_Engine->SetInstanceExtent(InstId, 1, Radius, Center);
+            G_Engine->SetInstanceExtent(InstId, 1, Radius, (const Vector*)Center);
         }
         return 1;
     }
 
-    int DACOM_API DestroyMeshInstance(void* /*InstId*/, void* Handle) override
+    int DACOM_API DestroyMeshInstance(InstanceIndex /*InstId*/, void* Handle) override
     {
         if (!VMeshHandleValid(Handle))
             return 0;
@@ -938,13 +938,13 @@ public:
     }
 
     // LAB_06c2da60: empty, EAX undefined in retail; 0 here.
-    int DACOM_API UpdateMeshInstance(void* /*InstId*/, void* /*Arg*/) override
+    int DACOM_API UpdateMeshInstance(InstanceIndex /*InstId*/, void* /*Arg*/) override
     {
         return 0;
     }
 
     // LAB_06c2daa0.
-    int DACOM_API QueryMeshInstance(void* /*InstId*/, void* Handle, const char* Iid, void** Out) override
+    int DACOM_API QueryMeshInstance(InstanceIndex /*InstId*/, void* Handle, const char* Iid, void** Out) override
     {
         return QueryHandle(Handle, Iid, Out);
     }
@@ -1004,7 +1004,7 @@ public:
 
     // LAB_06c2da10 -> AL: draw the part bound by BindMeshInstance (the Handle argument is
     // not read) with the flag word translated: 0x4000 clear -> 0x40, 0x1000 -> 2, 0x8000 -> 0x80.
-    int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, void* Inst, unsigned long Flags,
+    int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, InstanceIndex Inst, unsigned long Flags,
                          void* Matrix, void* Extra) override
     {
         unsigned long PartFlags = 0;
@@ -1018,7 +1018,7 @@ public:
     }
 
     // LAB_06c2dac0: invalid handle -> -1, else bind it.
-    int DACOM_API BindMeshInstance(void* /*Inst*/, void* Handle) override
+    int DACOM_API BindMeshInstance(InstanceIndex /*Inst*/, void* Handle) override
     {
         if (!VMeshHandleValid(Handle))
             return -1;

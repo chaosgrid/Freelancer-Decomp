@@ -73,7 +73,7 @@ inline GENRESULT PipelineQueryDeviceAbility(IRenderPipeline* Pipeline, unsigned 
 
 inline GENRESULT PipelineSetModelview(IRenderPipeline* Pipeline, const float* Matrix12)
 {
-    return Pipeline->SetModelview(Matrix12);
+    return Pipeline->SetModelview((const Transform*)Matrix12);
 }
 
 inline GENRESULT PipelineDrawPrimitiveVb(IRenderPipeline* Pipeline, unsigned long Prim, void* Vb,

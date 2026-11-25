@@ -7,6 +7,7 @@
 #include "MediaPlayer.h"
 #include "MoviePlay.h"
 #include "MovieObject.h"
+#include "MovieRuntime.h"
 #include <dshow.h>
 #include <stdio.h>
 #include <cstring>
@@ -104,7 +105,7 @@ void __cdecl Movie_ReleaseComAndRestoreWndProc()
     IVideoWindow* Window = g_videoWindow;
     if (Window != nullptr)
     {
-        Window->put_Visible(0);
+        Window->put_Visible(OAFALSE);
         Window = g_videoWindow;
         Window->put_Owner(0);
         Media = g_mediaControl;
@@ -148,7 +149,7 @@ void __cdecl Movie_ReleaseComAndRestoreWndProc()
 
     if (g_originalWndProc != nullptr)
     {
-        SetWindowLongA(g_hwndParent, -4, static_cast<LONG>(reinterpret_cast<LONG_PTR>(g_originalWndProc)));
+        SetWindowLongA(g_hwndParent, GWL_WNDPROC, static_cast<LONG>(reinterpret_cast<LONG_PTR>(g_originalWndProc)));
         g_originalWndProc = nullptr;
     }
 
@@ -216,7 +217,7 @@ long __cdecl PlayMovie(HWND hwnd, bool fullscreen, const char* path)
     char PathBuf[0x208];
     if (path[1] != ':')
     {
-        GetCurrentDirectoryA(0x104, PathBuf);
+        GetCurrentDirectoryA(MAX_PATH, PathBuf);
         char* Term = PathBuf;
         while (*Term != 0)
         {
@@ -326,7 +327,7 @@ long __cdecl PlayMovie(HWND hwnd, bool fullscreen, const char* path)
     }
 
     FApproach2Player* Object = nullptr;
-    void* Allocated = MovieOperatorNew(0x20);
+    void* Allocated = MovieOperatorNew(sizeof(FApproach2Player));
     if (Allocated != nullptr)
     {
         try

@@ -52,8 +52,8 @@ namespace
     // DAT_006751d0/d4/d8 (HpLeftLane). DAT_006751e8 only guards the atexit registration of the two
     // vectors' (empty) destructors, LAB_00514250 / LAB_00514240 -- nothing to register here.
     bool G_TlHpCached = false;
-    FVector G_TlHpRight = {};
-    FVector G_TlHpLeft = {};
+    Vector G_TlHpRight = {};
+    Vector G_TlHpLeft = {};
 
     // DAT_00675200 -- .bss, read by FUN_00513b40 / FUN_005163e0 and never written anywhere in the
     // exe, so the travel effect is only ever started by FUN_005142e0 / FUN_00515890.
@@ -276,7 +276,7 @@ namespace
     // FUN_00514070 (on the factory) -- an empty id gives false; else
     // FUN_00503070 on the same factory with FindEffectArch(Id).
     unsigned char TlCreateEffectFromId(FCliEffectFactory const* Factory, ID_String const* Id,
-                                       void* ListOwner, int EngineIndex, FTransform const* Xform,
+                                       void* ListOwner, int EngineIndex, Transform const* Xform,
                                        void* CompanionOut)
     {
         if (Id->IsEmpty())
@@ -288,7 +288,7 @@ namespace
     // FUN_00515dd0 (on the factory) -- the world-space twin of FUN_00514070:
     // an empty id gives false, else FUN_00503f40 with FindEffectArch(Id).
     unsigned char TlCreateWorldEffectFromId(FCliEffectFactory const* Factory, ID_String const* Id,
-                                            FTransform const* Xform, float const* Pos3,
+                                            Transform const* Xform, float const* Pos3,
                                             void* CompanionOut)
     {
         if (Id->IsEmpty())
@@ -297,13 +297,13 @@ namespace
                                              CompanionOut);
     }
 
-    void TlIdentityXform(FTransform* Out)
+    void TlIdentityXform(Transform* Out)
     {
         // FUN_004b5150 / FUN_004215b0 + zero translation.
-        std::memset(Out, 0, sizeof(FTransform));
-        Out->Rotation.D[0][0] = 1.0f;
-        Out->Rotation.D[1][1] = 1.0f;
-        Out->Rotation.D[2][2] = 1.0f;
+        std::memset(Out, 0, sizeof(Transform));
+        Out->Rotation.E[0][0] = 1.0f;
+        Out->Rotation.E[1][1] = 1.0f;
+        Out->Rotation.E[2][2] = 1.0f;
     }
 
     // The camera-space player one-shot of FUN_00514960 / 00514bf0 / 00514f20 / 00515b60 /
@@ -314,9 +314,9 @@ namespace
         float Radius = 0.0f;
         Vector Center = {};
         Ship->get_physical_radius(Radius, Center);
-        FTransform Xform;
+        Transform Xform;
         TlIdentityXform(&Xform);
-        Xform.Translation.Z = -Radius;
+        Xform.Translation.z = -Radius;
         float const Velocity[3] = {0.0f, 0.0f, 0.0f};
         TlCreateWorldEffectFromId(&G_CliEffectFactoryCameraParticles, Id, &Xform, Velocity,
                                   nullptr);
@@ -326,10 +326,10 @@ namespace
     // with s = V.V (DAT_005c75e0 = 0.5, DAT_005ca220 = 1.5). s stays unrounded (only its float
     // copy feeds the bit trick) and so does the result: callers that round it get a float (the
     // distance), the speed stays wide -- hence double here.
-    double TlVecLength(FVector const* V)
+    double TlVecLength(Vector const* V)
     {
-        double const Sqr = static_cast<double>(V->X) * V->X + static_cast<double>(V->Y) * V->Y +
-                           static_cast<double>(V->Z) * V->Z;
+        double const Sqr = static_cast<double>(V->x) * V->x + static_cast<double>(V->y) * V->y +
+                           static_cast<double>(V->z) * V->z;
         float const SqrFloat = static_cast<float>(Sqr);
         int Bits = 0;
         std::memcpy(&Bits, &SqrFloat, sizeof(Bits));
@@ -366,8 +366,8 @@ namespace
     // FUN_004fcc40 (on ring + 0x20) -- the glow moves towards its target at
     // GlowParam per second: 0 with no ship probe or the probe outside GlowMax, 1 inside GlowMin,
     // a linear ramp in between.
-    float TlGlowUpdate(FTradeLaneRingRuntime* Ring, float Dt, FVector const* ProbeA,
-                       FVector const* ProbeB)
+    float TlGlowUpdate(FTradeLaneRingRuntime* Ring, float Dt, Vector const* ProbeA,
+                       Vector const* ProbeB)
     {
         float* const Block = &Ring->GlowMax;
         if (ProbeB == nullptr)
@@ -391,9 +391,9 @@ namespace
             }
             return Block[2];
         }
-        float const Dx = ProbeA->X - ProbeB->X;
-        float const Dy = ProbeA->Y - ProbeB->Y;
-        float const Dz = ProbeA->Z - ProbeB->Z;
+        float const Dx = ProbeA->x - ProbeB->x;
+        float const Dy = ProbeA->y - ProbeB->y;
+        float const Dz = ProbeA->z - ProbeB->z;
         float const DistSqr = Dx * Dx + Dy * Dy + Dz * Dz;
         // The squared radii and the ramp target (1.0 at DAT_005c89b8) stay unrounded: double here.
         double const MaxR = Block[0];
@@ -515,7 +515,7 @@ namespace
         ID_String const* Id = TlCompanionId(Companion, kTlShipEnter);
         if (bPlayer && !TlCompanionId(Companion, kTlPlayerEnter)->IsEmpty())
             Id = TlCompanionId(Companion, kTlPlayerEnter);
-        FTransform Xform;
+        Transform Xform;
         TlIdentityXform(&Xform);
         long const Index = Ship->get_index();
         if (Id->IsEmpty())
@@ -540,23 +540,23 @@ namespace
         if (bPlayer)
         {
             Transform const& RingXform = TlWatchedGameobj(Ring)->get_transform();
-            FTransform Xform;
+            Transform Xform;
             std::memcpy(&Xform.Rotation, &RingXform.Rotation, sizeof(Xform.Rotation));
             if ((TlShipFlags184(Ship) & 1u) == 0)
             {
-                Xform.Rotation.D[0][2] = -Xform.Rotation.D[0][2];
-                Xform.Rotation.D[1][2] = -Xform.Rotation.D[1][2];
-                Xform.Rotation.D[2][2] = -Xform.Rotation.D[2][2];
+                Xform.Rotation.E[0][2] = -Xform.Rotation.E[0][2];
+                Xform.Rotation.E[1][2] = -Xform.Rotation.E[1][2];
+                Xform.Rotation.E[2][2] = -Xform.Rotation.E[2][2];
             }
             Vector const& Pos = Ship->get_position();
-            Xform.Translation.X = Pos.x;
-            Xform.Translation.Y = Pos.y;
-            Xform.Translation.Z = Pos.z;
+            Xform.Translation.x = Pos.x;
+            Xform.Translation.y = Pos.y;
+            Xform.Translation.z = Pos.z;
             TlCreateEffectFromId(&G_CliEffectFactoryTunnel, TlCompanionId(Companion, kTlPlayerTravel),
                                  Ship, -1, &Xform, TlShipCompanion(Ship, kTlShipFxBinder174));
             return;
         }
-        FTransform Xform;
+        Transform Xform;
         TlIdentityXform(&Xform);
         long const Index = Ship->get_index();
         TlCreateEffectFromId(&G_CliEffectFactoryC60, TlCompanionId(Companion, kTlShipTravel), Ship,
@@ -582,14 +582,13 @@ namespace
             return;
         }
         FClientGameobj* const RingGo = TlWatchedGameobj(Ring);
-        FVector HpLocal;
+        Vector HpLocal;
         TradeLaneRingLaneHardpoint(&HpLocal, RingGo,
                                    static_cast<unsigned char>(TlShipFlags184(Ship) & 1u));
-        FTransform const* const RingXform =
-            reinterpret_cast<FTransform const*>(&RingGo->get_transform());
-        FVector HpWorld;
+        Transform const* const RingXform = &RingGo->get_transform();
+        Vector HpWorld;
         TlMath()->TransformXform(HpWorld, *RingXform, HpLocal);
-        FTransform Xform;
+        Transform Xform;
         TlIdentityXform(&Xform);
         Xform.Translation = HpWorld;
         float const Velocity[3] = {0.0f, 0.0f, 0.0f};
@@ -635,7 +634,7 @@ namespace
             TlPlayerCameraOneShot(Ship, TlCompanionId(Companion, kTlPlayerExit));
             return;
         }
-        FTransform Xform;
+        Transform Xform;
         TlIdentityXform(&Xform);
         long const Index = Ship->get_index();
         ID_String const* const Id = TlCompanionId(Companion, kTlShipExit);
@@ -678,7 +677,7 @@ namespace
         }
         else
         {
-            FTransform Xform;
+            Transform Xform;
             TlIdentityXform(&Xform);
             long const Index = Ship->get_index();
             ID_String const* const Id = TlCompanionId(Companion, kTlShipDisrupt);
@@ -765,20 +764,20 @@ namespace
 
             Vector const& RingPos = TlWatchedGameobj(Ring)->get_position();
             Vector const& ShipPos = Ship->get_position();
-            FVector Delta;
-            Delta.X = ShipPos.x - RingPos.x;
-            Delta.Y = ShipPos.y - RingPos.y;
-            Delta.Z = ShipPos.z - RingPos.z;
+            Vector Delta;
+            Delta.x = ShipPos.x - RingPos.x;
+            Delta.y = ShipPos.y - RingPos.y;
+            Delta.z = ShipPos.z - RingPos.z;
             float const Dist = static_cast<float>(TlVecLength(&Delta));
 
             double Speed = 2500.0; // DAT_005db7d8
             if ((TlShipFlags184(Ship) & 0x80u) == 0)
             {
                 Vector const Velocity = Ship->get_velocity();
-                FVector V;
-                V.X = Velocity.x;
-                V.Y = Velocity.y;
-                V.Z = Velocity.z;
+                Vector V;
+                V.x = Velocity.x;
+                V.y = Velocity.y;
+                V.z = Velocity.z;
                 Speed = TlVecLength(&V);
             }
             // Only a speed strictly above 1 divides.
@@ -851,24 +850,24 @@ namespace
     bool TlRingGlowTail(FTradeLaneRingRuntime* Ring, FClientGameobj* Nearest, float Dt)
     {
         FClientGameobj* const RingGo = TlWatchedGameobj(Ring);
-        FVector HpLocal;
+        Vector HpLocal;
         TradeLaneRingLaneHardpoint(&HpLocal, RingGo, Ring->SideKey);
-        FVector HpWorld;
-        HudTransformPoint(reinterpret_cast<FTransform const*>(&RingGo->get_transform()), &HpWorld,
+        Vector HpWorld;
+        HudTransformPoint(&RingGo->get_transform(), &HpWorld,
                           &HpLocal);
-        FTransform Probe;
+        Transform Probe;
         TradeLaneRingMakeTranslationXform(&Probe, &HpWorld);
 
-        FVector const* ProbeShip = nullptr;
+        Vector const* ProbeShip = nullptr;
         if (Nearest != nullptr)
         {
-            ProbeShip = reinterpret_cast<FVector const*>(&Nearest->get_position());
+            ProbeShip = &Nearest->get_position();
             if (CreateEffectCompanionAlive(&Ring->EffectSlot0) == 0 && Ring->bActive != 0)
             {
                 Archetype::ICliObj* const Companion = TlTradeLaneCompanion(TlWatchedGameobj(Ring));
-                FVector Hp;
+                Vector Hp;
                 TradeLaneRingLaneHardpoint(&Hp, TlWatchedGameobj(Ring), Ring->SideKey);
-                FTransform Xform;
+                Transform Xform;
                 TradeLaneRingMakeTranslationXform(&Xform, &Hp);
                 FClientGameobj* const Owner = TlWatchedGameobj(Ring);
                 long const Index = TlWatchedGameobj(Ring)->get_index();
@@ -1011,22 +1010,22 @@ int TradeLaneRingLiveCount()
     return G_TlLiveRings.Count;
 }
 
-void TradeLaneRingMakeTranslationXform(FTransform* Out, FVector const* Translation)
+void TradeLaneRingMakeTranslationXform(Transform* Out, Vector const* Translation)
 {
     // FUN_00514010.
-    Out->Rotation.D[0][0] = 1.0f;
-    Out->Rotation.D[0][1] = 0.0f;
-    Out->Rotation.D[0][2] = 0.0f;
-    Out->Rotation.D[1][0] = 0.0f;
-    Out->Rotation.D[1][1] = 1.0f;
-    Out->Rotation.D[1][2] = 0.0f;
-    Out->Rotation.D[2][0] = 0.0f;
-    Out->Rotation.D[2][1] = 0.0f;
-    Out->Rotation.D[2][2] = 1.0f;
+    Out->Rotation.E[0][0] = 1.0f;
+    Out->Rotation.E[0][1] = 0.0f;
+    Out->Rotation.E[0][2] = 0.0f;
+    Out->Rotation.E[1][0] = 0.0f;
+    Out->Rotation.E[1][1] = 1.0f;
+    Out->Rotation.E[1][2] = 0.0f;
+    Out->Rotation.E[2][0] = 0.0f;
+    Out->Rotation.E[2][1] = 0.0f;
+    Out->Rotation.E[2][2] = 1.0f;
     Out->Translation = *Translation;
 }
 
-void TradeLaneRingLaneHardpoint(FVector* Out, FClientGameobj* RingGameobj, unsigned char Side)
+void TradeLaneRingLaneHardpoint(Vector* Out, FClientGameobj* RingGameobj, unsigned char Side)
 {
     // FUN_00514110. The hardpoints are looked up once for the
     // process, on the ring's engine index (vt+0x1c); FindHardpoint_PS's result is not tested.
@@ -1036,13 +1035,13 @@ void TradeLaneRingLaneHardpoint(FVector* Out, FClientGameobj* RingGameobj, unsig
         long HpHandle = 0;
         HardpointInfo HpInfo = {};
         FindHardpoint_PS(RingGameobj->get_index(), "HpRightLane", HpHandle, HpInfo);
-        G_TlHpRight.X = HpInfo.Position.x;
-        G_TlHpRight.Y = HpInfo.Position.y;
-        G_TlHpRight.Z = HpInfo.Position.z;
+        G_TlHpRight.x = HpInfo.Position.x;
+        G_TlHpRight.y = HpInfo.Position.y;
+        G_TlHpRight.z = HpInfo.Position.z;
         FindHardpoint_PS(RingGameobj->get_index(), "HpLeftLane", HpHandle, HpInfo);
-        G_TlHpLeft.X = HpInfo.Position.x;
-        G_TlHpLeft.Y = HpInfo.Position.y;
-        G_TlHpLeft.Z = HpInfo.Position.z;
+        G_TlHpLeft.x = HpInfo.Position.x;
+        G_TlHpLeft.y = HpInfo.Position.y;
+        G_TlHpLeft.z = HpInfo.Position.z;
     }
     if (Side != 0)
         *Out = G_TlHpRight;
@@ -1099,12 +1098,12 @@ FTradeLaneRingRuntime* TradeLaneRingFindOrCreate(FClientGameobj* RingGameobj,
 
     // The lane hardpoint in world space made into a transform nothing reads (FUN_00514110
     // fills its cache as a side effect).
-    FVector HpLocal;
+    Vector HpLocal;
     TradeLaneRingLaneHardpoint(&HpLocal, TlWatchedGameobj(Ring), Ring->SideKey);
-    FVector HpWorld;
-    HudTransformPoint(reinterpret_cast<FTransform const*>(&TlWatchedGameobj(Ring)->get_transform()),
+    Vector HpWorld;
+    HudTransformPoint(&TlWatchedGameobj(Ring)->get_transform(),
                       &HpWorld, &HpLocal);
-    FTransform Unused;
+    Transform Unused;
     TradeLaneRingMakeTranslationXform(&Unused, &HpWorld);
 
     Ring->GlowScale = 0.0f;

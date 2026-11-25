@@ -25,7 +25,7 @@ public:
     ~UiShipViewControl() override;
 
     // slot 8 (+0x20) -- LAB_0059c100 (RET 4).
-    void SetTransform(float const* Transform) override;
+    void SetTransform(Transform const* NewXform) override;
     // slot 9 (+0x24) -- FUN_0059c010 (RET 8).
     bool Create(Win3D* NewParent, void* Payload) override;
 

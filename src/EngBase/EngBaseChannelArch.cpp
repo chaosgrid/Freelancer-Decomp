@@ -143,7 +143,7 @@ static unsigned long ChannelStrideFromHeader(unsigned long Flags, float SampleRa
 }
 
 // LAB_0661d8d0, IChannelArchetype slot 3 (Load). This is not tested.
-GENRESULT DACOM_API FChannelArchetypeObject::Load(void* FileSystem)
+GENRESULT DACOM_API FChannelArchetypeObject::Load(IFileSystem* FileSystem)
 {
     if (FileSystem == nullptr)
         return GR_INVALID_PARMS;

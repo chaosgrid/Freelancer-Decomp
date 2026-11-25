@@ -60,6 +60,9 @@
     <ClInclude Include="MovieWide.h" />
     <ClInclude Include="MoviePlay.h" />
     <ClInclude Include="MovieObject.h" />
+    <ClInclude Include="MovieExp.h" />
+    <ClInclude Include="MovieFieldHigh.h" />
+    <ClInclude Include="MovieRuntime.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MediaPlayer.cpp" />

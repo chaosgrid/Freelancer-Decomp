@@ -12,6 +12,7 @@
 //
 // Base +0x00..+0x2C = FUN_005593d0 RoomObject, registered in DAT_00679a10.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include <list>
 #include <stdint.h>
 #include <vector>
@@ -28,7 +29,7 @@ namespace Archetype
 }
 
 // The engine-instance handle a RoomObject answers with when it has none (FUN_00450870 -1).
-static void* const kRoomObjectNoInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+static const InstanceIndex kRoomObjectNoInstance = InvalidInstanceIndex;
 
 // RoomObject (RTTI .?AVRoomObject@@) -- the base of every object a room draws. The ctor
 // FUN_005593d0(Owner) appends it to DAT_00679a10 and the dtor FUN_005594b0 releases its
@@ -46,7 +47,7 @@ struct FRoomObject
     virtual void SetFloorHeight(float Value);              // 3  +0x0c LAB_00443850
     virtual float GetFloorHeight();                        // 4  +0x10 LAB_00443860
     virtual void Update(double DeltaSeconds) = 0;          // 5  +0x14 _purecall
-    virtual void* GetEngineInstance();                     // 6  +0x18 FUN_00450870: -1
+    virtual InstanceIndex GetEngineInstance();                     // 6  +0x18 FUN_00450870: -1
     virtual void DrawOpaque(ICamera* Camera);              // 7  +0x1c no-op
     virtual void DrawTranslucent(ICamera* Camera);         // 8  +0x20 no-op
     virtual void DrawEffects(ICamera* Camera);             // 9  +0x24 no-op

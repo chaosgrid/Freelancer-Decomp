@@ -7,6 +7,78 @@
 #pragma once
 
 #include <windows.h>
+#include <stddef.h>
+
+// The field descriptor Movie_BindFieldHeader (FUN_06ac32b0) fills. The Field / FieldWords
+// arguments of the field helpers point at one; they read it as dwords (Field[0], Field[2], ...).
+// Kind 1 is arithmetic modulo the record at Modulus. Kinds 2 and 3 are the XOR-based kinds:
+// their adds are XOR, kind 2 multiplies through Pairs, kind 3 through ShiftXorModulus.
+struct FMovieField
+{
+    unsigned int LimbCount;            // +0x000 dwords per group (Movie_GroupBytes, FUN_06ac3110 / 3140)
+    unsigned int BitCount;             // +0x004 1 for kind 1; the bit count walked by kinds 2 and 3 (FUN_06ac36d0, 3b80)
+    unsigned int Kind;                 // +0x008 1, 2 or 3; every helper switches on it
+    unsigned int* Scratch;             // +0x00C kind 1: Scratch of Movie_MultiplyModulo (FUN_06ac3490)
+    unsigned int* Modulus;             // +0x010 kind 1: modulus record (FUN_06ac3d40)
+    unsigned int Field_0x14;           // +0x014 no reader or writer in the port
+    unsigned int PairCount;            // +0x018 kind 2: entries at Pairs (FUN_06ac38d0)
+    unsigned short* Pairs;             // +0x01C kind 2: two bit positions per entry (FUN_06ac38d0); 0 after FUN_06ac32b0
+    unsigned int TraceBit;             // +0x020 kind 3: the single set bit FUN_06ac3b80 starts from; 0 after FUN_06ac32b0
+    unsigned int ShiftXorModulus[0x40]; // +0x024 kind 3: Modulus of MultiplyLimbsShiftXor (FUN_06ac3490, 3300)
+    unsigned int TopShift;             // +0x124 kinds 2 and 3: unused high bits of the last limb (FUN_06ac38d0, 3b80)
+    unsigned int TopMask;              // +0x128 kind 2: mask ANDed into the last limb (FUN_06ac36d0, 38d0)
+    unsigned int One[0x40];            // +0x12C the field's one: kind 1 copies the modulus record's at +0x1144 (FUN_06ac32b0)
+};
+
+static_assert(offsetof(FMovieField, Kind) == 0x8, "FUN_06ac3490 reads [field+8]");
+static_assert(offsetof(FMovieField, Modulus) == 0x10, "FUN_06ac30a0 passes [field+0x10] as the modulus");
+static_assert(offsetof(FMovieField, Pairs) == 0x1C, "FUN_06ac32b0 zeros field+0x1C");
+static_assert(offsetof(FMovieField, TraceBit) == 0x20, "FUN_06ac32b0 zeros field+0x20");
+static_assert(offsetof(FMovieField, ShiftXorModulus) == 0x24, "FUN_06ac3490 passes field+0x24");
+static_assert(offsetof(FMovieField, TopShift) == 0x124, "FUN_06ac38d0 reads [field+0x124]");
+static_assert(offsetof(FMovieField, TopMask) == 0x128, "FUN_06ac36d0 ANDs [field+0x128]");
+static_assert(offsetof(FMovieField, One) == 0x12C, "FUN_06ac32b0 copies into field+0x12C");
+static_assert(sizeof(FMovieField) == 0x22C, "field+0x22C is the next member of the 0x439C context");
+
+// The record Movie_CommitFieldPair (FUN_06ac8200) fills. The FieldHolder / FieldBlock arguments
+// point at one; the helpers fetch the descriptor from its first dword.
+struct FMovieFieldRecord
+{
+    FMovieField* Field;       // +0x000 stored by FUN_06ac8200
+    unsigned int Left[0x40];  // +0x004 copy of FUN_06ac8200's Left
+    unsigned int Right[0x40]; // +0x104 copy of FUN_06ac8200's Right
+};
+
+static_assert(offsetof(FMovieFieldRecord, Left) == 0x4, "FUN_06ac8200 copies Left to record+4");
+static_assert(offsetof(FMovieFieldRecord, Right) == 0x104, "FUN_06ac8200 copies Right to record+0x104");
+static_assert(sizeof(FMovieFieldRecord) == 0x204, "the descriptor follows the record in the 0x439C context");
+
+// The 0x439C-byte object FUN_06ac2910 allocates and FUN_06ac2970 fills from the six
+// five-limb constants at .rdata:06ada788..06ada7ec.
+struct FMovieFieldContext
+{
+    unsigned int ModulusLimbs[5];      // +0x0000 06ada788; source of the modulus record
+    unsigned int PairLeft[5];          // +0x0014 06ada7b0 reduced; Left of FUN_06ac8200
+    unsigned int PairRight[5];         // +0x0028 06ada7c4 reduced; Right of FUN_06ac8200
+    unsigned int Element[10];          // +0x003C 06ada7d8 and 06ada7ec reduced; checked by FUN_06ac8010, expanded by FUN_06ac5d70
+    unsigned int Divisor[5];           // +0x0064 06ada79c; source of DivisorReciprocal
+    unsigned int Modulus[0x491];       // +0x0078 modulus record built by FUN_06ac3d40
+    unsigned int Scratch[0x8C7];       // +0x12BC Field.Scratch (0x231C bytes)
+    FMovieFieldRecord Record;          // +0x35D8
+    FMovieField Field;                 // +0x37DC
+    unsigned int DivisorCount;         // +0x3A08 5
+    unsigned int DivisorReciprocal[2]; // +0x3A0C StoreLeadingReciprocal of Divisor
+    unsigned int Rows[0x262];          // +0x3A14 table filled by FUN_06ac5d70, read by FUN_06ac5610
+};
+
+static_assert(offsetof(FMovieFieldContext, Divisor) == 0x64, "FUN_06ac2970 copies 06ada79c to object+0x64");
+static_assert(offsetof(FMovieFieldContext, Modulus) == 0x78, "FUN_06ac2b90 passes object+0x78 as the modulus");
+static_assert(offsetof(FMovieFieldContext, Scratch) == 0x12BC, "FUN_06ac2970 binds object+0x12BC as the scratch");
+static_assert(offsetof(FMovieFieldContext, Record) == 0x35D8, "FUN_06ac2b90 passes object+0x35D8 as the record");
+static_assert(offsetof(FMovieFieldContext, Field) == 0x37DC, "FUN_06ac2970 binds the descriptor at object+0x37DC");
+static_assert(offsetof(FMovieFieldContext, DivisorCount) == 0x3A08, "FUN_06ac2970 stores 5 at object+0x3A08");
+static_assert(offsetof(FMovieFieldContext, Rows) == 0x3A14, "FUN_06ac2b90 passes object+0x3A14 to FUN_06ac2b60");
+static_assert(sizeof(FMovieFieldContext) == 0x439C, "operator new(0x439C) in FUN_06ac2910");
 
 // Field-arithmetic helpers for the COM object at vtable PTR_FUN_06ada770.
 // FUN_06ac1e50 (PlayMovie, approach 0) installs an IServiceProvider at
@@ -14,8 +86,7 @@
 // vtable slot +0x14 (FUN_06ac2549) calls CreateFieldContext / HresultIfNonZeroLocked /
 // RecoverFieldLimbsLocked / MapFieldLimbsLocked / ReleaseFieldContext
 // (FUN_06ac2ae0 / 28e0 / 3060 / 2e40 / 2b30).
-// The rest of this file is that cluster calling itself. Callees past 0x06ac3d40
-// are declared in MovieGraph.cpp and defined elsewhere.
+// The rest of this file is that cluster calling itself.
 
 // DAT_06ae0960, the CRITICAL_SECTION these helpers take. DAT_06ae0978 is the
 // one-shot init flag. DAT_06ae097c is the status dword FUN_06ac3d40 writes.
@@ -40,7 +111,7 @@ long  Movie_HresultIfNonZeroLocked(int* Value);
 void  Movie_AllocateFieldContext(void** Holder);
 
 // FUN_06ac2970. stdcall, RET 0x1C. 0 on success, 0x80070057 or 0x80004005 otherwise.
-long __stdcall Movie_BuildFieldContext(unsigned int* Object, unsigned int* LimbsA, unsigned int* LimbsB, unsigned int* LimbsC, unsigned int* LimbsD, int NonNullA, int NonNullB);
+long __stdcall Movie_BuildFieldContext(FMovieFieldContext* Object,unsigned int* LimbsA, unsigned int* LimbsB, unsigned int* LimbsC, unsigned int* LimbsD, int NonNullA, int NonNullB);
 
 // FUN_06ac2ae0. thiscall. Lazy-inits the lock, then AllocateFieldContext. Returns This.
 void*  Movie_CreateFieldContext(void** Holder);
@@ -49,13 +120,13 @@ void*  Movie_CreateFieldContext(void** Holder);
 void  Movie_ReleaseFieldContext(void** Holder);
 
 // FUN_06ac2b60. stdcall, RET 0x14. Forwards to FUN_06ac5610 with 4 and 0x3C inserted.
-long __stdcall Movie_ReduceWithFixedWidth(void* Arg1, void* Arg2, int Arg3, void* Arg4, void* Arg5);
+long __stdcall Movie_ReduceWithFixedWidth(void* Base, void* Exponent, int ExponentCount, void* Dest, void* FieldHolder);
 
 // FUN_06ac2b90. thiscall, RET 0xC. Four groups of five limbs into OutLimbs.
 long  Movie_MapFieldLimbs(void* This, unsigned int* InLimbs, unsigned int* Seed, unsigned int* OutLimbs);
 
 // FUN_06ac2de0. stdcall, RET 0x14. Five stack arguments (the decompiled signature shows one).
-long __stdcall Movie_ReduceExpandedRows(unsigned int* Arg1, void* Arg2, int Arg3, void* Arg4, void* Arg5);
+long __stdcall Movie_ReduceExpandedRows(unsigned int* Value, void* Exponent, int ExponentCount, void* Dest, void* FieldHolder);
 
 // FUN_06ac2e40. thiscall, RET 0xC. MapFieldLimbs under the lock.
 long  Movie_MapFieldLimbsLocked(void* This, unsigned int* InLimbs, unsigned int* Seed, unsigned int* OutLimbs);

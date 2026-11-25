@@ -14,7 +14,7 @@
 #include "../ivp_collision/ivp_compact_ledge_solver.h"
 #include "../ivp_collision/ivp_compact_surface.h"
 #include "../ivp_collision/ivp_ray_solver.h"
-#include "../ivp_utility/ivp_u_bigvector.h" // IVP_U_BigVector_Grow (FUN_0635d3e0)
+#include "../ivp_utility/ivp_u_bigvector.h" // IVP_SurfaceManager_OutList::grow (FUN_0635d3e0)
 
 namespace
 {
@@ -22,7 +22,7 @@ namespace
     {
         // Grow only when Count >= Capacity (signed).
         if (!(OutList->Count < OutList->Capacity))
-            IVP_U_BigVector_Grow(OutList); // FUN_0635d3e0
+            OutList->grow(); // FUN_0635d3e0
         OutList->Elems[OutList->Count] = const_cast<IVP_Compact_Ledge*>(Ledge);
         OutList->Count = OutList->Count + 1;
     }

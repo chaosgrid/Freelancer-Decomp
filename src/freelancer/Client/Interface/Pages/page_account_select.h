@@ -54,7 +54,7 @@ public:
     double SlideT;                 // +0xb8 -- Create -1.5; 0..2 while in, 0..-0.9 while leaving
     unsigned char bLeaving;        // +0xc0
     int LeaveDirection;            // +0xc4 -- 1 on to ServerSelect (Result 5), -1 back (1)
-    float BoxHome[3];              // +0xd4 -- AccountBoxShort's position after Create
+    Vector BoxHome;                // +0xd4 -- AccountBoxShort's position after Create
     UiTextEdit* AccountId;         // +0xe0 -- "AccountID"
     UiTextMsgButton* SelectServer; // +0xe4 -- "SelectServer"
     UiTextMsgButton* Back;         // +0xe8 -- "Back"

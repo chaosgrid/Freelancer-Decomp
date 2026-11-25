@@ -15,7 +15,7 @@
 #include "common_cobject.h" // CShip::bIsPlayer / GroupId
 #include "common_csys.h"  // Matrix, Transform, MatrixSetIdentity, Acquire3DMathEngine (UpdateFollowerSteering/GetRotatedOffset)
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
-#include "x86math.h"      // I3DMathEngine::TransformMatrix (+0x2c), FVector, FMatrix
+#include "x86math.h"      // I3DMathEngine::TransformMatrix (+0x2c), Vector, Matrix
 #include "common_pathfind.h"
 
 #include <cmath>
@@ -276,18 +276,14 @@ void FormationBehavior::UpdateFollowerSteering()
     // Anchor = LeaderPos - Rot(LeaderBasis, LeaderOffset): FUN_06288800 is Vec3Sub (FSUB),
     // not the neighbouring Vec3Add FUN_062887d0 used for the slot point below.
     Vector LeaderOffsetWorld{ 0.0f, 0.0f, 0.0f };
-    Math->TransformMatrix(reinterpret_cast<FVector&>(LeaderOffsetWorld),
-                          reinterpret_cast<FMatrix const&>(LeaderBasis),
-                          reinterpret_cast<FVector const&>(LeaderFormationOffset));
+    Math->TransformMatrix(LeaderOffsetWorld, LeaderBasis, LeaderFormationOffset);
     Vector const Anchor{ LeaderPos.x - LeaderOffsetWorld.x,
                          LeaderPos.y - LeaderOffsetWorld.y,
                          LeaderPos.z - LeaderOffsetWorld.z };
 
     // Slot = Anchor + Rot(LeaderBasis, OwnOffset).
     Vector OwnOffsetWorld{ 0.0f, 0.0f, 0.0f };
-    Math->TransformMatrix(reinterpret_cast<FVector&>(OwnOffsetWorld),
-                          reinterpret_cast<FMatrix const&>(LeaderBasis),
-                          reinterpret_cast<FVector const&>(Offset290));
+    Math->TransformMatrix(OwnOffsetWorld, LeaderBasis, Offset290);
     Vector const SlotPoint{ OwnOffsetWorld.x + Anchor.x,
                             OwnOffsetWorld.y + Anchor.y,
                             OwnOffsetWorld.z + Anchor.z };
@@ -339,9 +335,7 @@ void FormationBehavior::UpdateFollowerSteering()
                                  Offset290.y,
                                  static_cast<float>(static_cast<double>(Offset290.z) - Clearance) };
     Vector AdjustedWorld{ 0.0f, 0.0f, 0.0f };
-    Math->TransformMatrix(reinterpret_cast<FVector&>(AdjustedWorld),
-                          reinterpret_cast<FMatrix const&>(LeaderBasis),
-                          reinterpret_cast<FVector const&>(AdjustedOffset));
+    Math->TransformMatrix(AdjustedWorld, LeaderBasis, AdjustedOffset);
     Vector const TargetPoint{ AdjustedWorld.x + Anchor.x,
                               AdjustedWorld.y + Anchor.y,
                               AdjustedWorld.z + Anchor.z };
@@ -383,8 +377,6 @@ Vector FormationBehavior::GetRotatedOffset()
     Matrix const LeaderBasis = Behavior_GetTransform(Leader)->Rotation;
 
     Vector Out;
-    Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(Out),
-                                           reinterpret_cast<FMatrix const&>(LeaderBasis),
-                                           reinterpret_cast<FVector const&>(FormationOffsetLocal));
+    Acquire3DMathEngine()->TransformMatrix(Out, LeaderBasis, FormationOffsetLocal);
     return Out;
 }

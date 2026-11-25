@@ -587,10 +587,10 @@ void SpaceAppArmDeathCamera()
         // Everything within 50 (DAT_00614030) of the active camera's position (the camera is
         // not tested), capacity 0x800.
         Geometry::Sphere Query;
-        const float* const CameraPos = AsCamera(G_SpaceApp.ActiveCamera)->GetPosition();
-        Query.Center.x = CameraPos[0];
-        Query.Center.y = CameraPos[1];
-        Query.Center.z = CameraPos[2];
+        const Vector* const CameraPos = AsCamera(G_SpaceApp.ActiveCamera)->GetPosition();
+        Query.Center.x = CameraPos->x;
+        Query.Center.y = CameraPos->y;
+        Query.Center.z = CameraPos->z;
         Query.Radius = 50.0f;
         FSpatialQueryResult Result;
         Result.Capacity = 0x800;
@@ -624,11 +624,11 @@ void SpaceAppArmDeathCamera()
     // The listener camera's (FUN_0040f130) transform into the death camera's World, its 3x3
     // into the shake matrix, its position into the drift accumulator.
     FSpaceCamera* const Listener = static_cast<FSpaceCamera*>(GetClientSoundListenerObject());
-    const float* const Src = AsCamera(Listener)->GetOrientation();
+    const float* const Src = (const float*)AsCamera(Listener)->GetOrientation();
     FSpaceCamera* const DeathBase = SpaceCameraOf((FGameCamera*)Death);
     DeathBase->bViewDirty = 1;
-    memcpy(DeathBase->World, Src, 9 * sizeof(float));
-    memcpy(DeathBase->WorldPos, Src + 9, 3 * sizeof(float));
+    memcpy(&DeathBase->World, Src, 9 * sizeof(float));
+    memcpy(&DeathBase->WorldPos, Src + 9, 3 * sizeof(float));
     memcpy(Death->ShakeOrientation, Src, 9 * sizeof(float));
     Death->DriftPosition[0] = Src[9];
     Death->DriftPosition[1] = Src[10];
@@ -651,8 +651,8 @@ void SetStaticCameraTransform(const float* Csys12)
     // FUN_0054bb50. The Csys and the view-dirty byte are written before the guard.
     FSpaceCamera* const Static = SpaceCameraOf((FGameCamera*)&G_SpaceApp.Static);
     Static->bViewDirty = 1;
-    memcpy(Static->World, Csys12, 9 * sizeof(float));
-    memcpy(Static->WorldPos, Csys12 + 9, 3 * sizeof(float));
+    memcpy(&Static->World, Csys12, 9 * sizeof(float));
+    memcpy(&Static->WorldPos, Csys12 + 9, 3 * sizeof(float));
 
     if (G_SpaceApp.bCameraReady != 0)
         SwitchSpaceCameraMode("static", nullptr);
@@ -708,9 +708,9 @@ namespace
             PhySys::CreateParms Parms;
             Parms.Mass = 1.0f;
             Parms.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-            Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-            Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-            Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+            Parms.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+            Parms.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+            Parms.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
             Parms.SystemId = 0;
             Parms.Type = 2;
             Parms.bPhysicalUnmoveable = 0;
@@ -742,13 +742,13 @@ namespace
             // as retail) off the object as it is now.
             Parms.bEnableCollisions = PhySys::GetCollisionState(Object) ? 1 : 0;
             Vector AngularDamping;
-            AngularDamping.x = Parms.AngularDamping[0];
-            AngularDamping.y = Parms.AngularDamping[1];
-            AngularDamping.z = Parms.AngularDamping[2];
+            AngularDamping.x = Parms.AngularDamping.x;
+            AngularDamping.y = Parms.AngularDamping.y;
+            AngularDamping.z = Parms.AngularDamping.z;
             PhySys::GetDamping(Object, Parms.LinearDamping, AngularDamping);
-            Parms.AngularDamping[0] = AngularDamping.x;
-            Parms.AngularDamping[1] = AngularDamping.y;
-            Parms.AngularDamping[2] = AngularDamping.z;
+            Parms.AngularDamping.x = AngularDamping.x;
+            Parms.AngularDamping.y = AngularDamping.y;
+            Parms.AngularDamping.z = AngularDamping.z;
             strcpy(Parms.Name, PhySys::GetCollisionGroup(Object));
 
             // Out of the physics, out of the old system with the player gameobj, the new system

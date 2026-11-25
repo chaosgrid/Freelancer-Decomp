@@ -53,7 +53,7 @@ void BuildOrientationBasis(Matrix& Out, Matrix const& Reference, Vector const& F
 {
     // Retail builds the basis in a zero-filled 9-dword local and copies it whole into Out on
     // every path, returning Out in EAX.
-    Matrix Result{};
+    Matrix Result;
 
     // FUN_062c5a70.
     Vector ZRaw;
@@ -251,29 +251,29 @@ Matrix* BuildRandomSpreadFrame(Matrix& Out, Matrix const& Reference,
     }
 
     // MatrixToQuaternion is engine slot +0x50; the engine is created lazily with no null test.
-    FQuaternion Quat0;
-    Acquire3DMathEngine()->MatrixToQuaternion(Quat0, reinterpret_cast<FMatrix const&>(Reference));
+    Quaternion Quat0;
+    Acquire3DMathEngine()->MatrixToQuaternion(Quat0, Reference);
 
     // The spread quaternion: W = FCOS(Half), K = FSIN(Half) / |RandomAxis|, both rounded to
     // float; XYZ = RandomAxis * K through FUN_06288830 (one float product each).
     Vector const RandomAxis = RandomVector(1.0f);
     double const HalfAngle = (double)(SpreadAngle) * 0.5f;
-    FQuaternion Quat1;
-    Quat1.W = X87CosF(HalfAngle);
+    Quaternion Quat1;
+    Quat1.w = X87CosF(HalfAngle);
     double const AxisLen = std::sqrt(((double)(RandomAxis.y) * RandomAxis.y +
                                       (double)(RandomAxis.z) * RandomAxis.z) +
                                      (double)(RandomAxis.x) * RandomAxis.x);
     float const AxisScale = (float)(X87Sin(HalfAngle) / AxisLen);
-    Quat1.X = RandomAxis.x * AxisScale;
-    Quat1.Y = RandomAxis.y * AxisScale;
-    Quat1.Z = RandomAxis.z * AxisScale;
+    Quat1.x = RandomAxis.x * AxisScale;
+    Quat1.y = RandomAxis.y * AxisScale;
+    Quat1.z = RandomAxis.z * AxisScale;
 
     // MulQuat is engine slot +0x18.
-    FQuaternion Combined;
+    Quaternion Combined;
     Acquire3DMathEngine()->MulQuat(Combined, Quat0, Quat1);
 
     // QuaternionToMatrix is engine slot +0x54.
-    Acquire3DMathEngine()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Frame), Combined);
+    Acquire3DMathEngine()->QuaternionToMatrix(Frame, Combined);
 
     // Unconditional copy before the branch. Working is what BuildOrientationBasis receives as
     // its Reference, because retail aims its Out at Frame's own storage.
@@ -338,9 +338,9 @@ Vector TransformVectorByMatrix(Matrix const& M, Vector const& V)
 {
     Vector const Src = V;
     Vector Result;
-    Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(Result),
-                                           reinterpret_cast<const FMatrix&>(M),
-                                           reinterpret_cast<const FVector&>(Src)); // +0x2C
+    Acquire3DMathEngine()->TransformMatrix(Result,
+                                           M,
+                                           Src); // +0x2C
     return Result;
 }
 
@@ -441,9 +441,7 @@ Vector* LimitAxisThrottleForTurn(Vector& Out, IObjInspect const* Obj, Vector Com
     // TransposeTransform is engine slot +0x38; the engine is created lazily with no null test.
     Vector const AngularVelocity = Obj->get_angular_velocity();
     Vector LocalAngularVelocity;
-    Acquire3DMathEngine()->TransposeTransform(reinterpret_cast<FVector&>(LocalAngularVelocity),
-                                              reinterpret_cast<FMatrix const&>(Frame),
-                                              reinterpret_cast<FVector const&>(AngularVelocity));
+    Acquire3DMathEngine()->TransposeTransform(LocalAngularVelocity, Frame, AngularVelocity);
 
     // The unrounded value is tested; only less stores 0.
     double const AngularSpeedXYD = std::sqrt((double)(LocalAngularVelocity.x) * LocalAngularVelocity.x +
@@ -613,9 +611,7 @@ bool ComputeBankedSteeringFrame(FAiTarget* Elem, Vector const& TargetDir, Matrix
             return false;
         Transform const& Xform = Elem->Iface->get_transform();
         Vector Local;
-        Acquire3DMathEngine()->TransposeTransform(reinterpret_cast<FVector&>(Local),
-                                                  reinterpret_cast<FMatrix const&>(Xform.Rotation),
-                                                  reinterpret_cast<FVector const&>(BankVector));
+        Acquire3DMathEngine()->TransposeTransform(Local, Xform.Rotation, BankVector);
         BankLocal = Local;
     }
     else
@@ -653,15 +649,13 @@ bool ComputeBankedSteeringFrame(FAiTarget* Elem, Vector const& TargetDir, Matrix
         // 0.707f at DAT_063a0768; FUN_062c5a70 negates exactly.
         Vector const IfaceForward3 = MatrixColumn2(Elem->Iface->get_transform().Rotation);
         Vector const NegForward3{ -IfaceForward3.x, -IfaceForward3.y, -IfaceForward3.z };
-        Matrix PerpFrame{};
+        Matrix PerpFrame;
         if (BuildPerpendicularFrame(NegForward3, &PerpFrame, 0.707f, &TargetDir))
         {
             Vector const PerpRight = MatrixColumn0(PerpFrame);
             Transform const& Xform = Elem->Iface->get_transform();
             Vector LocalRight;
-            Acquire3DMathEngine()->TransposeTransform(reinterpret_cast<FVector&>(LocalRight),
-                                                      reinterpret_cast<FMatrix const&>(Xform.Rotation),
-                                                      reinterpret_cast<FVector const&>(PerpRight));
+            Acquire3DMathEngine()->TransposeTransform(LocalRight, Xform.Rotation, PerpRight);
 
             Vector RollAxis{ -BankLocal.y, BankLocal.x, 0.0f };
             BankNormalizeOrZero(RollAxis);
@@ -867,7 +861,7 @@ bool ComputeBankedSteeringFrame(FAiTarget* Elem, Vector const& TargetDir, Matrix
     Vector const NegTailForward{ -TailForward.x, -TailForward.y, -TailForward.z };
     Transform const& TailXform = Elem->Iface->get_transform();
     Vector const TailUp = MatrixColumn1(NewFrame);
-    Matrix FinalFrame{};
+    Matrix FinalFrame;
     BuildOrientationBasis(FinalFrame, TailXform.Rotation, NegTailForward, &TailUp);
     WorkingFrame = FinalFrame;
 
@@ -941,27 +935,25 @@ Vector TurnHelper::get_angular_throttle(Matrix const& A, Matrix const& B, float*
 
     // MulMatrix is engine slot +0x20; the engine is created lazily with no null test.
     Matrix RelativeMat;
-    Acquire3DMathEngine()->MulMatrix(reinterpret_cast<FMatrix&>(RelativeMat),
-                                     reinterpret_cast<const FMatrix&>(B),
-                                     reinterpret_cast<const FMatrix&>(TransposedA));
+    Acquire3DMathEngine()->MulMatrix(RelativeMat, B, TransposedA);
 
     // MatrixToQuaternion is engine slot +0x50.
-    FQuaternion Quat;
-    Acquire3DMathEngine()->MatrixToQuaternion(Quat, reinterpret_cast<const FMatrix&>(RelativeMat));
+    Quaternion Quat;
+    Acquire3DMathEngine()->MatrixToQuaternion(Quat, RelativeMat);
 
     // Retail tests -1 first, then 1.
-    float ClampedW = Quat.W;
-    if (Quat.W < -1.0f)
+    float ClampedW = Quat.w;
+    if (Quat.w < -1.0f)
         ClampedW = -1.0f;
-    else if (Quat.W > 1.0f)
+    else if (Quat.w > 1.0f)
         ClampedW = 1.0f;
     float Angle2 = (float)(std::acos((double)(ClampedW)) * 2.0);
 
     // asin Z is stored rounded but its unrounded value feeds the length; 1e-5f at DAT_0639b984.
     Vector Axis;
-    Axis.x = (float)(std::asin((double)(Quat.X)));
-    Axis.y = (float)(std::asin((double)(Quat.Y)));
-    double const AsinZ = std::asin((double)(Quat.Z));
+    Axis.x = (float)(std::asin((double)(Quat.x)));
+    Axis.y = (float)(std::asin((double)(Quat.y)));
+    double const AsinZ = std::asin((double)(Quat.z));
     Axis.z = (float)(AsinZ);
     double const AxisLenSq = (AsinZ * Axis.z + (double)(Axis.x) * Axis.x) +
                              (double)(Axis.y) * Axis.y;
@@ -975,9 +967,7 @@ Vector TurnHelper::get_angular_throttle(Matrix const& A, Matrix const& B, float*
 
     // TransposeTransform is engine slot +0x38.
     Vector LocalAxis;
-    Acquire3DMathEngine()->TransposeTransform(reinterpret_cast<FVector&>(LocalAxis),
-                                              reinterpret_cast<const FMatrix&>(A),
-                                              reinterpret_cast<const FVector&>(Axis));
+    Acquire3DMathEngine()->TransposeTransform(LocalAxis, A, Axis);
 
     // Scale x/y so the larger of the two is 1.
     Vector Scaled = LocalAxis;
@@ -1001,9 +991,7 @@ Vector TurnHelper::get_angular_throttle(Matrix const& A, Matrix const& B, float*
 
     // TransformMatrix is engine slot +0x2c.
     Vector WorldThrottle;
-    Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(WorldThrottle),
-                                           reinterpret_cast<const FMatrix&>(A),
-                                           reinterpret_cast<const FVector&>(Scaled));
+    Acquire3DMathEngine()->TransformMatrix(WorldThrottle, A, Scaled);
 
     // pi at DAT_0639d208, 2pi at DAT_0639c9e8, -pi at DAT_0639d2a0.
     float const Pi = 3.14159274f;

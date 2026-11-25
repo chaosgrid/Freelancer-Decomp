@@ -138,7 +138,7 @@ private:
     // FUN_062d5980(Move, Flag) = MoveIdea::SetMode (.text:062cdc6a / 062cdcc9).
     void ReleaseApproachStep(int Flag);
     // FUN_062d5840(Move, &Vector) = MoveIdea::SetPosition.
-    void SetApproachOffset(void const* OffsetVector);
+    void SetApproachOffset(Vector const* OffsetVector);
     // FUN_062d75c0 on Face = FaceIdea::SetBasis: tag 4 and the 9-dword basis copied
     // in from the caller (LaunchBasis). Cases 4/5/6.
     void PushApproachBasisToSubObjectB(void const* SrcVectorBlock);

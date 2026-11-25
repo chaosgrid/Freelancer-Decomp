@@ -63,15 +63,15 @@ namespace
     }
 }
 
-float FCliTractorBeam::GetWorldPos(FVector* Out)
+float FCliTractorBeam::GetWorldPos(Vector* Out)
 {
     FCliTractorBeam* const Self = this;
     // LAB_005133b0: the source position; the radius is the arch's max_length (+0x70).
     CETractor* const Tractor = BeamTractor(Self);
     Vector const Source = Tractor->GetSourcePos();
-    Out->X = Source.x;
-    Out->Y = Source.y;
-    Out->Z = Source.z;
+    Out->x = Source.x;
+    Out->y = Source.y;
+    Out->z = Source.z;
     return Tractor->TractorArch()->MaxLength;
 }
 
@@ -100,10 +100,10 @@ unsigned char FCliTractorBeam::BuildGeometry(FSpaceCamera* Cam)
     Line.Color[2] = Self->Color[2];
     Line.Texture = Self->LineShape->Texture;
     Line.JitterScale = kLineJitterScale;
-    float const* const Eye = AsCamera(Cam)->GetPosition();
-    Line.EyePos[0] = Eye[0];
-    Line.EyePos[1] = Eye[1];
-    Line.EyePos[2] = Eye[2];
+    const Vector* const Eye = AsCamera(Cam)->GetPosition();
+    Line.EyePos[0] = Eye->x;
+    Line.EyePos[1] = Eye->y;
+    Line.EyePos[2] = Eye->z;
     Line.SideScale = 1.0f;
 
     Win3DSetDepthWrite(0);
@@ -206,11 +206,11 @@ unsigned char FCliTractorBeam::BuildGeometry(FSpaceCamera* Cam)
             LookDir.y = ToLoot[1];
             LookDir.z = ToLoot[2];
             Matrix const Look = LookMatrixYup(LookDir);
-            FMatrix LookMatrix;
+            Matrix LookMatrix;
             for (int Row = 0; Row < 3; ++Row)
             {
                 for (int Col = 0; Col < 3; ++Col)
-                    LookMatrix.D[Row][Col] = Look.E[Row][Col];
+                    LookMatrix.E[Row][Col] = Look.E[Row][Col];
             }
 
             // The spark centre, 0.3f back along the beam from the loot; x and y subtract the
@@ -228,20 +228,20 @@ unsigned char FCliTractorBeam::BuildGeometry(FSpaceCamera* Cam)
             {
                 // A direction on the cone about the look axis.
                 double const Theta = RandomScaled(kTwoPi);
-                FVector ConeDir;
-                ConeDir.X = static_cast<float>(cos(Theta) * SinSpread);
-                ConeDir.Y = static_cast<float>(sin(Theta) * SinSpread);
-                ConeDir.Z = CosSpread;
+                Vector ConeDir;
+                ConeDir.x = static_cast<float>(cos(Theta) * SinSpread);
+                ConeDir.y = static_cast<float>(sin(Theta) * SinSpread);
+                ConeDir.z = CosSpread;
 
                 if (G_TractorBeamMath == nullptr)
                     G_TractorBeamMath = Acquire3DMathEngine();
-                FVector Local;
+                Vector Local;
                 G_TractorBeamMath->TransformMatrix(Local, LookMatrix, ConeDir);
 
                 // The arc from the beam end to Centre + Local, bent about Centre.
-                Line.End[0] = Local.X + Centre[0];
-                Line.End[1] = Local.Y + Centre[1];
-                Line.End[2] = Local.Z + Centre[2];
+                Line.End[0] = Local.x + Centre[0];
+                Line.End[1] = Local.y + Centre[1];
+                Line.End[2] = Local.z + Centre[2];
                 Line.Control[0] = Centre[0];
                 Line.Control[1] = Centre[1];
                 Line.Control[2] = Centre[2];

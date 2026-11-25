@@ -27,51 +27,51 @@ FThornMarker::FThornMarker(Csys const& ScriptFrame, FGfScript* InOwner,
 }
 
 // LAB_004537d0.
-GENRESULT DACOM_API FThornMarker::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornMarker::SetTransform(const Transform* Transform12)
 {
-    World.Pos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Transform12 + 9));
-    World.Orient = Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Transform12));
+    World.Pos = Frame.trans_from_frame(Transform12->Translation);
+    World.Orient = Frame.trans_from_frame(Transform12->Rotation);
     return GR_OK;
 }
 
 // LAB_004538b0.
-GENRESULT DACOM_API FThornMarker::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornMarker::GetTransform(Transform* OutTransform12)
 {
     Vector const LocalPos = Frame.trans_to_frame(World.Pos);
-    OutTransform12[9] = LocalPos.x;
-    OutTransform12[10] = LocalPos.y;
-    OutTransform12[11] = LocalPos.z;
+    OutTransform12->Translation.x = LocalPos.x;
+    OutTransform12->Translation.y = LocalPos.y;
+    OutTransform12->Translation.z = LocalPos.z;
     Matrix const LocalOrient = Frame.trans_to_frame(World.Orient);
     memcpy(OutTransform12, &LocalOrient, sizeof(float) * 9);
     return GR_OK;
 }
 
 // LAB_00453750.
-GENRESULT DACOM_API FThornMarker::SetPosition(float* Position)
+GENRESULT DACOM_API FThornMarker::SetPosition(const Vector* Position)
 {
     World.Pos = Frame.trans_from_frame(*reinterpret_cast<Vector const*>(Position));
     return GR_OK;
 }
 
 // LAB_00453790.
-GENRESULT DACOM_API FThornMarker::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornMarker::SetOrientation(const Matrix* Orient9)
 {
     World.Orient = Frame.trans_from_frame(*reinterpret_cast<Matrix const*>(Orient9));
     return GR_OK;
 }
 
 // LAB_00453830.
-GENRESULT DACOM_API FThornMarker::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornMarker::GetPosition(Vector* OutPosition)
 {
     Vector const Local = Frame.trans_to_frame(World.Pos);
-    OutPosition[0] = Local.x;
-    OutPosition[1] = Local.y;
-    OutPosition[2] = Local.z;
+    OutPosition->x = Local.x;
+    OutPosition->y = Local.y;
+    OutPosition->z = Local.z;
     return GR_OK;
 }
 
 // LAB_00453870.
-GENRESULT DACOM_API FThornMarker::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornMarker::GetOrientation(Matrix* OutOrient9)
 {
     Matrix const Local = Frame.trans_to_frame(World.Orient);
     memcpy(OutOrient9, &Local, sizeof(float) * 9);
@@ -79,9 +79,9 @@ GENRESULT DACOM_API FThornMarker::GetOrientation(float* OutOrient9)
 }
 
 // FUN_00450870.
-void* FThornMarker::GetEngineInstance()
+InstanceIndex FThornMarker::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<intptr_t>(-1);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -96,32 +96,32 @@ FThornMarkerReference::FThornMarkerReference(Csys const& ScriptFrame, FGfScript*
 {
 }
 
-GENRESULT DACOM_API FThornMarkerReference::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornMarkerReference::SetTransform(const Transform* Transform12)
 {
     return ThornReferenceSetTransform(Target, Transform12);
 }
 
-GENRESULT DACOM_API FThornMarkerReference::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornMarkerReference::GetTransform(Transform* OutTransform12)
 {
     return ThornReferenceGetTransform(Target, OutTransform12);
 }
 
-GENRESULT DACOM_API FThornMarkerReference::SetPosition(float* Position)
+GENRESULT DACOM_API FThornMarkerReference::SetPosition(const Vector* Position)
 {
     return ThornReferenceSetPosition(Target, Position);
 }
 
-GENRESULT DACOM_API FThornMarkerReference::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornMarkerReference::SetOrientation(const Matrix* Orient9)
 {
     return ThornReferenceSetOrientation(Target, Orient9);
 }
 
-GENRESULT DACOM_API FThornMarkerReference::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornMarkerReference::GetPosition(Vector* OutPosition)
 {
     return ThornReferenceGetPosition(Target, OutPosition);
 }
 
-GENRESULT DACOM_API FThornMarkerReference::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornMarkerReference::GetOrientation(Matrix* OutOrient9)
 {
     return ThornReferenceGetOrientation(Target, OutOrient9);
 }
@@ -133,7 +133,7 @@ void FThornMarkerReference::Stop()
 }
 
 // LAB_00453550.
-void* FThornMarkerReference::GetEngineInstance()
+InstanceIndex FThornMarkerReference::GetEngineInstance()
 {
     return ThornReferenceGetEngineInstance(Target);
 }

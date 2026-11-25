@@ -23,7 +23,7 @@
 #include "Interface/win3d_engine_submit.h"
 
 #include "common_csys.h"        // Acquire3DMathEngine (FUN_005b73e0)
-#include "x86math.h"            // I3DMathEngine, FVector, FMatrix
+#include "x86math.h"            // I3DMathEngine, Vector, Matrix
 #include "Interface/win3d_immediate.h"
 #include "Interface/win3d_renderables.h"
 
@@ -53,7 +53,7 @@ namespace
         FProjectedPoint Point;
         float Depth;
         int const Result = AsCamera(GetWin3DSceneCamera())->Project(
-            &Point.X, &Point.Y, &Depth, Position);
+            &Point.X, &Point.Y, &Depth, (const Vector*)Position);
         if (static_cast<unsigned char>(Result) == 0)
         {
             Point.X = 0.0f;
@@ -141,27 +141,27 @@ void NnToolTipControl::RepositionAfterCaption(FToolTipHoverInfo const* Info)
     FSpaceCamera* const Cam = GetWin3DSceneCamera();
 
     // The viewport's top-left corner on the near plane (FUN_004bdd40).
-    FVector TopLeftLocal;
+    Vector TopLeftLocal;
     Win3DScreenToNearPlane(Cam, TopLeftLocal, static_cast<float>(Cam->Viewport[0]),
                            static_cast<float>(Cam->Viewport[1]));
 
     // Through this file's own engine (DAT_00672448).
-    FMatrix Orientation;
-    memcpy(&Orientation, Cam->World, sizeof(Orientation));
+    Matrix Orientation;
+    memcpy(&Orientation, &Cam->World, sizeof(Orientation));
     if (G_ToolTipMath == nullptr)
         G_ToolTipMath = Acquire3DMathEngine();
-    FVector TopLeft;
+    Vector TopLeft;
     G_ToolTipMath->TransformMatrix(TopLeft, Orientation, TopLeftLocal);
 
     // The bottom-right corner, inlined with the other operation order, then FUN_00423b90.
-    FVector BottomRightLocal;
-    BottomRightLocal.X = static_cast<float>(
+    Vector BottomRightLocal;
+    BottomRightLocal.x = static_cast<float>(
         (static_cast<double>(Cam->Viewport[2]) - Cam->ScreenCenterX) / Cam->XScale * Cam->ZNear);
-    BottomRightLocal.Y = static_cast<float>(
+    BottomRightLocal.y = static_cast<float>(
         (static_cast<double>(Cam->Viewport[3]) - Cam->ScreenCenterY) / Cam->YScale * Cam->ZNear);
-    BottomRightLocal.Z = -Cam->ZNear;
-    memcpy(&Orientation, Cam->World, sizeof(Orientation));
-    FVector BottomRight;
+    BottomRightLocal.z = -Cam->ZNear;
+    memcpy(&Orientation, &Cam->World, sizeof(Orientation));
+    Vector BottomRight;
     Win3DTransformByMatrix(BottomRight, Orientation, BottomRightLocal);
 
     float Ray[3];
@@ -176,10 +176,10 @@ void NnToolTipControl::RepositionAfterCaption(FToolTipHoverInfo const* Info)
     // Only the left edge of the top-left corner and the right / bottom of the bottom-right
     // corner are projected.
     float const BoundLeft =
-        static_cast<float>(static_cast<double>(TopLeft.X) * (-1.0 / static_cast<double>(TopLeft.Z)));
-    double const BoundScale = -1.0 / static_cast<double>(BottomRight.Z);
-    float const BoundRight = static_cast<float>(static_cast<double>(BottomRight.X) * BoundScale);
-    float const BoundVert = static_cast<float>(static_cast<double>(BottomRight.Y) * BoundScale);
+        static_cast<float>(static_cast<double>(TopLeft.x) * (-1.0 / static_cast<double>(TopLeft.z)));
+    double const BoundScale = -1.0 / static_cast<double>(BottomRight.z);
+    float const BoundRight = static_cast<float>(static_cast<double>(BottomRight.x) * BoundScale);
+    float const BoundVert = static_cast<float>(static_cast<double>(BottomRight.y) * BoundScale);
 
     // A live hover anchors at its world box's corner instead. The reciprocal rounded to a float
     // scales Y and Z; X uses the unrounded one.
@@ -195,7 +195,7 @@ void NnToolTipControl::RepositionAfterCaption(FToolTipHoverInfo const* Info)
     }
 
     // The caption's font scale at the CURRENT depth, then its extent.
-    FontStringSetScale(&Text, 0.35f, Position[2]);
+    FontStringSetScale(&Text, 0.35f, Position.z);
     int Extent[2] = {0, 0};
     FontStringGetExtent(&Text, Extent);
 
@@ -242,7 +242,7 @@ void NnToolTipControl::Draw()
     Win3DDisable(kWin3DDepthTest);
     Win3DDisable(kWin3DCullFace);
 
-    FontStringSetScale(&Text, 0.35f, Position[2]);
+    FontStringSetScale(&Text, 0.35f, Position.z);
     Bounds[3] = -Height;
     Bounds[2] = Width;
     Bounds[0] = 0.0f;
@@ -252,7 +252,7 @@ void NnToolTipControl::Draw()
     Width = static_cast<float>(static_cast<unsigned>(Extent[0]));
     Height = static_cast<float>(static_cast<unsigned>(Extent[1]));
 
-    FProjectedPoint const Screen = ProjectUiPoint(Position);
+    FProjectedPoint const Screen = ProjectUiPoint(&Position.x);
     if (bDrawBackground != 0)
     {
         float const PadW = Width + 3.0f;

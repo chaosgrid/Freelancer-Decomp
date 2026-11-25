@@ -53,7 +53,7 @@ public:
     // slot 5 LAB_005896b0 (RET 4)
     void SetPosition(float const* NewPosition) override;
     // slot 7 LAB_00588d00 (RET 4)
-    void SetOrientation(float const* NewOrientation) override;
+    void SetOrientation(Matrix const* NewOrientation) override;
     // slot 9 LAB_00587fc0 (RET 8) -- Data is the INI_Reader positioned on this control's section
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 11 LAB_00588e80

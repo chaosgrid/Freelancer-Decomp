@@ -97,8 +97,8 @@ namespace
 
     void RestoreCamera(FSpaceCamera* Cam)
     {
-        memcpy(Cam->View, G_BaseView, sizeof(G_BaseView));
-        memcpy(Cam->ViewPos, G_BaseViewPos, sizeof(G_BaseViewPos));
+        memcpy(&Cam->View, G_BaseView, sizeof(G_BaseView));
+        memcpy(&Cam->ViewPos, G_BaseViewPos, sizeof(G_BaseViewPos));
         Cam->ScreenCenterX = G_BaseScreenCenterX;
         // Rebuilt from the untouched world transform on the next read, in case the camera
         // moved while it was shifted.
@@ -119,18 +119,18 @@ namespace
         // row 2. A point at depth d = -z moves s*d sideways, which XScale (pixels per unit at
         // depth 1) turns into ShiftPx on screen at every depth.
         Cam->GetViewTransform();
-        memcpy(G_BaseView, Cam->View, sizeof(G_BaseView));
-        memcpy(G_BaseViewPos, Cam->ViewPos, sizeof(G_BaseViewPos));
+        memcpy(G_BaseView, &Cam->View, sizeof(G_BaseView));
+        memcpy(G_BaseViewPos, &Cam->ViewPos, sizeof(G_BaseViewPos));
         G_BaseScreenCenterX = Cam->ScreenCenterX;
 
         double const S = static_cast<double>(ShiftPx) / static_cast<double>(Cam->XScale);
         for (int Column = 0; Column < 3; ++Column)
         {
-            Cam->View[Column] = static_cast<float>(static_cast<double>(Cam->View[Column]) -
-                                                   S * static_cast<double>(Cam->View[6 + Column]));
+            Cam->View.E[0][Column] = static_cast<float>(static_cast<double>(Cam->View.E[0][Column]) -
+                                                        S * static_cast<double>(Cam->View.E[2][Column]));
         }
-        Cam->ViewPos[0] = static_cast<float>(static_cast<double>(Cam->ViewPos[0]) -
-                                             S * static_cast<double>(Cam->ViewPos[2]));
+        Cam->ViewPos.x = static_cast<float>(static_cast<double>(Cam->ViewPos.x) -
+                                             S * static_cast<double>(Cam->ViewPos.z));
         // Project and Unproject go through the world transform and the screen centre.
         Cam->ScreenCenterX = static_cast<float>(static_cast<double>(Cam->ScreenCenterX) + ShiftPx);
     }
@@ -198,19 +198,19 @@ void WidescreenHudCursorRay(float* OutRay3)
     int CursorY = 0;
     GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
     FSpaceCamera* const Cam = Win3DGetCamera();
-    FVector Local;
+    Vector Local;
     Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX), static_cast<float>(CursorY));
-    FMatrix Orientation;
-    memcpy(&Orientation, Cam->World, sizeof(Orientation));
-    FVector World;
+    Matrix Orientation;
+    memcpy(&Orientation, &Cam->World, sizeof(Orientation));
+    Vector World;
     Win3DTransformByMatrix(World, Orientation, Local);
-    double const Length = sqrt(static_cast<double>(World.X) * World.X +
-                               static_cast<double>(World.Y) * World.Y +
-                               static_cast<double>(World.Z) * World.Z);
+    double const Length = sqrt(static_cast<double>(World.x) * World.x +
+                               static_cast<double>(World.y) * World.y +
+                               static_cast<double>(World.z) * World.z);
     double const Inverse = Length > 0.0 ? 1.0 / Length : 0.0;
-    OutRay3[0] = static_cast<float>(World.X * Inverse);
-    OutRay3[1] = static_cast<float>(World.Y * Inverse);
-    OutRay3[2] = static_cast<float>(World.Z * Inverse);
+    OutRay3[0] = static_cast<float>(World.x * Inverse);
+    OutRay3[1] = static_cast<float>(World.y * Inverse);
+    OutRay3[2] = static_cast<float>(World.z * Inverse);
 }
 
 FWidescreenHudShiftScope::FWidescreenHudShiftScope(float ShiftPx, bool bDrawIn)

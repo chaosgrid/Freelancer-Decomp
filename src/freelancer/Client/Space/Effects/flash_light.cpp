@@ -247,7 +247,7 @@ void FFlashLight::DrawShine(ICamera* Camera)
     if (FlareConeOuterCos > FlareConeInnerCos)
     {
         float Dir[3];
-        Win3DVec3Sub(Dir, &Pos.x, Camera->GetPosition());
+        Win3DVec3Sub(Dir, &Pos.x, (const float*)Camera->GetPosition());
         FlashLightNormalizeFast(Dir);
         // The light's third axis; the dot (z + y) + x stays unrounded.
         float const Axis[3] = {Orient.E[0][2], Orient.E[1][2], Orient.E[2][2]};
@@ -273,9 +273,9 @@ void FFlashLight::DrawShine(ICamera* Camera)
     Win3DColor3f(Shade[0], Shade[1], Shade[2]);
 
     // The camera's first two columns (orientation read twice), scaled by GlowSize.
-    float const* View = Camera->GetOrientation();
+    const float* View = (const float*)Camera->GetOrientation();
     float const Right[3] = {View[0], View[3], View[6]};
-    View = Camera->GetOrientation();
+    View = (const float*)Camera->GetOrientation();
     float const Up[3] = {View[1], View[4], View[7]};
     float R[3];
     ScaleVec3(R, Right, GlowSize);
@@ -297,9 +297,9 @@ void FFlashLight::DrawBulb(ICamera* Camera)
     Win3DColor3f(BlendColor.x, BlendColor.y, BlendColor.z);
 
     // The camera's first two columns, scaled by BulbSize.
-    float const* View = Camera->GetOrientation();
+    const float* View = (const float*)Camera->GetOrientation();
     float const Right[3] = {View[0], View[3], View[6]};
-    View = Camera->GetOrientation();
+    View = (const float*)Camera->GetOrientation();
     float const Up[3] = {View[1], View[4], View[7]};
     float R[3];
     ScaleVec3(R, Right, BulbSize);

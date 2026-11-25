@@ -23,16 +23,6 @@ static const unsigned long G_FactoryIidCompareBytes = 0x17; // "1.11_IComponentF
 static const unsigned long G_AggDescSizeThorn = 0x14;
 static const unsigned long G_AggDescSizeMath = 0xC;
 
-typedef FVector FVec3;
-
-struct FQuat
-{
-    float W;
-    float X;
-    float Y;
-    float Z;
-};
-
 // Retail FUN_06f57de0 stack desc: size, name and the outer unknown (+8, FAGGDESC14's
 // OuterUnknown), which Thorn leaves null.
 struct FAggDescC
@@ -114,25 +104,25 @@ private:
 };
 
 // Raw I3DMathEngine* from x86math CreateInstance — do not QI (docs/re/thorn.md).
-// Its ABI is x86math.dll's published one; FQuat above is layout-identical to FQuaternion.
+// Its ABI is x86math.dll's published one.
 
 void ThornFdump(const char* Message);
 bool ThornNameEqual(const char* Left, const char* Right);
 I3DMathEngine* ThornAcquire3DMathEngine();
-GENRESULT ThornQuatMul(I3DMathEngine* Math, FQuat& Dst, const FQuat& A, const FQuat& B);
-GENRESULT ThornQuatSlerp(I3DMathEngine* Math, FQuat& Dst, const FQuat& A, const FQuat& B, float T);
-GENRESULT ThornQuatToMatrix(I3DMathEngine* Math, float* Dst9, const FQuat& Quat);
-GENRESULT ThornMatrixToQuat(I3DMathEngine* Math, FQuat& Dst, const float* Src9);
-GENRESULT ThornMathTransform(I3DMathEngine* Math, float* OutVec3, const float* Xform12,
-                             const float* InVec3);
-GENRESULT ThornMathMulMatrix(I3DMathEngine* Math, float* Out9, const float* Left9,
-                             const float* Right9);
-GENRESULT ThornMathMulTransform(I3DMathEngine* Math, float* Out12, const float* Left12,
-                                const float* Right12);
-GENRESULT ThornMathRotate(I3DMathEngine* Math, float* OutVec3, const float* Xform12,
-                          const float* InVec3);
-GENRESULT ThornMathTransposeTransform(I3DMathEngine* Math, float* OutVec3, const float* Matrix9,
-                                      const float* InVec3);
+GENRESULT ThornQuatMul(I3DMathEngine* Math, Quaternion& Dst, const Quaternion& A, const Quaternion& B);
+GENRESULT ThornQuatSlerp(I3DMathEngine* Math, Quaternion& Dst, const Quaternion& A, const Quaternion& B, float T);
+GENRESULT ThornQuatToMatrix(I3DMathEngine* Math, Matrix* Dst, const Quaternion& Quat);
+GENRESULT ThornMatrixToQuat(I3DMathEngine* Math, Quaternion& Dst, const Matrix* Src);
+GENRESULT ThornMathTransform(I3DMathEngine* Math, Vector* Out, const Transform* Xform,
+                             const Vector* In);
+GENRESULT ThornMathMulMatrix(I3DMathEngine* Math, Matrix* Out, const Matrix* Left,
+                             const Matrix* Right);
+GENRESULT ThornMathMulTransform(I3DMathEngine* Math, Transform* Out, const Transform* Left,
+                                const Transform* Right);
+GENRESULT ThornMathRotate(I3DMathEngine* Math, Vector* Out, const Transform* Xform,
+                          const Vector* In);
+GENRESULT ThornMathTransposeTransform(I3DMathEngine* Math, Vector* Out, const Matrix* Orientation,
+                                      const Vector* In);
 
 IDAComponent* ThornCreateParamCurve(const char* FactoryName, bool bDeadSecondLinear);
 // LAB_06f37400 object construction + aggregation step: the new object's

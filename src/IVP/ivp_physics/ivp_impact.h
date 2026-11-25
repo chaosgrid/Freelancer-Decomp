@@ -86,11 +86,6 @@ static_assert(sizeof(void*) != 4 || sizeof(IVP_Impact_System) == 0x24, "do_impac
 // FUN_06358680: Ipion IVP_Mindist::do_impact. Only caller: FUN_06358cb0.
 void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IVP_Real_Object* ObjB);
 
-// FUN_06358d60 (thiscall on the long-term contact data): Ipion
-// IVP_Impact_Solver_Long_Term::do_impact_long_term. Callers 0635886c, 063592ce.
-void IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(IVP_Impact_Solver_Long_Term* LongTerm, IVP_Core* PushedCores[2],
-                                                     float RescueSpeedVal, IVP_Contact_Point* Cp);
-
 // FUN_06358c00 (ECX is set by every caller but never read). Callers 06358e7d,
 // 06358eb0, 0635948e.
 void IVP_Impact_Solver_Long_Term_Get_Cos_Sin_For_Impact(float FrictionVal, float OrthComp,

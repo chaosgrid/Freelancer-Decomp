@@ -22,27 +22,27 @@
 // Typed math calls preserve the caller's float buffers and their spill boundaries.
 static GENRESULT MathMulMatrix(I3DMathEngine* Math, float* Dst, const float* A, const float* B)
 {
-    return Math->MulMatrix(*(FMatrix*)Dst, *(const FMatrix*)A, *(const FMatrix*)B);
+    return Math->MulMatrix(*(Matrix*)Dst, *(const Matrix*)A, *(const Matrix*)B);
 }
 
 static GENRESULT MathTransformMatrix(I3DMathEngine* Math, float* Dst, const float* A, const float* B)
 {
-    return Math->TransformMatrix(*(FVector*)Dst, *(const FMatrix*)A, *(const FVector*)B);
+    return Math->TransformMatrix(*(Vector*)Dst, *(const Matrix*)A, *(const Vector*)B);
 }
 
 static GENRESULT MathMatrixToQuat(I3DMathEngine* Math, float* Dst, const float* A)
 {
-    return Math->MatrixToQuaternion(*(FQuaternion*)Dst, *(const FMatrix*)A);
+    return Math->MatrixToQuaternion(*(Quaternion*)Dst, *(const Matrix*)A);
 }
 
 GENRESULT MathQuatToMatrix(I3DMathEngine* Math, float* Dst, const float* A)
 {
-    return Math->QuaternionToMatrix(*(FMatrix*)Dst, *(const FQuaternion*)A);
+    return Math->QuaternionToMatrix(*(Matrix*)Dst, *(const Quaternion*)A);
 }
 
 static GENRESULT MathQuatSlerp(I3DMathEngine* Math, float* Dst, const float* A, const float* B, float C)
 {
-    return Math->QuatSlerp(*(FQuaternion*)Dst, *(const FQuaternion*)A, *(const FQuaternion*)B, C);
+    return Math->QuatSlerp(*(Quaternion*)Dst, *(const Quaternion*)A, *(const Quaternion*)B, C);
 }
 static const char* const G_FdumpFmtNotice = "%s(%d) : NOTICE:General:%s";
 static const char* const G_FdumpFmtError = "%s(%d) : ERROR:General:%s";
@@ -216,9 +216,9 @@ unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
             std::memcpy(&Bits, &Block[9], sizeof(Bits));
             return Bits;
         }
-        const float* Orient = G_AnimEngine->GetInstanceOrientation(Instance);
+        const float* Orient = (const float*)G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
         std::memcpy(Matrix, Orient, sizeof(Matrix));
-        float* Position = G_AnimEngine->GetInstancePosition(Instance);
+        const float* Position = (const float*)G_AnimEngine->GetInstancePosition((InstanceIndex)Instance);
         TypedCopyVec3(Delta, Position);
         return (unsigned long)((size_t)Position);
     }
@@ -259,15 +259,15 @@ unsigned long FPosQuatTypedChannel::BindHeader(const FPlayHeader* Header)
         Transposed[6] = QuatMatrix[2];
         Transposed[7] = QuatMatrix[5];
         Transposed[8] = QuatMatrix[8];
-        const float* Orient = G_AnimEngine->GetInstanceOrientation(Instance);
+        const float* Orient = (const float*)G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
         float Composed[9];
         MathMulMatrix(Math, Composed, Orient, Transposed);
         std::memcpy(Matrix, Composed, sizeof(Matrix));
         MathTransformMatrix(Math, Xformed, Matrix, Pos);
-        const float* Position = G_AnimEngine->GetInstancePosition(Instance);
-        Delta[0] = Position[0] - Xformed[0];
-        Delta[1] = Position[1] - Xformed[1];
-        Delta[2] = Position[2] - Xformed[2];
+        const Vector* Position = G_AnimEngine->GetInstancePosition((InstanceIndex)Instance);
+        Delta[0] = Position->x - Xformed[0];
+        Delta[1] = Position->y - Xformed[1];
+        Delta[2] = Position->z - Xformed[2];
     }
     unsigned long Bits = 0;
     std::memcpy(&Bits, &Delta[1], sizeof(Bits));
@@ -316,7 +316,7 @@ static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* 
     if (This->Kind == 0 && G_AnimEngine != nullptr)
     {
         unsigned long* Relative = G_AnimEngine->GetInstanceRelative(
-            (void*)(This->Instance));
+            This->Instance);
         unsigned long MixKind = 0;
         if (Relative != nullptr)
         {
@@ -347,7 +347,7 @@ unsigned long FScalarTypedChannel::BindMap(unsigned long* Map, void* Bind)
     if (bBound != 0)
     {
         unsigned long* Relative = (unsigned long*)(
-            G_AnimEngine->GetInstanceRelative((void*)(Map[3])));
+            G_AnimEngine->GetInstanceRelative(Map[3]));
         if (Relative != nullptr)
             JointType = Relative[0];
     }
@@ -782,8 +782,8 @@ unsigned long FTypedChannel::Tick(float Dt)
                 Frame[10] = Pose->AppliedPos[1];
                 Frame[11] = Pose->AppliedPos[2];
                 I3DMathEngine* Math = Acquire3DMathEngine();
-                Math->QuaternionToMatrix(*(FMatrix*)(&Frame[12]),
-                                         *(const FQuaternion*)(Pose->AppliedQuat));
+                Math->QuaternionToMatrix(*(Matrix*)(&Frame[12]),
+                                         *(const Quaternion*)(Pose->AppliedQuat));
                 std::memcpy(Frame, &Frame[12], 9 * sizeof(float));
                 void* Sink = (void*)((size_t)(this->Sink));
                 if (Sink != nullptr)
@@ -958,9 +958,9 @@ unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right,
         float MatrixQuat[4];
         MathMatrixToQuat(Math, MatrixQuat, Matrix);
         float Composed[4];
-        Math->MulQuat(*(FQuaternion*)Composed,
-                              *(const FQuaternion*)MatrixQuat,
-                              *(const FQuaternion*)(Local + 3));   // +0x18
+        Math->MulQuat(*(Quaternion*)Composed,
+                              *(const Quaternion*)MatrixQuat,
+                              *(const Quaternion*)(Local + 3));   // +0x18
         AppliedQuat[0] = Composed[0];
         AppliedQuat[1] = Composed[1];
         AppliedQuat[2] = Composed[2];
@@ -1290,7 +1290,7 @@ unsigned long FPosQuatTypedChannel::SetOverlayExtra(const float* Orient)
     Quat[2] = Pose[5];
     Quat[3] = Pose[6];
     FEngineInstance* Instance = (FEngineInstance*)((size_t)(this->Instance));
-    const float* InstanceOrient = G_AnimEngine->GetInstanceOrientation(Instance);
+    const float* InstanceOrient = (const float*)G_AnimEngine->GetInstanceOrientation((InstanceIndex)Instance);
     float Transposed[9];                                         // FUN_0661caa0
     Transposed[0] = InstanceOrient[0];
     Transposed[1] = InstanceOrient[3];

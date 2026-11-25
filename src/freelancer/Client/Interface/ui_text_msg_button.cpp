@@ -61,14 +61,14 @@ void UiTextMsgButton::SetPosition(float const* NewPosition)
     // along the control's axes, scaled onto the z = -1 plane and written straight into the
     // WinControl offset +0xa8..+0xb0.
     I3DMathEngine* const Math = UiWidgetMathEngine();
-    FVector Half;
-    Half.X = LocalWidth * 0.5f;
-    Half.Y = LocalHeight * -0.5f;
-    Half.Z = 0.0f;
-    FVector Centre;
-    Math->TransformMatrix(Centre, *reinterpret_cast<FMatrix const*>(Orientation), Half);
-    double const SumX = static_cast<double>(Centre.X) + NewPosition[0];
-    double const SumY = static_cast<double>(Centre.Y) + NewPosition[1];
+    Vector Half;
+    Half.x = LocalWidth * 0.5f;
+    Half.y = LocalHeight * -0.5f;
+    Half.z = 0.0f;
+    Vector Centre;
+    Math->TransformMatrix(Centre, Orientation, Half);
+    double const SumX = static_cast<double>(Centre.x) + NewPosition[0];
+    double const SumY = static_cast<double>(Centre.y) + NewPosition[1];
     double const Scale = -1.0 / NewPosition[2];
     Offset[0] = static_cast<float>(SumX * Scale - NewPosition[0]);
     Offset[1] = static_cast<float>(SumY * Scale - NewPosition[1]);
@@ -76,7 +76,7 @@ void UiTextMsgButton::SetPosition(float const* NewPosition)
     BaseRichTextWin::SetPosition(NewPosition);
 }
 
-void UiTextMsgButton::SetOrientation(float const* NewOrientation)
+void UiTextMsgButton::SetOrientation(Matrix const* NewOrientation)
 {
     // LAB_00599e00 (RET 4): with a style mesh bound, the instance is reset to the identity
     // orientation and updated.
@@ -93,7 +93,7 @@ void UiTextMsgButton::SetOrientation(float const* NewOrientation)
     Identity[6] = 0.0f;
     Identity[7] = 0.0f;
     Identity[8] = 1.0f;
-    DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, Identity);
+    DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, (const Matrix*)Identity);
     DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
 }
 

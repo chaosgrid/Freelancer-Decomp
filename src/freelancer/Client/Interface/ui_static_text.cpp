@@ -50,13 +50,14 @@ bool UiStaticText::Create(Win3D* NewParent, void* Payload)
     return true;
 }
 
-void UiStaticText::SetTransform(float const* Transform)
+void UiStaticText::SetTransform(Transform const* NewXform)
 {
     // LAB_00599b70 (RET 4). Unlike the other UI* widgets, the projection's matrix is the
     // argument block itself, not this+0x3c.
-    SetOrientation(Transform);
-    SetPosition(Transform + 9);
-    UiWidgetProjectExtent(Transform, Transform[11], LocalWidth, LocalHeight, &Width, &Height);
+    SetOrientation(&NewXform->Rotation);
+    SetPosition(&NewXform->Translation.x);
+    UiWidgetProjectExtent(&NewXform->Rotation, NewXform->Translation.z, LocalWidth, LocalHeight,
+                          &Width, &Height);
 }
 
 // DAT_0067db70.

@@ -354,17 +354,17 @@ void GfLightsSelectNearest(FGfLightWrapper* const* List, int Count, float const*
         *InOutCount = MaxCount;
 }
 
-void GfLightsApplyNearest(FGfLightWrapper* const* List, int Count, void* Instance,
+void GfLightsApplyNearest(FGfLightWrapper* const* List, int Count, InstanceIndex Instance,
                           unsigned char Group, ICamera* Camera)
 {
     // FUN_005572b0 (cdecl).
-    float const* Pos = DALib::Engine->GetInstancePosition(Instance);
+    const Vector* Pos = DALib::Engine->GetInstancePosition(Instance);
     // Radius 10000.0f (DAT_005e129c), at most 4 lights, 0x40-entry arrays with the in/out count
     // seeded to 0x40.
     FEngineLight* Lights[0x40];
     float Scores[0x40];
     int Selected = 0x40;
-    float const PosCopy[3] = {Pos[0], Pos[1], Pos[2]};
+    float const PosCopy[3] = {Pos->x, Pos->y, Pos->z};
     GfLightsSelectNearest(List, Count, PosCopy, 10000.0f, Group, 4, Lights, Scores, &Selected);
     // FUN_004102c0.
     EngineLightApplyList(Lights, static_cast<unsigned>(Selected), Camera, nullptr);

@@ -240,8 +240,7 @@ void ObstacleAvoidance::Update(float Dt)
     // DAT_063fca10 is the function's cached math engine.
     I3DMathEngine* const Math = Acquire3DMathEngine();
     Vector ProbeOffset;
-    Math->TransformMatrix((FVector&)(ProbeOffset), (FMatrix const&)(Rotation),
-                          (FVector const&)(ProbeLocal));
+    Math->TransformMatrix(ProbeOffset, Rotation, ProbeLocal);
     Vector const ProbeEnd{ Nose.x + ProbeOffset.x, Nose.y + ProbeOffset.y, Nose.z + ProbeOffset.z };
 
     PhySys::RayHit Hits[8];
@@ -369,18 +368,18 @@ void ObstacleAvoidance::Update(float Dt)
         else
         {
             double const HalfAngle = (1.0 - Dot) * GAvoidTurnGain * 0.5f;
-            FQuaternion Turn;
-            Turn.W = X87CosF(HalfAngle);
+            Quaternion Turn;
+            Turn.w = X87CosF(HalfAngle);
             float const AxisScale = (float)(X87Sin(HalfAngle) / std::sqrt(
                 (double)(Axis.z) * Axis.z + (double)(Axis.y) * Axis.y
                 + (double)(Axis.x) * Axis.x));
-            Turn.X = Axis.x * AxisScale;                 // FUN_06288830
-            Turn.Y = Axis.y * AxisScale;
-            Turn.Z = Axis.z * AxisScale;
-            FMatrix TurnMatrix;
+            Turn.x = Axis.x * AxisScale;                 // FUN_06288830
+            Turn.y = Axis.y * AxisScale;
+            Turn.z = Axis.z * AxisScale;
+            Matrix TurnMatrix;
             Math->QuaternionToMatrix(TurnMatrix, Turn);  // +0x54
-            Math->TransformMatrix((FVector&)(Heading), TurnMatrix,
-                                  (FVector const&)(Forward)); // +0x2c
+            Math->TransformMatrix(Heading, TurnMatrix,
+                                  Forward); // +0x2c
         }
 
         // 1000.0f is DAT_063a0608. Active is left as it is.
@@ -404,8 +403,7 @@ void ObstacleAvoidance::Update(float Dt)
                                 (float)(X87Sin(Angle) * Radius), ConeDepth };
 
         Vector ConeOffset;
-        Math->TransformMatrix((FVector&)(ConeOffset), (FMatrix const&)(Rotation),
-                              (FVector const&)(ConeLocal));
+        Math->TransformMatrix(ConeOffset, Rotation, ConeLocal);
         Vector const ConeEnd{ ConeOffset.x + Nose.x, ConeOffset.y + Nose.y, ConeOffset.z + Nose.z };
         Vector ConeDirection{ ConeEnd.x - Nose.x, ConeEnd.y - Nose.y, ConeEnd.z - Nose.z };
 
@@ -515,18 +513,17 @@ void ObstacleAvoidance::Update(float Dt)
         }
         double const HalfAngle = TurnAngle * 0.5f;
 
-        FQuaternion Turn;
-        Turn.W = X87CosF(HalfAngle);
+        Quaternion Turn;
+        Turn.w = X87CosF(HalfAngle);
         float const AxisScale = (float)(X87Sin(HalfAngle) / std::sqrt(
             (double)(Axis.z) * Axis.z + (double)(Axis.y) * Axis.y
             + (double)(Axis.x) * Axis.x));
-        Turn.X = Axis.x * AxisScale;                     // FUN_06288830
-        Turn.Y = Axis.y * AxisScale;
-        Turn.Z = Axis.z * AxisScale;
-        FMatrix TurnMatrix;
+        Turn.x = Axis.x * AxisScale;                     // FUN_06288830
+        Turn.y = Axis.y * AxisScale;
+        Turn.z = Axis.z * AxisScale;
+        Matrix TurnMatrix;
         Math->QuaternionToMatrix(TurnMatrix, Turn);
-        Math->TransformMatrix((FVector&)(Heading), TurnMatrix,
-                              (FVector const&)(Forward));
+        Math->TransformMatrix(Heading, TurnMatrix, Forward);
     }
     else
     {
@@ -640,18 +637,18 @@ Vector RotateTowardBySlerp(Vector const& From, Vector const& To, float Angle)
     double const AxisLength = std::sqrt(((double)(AxisZ) * AxisZ + AxisX * AxisX) + AxisY * AxisY);
     float const SinOverLength = (float)(X87Sin(HalfAngle) / AxisLength);
 
-    FQuaternion Quat;
-    Quat.W = X87CosF(HalfAngle);
-    Quat.X = (float)(SinOverLength * AxisX);
-    Quat.Y = (float)(SinOverLength * AxisY);
-    Quat.Z = (float)((double)(AxisZ) * SinOverLength);
+    Quaternion Quat;
+    Quat.w = X87CosF(HalfAngle);
+    Quat.x = (float)(SinOverLength * AxisX);
+    Quat.y = (float)(SinOverLength * AxisY);
+    Quat.z = (float)((double)(AxisZ) * SinOverLength);
 
     Matrix RotMatrix;
-    Acquire3DMathEngine()->QuaternionToMatrix((FMatrix&)(RotMatrix), Quat); // +0x54
+    Acquire3DMathEngine()->QuaternionToMatrix(RotMatrix, Quat); // +0x54
     Vector Result;
-    Acquire3DMathEngine()->TransformMatrix((FVector&)(Result),
-                                           (FMatrix const&)(RotMatrix),
-                                           (FVector const&)(From)); // +0x2C
+    Acquire3DMathEngine()->TransformMatrix(Result,
+                                           RotMatrix,
+                                           From); // +0x2C
     return Result;
 }
 
@@ -834,9 +831,7 @@ bool ResolveObstacleCandidateSlot(IObjRW* Candidate, ObstacleAvoidance::Slot& Ou
 
     // The result is never read again (kept as retail).
     Vector WorldCentre;
-    Acquire3DMathEngine()->TransformXform((FVector&)(WorldCentre),
-                                          (FTransform const&)(CandXform),
-                                          (FVector const&)(LocalCentre));
+    Acquire3DMathEngine()->TransformXform(WorldCentre, CandXform, LocalCentre);
 
     // Ey and Ez are rounded to float, Ex stays unrounded.
     double const ExtentX = (double)(Max.x) - Min.x;
@@ -881,14 +876,10 @@ bool ResolveObstacleCandidateSlot(IObjRW* Candidate, ObstacleAvoidance::Slot& Ou
     OutSlot.Timer = (float)(Across * 0.5); // double DAT_0639df88
 
     Vector WorldPoint;
-    Acquire3DMathEngine()->TransformXform((FVector&)(WorldPoint),
-                                          (FTransform const&)(CandXform),
-                                          (FVector const&)(OutSlot.Point));
+    Acquire3DMathEngine()->TransformXform(WorldPoint, CandXform, OutSlot.Point);
     OutSlot.Point = WorldPoint;
     Vector WorldDir;
-    Acquire3DMathEngine()->Rotate((FVector&)(WorldDir),
-                                  (FTransform const&)(CandXform),
-                                  (FVector const&)(OutSlot.Direction));
+    Acquire3DMathEngine()->Rotate(WorldDir, CandXform, OutSlot.Direction);
     OutSlot.Direction = WorldDir;
     return true;
 }
@@ -945,9 +936,7 @@ int PathfindManager::ClassifyObstaclePhase()
         This->bBlendEnabled = true;
         Vector const LocalAhead{ 0.0f, 0.0f, -2000.0f };
         Vector Ahead;
-        Acquire3DMathEngine()->TransformXform((FVector&)(Ahead),
-                                              (FTransform const&)(*ShipXform),
-                                              (FVector const&)(LocalAhead));
+        Acquire3DMathEngine()->TransformXform(Ahead, *ShipXform, LocalAhead);
         WorkingTarget = Ahead;
     }
     else
@@ -1267,24 +1256,22 @@ void PathfindManager::UpdateHeadingBlend(float Dt)
 
                 double const HalfAngle = std::acos((double)(DotF)) *
                                          (((double)(4.0f) - LocalTimer) * 0.25f) * 0.5f;
-                FQuaternion Quat;
-                Quat.W = X87CosF(HalfAngle);
+                Quaternion Quat;
+                Quat.w = X87CosF(HalfAngle);
 
                 // FUN_06288830 scales Axis by K (one float product per component).
                 double const AxisLength = std::sqrt(((double)(Axis.z) * Axis.z +
                                                      (double)(Axis.x) * Axis.x) +
                                                     (double)(Axis.y) * Axis.y);
                 float const K = (float)(X87Sin(HalfAngle) / AxisLength);
-                Quat.X = Axis.x * K;
-                Quat.Y = Axis.y * K;
-                Quat.Z = Axis.z * K;
+                Quat.x = Axis.x * K;
+                Quat.y = Axis.y * K;
+                Quat.z = Axis.z * K;
 
                 // The engine (DAT_063fc994) is created lazily with no null test.
                 Matrix RotMatrix;
-                Acquire3DMathEngine()->QuaternionToMatrix((FMatrix&)(RotMatrix), Quat);
-                Acquire3DMathEngine()->TransformMatrix((FVector&)(NewHeading),
-                                                       (FMatrix const&)(RotMatrix),
-                                                       (FVector const&)(BlendStart));
+                Acquire3DMathEngine()->QuaternionToMatrix(RotMatrix, Quat);
+                Acquire3DMathEngine()->TransformMatrix(NewHeading, RotMatrix, BlendStart);
             }
 
             Reaction.LastObstacleTag = 0;

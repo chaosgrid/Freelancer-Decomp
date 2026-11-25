@@ -92,46 +92,46 @@ void FThornCamera::Register(FRoomCamera* Camera, int Priority, unsigned char bCa
 }
 
 // LAB_00450940. The position first, then the rotation.
-GENRESULT DACOM_API FThornCamera::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornCamera::SetTransform(const Transform* Transform12)
 {
-    StorePoolPosition(Frame, PoolSlot, Transform12 + 9);
-    StorePoolOrientation(Frame, PoolSlot, Transform12);
+    StorePoolPosition(Frame, PoolSlot, &Transform12->Translation.x);
+    StorePoolOrientation(Frame, PoolSlot, &Transform12->Rotation.E[0][0]);
     return GR_OK;
 }
 
 // LAB_00450aa0.
-GENRESULT DACOM_API FThornCamera::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornCamera::GetTransform(Transform* OutTransform12)
 {
-    LoadPoolPosition(Frame, PoolSlot, OutTransform12 + 9);
-    LoadPoolOrientation(Frame, PoolSlot, OutTransform12);
+    LoadPoolPosition(Frame, PoolSlot, &OutTransform12->Translation.x);
+    LoadPoolOrientation(Frame, PoolSlot, &OutTransform12->Rotation.E[0][0]);
     return GR_OK;
 }
 
 // LAB_00450880.
-GENRESULT DACOM_API FThornCamera::SetPosition(float* Position)
+GENRESULT DACOM_API FThornCamera::SetPosition(const Vector* Position)
 {
-    StorePoolPosition(Frame, PoolSlot, Position);
+    StorePoolPosition(Frame, PoolSlot, &Position->x);
     return GR_OK;
 }
 
 // LAB_004508e0.
-GENRESULT DACOM_API FThornCamera::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornCamera::SetOrientation(const Matrix* Orient9)
 {
-    StorePoolOrientation(Frame, PoolSlot, Orient9);
+    StorePoolOrientation(Frame, PoolSlot, &Orient9->E[0][0]);
     return GR_OK;
 }
 
 // LAB_004509f0.
-GENRESULT DACOM_API FThornCamera::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornCamera::GetPosition(Vector* OutPosition)
 {
-    LoadPoolPosition(Frame, PoolSlot, OutPosition);
+    LoadPoolPosition(Frame, PoolSlot, &OutPosition->x);
     return GR_OK;
 }
 
 // LAB_00450a50.
-GENRESULT DACOM_API FThornCamera::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornCamera::GetOrientation(Matrix* OutOrient9)
 {
-    LoadPoolOrientation(Frame, PoolSlot, OutOrient9);
+    LoadPoolOrientation(Frame, PoolSlot, &OutOrient9->E[0][0]);
     return GR_OK;
 }
 
@@ -197,9 +197,9 @@ void FThornCamera::Stop()
 }
 
 // FUN_00450870 (ICF-folded with every "-1" getter of the exe).
-void* FThornCamera::GetEngineInstance()
+InstanceIndex FThornCamera::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<intptr_t>(-1);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -216,7 +216,7 @@ FThornCameraReference::FThornCameraReference(Csys const& ScriptFrame, FGfScript*
 }
 
 // LAB_00450dc0.
-GENRESULT DACOM_API FThornCameraReference::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornCameraReference::SetTransform(const Transform* Transform12)
 {
     if (Target == nullptr)
         return ReportInvalidReference(Name, 0x226);
@@ -224,7 +224,7 @@ GENRESULT DACOM_API FThornCameraReference::SetTransform(float const* Transform12
 }
 
 // LAB_00450ea0.
-GENRESULT DACOM_API FThornCameraReference::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornCameraReference::GetTransform(Transform* OutTransform12)
 {
     if (Target == nullptr)
         return ReportInvalidReference(Name, 0x24d);
@@ -232,7 +232,7 @@ GENRESULT DACOM_API FThornCameraReference::GetTransform(float* OutTransform12)
 }
 
 // LAB_00450d20.
-GENRESULT DACOM_API FThornCameraReference::SetPosition(float* Position)
+GENRESULT DACOM_API FThornCameraReference::SetPosition(const Vector* Position)
 {
     if (Target == nullptr)
         return ReportInvalidReference(Name, 0x20c);
@@ -240,7 +240,7 @@ GENRESULT DACOM_API FThornCameraReference::SetPosition(float* Position)
 }
 
 // LAB_00450d70.
-GENRESULT DACOM_API FThornCameraReference::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornCameraReference::SetOrientation(const Matrix* Orient9)
 {
     if (Target == nullptr)
         return ReportInvalidReference(Name, 0x219);
@@ -248,7 +248,7 @@ GENRESULT DACOM_API FThornCameraReference::SetOrientation(float* Orient9)
 }
 
 // LAB_00450e00.
-GENRESULT DACOM_API FThornCameraReference::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornCameraReference::GetPosition(Vector* OutPosition)
 {
     if (Target == nullptr)
         return ReportInvalidReference(Name, 0x233);
@@ -256,7 +256,7 @@ GENRESULT DACOM_API FThornCameraReference::GetPosition(float* OutPosition)
 }
 
 // LAB_00450e50.
-GENRESULT DACOM_API FThornCameraReference::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornCameraReference::GetOrientation(Matrix* OutOrient9)
 {
     if (Target == nullptr)
         return ReportInvalidReference(Name, 0x240);
@@ -318,12 +318,12 @@ void FThornCameraReference::Stop()
 }
 
 // LAB_00450ce0.
-void* FThornCameraReference::GetEngineInstance()
+InstanceIndex FThornCameraReference::GetEngineInstance()
 {
     if (Target == nullptr)
     {
         ReportInvalidReference(Name, 0x1ff);
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+        return static_cast<intptr_t>(-1);
     }
     return Target->GetEngineInstance();
 }

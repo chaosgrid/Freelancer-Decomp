@@ -17,6 +17,8 @@
 
 class IVP_Environment;
 struct IVP_Friction_Info_For_Core; // declared in full next to IVP_ListManager below
+struct IVP_Contact_Point;
+struct IVP_Cache_Ledge_Point; // ivp_mindist_minimize.h
 
 // Synapse status (IVP_Synapse_Real::status, +0x1a): which feature of the
 // object the synapse currently tracks. Polygon synapses start at 0 and ball
@@ -136,11 +138,11 @@ public:
     Vector             SolverContactPointWS; // +0x20..0x2B
     uint8_t            _pad2c[0x04];       // +0x2C..0x2F: unconfirmed
     IVP_Real_Object*   Objects[2];         // +0x30: copied from the contact point's Object1/Object2 (FUN_06358c50)
-    // +0x38..0x47: filled by FUN_06358c50 / FUN_06358bb0 (IVP_PopulatePairRecordIntoOwner,
+    // +0x38..0x47: filled by FUN_06358c50 / FUN_06358bb0 (IVP_Contact_Point::PopulateOwner,
     // ivp_mindist_limiter.cpp).
-    void*              Feature0;           // +0x38: tagged IVP_Compact_Edge* copy of Candidate->Feature1; mask
+    IVP_Compact_Edge*  Feature0;           // +0x38: tagged IVP_Compact_Edge* copy of Candidate->Feature1; mask
                                             // `&0xfffffff0` before use, as for IVP_Synapse_Real::edge.
-    void*              Feature1;           // +0x3c: mirror of Feature0, Candidate->Feature2.
+    IVP_Compact_Edge*  Feature1;           // +0x3c: mirror of Feature0, Candidate->Feature2.
     IVP_Material*      Materials[2];       // +0x40, +0x44: per-side FUN_06358bb0 output (the object's material,
                                             // or the manager's get_material_by_index for a tagged feature).
     // +0x48 / +0x4C: per-core kinetic energy deltas across the impact system
@@ -196,6 +198,10 @@ public:
     // in that side's object space (FUN_0635a1e0); zeroed for a kinematic side.
     // Ends exactly at the 0xD8 allocation size.
     IVP_Mindist_PadVec CoordOSCrossNormal[2]; // +0xB8 / +0xC8
+
+    // FUN_06358d60 (thiscall on the long-term contact data): Ipion
+    // IVP_Impact_Solver_Long_Term::do_impact_long_term. Callers 0635886c, 063592ce.
+    void DoImpactLongTerm(IVP_Core* PushedCores[2], float RescueSpeedVal, IVP_Contact_Point* Cp);
 };
 static_assert(sizeof(IVP_Impact_Solver_Long_Term) >= 0xD8, "IVP_Impact_Solver_Long_Term covers retail's 0xd8-byte allocation (FUN_0635a1e0)");
 static_assert(offsetof(IVP_Impact_Solver_Long_Term, SolverContactPointWS) == 0x20, "IVP_Impact_Solver_Long_Term+0x20");
@@ -321,6 +327,11 @@ public:
     // FUN_06358070: commits both cores immediately, or defers the winning
     // (larger effective-mass) core's update to the main simulation step.
     void FinalizeImpact(IVP_Core* CoresOut[2]);
+
+    // FUN_06359380 (thiscall on the IVP_Impact_Solver, RET 4): the second
+    // friction axis of an anisotropic material -- FrictionReferenceAxis (+0xdc),
+    // ConeBlendScale (+0xd8) and UseFrictionConeBlend (+0xd4).
+    void CalcSecondFriction(IVP_Contact_Point* Cp);
 };
 static_assert(sizeof(IVP_Impact_Solver) == 0x110, "IVP_Impact_Solver size must be 0x110 (272 bytes), per the class's own top-of-file comment");
 static_assert(offsetof(IVP_Impact_Solver, EffectiveMass0) == 0x04, "IVP_Impact_Solver+0x04");
@@ -362,7 +373,7 @@ static_assert(offsetof(IVP_Impact_Solver, FrictionVectorWS) == 0x10C, "IVP_Impac
 // covers the whole recursive tree. FUN_0634e0b0 (create_exact_mindists) is
 // IVP_Create_Exact_Mindists in ivp_collision/ivp_mindist_create.h.
 //
-// FUN_06356bc0 (IVP_Try_To_Generate_Managed_Friction) reads the mindist only
+// FUN_06356bc0 (IVP_Ledge_Mindist::try_to_generate_managed_friction) reads the mindist only
 // until it calls the find-or-create FUN_0635a950; from there on it works on
 // the returned contact point (IVP_Contact_Point below), not on the mindist.
 
@@ -394,7 +405,7 @@ struct IVP_Contact_Point
     // +0x16: low byte = side 1's synapse status (shape type) at construction,
     // read as a signed byte; the high byte is kept.
     uint16_t Status1;                // +0x16
-    void* Feature1;                  // +0x18: tagged IVP_Compact_Edge* copy (side 1's synapse edge)
+    IVP_Compact_Edge* Feature1;      // +0x18: tagged IVP_Compact_Edge* copy (side 1's synapse edge)
 
     // Node #2: mirror of node #1 for Object2.
     void* Next2; // +0x1C
@@ -402,7 +413,7 @@ struct IVP_Contact_Point
     IVP_Real_Object* Object2;       // +0x24
     int16_t Delta2;                  // +0x28: self-relative link (always -0x1c)
     uint16_t Status2;                 // +0x2A: mirror of Status1
-    void* Feature2;                   // +0x2C: mirror of Feature1, other side
+    IVP_Compact_Edge* Feature2;       // +0x2C: mirror of Feature1, other side
 
     // +0x30: 1 / reduced effective mass of the two cores (FUN_063562d0, via
     // IVP_Core::calc_conservative_effective_mass).
@@ -487,6 +498,41 @@ struct IVP_Contact_Point
     // timestamp and renormalize the offset into [0, 1]. Caller:
     // IVP_ListManager::reset_time.
     void ShiftTimeStamp(float DeltaBase, float DeltaOffset);
+
+    // FUN_06355200. IVP_Contact_Point's destructor body: releases both ledges
+    // through the surface managers, fires the friction-deleted events and unlinks
+    // the record from both objects' mindist_list.
+    void UnlinkFromObjects();
+
+    // FUN_0635a1e0: the contact-frame dispatcher of one dist (ivp_mindist_limiter.cpp).
+    void UpdateContactFrame();
+
+    // FUN_063562d0. Record->MassFactor = reciprocal two-body reduced mass of
+    // the two cores (only the other side's effective mass when one core is
+    // kinematic); SolverMode = 1 when either material has
+    // SecondFrictionXEnabled (+0x08). Implemented in ivp_mindist_limiter.cpp.
+    void ComputeMassFactor();
+    // FUN_06358bb0 (RET 4): per side, the object's material or, for a tagged
+    // feature, the material manager's (ivp_mindist_limiter.cpp).
+    void ResolveSideMaterials(IVP_Material** OutArray);
+
+    // FUN_06358c50 (RET 4): read_materials_for_contact_situation -- fills Owner's
+    // objects/features/materials/elasticity and this contact point's friction
+    // factor (ivp_mindist_limiter.cpp).
+    void PopulateOwner(IVP_Impact_Solver_Long_Term* Owner);
+
+    // FUN_06359560 (thiscall on the contact point, RET 4): Ipion
+    // IVP_Contact_Point::get_rescue_speed_impact. Returned on the x87 stack
+    // (double here); both callers store it as a float at once.
+    double GetRescueSpeedImpact(IVP_Environment* Env);
+
+    // FUN_063595c0 (thiscall on the contact point, no arguments): marks the
+    // long-term data processed and recomputes its impact priority (+0x5c).
+    void CalcImpactPriority();
+    void CalcFrictionEdgeEdge(const IVP_Compact_Edge* K, const IVP_Compact_Edge* L,
+                              const IVP_Cache_Ledge_Point* CacheK,
+                              const IVP_Cache_Ledge_Point* CacheL,
+                              IVP_Impact_Solver_Long_Term* LongTerm, Vector* OutScratch);
 };
 #pragma pack(pop)
 static_assert(sizeof(IVP_Contact_Point) == 0x74, "retail operator_new(0x74), FUN_0635a950/FUN_063539d0");
@@ -572,7 +618,7 @@ struct IVP_ListManager_CorePairEntry
     // restamps it.
     IVP_Time LastImpactTime = { -1000.0f, 0.0f }; // +0x1c / +0x20
     // +0x24: the per-pair energy budget (a float): scaled by
-    // Environment->integrated_energy_damp per tick (IVP_ListManager_TickCorePairBudget),
+    // Environment->integrated_energy_damp per tick (IVP_ListManager_CorePairEntry::TickBudget),
     // grown by RecalcAllContactPoints.
     float IntegratedAntiEnergy = 0.0f;
 
@@ -583,6 +629,25 @@ struct IVP_ListManager_CorePairEntry
 
     // FUN_06356240: the initialisers above and nothing else.
     IVP_ListManager_CorePairEntry() {}
+
+    // FUN_06355c10, thiscall on Entry with Manager on the stack (the caller
+    // passes its own [EDI+0x20]). For each attached record: FUN_0635a1e0, then
+    // IVP_Contact_Point::PopulateOwner; a record whose Owner's packed state is
+    // 0x100 under mask 0x300 is removed (FUN_06355490) and not counted. Returns
+    // the live count. Implemented in ivp_mindist_limiter.cpp.
+    int RefreshAttachedCtxAndCountLive(IVP_ListManager* Manager);
+
+    // FUN_06355cc0. Scales Entry->IntegratedAntiEnergy by Environment->integrated_energy_damp; while the
+    // result is non-negative and neither core has an AxisLock (+0x10), spends
+    // some through IVP_ListManager_CorePairEntry::ComputeAndApplyContactAxisImpulse, adds the amount spent
+    // to the float at IVP_Environment+0x68 and subtracts it from the budget.
+    void TickBudget();
+
+    // FUN_063561c0, thiscall on Entry (reads Entry->CoreA/CoreB, +0x28/+0x2c).
+    // Builds the scratch, clamps Budget to EnergySum * 0.1f (DAT_063a5464) and,
+    // unless EnergySum < 1e-10f (DAT_063a53d8), applies Budget/EnergySum.
+    // Returns the amount spent.
+    float ComputeAndApplyContactAxisImpulse(float Budget);
 };
 #pragma pack(pop)
 static_assert(sizeof(IVP_ListManager_CorePairEntry) == 0x30, "retail operator_new(0x30), FUN_0634b900/FUN_06356240");
@@ -810,6 +875,34 @@ public:
     // FUN_063691b0: sum of Mass * 9.81f * 0.1f over the RegisteredCores whose
     // Flags & 0xc is clear.
     double MaxEnergyGain() const;
+
+    // FUN_063557e0. Union-find connectivity check over Manager->RegisteredCores
+    // via Manager->CorePairEntries. Returns a core whose master differs from the
+    // reference master, or nullptr if all registered cores are one component.
+    IVP_Core* FindDisconnectedCore();
+
+    // FUN_06355890. Moves every core whose master is TargetMaster (and any
+    // further disconnected group left behind) out of Manager into new
+    // IVP_ListManagers (ctor FUN_0634b600); an underfull manager is deleted.
+    void SplitOffCoreGroup(IVP_Core* TargetMaster);
+
+    // FUN_06355c80. IVP_ListManager_CorePairEntry::TickBudget on every entry.
+    void TickAllCorePairBudgets();
+
+    // FUN_06355ca0. Clears CorePairEntry+0x24 (IntegratedAntiEnergy, the budget) on every entry.
+    void ClearAllCorePairBudgets();
+
+    // FUN_06354c10: per-PSI Coulomb friction-cone clamp over every core pair of
+    // the system, then the per-dist reaction kernel.
+    void ClampFrictionCone(const IVP_Event_Sim* EventSim);
+
+    // FUN_063551c0: age each pair's merge countdown by one PSI; at zero, re-merge
+    // its redundant dists (FUN_06355050) and reset the countdown to 5.
+    void AgeAndRemergeContactSets();
+
+    // FUN_06355590: the two steps above,
+    // run back to back once per PSI.
+    void StepFrictionSolver(const IVP_Event_Sim* EventSim);
 };
 #pragma pack(pop)
 static_assert(sizeof(IVP_ListManager) == 0x4c, "retail operator new(0x4c), FUN_06356bc0 (ctor FUN_0634b600)");
@@ -983,11 +1076,26 @@ public:
 
     // FUN_0634fe60 (slot 0): runs DispatchNarrowPhaseSolve(), then (unless
     // the kind bits 0xc000 are set) either defers via FUN_0634f320
-    // (IVP_RescheduleCollisionEvent) when StateFlags' low nibble is set, or
+    // (IVP_Ledge_Mindist::RescheduleCollisionEvent) when StateFlags' low nibble is set, or
     // compares SeparationGap against a per-shape-pair threshold
     // (DAT_0658aa18[idx] + DAT_0658ab34) to choose between do_impact and the
     // same deferral with another event mode. See ivp_mindist_limiter.cpp.
     void UpdatePerTick();
+
+    // FUN_06356bc0 (thiscall on the dist, RET 0x10): Ipion's
+    // IVP_Mindist::try_to_generate_managed_friction. Finds or creates the dist's
+    // contact point; a new one is announced to the listeners, put into a friction
+    // system (found on either core, merged, or created) and the two cores' sim
+    // units are fused. *OutFrictionSystem gets the system, *OutHavingNew 1 for a
+    // new contact point. SimUnitNotDestroy is the sim unit that survives the
+    // fusion; bCallRecalcSvals re-runs the contact frame and the materials.
+    IVP_Contact_Point* try_to_generate_managed_friction(IVP_ListManager** OutFrictionSystem,
+                                                        int32_t* OutHavingNew,
+                                                        IVP_Simulation_Unit* SimUnitNotDestroy,
+                                                        int32_t bCallRecalcSvals);
+
+    // Defined in ivp_mindist_limiter.cpp.
+    void RescheduleCollisionEvent(int32_t RearmWhenFar, int32_t EventMode);
 };
 #pragma pack(pop)
 static_assert(offsetof(IVP_Ledge_Mindist, LastDispatchTick) == 0x70, "IVP_Ledge_Mindist+0x70 (0634dd10 :0634dd1f)");

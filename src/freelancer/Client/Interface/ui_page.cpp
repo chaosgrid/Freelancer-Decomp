@@ -47,35 +47,35 @@ I3DMathEngine* UiWidgetMathEngine()
     return G_UiWidgetMathEngine;
 }
 
-void UiWidgetProjectExtent(float const Matrix[9], float Z, float Width, float Height,
+void UiWidgetProjectExtent(Matrix const* Mat, float Z, float Width, float Height,
                            float* OutWidth, float* OutHeight)
 {
-    FMatrix const& M = *reinterpret_cast<FMatrix const*>(Matrix);
+    Matrix const& M = *Mat;
 
-    FVector Source;
-    FVector WidthPoint;
-    FVector Origin;
+    Vector Source;
+    Vector WidthPoint;
+    Vector Origin;
 
-    Source.X = Width;
-    Source.Y = 0.0f;
-    Source.Z = Z;
+    Source.x = Width;
+    Source.y = 0.0f;
+    Source.z = Z;
     UiWidgetMathEngine()->TransformMatrix(WidthPoint, M, Source);
-    Source.X = 0.0f;
-    Source.Y = 0.0f;
-    Source.Z = Z;
+    Source.x = 0.0f;
+    Source.y = 0.0f;
+    Source.z = Z;
     UiWidgetMathEngine()->TransformMatrix(Origin, M, Source);
-    *OutWidth = fabsf(WidthPoint.X - Origin.X);
+    *OutWidth = fabsf(WidthPoint.x - Origin.x);
 
-    FVector HeightPoint;
-    Source.X = 0.0f;
-    Source.Y = Height;
-    Source.Z = Z;
+    Vector HeightPoint;
+    Source.x = 0.0f;
+    Source.y = Height;
+    Source.z = Z;
     UiWidgetMathEngine()->TransformMatrix(HeightPoint, M, Source);
-    Source.X = 0.0f;
-    Source.Y = 0.0f;
-    Source.Z = Z;
+    Source.x = 0.0f;
+    Source.y = 0.0f;
+    Source.z = Z;
     UiWidgetMathEngine()->TransformMatrix(Origin, M, Source);
-    *OutHeight = fabsf(HeightPoint.Y - Origin.Y);
+    *OutHeight = fabsf(HeightPoint.y - Origin.y);
 }
 
 namespace UIPage
@@ -148,7 +148,7 @@ namespace UIPage
     }
 
     bool Page::Instantiate(FUiWidgetEntry** Entries, Win3D* Parent,
-                           FTransform const* Matrix)
+                           Transform const* Mat)
     {
         // FUN_005916b0 (thiscall, RET 0xc).
         bool bResult = true;
@@ -165,29 +165,29 @@ namespace UIPage
                 return false;
 
             // Local = identity rotation, translation (Left, Top, 0).
-            FTransform Local;
-            Local.Rotation.D[0][0] = 1.0f;
-            Local.Rotation.D[0][1] = 0.0f;
-            Local.Rotation.D[0][2] = 0.0f;
-            Local.Rotation.D[1][0] = 0.0f;
-            Local.Rotation.D[1][1] = 1.0f;
-            Local.Rotation.D[1][2] = 0.0f;
-            Local.Rotation.D[2][0] = 0.0f;
-            Local.Rotation.D[2][1] = 0.0f;
-            Local.Rotation.D[2][2] = 1.0f;
-            Local.Translation.X = Entry->Left;
-            Local.Translation.Y = Entry->Top;
-            Local.Translation.Z = 0.0f;
+            Transform Local;
+            Local.Rotation.E[0][0] = 1.0f;
+            Local.Rotation.E[0][1] = 0.0f;
+            Local.Rotation.E[0][2] = 0.0f;
+            Local.Rotation.E[1][0] = 0.0f;
+            Local.Rotation.E[1][1] = 1.0f;
+            Local.Rotation.E[1][2] = 0.0f;
+            Local.Rotation.E[2][0] = 0.0f;
+            Local.Rotation.E[2][1] = 0.0f;
+            Local.Rotation.E[2][2] = 1.0f;
+            Local.Translation.x = Entry->Left;
+            Local.Translation.y = Entry->Top;
+            Local.Translation.z = 0.0f;
 
             if (G_UiPageMathEngine == nullptr)
                 G_UiPageMathEngine = Acquire3DMathEngine();
 
-            FTransform Placed;
-            G_UiPageMathEngine->MulTransform(Placed, *Matrix, Local);
+            Transform Placed;
+            G_UiPageMathEngine->MulTransform(Placed, *Mat, Local);
 
             // SetTransform gets a copy, as retail.
-            FTransform PlacedCopy = Placed;
-            Widget->SetTransform(reinterpret_cast<float const*>(&PlacedCopy));
+            Transform PlacedCopy = Placed;
+            Widget->SetTransform(&PlacedCopy);
 
             // A duplicate name overwrites the earlier entry's pointer.
             std::pair<std::map<std::string, Win3D*>::iterator, bool> Inserted =
@@ -196,12 +196,12 @@ namespace UIPage
             Inserted.first->second = Widget;
 
             // The recursion result overwrites the running result every iteration.
-            bResult = Instantiate(Entry->NestedChildren, Widget, Matrix);
+            bResult = Instantiate(Entry->NestedChildren, Widget, Mat);
         }
         return bResult;
     }
 
-    Page* CreatePage(FUiPageData* Data, FTransform const* Matrix, Win3D* Parent)
+    Page* CreatePage(FUiPageData* Data, Transform const* Mat, Win3D* Parent)
     {
         // FUN_00594590.
         Page* NewPage = new Page();
@@ -216,7 +216,7 @@ namespace UIPage
         NewPage->Widgets.clear();
 
         NewPage->Aspect = Data->Aspect;
-        if (!NewPage->Instantiate(Data->Entries, Parent, Matrix))
+        if (!NewPage->Instantiate(Data->Entries, Parent, Mat))
         {
             delete NewPage;
             return nullptr;
@@ -261,28 +261,28 @@ namespace UIPage
         // The Win3D camera (DAT_0067dbf8).
         ICamera* Camera = AsCamera(GetWin3DSceneCamera());
         float TopLeft[3];
-        Camera->Unproject(TopLeft, 0.0f, 0.0f);
+        Camera->Unproject((Vector*)TopLeft, 0.0f, 0.0f);
         float BottomRight[3];
         // The created surface size (DAT_00610850 / DAT_00610854).
-        Camera->Unproject(BottomRight,
+        Camera->Unproject((Vector*)BottomRight,
                           static_cast<float>(static_cast<int>(G_RenderSurfaceWidth)),
                           static_cast<float>(static_cast<int>(G_RenderSurfaceHeight)));
 
         float const Height = TopLeft[1] - BottomRight[1];
 
-        FTransform Frame;
-        Frame.Rotation.D[0][0] = Height;
-        Frame.Rotation.D[0][1] = 0.0f;
-        Frame.Rotation.D[0][2] = 0.0f;
-        Frame.Rotation.D[1][0] = 0.0f;
-        Frame.Rotation.D[1][1] = Height;
-        Frame.Rotation.D[1][2] = 0.0f;
-        Frame.Rotation.D[2][0] = 0.0f;
-        Frame.Rotation.D[2][1] = 0.0f;
-        Frame.Rotation.D[2][2] = 1.0f;
-        Frame.Translation.X = 0.0f;
-        Frame.Translation.Y = 0.0f;
-        Frame.Translation.Z = FloatFromBits(kMasterWinDepthBiasBits) + TopLeft[2];
+        Transform Frame;
+        Frame.Rotation.E[0][0] = Height;
+        Frame.Rotation.E[0][1] = 0.0f;
+        Frame.Rotation.E[0][2] = 0.0f;
+        Frame.Rotation.E[1][0] = 0.0f;
+        Frame.Rotation.E[1][1] = Height;
+        Frame.Rotation.E[1][2] = 0.0f;
+        Frame.Rotation.E[2][0] = 0.0f;
+        Frame.Rotation.E[2][1] = 0.0f;
+        Frame.Rotation.E[2][2] = 1.0f;
+        Frame.Translation.x = 0.0f;
+        Frame.Translation.y = 0.0f;
+        Frame.Translation.z = FloatFromBits(kMasterWinDepthBiasBits) + TopLeft[2];
 
         PageObject = CreatePage(PageData, &Frame, this);
         return PageObject != nullptr;

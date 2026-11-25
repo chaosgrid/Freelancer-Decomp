@@ -580,7 +580,7 @@ namespace AlchemyImpl
         }
 
         // +0x2C LAB_06243a60.
-        void DACOM_API Evaluate(unsigned long TimeA, unsigned long TimeB, float* Out12) override;
+        void DACOM_API Evaluate(unsigned long TimeA, unsigned long TimeB, Transform* Out) override;
 
         // +0x30 LAB_06243690: returns 0, no side effect.
         GENRESULT DACOM_API Slot0x30(unsigned long /*Arg*/) override { return GR_OK; }

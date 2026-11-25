@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "math3d.h"
+
 // Retail `E:\FL\Scratch\Source\Client\cmn\OpenGL.cpp` -- an OpenGL immediate-mode emulator
 // sitting on top of the D3D8-shaped IRenderPipeline. The source file names itself in the
 // binary twice, in the glVertex overflow warning and in glEnd's invalid-mode warning.
@@ -222,7 +224,7 @@ void Win3DDrawSphereGrid(const float* Points, int Cols, int Rows);
 // FUN_00423180 (cdecl) -- a wireframe sphere: the points into the static 0x3000-byte buffer
 // DAT_006649c8, the modelview from Camera and Xform, then Win3DDrawSphereGrid. Caller:
 // HUD_Target's target view (16 x 16).
-void Win3DDrawWireSphere(void* Camera, float const* Xform12, float Radius, int Cols, int Rows);
+void Win3DDrawWireSphere(void* Camera, Transform const* Xform, float Radius, int Cols, int Rows);
 
 // FUN_00423b30 / FUN_00423b60 (cdecl Out, A, B): Out = A + B / Out = A - B, each component
 // rounded to float. Out may alias an input (all loads precede the stores).

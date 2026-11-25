@@ -357,6 +357,7 @@
     <ClInclude Include="..\IVP\ivp_utility\ivp_random.h" />
     <ClInclude Include="..\IVP\ivp_utility\ivp_min_hash.h" />
     <ClInclude Include="..\IVP\ivp_utility\ivp_message_router.h" />
+    <ClInclude Include="..\IVP\ivp_utility\ivp_message.h" />
     <ClInclude Include="..\IVP\ivp_physics\ivp_great_matrix.h" />
     <ClInclude Include="..\IVP\ivp_physics\ivp_mindist_settings.h" />
     <ClInclude Include="..\IVP\ivp_physics\ivp_friction_solver.h" />

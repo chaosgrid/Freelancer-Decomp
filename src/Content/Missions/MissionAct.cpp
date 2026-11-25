@@ -1253,14 +1253,14 @@ void ActSetInitialPlayerPos::Parse(INI_Reader& Reader)
     Position.z = Reader.get_value_float(2);
     Position.y = Reader.get_value_float(1);
     Position.x = Reader.get_value_float(0);
-    FQuaternion Rotation;
-    Rotation.Z = Reader.get_value_float(6);
-    Rotation.Y = Reader.get_value_float(5);
-    Rotation.X = Reader.get_value_float(4);
-    Rotation.W = Reader.get_value_float(3);
-    FMatrix Result;
+    Quaternion Rotation;
+    Rotation.z = Reader.get_value_float(6);
+    Rotation.y = Reader.get_value_float(5);
+    Rotation.x = Reader.get_value_float(4);
+    Rotation.w = Reader.get_value_float(3);
+    Matrix Result;
     ContentMathEngine()->QuaternionToMatrix(Result, Rotation);
-    memcpy(&Orientation, &Result, sizeof(Orientation));
+    Orientation = Result;
 }
 
 // FUN_06ecdad0.
@@ -3176,20 +3176,20 @@ ActSetOrient::ActSetOrient(FMissionScript* InMission)
     : Act(InMission)
 {
     ClearTString(Label);
-    Orientation.W = 0.0f;
-    Orientation.X = 0.0f;
-    Orientation.Y = 0.0f;
-    Orientation.Z = 0.0f;
+    Orientation.w = 0.0f;
+    Orientation.x = 0.0f;
+    Orientation.y = 0.0f;
+    Orientation.z = 0.0f;
 }
 
 // FUN_06ec93d0.
 void ActSetOrient::Parse(INI_Reader& Reader)
 {
     Label = Reader.get_value_string(0);
-    Orientation.W = Reader.get_value_float(1);
-    Orientation.X = Reader.get_value_float(2);
-    Orientation.Y = Reader.get_value_float(3);
-    Orientation.Z = Reader.get_value_float(4);
+    Orientation.w = Reader.get_value_float(1);
+    Orientation.x = Reader.get_value_float(2);
+    Orientation.y = Reader.get_value_float(3);
+    Orientation.z = Reader.get_value_float(4);
 }
 
 // LAB_06ec9470 (RelocateShip = FUN_06f67740).
@@ -3206,10 +3206,10 @@ bool ActSetOrient::Execute()
     FSystemInfo* const System = Mission->PlayerState->GetSystemRecord();
     if (System == nullptr)
         return true;
-    FMatrix Rotation;
+    Matrix Rotation;
     ContentMathEngine()->QuaternionToMatrix(Rotation, Orientation);
     Matrix NewOrientation;
-    memcpy(&NewOrientation, &Rotation, sizeof(NewOrientation));
+    NewOrientation = Rotation;
     unsigned int const SystemId = System->SystemId;
     RelocateShip(&ObjectId, &SystemId, &Position, &NewOrientation);
     return true;
@@ -3223,49 +3223,49 @@ namespace
 {
     // The unit quaternion of FUN_06ecdd30 / FUN_06ece9b0: 1.0f (DAT_06fb5810) over the root of
     // the sum of squares (x87: W*W + X*X + Y*Y + Z*Z in that order), each part times it.
-    FQuaternion NormalizeQuaternion(float W, float X, float Y, float Z)
+    Quaternion NormalizeQuaternion(float W, float X, float Y, float Z)
     {
         double const Scale = 1.0 / std::sqrt(static_cast<double>(W) * W +
                                               static_cast<double>(X) * X +
                                               static_cast<double>(Y) * Y +
                                               static_cast<double>(Z) * Z);
-        FQuaternion Result;
-        Result.W = static_cast<float>(Scale * W);
-        Result.X = static_cast<float>(Scale * X);
-        Result.Y = static_cast<float>(Scale * Y);
-        Result.Z = static_cast<float>(Scale * Z);
+        Quaternion Result;
+        Result.w = static_cast<float>(Scale * W);
+        Result.x = static_cast<float>(Scale * X);
+        Result.y = static_cast<float>(Scale * Y);
+        Result.z = static_cast<float>(Scale * Z);
         return Result;
     }
 
     // FUN_06ecdd30 (shared Parse of Act_RelocateForm / Act_RelocateShip). Values are read from
     // the highest slot down.
-    void ParseRelocation(INI_Reader& Reader, TString<0x30>* Label, FTransform* Placement)
+    void ParseRelocation(INI_Reader& Reader, TString<0x30>* Label, Transform* Placement)
     {
         *Label = Reader.get_value_string(0);
         float const Z = Reader.get_value_float(3);
         float const Y = Reader.get_value_float(2);
-        Placement->Translation.X = Reader.get_value_float(1);
-        Placement->Translation.Z = Z;
-        Placement->Translation.Y = Y;
+        Placement->Translation.x = Reader.get_value_float(1);
+        Placement->Translation.z = Z;
+        Placement->Translation.y = Y;
         if (Reader.is_value_empty(4))
             return;
         float const QuatZ = Reader.get_value_float(7);
         float const QuatY = Reader.get_value_float(6);
         float const QuatX = Reader.get_value_float(5);
         float const QuatW = Reader.get_value_float(4);
-        FQuaternion const Rotation = NormalizeQuaternion(QuatW, QuatX, QuatY, QuatZ);
-        FMatrix Result;
+        Quaternion const Rotation = NormalizeQuaternion(QuatW, QuatX, QuatY, QuatZ);
+        Matrix Result;
         ContentMathEngine()->QuaternionToMatrix(Result, Rotation);
         Placement->Rotation = Result;
     }
 
     // The identity rotation and zero position both relocation ctors store (+0x40..+0x6c).
-    void SetIdentityPlacement(FTransform* Placement)
+    void SetIdentityPlacement(Transform* Placement)
     {
         memset(Placement, 0, sizeof(*Placement));
-        Placement->Rotation.D[0][0] = 1.0f;
-        Placement->Rotation.D[1][1] = 1.0f;
-        Placement->Rotation.D[2][2] = 1.0f;
+        Placement->Rotation.E[0][0] = 1.0f;
+        Placement->Rotation.E[1][1] = 1.0f;
+        Placement->Rotation.E[2][2] = 1.0f;
     }
 }
 
@@ -3300,23 +3300,23 @@ bool ActRelocateForm::Execute()
     for (; It != Members.end(); ++It)
     {
         FContentShipBase* const Member = *It;
-        FVector SlotPosition;
-        SlotPosition.X = 0.0f;
-        SlotPosition.Y = 0.0f;
-        SlotPosition.Z = 0.0f;
-        FMatrix SlotOrientation;
+        Vector SlotPosition;
+        SlotPosition.x = 0.0f;
+        SlotPosition.y = 0.0f;
+        SlotPosition.z = 0.0f;
+        Matrix SlotOrientation;
         memset(&SlotOrientation, 0, sizeof(SlotOrientation));
         Formation->GetSlotTransform(Member->FormationSlot, &SlotPosition, &SlotOrientation);
-        FVector WorldPosition;
+        Vector WorldPosition;
         ContentMathEngine()->TransformXform(WorldPosition, Placement, SlotPosition);
-        FMatrix WorldRotation;
+        Matrix WorldRotation;
         ContentMathEngine()->MulMatrix(WorldRotation, Placement.Rotation, SlotOrientation);
         Vector Position;
-        Position.x = WorldPosition.X;
-        Position.y = WorldPosition.Y;
-        Position.z = WorldPosition.Z;
+        Position.x = WorldPosition.x;
+        Position.y = WorldPosition.y;
+        Position.z = WorldPosition.z;
         Matrix Orientation;
-        memcpy(&Orientation, &WorldRotation, sizeof(Orientation));
+        Orientation = WorldRotation;
         unsigned int const SystemId = Mission->PlayerState->GetSystemRecord()->SystemId;
         unsigned int const ShipId = Member->SpaceObjId;
         RelocateShip(&ShipId, &SystemId, &Position, &Orientation);
@@ -3349,11 +3349,11 @@ bool ActRelocateShip::Execute()
         return true;
     unsigned int const SystemId = Mission->PlayerState->GetSystemRecord()->SystemId;
     Vector Position;
-    Position.x = Placement.Translation.X;
-    Position.y = Placement.Translation.Y;
-    Position.z = Placement.Translation.Z;
+    Position.x = Placement.Translation.x;
+    Position.y = Placement.Translation.y;
+    Position.z = Placement.Translation.z;
     Matrix Orientation;
-    memcpy(&Orientation, &Placement.Rotation, sizeof(Orientation));
+    Orientation = Placement.Rotation;
     RelocateShip(&ObjectId, &SystemId, &Position, &Orientation);
     return true;
 }
@@ -3492,10 +3492,10 @@ void ActStaticCam::Parse(INI_Reader& Reader)
     float const QuatY = Reader.get_value_float(5);
     float const QuatX = Reader.get_value_float(4);
     float const QuatW = Reader.get_value_float(3);
-    FQuaternion const Rotation = NormalizeQuaternion(QuatW, QuatX, QuatY, QuatZ);
-    FMatrix Result;
+    Quaternion const Rotation = NormalizeQuaternion(QuatW, QuatX, QuatY, QuatZ);
+    Matrix Result;
     ContentMathEngine()->QuaternionToMatrix(Result, Rotation);
-    memcpy(&Camera.Rotation, &Result, sizeof(Camera.Rotation));
+    Camera.Rotation = Result;
     if (!Reader.is_value_empty(7))
         Fov = Reader.get_value_float(7);
     if (!Reader.is_value_empty(8))
@@ -3998,25 +3998,25 @@ bool ActSetVibeShipToLbl::Execute()
 namespace
 {
     // The quaternion tail of the spawn Parses: W, X, Y, Z read last to first, normalized.
-    void ParseSpawnRotation(INI_Reader& Reader, int First, FMatrix* Out)
+    void ParseSpawnRotation(INI_Reader& Reader, int First, Matrix* Out)
     {
         float const Z = Reader.get_value_float(First + 3);
         float const Y = Reader.get_value_float(First + 2);
         float const X = Reader.get_value_float(First + 1);
         float const W = Reader.get_value_float(First);
-        FQuaternion const Rotation = NormalizeQuaternion(W, X, Y, Z);
-        FMatrix Result;
+        Quaternion const Rotation = NormalizeQuaternion(W, X, Y, Z);
+        Matrix Result;
         ContentMathEngine()->QuaternionToMatrix(Result, Rotation);
         *Out = Result;
     }
 
     // The identity rotation and zero position the spawn ctors store.
-    void SetIdentityTransform(FTransform* Transform)
+    void SetIdentityTransform(Transform* Xform)
     {
-        memset(Transform, 0, sizeof(*Transform));
-        Transform->Rotation.D[0][0] = 1.0f;
-        Transform->Rotation.D[1][1] = 1.0f;
-        Transform->Rotation.D[2][2] = 1.0f;
+        memset(Xform, 0, sizeof(*Xform));
+        Xform->Rotation.E[0][0] = 1.0f;
+        Xform->Rotation.E[1][1] = 1.0f;
+        Xform->Rotation.E[2][2] = 1.0f;
     }
 
     // The first +0xb8 record whose nickname equals Name (strcmp), or end.
@@ -4039,54 +4039,54 @@ namespace
     // the ship 2500 (DAT_06fb6054) from the object, away from the offset point, using retail's
     // 0x5f3759df inverse-root step; any other mode leaves the position.
     void ComputeSpawnPlacement(int const* Mode, unsigned int const* RelObjId,
-                               FTransform const* Offset, float Heading, FMatrix* OutOrientation,
+                               Transform const* Offset, float Heading, Matrix* OutOrientation,
                                Vector* OutPosition)
     {
         Vector ObjectPosition = {0.0f, 0.0f, 0.0f};
         Matrix ObjectOrientation;
         memset(&ObjectOrientation, 0, sizeof(ObjectOrientation));
         pub::SpaceObj::GetLocation(*RelObjId, ObjectPosition, ObjectOrientation);
-        FMatrix ObjectRotation;
-        memcpy(&ObjectRotation, &ObjectOrientation, sizeof(ObjectRotation));
+        Matrix ObjectRotation;
+        ObjectRotation = ObjectOrientation;
 
-        FMatrix Heading3;
+        Matrix Heading3;
         memset(&Heading3, 0, sizeof(Heading3));
-        Heading3.D[0][0] = 1.0f;
-        Heading3.D[1][1] = 1.0f;
-        Heading3.D[2][2] = 1.0f;
+        Heading3.E[0][0] = 1.0f;
+        Heading3.E[1][1] = 1.0f;
+        Heading3.E[2][2] = 1.0f;
         if (!(Heading < 0.0f) && !std::isnan(Heading))
         {
             float const Angle = Heading * 0.0174532924f; // DAT_06fb6060 (0x3c8efa35)
             double const Cos = std::cos(static_cast<double>(Angle));
             double const Sin = std::sin(static_cast<double>(Angle));
-            Heading3.D[0][0] = static_cast<float>(Cos);
-            Heading3.D[0][2] = static_cast<float>(Sin);
-            Heading3.D[2][0] = static_cast<float>(-Sin);
-            Heading3.D[2][2] = static_cast<float>(Cos);
+            Heading3.E[0][0] = static_cast<float>(Cos);
+            Heading3.E[0][2] = static_cast<float>(Sin);
+            Heading3.E[2][0] = static_cast<float>(-Sin);
+            Heading3.E[2][2] = static_cast<float>(Cos);
         }
-        FMatrix Rotation;
+        Matrix Rotation;
         ContentMathEngine()->MulMatrix(Rotation, Heading3, ObjectRotation);
 
         int const PlacementMode = *Mode;
         if (PlacementMode == 2)
         {
-            FVector Turned;
+            Vector Turned;
             ContentMathEngine()->TransformMatrix(Turned, ObjectRotation, Offset->Translation);
-            OutPosition->x = Turned.X + ObjectPosition.x;
-            OutPosition->y = Turned.Y + ObjectPosition.y;
-            OutPosition->z = Turned.Z + ObjectPosition.z;
+            OutPosition->x = Turned.x + ObjectPosition.x;
+            OutPosition->y = Turned.y + ObjectPosition.y;
+            OutPosition->z = Turned.z + ObjectPosition.z;
         }
         else if (PlacementMode == 1)
         {
-            OutPosition->x = ObjectPosition.x + Offset->Translation.X;
-            OutPosition->y = ObjectPosition.y + Offset->Translation.Y;
-            OutPosition->z = ObjectPosition.z + Offset->Translation.Z;
+            OutPosition->x = ObjectPosition.x + Offset->Translation.x;
+            OutPosition->y = ObjectPosition.y + Offset->Translation.y;
+            OutPosition->z = ObjectPosition.z + Offset->Translation.z;
         }
         else if (PlacementMode == 0)
         {
-            float const DX = ObjectPosition.x - Offset->Translation.X;
-            float const DY = ObjectPosition.y - Offset->Translation.Y;
-            float const DZ = ObjectPosition.z - Offset->Translation.Z;
+            float const DX = ObjectPosition.x - Offset->Translation.x;
+            float const DY = ObjectPosition.y - Offset->Translation.y;
+            float const DZ = ObjectPosition.z - Offset->Translation.z;
             float const LengthSq = static_cast<float>(static_cast<double>(DX) * DX +
                                                       static_cast<double>(DY) * DY +
                                                       static_cast<double>(DZ) * DZ);
@@ -4140,9 +4140,9 @@ void ActSpawnShip::Parse(INI_Reader& Reader)
     bPosition = 1;
     float const Z = Reader.get_value_float(4);
     float const Y = Reader.get_value_float(3);
-    Placement.Translation.X = Reader.get_value_float(2);
-    Placement.Translation.Y = Y;
-    Placement.Translation.Z = Z;
+    Placement.Translation.x = Reader.get_value_float(2);
+    Placement.Translation.y = Y;
+    Placement.Translation.z = Z;
     if (Reader.is_value_empty(5))
         return;
     bOrientation = 1;
@@ -4167,9 +4167,9 @@ bool ActSpawnShip::Execute()
         if (bPosition != 0)
         {
             Group.bRelPos = 0;
-            Group.Position.x = Placement.Translation.X;
-            Group.Position.y = Placement.Translation.Y;
-            Group.Position.z = Placement.Translation.Z;
+            Group.Position.x = Placement.Translation.x;
+            Group.Position.y = Placement.Translation.y;
+            Group.Position.z = Placement.Translation.z;
         }
         if (bOrientation != 0)
             Group.Orientation = Placement.Rotation;
@@ -4209,9 +4209,9 @@ void ActSpawnShipRel::Parse(INI_Reader& Reader)
         Mode = 2;
     float const Z = Reader.get_value_float(6);
     float const Y = Reader.get_value_float(5);
-    Offset.Translation.X = Reader.get_value_float(4);
-    Offset.Translation.Y = Y;
-    Offset.Translation.Z = Z;
+    Offset.Translation.x = Reader.get_value_float(4);
+    Offset.Translation.y = Y;
+    Offset.Translation.z = Z;
     if (Reader.is_value_empty(7))
         return;
     Heading = Reader.get_value_float(7);
@@ -4260,7 +4260,7 @@ namespace
 {
     // FUN_06ec7450 (the Parse of Act_SpawnSolar / SpawnFormation / SpawnLoot). The position
     // is read from slot 3 down.
-    void ParseSpawnRecord(INI_Reader& Reader, TString<0x30>* Name, FTransform* Placement,
+    void ParseSpawnRecord(INI_Reader& Reader, TString<0x30>* Name, Transform* Placement,
                           unsigned char* bPosition, unsigned char* bOrientation)
     {
         *Name = Reader.get_value_string(0);
@@ -4269,9 +4269,9 @@ namespace
         *bPosition = 1;
         float const Z = Reader.get_value_float(3);
         float const Y = Reader.get_value_float(2);
-        Placement->Translation.X = Reader.get_value_float(1);
-        Placement->Translation.Z = Z;
-        Placement->Translation.Y = Y;
+        Placement->Translation.x = Reader.get_value_float(1);
+        Placement->Translation.z = Z;
+        Placement->Translation.y = Y;
         if (Reader.is_value_empty(4))
             return;
         *bOrientation = 1;
@@ -4351,9 +4351,9 @@ bool ActSpawnFormation::Execute()
         return true;
     }
     FMissionShipGroup Group = *It;
-    Group.Position.x = Placement.Translation.X;
-    Group.Position.y = Placement.Translation.Y;
-    Group.Position.z = Placement.Translation.Z;
+    Group.Position.x = Placement.Translation.x;
+    Group.Position.y = Placement.Translation.y;
+    Group.Position.z = Placement.Translation.z;
     if (bOrientation != 0)
         Group.Orientation = Placement.Rotation;
     Mission->SpawnMissionShipGroup(&Group);
@@ -4393,11 +4393,11 @@ bool ActSpawnLoot::Execute()
         return true;
     }
     FMissionLoot Loot = *It;
-    Loot.Info.Position.x = Placement.Translation.X;
-    Loot.Info.Position.y = Placement.Translation.Y;
-    Loot.Info.Position.z = Placement.Translation.Z;
+    Loot.Info.Position.x = Placement.Translation.x;
+    Loot.Info.Position.y = Placement.Translation.y;
+    Loot.Info.Position.z = Placement.Translation.z;
     if (bOrientation != 0)
-        memcpy(&Loot.Info.Orientation, &Placement.Rotation, sizeof(Loot.Info.Orientation));
+        Loot.Info.Orientation = Placement.Rotation;
     Mission->SpawnMissionLoot(&Loot);
     return true;
 }

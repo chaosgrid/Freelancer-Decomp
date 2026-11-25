@@ -286,9 +286,7 @@ int StrafeBehavior::OnUpdate()
                             static_cast<float>(static_cast<double>(ForwardExtent44) * 1.2) };
         Transform const& Xform = Sys->SelfTarget.Iface->get_transform();
         Vector Ahead{ 0.0f, 0.0f, 0.0f };
-        Acquire3DMathEngine()->TransformXform(reinterpret_cast<FVector&>(Ahead),
-                                              reinterpret_cast<FTransform const&>(Xform),
-                                              reinterpret_cast<FVector const&>(Local));
+        Acquire3DMathEngine()->TransformXform(Ahead, Xform, Local);
 
         // DAT_0639f7a4 = 10000.0f.
         Matrix const& Orientation = Sys->SelfTarget.Iface->get_orientation();

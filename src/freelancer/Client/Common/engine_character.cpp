@@ -267,10 +267,10 @@ FEngineCharacterAccessoryLink::~FEngineCharacterAccessoryLink()
     MaterialPaths.Capacity = nullptr;
 }
 
-void* FEngineCharacterAccessoryLink::Connect(long Bone)
+InstanceIndex FEngineCharacterAccessoryLink::Connect(long Bone)
 {
     // FUN_004c9e20.
-    void* const Instance = MiscUtilLoadEngineInstance(Mesh.Data, DALib::Data, nullptr, nullptr,
+    const InstanceIndex Instance = MiscUtilLoadEngineInstance(Mesh.Data, DALib::Data, nullptr, nullptr,
                                                       &MaterialPaths, nullptr, nullptr);
     long Hardpoint = -1;
     bool bFailed = true;
@@ -282,7 +282,7 @@ void* FEngineCharacterAccessoryLink::Connect(long Bone)
         FHardpointKey CharacterKey;
         CharacterKey.Name = CharacterHardpoint.Data;
         CharacterKey.Crc = DACOM_CRC::GetCRC32(CharacterHardpoint.Data);
-        bFailed = DALib::Hardpoint->ConnectHardpoints(reinterpret_cast<void*>(Hardpoint),
+        bFailed = DALib::Hardpoint->ConnectHardpoints(Hardpoint,
                                                      &CharacterKey, Instance,
                                                      &AccessoryKey) != 0;
     }
@@ -309,9 +309,9 @@ FEngineCharacterBody::FEngineCharacterBody()
         EmptyName(AnimNames[Index]);
     // FUN_004215b0 on +0x268, then +0x28c..+0x294 zeroed.
     memset(&RootTransform, 0, sizeof(RootTransform));
-    RootTransform.Rotation.D[0][0] = 1.0f;
-    RootTransform.Rotation.D[1][1] = 1.0f;
-    RootTransform.Rotation.D[2][2] = 1.0f;
+    RootTransform.Rotation.E[0][0] = 1.0f;
+    RootTransform.Rotation.E[1][1] = 1.0f;
+    RootTransform.Rotation.E[2][2] = 1.0f;
     Deformable = nullptr;
     for (int Index = 0; Index < 4; ++Index)
     {
@@ -365,14 +365,14 @@ long FEngineCharacterBody::GetRootBone() const
     return Bone;
 }
 
-FTransform* FEngineCharacterBody::GetRootTransform(FTransform* Out) const
+Transform* FEngineCharacterBody::GetRootTransform(Transform* Out) const
 {
     // FUN_004cba10. The bone lookup is inlined (the same body as FUN_004ca480).
     int Bone = -1;
     if (Deformable != nullptr)
         DALib::Deform->GetFirstBone(Deformable, &Bone);
-    float const* const Source = DALib::Engine->GetInstanceTransform(reinterpret_cast<void*>(Bone));
-    memcpy(Out, Source, sizeof(FTransform));
+    const Transform* const Source = DALib::Engine->GetInstanceTransform(Bone);
+    memcpy(Out, Source, sizeof(Transform));
     return Out;
 }
 
@@ -394,7 +394,7 @@ void FEngineCharacterBody::Advance(float Dt)
         DALib::Deform->GetFirstBone(Deformable, &Root);
     void* TimeArg = nullptr;
     memcpy(&TimeArg, &Scaled, sizeof(Scaled));
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Root), 0, TimeArg);
+    DALib::Engine->UpdateInstance(Root, 0, TimeArg);
 
     // No playback left -> every slot emptied (no id test here, unlike StopAnimations).
     int Running = 0;

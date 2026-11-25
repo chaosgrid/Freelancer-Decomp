@@ -26,7 +26,7 @@
 #include "common_ini.h"
 #include "common_server.h"
 #include "common_tstring.h"
-#include "x86math.h"            // FTransform
+#include "x86math.h"            // Transform
 
 #include <cstdio>
 #include <cstdlib>
@@ -978,15 +978,15 @@ void FEncounterParameters::SpawnFormation(FSpawnRequest const* Request, FSpawnPl
     }
 
     // The leader's placement (+0x90 orientation, +0xb4 position).
-    FTransform Placement;
+    Transform Placement;
     for (int Row = 0; Row < 3; ++Row)
     {
         for (int Column = 0; Column < 3; ++Column)
-            Placement.Rotation.D[Row][Column] = Leader.Orientation.E[Row][Column];
+            Placement.Rotation.E[Row][Column] = Leader.Orientation.E[Row][Column];
     }
-    Placement.Translation.X = Leader.Position.x;
-    Placement.Translation.Y = Leader.Position.y;
-    Placement.Translation.Z = Leader.Position.z;
+    Placement.Translation.x = Leader.Position.x;
+    Placement.Translation.y = Leader.Position.y;
+    Placement.Translation.z = Leader.Position.z;
 
     // formation_by_class through the faction's formations, else formation.
     ID_String FormationId;

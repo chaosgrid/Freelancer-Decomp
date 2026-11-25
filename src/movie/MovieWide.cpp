@@ -7,14 +7,9 @@
 #include "MovieWide.h"
 
 #include "MovieField.h"
+#include "MovieFieldHigh.h"
 #include "MovieFieldMid.h"
-
-// DAT_06ae097c. Defined in MovieGraph.cpp.
-extern int GMovieGraphCode;
-
-long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
-long __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count);
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
+#include "MovieGraph.h"
 
 static unsigned int Movie_SignificantLimbs(unsigned int* Limbs, unsigned int Count)
 {
@@ -132,10 +127,10 @@ void __stdcall Movie_MultiplyLowLimbs(unsigned int* Left, unsigned int* Right, u
 
     unsigned int Frame[0x10a] = {};
     unsigned int Index = 1u;
-    unsigned int RegB;
-    unsigned int RegC;
-    unsigned int Edi;
-    unsigned int Esi;
+    unsigned int LeftBase;
+    unsigned int RightBase;
+    unsigned int HighPos;
+    unsigned int LowPos;
     Frame[0x88] = Left[0];
     Frame[0xc9] = Right[0];
     Lo = (unsigned int)Wide;
@@ -169,29 +164,29 @@ void __stdcall Movie_MultiplyLowLimbs(unsigned int* Left, unsigned int* Right, u
     Frame[Count * 2u + 6u] = 0u;
     Frame[Count * 2u + 7u] = 0u;
 
-    RegB = Frame[0x88];
-    RegC = Frame[0xc9];
-    Edi = Count * 2u - 2u;
-    Esi = 0u;
+    LeftBase = Frame[0x88];
+    RightBase = Frame[0xc9];
+    HighPos = Count * 2u - 2u;
+    LowPos = 0u;
     for (;;)
     {
-        unsigned int TermL = Movie_FrameWord(Frame, 0x220u + Edi * 2u);
-        unsigned int TermR = Movie_FrameWord(Frame, 0x324u + Edi * 2u);
-        unsigned int Cross = (TermL - RegB) * (TermR - RegC);
+        unsigned int TermL = Movie_FrameWord(Frame, 0x220u + HighPos * 2u);
+        unsigned int TermR = Movie_FrameWord(Frame, 0x324u + HighPos * 2u);
+        unsigned int Cross = (TermL - LeftBase) * (TermR - RightBase);
         unsigned int Next;
         Frame[Count * 2u + 5u] = Frame[Count * 2u + 5u] + Cross;
-        Esi = Esi + 2u;
+        LowPos = LowPos + 2u;
         for (;;)
         {
-            unsigned int RawL = Movie_FrameWord(Frame, 0x21cu + Edi * 2u);
-            unsigned int RawR = Movie_FrameWord(Frame, 0x320u + Edi * 2u);
-            unsigned int LeftDelta = RawL - RegB;
-            unsigned int LeftMask = (RawL < RegB) ? 0xffffffffu : 0u;
-            unsigned int RightDelta = RawR - RegC;
-            unsigned int RightMask = (RawR < RegC) ? 0xffffffffu : 0u;
+            unsigned int RawL = Movie_FrameWord(Frame, 0x21cu + HighPos * 2u);
+            unsigned int RawR = Movie_FrameWord(Frame, 0x320u + HighPos * 2u);
+            unsigned int LeftDelta = RawL - LeftBase;
+            unsigned int LeftMask = (RawL < LeftBase) ? 0xffffffffu : 0u;
+            unsigned int RightDelta = RawR - RightBase;
+            unsigned int RightMask = (RawR < RightBase) ? 0xffffffffu : 0u;
             unsigned int AbsL = (LeftDelta + LeftMask) ^ LeftMask;
             unsigned int AbsR = (RightDelta + RightMask) ^ RightMask;
-            unsigned int Pos = Edi + Esi - 3u + (LeftMask ^ RightMask);
+            unsigned int Pos = HighPos + LowPos - 3u + (LeftMask ^ RightMask);
             unsigned int ProdLo;
             unsigned int ProdHi;
             unsigned int Cur;
@@ -206,7 +201,7 @@ void __stdcall Movie_MultiplyLowLimbs(unsigned int* Left, unsigned int* Right, u
             Sum = Cur + ProdLo;
             Carry = (Sum < Cur) ? 1u : 0u;
             Frame[Pos + 6u] = Sum;
-            Edi = Edi - 2u;
+            HighPos = HighPos - 2u;
             do
             {
                 unsigned long long Step;
@@ -218,18 +213,18 @@ void __stdcall Movie_MultiplyLowLimbs(unsigned int* Left, unsigned int* Right, u
                 NextLimb = Frame[Pos + 8u];
             }
             while (Carry != 0u);
-            if (Esi == Edi)
+            if (LowPos == HighPos)
             {
                 break;
             }
-            RegB = Movie_FrameWord(Frame, 0x21cu + Esi * 2u);
-            RegC = Movie_FrameWord(Frame, 0x320u + Esi * 2u);
+            LeftBase = Movie_FrameWord(Frame, 0x21cu + LowPos * 2u);
+            RightBase = Movie_FrameWord(Frame, 0x320u + LowPos * 2u);
         }
-        RegB = Movie_FrameWord(Frame, 0x220u + Esi * 2u);
-        RegC = Movie_FrameWord(Frame, 0x324u + Esi * 2u);
-        Next = Esi + 2u;
-        Edi = (Edi ^ 0xfffffffeu) + Count * 2u;
-        if ((int)Next >= (int)Edi)
+        LeftBase = Movie_FrameWord(Frame, 0x220u + LowPos * 2u);
+        RightBase = Movie_FrameWord(Frame, 0x324u + LowPos * 2u);
+        Next = LowPos + 2u;
+        HighPos = (HighPos ^ 0xfffffffeu) + Count * 2u;
+        if ((int)Next >= (int)HighPos)
         {
             break;
         }
@@ -267,7 +262,7 @@ void __stdcall Movie_MultiplyLowLimbs(unsigned int* Left, unsigned int* Right, u
 
     {
         unsigned int Half = Count >> 1;
-        unsigned int Fold = (Frame[0x88u + Half] - RegB) * (Frame[0xc9u + Half] - RegC);
+        unsigned int Fold = (Frame[0x88u + Half] - LeftBase) * (Frame[0xc9u + Half] - RightBase);
         unsigned int At = 6u;
         unsigned int Borrow = 0u;
         unsigned int First;

@@ -942,7 +942,7 @@ public:
     bool Execute() override;                 // LAB_06ec9470
 
     TString<0x30> Label;       // +0x0c s0
-    FQuaternion Orientation;   // +0x40 f1..f4 (W, X, Y, Z; not normalized; not set by the ctor)
+    Quaternion Orientation;   // +0x40 f1..f4 (W, X, Y, Z; not normalized; not set by the ctor)
 };
 
 // Act_RelocateForm / Act_RelocateShip: new(0x70), ctors FUN_06ecdce0 / FUN_06ece060, vtables
@@ -955,7 +955,7 @@ public:
     bool Execute() override;                 // FUN_06ecdea0
 
     TString<0x30> Label;     // +0x0c s0: the formation's NPC
-    FTransform Placement;    // +0x40 rotation (identity) from the normalized quaternion
+    Transform Placement;    // +0x40 rotation (identity) from the normalized quaternion
                              // f4..f7, +0x64 position f1..f3
 };
 
@@ -967,7 +967,7 @@ public:
     bool Execute() override;                 // LAB_06ece100
 
     TString<0x30> Label;     // +0x0c s0: a label
-    FTransform Placement;    // +0x40 / +0x64 as Act_RelocateForm
+    Transform Placement;    // +0x40 / +0x64 as Act_RelocateForm
 };
 
 // Act_RemoveCargo: new(0x44), ctor FUN_06ece2a0, vtable 06fb5ff8.
@@ -1139,7 +1139,7 @@ public:
 
     TString<0x30> Name;        // +0x0c s0: [MsnShip] / [MsnFormation] nickname
     TString<0x30> NewNickname; // +0x40 (ctor "") the first slot's nickname with +0xa6
-    FTransform Placement;      // +0x74 rotation (identity) from the normalized quaternion f5..f8,
+    Transform Placement;      // +0x74 rotation (identity) from the normalized quaternion f5..f8,
                                // +0x98 position f2..f4
     unsigned char bPosition;   // +0xa4 (ctor 0) value 2 present
     unsigned char bOrientation; // +0xa5 (ctor 0) value 5 present
@@ -1158,7 +1158,7 @@ public:
     TString<0x30> Name;        // +0x0c s0: a ship slot or [MsnShip] / [MsnFormation] nickname
     TString<0x30> RelObj;      // +0x40 s2: label of the reference object
     TString<0x30> NewNickname; // +0x74 s8 (with +0xdd)
-    FTransform Offset;         // +0xa8 rotation identity (never parsed), +0xcc offset f4..f6
+    Transform Offset;         // +0xa8 rotation identity (never parsed), +0xcc offset f4..f6
     // +0xd8 s3: "POINT" 0, "DIRECTIONAL" 1, "RELATIVE" 2, else unchanged. Retail's ctor never
     // writes it; the port starts it at -1, a mode FUN_06ecebc0 treats like any other that is not
     // 0..2 (rotation only).
@@ -1180,7 +1180,7 @@ public:
     bool Execute() override;                 // FUN_06ec7060
 
     TString<0x30> Name;         // +0x0c s0: [MsnSolar] nickname
-    FTransform Placement;       // +0x40 rotation (identity) from the normalized quaternion
+    Transform Placement;       // +0x40 rotation (identity) from the normalized quaternion
                                 // f4..f7, +0x64 position f1..f3
     unsigned char bPosition;    // +0x70 (ctor 0) value 1 present
     unsigned char bOrientation; // +0x71 (ctor 0) value 4 present
@@ -1194,7 +1194,7 @@ public:
     bool Execute() override;                 // FUN_06ec71d0
 
     TString<0x30> Name;         // +0x0c s0: [MsnShip] / [MsnFormation] nickname
-    FTransform Placement;       // +0x40 / +0x64 as Act_SpawnSolar
+    Transform Placement;       // +0x40 / +0x64 as Act_SpawnSolar
     unsigned char bPosition;    // +0x70
     unsigned char bOrientation; // +0x71
 };
@@ -1207,7 +1207,7 @@ public:
     bool Execute() override;                 // FUN_06ec75d0
 
     TString<0x30> Name;         // +0x0c s0: [MsnLoot] nickname
-    FTransform Placement;       // +0x40 / +0x64 as Act_SpawnSolar
+    Transform Placement;       // +0x40 / +0x64 as Act_SpawnSolar
     unsigned char bPosition;    // +0x70
     unsigned char bOrientation; // +0x71
 };

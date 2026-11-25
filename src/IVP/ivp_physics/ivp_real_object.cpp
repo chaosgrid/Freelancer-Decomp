@@ -24,11 +24,11 @@
 #include <cassert>
 #include "../ivp_utility/ivp_core_trap.h"   // IVP_CoreTrap (retail's `MOV dword ptr [0],0`)
 #include "../ivp_utility/ivp_malloc.h"      // ivp_malloc_aligned / ivp_free_aligned (06343fc0 / 06343ff0)
-#include "../ivp_utility/ivp_u_bigvector.h" // IVP_U_BigVector_Grow (0635d3e0)
+#include "../ivp_utility/ivp_u_bigvector.h" // IVP_SurfaceManager_OutList::grow (0635d3e0)
 
 // Forward declaration
 
-void IVP_Core_Remove_Object(IVP_Core* Core, IVP_Real_Object* Object); // ivp_core.cpp
+ // ivp_core.cpp
 
 namespace
 {
@@ -918,7 +918,7 @@ IVP_Real_Object::~IVP_Real_Object()
         IVP_Environment_Object_Notify_Event Event;
         Event.Env = environment;
         Event.Object = this;
-        IVP_Environment_Fire_Event_Object_Deleted(environment, &Event);
+        environment->fire_event_object_deleted(&Event);
     }
 
     if ((flags & 0x2000u) != 0)
@@ -944,14 +944,14 @@ IVP_Real_Object::~IVP_Real_Object()
 
     // 06346f20 on core, then on original_core unless it is core, then on
     // friction_core unless it is either. No null tests.
-    IVP_Core_Remove_Object(core, this);
+    core->remove_object(this);
     if (original_core != core)
     {
-        IVP_Core_Remove_Object(original_core, this);
+        original_core->remove_object(this);
     }
     if (friction_core != original_core && friction_core != core)
     {
-        IVP_Core_Remove_Object(friction_core, this);
+        friction_core->remove_object(this);
     }
 
     ::operator delete(q_core_f_object); // 06391d5a
@@ -1294,7 +1294,7 @@ void IVP_Real_Object::SetLocalCsysFromQuatAndPosition(const IVP_U_Quat* Orientat
 static void IVP_SurfaceManagerOutListAppend(IVP_SurfaceManager_OutList* OutList, void* Element)
 {
     if (OutList->Count >= OutList->Capacity)
-        IVP_U_BigVector_Grow(OutList);
+        OutList->grow();
 
     OutList->Elems[OutList->Count] = Element;
     ++OutList->Count;
@@ -1402,12 +1402,12 @@ int32_t IVP_SurfaceManager_Default::get_type()
 
 // DAT_0658afe0: built by a CRT static initializer and destroyed from atexit
 // in retail; a file-scope object does the same.
-IVP_SurfaceManager_Default g_IVP_DefaultSurfaceManager_0658afe0;
+IVP_SurfaceManager_Default g_IVP_DefaultSurfaceManager;
 
 // Port-only accessor (retail has no getter).
 IVP_SurfaceManager* IVP_GetDefaultSurfaceManager()
 {
-    return &g_IVP_DefaultSurfaceManager_0658afe0;
+    return &g_IVP_DefaultSurfaceManager;
 }
 
 // ============================================================================
@@ -1437,7 +1437,7 @@ IVP_Polygon::IVP_Polygon(IVP_Cluster* Father, IVP_SurfaceManager* SurfaceManager
     IVP_Environment_Object_Notify_Event Event;
     Event.Env = core->Environment;
     Event.Object = this;
-    IVP_Environment_Fire_Event_Object_Created(core->Environment, &Event);
+    core->Environment->fire_event_object_created(&Event);
 }
 
 // FUN_06362570. vptr 063a585c.
@@ -1452,7 +1452,7 @@ IVP_Ball::IVP_Ball(IVP_Cluster* Father, const float* Radius,
     object_type = 3;
 
     // The only user of the module's default surface manager in Common.dll.
-    surface_manager = &g_IVP_DefaultSurfaceManager_0658afe0; // +0x80
+    surface_manager = &g_IVP_DefaultSurfaceManager; // +0x80
 
     // A real float addition (IVP_Polygon copies).
     extra_radius = Parms->ExtraRadius + *Radius;
@@ -1462,7 +1462,7 @@ IVP_Ball::IVP_Ball(IVP_Cluster* Father, const float* Radius,
     IVP_Environment_Object_Notify_Event Event;
     Event.Env = core->Environment;
     Event.Object = this;
-    IVP_Environment_Fire_Event_Object_Created(core->Environment, &Event);
+    core->Environment->fire_event_object_created(&Event);
 }
 
 // ============================================================================
@@ -1716,9 +1716,9 @@ void IVP_RealObjectConstructionTemplate::set_long_name(const char* Name)
 // 06345f90, core merge 06343700, core split 06343940.
 // ============================================================================
 
-void IVP_Core_Add_Object(IVP_Core* Core, IVP_Real_Object* Object); // ivp_core.cpp, FUN_06346ef0
-void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core);                      // ivp_core.cpp
-void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar, int32_t EventMode); // ivp_mindist_limiter.cpp, FUN_0634f320
+ // ivp_core.cpp, FUN_06346ef0
+                      // ivp_core.cpp
+ // ivp_mindist_limiter.cpp, FUN_0634f320
 
 // FUN_06344dc0: tail-jumps to FUN_063450e0 when core's movement byte is 8.
 void IVP_Real_Object::ensure_in_simulation()
@@ -1736,10 +1736,10 @@ void IVP_Real_Object::ensure_in_simulation()
 void IVP_Real_Object::disable_simulation()
 {
     IVP_Core* const Core = core;
-    if ((Core->Flags & 0xcu) != 0)
+    if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
         return;
-    if ((Core->Flags & 0x30u) != 0)
-        IVP_Environment_Dequeue_Core(Core->Environment, Core);
+    if ((Core->Flags & IVP_CORE_IS_IN_WAKEUP_VEC) != 0)
+        Core->Environment->dequeue_core(Core);
     if (static_cast<int8_t>(Core->MovementState & 0xffu) >= 8)
         return;
 
@@ -1757,8 +1757,8 @@ void IVP_Real_Object::disable_simulation()
     Core->TimeOfLastMotion.time_base = (float)(Base);
     Core->TimeOfLastMotion.time_offset = (float)(Now - (double)(Base));
 
-    IVP_Simulation_Unit_Rebalance_And_Clear_Topology_Flag(Core->OwningSimUnit);           // 063495c0
-    IVP_Simulation_Unit_Update_Motion_And_Maybe_Sleep(Core->OwningSimUnit, Core->Environment); // 063495e0
+    Core->OwningSimUnit->rebalance_and_clear_topology_flag();           // 063495c0
+    Core->OwningSimUnit->update_motion_and_maybe_sleep(Core->Environment); // 063495e0
 }
 
 // FUN_06344f50. The next synapse is read before the mindist is touched.
@@ -1773,7 +1773,7 @@ void IVP_Real_Object::recheck_mindists_of_other_cores()
         {
             Mindist->DispatchNarrowPhaseSolve(); // FUN_06352cf0
             if ((Mindist->StateFlags & 0xc000u) == 0)
-                IVP_RescheduleCollisionEvent(Mindist, 0, 2); // FUN_0634f320
+                Mindist->RescheduleCollisionEvent(0, 2); // FUN_0634f320
         }
         Synapse = Next;
     }
@@ -1867,16 +1867,16 @@ void IVP_Merge_Object_Into_Core(IVP_Real_Object* Host, IVP_Real_Object* Object, 
         NewCore->MaxSurfaceDeviation = (float)(Limit);
 
     Object->unlink_contact_points(true);
-    IVP_Core_Remove_Object(OldCore, Object);
+    OldCore->remove_object(Object);
     Object->core = NewCore;
     Object->friction_core = NewCore;
     Object->original_core = NewCore;
-    IVP_Core_Add_Object(NewCore, Object);
+    NewCore->add_object(Object);
 
     Object->flags = (Object->flags & ~0xffu) | (Host->flags & 0xffu);
 
     PhySys::BeamBodyToWorldPose(nullptr, Object, &Quat.x, Position);
-    IVP_Core_RefreshContactPoints(NewCore);
+    NewCore->refresh_contact_points();
 }
 
 // FUN_06343940. The object leaves its core (which is deleted when it held only
@@ -1914,11 +1914,11 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
 
     // A count of at most 1 (signed) means the old core was deleted.
     const int32_t OldObjectCount = OldCore->Objects.n_elems;
-    IVP_Core_Remove_Object(OldCore, Object);
+    OldCore->remove_object(Object);
     if (OldObjectCount <= 1)
         OldCore = nullptr;
     else if (OldCore != nullptr)
-        IVP_Core_RefreshContactPoints(OldCore);
+        OldCore->refresh_contact_points();
 
     Object->flags = (Object->flags & 0xffffff08u) | 8u;
     IVP_Core* NewCore = new IVP_Core(Object, &Quat, &Position, 0, Template->FlagsLo);
@@ -1954,7 +1954,7 @@ void IVP_Split_Object_From_Core(IVP_Real_Object* Object, const IVP_RealObjectCon
     IVP_U_Vector_Fixed<IVP_Hull_Manager, 0x80> ActiveHullManagers;
 
     NewCore = Object->core;
-    if ((NewCore->Flags & 0xcu) == 0)
+    if ((NewCore->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         IVP_Hull_Manager& Hull = Object->hull_manager;
         Hull.OuterGradient = 0.0f;

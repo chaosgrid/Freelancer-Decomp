@@ -23,6 +23,7 @@
 // Gf ObjectShip's engine sound; a Thorn_SoundReference (operator new(0x70) in FUN_0044e1f0,
 // ctor FUN_00457a80) forwards to a Thorn_Sound another script created.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_csys.h"
 #include "GameFlow/Thorn/gf_thorn_component.h"
 
@@ -48,8 +49,8 @@ struct FThornSound : FThornComponent
     bool IsHoldingScript() const;
 
     // ICompoundControl (0x005ce290 / 0x005ce294)
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override;   // 11 LAB_00457400
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;      // 12 LAB_00457490
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override;   // 11 LAB_00457400
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;      // 12 LAB_00457490
 
     // ISoundControl (0x005ce234)
     GENRESULT DACOM_API StartSound(void* Desc, int TimeMs) override;        // 3  LAB_004574d0
@@ -62,14 +63,14 @@ struct FThornSound : FThornComponent
     GENRESULT DACOM_API GetAudioProps(float* Props8, int Mask) override;    // 10 LAB_00457810
 
     // IGeoTransformControl (0x005ce1f8)
-    GENRESULT DACOM_API SetPosition(float* Position) override;             // 3  LAB_004573b0
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;           // 4  LAB_004573e0
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;          // 5  LAB_00457440
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;        // 6  LAB_00457470
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;             // 3  LAB_004573b0
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;           // 4  LAB_004573e0
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;          // 5  LAB_00457440
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;        // 6  LAB_00457470
 
     // identity tail
     void SetSpawnTable(FThornComponent** Table, int Count) override;       // 15 LAB_004572e0
-    void* GetEngineInstance() override;                                    // 17 FUN_00450870
+    InstanceIndex GetEngineInstance() override;                                    // 17 FUN_00450870
     void RefreshSound() override;                                          // 21 LAB_00457630
     bool IsBackgroundSound() override;                                     // 22 LAB_00456ea0
 
@@ -124,7 +125,7 @@ struct FThornPlayerEngineSound : FThornComponent
 
     // identity tail
     void Stop() override;                                                  // 14 LAB_00457980
-    void* GetEngineInstance() override;                                    // 17 FUN_00450870
+    InstanceIndex GetEngineInstance() override;                                    // 17 FUN_00450870
 
     float Attenuation; // +0x6c
 };
@@ -138,8 +139,8 @@ struct FThornSoundReference : FThornComponent
     ~FThornSoundReference() override;
 
     // ICompoundControl
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override;   // 11 LAB_00457c00
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;      // 12 LAB_00457c20
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override;   // 11 LAB_00457c00
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;      // 12 LAB_00457c20
 
     // ISoundControl (0x005ce6e8)
     GENRESULT DACOM_API StartSound(void* Desc, int TimeMs) override;        // 3  LAB_00457c40
@@ -152,14 +153,14 @@ struct FThornSoundReference : FThornComponent
     GENRESULT DACOM_API GetAudioProps(float* Props8, int Mask) override;    // 10 LAB_00457d10
 
     // IGeoTransformControl (0x005ce6ac)
-    GENRESULT DACOM_API SetPosition(float* Position) override;             // 3  LAB_00457bc0
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;           // 4  LAB_00457be0
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;          // 5  LAB_00453560
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;        // 6  LAB_00453580
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;             // 3  LAB_00457bc0
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;           // 4  LAB_00457be0
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;          // 5  LAB_00453560
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;        // 6  LAB_00453580
 
     // identity tail
     void Stop() override;                                                  // 14 LAB_00450cd0
-    void* GetEngineInstance() override;                                    // 17 LAB_00453550
+    InstanceIndex GetEngineInstance() override;                                    // 17 LAB_00453550
 
     FThornComponent* Target; // +0x6c the created sound of that name, or null
 };

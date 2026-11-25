@@ -82,11 +82,11 @@ namespace
 
     // LAB_06f71830: Rotate/TransformMatrix literal shared x87 body.
     // Stores precede the next component source reads, including aliased calls.
-    void MulVecByMatrix(FVector& Dst, const FMatrix& Matrix, const FVector& Source)
+    void MulVecByMatrix(Vector& Dst, const Matrix& Mat, const Vector& Source)
     {
-        float* ResultVector = &Dst.X;
-        const float* MatrixValues = &Matrix.D[0][0];
-        const float* SourceVector = &Source.X;
+        float* ResultVector = &Dst.x;
+        const float* MatrixValues = &Mat.E[0][0];
+        const float* SourceVector = &Source.x;
         __asm
         {
             mov ecx, MatrixValues
@@ -125,11 +125,11 @@ namespace
 
     // LAB_06f718f0: shared InverseRotate/TransposeTransform body. Each
     // output float is stored before the next component reads the source.
-    void MulVecByTranspose(FVector& Dst, const FMatrix& Matrix, const FVector& Source)
+    void MulVecByTranspose(Vector& Dst, const Matrix& Mat, const Vector& Source)
     {
-        float* ResultVector = &Dst.X;
-        const float* MatrixValues = &Matrix.D[0][0];
-        const float* SourceVector = &Source.X;
+        float* ResultVector = &Dst.x;
+        const float* MatrixValues = &Mat.E[0][0];
+        const float* SourceVector = &Source.x;
         __asm
         {
             mov ecx, MatrixValues
@@ -166,30 +166,30 @@ namespace
         }
     }
 
-    void TransposeMatrix(FMatrix& Dst, const FMatrix& Source)
+    void TransposeMatrix(Matrix& Dst, const Matrix& Source)
     {
-        Dst.D[0][0] = Source.D[0][0];
-        Dst.D[0][1] = Source.D[1][0];
-        Dst.D[0][2] = Source.D[2][0];
-        Dst.D[1][0] = Source.D[0][1];
-        Dst.D[1][1] = Source.D[1][1];
-        Dst.D[1][2] = Source.D[2][1];
-        Dst.D[2][0] = Source.D[0][2];
-        Dst.D[2][1] = Source.D[1][2];
-        Dst.D[2][2] = Source.D[2][2];
+        Dst.E[0][0] = Source.E[0][0];
+        Dst.E[0][1] = Source.E[1][0];
+        Dst.E[0][2] = Source.E[2][0];
+        Dst.E[1][0] = Source.E[0][1];
+        Dst.E[1][1] = Source.E[1][1];
+        Dst.E[1][2] = Source.E[2][1];
+        Dst.E[2][0] = Source.E[0][2];
+        Dst.E[2][1] = Source.E[1][2];
+        Dst.E[2][2] = Source.E[2][2];
     }
 
-    void WriteAdjugate(FMatrix& Dst, const FMatrix& Source, float Scale)
+    void WriteAdjugate(Matrix& Dst, const Matrix& Source, float Scale)
     {
-        Dst.D[0][0] = (Source.D[1][1] * Source.D[2][2] - Source.D[1][2] * Source.D[2][1]) * Scale;
-        Dst.D[1][0] = -(Source.D[1][0] * Source.D[2][2] - Source.D[1][2] * Source.D[2][0]) * Scale;
-        Dst.D[2][0] = (Source.D[1][0] * Source.D[2][1] - Source.D[1][1] * Source.D[2][0]) * Scale;
-        Dst.D[0][1] = -(Source.D[0][1] * Source.D[2][2] - Source.D[0][2] * Source.D[2][1]) * Scale;
-        Dst.D[1][1] = (Source.D[0][0] * Source.D[2][2] - Source.D[0][2] * Source.D[2][0]) * Scale;
-        Dst.D[2][1] = -(Source.D[0][0] * Source.D[2][1] - Source.D[0][1] * Source.D[2][0]) * Scale;
-        Dst.D[0][2] = (Source.D[0][1] * Source.D[1][2] - Source.D[0][2] * Source.D[1][1]) * Scale;
-        Dst.D[1][2] = -(Source.D[0][0] * Source.D[1][2] - Source.D[0][2] * Source.D[1][0]) * Scale;
-        Dst.D[2][2] = (Source.D[0][0] * Source.D[1][1] - Source.D[0][1] * Source.D[1][0]) * Scale;
+        Dst.E[0][0] = (Source.E[1][1] * Source.E[2][2] - Source.E[1][2] * Source.E[2][1]) * Scale;
+        Dst.E[1][0] = -(Source.E[1][0] * Source.E[2][2] - Source.E[1][2] * Source.E[2][0]) * Scale;
+        Dst.E[2][0] = (Source.E[1][0] * Source.E[2][1] - Source.E[1][1] * Source.E[2][0]) * Scale;
+        Dst.E[0][1] = -(Source.E[0][1] * Source.E[2][2] - Source.E[0][2] * Source.E[2][1]) * Scale;
+        Dst.E[1][1] = (Source.E[0][0] * Source.E[2][2] - Source.E[0][2] * Source.E[2][0]) * Scale;
+        Dst.E[2][1] = -(Source.E[0][0] * Source.E[2][1] - Source.E[0][1] * Source.E[2][0]) * Scale;
+        Dst.E[0][2] = (Source.E[0][1] * Source.E[1][2] - Source.E[0][2] * Source.E[1][1]) * Scale;
+        Dst.E[1][2] = -(Source.E[0][0] * Source.E[1][2] - Source.E[0][2] * Source.E[1][0]) * Scale;
+        Dst.E[2][2] = (Source.E[0][0] * Source.E[1][1] - Source.E[0][1] * Source.E[1][0]) * Scale;
     }
 
     // Retail FSQRT + FDIVR dword 1.0 (DAT_06f730f8). quat_slerp (LAB_06f724d0)
@@ -221,39 +221,39 @@ namespace
         float A;
         float B;
         float C;
-        float (FFastDot::*Kernel)(const FVector* Vec);
+        float (FFastDot::*Kernel)(const Vector* Vec);
         int SavedOps;
 
-        float FastDotZZZ(const FVector* Vec);
-        float FastDotZZO(const FVector* Vec);
-        float FastDotZZG(const FVector* Vec);
-        float FastDotZOZ(const FVector* Vec);
-        float FastDotZOO(const FVector* Vec);
-        float FastDotZOG(const FVector* Vec);
-        float FastDotZGZ(const FVector* Vec);
-        float FastDotZGO(const FVector* Vec);
-        float FastDotZGG(const FVector* Vec);
-        float FastDotOZZ(const FVector* Vec);
-        float FastDotOZO(const FVector* Vec);
-        float FastDotOZG(const FVector* Vec);
-        float FastDotOOZ(const FVector* Vec);
-        float FastDotOOO(const FVector* Vec);
-        float FastDotOOG(const FVector* Vec);
-        float FastDotOGZ(const FVector* Vec);
-        float FastDotOGO(const FVector* Vec);
-        float FastDotOGG(const FVector* Vec);
-        float FastDotGZZ(const FVector* Vec);
-        float FastDotGZO(const FVector* Vec);
-        float FastDotGZG(const FVector* Vec);
-        float FastDotGOZ(const FVector* Vec);
-        float FastDotGOO(const FVector* Vec);
-        float FastDotGOG(const FVector* Vec);
-        float FastDotGGZ(const FVector* Vec);
-        float FastDotGGO(const FVector* Vec);
-        float FastDotGGG(const FVector* Vec);
+        float FastDotZZZ(const Vector* Vec);
+        float FastDotZZO(const Vector* Vec);
+        float FastDotZZG(const Vector* Vec);
+        float FastDotZOZ(const Vector* Vec);
+        float FastDotZOO(const Vector* Vec);
+        float FastDotZOG(const Vector* Vec);
+        float FastDotZGZ(const Vector* Vec);
+        float FastDotZGO(const Vector* Vec);
+        float FastDotZGG(const Vector* Vec);
+        float FastDotOZZ(const Vector* Vec);
+        float FastDotOZO(const Vector* Vec);
+        float FastDotOZG(const Vector* Vec);
+        float FastDotOOZ(const Vector* Vec);
+        float FastDotOOO(const Vector* Vec);
+        float FastDotOOG(const Vector* Vec);
+        float FastDotOGZ(const Vector* Vec);
+        float FastDotOGO(const Vector* Vec);
+        float FastDotOGG(const Vector* Vec);
+        float FastDotGZZ(const Vector* Vec);
+        float FastDotGZO(const Vector* Vec);
+        float FastDotGZG(const Vector* Vec);
+        float FastDotGOZ(const Vector* Vec);
+        float FastDotGOO(const Vector* Vec);
+        float FastDotGOG(const Vector* Vec);
+        float FastDotGGZ(const Vector* Vec);
+        float FastDotGGO(const Vector* Vec);
+        float FastDotGGG(const Vector* Vec);
     };
 
-    typedef float (FFastDot::*FFastDotKernel)(const FVector* Vec);
+    typedef float (FFastDot::*FFastDotKernel)(const Vector* Vec);
 
     int ClassifyLane(float X)
     {
@@ -266,7 +266,7 @@ namespace
 
 #if defined(_M_IX86)
     // DAT_06f730fc — FLD of +0.0; FLDZ is the same value (ZZZ only).
-    __declspec(naked) float FFastDot::FastDotZZZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZZZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -274,7 +274,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotZZO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZZO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -283,7 +283,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotZZG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZZG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -293,7 +293,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotZOZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZOZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -302,7 +302,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotZOO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZOO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -312,7 +312,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotZOG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZOG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -323,7 +323,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotZGZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZGZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -333,7 +333,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotZGO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZGO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -344,7 +344,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotZGG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotZGG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -357,7 +357,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOZZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOZZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -366,7 +366,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOZO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOZO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -376,7 +376,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOZG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOZG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -387,7 +387,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOOZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOOZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -397,7 +397,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOOO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOOO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -408,7 +408,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOOG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOOG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -420,7 +420,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOGZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOGZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -431,7 +431,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOGO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOGO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -443,7 +443,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotOGG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotOGG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -457,7 +457,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGZZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGZZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -467,7 +467,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGZO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGZO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -478,7 +478,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGZG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGZG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -491,7 +491,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGOZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGOZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -502,7 +502,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGOO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGOO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -514,7 +514,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGOG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGOG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -528,7 +528,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGGZ(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGGZ(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -541,7 +541,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGGO(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGGO(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -555,7 +555,7 @@ namespace
             ret 4
         }
     }
-    __declspec(naked) float FFastDot::FastDotGGG(const FVector* /*Vec*/)
+    __declspec(naked) float FFastDot::FastDotGGG(const Vector* /*Vec*/)
     {
         __asm
         {
@@ -572,33 +572,33 @@ namespace
         }
     }
 #else
-    float FFastDot::FastDotZZZ(const FVector*) { return 0.0f; }
-    float FFastDot::FastDotZZO(const FVector* Vec) { return Vec->Z; }
-    float FFastDot::FastDotZZG(const FVector* Vec) { return Vec->Z * C; }
-    float FFastDot::FastDotZOZ(const FVector* Vec) { return Vec->Y; }
-    float FFastDot::FastDotZOO(const FVector* Vec) { return Vec->Z + Vec->Y; }
-    float FFastDot::FastDotZOG(const FVector* Vec) { return Vec->Z * C + Vec->Y; }
-    float FFastDot::FastDotZGZ(const FVector* Vec) { return Vec->Y * B; }
-    float FFastDot::FastDotZGO(const FVector* Vec) { return Vec->Y * B + Vec->Z; }
-    float FFastDot::FastDotZGG(const FVector* Vec) { return Vec->Z * C + Vec->Y * B; }
-    float FFastDot::FastDotOZZ(const FVector* Vec) { return Vec->X; }
-    float FFastDot::FastDotOZO(const FVector* Vec) { return Vec->Z + Vec->X; }
-    float FFastDot::FastDotOZG(const FVector* Vec) { return Vec->Z * C + Vec->X; }
-    float FFastDot::FastDotOOZ(const FVector* Vec) { return Vec->Y + Vec->X; }
-    float FFastDot::FastDotOOO(const FVector* Vec) { return Vec->Z + Vec->Y + Vec->X; }
-    float FFastDot::FastDotOOG(const FVector* Vec) { return Vec->Z * C + Vec->Y + Vec->X; }
-    float FFastDot::FastDotOGZ(const FVector* Vec) { return Vec->Y * B + Vec->X; }
-    float FFastDot::FastDotOGO(const FVector* Vec) { return Vec->Y * B + Vec->Z + Vec->X; }
-    float FFastDot::FastDotOGG(const FVector* Vec) { return Vec->Z * C + Vec->Y * B + Vec->X; }
-    float FFastDot::FastDotGZZ(const FVector* Vec) { return Vec->X * A; }
-    float FFastDot::FastDotGZO(const FVector* Vec) { return Vec->X * A + Vec->Z; }
-    float FFastDot::FastDotGZG(const FVector* Vec) { return Vec->Z * C + Vec->X * A; }
-    float FFastDot::FastDotGOZ(const FVector* Vec) { return Vec->X * A + Vec->Y; }
-    float FFastDot::FastDotGOO(const FVector* Vec) { return Vec->X * A + Vec->Z + Vec->Y; }
-    float FFastDot::FastDotGOG(const FVector* Vec) { return Vec->Z * C + Vec->X * A + Vec->Y; }
-    float FFastDot::FastDotGGZ(const FVector* Vec) { return Vec->Y * B + Vec->X * A; }
-    float FFastDot::FastDotGGO(const FVector* Vec) { return Vec->Y * B + Vec->X * A + Vec->Z; }
-    float FFastDot::FastDotGGG(const FVector* Vec) { return Vec->Z * C + Vec->Y * B + Vec->X * A; }
+    float FFastDot::FastDotZZZ(const Vector*) { return 0.0f; }
+    float FFastDot::FastDotZZO(const Vector* Vec) { return Vec->Z; }
+    float FFastDot::FastDotZZG(const Vector* Vec) { return Vec->Z * C; }
+    float FFastDot::FastDotZOZ(const Vector* Vec) { return Vec->Y; }
+    float FFastDot::FastDotZOO(const Vector* Vec) { return Vec->Z + Vec->Y; }
+    float FFastDot::FastDotZOG(const Vector* Vec) { return Vec->Z * C + Vec->Y; }
+    float FFastDot::FastDotZGZ(const Vector* Vec) { return Vec->Y * B; }
+    float FFastDot::FastDotZGO(const Vector* Vec) { return Vec->Y * B + Vec->Z; }
+    float FFastDot::FastDotZGG(const Vector* Vec) { return Vec->Z * C + Vec->Y * B; }
+    float FFastDot::FastDotOZZ(const Vector* Vec) { return Vec->X; }
+    float FFastDot::FastDotOZO(const Vector* Vec) { return Vec->Z + Vec->X; }
+    float FFastDot::FastDotOZG(const Vector* Vec) { return Vec->Z * C + Vec->X; }
+    float FFastDot::FastDotOOZ(const Vector* Vec) { return Vec->Y + Vec->X; }
+    float FFastDot::FastDotOOO(const Vector* Vec) { return Vec->Z + Vec->Y + Vec->X; }
+    float FFastDot::FastDotOOG(const Vector* Vec) { return Vec->Z * C + Vec->Y + Vec->X; }
+    float FFastDot::FastDotOGZ(const Vector* Vec) { return Vec->Y * B + Vec->X; }
+    float FFastDot::FastDotOGO(const Vector* Vec) { return Vec->Y * B + Vec->Z + Vec->X; }
+    float FFastDot::FastDotOGG(const Vector* Vec) { return Vec->Z * C + Vec->Y * B + Vec->X; }
+    float FFastDot::FastDotGZZ(const Vector* Vec) { return Vec->X * A; }
+    float FFastDot::FastDotGZO(const Vector* Vec) { return Vec->X * A + Vec->Z; }
+    float FFastDot::FastDotGZG(const Vector* Vec) { return Vec->Z * C + Vec->X * A; }
+    float FFastDot::FastDotGOZ(const Vector* Vec) { return Vec->X * A + Vec->Y; }
+    float FFastDot::FastDotGOO(const Vector* Vec) { return Vec->X * A + Vec->Z + Vec->Y; }
+    float FFastDot::FastDotGOG(const Vector* Vec) { return Vec->Z * C + Vec->X * A + Vec->Y; }
+    float FFastDot::FastDotGGZ(const Vector* Vec) { return Vec->Y * B + Vec->X * A; }
+    float FFastDot::FastDotGGO(const Vector* Vec) { return Vec->Y * B + Vec->X * A + Vec->Z; }
+    float FFastDot::FastDotGGG(const Vector* Vec) { return Vec->Z * C + Vec->Y * B + Vec->X * A; }
 #endif
 
     const FFastDotKernel G_FastDotKernels[27] = {
@@ -620,12 +620,12 @@ namespace
     static_assert(sizeof(FFastDotKernel) == 4, "MSVC simple-class member pointer is a code address");
 
     // Plain member dispatch; the ST0 result is stored straight to Dst.
-    void StoreKernelPlain(FFastDot& Dot, const FVector* Src, float* Dst)
+    void StoreKernelPlain(FFastDot& Dot, const Vector* Src, float* Dst)
     {
         *Dst = (Dot.*Dot.Kernel)(Src);
     }
 
-    void StoreKernelAdd(FFastDot& Dot, const FVector* Src, float* Dst, const float* Addend)
+    void StoreKernelAdd(FFastDot& Dot, const Vector* Src, float* Dst, const float* Addend)
     {
         *Dst = (Dot.*Dot.Kernel)(Src) + *Addend;
     }
@@ -640,44 +640,44 @@ namespace
         Dot.Kernel = G_FastDotKernels[KernelId];
     }
 
-    void TransformListFast(FVector* Dst, const FMatrix& Matrix, const FVector* Source, int Count,
-                           const FVector* Translation)
+    void TransformListFast(Vector* Dst, const Matrix& Mat, const Vector* Source, int Count,
+                           const Vector* Translation)
     {
         FFastDot Row0;
         FFastDot Row1;
         FFastDot Row2;
-        BindFastDot(Row0, Matrix.D[0][0], Matrix.D[0][1], Matrix.D[0][2]);
-        BindFastDot(Row1, Matrix.D[1][0], Matrix.D[1][1], Matrix.D[1][2]);
-        BindFastDot(Row2, Matrix.D[2][0], Matrix.D[2][1], Matrix.D[2][2]);
+        BindFastDot(Row0, Mat.E[0][0], Mat.E[0][1], Mat.E[0][2]);
+        BindFastDot(Row1, Mat.E[1][0], Mat.E[1][1], Mat.E[1][2]);
+        BindFastDot(Row2, Mat.E[2][0], Mat.E[2][1], Mat.E[2][2]);
 
-        const FVector* End = Source + Count;
-        const FVector* Src = Source;
-        FVector* Out = Dst;
+        const Vector* End = Source + Count;
+        const Vector* Src = Source;
+        Vector* Out = Dst;
 
         if (Row0.SavedOps + Row1.SavedOps + Row2.SavedOps < 4)
         {
             while (Src < End)
             {
-                const float X = Src->X;
-                const float Y = Src->Y;
-                const float Z = Src->Z;
+                const float X = Src->x;
+                const float Y = Src->y;
+                const float Z = Src->z;
                 if (Translation != nullptr)
                 {
                     // The FIRST row adds X/Z/Y; rows 1/2 add Z/Y/X.
                     // Each destination is written before reading the next row.
-                    Out->X = ((X * Matrix.D[0][0] + Z * Matrix.D[0][2]) +
-                              Y * Matrix.D[0][1]) + Translation->X;
-                    Out->Y = ((Z * Matrix.D[1][2] + Y * Matrix.D[1][1]) +
-                              X * Matrix.D[1][0]) + Translation->Y;
-                    Out->Z = ((Z * Matrix.D[2][2] + Y * Matrix.D[2][1]) +
-                              X * Matrix.D[2][0]) + Translation->Z;
+                    Out->x = ((X * Mat.E[0][0] + Z * Mat.E[0][2]) +
+                              Y * Mat.E[0][1]) + Translation->x;
+                    Out->y = ((Z * Mat.E[1][2] + Y * Mat.E[1][1]) +
+                              X * Mat.E[1][0]) + Translation->y;
+                    Out->z = ((Z * Mat.E[2][2] + Y * Mat.E[2][1]) +
+                              X * Mat.E[2][0]) + Translation->z;
                 }
                 else
                 {
                     // Z/Y/X addition order, one final float store.
-                    Out->X = (Z * Matrix.D[0][2] + Y * Matrix.D[0][1]) + X * Matrix.D[0][0];
-                    Out->Y = (Z * Matrix.D[1][2] + Y * Matrix.D[1][1]) + X * Matrix.D[1][0];
-                    Out->Z = (Z * Matrix.D[2][2] + Y * Matrix.D[2][1]) + X * Matrix.D[2][0];
+                    Out->x = (Z * Mat.E[0][2] + Y * Mat.E[0][1]) + X * Mat.E[0][0];
+                    Out->y = (Z * Mat.E[1][2] + Y * Mat.E[1][1]) + X * Mat.E[1][0];
+                    Out->z = (Z * Mat.E[2][2] + Y * Mat.E[2][1]) + X * Mat.E[2][0];
                 }
                 ++Src;
                 ++Out;
@@ -689,9 +689,9 @@ namespace
         {
             while (Src < End)
             {
-                StoreKernelAdd(Row0, Src, &Out->X, &Translation->X);
-                StoreKernelAdd(Row1, Src, &Out->Y, &Translation->Y);
-                StoreKernelAdd(Row2, Src, &Out->Z, &Translation->Z);
+                StoreKernelAdd(Row0, Src, &Out->x, &Translation->x);
+                StoreKernelAdd(Row1, Src, &Out->y, &Translation->y);
+                StoreKernelAdd(Row2, Src, &Out->z, &Translation->z);
                 ++Src;
                 ++Out;
             }
@@ -700,9 +700,9 @@ namespace
 
         while (Src < End)
         {
-            StoreKernelPlain(Row0, Src, &Out->X);
-            StoreKernelPlain(Row1, Src, &Out->Y);
-            StoreKernelPlain(Row2, Src, &Out->Z);
+            StoreKernelPlain(Row0, Src, &Out->x);
+            StoreKernelPlain(Row1, Src, &Out->y);
+            StoreKernelPlain(Row2, Src, &Out->z);
             ++Src;
             ++Out;
         }
@@ -743,7 +743,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_OK;
     }
 
-    GENRESULT DACOM_API Inverse(FMatrix& Dst, const FMatrix& Source) override
+    GENRESULT DACOM_API Inverse(Matrix& Dst, const Matrix& Source) override
     {
         const float Determinant = Det(Source);
         if (std::fabs(Determinant) > G_MinDet)
@@ -755,42 +755,42 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_INVALID_PARMS;
     }
 
-    GENRESULT DACOM_API Scale(FMatrix& Dst, const FMatrix& Source, float Scale) override
+    GENRESULT DACOM_API Scale(Matrix& Dst, const Matrix& Source, float Scale) override
     {
         for (int Row = 0; Row < 3; ++Row)
         {
             for (int Col = 0; Col < 3; ++Col)
-                Dst.D[Row][Col] = Source.D[Row][Col] * Scale;
+                Dst.E[Row][Col] = Source.E[Row][Col] * Scale;
         }
         return GR_OK;
     }
 
-    float DACOM_API Det(const FMatrix& Source) override
+    float DACOM_API Det(const Matrix& Source) override
     {
-        return Source.D[0][0] * Source.D[1][1] * Source.D[2][2] +
-               Source.D[0][1] * Source.D[1][2] * Source.D[2][0] +
-               Source.D[0][2] * Source.D[1][0] * Source.D[2][1] -
-               Source.D[0][0] * Source.D[1][2] * Source.D[2][1] -
-               Source.D[0][1] * Source.D[1][0] * Source.D[2][2] -
-               Source.D[0][2] * Source.D[1][1] * Source.D[2][0];
+        return Source.E[0][0] * Source.E[1][1] * Source.E[2][2] +
+               Source.E[0][1] * Source.E[1][2] * Source.E[2][0] +
+               Source.E[0][2] * Source.E[1][0] * Source.E[2][1] -
+               Source.E[0][0] * Source.E[1][2] * Source.E[2][1] -
+               Source.E[0][1] * Source.E[1][0] * Source.E[2][2] -
+               Source.E[0][2] * Source.E[1][1] * Source.E[2][0];
     }
 
-    GENRESULT DACOM_API MulQuat(FQuaternion& Dst, const FQuaternion& A, const FQuaternion& B) override
+    GENRESULT DACOM_API MulQuat(Quaternion& Dst, const Quaternion& A, const Quaternion& B) override
     {
-        Dst.W = A.W * B.W - (A.X * B.X + A.Y * B.Y + A.Z * B.Z);
-        Dst.X = A.W * B.X + B.W * A.X + (A.Y * B.Z - A.Z * B.Y);
-        Dst.Y = A.W * B.Y + B.W * A.Y + (A.Z * B.X - A.X * B.Z);
-        Dst.Z = A.W * B.Z + B.W * A.Z + (A.X * B.Y - A.Y * B.X);
+        Dst.w = A.w * B.w - (A.x * B.x + A.y * B.y + A.z * B.z);
+        Dst.x = A.w * B.x + B.w * A.x + (A.y * B.z - A.z * B.y);
+        Dst.y = A.w * B.y + B.w * A.y + (A.z * B.x - A.x * B.z);
+        Dst.z = A.w * B.z + B.w * A.z + (A.x * B.y - A.y * B.x);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API MulTransform(FTransform& Dst, const FTransform& A, const FTransform& B) override
+    GENRESULT DACOM_API MulTransform(Transform& Dst, const Transform& A, const Transform& B) override
     {
         // LAB_06f716f0: literal row/translation interleave and x87 sum order.
         // Input words are read after each output store, including aliased calls.
-        float* ResultTransform = &Dst.Rotation.D[0][0];
-        const float* LeftTransform = &A.Rotation.D[0][0];
-        const float* RightTransform = &B.Rotation.D[0][0];
+        float* ResultTransform = &Dst.Rotation.E[0][0];
+        const float* LeftTransform = &A.Rotation.E[0][0];
+        const float* RightTransform = &B.Rotation.E[0][0];
         __asm
         {
             mov eax, LeftTransform
@@ -912,13 +912,13 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_OK;
     }
 
-    GENRESULT DACOM_API MulMatrix(FMatrix& Dst, const FMatrix& A, const FMatrix& B) override
+    GENRESULT DACOM_API MulMatrix(Matrix& Dst, const Matrix& A, const Matrix& B) override
     {
         // LAB_06f71670: literal x87 loop, preserving product/add/store order
         // and immediate alias visibility between individual result writes.
-        float* ResultMatrix = &Dst.D[0][0];
-        const float* LeftMatrix = &A.D[0][0];
-        const float* RightMatrix = &B.D[0][0];
+        float* ResultMatrix = &Dst.E[0][0];
+        const float* LeftMatrix = &A.E[0][0];
+        const float* RightMatrix = &B.E[0][0];
         __asm
         {
             mov edx, ResultMatrix
@@ -964,27 +964,27 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_OK;
     }
 
-    GENRESULT DACOM_API TransformQuat(FVector& Dst, const FQuaternion& Quat, const FVector& Source) override
+    GENRESULT DACOM_API TransformQuat(Vector& Dst, const Quaternion& Quat, const Vector& Source) override
     {
-        const float DotVv = Quat.X * Quat.X + Quat.Y * Quat.Y + Quat.Z * Quat.Z;
-        const float Scale = Quat.W * Quat.W - DotVv;
-        const float DotQv = Quat.X * Source.X + Quat.Y * Source.Y + Quat.Z * Source.Z;
-        const float CrossX = Quat.Y * Source.Z - Quat.Z * Source.Y;
-        const float CrossY = Quat.Z * Source.X - Quat.X * Source.Z;
-        const float CrossZ = Quat.X * Source.Y - Quat.Y * Source.X;
-        Dst.X = Source.X * Scale + Quat.X * (2.0f * DotQv) + CrossX * (Quat.W * 2.0f);
-        Dst.Y = Source.Y * Scale + Quat.Y * (2.0f * DotQv) + CrossY * (Quat.W * 2.0f);
-        Dst.Z = Source.Z * Scale + Quat.Z * (2.0f * DotQv) + CrossZ * (Quat.W * 2.0f);
+        const float DotVv = Quat.x * Quat.x + Quat.y * Quat.y + Quat.z * Quat.z;
+        const float Scale = Quat.w * Quat.w - DotVv;
+        const float DotQv = Quat.x * Source.x + Quat.y * Source.y + Quat.z * Source.z;
+        const float CrossX = Quat.y * Source.z - Quat.z * Source.y;
+        const float CrossY = Quat.z * Source.x - Quat.x * Source.z;
+        const float CrossZ = Quat.x * Source.y - Quat.y * Source.x;
+        Dst.x = Source.x * Scale + Quat.x * (2.0f * DotQv) + CrossX * (Quat.w * 2.0f);
+        Dst.y = Source.y * Scale + Quat.y * (2.0f * DotQv) + CrossY * (Quat.w * 2.0f);
+        Dst.z = Source.z * Scale + Quat.z * (2.0f * DotQv) + CrossZ * (Quat.w * 2.0f);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API TransformXform(FVector& Dst, const FTransform& Xform, const FVector& Source) override
+    GENRESULT DACOM_API TransformXform(Vector& Dst, const Transform& Xform, const Vector& Source) override
     {
         // LAB_06f71890: translation is added while each dot remains extended,
         // then that component is stored before the next source read.
-        float* ResultVector = &Dst.X;
-        const float* TransformValues = &Xform.Rotation.D[0][0];
-        const float* SourceVector = &Source.X;
+        float* ResultVector = &Dst.x;
+        const float* TransformValues = &Xform.Rotation.E[0][0];
+        const float* SourceVector = &Source.x;
         __asm
         {
             mov eax, TransformValues
@@ -1024,80 +1024,81 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_OK;
     }
 
-    GENRESULT DACOM_API TransformMatrix(FVector& Dst, const FMatrix& Matrix, const FVector& Source) override
+    GENRESULT DACOM_API TransformMatrix(Vector& Dst, const Matrix& Mat, const Vector& Source) override
     {
-        MulVecByMatrix(Dst, Matrix, Source);
+        MulVecByMatrix(Dst, Mat, Source);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API Rotate(FVector& Dst, const FTransform& Xform, const FVector& Source) override
+    GENRESULT DACOM_API Rotate(Vector& Dst, const Transform& Xform, const Vector& Source) override
     {
         MulVecByMatrix(Dst, Xform.Rotation, Source);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API InverseRotate(FVector& Dst, const FTransform& Xform, const FVector& Source) override
+    GENRESULT DACOM_API InverseRotate(Vector& Dst, const Transform& Xform, const Vector& Source) override
     {
         MulVecByTranspose(Dst, Xform.Rotation, Source);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API TransposeTransform(FVector& Dst, const FMatrix& Matrix, const FVector& Source) override
+    GENRESULT DACOM_API TransposeTransform(Vector& Dst, const Matrix& Mat, const Vector& Source) override
     {
-        MulVecByTranspose(Dst, Matrix, Source);
+        MulVecByTranspose(Dst, Mat, Source);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API InverseTransform(FVector& Dst, const FTransform& Xform, const FVector& Source) override
+    GENRESULT DACOM_API InverseTransform(Vector& Dst, const Transform& Xform, const Vector& Source) override
     {
-        const FVector Delta = {Source.X - Xform.Translation.X, Source.Y - Xform.Translation.Y,
-                               Source.Z - Xform.Translation.Z};
+        const Vector Delta = {Source.x - Xform.Translation.x, Source.y - Xform.Translation.y,
+                               Source.z - Xform.Translation.z};
         MulVecByTranspose(Dst, Xform.Rotation, Delta);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API TransformListXform(FVector* Dst, const FTransform& Xform, const FVector* Source,
+    GENRESULT DACOM_API TransformListXform(Vector* Dst, const Transform& Xform, const Vector* Source,
                                            int Count) override
     {
-        if (Xform.Translation.X == 0.0f && Xform.Translation.Y == 0.0f && Xform.Translation.Z == 0.0f)
+        if (Xform.Translation.x == 0.0f && Xform.Translation.y == 0.0f && Xform.Translation.z == 0.0f)
             return TransformListMatrix(Dst, Xform.Rotation, Source, Count);
 
         TransformListFast(Dst, Xform.Rotation, Source, Count, &Xform.Translation);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API TransformListMatrix(FVector* Dst, const FMatrix& Matrix, const FVector* Source,
+    GENRESULT DACOM_API TransformListMatrix(Vector* Dst, const Matrix& Mat, const Vector* Source,
                                             int Count) override
     {
-        TransformListFast(Dst, Matrix, Source, Count, nullptr);
+        TransformListFast(Dst, Mat, Source, Count, nullptr);
         return GR_OK;
     }
 
-    GENRESULT DACOM_API TransposeTransformList(FVector* Dst, const FMatrix& Matrix, const FVector* Source,
+    GENRESULT DACOM_API TransposeTransformList(Vector* Dst, const Matrix& Mat, const Vector* Source,
                                                int Count) override
     {
-        FMatrix Transposed;
-        TransposeMatrix(Transposed, Matrix);
+        Matrix Transposed;
+        TransposeMatrix(Transposed, Mat);
         return TransformListMatrix(Dst, Transposed, Source, Count);
     }
 
-    GENRESULT DACOM_API InverseTransformList(FVector* Dst, const FTransform& Xform, const FVector* Source,
+    GENRESULT DACOM_API InverseTransformList(Vector* Dst, const Transform& Xform, const Vector* Source,
                                              int Count) override
     {
-        FVector NegTranslation = {-Xform.Translation.X, -Xform.Translation.Y, -Xform.Translation.Z};
-        FVector InvTranslation;
+        Vector NegTranslation = {-Xform.Translation.x, -Xform.Translation.y, -Xform.Translation.z};
+        Vector InvTranslation;
         MulVecByTranspose(InvTranslation, Xform.Rotation, NegTranslation);
 
-        FTransform Inverse = {};
+        Transform Inverse;
+        std::memset(&Inverse, 0, sizeof(Inverse));
         TransposeMatrix(Inverse.Rotation, Xform.Rotation);
         Inverse.Translation = InvTranslation;
         return TransformListXform(Dst, Inverse, Source, Count);
     }
 
-    GENRESULT DACOM_API MatrixToQuaternion(FQuaternion& Dst, const FMatrix& Source) override
+    GENRESULT DACOM_API MatrixToQuaternion(Quaternion& Dst, const Matrix& Source) override
     {
-        const FMatrix* SourceMatrix = &Source;
-        FQuaternion* DestinationQuat = &Dst;
+        const Matrix* SourceMatrix = &Source;
+        Quaternion* DestinationQuat = &Dst;
         const float Zero = 0.0f;
         const float One = 1.0f;
         const float Half = 0.5f;
@@ -1203,7 +1204,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_OK;
     }
 
-    GENRESULT DACOM_API QuaternionToMatrix(FMatrix& Dst, const FQuaternion& Quat) override
+    GENRESULT DACOM_API QuaternionToMatrix(Matrix& Dst, const Quaternion& Quat) override
     {
         // LAB_06f723c0: retain S/Xs and selected products on x87; the
         // asymmetric float scratch stores are part of the arithmetic contract.
@@ -1301,12 +1302,12 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_OK;
     }
 
-    GENRESULT DACOM_API QuatSlerp(FQuaternion& Dst, const FQuaternion& A, const FQuaternion& B, float T) override
+    GENRESULT DACOM_API QuatSlerp(Quaternion& Dst, const Quaternion& A, const Quaternion& B, float T) override
     {
         return QuatSlerpValue(Dst, A, B, &T);
     }
 
-    GENRESULT DACOM_API QuatSlerpValue(FQuaternion& Dst, const FQuaternion& A, const FQuaternion& B, const float* T) override
+    GENRESULT DACOM_API QuatSlerpValue(Quaternion& Dst, const Quaternion& A, const Quaternion& B, const float* T) override
     {
         // LAB_06f724d0: normalized linear interpolation, literal x87 terms,
         // component store order and NaN hemisphere selection. Inputs may alias Dst.
@@ -1413,14 +1414,14 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_OK;
     }
 
-    GENRESULT DACOM_API GeneralInverse(FTransform& Dst, float& W, const FTransform& Source) override
+    GENRESULT DACOM_API GeneralInverse(Transform& Dst, float& W, const Transform& Source) override
     {
-        const float Determinant = Source.Rotation.D[0][0] * (Source.Rotation.D[1][1] * Source.Rotation.D[2][2] -
-                                                             Source.Rotation.D[2][1] * Source.Rotation.D[1][2]) -
-                                  Source.Rotation.D[0][1] * (Source.Rotation.D[1][0] * Source.Rotation.D[2][2] -
-                                                             Source.Rotation.D[2][0] * Source.Rotation.D[1][2]) +
-                                  Source.Rotation.D[0][2] * (Source.Rotation.D[1][0] * Source.Rotation.D[2][1] -
-                                                             Source.Rotation.D[2][0] * Source.Rotation.D[1][1]);
+        const float Determinant = Source.Rotation.E[0][0] * (Source.Rotation.E[1][1] * Source.Rotation.E[2][2] -
+                                                             Source.Rotation.E[2][1] * Source.Rotation.E[1][2]) -
+                                  Source.Rotation.E[0][1] * (Source.Rotation.E[1][0] * Source.Rotation.E[2][2] -
+                                                             Source.Rotation.E[2][0] * Source.Rotation.E[1][2]) +
+                                  Source.Rotation.E[0][2] * (Source.Rotation.E[1][0] * Source.Rotation.E[2][1] -
+                                                             Source.Rotation.E[2][0] * Source.Rotation.E[1][1]);
 
         GENRESULT Result = GR_OK;
         float InvDet = 1.0f;
@@ -1431,20 +1432,20 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
 
         WriteAdjugate(Dst.Rotation, Source.Rotation, InvDet);
 
-        const FMatrix& M = Source.Rotation;
-        const FVector& T = Source.Translation;
-        Dst.Translation.X = -(M.D[0][1] * M.D[1][2] * T.Z + M.D[1][1] * M.D[2][2] * T.X + M.D[2][1] * M.D[0][2] * T.Y -
-                              M.D[0][1] * M.D[2][2] * T.Y - M.D[1][1] * M.D[0][2] * T.Z - M.D[2][1] * M.D[1][2] * T.X) *
+        const Matrix& M = Source.Rotation;
+        const Vector& T = Source.Translation;
+        Dst.Translation.x = -(M.E[0][1] * M.E[1][2] * T.z + M.E[1][1] * M.E[2][2] * T.x + M.E[2][1] * M.E[0][2] * T.y -
+                              M.E[0][1] * M.E[2][2] * T.y - M.E[1][1] * M.E[0][2] * T.z - M.E[2][1] * M.E[1][2] * T.x) *
                             InvDet;
-        Dst.Translation.Y = (M.D[0][0] * M.D[1][2] * T.Z + M.D[1][0] * M.D[2][2] * T.X + M.D[2][0] * M.D[0][2] * T.Y -
-                             M.D[0][0] * M.D[2][2] * T.Y - M.D[1][0] * M.D[0][2] * T.Z - M.D[2][0] * M.D[1][2] * T.X) *
+        Dst.Translation.y = (M.E[0][0] * M.E[1][2] * T.z + M.E[1][0] * M.E[2][2] * T.x + M.E[2][0] * M.E[0][2] * T.y -
+                             M.E[0][0] * M.E[2][2] * T.y - M.E[1][0] * M.E[0][2] * T.z - M.E[2][0] * M.E[1][2] * T.x) *
                             InvDet;
-        Dst.Translation.Z = -(M.D[0][0] * M.D[1][1] * T.Z + M.D[1][0] * M.D[2][1] * T.X + M.D[2][0] * M.D[0][1] * T.Y -
-                              M.D[0][0] * M.D[2][1] * T.Y - M.D[1][0] * M.D[0][1] * T.Z - M.D[2][0] * M.D[1][1] * T.X) *
+        Dst.Translation.z = -(M.E[0][0] * M.E[1][1] * T.z + M.E[1][0] * M.E[2][1] * T.x + M.E[2][0] * M.E[0][1] * T.y -
+                              M.E[0][0] * M.E[2][1] * T.y - M.E[1][0] * M.E[0][1] * T.z - M.E[2][0] * M.E[1][1] * T.x) *
                             InvDet;
 
-        W = (M.D[0][0] * M.D[1][1] * M.D[2][2] + M.D[1][0] * M.D[2][1] * M.D[0][2] + M.D[2][0] * M.D[0][1] * M.D[1][2] -
-             M.D[2][0] * M.D[1][1] * M.D[0][2] - M.D[0][0] * M.D[2][1] * M.D[1][2] - M.D[1][0] * M.D[0][1] * M.D[2][2]) *
+        W = (M.E[0][0] * M.E[1][1] * M.E[2][2] + M.E[1][0] * M.E[2][1] * M.E[0][2] + M.E[2][0] * M.E[0][1] * M.E[1][2] -
+             M.E[2][0] * M.E[1][1] * M.E[0][2] - M.E[0][0] * M.E[2][1] * M.E[1][2] - M.E[1][0] * M.E[0][1] * M.E[2][2]) *
             InvDet;
         return Result;
     }

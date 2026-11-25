@@ -91,8 +91,8 @@ namespace
     {
         ~FLFxMesh() override;
 
-        GENRESULT DACOM_API SetTransform(void* Transform) override;
-        float* DACOM_API GetTransform() override;
+        GENRESULT DACOM_API SetTransform(const Transform* Xform) override;
+        const Transform* DACOM_API GetTransform() override;
         GENRESULT DACOM_API Update(void* Arg) override;
         GENRESULT DACOM_API Render(void* Camera) override;
         GENRESULT DACOM_API Destroy() override;
@@ -155,14 +155,14 @@ namespace
         return 0;
     }
 
-    GENRESULT DACOM_API FLFxMesh::SetTransform(void* Transform)
+    GENRESULT DACOM_API FLFxMesh::SetTransform(const Transform* Xform)
     {
         // LAB_004f6910 (RET 8).
-        ClientMeshHolderSetMatrix(this, Transform);
+        ClientMeshHolderSetMatrix(this, Xform);
         return GR_OK;
     }
 
-    float* DACOM_API FLFxMesh::GetTransform()
+    const Transform* DACOM_API FLFxMesh::GetTransform()
     {
         // LAB_004f6930 (RET 4).
         return ClientMeshHolderGetTransform(this);
@@ -195,11 +195,10 @@ namespace
     {
         // FUN_004f6a70 (RET 4). The auxiliary material entry is left alone.
         Archetype::ReleaseMaterialEntrySlot(&MaterialEntry);
-        void* const NoInstance = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
-        if (EngineInstance != NoInstance)
+        if (EngineInstance != InvalidInstanceIndex)
         {
             DALib::Engine->DestroyInstance(EngineInstance);
-            EngineInstance = NoInstance;
+            EngineInstance = InvalidInstanceIndex;
         }
         return GR_OK;
     }
@@ -287,7 +286,7 @@ namespace
             return GR_OK;
 
         *Out = Mesh;
-        void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(ArchHandle));
+        const ArchetypeIndex Loaded = ArchHandle;
         ClientMeshHolderSetMaterials(Mesh, Path.Text, nullptr);
         ClientMeshHolderBindInstance(Mesh, Loaded);
         ClientMeshHolderSetPosition(Mesh, Position);

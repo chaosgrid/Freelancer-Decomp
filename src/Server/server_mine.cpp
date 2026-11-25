@@ -76,7 +76,7 @@ bool Mine::create(Archetype::Root* Arch)
     // nothing.
     Arch->create_instance(static_cast<IEngineInstance*>(Object));
 
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Object->EngineInstanceId), 0, nullptr);
+    DALib::Engine->UpdateInstance(Object->EngineInstanceId, 0, nullptr);
 
     // open (vt+0x4c) goes through the CSimple narrowing, not null-tested.
     CObject* Narrowed = Object;

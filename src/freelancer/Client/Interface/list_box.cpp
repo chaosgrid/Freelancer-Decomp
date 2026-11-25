@@ -64,14 +64,14 @@ bool ListBox::HitTest(float const* Ray)
 {
     // FUN_005a26a0: the ray's point at this object's depth inside [x, x + width] and
     // [y - height, y]. The y product is rounded to float; the x difference stays double.
-    double const T = static_cast<double>(Position[2]) / Ray[2];
+    double const T = static_cast<double>(Position.z) / Ray[2];
     float const PointY = static_cast<float>(T * Ray[1]);
-    double const DeltaX = T * Ray[0] - Position[0];
+    double const DeltaX = T * Ray[0] - Position.x;
     if (!(DeltaX >= 0.0))
         return false;
     if (!(DeltaX <= Width))
         return false;
-    double const DeltaY = static_cast<double>(Position[1]) - PointY;
+    double const DeltaY = static_cast<double>(Position.y) - PointY;
     if (!(DeltaY >= 0.0))
         return false;
     if (!(DeltaY <= Height))
@@ -108,10 +108,10 @@ void ListBox::Update()
 
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
-    TextWinProjectPoint(Position, &ScreenX, &ScreenY);
+    TextWinProjectPoint(&Position.x, &ScreenX, &ScreenY);
     float ScreenWidth = 0.0f;
     float ScreenHeight = 0.0f;
-    TextWinProjectExtent(Width, Height, Position[2], &ScreenWidth, &ScreenHeight);
+    TextWinProjectExtent(Width, Height, Position.z, &ScreenWidth, &ScreenHeight);
 
     HoverIndex = -1;
 
@@ -149,10 +149,10 @@ void ListBox::Draw()
 
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
-    TextWinProjectPoint(Position, &ScreenX, &ScreenY);
+    TextWinProjectPoint(&Position.x, &ScreenX, &ScreenY);
     float ScreenWidth = 0.0f;
     float ScreenHeight = 0.0f;
-    TextWinProjectExtent(Width, Height, Position[2], &ScreenWidth, &ScreenHeight);
+    TextWinProjectExtent(Width, Height, Position.z, &ScreenWidth, &ScreenHeight);
     int const BoxWidth = static_cast<int>(floor(static_cast<double>(ScreenWidth)));
 
     // The row origin lives on the stack as {x, y, x, y}; Paint reads the first two, and y
@@ -215,7 +215,7 @@ void ListBox::Draw()
 
     float FrameWidth = 0.0f;
     float FrameHeight = 0.0f;
-    TextWinProjectExtent(Width, Height, Position[2], &FrameWidth, &FrameHeight);
+    TextWinProjectExtent(Width, Height, Position.z, &FrameWidth, &FrameHeight);
     float const Left = Origin[0];
     float const Top = Origin[1];
     float const Right = static_cast<float>(static_cast<double>(FrameWidth) + Left);

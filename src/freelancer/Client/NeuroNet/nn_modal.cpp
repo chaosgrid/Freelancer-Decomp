@@ -116,7 +116,7 @@ bool NnArrivalText::Create(Win3D* NewParent, void* Data)
     Caption->Flags = static_cast<unsigned char>(Caption->Flags & 0xfc);
 
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
 
     HoldTime = 2.0f;
     Delay = 4.0f;
@@ -383,7 +383,7 @@ void NnMainButtonOnModalOpen()
     G_NnMainButton->ClosePanel();
 }
 
-void NnMainButtonSetPanelOrigin(int PanelId, float const* Origin)
+void NnMainButtonSetPanelOrigin(int PanelId, Vector const* Origin)
 {
     // FUN_0045a780.
     if (G_NnMainButton == nullptr)

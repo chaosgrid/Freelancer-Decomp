@@ -91,7 +91,7 @@ struct FGateTunnelCurve
 struct FGateTunnelLayer
 {
     FTextureRef Texture;  // +0x00 texture (a G_EffectShapeDB shape's record)
-    FVector Color;        // +0x08 color (defaults 0.5)
+    Vector Color;        // +0x08 color (defaults 0.5)
     float NearAlpha;      // +0x14 near_alpha (1.0)
     float FarAlpha;       // +0x18 far_alpha (0.0)
     float RadiusFactor;   // +0x1c radius_factor (1.0)
@@ -129,7 +129,7 @@ struct FGateTunnel
     void Draw(FSpaceCamera* Camera);
     // FUN_004ffbb0: the path frame at T -- columns (left, up, forward), the point on the path as
     // translation.
-    void BuildFrame(FTransform* Out, float T) const;
+    void BuildFrame(Transform* Out, float T) const;
     // FUN_004ffe50: one layer's ring strips from T0 to T1.
     void EmitLayer(float T0, float T1, FGateTunnelLayer* Layer, int LayerIndex);
     // FUN_00500a80.
@@ -155,8 +155,8 @@ struct FGateTunnel
     float NumSSteps;               // +0x0a4 num_s_steps (12)
     float MinRotation;             // +0x0a8 min_rotation (-pi)
     float MaxRotation;             // +0x0ac max_rotation (pi)
-    FVector MinRgb;                // +0x0b0 min_rgb (0)
-    FVector MaxRgb;                // +0x0bc max_rgb (0)
+    Vector MinRgb;                // +0x0b0 min_rgb (0)
+    Vector MaxRgb;                // +0x0bc max_rgb (0)
     FGateTunnelCurve PathX;        // +0x0c8
     FGateTunnelCurve PathY;        // +0x0f0
     FGateTunnelCurve PathZ;        // +0x118

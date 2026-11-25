@@ -318,7 +318,7 @@ bool NnNews::Create(Win3D* NewParent, void* Data)
 
     DrawLayer = 0x64;
     SetOffset(0.0f, 0.0f, 0.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
 
     IconPathCount = 7;
     IconPaths = static_cast<char const**>(::operator new(0x1c));
@@ -753,7 +753,7 @@ intptr_t NnNews::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Target = reinterpret_cast<float const*>(A);
         SetOffset(Target[0], Target[1], Target[2]);
-        SetPosition(Position);
+        SetPosition(&Position.x);
         return 0;
     }
     case kWinNotifyClick:

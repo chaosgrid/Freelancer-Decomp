@@ -7,7 +7,7 @@
 #pragma once
 
 #include "dacom.h"
-#include "x86math.h"            // FVector
+#include "x86math.h"            // Vector
 #include "audio/dsound8.h"
 
 // soundmanager.dll public ABI. Source: EXE/Disasm/soundmanager.dll, docs/re/audio.md.
@@ -19,8 +19,7 @@
 // menu_sound_arch.cpp (docs/re/cross_dll_protocol.md).
 
 // The listener/source vectors this interface takes are plain 3-float records (x86math.h's
-// FVector).
-typedef FVector FVec3;
+// Vector).
 
 struct ISoundManagerStatus : IDAComponent
 {
@@ -92,7 +91,7 @@ struct ISoundSource : IDAComponent
     virtual GENRESULT DACOM_API GetPan(long* Out) = 0;
     // 12 +0x30 RET 0x8 -- LAB_00429d30: world position, resolved through DALib::Engine when
     // the source is attached (this+0x60 != -1).
-    virtual GENRESULT DACOM_API GetPosition(FVec3* Out) = 0;
+    virtual GENRESULT DACOM_API GetPosition(Vector* Out) = 0;
     // 13 +0x34 RET 0x8 -- LAB_00429bf0. The mixer defaults it to 10.0f before asking.
     virtual GENRESULT DACOM_API GetMinDistance(float* Out) = 0;
     // 14 +0x38 RET 0x8 -- FUN_00429c20. Default 500.0f; squared into the mixer's range cull.
@@ -101,11 +100,11 @@ struct ISoundSource : IDAComponent
     virtual GENRESULT DACOM_API GetConeAngles(unsigned long* Inside,
                                               unsigned long* Outside) = 0;
     // 16 +0x40 RET 0x8 -- LAB_00429f60.
-    virtual GENRESULT DACOM_API GetConeOrientation(FVec3* Out) = 0;
+    virtual GENRESULT DACOM_API GetConeOrientation(Vector* Out) = 0;
     // 17 +0x44 RET 0x8 -- LAB_00429f20.
     virtual GENRESULT DACOM_API GetConeOutsideVolume(float* Out) = 0;
     // 18 +0x48 RET 0x8 -- LAB_00429de0.
-    virtual GENRESULT DACOM_API GetVelocity(FVec3* Out) = 0;
+    virtual GENRESULT DACOM_API GetVelocity(Vector* Out) = 0;
     // 19 +0x4C RET 0x8 -- the mixer forwards the answer straight into EAX 2.0 listener
     // property 1 via IKsPropertySet, so it is an environment id.
     virtual GENRESULT DACOM_API GetEaxEnvironment(unsigned long* Out) = 0;
@@ -142,7 +141,7 @@ struct ISoundSource : IDAComponent
     // 30 LAB_00429730 bare RET, 0 args -- sets up an SEH frame, so it owns a C++ object.
     virtual unsigned long __thiscall GetDurationMs() = 0;
     // 31 LAB_00429450 RET 0x4: write mixer score, preserving x87 rounding and unordered branches.
-    virtual void __thiscall ComputeMixerScore(const float* Listener) = 0;
+    virtual void __thiscall ComputeMixerScore(const Vector* Listener) = 0;
     // 32 LAB_00429330: clamps source attenuation to [-96, 0] dB, preserving NaN bits.
     virtual void __thiscall SetAttenuation(float Attenuation) = 0;
     // 33 LAB_00429370 RET 0x4 -- clamps pan to [-10000, 10000]; NaN is stored unchanged.
@@ -155,10 +154,10 @@ struct ISoundSource : IDAComponent
 
     // 36..39: __thiscall, object in ECX -- see the header note above.
     // 36 +0x90 RET 0x4 -- LAB_00429dc0 copies three floats into this+0x48.
-    virtual void __thiscall SetVelocity(const float* Velocity) = 0;
+    virtual void __thiscall SetVelocity(const Vector* Velocity) = 0;
     // 37 +0x94 RET 0x8 -- FUN_00429e70: this+0x60 = handle, then three floats from Pose+0x24
     // into this+0x30.
-    virtual void __thiscall SetPose(int AttachHandle, const float* Transform) = 0;
+    virtual void __thiscall SetPose(int AttachHandle, const Transform* Pose) = 0;
     // 38 +0x98 RET 0x4 -- LAB_004299a0 clamps the pitch into +/-100.0f at this+0x10.
     virtual void __thiscall SetPitch(float Pitch) = 0;
     // 39 +0x9C bare RET -- LAB_00428810 is `MOV EAX,[ECX+0x60]; RET`. Zero arguments, and the
@@ -175,7 +174,7 @@ struct ISoundSource : IDAComponent
     // integrates the velocity triple at +0x48 into the position at +0x30 by that delta, then
     // calls its own slot 31 with the first argument and slot 29 (IsFinished), returning the
     // logical NOT of that. The base class body FUN_00429690 is the same minus the integration.
-    virtual unsigned char __thiscall Update(const float* Listener, float DeltaSeconds) = 0;
+    virtual unsigned char __thiscall Update(const Vector* Listener, float DeltaSeconds) = 0;
 };
 
 // ISoundListenerPose -- the camera pose ISoundManager::MixerTick takes. FUN_06ee6e20 copies
@@ -188,9 +187,9 @@ struct ISoundSource : IDAComponent
 // slots 14 / 15 / 16 just before. No port class implements it.
 struct ISoundListenerPose : IDAComponent
 {
-    virtual int DACOM_API GetOrientation(FVec3* OutFront, FVec3* OutUp) = 0; // +0x0C
-    virtual int DACOM_API GetPosition(FVec3* Out) = 0;                       // +0x10
-    virtual int DACOM_API GetVelocity(FVec3* Out) = 0;                       // +0x14
+    virtual int DACOM_API GetOrientation(Vector* OutFront, Vector* OutUp) = 0; // +0x0C
+    virtual int DACOM_API GetPosition(Vector* Out) = 0;                       // +0x10
+    virtual int DACOM_API GetVelocity(Vector* Out) = 0;                       // +0x14
     virtual int DACOM_API GetDistanceFactor(float* Out) = 0;                 // +0x18
     virtual int DACOM_API GetDopplerFactor(float* Out) = 0;                  // +0x1C
     virtual int DACOM_API GetRolloffFactor(float* Out) = 0;                  // +0x20
@@ -212,21 +211,21 @@ struct ISoundManager : IDAComponent
     virtual GENRESULT DACOM_API GetEaxPreview(unsigned long* Env, unsigned long* Vol,
                                               unsigned long* Decay,
                                               unsigned long* Damp) = 0;                // 12
-    virtual GENRESULT DACOM_API SetOrientation(FVector* Front, FVector* Up) = 0;           // 13
+    virtual GENRESULT DACOM_API SetOrientation(Vector* Front, Vector* Up) = 0;           // 13
     // 14: Front = column 2 (m[2], m[5], m[8]), Up = column 1 (m[1], m[4], m[7]) - 06ee2380.
-    virtual GENRESULT DACOM_API SetOrientationFromMatrix(float* Matrix) = 0;           // 14
-    virtual GENRESULT DACOM_API SetListenerPosition(FVector* Pos) = 0;                   // 15
-    virtual GENRESULT DACOM_API SetListenerVelocity(FVector* Vel) = 0;                   // 16
+    virtual GENRESULT DACOM_API SetOrientationFromMatrix(const Matrix* Orient) = 0;           // 14
+    virtual GENRESULT DACOM_API SetListenerPosition(Vector* Pos) = 0;                   // 15
+    virtual GENRESULT DACOM_API SetListenerVelocity(Vector* Vel) = 0;                   // 16
     virtual GENRESULT DACOM_API SetDistanceFactor(float Value) = 0;                    // 17
     virtual GENRESULT DACOM_API SetDopplerFactor(float Value) = 0;                     // 18
     virtual GENRESULT DACOM_API SetRolloffFactor(float Value) = 0;                     // 19
     // 20..23 return no status: retail leaves the (last) out pointer in EAX (06ee2730, 25f0, 27c0,
     // 2810). Slot 20 writes (front, up) as slot 13 took them (stored +0xA8 negated back); slot 21
     // writes columns (right, up, front), the inverse of slot 14.
-    virtual GENRESULT DACOM_API GetOrientationSpace(FVector* Pos, FVector* Vel) = 0;       // 20
-    virtual GENRESULT DACOM_API GetOrientationMatrix(float* Out9) = 0;                 // 21
-    virtual GENRESULT DACOM_API GetListenerPosition(FVector* Out) = 0;                   // 22
-    virtual GENRESULT DACOM_API GetListenerVelocity(FVector* Out) = 0;                   // 23
+    virtual GENRESULT DACOM_API GetOrientationSpace(Vector* Pos, Vector* Vel) = 0;       // 20
+    virtual GENRESULT DACOM_API GetOrientationMatrix(Matrix* Out9) = 0;                 // 21
+    virtual GENRESULT DACOM_API GetListenerPosition(Vector* Out) = 0;                   // 22
+    virtual GENRESULT DACOM_API GetListenerVelocity(Vector* Out) = 0;                   // 23
     virtual float DACOM_API GetDistanceFactor() = 0;                                   // 24
     virtual float DACOM_API GetDopplerFactor() = 0;                                    // 25
     virtual float DACOM_API GetRolloffFactor() = 0;                                    // 26

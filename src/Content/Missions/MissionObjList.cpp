@@ -1145,12 +1145,12 @@ bool FObjListFollowPlayer::Execute(FContentShipBase* Ship)
         pub::AI::DirectiveFollowOp FollowOp;
         FollowOp.TargetId = Ship->SpaceObjId;
         FollowOp.FollowDistance = 1000.0f;
-        FVector LeaderPosition = Formation->GetSlotPosition(static_cast<unsigned int>(LeaderSlot));
-        FVector MemberPosition = Formation->GetSlotPosition(MemberSlot);
+        Vector LeaderPosition = Formation->GetSlotPosition(static_cast<unsigned int>(LeaderSlot));
+        Vector MemberPosition = Formation->GetSlotPosition(MemberSlot);
         ++MemberSlot;
-        FollowOp.FollowOffsetX = MemberPosition.X - LeaderPosition.X;
-        FollowOp.FollowOffsetY = MemberPosition.Y - LeaderPosition.Y;
-        FollowOp.FollowOffsetZ = MemberPosition.Z - LeaderPosition.Z;
+        FollowOp.FollowOffsetX = MemberPosition.x - LeaderPosition.x;
+        FollowOp.FollowOffsetY = MemberPosition.y - LeaderPosition.y;
+        FollowOp.FollowOffsetZ = MemberPosition.z - LeaderPosition.z;
 
         Member->CancelDirectives();
         DefaultPriority(&FollowOp, Member);

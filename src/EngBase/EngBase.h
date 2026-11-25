@@ -271,30 +271,32 @@ struct FHardpointRecord
 typedef std::list<FHardpointRecord> FHardpointList;
 typedef std::map<long, FHardpointList> FHardpointMap;
 
-// Engine-owned transform; only User is initialized by the constructor.
-struct FInstanceTransform : IInstanceTransform
+// Engine-owned IEngineInstance; only InstanceFlags is initialized by the constructor.
+struct FInstanceTransform : IEngineInstance
 {
-    FInstanceTransform() { User = 0; }   // FUN_0661f310; every other member keeps the block's bytes
+    FInstanceTransform() { InstanceFlags = 0; } // FUN_0661f310; every other member keeps the block's bytes
 
-    GENRESULT DACOM_API Init(void* Instance) override;                                  // LAB_0661f340
-    GENRESULT DACOM_API AddRef(void* Instance) override;                                // LAB_06612160
-    GENRESULT DACOM_API Release(void* Instance) override;                               // LAB_06612160
-    GENRESULT DACOM_API SetPosition(void* Instance, const float* Position) override;     // LAB_0661f380
-    float* DACOM_API GetPosition(void* Instance) override;                              // LAB_0661f3a0
-    GENRESULT DACOM_API SetOrientation(void* Instance, const float* Rows) override;      // LAB_0661f3b0
-    float* DACOM_API GetOrientation(void* Instance) override;                           // LAB_0661f3d0
-    GENRESULT DACOM_API SetMatrix(void* Instance, const float* Matrix) override;         // LAB_0661f3e0
-    float* DACOM_API GetMatrix(void* Instance) override;                                // LAB_0661f3d0
-    GENRESULT DACOM_API GetExtra(void* Instance, float* OutExtra, float* OutVec) override; // LAB_0661f400
-    GENRESULT DACOM_API SetExtra(void* Instance, float Extra, const float* Vec) override; // LAB_0661f430
-    GENRESULT DACOM_API SetUser(void* Instance, unsigned long User) override;            // LAB_0661f460
-    unsigned long DACOM_API GetUser(void* Instance) override;                           // LAB_0661f470
-    unsigned long DACOM_API MarkWorldDirty(void* Instance) override;                    // LAB_0661f320
+    void DACOM_API initialize_instance(long Inst) override;                            // LAB_0661f340
+    void DACOM_API create_instance(long Inst) override;                                // LAB_06612160
+    void DACOM_API destroy_instance(long Inst) override;                               // LAB_06612160
+    void DACOM_API set_position(long Inst, Vector const& Pos) override;                // LAB_0661f380
+    Vector const& DACOM_API get_position(long Inst) const override;                    // LAB_0661f3a0
+    void DACOM_API set_orientation(long Inst, Matrix const& Orient) override;          // LAB_0661f3b0
+    Matrix const& DACOM_API get_orientation(long Inst) const override;                 // LAB_0661f3d0
+    void DACOM_API set_transform(long Inst, Transform const& NewXform) override;       // LAB_0661f3e0
+    Transform const& DACOM_API get_transform(long Inst) const override;                // LAB_0661f3d0
+    void DACOM_API get_centered_radius(long Inst, float* OutRadius,
+                                       Vector* OutCenter) const override;              // LAB_0661f400
+    void DACOM_API set_centered_radius(long Inst, float NewRadius,
+                                       Vector const& NewCenter) override;              // LAB_0661f430
+    void DACOM_API set_instance_flags(long Inst, unsigned long Flags) override;        // LAB_0661f460
+    unsigned long DACOM_API get_instance_flags(long Inst) const override;              // LAB_0661f470
+    bool DACOM_API joint_changed(long Inst) override;                                  // LAB_0661f320
 
-    float Matrix[12];        // +0x04
-    float Extra;             // +0x34
-    float ExtraVec[3];       // +0x38
-    unsigned long User;      // +0x44
+    Transform Xform;             // +0x04
+    float Radius;                // +0x34
+    Vector Center;               // +0x38
+    unsigned long InstanceFlags; // +0x44
 
     // FUN_0661f330. Defined in EngBaseEngine.cpp.
     void Free();
@@ -306,7 +308,7 @@ struct FInstanceTransform : IInstanceTransform
 struct FEngineInstance
 {
     unsigned long Flags;
-    IInstanceTransform* Transform;   // +0x04: owned FInstanceTransform (flag 2) or a caller's
+    IEngineInstance* Callbacks;      // +0x04: owned FInstanceTransform (flag 2) or a caller's
     FArchetypeHandle* Archetype;
     FArchetypeHandle* ParentArchetype;
     FEngineInstance* Parent;
@@ -382,64 +384,65 @@ struct FEngineObject : IEngine
     GENRESULT DACOM_API SetSearchPath(const char* Path) override;
     GENRESULT DACOM_API QuerySearchPath(char* Dest, unsigned long MaxChars) override;
     GENRESULT DACOM_API SetFilesystem(IDAComponent* NewPath) override;
-    GENRESULT DACOM_API GetSearchPath(void** Out) override;
-    GENRESULT DACOM_API CreateFileSystem(const char* Path, void** Out, void* Factory) override;
-    void* DACOM_API CreateCompoundArchetype(FEngineName* Name) override;
-    void* DACOM_API CreateArchetypeHandle(FEngineName* Name, void* FileSystem) override;
-    void* DACOM_API DuplicateArchetype(void* ArchIn, FEngineName* Name) override;
-    unsigned long DACOM_API AddRefHandle(void* Handle) override;
-    unsigned long DACOM_API ReleaseHandle(void* Handle) override;
-    FEngineName* DACOM_API GetArchetypeName(FEngineName* Out, void* Handle) override;
-    void* DACOM_API FindArchetype(FEngineName* Name) override;
-    GENRESULT DACOM_API QueryEngineComponent(int Id, void* Name, void** Out) override;
-    unsigned long DACOM_API IsCompoundArchetype(void* Handle) override;
+    GENRESULT DACOM_API GetSearchPath(IDAComponent** Out) override;
+    GENRESULT DACOM_API CreateFileSystem(const char* Path, IFileSystem** Out, IComponentFactory* Factory) override;
+    ArchetypeIndex DACOM_API CreateCompoundArchetype(FEngineName* Name) override;
+    ArchetypeIndex DACOM_API CreateArchetypeHandle(FEngineName* Name, IFileSystem* FileSystem) override;
+    ArchetypeIndex DACOM_API DuplicateArchetype(ArchetypeIndex ArchIn, FEngineName* Name) override;
+    unsigned long DACOM_API AddRefHandle(ArchetypeIndex Handle) override;
+    unsigned long DACOM_API ReleaseHandle(ArchetypeIndex Handle) override;
+    FEngineName* DACOM_API GetArchetypeName(FEngineName* Out, ArchetypeIndex Handle) override;
+    ArchetypeIndex DACOM_API FindArchetype(FEngineName* Name) override;
+    GENRESULT DACOM_API QueryEngineComponent(ArchetypeIndex Archetype, const char* Iid,
+                                             void** Out) override;
+    unsigned long DACOM_API IsCompoundArchetype(ArchetypeIndex Handle) override;
     GENRESULT DACOM_API EnumerateArchetypeConstraints(
-        void* Handle, int(__cdecl* Callback)(void*, void*, void*, void*),
+        ArchetypeIndex Handle, int(__cdecl* Callback)(ArchetypeIndex, ArchetypeIndex, void*, void*),
         void* Context) override;
     GENRESULT DACOM_API EnumerateArchetypeChildren(
-        void* Handle, int(__cdecl* Callback)(void*, void*, int, void*),
+        ArchetypeIndex Handle, int(__cdecl* Callback)(ArchetypeIndex, ArchetypeIndex, int, void*),
         void* Context) override;
-    void* DACOM_API CreateInstanceFromName(FEngineName* Name, void* FileSystem,
-                                             void* Transform) override;
-    void* DACOM_API CreateInstance(void* Handle, void* Transform) override;
-    GENRESULT DACOM_API DestroyInstance(void* Instance) override;
-    void* DACOM_API GetInstanceArchetype(void* Instance) override;
-    FEngineName* DACOM_API GetInstanceName(FEngineName* Out, void* Instance) override;
-    GENRESULT DACOM_API UpdateInstance(void* Instance, unsigned long Flags, void* Arg) override;
-    GENRESULT DACOM_API SetInstanceTransform(void* Instance, void* Transform) override;
-    GENRESULT DACOM_API GetInstanceTransformObject(void* Instance, void** Out) override;
-    GENRESULT DACOM_API QueryInstance(void* Instance, const char* Iid, void** Out) override;
-    GENRESULT DACOM_API SetInstanceUserData(void* Instance, void* Value) override;
-    void* DACOM_API GetInstanceUserData(void* Instance) override;
-    GENRESULT DACOM_API SetInstanceExtent(void* Instance, unsigned long Flags, float Extent,
-                                          const float* Vec) override;
-    GENRESULT DACOM_API GetInstanceExtent(void* Instance, unsigned long Flags, float* OutExtent,
-                                          float* OutVec) override;
-    GENRESULT DACOM_API SetInstancePosition(void* Instance, void* Position) override;
-    float* DACOM_API GetInstancePosition(void* Instance) override;
-    GENRESULT DACOM_API SetInstanceOrientation(void* Instance, void* Orient) override;
-    float* DACOM_API GetInstanceOrientation(void* Instance) override;
-    GENRESULT DACOM_API SetInstanceMatrix(void* Instance, void* Matrix) override;
-    float* DACOM_API GetInstanceTransform(void* Instance) override;
+    InstanceIndex DACOM_API CreateInstanceFromName(FEngineName* Name, IFileSystem* FileSystem,
+                                             IEngineInstance* Transform) override;
+    InstanceIndex DACOM_API CreateInstance(ArchetypeIndex Handle, IEngineInstance* Transform) override;
+    GENRESULT DACOM_API DestroyInstance(InstanceIndex Instance) override;
+    ArchetypeIndex DACOM_API GetInstanceArchetype(InstanceIndex Instance) override;
+    FEngineName* DACOM_API GetInstanceName(FEngineName* Out, InstanceIndex Instance) override;
+    GENRESULT DACOM_API UpdateInstance(InstanceIndex Instance, unsigned long Flags, void* Arg) override;
+    GENRESULT DACOM_API SetInstanceTransform(InstanceIndex Instance, IEngineInstance* Transform) override;
+    GENRESULT DACOM_API GetInstanceTransformObject(InstanceIndex Instance, IEngineInstance** Out) override;
+    GENRESULT DACOM_API QueryInstance(InstanceIndex Instance, const char* Iid, void** Out) override;
+    GENRESULT DACOM_API SetInstanceUserData(InstanceIndex Instance, void* Value) override;
+    void* DACOM_API GetInstanceUserData(InstanceIndex Instance) override;
+    GENRESULT DACOM_API SetInstanceExtent(InstanceIndex Instance, unsigned long Flags, float Extent,
+                                          const Vector* Vec) override;
+    GENRESULT DACOM_API GetInstanceExtent(InstanceIndex Instance, unsigned long Flags, float* OutExtent,
+                                          Vector* OutVec) override;
+    void DACOM_API SetInstancePosition(InstanceIndex Instance, const Vector* Position) override;
+    const Vector* DACOM_API GetInstancePosition(InstanceIndex Instance) override;
+    void DACOM_API SetInstanceOrientation(InstanceIndex Instance, const Matrix* Orient) override;
+    const Matrix* DACOM_API GetInstanceOrientation(InstanceIndex Instance) override;
+    void DACOM_API SetInstanceMatrix(InstanceIndex Instance, const Transform* Matrix) override;
+    const Transform* DACOM_API GetInstanceTransform(InstanceIndex Instance) override;
     GENRESULT DACOM_API NoOp41(void* A, void* B) override; // TODO: original operation purpose.
     float* DACOM_API GetIdentityMatrix(void* Unused) override;
     GENRESULT DACOM_API NoOp43(void* A, void* B) override; // TODO: original operation purpose.
     float* DACOM_API GetIdentityMatrix2(void* Unused) override;
-    GENRESULT DACOM_API SetTransformUser(void* Instance, unsigned long User) override;
-    unsigned long DACOM_API GetTransformUser(void* Instance) override;
-    unsigned long DACOM_API CreateJoint(void* Parent, void* Child,
+    void DACOM_API SetTransformUser(InstanceIndex Instance, unsigned long User) override;
+    unsigned long DACOM_API GetTransformUser(InstanceIndex Instance) override;
+    unsigned long DACOM_API CreateJoint(InstanceIndex Parent, InstanceIndex Child,
                                          const unsigned long* Payload) override;
-    unsigned long DACOM_API DestroyJoint(void* Parent, void* Child) override;
-    unsigned long* DACOM_API GetInstanceRelative(void* Instance) override;
-    unsigned long DACOM_API SetJointParams(void* Instance, unsigned long Index,
+    unsigned long DACOM_API DestroyJoint(InstanceIndex Parent, InstanceIndex Child) override;
+    unsigned long* DACOM_API GetInstanceRelative(InstanceIndex Instance) override;
+    unsigned long DACOM_API SetJointParams(InstanceIndex Instance, unsigned long Index,
                                             const float* Values) override;
-    unsigned long DACOM_API GetJointParams(void* Instance, unsigned long Index,
+    unsigned long DACOM_API GetJointParams(InstanceIndex Instance, unsigned long Index,
                                             float* Out) override;
-    void* DACOM_API FindMappedInstance(void* Instance) override;
-    void* DACOM_API GetInstanceParent(void* Instance) override;
-    void* DACOM_API GetRelatedInstance(void* From, unsigned long Flags, void* Cursor) override;
-    void* DACOM_API GetInstanceRoot(void* Instance) override;
-    void* DACOM_API FindArchetypeChild(void* Handle, void* ChildHandle) override;
+    InstanceIndex DACOM_API FindMappedInstance(InstanceIndex Instance) override;
+    InstanceIndex DACOM_API GetInstanceParent(InstanceIndex Instance) override;
+    InstanceIndex DACOM_API GetRelatedInstance(InstanceIndex From, unsigned long Flags, InstanceIndex Cursor) override;
+    InstanceIndex DACOM_API GetInstanceRoot(InstanceIndex Instance) override;
+    void* DACOM_API FindArchetypeChild(ArchetypeIndex Handle, ArchetypeIndex ChildHandle) override;
     unsigned long DACOM_API RejectOperation(void* A, void* B) override; // TODO: original operation purpose.
 
     // FUN_0661f550. Defined in EngBaseEngine.cpp.
@@ -470,7 +473,7 @@ struct FAnimTrack
     FAnimTrack& operator=(const FAnimTrack&) = delete;
 
     // FUN_06611350. Defined in EngBaseAnim.cpp.
-    void LoadChannelNode(void* FileSystem);
+    void LoadChannelNode(IFileSystem* FileSystem);
 };
 
 // Script animation value owns tracks and retains its longest channel.
@@ -921,14 +924,14 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     unsigned long DACOM_API AddRef() override;
     unsigned long DACOM_API Release() override;
-    void* DACOM_API OpenScript(void* FileSystem) override;
+    void* DACOM_API OpenScript(IFileSystem* FileSystem) override;
     GENRESULT DACOM_API CloseScript(void* Script) override;
     float DACOM_API GetScriptDuration(void* Script) override;
     float DACOM_API GetNamedDuration(void* Script, const char* Name) override;
-    GENRESULT DACOM_API EnumScriptNames(void* Callback, void* Script, void* Context) override;
-    GENRESULT DACOM_API FindScriptName(void* Callback, void* Script, const char* Name,
+    GENRESULT DACOM_API EnumScriptNames(FAnimNameProc Callback, void* Script, void* Context) override;
+    GENRESULT DACOM_API FindScriptName(FAnimChannelProc Callback, void* Script, const char* Name,
                                         void* Context) override;
-    unsigned long DACOM_API PlayScript(void* Script, void* Root, const char* Name, void* Sink,
+    unsigned long DACOM_API PlayScript(void* Script, InstanceIndex Root, const char* Name, void* Sink,
                                          void* SinkContext) override;
     GENRESULT DACOM_API DestroyScript(void* Script) override;
     unsigned long DACOM_API EvalPlayback(unsigned long PlaybackId, unsigned long Flags, float Time,
@@ -949,13 +952,13 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     unsigned long DACOM_API MixerWalk(unsigned long PlaybackId, float Time) override;
     unsigned long DACOM_API MixerWalkAll(float Time) override;
     void* DACOM_API CreateEmptyScript() override;
-    unsigned long DACOM_API AddScriptNames(void* Script, void* FileSystem, const char** Names,
+    unsigned long DACOM_API AddScriptNames(void* Script, IFileSystem* FileSystem, const char** Names,
                                            int Count) override;
     unsigned long DACOM_API RemoveScriptNames(void* Script, const char** Names, int Count) override;
-    unsigned long DACOM_API EnumFsScripts(void* Callback, void* FileSystem, void* Context) override;
+    unsigned long DACOM_API EnumFsScripts(FAnimNameProc Callback, IFileSystem* FileSystem, void* Context) override;
     unsigned long DACOM_API HasScriptName(void* Script, const char* Name) override;
     unsigned long DACOM_API GetScriptNameCount(void* Script, unsigned long* Out) override;
-    unsigned long DACOM_API EnumObjects(void* Callback, unsigned long PlaybackId,
+    unsigned long DACOM_API EnumObjects(FAnimObjectProc Callback, unsigned long PlaybackId,
                                          void* Context) override;
     unsigned long DACOM_API RegisterHandle(unsigned long Key) override;
     unsigned long DACOM_API HasHandle(unsigned long Key, unsigned char* Out) override;
@@ -990,24 +993,24 @@ struct FHardpointObject : IHardpoint, IEngineComponent
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     unsigned long DACOM_API AddRef() override;
     unsigned long DACOM_API Release() override;
-    unsigned long DACOM_API GetHardpoint(void* Handle, FHardpointKey const* Key,
+    unsigned long DACOM_API GetHardpoint(ArchetypeIndex Handle, FHardpointKey const* Key,
                                          void* Out) override;
-    unsigned long DACOM_API AddHardpoint(void* Handle, FHardpointKey const* Key,
+    unsigned long DACOM_API AddHardpoint(ArchetypeIndex Handle, FHardpointKey const* Key,
                                          const void* Data) override;
-    GENRESULT DACOM_API EnumerateHardpoints(FHardpointEnumProc Callback, void* Handle,
+    GENRESULT DACOM_API EnumerateHardpoints(FHardpointEnumProc Callback, ArchetypeIndex Handle,
                                           void* Context) override;
-    unsigned long DACOM_API ConnectHardpoints(void* InstA, FHardpointKey const* KeyA, void* InstB,
+    unsigned long DACOM_API ConnectHardpoints(InstanceIndex InstA, FHardpointKey const* KeyA, InstanceIndex InstB,
                                               FHardpointKey const* KeyB) override;
-    char const* DACOM_API FindHardpoint(void* Handle, unsigned long const* Crc) override;
+    char const* DACOM_API FindHardpoint(ArchetypeIndex Handle, unsigned long const* Crc) override;
     int DACOM_API Initialize() override;
-    int DACOM_API CreateArchetype(void* Archetype, void* FileSystem) override;
-    int DACOM_API DuplicateArchetype(void* NewArchetype, void* OldArchetype) override;
-    int DACOM_API DestroyArchetype(void* Archetype) override;
-    int DACOM_API QueryArchetype(void* Archetype, const char* Iid, void** Out) override;
-    int DACOM_API CreateInstance(void* Instance, void* Archetype) override;
-    int DACOM_API DestroyInstance(void* Instance) override;
-    int DACOM_API UpdateInstance(void* Instance, void* Arg) override;
-    int DACOM_API QueryInstance(void* Instance, const char* Iid, void** Out) override;
+    int DACOM_API CreateArchetype(ArchetypeIndex Archetype, IFileSystem* FileSystem) override;
+    int DACOM_API DuplicateArchetype(ArchetypeIndex NewArchetype, ArchetypeIndex OldArchetype) override;
+    int DACOM_API DestroyArchetype(ArchetypeIndex Archetype) override;
+    int DACOM_API QueryArchetype(ArchetypeIndex Archetype, const char* Iid, void** Out) override;
+    int DACOM_API CreateInstance(InstanceIndex Instance, ArchetypeIndex Archetype) override;
+    int DACOM_API DestroyInstance(InstanceIndex Instance) override;
+    int DACOM_API UpdateInstance(InstanceIndex Instance, void* Arg) override;
+    int DACOM_API QueryInstance(InstanceIndex Instance, const char* Iid, void** Out) override;
     int DACOM_API Notify(void* Arg) override;
 
     // FUN_06625c70. Defined in EngBaseHardPoint.cpp.
@@ -1028,7 +1031,7 @@ struct FChannelArchetypeObject : IChannelArchetype
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     unsigned long DACOM_API AddRef() override;
     unsigned long DACOM_API Release() override;
-    GENRESULT DACOM_API Load(void* FileSystem) override;
+    GENRESULT DACOM_API Load(IFileSystem* FileSystem) override;
     GENRESULT DACOM_API GetDuration(float* Out) override;
     GENRESULT DACOM_API GetFlags(unsigned long* Out) override;
     GENRESULT DACOM_API Sample(float Time, const unsigned char** OutA, const unsigned char** OutB,

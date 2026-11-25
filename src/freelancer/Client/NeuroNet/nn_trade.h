@@ -60,7 +60,7 @@ public:
     bool KeyEvent(unsigned Key, unsigned char* Modifiers) override;
     // slot 36 LAB_004bfe00 (RET 8) -- WinControl's lookup, with this window's +0xa8 added and the
     // z translation forced to 0; a miss is the identity with no translation at all.
-    bool GetHardpointTransform(char const* Name, float* OutTransform12) override;
+    bool GetHardpointTransform(char const* Name, Transform* OutXform) override;
     // slot 42 FUN_004c2d50 (RET 0xc) -- hover (0x2c / 0x2d), clicks (0x26), scroll bars (0x3e)
     // and the close (0xef02). Every message returns 0; nothing is passed to WinControl.
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override;

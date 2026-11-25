@@ -42,7 +42,7 @@
 #include "Space/Cameras/space_camera_game.h"  // FGameCamera
 #include "Common/Graphics/texture_shapes.h"     // FTextureRef
 #include "Interface/win3d.h"
-#include "x86math.h"            // FMatrix, FVector, FTransform
+#include "x86math.h"            // Matrix, Vector, Transform
 
 #include <stddef.h>
 #include <vector>
@@ -240,8 +240,8 @@ public:
     unsigned char Pad01[3];
     int Rect[4];                  // +0x04 -- screen rect of corners 0 and 3 (ctor 0, 0, 1, 1)
     unsigned char Unknown14[0x10]; // +0x14..+0x23 never written
-    FVector WinPos;               // +0x24 "win_pos" (ctor 0.3, 0.3, -1)
-    FVector BtnPos;               // +0x30 "btn_pos" (ctor 0, 0, -2)
+    Vector WinPos;               // +0x24 "win_pos" (ctor 0.3, 0.3, -1)
+    Vector BtnPos;               // +0x30 "btn_pos" (ctor 0, 0, -2)
     float WinSizeX;               // +0x3c "win_size" (ctor 0.2)
     float WinSizeY;               // +0x40 (ctor 0.2)
     float OpenFraction;           // +0x44 -- 1 open, 0 closed; nothing animates it
@@ -251,7 +251,7 @@ public:
     unsigned char bStatic;        // +0x4e "static" (ctor 1)
     unsigned char Pad4f;
     FClientMeshHolder Corner;     // +0x50 "corner" mesh
-    FTransform CornerXform[4];    // +0x78 / +0xa8 / +0xd8 / +0x108
+    Transform CornerXform[4];    // +0x78 / +0xa8 / +0xd8 / +0x108
 
 private:
     FCommWindow(FCommWindow const&) = delete;
@@ -299,9 +299,9 @@ public:
     FEngineCharacterBody* Body;       // +0x170
     unsigned char bNoPortrait;        // +0x174
     unsigned char Pad175[3];
-    FMatrix SpeakerRotate;            // +0x178 "speaker_rotate"
-    FVector MaleOffset;               // +0x19c "male_speaker_offset"
-    FVector FemaleOffset;             // +0x1a8 "female_speaker_offset"
+    Matrix SpeakerRotate;            // +0x178 "speaker_rotate"
+    Vector MaleOffset;               // +0x19c "male_speaker_offset"
+    Vector FemaleOffset;             // +0x1a8 "female_speaker_offset"
     unsigned NameIds;                 // +0x1b4
     float Linger;                     // +0x1b8
     NnTextControl* CommText;          // +0x1bc "CommText"
@@ -366,9 +366,9 @@ public:
     FCommSlot SlotA;                  // +0x454
     FCommSlot SlotB;                  // +0x464
     FTextureRef Backdrop;             // +0x474 "backdrop"
-    FMatrix SpeakerRotate;            // +0x47c "speaker_rotate"
-    FVector MaleOffset;               // +0x4a0
-    FVector FemaleOffset;             // +0x4ac
+    Matrix SpeakerRotate;            // +0x47c "speaker_rotate"
+    Vector MaleOffset;               // +0x4a0
+    Vector FemaleOffset;             // +0x4ac
     FGameCamera Camera;               // +0x4b8 -- "video_fovx", near 1.4 / far 50
     FEngineLight* Light;              // +0x5b0
     Win3D* LowEndCommButton;          // +0x5b4

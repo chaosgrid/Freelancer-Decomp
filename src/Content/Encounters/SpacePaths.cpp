@@ -84,9 +84,9 @@ namespace
         Ring->Position.y = 0.0f;
         Ring->Position.z = 0.0f;
         SetMatrixIdentity(&Ring->Placement.Rotation);
-        Ring->Placement.Translation.X = 0.0f;
-        Ring->Placement.Translation.Y = 0.0f;
-        Ring->Placement.Translation.Z = 0.0f;
+        Ring->Placement.Translation.x = 0.0f;
+        Ring->Placement.Translation.y = 0.0f;
+        Ring->Placement.Translation.z = 0.0f;
         Ring->Reputation = 0xffffffffu;
     }
 
@@ -623,15 +623,15 @@ void __cdecl FindEntryRing(FTradeLaneRing* Out, Vector const* Position,
             continue;
 
         // The ring's -z axis through its rotation, normalised with 1 / sqrt((x*x + y*y) + z*z).
-        FVector const Back = {0.0f, 0.0f, -1.0f};
-        FVector Axis;
+        Vector const Back = {0.0f, 0.0f, -1.0f};
+        Vector Axis;
         GetSpaceMathEngine()->TransformMatrix(Axis, Ring->Placement.Rotation, Back);
-        double const Inverse = 1.0 / std::sqrt((static_cast<double>(Axis.X) * Axis.X +
-                                                static_cast<double>(Axis.Y) * Axis.Y) +
-                                               static_cast<double>(Axis.Z) * Axis.Z);
-        double const Nx = Axis.X * Inverse;
-        double const Ny = Inverse * Axis.Y;
-        double const Nz = Inverse * Axis.Z;
+        double const Inverse = 1.0 / std::sqrt((static_cast<double>(Axis.x) * Axis.x +
+                                                static_cast<double>(Axis.y) * Axis.y) +
+                                               static_cast<double>(Axis.z) * Axis.z);
+        double const Nx = Axis.x * Inverse;
+        double const Ny = Inverse * Axis.y;
+        double const Nz = Inverse * Axis.z;
         // The plane's offset, then the signed distances of Target and Position; the ring
         // counts when their product is below 0 (the ring plane lies between them).
         double const Offset = -((Ring->Position.z * Nz + Ring->Position.x * Nx) +

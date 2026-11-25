@@ -16,7 +16,7 @@
 #include "common_misc.h" // FastInvSqrt
 #include "common_csys.h"  // Matrix, Transform, MatrixSetIdentity, Acquire3DMathEngine
 #include "common_iface.h" // IObjInspect / IObjRW / ObjInspectOf / ObjRwFromWatchable
-#include "x86math.h"      // I3DMathEngine::TransformMatrix (+0x2c), FVector, FMatrix
+#include "x86math.h"      // I3DMathEngine::TransformMatrix (+0x2c), Vector, Matrix
 #include "common_pathfind.h" // PathfindManager -- Behavior::OnDisengage / Behavior::SetAvoidanceAllowed
 
 #include <cmath>

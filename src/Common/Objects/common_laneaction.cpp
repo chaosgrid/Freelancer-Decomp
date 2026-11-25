@@ -30,7 +30,7 @@ namespace
     Quaternion* MatrixToQuaternionViaMathEngine(Quaternion& Out, Matrix const& In)
     {
         I3DMathEngine* Math = Acquire3DMathEngine();
-        Math->MatrixToQuaternion((FQuaternion&)Out, (FMatrix const&)In); // +0x50
+        Math->MatrixToQuaternion(Out, In); // +0x50
         return &Out;
     }
 }
@@ -172,7 +172,7 @@ void LaneAction::BuildRingTransform(IObjInspect const* Ring, LaneRingTransform& 
 
     // MulMatrix (slot 0x20), no null test.
     Matrix Turned;
-    Acquire3DMathEngine()->MulMatrix((FMatrix&)Turned, (FMatrix const&)RotY, (FMatrix const&)HpRightOrient);
+    Acquire3DMathEngine()->MulMatrix(Turned, RotY, HpRightOrient);
     OutXform.Orient = Turned;
 }
 
@@ -324,8 +324,7 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
 
             // MulMatrix (slot 0x20), no null test.
             Matrix Turned;
-            Acquire3DMathEngine()->MulMatrix((FMatrix&)Turned, (FMatrix const&)Turn,
-                                             (FMatrix const&)LanePose.Rotation);
+            Acquire3DMathEngine()->MulMatrix(Turned, Turn, LanePose.Rotation);
             LanePose.Rotation = Turned;
         }
 
@@ -438,7 +437,7 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
             // Math engine slot 0x30, no null test.
             Offset.z = 0.0f;
             Vector Rotated{ 0.0f, 0.0f, 0.0f };
-            Acquire3DMathEngine()->Rotate((FVector&)Rotated, (FTransform const&)LanePose, (FVector const&)Offset);
+            Acquire3DMathEngine()->Rotate(Rotated, LanePose, Offset);
             LanePose.Translation.x = Rotated.x + LanePose.Translation.x;
             LanePose.Translation.y = Rotated.y + LanePose.Translation.y;
             LanePose.Translation.z = Rotated.z + LanePose.Translation.z;
@@ -523,17 +522,17 @@ void LaneAction::do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<
         I3DMathEngine* const Math = Acquire3DMathEngine();
 
         Quaternion LaneQuat;
-        Math->MatrixToQuaternion((FQuaternion&)LaneQuat, (FMatrix const&)LanePose.Rotation);   // slot 0x50
+        Math->MatrixToQuaternion(LaneQuat, LanePose.Rotation);   // slot 0x50
 
         // 1/3 is the double DAT_0639e0e8.
         float const Blend = (float)((double)TransitElapsed * (1.0 / 3.0));
 
         Quaternion Blended;
-        Math->QuatSlerp((FQuaternion&)Blended, (FQuaternion const&)CapturedShipOrient,
-                        (FQuaternion const&)LaneQuat, Blend);   // slot 0x58
+        Math->QuatSlerp(Blended, CapturedShipOrient,
+                        LaneQuat, Blend);   // slot 0x58
 
         Matrix BlendedRotation;
-        Math->QuaternionToMatrix((FMatrix&)BlendedRotation, (FQuaternion const&)Blended);   // slot 0x54
+        Math->QuaternionToMatrix(BlendedRotation, Blended);   // slot 0x54
         LanePose.Rotation = BlendedRotation;
 
         // x87: x keeps both products unrounded, y rounds the captured product, z rounds both.

@@ -71,37 +71,37 @@ namespace
     struct FPhySysJointBlock
     {
         unsigned long Type;  // +0x00  0, 1 or 2 (anything else: the pose is left as the parent's)
-        FVector ParentPoint; // +0x04
-        FVector ChildPoint;  // +0x10
-        FMatrix Orient;      // +0x1c
-        FVector Axis;        // +0x40
+        Vector ParentPoint; // +0x04
+        Vector ChildPoint;  // +0x10
+        Matrix Orient;      // +0x1c
+        Vector Axis;        // +0x40
     };
     static_assert(offsetof(FPhySysJointBlock, ParentPoint) == 0x04, "joint block +0x04");
     static_assert(offsetof(FPhySysJointBlock, ChildPoint) == 0x10, "joint block +0x10");
     static_assert(offsetof(FPhySysJointBlock, Orient) == 0x1c, "joint block +0x1c");
     static_assert(offsetof(FPhySysJointBlock, Axis) == 0x40, "joint block +0x40");
-    static_assert(sizeof(FTransform) == 0x30, "the engine instance transform is 12 floats");
+    static_assert(sizeof(Transform) == 0x30, "the engine instance transform is 12 floats");
 
     // FUN_06288860 (thiscall on M): M = M * B through the math engine.
-    void PhySys_MatrixMulInPlace(FMatrix& M, FMatrix const& B)
+    void PhySys_MatrixMulInPlace(Matrix& M, Matrix const& B)
     {
-        FMatrix Product;
+        Matrix Product;
         Acquire3DMathEngine()->MulMatrix(Product, M, B);
         M = Product;
     }
 
     // FUN_06288900 (cdecl): Out = A * B (+0x20).
-    FMatrix PhySys_MatrixMul(FMatrix const& A, FMatrix const& B)
+    Matrix PhySys_MatrixMul(Matrix const& A, Matrix const& B)
     {
-        FMatrix Product;
+        Matrix Product;
         Acquire3DMathEngine()->MulMatrix(Product, A, B);
         return Product;
     }
 
     // FUN_062888b0 (cdecl): Out = M * V (TransformMatrix, +0x2c).
-    FVector PhySys_MatrixTransform(FMatrix const& M, FVector const& V)
+    Vector PhySys_MatrixTransform(Matrix const& M, Vector const& V)
     {
-        FVector Out;
+        Vector Out;
         Acquire3DMathEngine()->TransformMatrix(Out, M, V);
         return Out;
     }
@@ -119,9 +119,9 @@ namespace CmnPhySys
 
         IEngine* const Engine = DALib::Engine;
 
-        // engbase.h types the result float*; it is the instance's 12-float FTransform.
-        FTransform const* const ParentTransform =
-            (FTransform const*)Engine->GetInstanceTransform(PhySys_InstanceHandle(Instance));
+        // engbase.h types the result float*; it is the instance's 12-float Transform.
+        Transform const* const ParentTransform =
+            Engine->GetInstanceTransform(Instance);
 
         for (long Child = PhySys_RelatedInstance(Instance, 1, -1); Child != -1;
              Child = PhySys_RelatedInstance(Instance, 1, Child))
@@ -130,97 +130,97 @@ namespace CmnPhySys
                 continue;
 
             // Called once with the result unused, as in retail.
-            Engine->GetInstanceRelative(PhySys_InstanceHandle(Child));
+            Engine->GetInstanceRelative(Child);
 
             // GetInstanceRelative hands back the child's joint block (typed unsigned long*).
-            FTransform Local = *ParentTransform;
+            Transform Local = *ParentTransform;
             FPhySysJointBlock const* const Joint =
-                (FPhySysJointBlock const*)Engine->GetInstanceRelative(PhySys_InstanceHandle(Child));
-            FMatrix const ParentRotation = Local.Rotation;
+                (FPhySysJointBlock const*)Engine->GetInstanceRelative(Child);
+            Matrix const ParentRotation = Local.Rotation;
 
             if (Joint->Type == 0)
             {
                 // R = R * Orient; T += ParentR * ChildPoint.
                 PhySys_MatrixMulInPlace(Local.Rotation, Joint->Orient);
-                FVector const Offset = PhySys_MatrixTransform(ParentRotation, Joint->ChildPoint);
-                Local.Translation.X = Local.Translation.X + Offset.X;
-                Local.Translation.Y = Local.Translation.Y + Offset.Y;
-                Local.Translation.Z = Local.Translation.Z + Offset.Z;
+                Vector const Offset = PhySys_MatrixTransform(ParentRotation, Joint->ChildPoint);
+                Local.Translation.x = Local.Translation.x + Offset.x;
+                Local.Translation.y = Local.Translation.y + Offset.y;
+                Local.Translation.z = Local.Translation.z + Offset.z;
             }
             else if (Joint->Type == 1)
             {
                 // Prismatic: the joint parameter slides along Axis.
                 float Parameter;
-                Engine->GetJointParams(PhySys_InstanceHandle(Child), 0, &Parameter);
+                Engine->GetJointParams(Child, 0, &Parameter);
 
                 PhySys_MatrixMulInPlace(Local.Rotation, Joint->Orient);
-                FVector const ChildOffset = PhySys_MatrixTransform(Local.Rotation, Joint->ChildPoint);
+                Vector const ChildOffset = PhySys_MatrixTransform(Local.Rotation, Joint->ChildPoint);
 
                 // Slid = ParentPoint + Axis * Parameter, each product rounded first.
-                FVector Scaled;
-                Scaled.X = Joint->Axis.X * Parameter;
-                Scaled.Y = Joint->Axis.Y * Parameter;
-                Scaled.Z = Joint->Axis.Z * Parameter;
-                FVector Slid;
-                Slid.X = Joint->ParentPoint.X + Scaled.X;
-                Slid.Y = Joint->ParentPoint.Y + Scaled.Y;
-                Slid.Z = Joint->ParentPoint.Z + Scaled.Z;
+                Vector Scaled;
+                Scaled.x = Joint->Axis.x * Parameter;
+                Scaled.y = Joint->Axis.y * Parameter;
+                Scaled.z = Joint->Axis.z * Parameter;
+                Vector Slid;
+                Slid.x = Joint->ParentPoint.x + Scaled.x;
+                Slid.y = Joint->ParentPoint.y + Scaled.y;
+                Slid.z = Joint->ParentPoint.z + Scaled.z;
 
                 // T += (ParentR * Slid) - ChildOffset.
-                FVector const ParentOffset = PhySys_MatrixTransform(ParentRotation, Slid);
-                FVector Delta;
-                Delta.X = ParentOffset.X - ChildOffset.X;
-                Delta.Y = ParentOffset.Y - ChildOffset.Y;
-                Delta.Z = ParentOffset.Z - ChildOffset.Z;
-                Local.Translation.X = Local.Translation.X + Delta.X;
-                Local.Translation.Y = Local.Translation.Y + Delta.Y;
-                Local.Translation.Z = Local.Translation.Z + Delta.Z;
+                Vector const ParentOffset = PhySys_MatrixTransform(ParentRotation, Slid);
+                Vector Delta;
+                Delta.x = ParentOffset.x - ChildOffset.x;
+                Delta.y = ParentOffset.y - ChildOffset.y;
+                Delta.z = ParentOffset.z - ChildOffset.z;
+                Local.Translation.x = Local.Translation.x + Delta.x;
+                Local.Translation.y = Local.Translation.y + Delta.y;
+                Local.Translation.z = Local.Translation.z + Delta.z;
             }
             else if (Joint->Type == 2)
             {
                 // Revolute: the joint angle about Axis. x87: sin of the half angle is stored as
                 // a float, divided by the unrounded axis length.
                 float Angle;
-                Engine->GetJointParams(PhySys_InstanceHandle(Child), 0, &Angle);
+                Engine->GetJointParams(Child, 0, &Angle);
 
                 float const HalfAngle = Angle * 0.5f;
                 float const SinHalf = X87SinF(HalfAngle);
-                double const AxisLength = sqrt((double)(Joint->Axis.X) * Joint->Axis.X +
-                                               (double)(Joint->Axis.Y) * Joint->Axis.Y +
-                                               (double)(Joint->Axis.Z) * Joint->Axis.Z);
+                double const AxisLength = sqrt((double)(Joint->Axis.x) * Joint->Axis.x +
+                                               (double)(Joint->Axis.y) * Joint->Axis.y +
+                                               (double)(Joint->Axis.z) * Joint->Axis.z);
                 float const AxisScale = (float)((double)(SinHalf) / AxisLength);
 
-                FQuaternion Rotation;
-                Rotation.W = X87CosF(HalfAngle);
-                Rotation.X = Joint->Axis.X * AxisScale;
-                Rotation.Y = Joint->Axis.Y * AxisScale;
-                Rotation.Z = Joint->Axis.Z * AxisScale;
+                Quaternion Rotation;
+                Rotation.w = X87CosF(HalfAngle);
+                Rotation.x = Joint->Axis.x * AxisScale;
+                Rotation.y = Joint->Axis.y * AxisScale;
+                Rotation.z = Joint->Axis.z * AxisScale;
 
                 // R = R * (JointR * Orient).
-                FMatrix JointRotation;
+                Matrix JointRotation;
                 Acquire3DMathEngine()->QuaternionToMatrix(JointRotation, Rotation);
                 PhySys_MatrixMulInPlace(Local.Rotation, PhySys_MatrixMul(JointRotation, Joint->Orient));
 
                 // T += (ParentR * ParentPoint) - (R * ChildPoint).
-                FVector const ChildOffset = PhySys_MatrixTransform(Local.Rotation, Joint->ChildPoint);
-                FVector const ParentOffset = PhySys_MatrixTransform(ParentRotation, Joint->ParentPoint);
-                FVector Delta;
-                Delta.X = ParentOffset.X - ChildOffset.X;
-                Delta.Y = ParentOffset.Y - ChildOffset.Y;
-                Delta.Z = ParentOffset.Z - ChildOffset.Z;
-                Local.Translation.X = Local.Translation.X + Delta.X;
-                Local.Translation.Y = Local.Translation.Y + Delta.Y;
-                Local.Translation.Z = Local.Translation.Z + Delta.Z;
+                Vector const ChildOffset = PhySys_MatrixTransform(Local.Rotation, Joint->ChildPoint);
+                Vector const ParentOffset = PhySys_MatrixTransform(ParentRotation, Joint->ParentPoint);
+                Vector Delta;
+                Delta.x = ParentOffset.x - ChildOffset.x;
+                Delta.y = ParentOffset.y - ChildOffset.y;
+                Delta.z = ParentOffset.z - ChildOffset.z;
+                Local.Translation.x = Local.Translation.x + Delta.x;
+                Local.Translation.y = Local.Translation.y + Delta.y;
+                Local.Translation.z = Local.Translation.z + Delta.z;
             }
 
             // Other joint types keep the parent's pose.
-            Engine->SetInstanceMatrix(PhySys_InstanceHandle(Child), &Local);
+            Engine->SetInstanceMatrix(Child, &Local);
 
             // Read the instance extent (flags 1) and write it back.
             float Extent;
-            FVector ExtentVector;
-            Engine->GetInstanceExtent(PhySys_InstanceHandle(Child), 1, &Extent, &ExtentVector.X);
-            Engine->SetInstanceExtent(PhySys_InstanceHandle(Child), 1, Extent, &ExtentVector.X);
+            Vector ExtentVector;
+            Engine->GetInstanceExtent(Child, 1, &Extent, &ExtentVector);
+            Engine->SetInstanceExtent(Child, 1, Extent, &ExtentVector);
 
             PhySys_UpdateJointedChildren(Child, Object);
         }

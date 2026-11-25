@@ -32,13 +32,12 @@
 // ---------------------------------------------------------------------------
 static Vector Guided_TransformMatrix(Matrix const& M, Vector const& V)
 {
-    FVector Tmp;
-    Server_MathEngine()->TransformMatrix(Tmp, reinterpret_cast<FMatrix const&>(M),
-                                       reinterpret_cast<FVector const&>(V));
+    Vector Tmp;
+    Server_MathEngine()->TransformMatrix(Tmp, M, V);
     Vector Out;
-    Out.x = Tmp.X;
-    Out.y = Tmp.Y;
-    Out.z = Tmp.Z;
+    Out.x = Tmp.x;
+    Out.y = Tmp.y;
+    Out.z = Tmp.z;
     return Out;
 }
 
@@ -94,7 +93,7 @@ bool Guided::create(Archetype::Root* Arch)
     // create_instance runs before open.
     Arch->create_instance(static_cast<IEngineInstance*>(Object));
 
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Object->EngineInstanceId), 0, nullptr);
+    DALib::Engine->UpdateInstance(Object->EngineInstanceId, 0, nullptr);
 
     // The CGuided narrowing is not null-tested before open (vt+0x4c).
     CObject* Narrowed = Object;
@@ -629,7 +628,7 @@ bool Bullet::create(Archetype::Root* Arch)
 
     Arch->create_instance(static_cast<IEngineInstance*>(Object));
 
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Object->EngineInstanceId), 0, nullptr);
+    DALib::Engine->UpdateInstance(Object->EngineInstanceId, 0, nullptr);
 
     // The CBeam narrowing is not null-tested before open.
     CObject* Narrowed = Object;

@@ -8,7 +8,7 @@
 #include "ivp_environment.h"
 #include "ivp_core.h"
 #include "ivp_real_object.h"
-#include "ivp_contact_point.h"                 // IVP_Try_To_Generate_Managed_Friction, the contact point helpers
+#include "ivp_contact_point.h"                 // IVP_Ledge_Mindist::try_to_generate_managed_friction, the contact point helpers
 #include "ivp_cluster_manager.h"               // fire_event_pre_collision (FUN_0634b030)
 #include "ivp_listener.h"                      // IVP_Event_Collision
 #include "ivp_mindist_settings.h"
@@ -69,41 +69,41 @@ void IVP_Impact_Solver_Long_Term_Get_Cos_Sin_For_Impact(float FrictionVal, float
 // Friction only when neither core has an AxisLock. No null test anywhere: a
 // null contact core 0 in the first branch is dereferenced, as in retail.
 // ---------------------------------------------------------------------------
-void IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(IVP_Impact_Solver_Long_Term* LongTerm, IVP_Core* PushedCores[2],
-                                                     float RescueSpeedVal, IVP_Contact_Point* Cp)
+void IVP_Impact_Solver_Long_Term::DoImpactLongTerm(IVP_Core* PushedCores[2], float RescueSpeedVal,
+                                                   IVP_Contact_Point* Cp)
 {
     IVP_Impact_Solver ImpactSolver;
     Vector NegatedNormal;
 
-    if (LongTerm->ContactCores[1] == nullptr)
+    if (ContactCores[1] == nullptr)
     {
-        NegatedNormal.x = -LongTerm->ContactNormalWS.x;
-        NegatedNormal.y = -LongTerm->ContactNormalWS.y;
-        NegatedNormal.z = -LongTerm->ContactNormalWS.z;
-        ImpactSolver.Cores[0] = LongTerm->Objects[1]->core;
-        ImpactSolver.Cores[1] = LongTerm->ContactCores[0];
-        ImpactSolver.ContactCoordsOS[0] = &LongTerm->CoordOS[1];
-        ImpactSolver.ContactCoordsOS[1] = &LongTerm->CoordOS[0];
+        NegatedNormal.x = -ContactNormalWS.x;
+        NegatedNormal.y = -ContactNormalWS.y;
+        NegatedNormal.z = -ContactNormalWS.z;
+        ImpactSolver.Cores[0] = Objects[1]->core;
+        ImpactSolver.Cores[1] = ContactCores[0];
+        ImpactSolver.ContactCoordsOS[0] = &CoordOS[1];
+        ImpactSolver.ContactCoordsOS[1] = &CoordOS[0];
         ImpactSolver.NormalVectorWS = &NegatedNormal;
     }
     else
     {
-        IVP_Core* Core0 = LongTerm->ContactCores[0];
+        IVP_Core* Core0 = ContactCores[0];
         if (Core0 == nullptr)
         {
-            Core0 = LongTerm->Objects[0]->core;
+            Core0 = Objects[0]->core;
         }
         ImpactSolver.Cores[0] = Core0;
-        ImpactSolver.ContactCoordsOS[0] = &LongTerm->CoordOS[0];
-        ImpactSolver.Cores[1] = LongTerm->ContactCores[1];
-        ImpactSolver.ContactCoordsOS[1] = &LongTerm->CoordOS[1];
-        ImpactSolver.NormalVectorWS = &LongTerm->ContactNormalWS;
+        ImpactSolver.ContactCoordsOS[0] = &CoordOS[0];
+        ImpactSolver.Cores[1] = ContactCores[1];
+        ImpactSolver.ContactCoordsOS[1] = &CoordOS[1];
+        ImpactSolver.NormalVectorWS = &ContactNormalWS;
     }
 
-    const float Elasticity = LongTerm->ContactElasticity;
+    const float Elasticity = ContactElasticity;
     ImpactSolver.Restitution = Elasticity;
     // +0x10 of the long-term data is Ipion's contact-situation speed.
-    ImpactSolver.FrictionVectorWS = &LongTerm->Speed;
+    ImpactSolver.FrictionVectorWS = &Speed;
     ImpactSolver.UseFrictionConeBlend = 0;
 
     if (ImpactSolver.Cores[0]->AxisLock == nullptr && ImpactSolver.Cores[1]->AxisLock == nullptr)
@@ -112,7 +112,7 @@ void IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(IVP_Impact_Solver_Long_Term
                                                             &ImpactSolver.NormalCoeff, &ImpactSolver.TangentCoeff);
         if (Cp->SolverMode != 0)
         {
-            IVP_Impact_Solver_Calc_Second_Friction(&ImpactSolver, Cp); // FUN_06359380
+            ImpactSolver.CalcSecondFriction(Cp); // FUN_06359380
         }
     }
     else
@@ -121,7 +121,7 @@ void IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(IVP_Impact_Solver_Long_Term
                                                             &ImpactSolver.NormalCoeff, &ImpactSolver.TangentCoeff);
     }
 
-    ImpactSolver.DoImpactSystem(PushedCores, 1, static_cast<int32_t>(LongTerm->Status), RescueSpeedVal); // FUN_063578a0
+    ImpactSolver.DoImpactSystem(PushedCores, 1, static_cast<int32_t>(Status), RescueSpeedVal); // FUN_063578a0
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IV
     IVP_ListManager* Fs;
     int32_t HavingNewDist;
     IVP_Contact_Point* const Cp =
-        IVP_Try_To_Generate_Managed_Friction(Mindist, &Fs, &HavingNewDist, SimUnitNotDestroy, 1); // FUN_06356bc0
+        Mindist->try_to_generate_managed_friction(&Fs, &HavingNewDist, SimUnitNotDestroy, 1); // FUN_06356bc0
     IVP_Impact_Solver_Long_Term* const LongTerm = Cp->Owner;
 
     IVP_ListManager_CorePairEntry* const Pair = Fs->FindCorePairEntryExact(CoreA, CoreB); // FUN_06356280
@@ -155,7 +155,7 @@ void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IV
     *LastImpactTime = NowTime;
 
     const float RescueSpeed =
-        (float)(IVP_Contact_Point_Get_Rescue_Speed_Impact(Cp, ObjA->environment)); // FUN_06359560
+        (float)(Cp->GetRescueSpeedImpact(ObjA->environment)); // FUN_06359560
 
     IVP_Core* const Core0 = LongTerm->Objects[0]->core;
     IVP_Core* const Core1 = LongTerm->Objects[1]->core;
@@ -163,10 +163,10 @@ void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IV
     const float EnergyBefore1 = (float)(IVP_Impact_Core_Energy(Core1));
 
     IVP_Core* PushedCores[2];
-    IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(LongTerm, PushedCores, RescueSpeed, Cp); // FUN_06358d60
+    LongTerm->DoImpactLongTerm(PushedCores, RescueSpeed, Cp); // FUN_06358d60
 
     Vector SavedSpeed = LongTerm->Speed;
-    if ((CoreB->Flags & 0xcu) != 0)
+    if ((CoreB->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
     {
         SavedSpeed.x = -SavedSpeed.x;
         SavedSpeed.y = -SavedSpeed.y;
@@ -190,7 +190,7 @@ void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IV
     Event.contact_situation = reinterpret_cast<IVP_Contact_Situation*>(LongTerm);
     LongTerm->Speed = SavedSpeed;
 
-    IVP_Environment_Fire_Event_Pre_Collision(Env, &Event); // FUN_0634cf60
+    Env->fire_event_pre_collision(&Event); // FUN_0634cf60
     if ((ObjA->flags & 0x2000u) != 0)
     {
         Env->cluster_manager->fire_event_pre_collision(ObjA, &Event); // FUN_0634b030
@@ -215,21 +215,21 @@ void IVP_Impact_System::init_and_solve_impact_system(IVP_Ledge_Mindist* Mindist,
     AssociatedFs = Fs;
     LEnvironment = Pair->CoreA->Environment;
 
-    if (Core0 != nullptr && (Core0->Flags & 0xcu) == 0 && (Core0->Flags & 0x300u) == 0)
+    if (Core0 != nullptr && (Core0->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0 && (Core0->Flags & IVP_CORE_PINNED) == 0)
     {
         add_pushed_core_with_pairs_except(Core0, Pair); // FUN_063590e0
     }
     IVP_Core* const PairCoreA = Pair->CoreA;
-    if ((PairCoreA->Flags & 0xcu) == 0 && (PairCoreA->Flags & 0x300u) == 0)
+    if ((PairCoreA->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0 && (PairCoreA->Flags & IVP_CORE_PINNED) == 0)
     {
         SyncedCores.Add(PairCoreA);
     }
-    if (Core1 != nullptr && (Core1->Flags & 0xcu) == 0 && (Core1->Flags & 0x300u) == 0)
+    if (Core1 != nullptr && (Core1->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0 && (Core1->Flags & IVP_CORE_PINNED) == 0)
     {
         add_pushed_core_with_pairs_except(Core1, Pair);
     }
     IVP_Core* const PairCoreB = Pair->CoreB;
-    if ((PairCoreB->Flags & 0xcu) == 0 && (PairCoreB->Flags & 0x300u) == 0)
+    if ((PairCoreB->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0 && (PairCoreB->Flags & IVP_CORE_PINNED) == 0)
     {
         SyncedCores.Add(PairCoreB);
     }
@@ -278,9 +278,9 @@ void IVP_Impact_System::recalc_pair_dists_except(IVP_ListManager_CorePairEntry* 
         {
             continue;
         }
-        IVP_UpdatePairRecordContactFrame(Cp);            // FUN_0635a1e0
+        Cp->UpdateContactFrame();            // FUN_0635a1e0
         IVP_Impact_Solver_Long_Term* const LongTerm = Cp->Owner;
-        IVP_PopulatePairRecordIntoOwner(Cp, LongTerm);   // FUN_06358c50
+        Cp->PopulateOwner(LongTerm);   // FUN_06358c50
         if ((LongTerm->FrictionIsBroken & 0x3u) == 0x1u)
         {
             AssociatedFs->RemoveDistFromSystem(Cp);      // FUN_06355490
@@ -323,7 +323,7 @@ void IVP_Impact_System::add_pushed_core_with_pairs_except(IVP_Core* Core, IVP_Li
         {
             continue;
         }
-        if (IVP_ListManager_RefreshAttachedCtxAndCountLive(Pair, AssociatedFs) > 0) // FUN_06355c10
+        if (Pair->RefreshAttachedCtxAndCountLive(AssociatedFs) > 0) // FUN_06355c10
         {
             Pairs.Add(Pair); // FUN_06359090
         }
@@ -363,7 +363,7 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
             if (Cp->Owner->StateProcessed != 1)
             {
                 ++LEnvironment->impact_priority_calc_count;
-                IVP_Contact_Point_Calc_Impact_Priority(Cp); // FUN_063595c0
+                Cp->CalcImpactPriority(); // FUN_063595c0
             }
             const float Priority = Cp->Owner->WinnerPriority;
             if (!(Priority >= BestPriority))
@@ -394,13 +394,13 @@ int32_t IVP_Impact_System::test_loop_all_pairs()
     IVP_Impact_Solver_Long_Term* const LongTerm = BestCp->Owner;
     ++LongTerm->Status;
     IVP_Core* PushedCoresOfImpact[2];
-    IVP_Impact_Solver_Long_Term_Do_Impact_Long_Term(BestCp->Owner, PushedCoresOfImpact,
-                                                    BestCp->Owner->LastImpactTimeStep, BestCp); // FUN_06358d60
+    BestCp->Owner->DoImpactLongTerm(PushedCoresOfImpact,
+                                    BestCp->Owner->LastImpactTimeStep, BestCp); // FUN_06358d60
 
     for (int32_t Side = 1; Side >= 0; --Side)
     {
         IVP_Core* const Core = PushedCoresOfImpact[Side];
-        if (Core == nullptr || (Core->Flags & 0xcu) != 0 || (Core->Flags & 0x300u) != 0)
+        if (Core == nullptr || (Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0 || (Core->Flags & IVP_CORE_PINNED) != 0)
         {
             continue;
         }
@@ -455,7 +455,7 @@ void IVP_Impact_System::recalc_all_affected_cores()
         for (int32_t Index = static_cast<int32_t>(PushedCores.n_elems) - 1; Index >= 0; --Index)
         {
             IVP_Core* const Core = PushedCores.elems[Index];
-            if ((Core->Flags & 0xcu) != 0)
+            if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
             {
                 continue;
             }
@@ -482,7 +482,7 @@ void IVP_Impact_System::recalc_all_affected_cores()
     for (int32_t Index = static_cast<int32_t>(PushedCores.n_elems) - 1; Index >= 0; --Index)
     {
         IVP_Core* const Core = PushedCores.elems[Index];
-        if ((Core->Flags & 0xcu) == 0)
+        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
         {
             Core->notify_objects_and_cache_env_field(); // FUN_06347be0
         }

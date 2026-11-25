@@ -236,7 +236,7 @@ public:
     void revive_sleeping_core();
 
     // FUN_06349180: Controllers.Add(Controller), then
-    // IVP_Simulation_Unit_Register_Core_With_Controller(OwningSimUnit, Controller,
+    // IVP_Simulation_Unit::register_core_with_controller(OwningSimUnit, Controller,
     // this) -- the counterpart of detach_controller().
     void register_controller(IVP_Controller* Controller);
 
@@ -263,7 +263,7 @@ public:
     void get_surface_speed(const IVP_U_Point* PositionWs, IVP_U_Point* SpeedWsOut) const;
 
     // FUN_06349110: Controllers.RemoveElement(Controller), then
-    // IVP_Simulation_Unit_Detach_Core_From_Controller_Bucket(OwningSimUnit,
+    // IVP_Simulation_Unit::detach_core_from_controller_bucket(OwningSimUnit,
     // Controller, this) with no null test of OwningSimUnit (as retail; the known
     // callers FUN_06348f60 / FUN_06349040 only pass cores that have one).
     // Defined in ivp_core.cpp to avoid a circular include with ivp_simulation_unit.h.
@@ -291,7 +291,7 @@ public:
 
     // FUN_0634b480 (Ipion revive_for_simulation's per-core step). Returns
     // grow_friction_system()'s result; the caller
-    // (IVP_Simulation_Unit_Revive_If_Sleeping, 06349490) restarts its core scan on 1.
+    // (IVP_Simulation_Unit::revive_if_sleeping, 06349490) restarts its core scan on 1.
     int revive_pass();
 
     // FUN_063563d0 (no arguments; Ipion IVP_Core::grow_friction_system): for every
@@ -464,6 +464,19 @@ public:
 
     // FUN_06347db0: calls IVP_Real_Object::EnsureInSimulation() on every attached object.
     void ensure_objects_in_simulation();
+
+    // FUN_063464a0: the contact points of a core that has just become fixed (ivp_core.cpp).
+    void recalc_contact_points_of_fixed_core();
+
+    // FUN_063465a0: recomputes the core's contact points (ivp_core.cpp).
+    void refresh_contact_points();
+
+    // FUN_06346ef0: appends Object to Objects.
+    void add_object(IVP_Real_Object* Object);
+
+    // FUN_06346f20: removes Object from Objects; the last one out runs the
+    // core's teardown (ivp_core.cpp).
+    void remove_object(IVP_Real_Object* Object);
 };
 
 static_assert(sizeof(IVP_Core) == 0x1BC, "IVP_Core size must be 0x1BC (444 bytes)");

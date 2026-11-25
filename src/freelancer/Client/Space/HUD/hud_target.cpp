@@ -62,21 +62,10 @@ namespace
         return G_HudTargetMath;
     }
 
-    // Engine instance handles travel as void*; a GetRootIndex / get_index long converts 1:1.
-    void* InstanceFromIndex(long Index)
-    {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Index));
-    }
-
-    void* NoInstance()
-    {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-    }
-
-    FTransform const* InstanceTransform(void* Instance)
+    Transform const* InstanceTransform(InstanceIndex Instance)
     {
         // IEngine slot 40 (+0xa0) returns the instance's 12-float transform.
-        return reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
+        return DALib::Engine->GetInstanceTransform(Instance);
     }
 
     // DAT_006127b8 -- the slack PickSubTarget hands FHudSpherePick::Test (0x3ecccccd).
@@ -146,100 +135,100 @@ namespace
 // FHudInstanceBounds
 // =============================================================================================
 
-FVector* HudInverseTransformPoint(FTransform const* Xform, FVector* Out, FVector const* In)
+Vector* HudInverseTransformPoint(Transform const* Xform, Vector* Out, Vector const* In)
 {
     // FUN_004e6880.
-    FVector Local;
+    Vector Local;
     HudTargetMath()->InverseTransform(Local, *Xform, *In);
     *Out = Local;
     return Out;
 }
 
-FHudInstanceBounds::FHudInstanceBounds(void* Instance, FTransform const* Xform,
+FHudInstanceBounds::FHudInstanceBounds(InstanceIndex Instance, Transform const* Xform,
                                        bool bIncludeShieldParts)
 {
     // FUN_004e65d0: the root part's sphere.
     float Radius = 0.0f;
-    FVector Center;
-    DALib::Engine->GetInstanceExtent(Instance, 0, &Radius, &Center.X);
-    FTransform const* const Transform = InstanceTransform(Instance);
-    FVector World;
-    HudTargetMath()->TransformXform(World, *Transform, Center);
+    Vector Center;
+    DALib::Engine->GetInstanceExtent(Instance, 0, &Radius, &Center);
+    Transform const* const InstanceXform = InstanceTransform(Instance);
+    Vector World;
+    HudTargetMath()->TransformXform(World, *InstanceXform, Center);
     Center = World;
 
     // Retail calls InverseTransform twice, once for Min and once for Max.
-    FVector Local;
+    Vector Local;
     HudTargetMath()->InverseTransform(Local, *Xform, Center);
-    Min.X = Local.X - Radius;
-    Min.Y = Local.Y - Radius;
-    Min.Z = Local.Z - Radius;
+    Min.x = Local.x - Radius;
+    Min.y = Local.y - Radius;
+    Min.z = Local.z - Radius;
 
     HudTargetMath()->InverseTransform(Local, *Xform, Center);
-    Max.X = Local.X + Radius;
-    Max.Y = Local.Y + Radius;
-    Max.Z = Local.Z + Radius;
+    Max.x = Local.x + Radius;
+    Max.y = Local.y + Radius;
+    Max.z = Local.z + Radius;
 
     ExpandChildren(Instance, Xform, bIncludeShieldParts);
 }
 
-FVector* FHudInstanceBounds::GetCenter(FVector* Out) const
+Vector* FHudInstanceBounds::GetCenter(Vector* Out) const
 {
     // FUN_004e6580 (DAT_005c75e0 = 0.5f).
-    Out->X = (Min.X + Max.X) * 0.5f;
-    Out->Y = (Min.Y + Max.Y) * 0.5f;
-    Out->Z = (Min.Z + Max.Z) * 0.5f;
+    Out->x = (Min.x + Max.x) * 0.5f;
+    Out->y = (Min.y + Max.y) * 0.5f;
+    Out->z = (Min.z + Max.z) * 0.5f;
     return Out;
 }
 
-void FHudInstanceBounds::ExpandChildren(void* Instance, FTransform const* Xform,
+void FHudInstanceBounds::ExpandChildren(InstanceIndex Instance, Transform const* Xform,
                                         bool bIncludeShieldParts)
 {
     // FUN_004e69c0.
-    void* Child = DALib::Engine->GetRelatedInstance(Instance, 1, NoInstance());
-    while (Child != NoInstance())
+    InstanceIndex Child = DALib::Engine->GetRelatedInstance(Instance, 1, InvalidInstanceIndex);
+    while (Child != InvalidInstanceIndex)
     {
         if (bIncludeShieldParts || !IsShieldPart(Child))
         {
-            FVector Center;
+            Vector Center;
             float const Radius = GetPartSphere(Child, &Center);
 
             // Min: a component moves only when strictly below.
-            FVector Local;
+            Vector Local;
             HudInverseTransformPoint(Xform, &Local, &Center);
-            FVector Low;
-            Low.X = Local.X - Radius;
-            Low.Y = Local.Y - Radius;
-            Low.Z = Local.Z - Radius;
-            if (Low.X < Min.X)
+            Vector Low;
+            Low.x = Local.x - Radius;
+            Low.y = Local.y - Radius;
+            Low.z = Local.z - Radius;
+            if (Low.x < Min.x)
             {
-                Min.X = Low.X;
+                Min.x = Low.x;
             }
-            if (Low.Y < Min.Y)
+            if (Low.y < Min.y)
             {
-                Min.Y = Low.Y;
+                Min.y = Low.y;
             }
-            if (Low.Z < Min.Z)
+            if (Low.z < Min.z)
             {
-                Min.Z = Low.Z;
+                Min.z = Low.z;
             }
 
             // Max: the transform again; a component moves only when strictly above.
             HudInverseTransformPoint(Xform, &Local, &Center);
-            FVector High;
-            High.X = Local.X + Radius;
-            High.Y = Local.Y + Radius;
-            High.Z = Local.Z + Radius;
-            if (High.X > Max.X)
+            Vector High;
+            High.x = Local.x + Radius;
+            High.y = Local.y + Radius;
+            High.z = Local.z + Radius;
+            if (High.x > Max.x)
             {
-                Max.X = High.X;
+                Max.x = High.x;
             }
-            if (High.Y > Max.Y)
+            if (High.y > Max.y)
             {
-                Max.Y = High.Y;
+                Max.y = High.y;
             }
-            if (High.Z > Max.Z)
+            if (High.z > Max.z)
             {
-                Max.Z = High.Z;
+                Max.z = High.z;
             }
 
             ExpandChildren(Child, Xform, bIncludeShieldParts);
@@ -248,25 +237,25 @@ void FHudInstanceBounds::ExpandChildren(void* Instance, FTransform const* Xform,
     }
 }
 
-float FHudInstanceBounds::GetPartSphere(void* Instance, FVector* OutCenter) const
+float FHudInstanceBounds::GetPartSphere(InstanceIndex Instance, Vector* OutCenter) const
 {
     // FUN_004e68d0.
     float Radius = 0.0f;
-    DALib::Engine->GetInstanceExtent(Instance, 0, &Radius, &OutCenter->X);
-    FTransform const* const Transform = InstanceTransform(Instance);
-    FVector World;
-    HudTargetMath()->TransformXform(World, *Transform, *OutCenter);
+    DALib::Engine->GetInstanceExtent(Instance, 0, &Radius, OutCenter);
+    Transform const* const Xform = InstanceTransform(Instance);
+    Vector World;
+    HudTargetMath()->TransformXform(World, *Xform, *OutCenter);
     *OutCenter = World;
     return Radius;
 }
 
-bool FHudInstanceBounds::IsShieldPart(void* Instance) const
+bool FHudInstanceBounds::IsShieldPart(InstanceIndex Instance) const
 {
     // FUN_004e6960: the instance's user data is its CObject; retail inlines inst_to_part and
     // is_shield_part over the +0x68..+0x6c part map (no null test on the user data).
     CObject const* const Object = static_cast<CObject const*>(
         DALib::Engine->GetInstanceUserData(Instance));
-    long const EngineInst = static_cast<long>(reinterpret_cast<intptr_t>(Instance));
+    long const EngineInst = Instance;
     return Object->is_shield_part(Object->inst_to_part(EngineInst));
 }
 
@@ -283,44 +272,44 @@ FHudSpherePick::FHudSpherePick(unsigned char Flag)
     Field4c = Flag;
 }
 
-void FHudSpherePick::Setup(FVector const* From, FVector const* To)
+void FHudSpherePick::Setup(Vector const* From, Vector const* To)
 {
     // FUN_00422bc0: one reciprocal of the double-precision length, then each component scaled.
     Origin = *From;
-    Dir.X = To->X - Origin.X;
-    Dir.Y = To->Y - Origin.Y;
-    Dir.Z = To->Z - Origin.Z;
-    double const Inverse = 1.0 / sqrt(static_cast<double>(Dir.X) * Dir.X +
-                                      static_cast<double>(Dir.Y) * Dir.Y +
-                                      static_cast<double>(Dir.Z) * Dir.Z);
-    Dir.X = static_cast<float>(Inverse * Dir.X);
-    Dir.Y = static_cast<float>(Inverse * Dir.Y);
-    Dir.Z = static_cast<float>(Inverse * Dir.Z);
+    Dir.x = To->x - Origin.x;
+    Dir.y = To->y - Origin.y;
+    Dir.z = To->z - Origin.z;
+    double const Inverse = 1.0 / sqrt(static_cast<double>(Dir.x) * Dir.x +
+                                      static_cast<double>(Dir.y) * Dir.y +
+                                      static_cast<double>(Dir.z) * Dir.z);
+    Dir.x = static_cast<float>(Inverse * Dir.x);
+    Dir.y = static_cast<float>(Inverse * Dir.y);
+    Dir.z = static_cast<float>(Inverse * Dir.z);
     Field18 = -1.0f;
     HitCount = 0;
     Field50 = -1;
     BestKey = 0.0f;
 }
 
-float HudRaySphereClosest(FVector const* Origin, FVector const* Dir, FVector const* Center,
-                          float Radius, FVector* OutRay, FVector* OutSurface,
-                          FTransform const* Xform)
+float HudRaySphereClosest(Vector const* Origin, Vector const* Dir, Vector const* Center,
+                          float Radius, Vector* OutRay, Vector* OutSurface,
+                          Transform const* Xform)
 {
     // FUN_00422c70.
     if (G_HudPickMath == nullptr)
     {
         G_HudPickMath = Acquire3DMathEngine();
     }
-    FVector World;
+    Vector World;
     G_HudPickMath->TransformXform(World, *Xform, *Center);
 
-    FVector ToCenter;
-    ToCenter.X = World.X - Origin->X;
-    ToCenter.Y = World.Y - Origin->Y;
-    ToCenter.Z = World.Z - Origin->Z;
+    Vector ToCenter;
+    ToCenter.x = World.x - Origin->x;
+    ToCenter.y = World.y - Origin->y;
+    ToCenter.z = World.z - Origin->z;
 
     // t = V.D summed x, z, y, in retail's order.
-    float const Along = ToCenter.X * Dir->X + ToCenter.Z * Dir->Z + ToCenter.Y * Dir->Y;
+    float const Along = ToCenter.x * Dir->x + ToCenter.z * Dir->z + ToCenter.y * Dir->y;
     float Cosine = 1.0f;
     if (Along < 0.0f)
     {
@@ -328,22 +317,22 @@ float HudRaySphereClosest(FVector const* Origin, FVector const* Dir, FVector con
     }
     else
     {
-        OutRay->X = Along * Dir->X + Origin->X;
-        OutRay->Y = Along * Dir->Y + Origin->Y;
-        OutRay->Z = Along * Dir->Z + Origin->Z;
-        Cosine = Along / sqrtf(ToCenter.Z * ToCenter.Z + ToCenter.Y * ToCenter.Y +
-                               ToCenter.X * ToCenter.X);
+        OutRay->x = Along * Dir->x + Origin->x;
+        OutRay->y = Along * Dir->y + Origin->y;
+        OutRay->z = Along * Dir->z + Origin->z;
+        Cosine = Along / sqrtf(ToCenter.z * ToCenter.z + ToCenter.y * ToCenter.y +
+                               ToCenter.x * ToCenter.x);
     }
 
-    FVector Gap;
-    Gap.X = OutRay->X - World.X;
-    Gap.Y = OutRay->Y - World.Y;
-    Gap.Z = OutRay->Z - World.Z;
-    float const Distance = sqrtf(Gap.Z * Gap.Z + Gap.Y * Gap.Y + Gap.X * Gap.X);
+    Vector Gap;
+    Gap.x = OutRay->x - World.x;
+    Gap.y = OutRay->y - World.y;
+    Gap.z = OutRay->z - World.z;
+    float const Distance = sqrtf(Gap.z * Gap.z + Gap.y * Gap.y + Gap.x * Gap.x);
     float const Scale = Radius / Distance;
-    OutSurface->X = World.X + Gap.X * Scale;
-    OutSurface->Y = World.Y + Gap.Y * Scale;
-    OutSurface->Z = World.Z + Gap.Z * Scale;
+    OutSurface->x = World.x + Gap.x * Scale;
+    OutSurface->y = World.y + Gap.y * Scale;
+    OutSurface->z = World.z + Gap.z * Scale;
 
     // The ray point snaps to the surface only when inside.
     if (Distance < Radius)
@@ -353,12 +342,12 @@ float HudRaySphereClosest(FVector const* Origin, FVector const* Dir, FVector con
     return Cosine;
 }
 
-bool FHudSpherePick::Test(void* Instance, float Slack)
+bool FHudSpherePick::Test(InstanceIndex Instance, float Slack)
 {
     // FUN_00422e30: every child first.
     bool bHit = false;
-    void* Child = DALib::Engine->GetRelatedInstance(Instance, 1, NoInstance());
-    while (Child != NoInstance())
+    InstanceIndex Child = DALib::Engine->GetRelatedInstance(Instance, 1, InvalidInstanceIndex);
+    while (Child != InvalidInstanceIndex)
     {
         if (Test(Child, Slack))
         {
@@ -369,13 +358,13 @@ bool FHudSpherePick::Test(void* Instance, float Slack)
 
     // Then this instance's extent-flag-1 sphere.
     float Radius;
-    FVector Center;
-    DALib::Engine->GetInstanceExtent(Instance, 1, &Radius, &Center.X);
-    FTransform const* const Transform = InstanceTransform(Instance);
-    FVector RayPoint;
-    FVector SurfacePoint;
+    Vector Center;
+    DALib::Engine->GetInstanceExtent(Instance, 1, &Radius, &Center);
+    Transform const* const Xform = InstanceTransform(Instance);
+    Vector RayPoint;
+    Vector SurfacePoint;
     float const Cosine = HudRaySphereClosest(&Origin, &Dir, &Center, Radius, &RayPoint,
-                                             &SurfacePoint, Transform);
+                                             &SurfacePoint, Xform);
 
     // Compared against a double 0.5; only a cosine strictly above goes on (NaN stops).
     if (!(Cosine > 0.5))
@@ -383,9 +372,9 @@ bool FHudSpherePick::Test(void* Instance, float Slack)
         return bHit;
     }
     float const Key = -Cosine;
-    float const Dx = RayPoint.X - SurfacePoint.X;
-    float const Dy = RayPoint.Y - SurfacePoint.Y;
-    float const Dz = RayPoint.Z - SurfacePoint.Z;
+    float const Dx = RayPoint.x - SurfacePoint.x;
+    float const Dy = RayPoint.y - SurfacePoint.y;
+    float const Dz = RayPoint.z - SurfacePoint.z;
     float const Gap = sqrtf(Dx * Dx + Dz * Dz + Dy * Dy);
     // NaN stops here too.
     if (!(Gap <= Slack))
@@ -480,7 +469,7 @@ unsigned long* HudDamageColorArgb(unsigned long* OutArgb, float Damage)
     return OutArgb;
 }
 
-int* HudProjectScreenRect(int* OutRect4, FVector const* A, FVector const* B)
+int* HudProjectScreenRect(int* OutRect4, Vector const* A, Vector const* B)
 {
     // FUN_004c71b0. Retail's Project outputs x / y / z and the rectangle's fallback values share
     // four stack dwords. Project writes nothing when it fails, and the pair
@@ -497,7 +486,7 @@ int* HudProjectScreenRect(int* OutRect4, FVector const* A, FVector const* B)
     int Left = 0;
     int Top = 0;
     if (static_cast<unsigned char>(Camera->Project(&Scratch.F[0], &Scratch.F[1], &Scratch.F[2],
-                                                   &A->X)) != 0)
+                                                   A)) != 0)
     {
         Left = static_cast<int>(Scratch.F[0]);
         Top = static_cast<int>(Scratch.F[1]);
@@ -511,7 +500,7 @@ int* HudProjectScreenRect(int* OutRect4, FVector const* A, FVector const* B)
     int Right = 0;
     int Bottom = 0;
     if (static_cast<unsigned char>(Camera->Project(&Scratch.F[0], &Scratch.F[1], &Scratch.F[2],
-                                                   &B->X)) != 0)
+                                                   B)) != 0)
     {
         Right = static_cast<int>(Scratch.F[0]);
         Bottom = static_cast<int>(Scratch.F[1]);
@@ -529,10 +518,10 @@ int* HudProjectScreenRect(int* OutRect4, FVector const* A, FVector const* B)
     return OutRect4;
 }
 
-FVector* HudTransformPoint(FTransform const* Xform, FVector* Out, FVector const* In)
+Vector* HudTransformPoint(Transform const* Xform, Vector* Out, Vector const* In)
 {
     // FUN_004e7090.
-    FVector Result;
+    Vector Result;
     HudTargetMath()->TransformXform(Result, *Xform, *In);
     *Out = Result;
     return Out;
@@ -883,22 +872,22 @@ bool HudTradelaneCaption(CSimple const* Object, wchar_t* Out, int Capacity)
 
     // The ring's -z axis (its orientation, +0x08, times (0, 0, -1)), normalised, and the plane
     // offset -(n . ring position).
-    FMatrix const Orientation = reinterpret_cast<FMatrix const&>(Object->Orientation);
-    FVector const Back = {0.0f, 0.0f, -1.0f};
+    Matrix const Orientation = Object->Orientation;
+    Vector const Back = {0.0f, 0.0f, -1.0f};
     if (G_HudObjectsMath == nullptr)
     {
         G_HudObjectsMath = Acquire3DMathEngine(); // FUN_005b73e0
     }
-    FVector Axis;
+    Vector Axis;
     G_HudObjectsMath->TransformMatrix(Axis, Orientation, Back); // vt+0x2c
     // Inline, not FUN_00410190: the reciprocal stays in double. X and Y are rounded to float;
     // Z is too, but the unrounded product feeds the plane offset.
-    double const Inverse = 1.0 / sqrt(static_cast<double>(Axis.X) * Axis.X +
-                                      static_cast<double>(Axis.Y) * Axis.Y +
-                                      static_cast<double>(Axis.Z) * Axis.Z);
-    float const NormalX = static_cast<float>(Axis.X * Inverse);
-    float const NormalY = static_cast<float>(Axis.Y * Inverse);
-    double const NormalZExact = Inverse * Axis.Z;
+    double const Inverse = 1.0 / sqrt(static_cast<double>(Axis.x) * Axis.x +
+                                      static_cast<double>(Axis.y) * Axis.y +
+                                      static_cast<double>(Axis.z) * Axis.z);
+    float const NormalX = static_cast<float>(Axis.x * Inverse);
+    float const NormalY = static_cast<float>(Axis.y * Inverse);
+    double const NormalZExact = Inverse * Axis.z;
     float const NormalZ = static_cast<float>(NormalZExact);
     Vector const& RingPos = Object->WorldPosition;
     float const PlaneOffset = static_cast<float>(
@@ -1357,24 +1346,24 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
     // Retail calls slot 4 (+0x10) get_orientation, whose body is ICF-folded with slot 3
     // get_transform -- the pointer is the object's whole Transform, and FUN_004e65d0 uses it as
     // one. The port asks for the transform by its own name.
-    FTransform const* const Xform = reinterpret_cast<FTransform const*>(&Viewed->get_transform());
-    void* const Instance = InstanceFromIndex(Viewed->get_index());
+    Transform const* const Xform = &Viewed->get_transform();
+    const InstanceIndex Instance = Viewed->get_index();
     FHudInstanceBounds Bounds(Instance, Xform, false);
 
-    FVector Center;
+    Vector Center;
     ViewCenter = *Bounds.GetCenter(&Center);
 
     // Retail stores |Max - Center| (FUN_00423b60, FUN_00410190) to ViewRadius and then
     // overwrites it below.
     float Reach[3];
-    Reach[0] = Bounds.Max.X - ViewCenter.X;
-    Reach[1] = Bounds.Max.Y - ViewCenter.Y;
-    Reach[2] = Bounds.Max.Z - ViewCenter.Z;
+    Reach[0] = Bounds.Max.x - ViewCenter.x;
+    Reach[1] = Bounds.Max.y - ViewCenter.y;
+    Reach[2] = Bounds.Max.z - ViewCenter.z;
     ViewRadius = static_cast<float>(Vec3Length(Reach));
 
     // The X span wins only when strictly larger (NaN takes Z); * 0.5 is DAT_005c75e8, double.
-    float const SpanX = Bounds.Max.X - Bounds.Min.X;
-    float const SpanZ = Bounds.Max.Z - Bounds.Min.Z;
+    float const SpanX = Bounds.Max.x - Bounds.Min.x;
+    float const SpanZ = Bounds.Max.z - Bounds.Min.z;
     float const Span = (SpanX > SpanZ) ? SpanX : SpanZ;
     ViewRadius = static_cast<float>(static_cast<double>(Span) * 0.5);
 
@@ -1389,7 +1378,7 @@ void HudTargetBase::SetViewObject(IObjRW* Target)
 
     // get_index again; the renderer LODs pinned to 3 while the cache is built, then put back
     // (FUN_00402580 / FUN_00405b10 / FUN_00402720).
-    void* const BuildInstance = InstanceFromIndex(Viewed->get_index());
+    const InstanceIndex BuildInstance = Viewed->get_index();
     FRendererLodMap SavedLods;
     BindRendererLods(BuildInstance, 3, &SavedLods);
     PartCacheBuild(&PartCache, BuildInstance, Tag);
@@ -1446,7 +1435,7 @@ void HudTargetBase::HideGroupAndEquipParts()
     CArchGroup* Group = EqObj->ArchGroups.Traverse(GroupWalk);
     while (Group != nullptr)
     {
-        PartCacheMarkHidden(&PartCache, InstanceFromIndex(Group->GetRootIndex()), false);
+        PartCacheMarkHidden(&PartCache, Group->GetRootIndex(), false);
         Group = EqObj->ArchGroups.Traverse(GroupWalk);
     }
 
@@ -1459,7 +1448,7 @@ void HudTargetBase::HideGroupAndEquipParts()
         long const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
         if (Root != -1)
         {
-            PartCacheMarkHidden(&PartCache, InstanceFromIndex(Root), true);
+            PartCacheMarkHidden(&PartCache, Root, true);
         }
         Equip = EqObj->EquipManager.Traverse(EquipWalk);
     }
@@ -1491,14 +1480,14 @@ namespace
 void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
 {
     // FUN_004e70e0. The hit box's top-left and bottom-right corners through the Win3D camera.
-    FVector Corner0;
-    Corner0.X = HitCenter.X - HitHalfWidth;
-    Corner0.Y = HitCenter.Y + HitHalfHeight;
-    Corner0.Z = HitCenter.Z;
-    FVector Corner1;
-    Corner1.X = HitCenter.X + HitHalfWidth;
-    Corner1.Y = HitCenter.Y - HitHalfHeight;
-    Corner1.Z = HitCenter.Z;
+    Vector Corner0;
+    Corner0.x = HitCenter.x - HitHalfWidth;
+    Corner0.y = HitCenter.y + HitHalfHeight;
+    Corner0.z = HitCenter.z;
+    Vector Corner1;
+    Corner1.x = HitCenter.x + HitHalfWidth;
+    Corner1.y = HitCenter.y - HitHalfHeight;
+    Corner1.z = HitCenter.z;
     int Box[4];
     int const* const Projected = HudProjectScreenRect(Box, &Corner0, &Corner1);
     int const Left = Projected[0];
@@ -1533,17 +1522,17 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
     SpaceCameraSetHalfFovX(&ViewCamera, kViewHalfFovX);
 
     IObjRW* const Viewed = ObjRwFromWatchable(const_cast<Watchable*>(ViewObject.target()));
-    FTransform Xform;
+    Transform Xform;
     if (!bFixedOrbit)
     {
         // ViewRadius * 1.1 (DAT_005d8468) / tan(35) away from the object's centre.
         float const Distance = static_cast<float>(static_cast<double>(InvTanHalfFov) *
                                                   static_cast<double>(ViewRadius) *
                                                   static_cast<double>(1.1f));
-        Win3DIdentityRotation3x3(&Xform.Rotation.D[0][0]);
-        Xform.Translation.X = 0.0f;
-        Xform.Translation.Y = 0.0f;
-        Xform.Translation.Z = 0.0f;
+        Win3DIdentityRotation3x3(&Xform.Rotation);
+        Xform.Translation.x = 0.0f;
+        Xform.Translation.y = 0.0f;
+        Xform.Translation.z = 0.0f;
 
         // The HUDItem target (+0x28) when it is a ship, else null -- which retail does not test:
         // GetDirectionMatrix is handed null + 8 (EngineObject::get_transform inlined).
@@ -1553,15 +1542,14 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
             Ship = nullptr;
         }
         Matrix const Facing = GetDirectionMatrix(Ship->get_transform(), Viewed->get_position());
-        memcpy(&Xform.Rotation, &Facing, sizeof(FMatrix));
+        memcpy(&Xform.Rotation, &Facing, sizeof(Matrix));
 
         // Slot 4 (+0x10), ICF-folded with get_transform -- see SetViewObject.
-        FTransform const* const ViewXform =
-            reinterpret_cast<FTransform const*>(&Viewed->get_transform());
-        FVector Center;
+        Transform const* const ViewXform = &Viewed->get_transform();
+        Vector Center;
         HudTransformPoint(ViewXform, &Center, &ViewCenter);
-        float const Axis[3] = {Xform.Rotation.D[0][2], Xform.Rotation.D[1][2],
-                               Xform.Rotation.D[2][2]};
+        float const Axis[3] = {Xform.Rotation.E[0][2], Xform.Rotation.E[1][2],
+                               Xform.Rotation.E[2][2]};
         float Offset[3];
         ScaleVec3(Offset, Axis, Distance);
         // Loot (class & 0x803) stands four times as far (DAT_005cfc9c).
@@ -1573,51 +1561,49 @@ void HudTargetBase::SetupViewCamera(bool bFixedOrbit, float ScreenShift)
             Offset[1] = Offset[1] * 4.0f;
             Offset[2] = Offset[2] * 4.0f;
         }
-        Xform.Translation.X = Center.X + Offset[0];
-        Xform.Translation.Y = Center.Y + Offset[1];
-        Xform.Translation.Z = Center.Z + Offset[2];
+        Xform.Translation.x = Center.x + Offset[0];
+        Xform.Translation.y = Center.y + Offset[1];
+        Xform.Translation.z = Center.z + Offset[2];
     }
     else
     {
         // The object's own orientation (slot 3, +0xc) with its y / z columns turned
         // by -90 degrees (the double DAT_005d8ec0 = (double)-1.57079637f): per row,
         // m1' = m1 cos + sin m2 and m2' = cos m2 - m1 sin.
-        FTransform const* const ObjectXform =
-            reinterpret_cast<FTransform const*>(&Viewed->get_transform());
+        Transform const* const ObjectXform = &Viewed->get_transform();
         Xform.Rotation = ObjectXform->Rotation;
-        Xform.Translation.X = 0.0f;
-        Xform.Translation.Y = 0.0f;
-        Xform.Translation.Z = 0.0f;
+        Xform.Translation.x = 0.0f;
+        Xform.Translation.y = 0.0f;
+        Xform.Translation.z = 0.0f;
         double const Angle = static_cast<double>(-1.57079637f);
         double const Cos = cos(Angle);
         double const Sin = sin(Angle);
         for (int Row = 0; Row < 3; ++Row)
         {
-            double const M1 = static_cast<double>(Xform.Rotation.D[Row][1]);
-            double const M2 = static_cast<double>(Xform.Rotation.D[Row][2]);
-            Xform.Rotation.D[Row][1] = static_cast<float>(M1 * Cos + Sin * M2);
-            Xform.Rotation.D[Row][2] = static_cast<float>(Cos * M2 - M1 * Sin);
+            double const M1 = static_cast<double>(Xform.Rotation.E[Row][1]);
+            double const M2 = static_cast<double>(Xform.Rotation.E[Row][2]);
+            Xform.Rotation.E[Row][1] = static_cast<float>(M1 * Cos + Sin * M2);
+            Xform.Rotation.E[Row][2] = static_cast<float>(Cos * M2 - M1 * Sin);
         }
 
         float const Distance = static_cast<float>(static_cast<double>(InvTanHalfFov) *
                                                   static_cast<double>(ViewRadius) *
                                                   static_cast<double>(1.1f));
         // Slot 4 (+0x10) through DAT_00674b1c directly (FUN_004e7090 inlined).
-        FTransform const* const ViewXform =
-            reinterpret_cast<FTransform const*>(&Viewed->get_transform());
-        FVector Center;
+        Transform const* const ViewXform = &Viewed->get_transform();
+        Vector Center;
         HudTargetMath()->TransformXform(Center, *ViewXform, ViewCenter);
-        float const OffsetX = Xform.Rotation.D[0][2] * Distance;
-        float const OffsetY = Xform.Rotation.D[1][2] * Distance;
-        float const OffsetZ = Xform.Rotation.D[2][2] * Distance;
-        Xform.Translation.X = Center.X + OffsetX;
-        Xform.Translation.Y = Center.Y + OffsetY;
-        Xform.Translation.Z = Center.Z + OffsetZ;
+        float const OffsetX = Xform.Rotation.E[0][2] * Distance;
+        float const OffsetY = Xform.Rotation.E[1][2] * Distance;
+        float const OffsetZ = Xform.Rotation.E[2][2] * Distance;
+        Xform.Translation.x = Center.x + OffsetX;
+        Xform.Translation.y = Center.y + OffsetY;
+        Xform.Translation.z = Center.z + OffsetZ;
     }
 
     ViewCamera.bViewDirty = 1;
-    memcpy(ViewCamera.World, &Xform.Rotation, sizeof(ViewCamera.World));
-    memcpy(ViewCamera.WorldPos, &Xform.Translation, sizeof(ViewCamera.WorldPos));
+    memcpy(&ViewCamera.World, &Xform.Rotation, sizeof(ViewCamera.World));
+    memcpy(&ViewCamera.WorldPos, &Xform.Translation, sizeof(ViewCamera.WorldPos));
     Win3DSetViewport(AsCamera(&ViewCamera),
                      "E:\\FL\\Scratch\\Source\\Client\\Space\\HUD_Target_Base.cpp", 0x16b);
     Win3DApplyCameraPerspective(AsCamera(&ViewCamera));
@@ -1678,7 +1664,7 @@ void HudTargetBase::ColourGroupParts()
         }
 
         // Re-activated without recursion; the root index is not tested against -1.
-        PartCacheActivatePart(&PartCache, InstanceFromIndex(Group->GetRootIndex()), false,
+        PartCacheActivatePart(&PartCache, Group->GetRootIndex(), false,
                               PackPartTag(Colour));
         Group = EqObj->ArchGroups.Traverse(GroupWalk);
     }
@@ -1739,7 +1725,7 @@ void HudTargetBase::ColourEquipParts()
         long const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
         if (Root != -1)
         {
-            PartCacheActivatePart(&PartCache, InstanceFromIndex(Root), true, PackPartTag(Colour));
+            PartCacheActivatePart(&PartCache, Root, true, PackPartTag(Colour));
         }
         Equip = EqObj->EquipManager.Traverse(EquipWalk);
     }
@@ -1850,35 +1836,35 @@ unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, in
     float const ScreenX = static_cast<float>(X);
     float const ScreenY = static_cast<float>(Y);
     ICamera* const Camera = AsCamera(&ViewCamera);
-    FVector Unprojected;
-    Camera->Unproject(&Unprojected.X, ScreenX, ScreenY);
-    float const* const CameraPos = Camera->GetPosition();
-    FVector RayEnd;
-    RayEnd.X = Unprojected.X + CameraPos[0];
-    RayEnd.Y = Unprojected.Y + CameraPos[1];
-    RayEnd.Z = Unprojected.Z + CameraPos[2];
+    Vector Unprojected;
+    Camera->Unproject(&Unprojected, ScreenX, ScreenY);
+    const Vector* const CameraPos = Camera->GetPosition();
+    Vector RayEnd;
+    RayEnd.x = Unprojected.x + CameraPos->x;
+    RayEnd.y = Unprojected.y + CameraPos->y;
+    RayEnd.z = Unprojected.z + CameraPos->z;
 
     // The same screen point on the Win3D camera's near plane (DAT_0067dbf8: +0x68 / +0x6c
     // centre, +0x78 / +0x7c scales, +0xa4 near), rotated by its orientation (+0x04) -- the
     // direction the WinControl face's HitTest (slot 4) takes.
     FSpaceCamera const* const UiCamera = Win3DGetCamera();
-    FVector Near;
-    Near.X = static_cast<float>((static_cast<double>(ScreenX) - UiCamera->ScreenCenterX) *
+    Vector Near;
+    Near.x = static_cast<float>((static_cast<double>(ScreenX) - UiCamera->ScreenCenterX) *
                                 (static_cast<double>(UiCamera->ZNear) / UiCamera->XScale));
-    Near.Y = static_cast<float>((static_cast<double>(ScreenY) - UiCamera->ScreenCenterY) *
+    Near.y = static_cast<float>((static_cast<double>(ScreenY) - UiCamera->ScreenCenterY) *
                                 (static_cast<double>(UiCamera->ZNear) / UiCamera->YScale));
-    Near.Z = -UiCamera->ZNear;
-    FMatrix Orientation;
-    memcpy(&Orientation, UiCamera->World, sizeof(Orientation));
-    FVector Direction;
+    Near.z = -UiCamera->ZNear;
+    Matrix Orientation;
+    memcpy(&Orientation, &UiCamera->World, sizeof(Orientation));
+    Vector Direction;
     HudTargetMath()->TransformMatrix(Direction, Orientation, Near);
-    if (!HitTest(&Direction.X))
+    if (!HitTest(&Direction.x))
     {
         return 0;
     }
 
     FHudSpherePick Pick(1);
-    Pick.Setup(reinterpret_cast<FVector const*>(Camera->GetPosition()), &RayEnd);
+    Pick.Setup(reinterpret_cast<Vector const*>(Camera->GetPosition()), &RayEnd);
 
     unsigned Result = 0;
 
@@ -1889,7 +1875,7 @@ unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, in
     {
         CAttachedEquip* const Attached = static_cast<CAttachedEquip*>(Equip);
         if (Attached->IsConnected() &&
-            Pick.Test(InstanceFromIndex(Attached->GetRootIndex()), kSubTargetPickSlack))
+            Pick.Test(Attached->GetRootIndex(), kSubTargetPickSlack))
         {
             *OutSubId = Equip->Id;
             Result = static_cast<unsigned>(Equip->Arch->IdsName);
@@ -1905,7 +1891,7 @@ unsigned HudTargetBase::PickSubTarget(int X, int Y, unsigned short* OutSubId, in
     while (Group != nullptr)
     {
         if (Group->GetRootIndex() != -1 &&
-            Pick.Test(InstanceFromIndex(Group->GetRootIndex()), kSubTargetPickSlack))
+            Pick.Test(Group->GetRootIndex(), kSubTargetPickSlack))
         {
             *OutSubId = Group->GetID();
             Result = HudCollisionGroupTypeIds(Group->GetCollisionGroupType());
@@ -1935,11 +1921,11 @@ bool HudTargetBase::HitTest(float const* Ray)
     if (bExpanded != 0)
     {
         // The ray scaled to the hit plane's depth, tested against the box around HitCenter.
-        float const Scale = HitCenter.Z / Ray[2];
+        float const Scale = HitCenter.z / Ray[2];
         float const PlaneX = Scale * Ray[0];
         float const PlaneY = Scale * Ray[1];
-        float const Dx = PlaneX - (HitCenter.X - HitHalfWidth);
-        float const Dy = (HitCenter.Y + HitHalfHeight) - PlaneY;
+        float const Dx = PlaneX - (HitCenter.x - HitHalfWidth);
+        float const Dy = (HitCenter.y + HitHalfHeight) - PlaneY;
         // DAT_005c7474 = 0.0f. Each test falls through to the base on false or unordered.
         if (Dx > 0.0f && Dx < HitHalfWidth + HitHalfWidth && Dy > 0.0f &&
             HitHalfHeight + HitHalfHeight > Dy)

@@ -404,16 +404,16 @@ CTradeEquipList::CTradeEquipList(WinControl* NewParent, char const* RowsHp,
 
     // The first row at the translation of the parent's RowsHp hardpoint (an identity transform
     // when it has none).
-    float Xform[12];
-    Win3DIdentityRotation3x3(Xform);
-    Xform[9] = 0.0f;
-    Xform[10] = 0.0f;
-    Xform[11] = 0.0f;
-    Parent->GetHardpointTransform(RowsHp, Xform);
+    Transform Xform;
+    Win3DIdentityRotation3x3(&Xform.Rotation);
+    Xform.Translation.x = 0.0f;
+    Xform.Translation.y = 0.0f;
+    Xform.Translation.z = 0.0f;
+    Parent->GetHardpointTransform(RowsHp, &Xform);
     float RowAt[3];
-    RowAt[0] = Xform[9];
-    RowAt[1] = Xform[10];
-    RowAt[2] = Xform[11];
+    RowAt[0] = Xform.Translation.x;
+    RowAt[1] = Xform.Translation.y;
+    RowAt[2] = Xform.Translation.z;
 
     CTradeEquipListLine* Line = new CTradeEquipListLine(this);
     Line->Init(Parent, RowAt);

@@ -2111,17 +2111,18 @@ GENRESULT FAtmosphereMaterial::SubmitAtmosphereLock(void* Context, unsigned long
                                     FvfPosSize(Lock.Listing.Fvf);
     uintptr_t DestUv = (uintptr_t)(Lock.Vertices) + TexOffset;
 
-    FTransform ScaleTransform = {};
-    ScaleTransform.Rotation.D[0][0] = Scale;
-    ScaleTransform.Rotation.D[1][1] = Scale;
-    ScaleTransform.Rotation.D[2][2] = Scale;
-    FTransform Temporary;
-    const FTransform& World = *(const FTransform*)(SubmitContext->World);
-    const FTransform& View = *(const FTransform*)(SubmitContext->View);
+    Transform ScaleTransform;
+    std::memset(&ScaleTransform, 0, sizeof(ScaleTransform));
+    ScaleTransform.Rotation.E[0][0] = Scale;
+    ScaleTransform.Rotation.E[1][1] = Scale;
+    ScaleTransform.Rotation.E[2][2] = Scale;
+    Transform Temporary;
+    const Transform& World = *SubmitContext->World;
+    const Transform& View = *SubmitContext->View;
     if (G_MathEngine == nullptr)
         G_MathEngine = AcquireMathEngine();
     G_MathEngine->MulTransform(Temporary, World, ScaleTransform);
-    const FTransform ScaledWorld = Temporary;
+    const Transform ScaledWorld = Temporary;
     int State7 = 1;
     Pipeline->GetPipelineState(7, &State7);
     if (State7 != 0)
@@ -2129,41 +2130,41 @@ GENRESULT FAtmosphereMaterial::SubmitAtmosphereLock(void* Context, unsigned long
         if (G_MathEngine == nullptr)
             G_MathEngine = AcquireMathEngine();
         G_MathEngine->MulTransform(Temporary, View, ScaledWorld);
-        const FTransform Modelview = Temporary;
-        Pipeline->SetModelview((const float*)(&Modelview));
+        const Transform Modelview = Temporary;
+        Pipeline->SetModelview(&Modelview);
     }
     else
-        Pipeline->SetWorld((const float*)(&ScaledWorld));
+        Pipeline->SetWorld(&ScaledWorld);
 
-    FVector Center = {};
+    Vector Center = {};
     float Radius = 1.0f;
     if (SubmitContext->MaterialContext != nullptr)
         ((IEngine*)(SubmitContext->MaterialContext))->GetInstanceExtent(
-            SubmitContext->Inst, 0, &Radius, &Center.X);
+            SubmitContext->Inst, 0, &Radius, &Center);
     const float RadiusOverScale = (float)((double)Radius / Scale);
     if (G_MathEngine == nullptr)
         G_MathEngine = AcquireMathEngine();
     G_MathEngine->MulTransform(Temporary, View, World);
-    const FTransform ViewWorld = Temporary;
-    const FVector Origin = {};
-    FVector Camera;
+    const Transform ViewWorld = Temporary;
+    const Vector Origin = {};
+    Vector Camera;
     if (G_MathEngine == nullptr)
         G_MathEngine = AcquireMathEngine();
     G_MathEngine->InverseTransform(Camera, ViewWorld, Origin);
 
     // (X*X + Y*Y) + Z*Z; the double sqrt is compared before rounding to float.
-    const double SquaredXY = (double)(Camera.X) * Camera.X +
-                             (double)(Camera.Y) * Camera.Y;
-    const double LengthWide = std::sqrt(SquaredXY + (double)(Camera.Z) * Camera.Z);
+    const double SquaredXY = (double)(Camera.x) * Camera.x +
+                             (double)(Camera.y) * Camera.y;
+    const double LengthWide = std::sqrt(SquaredXY + (double)(Camera.z) * Camera.z);
     float Length = (float)LengthWide;
     // Only an ordered <= 0 clamps; NaN is kept.
     if (LengthWide <= 0.0)
         Length = AtmosphereEps();
     const double InverseLength = 1.0 / Length;
-    const FVector Direction = {
-        (float)((double)(Camera.X) * InverseLength),
-        (float)((double)(Camera.Y) * InverseLength),
-        (float)((double)(Camera.Z) * InverseLength)};
+    const Vector Direction = {
+        (float)((double)(Camera.x) * InverseLength),
+        (float)((double)(Camera.y) * InverseLength),
+        (float)((double)(Camera.z) * InverseLength)};
     const float Threshold = (float)(InverseLength * Radius);
     double Shell = ((double)Scale - 1.0) * RadiusOverScale;
     // Same ordered <= 0 clamp; Shell stays double.
@@ -2190,9 +2191,9 @@ GENRESULT FAtmosphereMaterial::SubmitAtmosphereLock(void* Context, unsigned long
             Out[1] = (float)Fade;
             const float* Normal = (const float*)NormalAddress;
             // Retail sums Z, then Y, then X, in double precision.
-            const double DotZY = (double)(Direction.Z) * Normal[2] +
-                                 (double)(Direction.Y) * Normal[1];
-            const double Dot = DotZY + (double)(Direction.X) * Normal[0];
+            const double DotZY = (double)(Direction.z) * Normal[2] +
+                                 (double)(Direction.y) * Normal[1];
+            const double Dot = DotZY + (double)(Direction.x) * Normal[0];
             // Unordered takes the formula branch.
             if (Dot < (double)Threshold)
                 Out[0] = 0.0f;
@@ -3736,15 +3737,15 @@ GENRESULT DACOM_API FBatchedMaterial::Submit(void* Context, unsigned long PrimTy
     {
         // Retail captures both pointers before the lazy math-engine creation.
         const FMaterialSubmitContext* SubmitContext = (const FMaterialSubmitContext*)Context;
-        const FTransform* View = (const FTransform*)(SubmitContext->View);
-        const FVector* Translation = &((const FTransform*)(SubmitContext->World))->Translation;
+        const Transform* View = SubmitContext->View;
+        const Vector* Translation = &SubmitContext->World->Translation;
         static I3DMathEngine* GBatchedMathEngine = nullptr; // retail DAT_06ed56c8
         Flags |= 0x20;
         if (GBatchedMathEngine == nullptr)
             GBatchedMathEngine = AcquireMathEngine();
-        FVector Transformed;
+        Vector Transformed;
         GBatchedMathEngine->TransformXform(Transformed, *View, *Translation);
-        const float Depth = -Transformed.Z;
+        const float Depth = -Transformed.z;
         std::memcpy(&DepthBits, &Depth, sizeof(Depth));
     }
     // Retail re-reads Batcher and Inner after the math call.

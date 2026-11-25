@@ -311,7 +311,7 @@ struct FRmShipGroup
     int SpawnTriggerMode = RmSpawnDefault;      // +0x04 ship block +0x18 (ERmSpawnTriggerMode)
     int SpawnTriggerParam = -1;                 // +0x08 ship block +0x1c (seconds or remaining ship count)
     FSystemInfo* System = nullptr;              // +0x0c FindSystemInfo(query DestSys)
-    FMatrix Orientation;                        // +0x10 identity
+    Matrix Orientation;                        // +0x10 identity
     Vector Position;                            // +0x34 the objective position
     float Attitude = -2.0f;                     // +0x40 DAT_06fbc2e8; 0.9 friendly / -0.9 hostile
     TString<0x30> Name;                         // +0x44 arrival solar nickname (read by SpawnShipGroup)

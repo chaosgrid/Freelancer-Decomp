@@ -151,7 +151,7 @@ HudTargetableObjects::HudTargetableObjects(INI_Reader& /*Reader*/)
     // Create's body inlined; Win3D::Create(0, 0) is a direct (non-virtual) call.
     G_HudTargetableObjects = this;
     HUDItem::Name = "Targetable_Objects";
-    SetPosition(Position);
+    SetPosition(&Position.x);
     if (Win3D::Create(nullptr, nullptr))
         RegisterEvent(USER_BUTTON0);
     Win3D::SetName("Targetable_Objects");
@@ -394,7 +394,7 @@ void HudTargetableObjects::SetTarget(IObjRW* Target)
 bool HudTargetableObjects::Create(Win3D* NewParent, void* Data)
 {
     // FUN_004f17c0 (this = the WinControl face).
-    SetPosition(Position);
+    SetPosition(&Position.x);
     if (!Win3D::Create(NewParent, Data))   // FUN_004b5060
         return false;
     RegisterEvent(USER_BUTTON0);        // FUN_005760d0
@@ -470,21 +470,21 @@ bool HudTargetableObjects::ProjectContact(Vector const* World, float Radius, Vec
 {
     // FUN_004ecfd0. The listener camera (FUN_0040f130).
     ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());
-    float const* const View = Camera->GetViewTransform();
+    const float* const View = (const float*)Camera->GetViewTransform();
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();           // FUN_005b73e0
-    FVector ViewLocal;
-    FVector const WorldPoint = {World->x, World->y, World->z};
-    G_HudObjectsMath->TransformXform(ViewLocal, *reinterpret_cast<FTransform const*>(View),
+    Vector ViewLocal;
+    Vector const WorldPoint = {World->x, World->y, World->z};
+    G_HudObjectsMath->TransformXform(ViewLocal, *reinterpret_cast<Transform const*>(View),
                                      WorldPoint);
 
     // Projection is tried only for an ordered ZNear <= -viewZ; NaN skips it.
-    float const NegViewZ = -ViewLocal.Z;
+    float const NegViewZ = -ViewLocal.z;
     float const ZNear = Camera->GetZNear();
     bool bOnScreen = false;
     if (ZNear <= NegViewZ)
     {
-        if (Camera->ProjectVec(&OutScreen->x, &World->x) != 0)
+        if (Camera->ProjectVec(OutScreen, World) != 0)
         {
             // Any clamp into the surface means "off screen". z is zeroed either way.
             int const MaxX = static_cast<int>(G_RenderSurfaceWidth) - 1;
@@ -912,7 +912,7 @@ FCameraRayHit* CameraRayPick(FCameraRayHit* Out, ICamera* Camera, float ScreenX,
 {
     // FUN_0051dd20.
     Vector Direction;
-    Camera->Unproject(&Direction.x, ScreenX, ScreenY);
+    Camera->Unproject(&Direction, ScreenX, ScreenY);
 
     // Stretched to 1e7 (DAT_005dc130); the length sums y, z, x.
     double const Length = std::sqrt(static_cast<double>(Direction.y) * Direction.y +
@@ -923,11 +923,11 @@ FCameraRayHit* CameraRayPick(FCameraRayHit* Out, ICamera* Camera, float ScreenX,
     Direction.y = static_cast<float>(static_cast<double>(Direction.y) * Scale);
     Direction.z = static_cast<float>(static_cast<double>(Direction.z) * Scale);
 
-    float const* const From = Camera->GetPosition();
+    const Vector* const From = Camera->GetPosition();
     Vector To;
-    To.x = Direction.x + From[0];
-    To.y = Direction.y + From[1];
-    To.z = Direction.z + From[2];
+    To.x = Direction.x + From->x;
+    To.y = Direction.y + From->y;
+    To.z = Direction.z + From->z;
     CameraRayPickTo(Out, Camera, &To, Ignore, bSkipCloaked);
     return Out;
 }
@@ -2023,7 +2023,7 @@ void HudTargetableObjects::DrawContactMarkers()
         LeadScreen.y = 0.0f;
         LeadScreen.z = 0.0f;
         ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
-        Camera->ProjectVec(&LeadScreen.x, &Lead.x);
+        Camera->ProjectVec(&LeadScreen, &Lead);
         LeadMarkers.emplace_back();
         FHudLeadMarker& Marker = LeadMarkers.back();
         Marker.Target.set(Contact);
@@ -2351,18 +2351,18 @@ void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
     // The waypoint in the listener camera's frame: its orientation and position (read as one
     // transform) inverted onto World by DAT_00674b6c.
     ICamera* const Listener = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
-    float const* const Frame = Listener->GetOrientation();
+    const float* const Frame = (const float*)Listener->GetOrientation();
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();   // FUN_005b73e0
-    FVector Local;
-    G_HudObjectsMath->InverseTransform(Local, *reinterpret_cast<FTransform const*>(Frame),
-                                       *reinterpret_cast<FVector const*>(&Record->World));
+    Vector Local;
+    G_HudObjectsMath->InverseTransform(Local, *reinterpret_cast<Transform const*>(Frame),
+                                       Record->World);
 
     // Retail also builds this rotation product and copies it next to the arrow position; nothing
     // reads that copy.
     Vector Flat;
-    Flat.x = Local.X;
-    Flat.y = Local.Y;
+    Flat.x = Local.x;
+    Flat.y = Local.y;
     Flat.z = 0.0f;
     Vector Spin;
     Spin.x = 0.0f;
@@ -2372,9 +2372,9 @@ void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
     Matrix const Look = LookMatrix(Flat);
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();
-    FMatrix ArrowOrientation;
-    G_HudObjectsMath->MulMatrix(ArrowOrientation, *reinterpret_cast<FMatrix const*>(&Look),
-                                *reinterpret_cast<FMatrix const*>(&Rotation));
+    Matrix ArrowOrientation;
+    G_HudObjectsMath->MulMatrix(ArrowOrientation, Look,
+                                Rotation);
 
     // The arrow sits where the direction leaves the view, at depth -1.3 (DAT_005d8f04): through
     // a side edge when |y| * aspect is below |x| (ordered), at x = +-tan(HalfFovX deg) * 1.3 *
@@ -2382,9 +2382,9 @@ void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
     // NaN included); otherwise through the top or bottom at y = +-tan(FovY deg) * 1.3 * 0.945
     // with x on the line.
     FSpaceCamera const* const Ui = Win3DGetCamera();
-    double const AbsX = std::fabs(static_cast<double>(Local.X));
+    double const AbsX = std::fabs(static_cast<double>(Local.x));
     double const AbsYAspect =
-        std::fabs(static_cast<double>(Local.Y)) * static_cast<double>(Ui->Aspect);   // DAT_0067dc98
+        std::fabs(static_cast<double>(Local.y)) * static_cast<double>(Ui->Aspect);   // DAT_0067dc98
     Vector ArrowPos;
     ArrowPos.z = -1.3f;
     if (AbsYAspect < AbsX)
@@ -2396,10 +2396,10 @@ void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
         // Port-only Hor+: +0x98 is the 4:3 angle; the screen edge is the widened one.
         Edge *= SpaceCameraHorPlusScale(Ui);
 #endif
-        if (!(Local.X > 0.0f))
+        if (!(Local.x > 0.0f))
             Edge = -Edge;
         ArrowPos.y = static_cast<float>(
-            (static_cast<double>(Local.Y) / static_cast<double>(Local.X)) * Edge);
+            (static_cast<double>(Local.y) / static_cast<double>(Local.x)) * Edge);
         ArrowPos.x = static_cast<float>(Edge);
     }
     else
@@ -2407,12 +2407,12 @@ void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
         double Edge = std::tan(static_cast<double>(Ui->FovYDeg) *
                                static_cast<double>(0.0174533f)) *   // DAT_0067dc94
                       static_cast<double>(-(-1.3f)) * static_cast<double>(0.945f);
-        if (!(Local.Y > 0.0f))
+        if (!(Local.y > 0.0f))
             Edge = -Edge;
         ArrowPos.y = static_cast<float>(Edge);
         ArrowPos.x = static_cast<float>(
             static_cast<double>(ArrowPos.y) /
-            (static_cast<double>(Local.Y) / static_cast<double>(Local.X)));
+            (static_cast<double>(Local.y) / static_cast<double>(Local.x)));
     }
 
     // With both waypoint tiles, the background and the arrow (FUN_00559900).
@@ -2431,7 +2431,7 @@ void HudTargetableObjects::DrawWaypointArrow(FHudContactRecord const* Record)
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
     float ScreenZ = 0.0f;
-    if ((AsCamera(Win3DGetCamera())->Project(&ScreenX, &ScreenY, &ScreenZ, &ArrowPos.x) & 0xff) == 0)
+    if ((AsCamera(Win3DGetCamera())->Project(&ScreenX, &ScreenY, &ScreenZ, &ArrowPos) & 0xff) == 0)
         return;
     int CursorX = 0;
     int CursorY = 0;
@@ -2603,18 +2603,18 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
                                        static_cast<double>(Record->Screen.y));
 
     // The reticle transform -- the identity scaled by Scale at P.
-    FTransform Reticle;
+    Transform Reticle;
     for (int Row = 0; Row < 3; ++Row)
     {
         for (int Column = 0; Column < 3; ++Column)
-            Reticle.Rotation.D[Row][Column] = (Row == Column) ? 1.0f : 0.0f;
+            Reticle.Rotation.E[Row][Column] = (Row == Column) ? 1.0f : 0.0f;
     }
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();   // FUN_005b73e0
     G_HudObjectsMath->Scale(Reticle.Rotation, Reticle.Rotation, Scale);
-    Reticle.Translation.X = P.x;
-    Reticle.Translation.Y = P.y;
-    Reticle.Translation.Z = P.z;
+    Reticle.Translation.x = P.x;
+    Reticle.Translation.y = P.y;
+    Reticle.Translation.z = P.z;
 
     // Violet for a waypoint or the best-path object, else the marker colour; the HUD_Comm
     // speaker amber over either.
@@ -2726,9 +2726,9 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     // A waypoint's bars sit 0.003 right (DAT_005d3e90) and 0.04 down.
     if (bWaypoint)
     {
-        Reticle.Translation.X = static_cast<float>(static_cast<double>(Reticle.Translation.X) +
+        Reticle.Translation.x = static_cast<float>(static_cast<double>(Reticle.Translation.x) +
                                                    static_cast<double>(0.003f));
-        Reticle.Translation.Y = static_cast<float>(static_cast<double>(Reticle.Translation.Y) -
+        Reticle.Translation.y = static_cast<float>(static_cast<double>(Reticle.Translation.y) -
                                                    static_cast<double>(0.04f));
     }
 
@@ -2736,11 +2736,11 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
     // bound as the model-view (FUN_00422690); quads, opaque black.
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();
-    FTransform Combined;
+    Transform Combined;
     G_HudObjectsMath->MulTransform(
-        Combined, Reticle, *reinterpret_cast<FTransform const*>(&Win3DGetCamera()->World[0]));
-    FTransform const ModelView = Combined;
-    Win3DBindModelview(nullptr, reinterpret_cast<float const*>(&ModelView));
+        Combined, Reticle, Win3DGetCamera()->WorldXform);
+    Transform const ModelView = Combined;
+    Win3DBindModelview(nullptr, &ModelView);
     Win3DBegin(kWin3DQuads);          // FUN_00421670
     Win3DColor4ub(0, 0, 0, 0xff);     // FUN_00421b70
 
@@ -2995,7 +2995,7 @@ void HudTargetableObjects::DrawOnScreenTarget(IObjRW* Object, FHudContactRecord 
         {
             Vector LeadScreen = MakeVector(0.0f, 0.0f, 0.0f);
             ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());   // FUN_0040f130
-            Camera->ProjectVec(&LeadScreen.x, &Lead.x);
+            Camera->ProjectVec(&LeadScreen, &Lead);
             LeadMarkers.emplace_back();
             FHudLeadMarker& Marker = LeadMarkers.back();
             Marker.Target.set(Object);
@@ -3086,7 +3086,7 @@ namespace
         float ScreenY = 0.0f;
         float ScreenZ = 0.0f;
         Vector Point = ArrowPos;
-        if ((AsCamera(Win3DGetCamera())->Project(&ScreenX, &ScreenY, &ScreenZ, &Point.x) & 0xff) == 0)
+        if ((AsCamera(Win3DGetCamera())->Project(&ScreenX, &ScreenY, &ScreenZ, &Point) & 0xff) == 0)
             return false;
         int CursorX = 0;
         int CursorY = 0;
@@ -3234,18 +3234,18 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
     // through DAT_00674b6c's InverseTransform.
     ICamera* const Listener = static_cast<ICamera*>(GetClientSoundListenerObject());
     Vector const Center = Object->get_center_of_mass();
-    float const* const Frame = Listener->GetOrientation();
+    const float* const Frame = (const float*)Listener->GetOrientation();
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();   // FUN_005b73e0
-    FVector Local;
-    G_HudObjectsMath->InverseTransform(Local, *reinterpret_cast<FTransform const*>(Frame),
-                                       *reinterpret_cast<FVector const*>(&Center));
+    Vector Local;
+    G_HudObjectsMath->InverseTransform(Local, *reinterpret_cast<Transform const*>(Frame),
+                                       Center);
 
     // The arrow's orientation: the rotation of the transform whose position is the arrow point
     // below.
     Vector Flat;
-    Flat.x = Local.X;
-    Flat.y = Local.Y;
+    Flat.x = Local.x;
+    Flat.y = Local.y;
     Flat.z = 0.0f;
     Vector Spin;
     Spin.x = 0.0f;
@@ -3255,16 +3255,16 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
     Matrix const Look = LookMatrix(Flat);
     if (G_HudObjectsMath == nullptr)
         G_HudObjectsMath = Acquire3DMathEngine();
-    FTransform ArrowXform;
-    G_HudObjectsMath->MulMatrix(ArrowXform.Rotation, *reinterpret_cast<FMatrix const*>(&Look),
-                                *reinterpret_cast<FMatrix const*>(&Rotation));
+    Transform ArrowXform;
+    G_HudObjectsMath->MulMatrix(ArrowXform.Rotation, Look,
+                                Rotation);
 
     // The arrow point at depth -1.3 (DAT_005d8f10), as FUN_004f0620 but at 0.89 of the side edge
     // (DAT_005d9664) or 0.855 of the top / bottom (DAT_005d9660).
     FSpaceCamera const* const Ui = Win3DGetCamera();
-    double const AbsX = std::fabs(static_cast<double>(Local.X));
+    double const AbsX = std::fabs(static_cast<double>(Local.x));
     double const AbsYAspect =
-        std::fabs(static_cast<double>(Local.Y)) * static_cast<double>(Ui->Aspect);   // DAT_0067dc98
+        std::fabs(static_cast<double>(Local.y)) * static_cast<double>(Ui->Aspect);   // DAT_0067dc98
     Vector ArrowPos;
     ArrowPos.z = -1.3f;
     if (AbsYAspect < AbsX)
@@ -3276,10 +3276,10 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         // Port-only Hor+: +0x98 is the 4:3 angle; the screen edge is the widened one.
         Edge *= SpaceCameraHorPlusScale(Ui);
 #endif
-        if (!(Local.X > 0.0f))
+        if (!(Local.x > 0.0f))
             Edge = -Edge;
         ArrowPos.y = static_cast<float>(
-            (static_cast<double>(Local.Y) / static_cast<double>(Local.X)) * Edge);
+            (static_cast<double>(Local.y) / static_cast<double>(Local.x)) * Edge);
         ArrowPos.x = static_cast<float>(Edge);
     }
     else
@@ -3287,23 +3287,23 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         double Edge = std::tan(static_cast<double>(Ui->FovYDeg) *
                                static_cast<double>(0.0174533f)) *   // DAT_0067dc94
                       static_cast<double>(-(-1.3f)) * static_cast<double>(0.855f);
-        if (!(Local.Y > 0.0f))
+        if (!(Local.y > 0.0f))
             Edge = -Edge;
         ArrowPos.y = static_cast<float>(Edge);
         ArrowPos.x = static_cast<float>(
             static_cast<double>(ArrowPos.y) /
-            (static_cast<double>(Local.Y) / static_cast<double>(Local.X)));
+            (static_cast<double>(Local.y) / static_cast<double>(Local.x)));
     }
-    ArrowXform.Translation.X = ArrowPos.x;
-    ArrowXform.Translation.Y = ArrowPos.y;
-    ArrowXform.Translation.Z = ArrowPos.z;
+    ArrowXform.Translation.x = ArrowPos.x;
+    ArrowXform.Translation.y = ArrowPos.y;
+    ArrowXform.Translation.z = ArrowPos.z;
 
     // The arrow's roll -- 0 for a waypoint, else FUN_0053eb10 of the orientation's third column
     // (rows 0 and 1). Every tile below except the waypoint pair turns by roll + pi - pi/4
     // (DAT_005c8a5c float, DAT_005d9658 double).
     float Roll = 0.0f;
     if (!bWaypoint)
-        Roll = HudVectorAngle(ArrowXform.Rotation.D[0][2], ArrowXform.Rotation.D[1][2]);
+        Roll = HudVectorAngle(ArrowXform.Rotation.E[0][2], ArrowXform.Rotation.E[1][2]);
     float const Angle = static_cast<float>(static_cast<double>(Roll) +
                                            static_cast<double>(3.14159265f) -
                                            static_cast<double>(0.7853982f));
@@ -3439,11 +3439,11 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
         // (FUN_00422690), quads in black.
         if (G_HudObjectsMath == nullptr)
             G_HudObjectsMath = Acquire3DMathEngine();
-        FTransform BarXform;
+        Transform BarXform;
         G_HudObjectsMath->MulTransform(
             BarXform, ArrowXform,
-            *reinterpret_cast<FTransform const*>(&Win3DGetCamera()->World[0]));
-        Win3DBindModelview(nullptr, reinterpret_cast<float const*>(&BarXform));
+            Win3DGetCamera()->WorldXform);
+        Win3DBindModelview(nullptr, &BarXform);
         Win3DBegin(kWin3DQuads);   // FUN_00421670
         Win3DColor3ub(0, 0, 0);    // FUN_00421a70
 
@@ -3538,7 +3538,7 @@ void HudTargetableObjects::CollectLeadMarkers()
         Screen.x = 0.0f;
         Screen.y = 0.0f;
         Screen.z = 0.0f;
-        if ((Camera->ProjectVec(&Screen.x, &Object_->get_position().x) & 0xff) == 0)
+        if ((Camera->ProjectVec(&Screen, &Object_->get_position()) & 0xff) == 0)
             continue;
         bool bClamped = false;
         if (Screen.x < 0.0f)
@@ -3579,7 +3579,7 @@ void HudTargetableObjects::CollectLeadMarkers()
         Marker.LeadScreen.y = 0.0f;
         Marker.LeadScreen.z = 0.0f;
         ICamera* const LeadCamera = static_cast<ICamera*>(GetClientSoundListenerObject());
-        LeadCamera->ProjectVec(&Marker.LeadScreen.x, &Marker.LeadWorld.x);
+        LeadCamera->ProjectVec(&Marker.LeadScreen, &Marker.LeadWorld);
     }
 }
 
@@ -3749,7 +3749,7 @@ void HudTargetableObjects::UpdateAimPoint()
         // Otherwise the cursor ray (normalised: summed y, z, x) out to the marker's distance from
         // the camera (summed z, y, x).
         Vector Direction;
-        Camera->Unproject(&Direction.x, static_cast<float>(CursorX), static_cast<float>(CursorY));
+        Camera->Unproject(&Direction, static_cast<float>(CursorX), static_cast<float>(CursorY));
         double const InvLength = 1.0 / std::sqrt(static_cast<double>(Direction.y) * Direction.y +
                                                  static_cast<double>(Direction.z) * Direction.z +
                                                  static_cast<double>(Direction.x) * Direction.x);
@@ -3775,7 +3775,7 @@ void HudTargetableObjects::UpdateAimPoint()
     // No marker -- the cursor ray (summed y, z, x) out to the farthest active gun's range (no
     // null test on the player's ship, as retail), or 1e10 when that fails.
     Vector Direction;
-    Camera->Unproject(&Direction.x, static_cast<float>(CursorX), static_cast<float>(CursorY));
+    Camera->Unproject(&Direction, static_cast<float>(CursorX), static_cast<float>(CursorY));
     double const InvLength = 1.0 / std::sqrt(static_cast<double>(Direction.y) * Direction.y +
                                              static_cast<double>(Direction.z) * Direction.z +
                                              static_cast<double>(Direction.x) * Direction.x);

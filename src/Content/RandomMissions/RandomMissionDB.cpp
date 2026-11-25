@@ -843,18 +843,18 @@ void __cdecl LoadSolarFormations(INI_Reader* Reader)
             {
                 FRmSolarFormationSlot Slot;
                 // FUN_06efc7a0: identity.
-                Slot.Orientation.D[0][0] = 1.0f;
-                Slot.Orientation.D[0][1] = 0.0f;
-                Slot.Orientation.D[0][2] = 0.0f;
-                Slot.Orientation.D[1][0] = 0.0f;
-                Slot.Orientation.D[1][1] = 1.0f;
-                Slot.Orientation.D[1][2] = 0.0f;
-                Slot.Orientation.D[2][0] = 0.0f;
-                Slot.Orientation.D[2][1] = 0.0f;
-                Slot.Orientation.D[2][2] = 1.0f;
-                Slot.Position.X = 0.0f;
-                Slot.Position.Y = 0.0f;
-                Slot.Position.Z = 0.0f;
+                Slot.Orientation.E[0][0] = 1.0f;
+                Slot.Orientation.E[0][1] = 0.0f;
+                Slot.Orientation.E[0][2] = 0.0f;
+                Slot.Orientation.E[1][0] = 0.0f;
+                Slot.Orientation.E[1][1] = 1.0f;
+                Slot.Orientation.E[1][2] = 0.0f;
+                Slot.Orientation.E[2][0] = 0.0f;
+                Slot.Orientation.E[2][1] = 0.0f;
+                Slot.Orientation.E[2][2] = 1.0f;
+                Slot.Position.x = 0.0f;
+                Slot.Position.y = 0.0f;
+                Slot.Position.z = 0.0f;
 
                 if (_stricmp(Reader->get_value_string(0), "mandatory") == 0)
                     bMandatory = 1;
@@ -866,31 +866,31 @@ void __cdecl LoadSolarFormations(INI_Reader* Reader)
                 float const X = Reader->get_value_float(2);
                 float const Y = Reader->get_value_float(3);
                 float const Z = Reader->get_value_float(4);
-                Slot.Position.X = X;
-                Slot.Position.Y = Y;
-                Slot.Position.Z = Z;
+                Slot.Position.x = X;
+                Slot.Position.y = Y;
+                Slot.Position.z = Z;
 
                 if (!Reader->is_value_empty(5))
                 {
                     // Quaternion (W, X, Y, Z) = values 5..8, normalized on x87 (sum of
                     // squares in order v8,v7,v6,v5 and 1/sqrt kept unrounded; each product
                     // rounded to float).
-                    FQuaternion Quat;
-                    Quat.W = Reader->get_value_float(5);
-                    Quat.X = Reader->get_value_float(6);
-                    Quat.Y = Reader->get_value_float(7);
+                    Quaternion Quat;
+                    Quat.w = Reader->get_value_float(5);
+                    Quat.x = Reader->get_value_float(6);
+                    Quat.y = Reader->get_value_float(7);
                     float const LastZ = Reader->get_value_float(8);
                     double const Sum = static_cast<double>(LastZ) * LastZ +
-                                       static_cast<double>(Quat.Y) * Quat.Y +
-                                       static_cast<double>(Quat.X) * Quat.X +
-                                       static_cast<double>(Quat.W) * Quat.W;
+                                       static_cast<double>(Quat.y) * Quat.y +
+                                       static_cast<double>(Quat.x) * Quat.x +
+                                       static_cast<double>(Quat.w) * Quat.w;
                     double const InvLength = 1.0 / std::sqrt(Sum);
-                    Quat.W = static_cast<float>(Quat.W * InvLength);
-                    Quat.X = static_cast<float>(Quat.X * InvLength);
-                    Quat.Y = static_cast<float>(Quat.Y * InvLength);
-                    Quat.Z = static_cast<float>(InvLength * LastZ);
+                    Quat.w = static_cast<float>(Quat.w * InvLength);
+                    Quat.x = static_cast<float>(Quat.x * InvLength);
+                    Quat.y = static_cast<float>(Quat.y * InvLength);
+                    Quat.z = static_cast<float>(InvLength * LastZ);
 
-                    FMatrix Rotation;
+                    Matrix Rotation;
                     ContentMathEngine()->QuaternionToMatrix(Rotation, Quat);
                     Slot.Orientation = Rotation;
                 }
@@ -1687,16 +1687,16 @@ void FRandEncParams::Spawn(bool bForced)
 
     float const TurnCos = static_cast<float>(std::cos(GRandEncTurnAngle));
     float const TurnSin = static_cast<float>(std::sin(GRandEncTurnAngle));
-    FMatrix Turn;
-    Turn.D[0][0] = TurnCos;
-    Turn.D[0][1] = 0.0f;
-    Turn.D[0][2] = TurnSin;
-    Turn.D[1][0] = 0.0f;
-    Turn.D[1][1] = 1.0f;
-    Turn.D[1][2] = 0.0f;
-    Turn.D[2][0] = -TurnSin;
-    Turn.D[2][1] = 0.0f;
-    Turn.D[2][2] = TurnCos;
+    Matrix Turn;
+    Turn.E[0][0] = TurnCos;
+    Turn.E[0][1] = 0.0f;
+    Turn.E[0][2] = TurnSin;
+    Turn.E[1][0] = 0.0f;
+    Turn.E[1][1] = 1.0f;
+    Turn.E[1][2] = 0.0f;
+    Turn.E[2][0] = -TurnSin;
+    Turn.E[2][1] = 0.0f;
+    Turn.E[2][2] = TurnCos;
 
     // The list, then the directive holder; the holder is released first at the end.
     FMissionDirectiveList LeaderDirectives;
@@ -1714,16 +1714,16 @@ void FRandEncParams::Spawn(bool bForced)
         std::list<FRandEncPosition>::iterator const Picked =
             PickWeighted(&FreePositions, &FRandEncPosition::Weight);
 
-        FTransform Target;
-        std::memcpy(&Target.Rotation, &TargetRotation, sizeof(FMatrix));
-        Target.Translation.X = TargetPosition.x;
-        Target.Translation.Y = TargetPosition.y;
-        Target.Translation.Z = TargetPosition.z;
-        FTransform Around;
+        Transform Target;
+        Target.Rotation = TargetRotation;
+        Target.Translation.x = TargetPosition.x;
+        Target.Translation.y = TargetPosition.y;
+        Target.Translation.z = TargetPosition.z;
+        Transform Around;
         SetMatrixIdentity(&Around.Rotation);
-        Around.Translation.X = 0.0f;
-        Around.Translation.Y = 0.0f;
-        Around.Translation.Z = 0.0f;
+        Around.Translation.x = 0.0f;
+        Around.Translation.y = 0.0f;
+        Around.Translation.z = 0.0f;
         PlaceFacingAnchor(&Target, &SpawnAngle, &SpawnDistance, &Around);  // FUN_06f243d0
 
         FSystemInfo* const System = Player->GetSystemRecord();
@@ -1732,29 +1732,28 @@ void FRandEncParams::Spawn(bool bForced)
             unsigned int const SystemId = System->SystemId;
             float const Radius = static_cast<float>(EmptyPosRadius);
             Vector Point;
-            Point.x = Around.Translation.X;
-            Point.y = Around.Translation.Y;
-            Point.z = Around.Translation.Z;
+            Point.x = Around.Translation.x;
+            Point.y = Around.Translation.y;
+            Point.z = Around.Translation.z;
             bool bEmpty = true;
             pub::SpaceObj::IsPosEmpty(SystemId, Point, Radius, bEmpty);
             if (!bEmpty)
             {
-                static_assert(sizeof(Transform) == sizeof(FTransform), "Transform is 0x30");
-                Transform AroundTransform;
-                std::memcpy(&AroundTransform, &Around, sizeof(Transform));
+                // GetEmptyPos is handed a copy of the anchor transform.
+                Transform AroundTransform = Around;
                 pub::SpaceObj::PosSelectionType const Selection =
                     pub::SpaceObj::POS_SEL_3D_VOLUME;
                 pub::SpaceObj::GetEmptyPos(SystemId, AroundTransform, Radius, Radius, Selection,
                                            Point);
-                Around.Translation.X = Point.x;
-                Around.Translation.Y = Point.y;
-                Around.Translation.Z = Point.z;
+                Around.Translation.x = Point.x;
+                Around.Translation.y = Point.y;
+                Around.Translation.z = Point.z;
             }
         }
 
         // Retail unlinks the picked node unconditionally; with nothing picked that is the
         // list's own head (undefined), which the port does not erase.
-        FTransform Placement = Around;
+        Transform Placement = Around;
         if (Picked != FreePositions.end())
             FreePositions.erase(Picked);
         ContentMathEngine()->MulMatrix(Placement.Rotation, Turn, Target.Rotation);
@@ -1773,7 +1772,7 @@ void FRandEncParams::Spawn(bool bForced)
 // themselves second (FUN_06f35890 with level -1); no arch drops the blocks and returns false.
 // Retail also builds an unused name block (UnusedName: it has EH states) and an unused default
 // name request (FUN_06f31650; no destructor, no EH state, not reproduced).
-bool FRandEncParams::SpawnFormation(FTransform const* Placement, int Count,
+bool FRandEncParams::SpawnFormation(Transform const* Placement, int Count,
                                     std::list<FObjListDirective*> const* Directives,
                                     std::list<FRandEncShipChoice> const* Choices,
                                     std::list<TString<0x30>>* Names, int Priority,
@@ -1819,10 +1818,10 @@ bool FRandEncParams::SpawnFormation(FTransform const* Placement, int Count,
             Names->pop_front();
         }
         Params.ControllerId = ControllerId;
-        std::memcpy(&Params.Orientation, &Placement->Rotation, sizeof(FMatrix));
-        Params.Position.x = Placement->Translation.X;
-        Params.Position.y = Placement->Translation.Y;
-        Params.Position.z = Placement->Translation.Z;
+        Params.Orientation = Placement->Rotation;
+        Params.Position.x = Placement->Translation.x;
+        Params.Position.y = Placement->Translation.y;
+        Params.Position.z = Placement->Translation.z;
         Params.Longevity = bNoDockTarget ? 24.0f : -1.0f;
         Params.Priority = Priority;
         for (std::list<unsigned int>::iterator Label = Labels.begin(); Label != Labels.end();

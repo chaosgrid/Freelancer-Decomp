@@ -148,7 +148,7 @@ void GameobjCreateOfClass(FClientGameobj* Self, CObject::Class ObjectClass,
     // of it -- the caller does that afterwards.
     Self->Object = CObject::Alloc(ObjectClass);
     Arch->create_instance(static_cast<IEngineInstance*>(Self->Object));
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Self->Object->EngineInstanceId), 0u,
+    DALib::Engine->UpdateInstance(Self->Object->EngineInstanceId, 0u,
                                   nullptr);
     Self->advise(true);
 }
@@ -216,8 +216,8 @@ namespace
     // {the object's orientation, zero translation} and the object-space direction; the result's
     // columns taken in the order 0, -2, 1; the object-space point as the translation. No null
     // test on the object.
-    void BuildHitEffectTransform(FTransform* Out, CObject* Obj, FVector const& Direction,
-                                 FVector const& LocalPos)
+    void BuildHitEffectTransform(Transform* Out, CObject* Obj, Vector const& Direction,
+                                 Vector const& LocalPos)
     {
         Transform Basis;
         Basis.Rotation = Obj->Orientation;
@@ -225,16 +225,16 @@ namespace
         Basis.Translation.y = 0.0f;
         Basis.Translation.z = 0.0f;
         Vector Target;
-        Target.x = Direction.X;
-        Target.y = Direction.Y;
-        Target.z = Direction.Z;
+        Target.x = Direction.x;
+        Target.y = Direction.y;
+        Target.z = Direction.z;
         Matrix const Facing = GetDirectionMatrix(Basis, Target);
         int Row = 0;
         for (Row = 0; Row < 3; ++Row)
         {
-            Out->Rotation.D[Row][0] = Facing.E[Row][0];
-            Out->Rotation.D[Row][1] = -Facing.E[Row][2];
-            Out->Rotation.D[Row][2] = Facing.E[Row][1];
+            Out->Rotation.E[Row][0] = Facing.E[Row][0];
+            Out->Rotation.E[Row][1] = -Facing.E[Row][2];
+            Out->Rotation.E[Row][2] = Facing.E[Row][1];
         }
         Out->Translation = LocalPos;
     }
@@ -641,7 +641,7 @@ void FClientGameobj::PlayHitSound(unsigned SourceId, void* SoundArch, Vector con
         Pose.Translation.y = 0.0f;
         Pose.Translation.z = 0.0f;
         int const Attach = static_cast<int>(get_index());
-        Voice->SetPose(Attach, reinterpret_cast<float const*>(&Pose));
+        Voice->SetPose(Attach, &Pose);
 
         FGameobjSound Added;
         Added.SourceId = SourceId;
@@ -734,15 +734,14 @@ void FClientGameobj::SpawnSurfaceHitEffect(unsigned SourceId, FEffectArch* Effec
             HitEffects[Chosen] = Effect;
 
             // Into object space (DAT_006789d0's math engine); no null test on the object.
-            FTransform const& ObjXform =
-                reinterpret_cast<FTransform const&>(Object->get_transform());
-            FVector LocalPos;
+            Transform const& ObjXform = Object->get_transform();
+            Vector LocalPos;
             GameobjMathEngine()->InverseTransform(LocalPos, ObjXform,
-                                                  reinterpret_cast<FVector const&>(*Pos));
-            FVector LocalNormal;
+                                                  *Pos);
+            Vector LocalNormal;
             GameobjMathEngine()->InverseRotate(LocalNormal, ObjXform,
-                                               reinterpret_cast<FVector const&>(*Normal));
-            FTransform AttachXform;
+                                               *Normal);
+            Transform AttachXform;
             BuildHitEffectTransform(&AttachXform, Object, LocalNormal, LocalPos);
             ParticleEffectAttach(Effect, this, static_cast<int>(get_index()), &AttachXform);
         }
@@ -767,16 +766,16 @@ void FClientGameobj::SpawnSplashHitEffect(FEffectArch* EffectArch, Vector const*
 
     // Into object space. The object-space velocity is computed and never read again (retail
     // overwrites its buffer).
-    FTransform const& ObjXform = reinterpret_cast<FTransform const&>(Object->get_transform());
-    FVector LocalPos;
+    Transform const& ObjXform = Object->get_transform();
+    Vector LocalPos;
     GameobjMathEngine()->InverseTransform(LocalPos, ObjXform,
-                                          reinterpret_cast<FVector const&>(*Pos));
-    FVector LocalNormal;
+                                          *Pos);
+    Vector LocalNormal;
     GameobjMathEngine()->InverseRotate(LocalNormal, ObjXform,
-                                       reinterpret_cast<FVector const&>(*Normal));
-    FVector LocalVelocity;
+                                       *Normal);
+    Vector LocalVelocity;
     GameobjMathEngine()->InverseRotate(LocalVelocity, ObjXform,
-                                       reinterpret_cast<FVector const&>(*Velocity));
+                                       *Velocity);
 
     // The negated WORLD velocity is reflected off the object-space normal (retail mixes the
     // two spaces).
@@ -784,14 +783,14 @@ void FClientGameobj::SpawnSplashHitEffect(FEffectArch* EffectArch, Vector const*
     Incoming.x = -Velocity->x;
     Incoming.y = -Velocity->y;
     Incoming.z = -Velocity->z;
-    float const Scale = (LocalNormal.Z * Incoming.z + LocalNormal.Y * Incoming.y +
-                         LocalNormal.X * Incoming.x) * 2.0f;
-    FVector Direction;
-    Direction.X = LocalNormal.X * Scale - Incoming.x;
-    Direction.Y = LocalNormal.Y * Scale - Incoming.y;
-    Direction.Z = LocalNormal.Z * Scale - Incoming.z;
+    float const Scale = (LocalNormal.z * Incoming.z + LocalNormal.y * Incoming.y +
+                         LocalNormal.x * Incoming.x) * 2.0f;
+    Vector Direction;
+    Direction.x = LocalNormal.x * Scale - Incoming.x;
+    Direction.y = LocalNormal.y * Scale - Incoming.y;
+    Direction.z = LocalNormal.z * Scale - Incoming.z;
 
-    FTransform EffectXform;
+    Transform EffectXform;
     BuildHitEffectTransform(&EffectXform, Object, Direction, LocalPos);
     CliCreateEffectOneShot(EffectArch, this, static_cast<int>(get_index()), &EffectXform,
                            CompanionOut);
@@ -1758,14 +1757,14 @@ float FClientSolarGameobj::GetPhysicalRadius(Vector& Center)
     {
         float Radius = 0.0f;
         long const Inst = get_index();
-        DALib::Engine->GetInstanceExtent(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), 0u,
-                                         &Radius, &Center.x);
-        FTransform const& Xform = reinterpret_cast<FTransform const&>(get_orientation());
+        DALib::Engine->GetInstanceExtent(Inst, 0u,
+                                         &Radius, &Center);
+        Transform const& Xform = reinterpret_cast<Transform const&>(get_orientation());
         if (G_SolarMath == nullptr)
             G_SolarMath = Acquire3DMathEngine();
-        FVector World;
-        G_SolarMath->TransformXform(World, Xform, reinterpret_cast<FVector const&>(Center));
-        Center = reinterpret_cast<Vector const&>(World);
+        Vector World;
+        G_SolarMath->TransformXform(World, Xform, Center);
+        Center = World;
         return Radius;
     }
 
@@ -1886,7 +1885,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
         static_cast<long>(static_cast<double>(ColorBytes[3]) * Fade));
     long const Inst = get_index();
     int const Answer = SubmitWin3DMaterialEngineInstance(
-        Camera, reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), 1, ColorBytes, 0, Size, 0,
+        Camera, static_cast<intptr_t>(Inst), 1, ColorBytes, 0, Size, 0,
         0u);
     Lod = 0xffff0000u | static_cast<unsigned short>(Answer);
 
@@ -1906,7 +1905,7 @@ unsigned* FClientSolarGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsign
     Outline[3] = static_cast<unsigned char>(static_cast<long>(static_cast<double>(Fade) * 255.0f));
     long const OutlineInst = get_index();
     SubmitWin3DTintedEngineInstanceWrapped(
-        Camera, reinterpret_cast<void*>(static_cast<intptr_t>(OutlineInst)), 1, Outline, 0, Size,
+        Camera, static_cast<intptr_t>(OutlineInst), 1, Outline, 0, Size,
         0u);
     *OutLod = Lod;
     return OutLod;
@@ -2236,12 +2235,12 @@ namespace
 
         if (Companion[2] != nullptr)
             ParticleEffectAttach(static_cast<FParticleEffect*>(Companion[2]), Go, EngineIndex,
-                                 reinterpret_cast<FTransform const*>(Pose));
+                                 reinterpret_cast<Transform const*>(Pose));
         if (Companion[1] != nullptr)
-            static_cast<ISoundSource*>(Companion[1])->SetPose(EngineIndex, Pose);
+            static_cast<ISoundSource*>(Companion[1])->SetPose(EngineIndex, (const Transform*)Pose);
         if (Companion[3] != nullptr)
             CliExplosionAttachLocalXform(Companion[3], EngineIndex,
-                                         reinterpret_cast<FTransform const*>(Pose));
+                                         reinterpret_cast<Transform const*>(Pose));
 
         if (CreateEffectStart(Companion, Arch))
             CliEffectListInsert(&Go->EffectList, Companion);
@@ -2558,7 +2557,7 @@ void FClientShipGameobj::AttachPilotMesh(ID_String const* PilotMesh)
     long const Instance = PilotMeshArch->create_instance(nullptr);
     if (Instance == -1)
         return;
-    PilotMeshHolder.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+    PilotMeshHolder.EngineInstance = Instance;
 
     // The result is not tested. Port deviation: retail reads its stack HardpointInfo whether
     // or not the lookup filled it; the port starts it zeroed so a miss reads zeros instead of
@@ -2826,15 +2825,15 @@ void FClientShipGameobj::update(float Dt)
     {
         ID_String BurnEffect;
         BurnEffect.Id = CreateID("atmosphere_burn");
-        FTransform Local;
+        Transform Local;
         for (int Row = 0; Row < 3; ++Row)
         {
             for (int Col = 0; Col < 3; ++Col)
-                Local.Rotation.D[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
+                Local.Rotation.E[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
         }
-        Local.Translation.X = 0.0f;
-        Local.Translation.Y = 0.0f;
-        Local.Translation.Z = 0.0f;
+        Local.Translation.x = 0.0f;
+        Local.Translation.y = 0.0f;
+        Local.Translation.z = 0.0f;
         int const Index = static_cast<int>(get_index());
         if (!BurnEffect.IsEmpty())
             CliCreateEffectOneShot(FindEffectArch(&BurnEffect.Id), this, Index, &Local,
@@ -2965,11 +2964,11 @@ unsigned* FClientShipGameobj::SubmitDraw(unsigned* OutLod, void* Camera, unsigne
 
         UpdateDrawLighting(Camera);
         // ship.cpp's 3DMathEngine is DAT_00678b68.
-        FTransform const& ShipXform = reinterpret_cast<FTransform const&>(get_orientation());
-        FTransform PilotXform;
+        Transform const& ShipXform = reinterpret_cast<Transform const&>(get_orientation());
+        Transform PilotXform;
         GetShipMathEngine()->MulTransform(PilotXform, ShipXform,
-                                          reinterpret_cast<FTransform const&>(PilotTransform));
-        FTransform Copy;
+                                          PilotTransform);
+        Transform Copy;
         CopyTransform12(&Copy, &PilotXform);
         ClientMeshHolderSetMatrix(&PilotMeshHolder, &Copy);
         DALib::Renderer->RenderInstance(Camera, PilotMeshHolder.EngineInstance, 1.0f, 8u, nullptr, Extra);
@@ -4001,7 +4000,7 @@ namespace
         if (Effect->IsEmpty())
             return;
         CliCreateEffectOneShot(FindEffectArch(&Effect->Id), Self, EngineIndex,
-                               reinterpret_cast<FTransform const*>(&Xform),
+                               &Xform,
                                Self->OneShotCompanion);
     }
 }
@@ -4471,7 +4470,7 @@ void FClientGuidedGameobj::Explode(Vector const* Pos)
     if (Particle != nullptr)
     {
         Transform const& Frame = get_transform();
-        ParticleEffectAttach(Particle, nullptr, -1, reinterpret_cast<FTransform const*>(&Frame));
+        ParticleEffectAttach(Particle, nullptr, -1, &Frame);
     }
     FClientProjectileGameobj::Explode(Pos);
 }
@@ -4525,13 +4524,13 @@ void FClientGuidedGameobj::GetConstEffectTransform(Transform* Out)
     // The archetype mesh's bounds on the renderer: when both answer, the translation is
     // {centre x, centre y, extents[4]}.
     float Extents[6];
-    void* const MeshId =
-        reinterpret_cast<void*>(static_cast<intptr_t>(Object->get_archetype()->EngineIndex));
+    const ArchetypeIndex MeshId =
+        (Object->get_archetype()->EngineIndex);
     if (DALib::Renderer->GetBounds(MeshId, 1.0f, Extents) != 0)
     {
         float Center[3];
-        void* const MeshIdAgain =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Object->get_archetype()->EngineIndex));
+        const ArchetypeIndex MeshIdAgain =
+            (Object->get_archetype()->EngineIndex);
         if (DALib::Renderer->GetCentroid(MeshIdAgain, 1.0f, Center) != 0)
         {
             Local.Translation.x = Center[0];

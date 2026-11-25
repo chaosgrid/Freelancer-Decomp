@@ -177,8 +177,8 @@ namespace
         static_cast<NnStaticControl*>(State->ParentWindow)
             ->Init(kBriefingWindowMesh, Offset, nullptr, HalfExtents, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0,
                    StartYpr);
-        float const Position[3] = {-0.62f, 0.3f, -1.25f};
-        State->ParentWindow->SetPosition(Position);
+        Vector const Position = {-0.62f, 0.3f, -1.25f};
+        State->ParentWindow->SetPosition(&Position.x);
         // Hidden until the first frame.
         State->ParentWindow->Flags = static_cast<unsigned char>(
             State->ParentWindow->Flags & ~(kWin3DActive | kWin3DVisible));

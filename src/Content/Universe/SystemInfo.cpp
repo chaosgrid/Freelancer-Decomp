@@ -120,11 +120,11 @@ void FSystemInfo::LoadFromReader(INI_Reader* Reader, bool bLoadEncounters)
             Position.y = 0.0f;
             Position.z = 0.0f;
             // The 0x30 block is copied whole below.
-            FTransform Placement;
+            Transform Placement;
             SetMatrixIdentity(&Placement.Rotation);
-            Placement.Translation.X = 0.0f;
-            Placement.Translation.Y = 0.0f;
-            Placement.Translation.Z = 0.0f;
+            Placement.Translation.x = 0.0f;
+            Placement.Translation.y = 0.0f;
+            Placement.Translation.z = 0.0f;
             unsigned int PrevRing = 0;
             unsigned int NextRing = 0;
             unsigned int Reputation = 0;   // retail leaves it uninitialised
@@ -178,16 +178,16 @@ void FSystemInfo::LoadFromReader(INI_Reader* Reader, bool bLoadEncounters)
                     float SinZCosX = static_cast<float>(SinZ * CosX);
                     float CosZCosX = static_cast<float>(CosZ * CosX);
 
-                    FMatrix Rotated;
-                    Rotated.D[0][0] = static_cast<float>(CosZ * CosY);
-                    Rotated.D[0][1] = static_cast<float>(SinYSinX * CosZ - SinZCosX);
-                    Rotated.D[0][2] = static_cast<float>(CosZCosX * SinY + SinZ * SinX);
-                    Rotated.D[1][0] = static_cast<float>(SinZ * CosY);
-                    Rotated.D[1][1] = static_cast<float>(SinYSinX * SinZ + CosZCosX);
-                    Rotated.D[1][2] = static_cast<float>(SinZCosX * SinY - CosZ * SinX);
-                    Rotated.D[2][0] = static_cast<float>(-SinY);
-                    Rotated.D[2][1] = static_cast<float>(CosY * SinX);
-                    Rotated.D[2][2] = static_cast<float>(CosY * CosX);
+                    Matrix Rotated;
+                    Rotated.E[0][0] = static_cast<float>(CosZ * CosY);
+                    Rotated.E[0][1] = static_cast<float>(SinYSinX * CosZ - SinZCosX);
+                    Rotated.E[0][2] = static_cast<float>(CosZCosX * SinY + SinZ * SinX);
+                    Rotated.E[1][0] = static_cast<float>(SinZ * CosY);
+                    Rotated.E[1][1] = static_cast<float>(SinYSinX * SinZ + CosZCosX);
+                    Rotated.E[1][2] = static_cast<float>(SinZCosX * SinY - CosZ * SinX);
+                    Rotated.E[2][0] = static_cast<float>(-SinY);
+                    Rotated.E[2][1] = static_cast<float>(CosY * SinX);
+                    Rotated.E[2][2] = static_cast<float>(CosY * CosX);
                     Placement.Rotation = Rotated;
                 }
                 else if (Reader->is_value("archetype"))
@@ -1159,9 +1159,9 @@ static FTradeLaneRing MakeTradeLaneRing(FTradeLaneRingInfo const& Info)
 FTradeLane::FTradeLane()
 {
     SetMatrixIdentity(&Placement.Rotation);
-    Placement.Translation.X = 0.0f;
-    Placement.Translation.Y = 0.0f;
-    Placement.Translation.Z = 0.0f;
+    Placement.Translation.x = 0.0f;
+    Placement.Translation.y = 0.0f;
+    Placement.Translation.z = 0.0f;
 }
 
 // FUN_06f77e00.
@@ -1191,16 +1191,16 @@ bool FSystemInfo::GetTradeLaneRingsByRing(unsigned int const* RingId,
 namespace
 {
     // FUN_06f778b0 (thiscall on the transform).
-    void SetRingPlacement(FTransform* Out, Matrix const* Orientation)
+    void SetRingPlacement(Transform* Out, Matrix const* Orientation)
     {
         for (int Row = 0; Row < 3; ++Row)
         {
             for (int Column = 0; Column < 3; ++Column)
-                Out->Rotation.D[Row][Column] = Orientation->E[Row][Column];
+                Out->Rotation.E[Row][Column] = Orientation->E[Row][Column];
         }
-        Out->Translation.X = 0.0f;
-        Out->Translation.Y = 0.0f;
-        Out->Translation.Z = 0.0f;
+        Out->Translation.x = 0.0f;
+        Out->Translation.y = 0.0f;
+        Out->Translation.z = 0.0f;
     }
 
     // One live ring of FUN_06f77090 (inlined three times), reputation -1.
@@ -2196,9 +2196,9 @@ bool FSystemInfo::GetLaneShipDistance(int const* Direction, unsigned int const* 
     float const Ay = Position->y - NearestPosition.y;
     float const Az = Position->z - NearestPosition.z;
     // The lane's z axis: the third column of its placement.
-    double const Zx = TheLane->Placement.Rotation.D[0][2];
-    double const Zy = TheLane->Placement.Rotation.D[1][2];
-    double const Zz = TheLane->Placement.Rotation.D[2][2];
+    double const Zx = TheLane->Placement.Rotation.E[0][2];
+    double const Zy = TheLane->Placement.Rotation.E[1][2];
+    double const Zz = TheLane->Placement.Rotation.E[2][2];
     if (*Direction == 1)
     {
         // Negative only when the dot product is below 0 (ordered).

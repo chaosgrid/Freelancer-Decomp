@@ -41,8 +41,8 @@ public:
     unsigned long DACOM_API Release() override;
 
     // Slots 3..16.
-    float const* DACOM_API GetPosition() override;          // LAB_00556a80  this + 0x80
-    float const* DACOM_API GetOrientation() override;       // LAB_00556a90  this + 0x5c
+    const Vector* DACOM_API GetPosition() override;          // LAB_00556a80  this + 0x80
+    const Matrix* DACOM_API GetOrientation() override;       // LAB_00556a90  this + 0x5c
     int const* DACOM_API GetViewport() override;            // LAB_0040f380  this + 0x04
     float DACOM_API GetHalfFovXDeg() override;              // LAB_00556630  +0x14
     float DACOM_API GetFovYDeg() override;                  // LAB_00556640  +0x18
@@ -52,16 +52,16 @@ public:
     double DACOM_API GetXScaleOverNear() override;          // LAB_00556680  +0x38 / +0x1c
     double DACOM_API GetYScaleOverNear() override;          // LAB_00556690  +0x3c / +0x1c
     int DACOM_API Project(float* OutX, float* OutY, float* OutZ,
-                          float const* World) override;     // LAB_005568b0
-    void DACOM_API Unproject(float* OutWorld3, float ScreenX,
+                          const Vector* World) override;     // LAB_005568b0
+    void DACOM_API Unproject(Vector* OutWorld3, float ScreenX,
                              float ScreenY) override;       // LAB_00556950
-    int DACOM_API ClassifySphere(float const* Center,
+    int DACOM_API ClassifySphere(const Vector* Center,
                                  float Radius) override;    // LAB_00556780
-    float const* DACOM_API GetViewTransform() override;     // LAB_00556aa0
+    const Transform* DACOM_API GetViewTransform() override;     // LAB_00556aa0
 
     // The common prefix's remaining slots, plus two port-only placeholders.
-    int DACOM_API ProjectVec(float* Out3, float const* World) override;
-    void GetVelocity(float* Out3) override;
+    int DACOM_API ProjectVec(Vector* Out3, const Vector* World) override;
+    void GetVelocity(Vector* Out3) override;
     int SetProperty(char const* Key, char const* Value) override;
     virtual void DACOM_API Slot20();
     virtual void DACOM_API Slot21();
@@ -95,7 +95,7 @@ public:
     float PlaneX[3];             // +0x40
     float PlaneY[3];             // +0x4c
     unsigned long RefCount;      // +0x58
-    float Orient[9];             // +0x5c  row-major; followed by Pos -- together an FTransform
+    float Orient[9];             // +0x5c  row-major; followed by Pos -- together a Transform
     float Pos[3];                // +0x80
     float View[12];              // +0x8c  GetViewTransform's output
 };

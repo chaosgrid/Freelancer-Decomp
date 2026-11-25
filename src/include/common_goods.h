@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_exports.h"
 
 // Common.dll goods / markets / bases / loadouts / constants.
@@ -416,7 +417,7 @@ private:
     // instance in Instances[cursor] and queries the part's hardpoints. Both are -1 whenever
     // no fill is running (ctor / clear / analyze_instance's end).
     long FillInstance;           // +0x14
-    void* FillPart;              // +0x18  IEngine archetype handle
+    ArchetypeIndex FillPart;     // +0x18  IEngine archetype handle
     int FillCursor;              // +0x1C  array-fill cursor, 0..Count-1
 };
 

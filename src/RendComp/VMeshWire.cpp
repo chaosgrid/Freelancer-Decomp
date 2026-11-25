@@ -179,30 +179,30 @@ public:
         return 0;
     }
 
-    int DACOM_API CreateArchetype(void* Archetype, void* FileSystem) override;
-    int DACOM_API DuplicateArchetype(void* NewArchetype, void* OldArchetype) override;
-    int DACOM_API DestroyArchetype(void* Archetype) override;
-    int DACOM_API QueryArchetype(void* Archetype, const char* Name, void** Out) override;
+    int DACOM_API CreateArchetype(ArchetypeIndex Archetype, IFileSystem* FileSystem) override;
+    int DACOM_API DuplicateArchetype(ArchetypeIndex NewArchetype, ArchetypeIndex OldArchetype) override;
+    int DACOM_API DestroyArchetype(ArchetypeIndex Archetype) override;
+    int DACOM_API QueryArchetype(ArchetypeIndex Archetype, const char* Name, void** Out) override;
 
     // LAB_06c2fb40.
-    int DACOM_API CreateInstance(void* /*Instance*/, void* /*Archetype*/) override
+    int DACOM_API CreateInstance(InstanceIndex /*Instance*/, ArchetypeIndex /*Archetype*/) override
     {
         return 0;
     }
 
     // FUN_06c2fb50: empty, EAX undefined in retail; 0 here.
-    int DACOM_API DestroyInstance(void* /*Instance*/) override
+    int DACOM_API DestroyInstance(InstanceIndex /*Instance*/) override
     {
         return 0;
     }
 
     // LAB_06c2da60: empty, EAX undefined in retail; 0 here.
-    int DACOM_API UpdateInstance(void* /*Instance*/, void* /*Arg*/) override
+    int DACOM_API UpdateInstance(InstanceIndex /*Instance*/, void* /*Arg*/) override
     {
         return 0;
     }
 
-    int DACOM_API QueryInstance(void* Instance, const char* Iid, void** Out) override;
+    int DACOM_API QueryInstance(InstanceIndex Instance, const char* Iid, void** Out) override;
 
     // FUN_06c2fb50 again (slot 12).
     int DACOM_API Notify(void* /*Arg*/) override
@@ -252,7 +252,7 @@ unsigned long DACOM_API FVMeshWire::FInner::Release()
     return 0;
 }
 
-int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
+int DACOM_API FVMeshWire::CreateArchetype(ArchetypeIndex Archetype, IFileSystem* FileSystem)
 {
     IFileSystem* File = (IFileSystem*)FileSystem;
     const int Result = File->OpenNode("VMeshWire");
@@ -319,7 +319,7 @@ int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
 // LAB_06c2fa20: look up the OLD archetype; on a hit the NEW key shares its wrapper
 // (the previous value released, the shared one AddRef'd). The blob is not copied. EAX is not
 // set on either path in retail; 0 here.
-int DACOM_API FVMeshWire::DuplicateArchetype(void* NewArchetype, void* OldArchetype)
+int DACOM_API FVMeshWire::DuplicateArchetype(ArchetypeIndex NewArchetype, ArchetypeIndex OldArchetype)
 {
     const int OldKey = (int)((intptr_t)OldArchetype);
     std::map<int, FVmeshWireInstance*>::iterator Found = Archetypes.find(OldKey);
@@ -343,7 +343,7 @@ int DACOM_API FVMeshWire::DuplicateArchetype(void* NewArchetype, void* OldArchet
 
 // LAB_06c2f900: a present key is erased (its wrapper released). EAX is not set in
 // retail; 0 here.
-int DACOM_API FVMeshWire::DestroyArchetype(void* Archetype)
+int DACOM_API FVMeshWire::DestroyArchetype(ArchetypeIndex Archetype)
 {
     EraseArchetype((int)((intptr_t)Archetype));
     return 0;
@@ -351,7 +351,7 @@ int DACOM_API FVMeshWire::DestroyArchetype(void* Archetype)
 
 // LAB_06c2fac0: only "1.11_IVMeshWire" (exact 16-byte compare); a
 // wrong IID or an unknown archetype returns -1 with Out untouched. A hit AddRefs the wrapper.
-int DACOM_API FVMeshWire::QueryArchetype(void* Archetype, const char* Name, void** Out)
+int DACOM_API FVMeshWire::QueryArchetype(ArchetypeIndex Archetype, const char* Name, void** Out)
 {
     if (std::strcmp(Name, Iids::VMeshWire) != 0)
         return -1;
@@ -366,10 +366,10 @@ int DACOM_API FVMeshWire::QueryArchetype(void* Archetype, const char* Name, void
 
 // LAB_06c2fb60: the instance's archetype (IEngine +0x64, -1 -> -1), the handle
 // released again (+0x3C), then this component's own QueryArchetype through the vtable.
-int DACOM_API FVMeshWire::QueryInstance(void* Instance, const char* Iid, void** Out)
+int DACOM_API FVMeshWire::QueryInstance(InstanceIndex Instance, const char* Iid, void** Out)
 {
-    void* Archetype = G_Engine->GetInstanceArchetype(Instance);
-    if (Archetype == (void*)((intptr_t)-1))
+    ArchetypeIndex Archetype = G_Engine->GetInstanceArchetype(Instance);
+    if (Archetype == InvalidArchetypeIndex)
         return -1;
     G_Engine->ReleaseHandle(Archetype);
     return QueryArchetype(Archetype, Iid, Out);

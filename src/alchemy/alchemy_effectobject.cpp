@@ -167,7 +167,7 @@ namespace AlchemyImpl
         return Next;
     }
 
-    GENRESULT DACOM_API FFxEffectObject::SetTransform(void* A, void* B)
+    GENRESULT DACOM_API FFxEffectObject::SetTransform(unsigned long A, const Transform* B)
     {
         // FUN_0621f610 (see the header). Initialize selects this+0x18 as an alias to the
         // override-folder record. On an appearance the nodes' vt+0x3c is the this+0xc
@@ -176,13 +176,12 @@ namespace AlchemyImpl
         // gf_thorn_psys.cpp (1, Xform), particle_effect.cpp (0, &World).
 
         // The override node takes the call alone, with no null test on the node.
-        const unsigned long SlotIndex =
-            static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(A));
-        const float* const Source12 = static_cast<const float*>(B);
+        const unsigned long SlotIndex = A;
+        const Transform* const Source = B;
         if (TransformExtra_ != nullptr)
         {
             IDAComponent* const Node = TransformExtra_->Node;
-            return AsFx(Node)->SetNodeTransform(SlotIndex, Source12);
+            return AsFx(Node)->SetNodeTransform(SlotIndex, Source);
         }
 
         // Every root-prefix record (count +4), no null test on the node. Retail tests only
@@ -193,7 +192,7 @@ namespace AlchemyImpl
             IGenericFx* const Fx = AsFx(Record->Node);
             if (static_cast<unsigned char>(Fx->IsNodeDead()) != 0)
                 continue;
-            if (Fx->SetNodeTransform(SlotIndex, Source12) == GR_OK)
+            if (Fx->SetNodeTransform(SlotIndex, Source) == GR_OK)
                 continue;
             FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s",
                   "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxEffect.cpp",
@@ -202,13 +201,12 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectObject::GetTransform(void* A, void* B)
+    GENRESULT DACOM_API FFxEffectObject::GetTransform(unsigned long A, Transform** B)
     {
         // LAB_0621f6a0: TransformExtra_ (this+0x18) takes priority over the node list,
         // no null test. A = slot index, B = float** out.
-        const unsigned long SlotIndex =
-            static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(A));
-        float** const OutSlot = static_cast<float**>(B);
+        const unsigned long SlotIndex = A;
+        Transform** const OutSlot = B;
         if (TransformExtra_ != nullptr)
         {
             IDAComponent* const Node = TransformExtra_->Node;

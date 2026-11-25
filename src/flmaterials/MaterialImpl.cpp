@@ -1009,7 +1009,7 @@ namespace
 
     struct FNomadContext
     {
-        void* Inst;
+        InstanceIndex Inst;
         float* World;
         float* View;
         const FRpVertexSrcDesc* Mesh;
@@ -1141,9 +1141,9 @@ namespace
     {
         if (G_NomadMath == nullptr)
             G_NomadMath = FlmCreateMathEngine();
-        FTransform Combined;
-        G_NomadMath->MulTransform(Combined, *(const FTransform*)(View),
-            *(const FTransform*)(World));
+        Transform Combined;
+        G_NomadMath->MulTransform(Combined, *(const Transform*)(View),
+            *(const Transform*)(World));
         std::memcpy(Out, &Combined, sizeof(Combined));
     }
 
@@ -1154,9 +1154,9 @@ namespace
         // Retail re-reads the cache after MulTransform, independently of its helper.
         if (G_NomadMath == nullptr)
             G_NomadMath = FlmCreateMathEngine();
-        const FVector MinusZ = {0.0f, 0.0f, -1.0f};
-        G_NomadMath->InverseRotate(*(FVector*)(OutLight),
-            *(const FTransform*)(Combined), MinusZ);
+        const Vector MinusZ = {0.0f, 0.0f, -1.0f};
+        G_NomadMath->InverseRotate(*(Vector*)(OutLight),
+            *(const Transform*)(Combined), MinusZ);
     }
 
     // LAB_066f95b0 / FUN_066f95c0. The two default texture cursors start with stride 8.
@@ -1294,8 +1294,8 @@ namespace
         int RootId = InstanceId;
         if (G_FlmEngineOuter != nullptr)
         {
-            void* Root = ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(
-                (void*)((intptr_t)(InstanceId)));
+            InstanceIndex Root = ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(
+                (intptr_t)(InstanceId));
             RootId = (int)((intptr_t)(Root));
         }
 
@@ -3779,7 +3779,7 @@ GENRESULT DACOM_API FEnvMapMaterial::Bind(void* Context)
         }
         else
         {
-            void* Root = static_cast<const FMaterialSubmitContext*>(Context)->Inst;
+            InstanceIndex Root = static_cast<const FMaterialSubmitContext*>(Context)->Inst;
             // 066fc970 returns DAT_06704630, published by 066fca80.
             if (G_FlmEngineOuter != nullptr)
                 Root = ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(Root);

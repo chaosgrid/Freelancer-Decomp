@@ -24,7 +24,7 @@ public:
     ~UiStaticText() override;
 
     // slot 8 (+0x20) -- LAB_00599b70.
-    void SetTransform(float const* Transform) override;
+    void SetTransform(Transform const* NewXform) override;
     // slot 9 (+0x24) -- FUN_00599ac0; args (Parent, FUiPayloadText*). Always returns true.
     bool Create(Win3D* NewParent, void* Payload) override;
 

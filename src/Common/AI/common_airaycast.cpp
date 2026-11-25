@@ -138,8 +138,7 @@ namespace
         Box.HalfExtent.z = (float)(std::fabs((double)AabbMinMax[5] - AabbMinMax[4]) * 0.5);
         Vector const LocalMin{ AabbMinMax[0], AabbMinMax[2], AabbMinMax[4] };
         Vector const LocalCenter = Add(LocalMin, Box.HalfExtent);
-        Acquire3DMathEngine()->TransformXform((FVector&)Box.Center, (FTransform const&)Xform,
-                                              (FVector const&)LocalCenter);
+        Acquire3DMathEngine()->TransformXform(Box.Center, Xform, LocalCenter);
         return Box;
     }
 }
@@ -827,7 +826,7 @@ double BearingAngleToIface(void* Self, void* Target)
     GetIfacePositionOrZero(&PosSelf, ObjInspectOf(Self));
 
     // The matrix is read at +8/+0x14/+0x20 (column 2).
-    float const* const M = reinterpret_cast<float const*>(&ObjInspectOf(Self)->get_transform().Rotation);
+    Matrix const& M = ObjInspectOf(Self)->get_transform().Rotation;
 
     float const Dx = PosSelf.x - PosTarget.x;
     float const Dy = PosSelf.y - PosTarget.y;
@@ -856,8 +855,8 @@ double BearingAngleToIface(void* Self, void* Target)
         Nz = 0.0;
     }
 
-    float const Dot = static_cast<float>((Nz * M[8] + static_cast<double>(Ny) * M[5])
-                                         + static_cast<double>(M[2]) * Nx);
+    float const Dot = static_cast<float>((Nz * M.E[2][2] + static_cast<double>(Ny) * M.E[1][2])
+                                         + static_cast<double>(M.E[0][2]) * Nx);
     return BearingClampedAcos(Dot);
 }
 
@@ -874,7 +873,7 @@ double BearingAngleToPoint(void* Self, Vector const& ComparisonPoint)
     Vector PosSelf;
     GetIfacePositionOrZero(&PosSelf, ObjInspectOf(Self));
 
-    float const* const M = reinterpret_cast<float const*>(&ObjInspectOf(Self)->get_transform().Rotation);
+    Matrix const& M = ObjInspectOf(Self)->get_transform().Rotation;
 
     float const Dx = PosSelf.x - ComparisonPoint.x;
     float const Dy = PosSelf.y - ComparisonPoint.y;
@@ -903,6 +902,6 @@ double BearingAngleToPoint(void* Self, Vector const& ComparisonPoint)
         Nz = 0.0;
     }
 
-    float const Dot = static_cast<float>((Nz * M[8] + Ny * M[5]) + Nx * M[2]);
+    float const Dot = static_cast<float>((Nz * M.E[2][2] + Ny * M.E[1][2]) + Nx * M.E[0][2]);
     return BearingClampedAcos(Dot);
 }

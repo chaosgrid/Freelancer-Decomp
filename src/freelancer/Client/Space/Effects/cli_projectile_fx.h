@@ -249,7 +249,7 @@ void CliEffectListCopyPayload(void* DstSlots, void const* SrcSlots);
 void GameLightSetFreeMotionOffset(FGameLight* Light, float const* Offset3);
 
 // FUN_005377c0 — explosion FX local transform (when SlotExplosionFx non-null).
-void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, FTransform const* LocalXform);
+void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform const* LocalXform);
 
 // FUN_0053f340 (on the Beam, non-virtual) -- the Beam's activate: beam effect
 // + light into the +0xc0 companion, insert it into the effect list, then Projectile slot 92

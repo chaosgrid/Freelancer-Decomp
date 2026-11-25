@@ -105,29 +105,29 @@ namespace
         // Not directional -> the D3D position is the light position in camera space, z negated.
         if (Light->Type != kLightDirectional)
         {
-            FTransform const* const View =
-                reinterpret_cast<FTransform const*>(Camera->GetViewTransform());
+            Transform const* const View =
+                Camera->GetViewTransform();
             I3DMathEngine* const Math = AcquireSoftLightMath();
-            FVector CamSpace;
+            Vector CamSpace;
             Math->TransformXform(CamSpace, *View,
-                                 *reinterpret_cast<FVector const*>(Light->Position));
-            Light->D3d.Position[0] = CamSpace.X;
-            Light->D3d.Position[1] = CamSpace.Y;
-            Light->D3d.Position[2] = -CamSpace.Z;
+                                 *reinterpret_cast<Vector const*>(Light->Position));
+            Light->D3d.Position[0] = CamSpace.x;
+            Light->D3d.Position[1] = CamSpace.y;
+            Light->D3d.Position[2] = -CamSpace.z;
         }
 
         // Not a point light -> the D3D direction is the world direction rotated into camera
         // space, z negated.
         if (Light->Type != kLightPoint)
         {
-            FTransform const* const View =
-                reinterpret_cast<FTransform const*>(Camera->GetViewTransform());
+            Transform const* const View =
+                Camera->GetViewTransform();
             I3DMathEngine* const Math = AcquireSoftLightMath();
-            FVector CamDir;
-            Math->Rotate(CamDir, *View, *reinterpret_cast<FVector const*>(DirWorld));
-            Light->D3d.Direction[0] = CamDir.X;
-            Light->D3d.Direction[1] = CamDir.Y;
-            Light->D3d.Direction[2] = -CamDir.Z;
+            Vector CamDir;
+            Math->Rotate(CamDir, *View, *reinterpret_cast<Vector const*>(DirWorld));
+            Light->D3d.Direction[0] = CamDir.x;
+            Light->D3d.Direction[1] = CamDir.y;
+            Light->D3d.Direction[2] = -CamDir.z;
         }
 
         DALib::Pipeline->SetLight(&Light->D3d, (const D3DLIGHT8*)&Light->D3d);
@@ -351,13 +351,13 @@ FEngineLight* EngineLightCreate(float const* Frame12, FD3dLight8 const* Source,
     // Direction3 turned by the frame's orientation (Frame12 + 3, the 3x3 after the position),
     // then LookMatrixYup on that vector.
     I3DMathEngine* const Math = LightsCameraMath();
-    FVector Rotated;
-    Math->TransformMatrix(Rotated, *reinterpret_cast<FMatrix const*>(Frame12 + 3),
-                          *reinterpret_cast<FVector const*>(Direction3));
+    Vector Rotated;
+    Math->TransformMatrix(Rotated, *reinterpret_cast<Matrix const*>(Frame12 + 3),
+                          *reinterpret_cast<Vector const*>(Direction3));
     Vector Dir;
-    Dir.x = Rotated.X;
-    Dir.y = Rotated.Y;
-    Dir.z = Rotated.Z;
+    Dir.x = Rotated.x;
+    Dir.y = Rotated.y;
+    Dir.z = Rotated.z;
     const Matrix Look = LookMatrixYup(Dir);
     EngineLightSetOrientation(Light, &Look.E[0][0]);
 
@@ -1249,10 +1249,10 @@ FGameLight::FGameLight() : FEngineLight(kLightNone)
     this->Anim.CurrentIndex = -1;
     this->Anim.Elapsed = -1.0f;
     this->EngineIndex = 0xffffffffu;
-    memset(this->LocalXform, 0, sizeof(this->LocalXform));
-    this->LocalXform[8] = 1.0f;
-    this->LocalXform[4] = 1.0f;
-    this->LocalXform[0] = 1.0f;
+    memset(&this->LocalXform, 0, sizeof(this->LocalXform));
+    this->LocalXform.Rotation.E[2][2] = 1.0f;
+    this->LocalXform.Rotation.E[1][1] = 1.0f;
+    this->LocalXform.Rotation.E[0][0] = 1.0f;
     this->VelocityX = 0.0f;
     this->VelocityY = 0.0f;
     this->VelocityZ = 0.0f;
@@ -1532,15 +1532,15 @@ void GameLightTick(FGameLight* Light, float Dt)
     else
     {
         // No null test on the engine or the result.
-        float* const InstRaw = DALib::Engine->GetInstanceTransform(
-            reinterpret_cast<void*>(static_cast<intptr_t>(Light->EngineIndex)));
+        const float* const InstRaw = (const float*)DALib::Engine->GetInstanceTransform(
+            Light->EngineIndex);
         if (G_GameLightMath == nullptr)
             G_GameLightMath = Acquire3DMathEngine();
-        FTransform World;
-        G_GameLightMath->MulTransform(World, *reinterpret_cast<FTransform const*>(InstRaw),
-                                      *reinterpret_cast<FTransform const*>(Light->LocalXform));
-        FTransform const Copy = World;
-        EngineLightSetTransform((FEngineLight*)Light, &Copy.Rotation.D[0][0], &Copy.Translation.X);
+        Transform World;
+        G_GameLightMath->MulTransform(World, *reinterpret_cast<Transform const*>(InstRaw),
+                                      Light->LocalXform);
+        Transform const Copy = World;
+        EngineLightSetTransform((FEngineLight*)Light, &Copy.Rotation.E[0][0], &Copy.Translation.x);
     }
     if (Light->Anim.Keys != nullptr)
         GameLightTickAnim(&Light->Anim, Dt, Light);

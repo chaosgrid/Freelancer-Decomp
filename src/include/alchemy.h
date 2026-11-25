@@ -7,6 +7,7 @@
 #pragma once
 
 #include "dacom.h"
+#include "math3d.h"
 
 // alchemy.dll public ABI (docs/re/alchemy.md). Internal node implementations, particle pools
 // and .ale chunks stay in src/alchemy/.
@@ -120,8 +121,8 @@ struct IAlchemy : IFxNodeLibrary
 // inferred from what FLFxMesh does in each slot; arity from RET imm16.
 struct IFxMesh : IDAComponent
 {
-    virtual GENRESULT DACOM_API SetTransform(void* Transform) = 0; // +0x0C LAB_004f6910 RET 8: IEngine::SetInstanceMatrix
-    virtual float* DACOM_API GetTransform() = 0;                   // +0x10 LAB_004f6930 RET 4: IEngine::GetInstanceTransform
+    virtual GENRESULT DACOM_API SetTransform(const Transform* Xform) = 0;   // +0x0C LAB_004f6910 RET 8: IEngine::SetInstanceMatrix
+    virtual const Transform* DACOM_API GetTransform() = 0;                   // +0x10 LAB_004f6930 RET 4: IEngine::GetInstanceTransform
     virtual GENRESULT DACOM_API Update(void* Arg) = 0;      // +0x14 LAB_004f6940 RET 8: IEngine::UpdateInstance(inst, 0, Arg)
     virtual GENRESULT DACOM_API Render(void* Camera) = 0;    // +0x18 FUN_004f6970 RET 8: draw (ZWRITEENABLE 0, ZFUNC 4 LESSEQUAL)
     virtual GENRESULT DACOM_API Destroy() = 0;              // +0x1C FUN_004f6a70 RET 4: drop material + instance
@@ -180,8 +181,8 @@ struct IFxEffectLibrary : IDAComponent
 
 struct IFxEffect : IDAComponent
 {
-    virtual GENRESULT DACOM_API SetTransform(void* A, void* B) = 0;    // FUN_0621f610 RET 0xC
-    virtual GENRESULT DACOM_API GetTransform(void* A, void* B) = 0;    // LAB_0621f6a0 JMP node+0x40 RET 0xC
+    virtual GENRESULT DACOM_API SetTransform(unsigned long Slot, const Transform* Source) = 0;// FUN_0621f610 RET 0xC
+    virtual GENRESULT DACOM_API GetTransform(unsigned long Slot, Transform** Out) = 0;// LAB_0621f6a0 JMP node+0x40 RET 0xC
     virtual GENRESULT DACOM_API SetAge(float Age) = 0;                  // LAB_0621f7f0 RET 8: node +0x64
     virtual GENRESULT DACOM_API SetOuterTime(float OuterTime) = 0;            // LAB_0621f820 RET 8: node +0x5C
     virtual GENRESULT DACOM_API ComposeTransforms(void* Arg) = 0;      // FUN_0621f6d0 RET 8

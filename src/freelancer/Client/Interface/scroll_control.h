@@ -37,11 +37,11 @@
 struct FScrollControlPart
 {
     FClientMeshHolder Holder;    // +0x00 "<part>_mesh"
-    FVector Offset;              // +0x28 "<part>_offset"
-    FTransform Xform;            // +0x34 the instance transform: Hp moved by Offset + position
-    FVector MouseSize;           // +0x64 "<part>_mouse" -- the half extents the ray is tested on
+    Vector Offset;              // +0x28 "<part>_offset"
+    Transform Xform;            // +0x34 the instance transform: Hp moved by Offset + position
+    Vector MouseSize;           // +0x64 "<part>_mouse" -- the half extents the ray is tested on
     unsigned char bNoMeshRender; // +0x70 "<part>_no_mesh_render" -- skip the untinted pass
-    FTransform Hp;               // +0x74 "<part>_hp" -- the parent's hardpoint (identity if none)
+    Transform Hp;               // +0x74 "<part>_hp" -- the parent's hardpoint (identity if none)
 };
 
 static_assert(sizeof(FScrollControlPart) == 0xa4, "ScrollControl part stride 0xa4");
@@ -72,7 +72,7 @@ public:
     // --- Win3D / WinControl overrides ---
     bool HitTest(float const* Ray) override;                          // slot 4  LAB_00583130
     void SetPosition(float const* NewPosition) override;              // slot 5  LAB_00582aa0
-    void SetOrientation(float const* NewOrientation) override;        // slot 7  FUN_00582ac0
+    void SetOrientation(Matrix const* NewOrientation) override;        // slot 7  FUN_00582ac0
     bool Create(Win3D* NewParent, void* Data) override;               // slot 9  LAB_005815a0
     void Update() override;                                           // slot 11 FUN_00582ae0
     void Draw() override;                                             // slot 13 LAB_005826e0
@@ -103,15 +103,15 @@ public:
     FScrollControlPart Next;         // +0x3d0 "nextb_*"
     FScrollControlPart Prev;         // +0x474 "prevb_*"
     FClientMeshHolder ThumbHolder;   // +0x518 "thumb_mesh"
-    FTransform ThumbStart;           // +0x540 ThumbHp0 moved by ThumbOffset0 + position
-    FTransform ThumbEnd;             // +0x570 ThumbHp1 moved by ThumbOffset1 + position
-    FVector ThumbOffset0;            // +0x5a0 "thumb_offset0"
-    FVector ThumbOffset1;            // +0x5ac "thumb_offset1"
-    FTransform ThumbXform;           // +0x5b8 the thumb now
-    FVector ThumbMouse;              // +0x5e8 "thumb_mouse"
+    Transform ThumbStart;           // +0x540 ThumbHp0 moved by ThumbOffset0 + position
+    Transform ThumbEnd;             // +0x570 ThumbHp1 moved by ThumbOffset1 + position
+    Vector ThumbOffset0;            // +0x5a0 "thumb_offset0"
+    Vector ThumbOffset1;            // +0x5ac "thumb_offset1"
+    Transform ThumbXform;           // +0x5b8 the thumb now
+    Vector ThumbMouse;              // +0x5e8 "thumb_mouse"
     unsigned char bThumbNoMeshRender; // +0x5f4 "thumb_no_mesh_render"
-    FTransform ThumbHp0;             // +0x5f8 "thumb_hp0"
-    FTransform ThumbHp1;             // +0x628 "thumb_hp1"
+    Transform ThumbHp0;             // +0x5f8 "thumb_hp0"
+    Transform ThumbHp1;             // +0x628 "thumb_hp1"
     int MinRange;                    // +0x658 "min_range"
     int MaxRange;                    // +0x65c "max_range"
     int PageSize;                    // +0x660 "page_size" (ctor 1)

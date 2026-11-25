@@ -107,7 +107,7 @@ namespace AlchemyImpl
         // Outer +0x0C, CloneNode: each leaf class overrides it with its retail clone.
         // FUN_062401a0, the shared node-base compose (node vtable slot 2). The mesh
         // appearance overrides it with FUN_06225240 (compose, then pose its meshes).
-        GENRESULT DACOM_API ComposeNodeTransform(void* Unused, const float* Parent12) override;
+        GENRESULT DACOM_API ComposeNodeTransform(void* Unused, const Transform* Parent) override;
         // Per-node update. FUN_06240180 (node vtable slot 3): TickLifetime(Dt) through the
         // object's own vtable. FLBeamAppearance and the three emitters override it
         // (FUN_0620de30; LAB_0621b9d0 / LAB_0621d360 / LAB_0623bcf0).
@@ -152,8 +152,8 @@ namespace AlchemyImpl
             return 0x190;
         }
         // FUN_062400f0 / FUN_062400b0 (node vtable slots 6 / 5).
-        GENRESULT DACOM_API SetNodeTransform(unsigned long Index, const float* Source12) override;
-        GENRESULT DACOM_API GetNodeTransform(unsigned long Index, float** OutSlot) override;
+        GENRESULT DACOM_API SetNodeTransform(unsigned long Index, const Transform* Source) override;
+        GENRESULT DACOM_API GetNodeTransform(unsigned long Index, Transform** OutSlot) override;
         // Age_ += Dt; latches the expired bit once Age_ > Duration_ (strictly).
         GENRESULT DACOM_API TickLifetime(float Dt) override;
         GENRESULT DACOM_API SetParent(IDAComponent* Parent) override
@@ -418,8 +418,8 @@ namespace AlchemyImpl
         void InitAppearanceFromArchetype(FGenericFxObjectBase* Archetype);
 
         // The composed world transform, node+0x4c (what GetNodeTransform(0) hands out).
-        // I3DMathEngine FTransform layout: 3x3 row-major rotation, then translation.
-        const float* GetNodeWorldXform() const { return NodeWorldXform_; }
+        // I3DMathEngine Transform layout: 3x3 row-major rotation, then translation.
+        const Transform* GetNodeWorldXform() const { return &NodeWorldXform_; }
 
         // FUN_0623ffb0 -- node vtable slot 7 (+0x1c), shared by all 21 node vtables:
         // Out12 = GeneralInverse(Other's composed transform) * this node's composed
@@ -428,7 +428,7 @@ namespace AlchemyImpl
         // the outer vtables do forward +0x44 to it (FxNode LAB_06202770), but the port's
         // +0x44 is TickLifetime and every known caller reaches this through the node
         // sub-object (emitter body FUN_06245bf0, gravity field Begin, ...).
-        GENRESULT ComputeRelativeTransform(IDAComponent* Other, float* Out12);
+        GENRESULT ComputeRelativeTransform(IDAComponent* Other, Transform* Out);
 
         // [[this+0x80]+0x24]: the property set's Node_Transform IAnimatedTransform (the
         // set constructor's default FxAnimatedTransform, filled in place by FUN_062280a0
@@ -499,11 +499,11 @@ namespace AlchemyImpl
         // Node-base +0x1c: the raw (local) transform, identity from FUN_0623fb80. The
         // compose overwrites it with the evaluated Node_Transform while flag 0x4 is clear;
         // SetNodeTransform(1) sets it and flag 0x4.
-        float NodeLocalXform_[12];
+        Transform NodeLocalXform_;
         // Node-base +0x4c: the composed (world) transform, identity from FUN_0623fb80.
         // Written by the compose FUN_062401a0 and by SetNodeTransform(0); read through
         // GetNodeTransform(0) and by every emitter / appearance / bounds consumer.
-        float NodeWorldXform_[12];
+        Transform NodeWorldXform_;
 
         // Node-base +0x90, 1.0f from FUN_0623fb80; outer +0x84/+0x88.
         float LodInput_;

@@ -23,7 +23,7 @@
 #include "common_cequip.h" // IAction
 #include "common_csys.h"   // Matrix
 #include "common_physys.h" // PhySys::Controller, IVP_Event_Sim
-#include "x86math.h"       // FQuaternion
+#include "x86math.h"       // Quaternion
 
 class FClientGameobj;
 class FClientShipGameobj;
@@ -94,9 +94,9 @@ private:
     float Elapsed;                  // +0x1c  0 at construction, + delta_time every sim step
     float Duration;                 // +0x20
     FClientShipGameobj* Ship;       // +0x24
-    FQuaternion StartRotation;      // +0x28  the ship's orientation at construction
+    Quaternion StartRotation;      // +0x28  the ship's orientation at construction
     Vector StartPosition;           // +0x38  the ship's position at construction
-    FQuaternion EndRotation;        // +0x44  the jump effect's +0xa8 orientation (else the ship's)
+    Quaternion EndRotation;        // +0x44  the jump effect's +0xa8 orientation (else the ship's)
     Vector EndPosition;             // +0x54  the jump effect's +0xa8 position (else the ship's)
     bool bDone;                     // +0x60  set once Elapsed passes Duration
 };

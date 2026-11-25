@@ -42,7 +42,7 @@
 #include "Interface/win3d_render.h"           // Win3DApplyCamera (FUN_00422950)
 #include "Interface/win3d_renderables.h"      // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "Interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
-#include "x86math.h"                // FTransform, FMatrix, FVector, I3DMathEngine
+#include "x86math.h"                // Transform, Matrix, Vector, I3DMathEngine
 #include "common_cobject.h"         // CShip::get_target
 #include "common_csys.h"            // Acquire3DMathEngine (FUN_005b73e0), Transform
 #include "common_iface.h"           // IObjRW
@@ -292,20 +292,20 @@ namespace
     // I3DMathEngine::TransformXform (slot 10) of the zero vector, bound with FUN_00422690(0, ...).
     void BindMapModelview(NeuroNetNavMap const* Map, float Depth)
     {
-        FTransform Offset;
+        Transform Offset;
         memcpy(&Offset.Rotation, Map->MapRotation, sizeof(Offset.Rotation));
-        Offset.Translation.X = 0.0f;
-        Offset.Translation.Y = 0.0f;
-        Offset.Translation.Z = Depth;
-        FTransform Model;
+        Offset.Translation.x = 0.0f;
+        Offset.Translation.y = 0.0f;
+        Offset.Translation.z = Depth;
+        Transform Model;
         memcpy(&Model.Rotation, Map->MapRotation, sizeof(Model.Rotation));
-        FVector Zero;
-        Zero.X = 0.0f;
-        Zero.Y = 0.0f;
-        Zero.Z = 0.0f;
+        Vector Zero;
+        Zero.x = 0.0f;
+        Zero.y = 0.0f;
+        Zero.z = 0.0f;
         I3DMathEngine* const Math = NavMapMath();
         Math->TransformXform(Model.Translation, Offset, Zero);
-        Win3DBindModelview(nullptr, reinterpret_cast<float const*>(&Model)); // FUN_00422690
+        Win3DBindModelview(nullptr, &Model); // FUN_00422690
     }
 
     // BindMapModelview, then lighting, depth test, culling and texturing off, blending on at
@@ -556,15 +556,15 @@ namespace
 
     // A zone's transform as FUN_0049b600 / FUN_0049c740 use it: IZone slot 0x0c with the
     // position's x / z scaled by SystemScale and its y zeroed.
-    FTransform ZoneMapTransform(Universe::IZone const* Zone, float SystemScale)
+    Transform ZoneMapTransform(Universe::IZone const* Zone, float SystemScale)
     {
-        FTransform Xform;
+        Transform Xform;
         memcpy(&Xform, &Zone->GetTransform(), sizeof(Xform));
-        Xform.Translation.X = static_cast<float>(static_cast<double>(Xform.Translation.X) *
+        Xform.Translation.x = static_cast<float>(static_cast<double>(Xform.Translation.x) *
                                                  static_cast<double>(SystemScale));
-        Xform.Translation.Z = static_cast<float>(static_cast<double>(Xform.Translation.Z) *
+        Xform.Translation.z = static_cast<float>(static_cast<double>(Xform.Translation.z) *
                                                  static_cast<double>(SystemScale));
-        Xform.Translation.Y = 0.0f;
+        Xform.Translation.y = 0.0f;
         return Xform;
     }
 
@@ -581,7 +581,7 @@ namespace
     // The ellipse point of the zone outlines (FUN_0049b600, FUN_0049c740): the direction (sin, 0, cos) of Angle through IZone slot 0x40,
     // times SystemScale, about the zone's scaled position.
     void ZoneEllipsePoint(Universe::IZone const* Zone, float Angle, float SystemScale,
-                          FTransform const& Xform, float* OutPoint)
+                          Transform const& Xform, float* OutPoint)
     {
         Vector Dir;
         Dir.x = static_cast<float>(sin(static_cast<double>(Angle)));
@@ -591,25 +591,25 @@ namespace
         float const Mid = static_cast<float>(static_cast<double>(Dir.y) * Radius);
         float const Far = static_cast<float>(static_cast<double>(Dir.z) * Radius);
         OutPoint[0] = static_cast<float>(static_cast<double>(Dir.x) * Radius +
-                                         static_cast<double>(Xform.Translation.X));
+                                         static_cast<double>(Xform.Translation.x));
         OutPoint[1] = static_cast<float>(static_cast<double>(Mid) +
-                                         static_cast<double>(Xform.Translation.Y));
+                                         static_cast<double>(Xform.Translation.y));
         OutPoint[2] = static_cast<float>(static_cast<double>(Far) +
-                                         static_cast<double>(Xform.Translation.Z));
+                                         static_cast<double>(Xform.Translation.z));
     }
 
     // TransformXform of a local point through Xform into OutPoint.
-    void TransformPoint(FTransform const& Xform, float X, float Y, float Z, float* OutPoint)
+    void TransformPoint(Transform const& Xform, float X, float Y, float Z, float* OutPoint)
     {
-        FVector Local;
-        Local.X = X;
-        Local.Y = Y;
-        Local.Z = Z;
-        FVector World;
+        Vector Local;
+        Local.x = X;
+        Local.y = Y;
+        Local.z = Z;
+        Vector World;
         NavMapMath()->TransformXform(World, Xform, Local); // slot 10 (+0x28)
-        OutPoint[0] = World.X;
-        OutPoint[1] = World.Y;
-        OutPoint[2] = World.Z;
+        OutPoint[0] = World.x;
+        OutPoint[1] = World.y;
+        OutPoint[2] = World.z;
     }
 }
 
@@ -775,7 +775,7 @@ void NeuroNetNavMap::Draw()
                     }
                     else if (ViewMode == kNavMapViewSystemZoomed)
                     {
-                        float const* const Pos = Engine->GetInstancePosition(
+                        const float* const Pos = (const float*)Engine->GetInstancePosition(
                             Item->Mesh.EngineInstance); // IEngine slot 36
                         double const Dx = static_cast<double>(Pos[0]) -
                                           static_cast<double>(PanOffset[0]);
@@ -814,10 +814,10 @@ void NeuroNetNavMap::Draw()
                 {
                     // No number -- drawn at 0.4 of its size, the
                     // transform put back after.
-                    FTransform Saved;
+                    Transform Saved;
                     memcpy(&Saved, Engine->GetInstanceTransform(Item->Mesh.EngineInstance),
                            sizeof(Saved));
-                    FTransform Scaled = Saved;
+                    Transform Scaled = Saved;
                     NavMapMath()->Scale(Scaled.Rotation, Scaled.Rotation,
                                         kNavMapPlainMarkerScale); // slot 4
                     Engine->SetInstanceMatrix(Item->Mesh.EngineInstance, &Scaled); // slot 39
@@ -836,7 +836,7 @@ void NeuroNetNavMap::Draw()
                 if (Number < 10)
                 {
                     FClientMeshHolder* const Digit = &DigitMeshes[Number];
-                    Engine->SetInstancePosition(Digit->EngineInstance, Pos);       // slot 35
+                    Engine->SetInstancePosition(Digit->EngineInstance, (const Vector*)Pos);       // slot 35
                     Engine->UpdateInstance(Digit->EngineInstance, 0, nullptr);
                     DrawHolder(Digit, &Camera, 0x308);
                     continue;
@@ -849,7 +849,7 @@ void NeuroNetNavMap::Draw()
                 Left3[1] = Pos[1];
                 Left3[2] = Pos[2];
                 FClientMeshHolder* const TensDigit = &DigitMeshes[Tens];
-                Engine->SetInstancePosition(TensDigit->EngineInstance, Left3);
+                Engine->SetInstancePosition(TensDigit->EngineInstance, (const Vector*)Left3);
                 Engine->UpdateInstance(TensDigit->EngineInstance, 0, nullptr);
                 DrawHolder(TensDigit, &Camera, 0x308);
                 float Right3[3];
@@ -858,7 +858,7 @@ void NeuroNetNavMap::Draw()
                 Right3[1] = Pos[1];
                 Right3[2] = Pos[2];
                 FClientMeshHolder* const OnesDigit = &DigitMeshes[Ones];
-                Engine->SetInstancePosition(OnesDigit->EngineInstance, Right3);
+                Engine->SetInstancePosition(OnesDigit->EngineInstance, (const Vector*)Right3);
                 Engine->UpdateInstance(OnesDigit->EngineInstance, 0, nullptr);
                 DrawHolder(OnesDigit, &Camera, 0x308);
             }
@@ -870,21 +870,21 @@ void NeuroNetNavMap::Draw()
         // The info-card / legend / base-list modes -- the zoomed map
         // flat at depth -0.71 (identity rotation), its transform put back after.
         IEngine* const Engine = DALib::Engine;
-        FTransform Saved;
+        Transform Saved;
         memcpy(&Saved, Engine->GetInstanceTransform(ZoomedMapMesh.EngineInstance), sizeof(Saved));
-        FTransform Flat;
-        Flat.Rotation.D[0][0] = 1.0f;
-        Flat.Rotation.D[0][1] = 0.0f;
-        Flat.Rotation.D[0][2] = 0.0f;
-        Flat.Rotation.D[1][0] = 0.0f;
-        Flat.Rotation.D[1][1] = 1.0f;
-        Flat.Rotation.D[1][2] = 0.0f;
-        Flat.Rotation.D[2][0] = 0.0f;
-        Flat.Rotation.D[2][1] = 0.0f;
-        Flat.Rotation.D[2][2] = 1.0f;
-        Flat.Translation.X = 0.0f;
-        Flat.Translation.Y = 0.0f;
-        Flat.Translation.Z = kNavMapFlatDepth;
+        Transform Flat;
+        Flat.Rotation.E[0][0] = 1.0f;
+        Flat.Rotation.E[0][1] = 0.0f;
+        Flat.Rotation.E[0][2] = 0.0f;
+        Flat.Rotation.E[1][0] = 0.0f;
+        Flat.Rotation.E[1][1] = 1.0f;
+        Flat.Rotation.E[1][2] = 0.0f;
+        Flat.Rotation.E[2][0] = 0.0f;
+        Flat.Rotation.E[2][1] = 0.0f;
+        Flat.Rotation.E[2][2] = 1.0f;
+        Flat.Translation.x = 0.0f;
+        Flat.Translation.y = 0.0f;
+        Flat.Translation.z = kNavMapFlatDepth;
         Engine->SetInstanceMatrix(ZoomedMapMesh.EngineInstance, &Flat);
         Engine->UpdateInstance(ZoomedMapMesh.EngineInstance, 0, nullptr);
         DrawHolder(&ZoomedMapMesh, &Camera, 0x300);
@@ -894,17 +894,17 @@ void NeuroNetNavMap::Draw()
         // The legend (mode 4), loaded on first use and stretched.
         if (G_NavMapFilterMode == 4)
         {
-            if (LegendMesh.EngineInstance == reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+            if (LegendMesh.EngineInstance == InvalidInstanceIndex)
             {
                 ClientMeshLoadFromPath(&LegendMesh, kNavMapLegendMesh, 0, false); // FUN_0059ec80
-                Engine->SetInstancePosition(LegendMesh.EngineInstance, MeshPosition);
-                FTransform Legend;
+                Engine->SetInstancePosition(LegendMesh.EngineInstance, (const Vector*)MeshPosition);
+                Transform Legend;
                 memcpy(&Legend, Engine->GetInstanceTransform(LegendMesh.EngineInstance),
                        sizeof(Legend));
-                Legend.Rotation.D[0][0] = static_cast<float>(
-                    static_cast<double>(Legend.Rotation.D[0][0]) * kNavMapLegendScaleX);
-                Legend.Rotation.D[1][1] = static_cast<float>(
-                    static_cast<double>(Legend.Rotation.D[1][1]) * kNavMapLegendScaleY);
+                Legend.Rotation.E[0][0] = static_cast<float>(
+                    static_cast<double>(Legend.Rotation.E[0][0]) * kNavMapLegendScaleX);
+                Legend.Rotation.E[1][1] = static_cast<float>(
+                    static_cast<double>(Legend.Rotation.E[1][1]) * kNavMapLegendScaleY);
                 Engine->SetInstanceMatrix(LegendMesh.EngineInstance, &Legend);
                 Engine->UpdateInstance(LegendMesh.EngineInstance, 0, nullptr);
             }
@@ -975,28 +975,28 @@ void NeuroNetNavMap::Draw()
         int CursorY = 0;
         int CursorZ = 0;
         GetClientSoftwareCursor(&CursorX, &CursorY, &CursorZ); // DAT_00616840 / 44
-        FVector Near;
-        Near.X = static_cast<float>((static_cast<double>(CursorX) -
+        Vector Near;
+        Near.x = static_cast<float>((static_cast<double>(CursorX) -
                                      static_cast<double>(WinCamera->ScreenCenterX)) /
                                     static_cast<double>(WinCamera->XScale) *
                                     static_cast<double>(WinCamera->ZNear));
-        Near.Y = static_cast<float>((static_cast<double>(CursorY) -
+        Near.y = static_cast<float>((static_cast<double>(CursorY) -
                                      static_cast<double>(WinCamera->ScreenCenterY)) /
                                     static_cast<double>(WinCamera->YScale) *
                                     static_cast<double>(WinCamera->ZNear));
-        Near.Z = -WinCamera->ZNear;
-        FMatrix CameraRotation;
-        memcpy(&CameraRotation, WinCamera->World, sizeof(CameraRotation)); // DAT_0067dbfc
-        FVector Rotated;
+        Near.z = -WinCamera->ZNear;
+        Matrix CameraRotation;
+        memcpy(&CameraRotation, &WinCamera->World, sizeof(CameraRotation)); // DAT_0067dbfc
+        Vector Rotated;
         NavMapMath()->TransformMatrix(Rotated, CameraRotation, Near); // slot 11 (+0x2c)
-        double const Length = sqrt(static_cast<double>(Rotated.X) * static_cast<double>(Rotated.X) +
-                                   static_cast<double>(Rotated.Y) * static_cast<double>(Rotated.Y) +
-                                   static_cast<double>(Rotated.Z) * static_cast<double>(Rotated.Z));
+        double const Length = sqrt(static_cast<double>(Rotated.x) * static_cast<double>(Rotated.x) +
+                                   static_cast<double>(Rotated.y) * static_cast<double>(Rotated.y) +
+                                   static_cast<double>(Rotated.z) * static_cast<double>(Rotated.z));
         double const InvLength = 1.0 / Length; // FDIVR DAT_005c75dc
         float Ray[3];
-        Ray[0] = static_cast<float>(static_cast<double>(Rotated.X) * InvLength);
-        Ray[1] = static_cast<float>(static_cast<double>(Rotated.Y) * InvLength);
-        Ray[2] = static_cast<float>(static_cast<double>(Rotated.Z) * InvLength);
+        Ray[0] = static_cast<float>(static_cast<double>(Rotated.x) * InvLength);
+        Ray[1] = static_cast<float>(static_cast<double>(Rotated.y) * InvLength);
+        Ray[2] = static_cast<float>(static_cast<double>(Rotated.z) * InvLength);
 
         // The fifteen base rows -- both halves shown, pulsed when the
         // ray hits either (slot 4), coloured through SetProperty(0x33, &colour, 1), drawn.
@@ -1614,7 +1614,7 @@ void NeuroNetNavMap::DrawGroupMarkers()
 
     // The marker mesh on first use, tinted with the palette's
     // DAT_00679bac bytes / 255.
-    if (GroupMarkerMesh.EngineInstance == reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (GroupMarkerMesh.EngineInstance == InvalidInstanceIndex)
     {
         ClientMeshLoadFromPath(&GroupMarkerMesh, kNavMapGroupMarkerMesh, 0, false); // FUN_0059ec80
         unsigned char const* const Tint = reinterpret_cast<unsigned char const*>(&G_NnPaletteGreen);
@@ -1699,20 +1699,20 @@ void NeuroNetNavMap::DrawGroupMarkers()
         double const Angle = 0.0; // DAT_005c8ba8
         float const Cos = static_cast<float>(cos(Angle));
         float const Sin = static_cast<float>(sin(Angle));
-        FTransform Marker;
-        Marker.Rotation.D[0][0] = Cos;
-        Marker.Rotation.D[0][1] = -Sin;
-        Marker.Rotation.D[0][2] = 0.0f;
-        Marker.Rotation.D[1][0] = Sin;
-        Marker.Rotation.D[1][1] = Cos;
-        Marker.Rotation.D[1][2] = 0.0f;
-        Marker.Rotation.D[2][0] = 0.0f;
-        Marker.Rotation.D[2][1] = 0.0f;
-        Marker.Rotation.D[2][2] = 1.0f;
+        Transform Marker;
+        Marker.Rotation.E[0][0] = Cos;
+        Marker.Rotation.E[0][1] = -Sin;
+        Marker.Rotation.E[0][2] = 0.0f;
+        Marker.Rotation.E[1][0] = Sin;
+        Marker.Rotation.E[1][1] = Cos;
+        Marker.Rotation.E[1][2] = 0.0f;
+        Marker.Rotation.E[2][0] = 0.0f;
+        Marker.Rotation.E[2][1] = 0.0f;
+        Marker.Rotation.E[2][2] = 1.0f;
         NavMapMath()->Scale(Marker.Rotation, Marker.Rotation, MarkerScale); // slot 4 (+0x10)
-        Marker.Translation.X = PointX;
-        Marker.Translation.Y = PointY;
-        Marker.Translation.Z = kNavMapZoneDepth;
+        Marker.Translation.x = PointX;
+        Marker.Translation.y = PointY;
+        Marker.Translation.z = kNavMapZoneDepth;
         Engine->SetInstanceMatrix(GroupMarkerMesh.EngineInstance, &Marker); // +0x9c
         Engine->UpdateInstance(GroupMarkerMesh.EngineInstance, 0, nullptr); // +0x6c
         DrawHolder(&GroupMarkerMesh, &Camera, 0x308);
@@ -1892,7 +1892,7 @@ bool NeuroNetNavMap::BuildZoneShading()
 
         // The zone's size and transform in map units, its shape.
         Vector Size = ZoneMapSize(Zone, SystemScale);
-        FTransform const Xform = ZoneMapTransform(Zone, SystemScale);
+        Transform const Xform = ZoneMapTransform(Zone, SystemScale);
         unsigned const Shape = Zone->GetShape();
 
         float Points[38][3];
@@ -1957,25 +1957,25 @@ bool NeuroNetNavMap::BuildZoneShading()
             // The caps' centres along the local y axis (column 1 of
             // the rotation) -- the x offset rounded, the y / z ones not -- with identity
             // rotations.
-            float const OffsetX = static_cast<float>(static_cast<double>(Xform.Rotation.D[0][1]) *
+            float const OffsetX = static_cast<float>(static_cast<double>(Xform.Rotation.E[0][1]) *
                                                      static_cast<double>(HalfLen));
-            double const OffsetY = static_cast<double>(Xform.Rotation.D[1][1]) * static_cast<double>(HalfLen);
-            double const OffsetZ = static_cast<double>(Xform.Rotation.D[2][1]) * static_cast<double>(HalfLen);
-            FTransform Top;
-            FTransform Bottom;
+            double const OffsetY = static_cast<double>(Xform.Rotation.E[1][1]) * static_cast<double>(HalfLen);
+            double const OffsetZ = static_cast<double>(Xform.Rotation.E[2][1]) * static_cast<double>(HalfLen);
+            Transform Top;
+            Transform Bottom;
             memset(&Top, 0, sizeof(Top));
-            Top.Rotation.D[0][0] = 1.0f;
-            Top.Rotation.D[1][1] = 1.0f;
-            Top.Rotation.D[2][2] = 1.0f;
+            Top.Rotation.E[0][0] = 1.0f;
+            Top.Rotation.E[1][1] = 1.0f;
+            Top.Rotation.E[2][2] = 1.0f;
             Bottom = Top;
-            Top.Translation.X = static_cast<float>(static_cast<double>(OffsetX) +
-                                                   static_cast<double>(Xform.Translation.X));
-            Top.Translation.Y = static_cast<float>(OffsetY + static_cast<double>(Xform.Translation.Y));
-            Top.Translation.Z = static_cast<float>(static_cast<double>(Xform.Translation.Z) + OffsetZ);
-            Bottom.Translation.X = static_cast<float>(static_cast<double>(Xform.Translation.X) -
+            Top.Translation.x = static_cast<float>(static_cast<double>(OffsetX) +
+                                                   static_cast<double>(Xform.Translation.x));
+            Top.Translation.y = static_cast<float>(OffsetY + static_cast<double>(Xform.Translation.y));
+            Top.Translation.z = static_cast<float>(static_cast<double>(Xform.Translation.z) + OffsetZ);
+            Bottom.Translation.x = static_cast<float>(static_cast<double>(Xform.Translation.x) -
                                                       static_cast<double>(OffsetX));
-            Bottom.Translation.Y = static_cast<float>(static_cast<double>(Xform.Translation.Y) - OffsetY);
-            Bottom.Translation.Z = static_cast<float>(static_cast<double>(Xform.Translation.Z) - OffsetZ);
+            Bottom.Translation.y = static_cast<float>(static_cast<double>(Xform.Translation.y) - OffsetY);
+            Bottom.Translation.z = static_cast<float>(static_cast<double>(Xform.Translation.z) - OffsetZ);
 
             // Both rings (sin / cos kept as doubles for the second).
             float Angle = 0.0f;
@@ -2284,7 +2284,7 @@ bool NeuroNetNavMap::BuildTerrainPatches()
 
         // The zone in map units; spheres and ellipsoids only.
         Vector const Size = ZoneMapSize(Zone, SystemScale);
-        FTransform const Xform = ZoneMapTransform(Zone, SystemScale);
+        Transform const Xform = ZoneMapTransform(Zone, SystemScale);
         unsigned const ZoneShape = Zone->GetShape();
         float Points[33][3];
         if (ZoneShape == 1)

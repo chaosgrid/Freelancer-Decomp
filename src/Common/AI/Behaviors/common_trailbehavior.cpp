@@ -429,7 +429,7 @@ int TrailBehavior::OnUpdate()
             Face.Update(DeltaTime);
             Move.SetMode(0);                                        // FUN_062d5980
             Move.SetScale40(1.0f);                                  // ICF fold 062a33e0
-            Move.SetDirectionFrom(&Sys->SelfTarget.Iface->get_transform());   // FUN_062d58f0
+            Move.SetDirectionFrom(&Sys->SelfTarget.Iface->get_transform().Rotation);   // FUN_062d58f0
             Move.SetAngle38(3.14159274f);                           // ICF fold 063275f0
             Move.Update(DeltaTime);
             UpdateResult = 0;
@@ -489,9 +489,7 @@ int TrailBehavior::OnUpdate()
     if (GTrailMathEngine == nullptr)
         GTrailMathEngine = Acquire3DMathEngine();
     Vector Offset;
-    GTrailMathEngine->TransformMatrix(reinterpret_cast<FVector&>(Offset),
-                                      reinterpret_cast<FMatrix const&>(LeaderRotation),
-                                      reinterpret_cast<FVector const&>(Local));
+    GTrailMathEngine->TransformMatrix(Offset, LeaderRotation, Local);
     Vector TrailPoint;
     TrailPoint.x = Offset.x + LeaderCenter.x;
     TrailPoint.y = Offset.y + LeaderCenter.y;

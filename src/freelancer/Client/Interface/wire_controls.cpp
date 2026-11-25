@@ -167,47 +167,47 @@ void WireStaticControl::SetPosition(float const* NewPosition)
     RequestedPosition[2] = NewPosition[2];
     bAttached = 1;
 
-    float Placed[3];
+    Vector Placed;
     if ((PositionFlags & 1) != 0)
     {
-        float Attach[3];
-        GetAttachPosition(Attach); // slot 41
-        Placed[0] = NewPosition[0] + Attach[0];
-        Placed[1] = Attach[1] + NewPosition[1];
-        Placed[2] = Attach[2] + NewPosition[2];
+        Vector Attach;
+        GetAttachPosition(&Attach); // slot 41
+        Placed.x = NewPosition[0] + Attach.x;
+        Placed.y = Attach.y + NewPosition[1];
+        Placed.z = Attach.z + NewPosition[2];
     }
     else
     {
-        Placed[0] = NewPosition[0];
-        Placed[1] = NewPosition[1];
-        Placed[2] = NewPosition[2];
+        Placed.x = NewPosition[0];
+        Placed.y = NewPosition[1];
+        Placed.z = NewPosition[2];
     }
-    WinControl::SetPosition(Placed); // FUN_005a0880
+    WinControl::SetPosition(&Placed.x); // FUN_005a0880
 
     if ((PositionFlags & 1) != 0)
     {
-        WireCenter[0] = Offset[0] + Position[0];
-        WireCenter[1] = Offset[1] + Position[1];
-        WireCenter[2] = Offset[2] + Position[2];
+        WireCenter[0] = Offset[0] + Position.x;
+        WireCenter[1] = Offset[1] + Position.y;
+        WireCenter[2] = Offset[2] + Position.z;
     }
     else
     {
-        WireCenter[0] = Position[0];
-        WireCenter[1] = Position[1];
-        WireCenter[2] = Position[2];
+        WireCenter[0] = Position.x;
+        WireCenter[1] = Position.y;
+        WireCenter[2] = Position.z;
     }
 }
 
-void WireStaticControl::SetOrientation(float const* NewOrientation)
+void WireStaticControl::SetOrientation(Matrix const* NewOrientation)
 {
     // LAB_005a3a30. Unlike WinControl's FUN_005a0950 it neither moves an engine instance nor
     // recurses into children.
     bAttached = 1;
-    FMatrix Attach;
-    GetAttachOrientation(&Attach.D[0][0]);
-    FMatrix Result;
-    WireMathEngine()->MulMatrix(Result, *reinterpret_cast<FMatrix const*>(NewOrientation), Attach);
-    memcpy(Orientation, &Result, sizeof(Orientation));
+    Matrix Attach;
+    GetAttachOrientation(&Attach);
+    Matrix Result;
+    WireMathEngine()->MulMatrix(Result, *NewOrientation, Attach);
+    memcpy(&Orientation, &Result, sizeof(Orientation));
     memcpy(WireOrientation, &Result, sizeof(WireOrientation));
 }
 
@@ -218,7 +218,7 @@ bool WireStaticControl::Create(Win3D* NewParent, void* /*Data*/)
     Win3DRegister(this);            // FUN_0059dbf0
     Flags = static_cast<unsigned char>((Flags & 0xfb) | 0x03);
     if (Parent != nullptr)
-        Parent->SetPosition(Parent->Position);
+        Parent->SetPosition(&Parent->Position.x);
     return true;
 }
 
@@ -306,8 +306,8 @@ void WireStaticControl::Draw()
     if (bUseColour != 0)
         memcpy(Rgba, Colour, sizeof(Rgba));
 
-    float const Center[3] = {Position[0] + Offset[0], Position[1] + Offset[1],
-                             Position[2] + Offset[2]};
+    float const Center[3] = {Position.x + Offset[0], Position.y + Offset[1],
+                             Position.z + Offset[2]};
     WireCenter[0] = Center[0];
     WireCenter[1] = Center[1];
     WireCenter[2] = Center[2];
@@ -425,9 +425,9 @@ void WireStaticControl::Init(float const* NewOffset, float const* NewHalfExtents
     Offset[0] = NewOffset[0];
     Offset[1] = NewOffset[1];
     Offset[2] = NewOffset[2];
-    WireCenter[0] = Offset[0] + Position[0];
-    WireCenter[1] = Offset[1] + Position[1];
-    WireCenter[2] = Offset[2] + Position[2];
+    WireCenter[0] = Offset[0] + Position.x;
+    WireCenter[1] = Offset[1] + Position.y;
+    WireCenter[2] = Offset[2] + Position.z;
     HalfExtents[0] = NewHalfExtents[0];
     HalfExtents[1] = NewHalfExtents[1];
     HalfExtents[2] = NewHalfExtents[2];
@@ -475,24 +475,24 @@ void WireButtonControl::Update()
     int CursorX = 0;
     int CursorY = 0;
     GetClientSoftwareCursor(&CursorX, &CursorY, nullptr); // DAT_00616840 / DAT_00616844
-    FVector Local;
-    Local.X = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
+    Vector Local;
+    Local.x = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
                                  Cam->XScale * Cam->ZNear);
-    Local.Y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
+    Local.y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
                                  Cam->YScale * Cam->ZNear);
-    Local.Z = -Cam->ZNear;
-    FMatrix CamOrientation;
-    memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation)); // DAT_0067dbfc
-    FVector World;
+    Local.z = -Cam->ZNear;
+    Matrix CamOrientation;
+    memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation)); // DAT_0067dbfc
+    Vector World;
     Win3DTransformByMatrix(World, CamOrientation, Local); // FUN_00423b90
     double const Inv =
-        kOne / sqrt(static_cast<double>(World.X) * World.X +
-                    static_cast<double>(World.Y) * World.Y +
-                    static_cast<double>(World.Z) * World.Z);
+        kOne / sqrt(static_cast<double>(World.x) * World.x +
+                    static_cast<double>(World.y) * World.y +
+                    static_cast<double>(World.z) * World.z);
     float Ray[3];
-    Ray[0] = static_cast<float>(World.X * Inv);
-    Ray[1] = static_cast<float>(World.Y * Inv);
-    Ray[2] = static_cast<float>(World.Z * Inv);
+    Ray[0] = static_cast<float>(World.x * Inv);
+    Ray[1] = static_cast<float>(World.y * Inv);
+    Ray[2] = static_cast<float>(World.z * Inv);
 
     if (HitTest(Ray)) // slot 4
     {
@@ -563,21 +563,21 @@ bool WireButtonControl::MouseEvent(FWin3DMouseEvent const* Event)
         int CursorX = 0;
         int CursorY = 0;
         GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
-        FVector Local;
+        Vector Local;
         Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
                                static_cast<float>(CursorY));
-        FMatrix CamOrientation;
-        memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation));
-        FVector World;
+        Matrix CamOrientation;
+        memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation));
+        Vector World;
         WireMathEngine()->TransformMatrix(World, CamOrientation, Local);
         double const Inv =
-            kOne / sqrt(static_cast<double>(World.X) * World.X +
-                        static_cast<double>(World.Y) * World.Y +
-                        static_cast<double>(World.Z) * World.Z);
+            kOne / sqrt(static_cast<double>(World.x) * World.x +
+                        static_cast<double>(World.y) * World.y +
+                        static_cast<double>(World.z) * World.z);
         float Ray[3];
-        Ray[0] = static_cast<float>(World.X * Inv);
-        Ray[1] = static_cast<float>(World.Y * Inv);
-        Ray[2] = static_cast<float>(World.Z * Inv);
+        Ray[0] = static_cast<float>(World.x * Inv);
+        Ray[1] = static_cast<float>(World.y * Inv);
+        Ray[2] = static_cast<float>(World.z * Inv);
 
         if (!HitTest(Ray)) // slot 4
         {

@@ -35,7 +35,7 @@ I3DMathEngine* UiWidgetMathEngine();
 //   OutWidth  = |(M * (Width, 0, Z)).x - (M * (0, 0, Z)).x|
 //   OutHeight = |(M * (0, Height, Z)).y - (M * (0, 0, Z)).y|
 // via four TransformMatrix calls in that order.
-void UiWidgetProjectExtent(float const Matrix[9], float Z, float Width, float Height,
+void UiWidgetProjectExtent(Matrix const* Mat, float Z, float Width, float Height,
                            float* OutWidth, float* OutHeight);
 
 namespace UIPage
@@ -78,7 +78,7 @@ namespace UIPage
         // FUN_005916b0 — build every entry through the WINFACTORY registry, place it and
         // record it by name. Returns the result of the last child recursion (1 for an empty
         // array); a factory miss returns 0 at once.
-        bool Instantiate(FUiWidgetEntry** Entries, Win3D* Parent, FTransform const* Matrix);
+        bool Instantiate(FUiWidgetEntry** Entries, Win3D* Parent, Transform const* Mat);
 
         float Aspect;   // +0x18
 
@@ -88,12 +88,12 @@ namespace UIPage
         Page(Page const&) = delete;
         Page& operator=(Page const&) = delete;
 
-        friend Page* CreatePage(FUiPageData* Data, FTransform const* Matrix, Win3D* Parent);
+        friend Page* CreatePage(FUiPageData* Data, Transform const* Mat, Win3D* Parent);
     };
 
     // FUN_00594590 (cdecl) — new Page, Aspect = Data->Aspect, Instantiate(Data->Entries, Parent,
     // Matrix); on failure the page is deleted and null returned.
-    Page* CreatePage(FUiPageData* Data, FTransform const* Matrix, Win3D* Parent);
+    Page* CreatePage(FUiPageData* Data, Transform const* Mat, Win3D* Parent);
 
     // RTTI .?AVMasterWin@UIPage@@ : Win3D, IUIPage (+0x7c, vftable 0x005e534c), Event::Handler
     // (+0x80). vftable 0x005e5384 (28 slots). Retail +0x84 = FUiPageData*, +0x88 = Page*.

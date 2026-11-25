@@ -7,18 +7,12 @@
 #include "MovieFieldMid.h"
 
 #include "MovieField.h"
+#include "MovieFieldHigh.h"
 #include "MovieGraph.h"
 #include "MovieMod.h"
 #include "MovieWindow.h"
 
 #include <intrin.h>
-
-// Callees defined in other movie translation units.
-long __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
-long __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
-long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
-long __stdcall ReduceLimbsBelow(int Source, unsigned char* Dest, unsigned int Count);
 
 // 0x06ac52f0
 // One-limb division. A leading dividend limb below the divisor is the starting remainder
@@ -116,7 +110,7 @@ long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned
 {
     int* Field = (int*)FieldHolder[0];
     int LimbCount = Field[0];
-    unsigned int* Constant = (unsigned int*)((unsigned char*)Field + 0x12c);
+    unsigned int* Constant = ((FMovieField*)Field)->One;
     (void)Scratch;
     if (Movie_CopyFieldGroups(Constant, Work, 1, Field) == 0)
     {
@@ -286,7 +280,7 @@ static long Movie_MixBinaryElements(unsigned int* Left, unsigned int* Right, uns
     }
     if (Count != 0)
     {
-        unsigned int* HolderWords = FieldHolder + 1;
+        unsigned int* HolderWords = ((FMovieFieldRecord*)FieldHolder)->Left;
         int Index = 0;
         do
         {
@@ -433,7 +427,7 @@ long __stdcall Movie_AddFieldElements(unsigned int* Left, unsigned int* Right, u
         }
         if (Kind23 == 0)
         {
-            unsigned int* Factor = FieldHolder + 1;
+            unsigned int* Factor = ((FMovieFieldRecord*)FieldHolder)->Left;
             if (Movie_AddFieldLimbs(LeftHigh, LeftHigh, TempA, Field) == 0)
             {
                 return 0;
@@ -612,8 +606,8 @@ long __stdcall Movie_CommitFieldPair(unsigned int* Left, unsigned int* Right, un
 {
     int* Field = (int*)FieldWords;
     int Kind = Field[2];
-    unsigned int* Low = Record + 1;
-    unsigned int* High = Record + 0x41;
+    unsigned int* Low = ((FMovieFieldRecord*)Record)->Left;
+    unsigned int* High = ((FMovieFieldRecord*)Record)->Right;
     if (Kind == 1)
     {
         if (Movie_SetFieldFromSigned(0x1bu, High, Field) == 0)

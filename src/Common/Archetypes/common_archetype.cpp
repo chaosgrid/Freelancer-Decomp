@@ -605,13 +605,13 @@ namespace Archetype
             FEngineArchetypeName Name;
             Name.Text = PathBuf;
             Name.Crc = DACOM_CRC::GetCRC32(PathBuf);
-            *EngineIndex = (long)DALib::Engine->FindArchetype(&Name);
+            *EngineIndex = DALib::Engine->FindArchetype(&Name);
             if (*EngineIndex == -1)
             {
                 // Retail takes the CRC again.
                 Name.Text = PathBuf;
                 Name.Crc = DACOM_CRC::GetCRC32(PathBuf);
-                *EngineIndex = (long)DALib::Engine->CreateArchetypeHandle(&Name, Filesys);
+                *EngineIndex = DALib::Engine->CreateArchetypeHandle(&Name, Filesys);
             }
         }
         return true;
@@ -626,7 +626,7 @@ namespace Archetype
             FEngineArchetypeName Name;
             Name.Text = Path;
             Name.Crc = DACOM_CRC::GetCRC32(Path);
-            *EngineIndex = (long)DALib::Engine->FindArchetype(&Name);
+            *EngineIndex = DALib::Engine->FindArchetype(&Name);
             if (*EngineIndex != -1)
                 return true;
         }
@@ -757,7 +757,7 @@ namespace Archetype
         // FUN_062f05d0. No engine or handle test.
         if (EngineIndex != -1)
         {
-            return (long)DALib::Engine->CreateInstance((void*)EngineIndex, EngineInstance);
+            return DALib::Engine->CreateInstance(EngineIndex, EngineInstance);
         }
 
         // The CacheString always holds a pointer (clear() hands out the pool's empty string);
@@ -806,7 +806,7 @@ namespace Archetype
         }
 
         if (EngineIndex != -1)
-            DALib::Engine->ReleaseHandle((void*)EngineIndex);
+            DALib::Engine->ReleaseHandle(EngineIndex);
 
         PhyParts.clear();
 

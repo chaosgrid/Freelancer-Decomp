@@ -4,34 +4,15 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
+#include "MovieExp.h"
+
+#include "MovieField.h"
+#include "MovieFieldHigh.h"
+#include "MovieFieldMid.h"
 #include "MovieGraph.h"
 #include "MovieMod.h"
 #include "MovieWide.h"
 #include "MovieWindow.h"
-
-// Callees defined in other movie translation units.
-
-extern int GMovieGraphCode;
-
-void* __stdcall Movie_AllocateBlock(unsigned int Size);
-void __stdcall Movie_FreeBlock(void* Block);
-unsigned int __stdcall ShiftLimbs(unsigned int* Source, unsigned int BitCount, unsigned int* Dest, int Count);
-long __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count);
-long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
-long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int Dest, int Count);
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
-
-int __stdcall LimbBitLength(int Limbs, int Count);
-long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
-long __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* FieldHolder, unsigned int* Upper);
-long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch);
-long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
-long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
-long __stdcall Movie_QueueOrCommitFieldLimbs(unsigned int* Limbs, unsigned int Slot, unsigned int* Context, unsigned int Sign);
-void __stdcall Movie_RecordWindowSumDiff(unsigned int* SumSlot, unsigned int* DiffSlot, int First, int Second, int* State);
-long __stdcall Movie_SeedAndMultiplyLimbs(unsigned int* Left, unsigned int* Value, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch);
-long __stdcall Movie_MultiplyPairedLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch);
-long __stdcall Movie_ScalePairByTail(unsigned int* First, unsigned int* Second, int* FieldHolder, unsigned int* Scratch);
 
 // High limb first. -1 when Left < Right, 0 when equal, 1 when Left > Right.
 // SBB EAX,EAX / OR EAX,1 after the first differing limb. 06ac45fb and 06ac481d.
@@ -108,7 +89,7 @@ long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsig
     unsigned int Shift = Modulus[0x46];
     unsigned int Limit = LimbCount + (Second * 2u);
     unsigned int Span = Second + LimbCount;
-    unsigned char* Work;
+    FMovieModScratch* Work;
     unsigned int* Input;
     unsigned int* TempA;
     unsigned int* TempB;
@@ -135,10 +116,10 @@ long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsig
         }
     }
 
-    Work = (unsigned char*)Scratch;
+    Work = (FMovieModScratch*)Scratch;
     if (Work == 0)
     {
-        Work = (unsigned char*)Movie_AllocateBlock(0x231c);
+        Work = (FMovieModScratch*)Movie_AllocateBlock(sizeof(FMovieModScratch));
         if (Work == 0)
         {
             ZeroDwords(Dest, LimbCount);
@@ -146,14 +127,14 @@ long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsig
         }
     }
 
-    Input = (unsigned int*)(Work + 0xa74);
-    TempA = (unsigned int*)(Work + 0x1498);
-    TempB = (unsigned int*)(Work + 0x1698);
-    Shifted = (unsigned int*)(Work + 0x1898);
-    Product = (unsigned int*)(Work + 0x1a98);
-    ProductHigh = (unsigned int*)(Work + 0x1df8);
-    PairBase = (unsigned int*)(Work + 0x2158);
-    PairTail = (unsigned int*)(Work + 0x230c);
+    Input = Work->Product;
+    TempA = Work->TempA;
+    TempB = Work->TempB;
+    Shifted = Work->Shifted;
+    Product = Work->ReduceProduct;
+    ProductHigh = Work->ReduceProductHigh;
+    PairBase = Work->PairBase;
+    PairTail = Work->PairTail;
     CopyDwords(Input, Source, Count);
     ZeroDwords(Input + Count, Limit - Count);
 
@@ -312,7 +293,7 @@ static unsigned int* WindowFlag(unsigned char* Frame, int Index)
 // State at +0x2C is the object FUN_06ac6a90, FUN_06ac7680, FUN_06ac61a0 and FUN_06ac69a0 index:
 // +0 success, +4 kind-is-2-or-3, +8 refill counter, +0xC window half, +0x10 field holder.
 // +0x11184 is the depth counter at state+0x11158.
-long __stdcall ExponentiateSlidingWindow(void* Base, int Window, int Span, void* Exponent, int ExponentCount, void* Extra, void* FieldHolder)
+long __stdcall ExponentiateSlidingWindow(void* Base, int Window, int Span, void* Exponent, int ExponentCount, void* Dest, void* FieldHolder)
 {
     unsigned char Frame[0x11578];
     unsigned int* State = (unsigned int*)(Frame + 0x2c);
@@ -607,7 +588,7 @@ long __stdcall ExponentiateSlidingWindow(void* Base, int Window, int Span, void*
     }
     if (State[0] != 0u)
     {
-        if (MultiplyFieldLimbs(BufD, BufD, Field, BufDf) != 0 && Movie_MultiplyPairedLimbs(BufD, BufDa, BufDa, (unsigned int*)Field, BufDf) != 0 && Movie_ScalePairByTail(BufDa, (unsigned int*)Extra, Field, BufDf) != 0)
+        if (MultiplyFieldLimbs(BufD, BufD, Field, BufDf) != 0 && Movie_MultiplyPairedLimbs(BufD, BufDa, BufDa, (unsigned int*)Field, BufDf) != 0 && Movie_ScalePairByTail(BufDa, (unsigned int*)Dest, Field, BufDf) != 0)
         {
             State[0] = 1u;
         }

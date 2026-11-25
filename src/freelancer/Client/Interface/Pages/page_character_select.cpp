@@ -484,9 +484,9 @@ bool PageCharacterSelect::Create(Win3D* NewParent, void* /*Payload*/)
 
     for (int Axis = 0; Axis < 3; ++Axis)
     {
-        CharacterBoxHome[Axis] = CharacterBox->Position[Axis];
-        MotdBoxHome[Axis] = MotdBox->Position[Axis];
-        DetailsBoxHome[Axis] = ServerDetailsBox->Position[Axis];
+        CharacterBoxHome[Axis] = (&CharacterBox->Position.x)[Axis];
+        MotdBoxHome[Axis] = (&MotdBox->Position.x)[Axis];
+        DetailsBoxHome[Axis] = (&ServerDetailsBox->Position.x)[Axis];
     }
     return true;
 }

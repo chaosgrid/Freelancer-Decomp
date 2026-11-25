@@ -175,18 +175,18 @@ static void PhySys_SyncObjectFromBody(CObject* Object)
     Position.x = BodyPos.x;
     Position.y = BodyPos.y;
     Position.z = BodyPos.z;
-    FQuaternion Quat;
-    Quat.W = BodyQuat.w;
-    Quat.X = BodyQuat.x;
-    Quat.Y = BodyQuat.y;
-    Quat.Z = BodyQuat.z;
+    Quaternion Quat;
+    Quat.w = BodyQuat.w;
+    Quat.x = BodyQuat.x;
+    Quat.y = BodyQuat.y;
+    Quat.z = BodyQuat.z;
 
-    FMatrix Orientation;
+    Matrix Orientation;
     Acquire3DMathEngine()->QuaternionToMatrix(Orientation, Quat);
 
-    static_assert(sizeof(Matrix) == sizeof(FMatrix), "EngineObject orientation is 9 floats");
+    static_assert(sizeof(Matrix) == sizeof(Matrix), "EngineObject orientation is 9 floats");
     Object->WorldPosition = Position;
-    memcpy(&Object->Orientation, &Orientation, sizeof(FMatrix));
+    memcpy(&Object->Orientation, &Orientation, sizeof(Matrix));
 
     // With an engine instance, read the instance extent (flags 1) and write the same values
     // back, then update the jointed children. Retail reuses the position copy as the vector
@@ -194,8 +194,8 @@ static void PhySys_SyncObjectFromBody(CObject* Object)
     if (Object->EngineInstanceId != -1)
     {
         float Extent;
-        DALib::Engine->GetInstanceExtent(PhySys_InstanceHandle(Object->EngineInstanceId), 1, &Extent, &Position.x);
-        DALib::Engine->SetInstanceExtent(PhySys_InstanceHandle(Object->EngineInstanceId), 1, Extent, &Position.x);
+        DALib::Engine->GetInstanceExtent(Object->EngineInstanceId, 1, &Extent, &Position);
+        DALib::Engine->SetInstanceExtent(Object->EngineInstanceId, 1, Extent, &Position);
         PhySys_UpdateJointedChildren(Object->EngineInstanceId, Object);   // FUN_062883c0
     }
 
@@ -420,13 +420,13 @@ namespace CmnPhySys
     // the (W, X, Y, Z) result stored as IVP's (x, y, z, w).
     void PhySys_OrientationToIvpQuat(Matrix const& Orientation, IVP_U_Quat& Out)
     {
-        static_assert(sizeof(Matrix) == sizeof(FMatrix), "EngineObject orientation is 9 floats");
-        FQuaternion Quat;
-        Acquire3DMathEngine()->MatrixToQuaternion(Quat, (FMatrix const&)Orientation);
-        Out.x = Quat.X;
-        Out.y = Quat.Y;
-        Out.z = Quat.Z;
-        Out.w = Quat.W;
+        static_assert(sizeof(Matrix) == sizeof(Matrix), "EngineObject orientation is 9 floats");
+        Quaternion Quat;
+        Acquire3DMathEngine()->MatrixToQuaternion(Quat, Orientation);
+        Out.x = Quat.x;
+        Out.y = Quat.y;
+        Out.z = Quat.z;
+        Out.w = Quat.w;
     }
 }
 
@@ -594,15 +594,15 @@ int PhysicalSystem::FindRayCollisions(Vector const& From, Vector const& To, PhyS
             Out->Point.z = (float)((double)(From.z) + Vz);
 
             // The object-space hit normal through the client's orientation.
-            FVector NormalOs;
-            NormalOs.X = Hit->hit_surface_direction_os.x;
-            NormalOs.Y = Hit->hit_surface_direction_os.y;
-            NormalOs.Z = Hit->hit_surface_direction_os.z;
-            FVector NormalWs;
-            Acquire3DMathEngine()->TransformMatrix(NormalWs, (FMatrix const&)Client->Orientation, NormalOs);
-            Out->Normal.x = NormalWs.X;
-            Out->Normal.y = NormalWs.Y;
-            Out->Normal.z = NormalWs.Z;
+            Vector NormalOs;
+            NormalOs.x = Hit->hit_surface_direction_os.x;
+            NormalOs.y = Hit->hit_surface_direction_os.y;
+            NormalOs.z = Hit->hit_surface_direction_os.z;
+            Vector NormalWs;
+            Acquire3DMathEngine()->TransformMatrix(NormalWs, Client->Orientation, NormalOs);
+            Out->Normal.x = NormalWs.x;
+            Out->Normal.y = NormalWs.y;
+            Out->Normal.z = NormalWs.z;
 
             // The hit ledge's client data (its part id), or 0.
             Out->PartId = (Hit->hit_compact_ledge != nullptr)

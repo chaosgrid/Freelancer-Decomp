@@ -375,10 +375,10 @@ namespace
     // space_camera.h.
     void CameraReadPos(void* Camera, float* Out3)
     {
-        float const* const Pos = ((ICamera*)Camera)->GetPosition();
-        Out3[0] = Pos[0];
-        Out3[1] = Pos[1];
-        Out3[2] = Pos[2];
+        const Vector* const Pos = ((ICamera*)Camera)->GetPosition();
+        Out3[0] = Pos->x;
+        Out3[1] = Pos->y;
+        Out3[2] = Pos->z;
     }
 } // namespace
 
@@ -630,9 +630,9 @@ namespace
     }
 
     // The zone's vt+0x0c transform (orientation, then position), as retail reads it.
-    void ZoneToTransform(Universe::IZone const& Zone, FTransform& Out)
+    void ZoneToTransform(Universe::IZone const& Zone, Transform& Out)
     {
-        static_assert(sizeof(FTransform) == sizeof(Transform), "FTransform matches Transform");
+        static_assert(sizeof(Transform) == sizeof(Transform), "Transform matches Transform");
         memcpy(&Out, &Zone.GetTransform(), sizeof(Out));
     }
 } // namespace
@@ -654,15 +654,15 @@ double FTexturePanels::GetImmersion(Vector const& Point) const
     double const InnerMinus = static_cast<double>(InnerRadius) - TransitionDist;
     float const SoftInnerSq = static_cast<float>(InnerMinus * InnerMinus);
 
-    FTransform ZoneXf;
+    Transform ZoneXf;
     ZoneToTransform(*Zone, ZoneXf);
-    FVector Local;
+    Vector Local;
     AcquirePanelsMath()->InverseTransform(Local, ZoneXf,
-                                          *reinterpret_cast<FVector const*>(&Point));
+                                          Point);
 
     // The height factor (double 1.0 DAT_005c89b8); unordered compares take the ramp and the
     // early 0.
-    double const AbsY = std::fabs(static_cast<double>(Local.Y));
+    double const AbsY = std::fabs(static_cast<double>(Local.y));
     float Factor = 1.0f;
     if (!(AbsY < static_cast<double>(HalfHeight)))
     {
@@ -675,8 +675,8 @@ double FTexturePanels::GetImmersion(Vector const& Point) const
     }
 
     // r^2 is compared unrounded against the soft outer square, then as the stored float.
-    double const RadialSq = static_cast<double>(Local.X) * Local.X +
-                            static_cast<double>(Local.Z) * Local.Z;
+    double const RadialSq = static_cast<double>(Local.x) * Local.x +
+                            static_cast<double>(Local.z) * Local.z;
     double const RadialSqF = static_cast<double>(static_cast<float>(RadialSq));
     if (RadialSq > static_cast<double>(SoftOuterSq))
         return 0.0 * static_cast<double>(Factor);
@@ -710,10 +710,10 @@ void FTexturePanels::Update(void* Camera, float Dt)
         CamV.x = CamPos[0];
         CamV.y = CamPos[1];
         CamV.z = CamPos[2];
-        FTransform ZoneXf;
+        Transform ZoneXf;
         ZoneToTransform(*Zone, ZoneXf);
-        FVector Local;
-        AcquirePanelsMath()->InverseTransform(Local, ZoneXf, *reinterpret_cast<FVector const*>(&CamV));
+        Vector Local;
+        AcquirePanelsMath()->InverseTransform(Local, ZoneXf, CamV);
         if (!Zone->InZone(CamV, 0.0f))
         {
             Vector const Surface = Zone->GetSurfacePoint(CamV);
@@ -755,19 +755,19 @@ void FTexturePanels::DrawPiece(void* Camera, int PieceIndex)
 
     // The zone-local camera position goes into a scratch the loop overwrites before anything
     // reads it.
-    FTransform ZoneXf;
+    Transform ZoneXf;
     ZoneToTransform(*Zone, ZoneXf);
-    FVector const CamPos = *(FVector const*)((ICamera*)Camera)->GetPosition();
-    FVector Scratch;
+    Vector const CamPos = *(Vector const*)((ICamera*)Camera)->GetPosition();
+    Vector Scratch;
     AcquirePanelsMath()->InverseTransform(Scratch, ZoneXf, CamPos);
 
     // FUN_004215b0, then FUN_00422690(camera, &matrix).
     float World12[12];
-    Win3DIdentityRotation3x3(World12);
+    Win3DIdentityRotation3x3(reinterpret_cast<Matrix*>(World12));
     World12[11] = 0.0f;
     World12[10] = 0.0f;
     World12[9] = 0.0f;
-    Win3DBindModelview(Camera, World12);
+    Win3DBindModelview(Camera, reinterpret_cast<Transform const*>(World12));
 
     // Zero skips straight to the restorers.
     if (SetupPanelPipeline(this) != 0)
@@ -1020,7 +1020,7 @@ void FTexturePanels::Load(char const* IniPath,
     PieceCount = 8;
     Pieces = static_cast<FTexturePanelPiece*>(operator new(0xc0));
 
-    FTransform ZoneXf;
+    Transform ZoneXf;
     ZoneToTransform(*Zone, ZoneXf);
 
     // Segment I puts the ring's two edges at mesh vertices 2I and 2I+1 (the wrap is never taken
@@ -1041,24 +1041,24 @@ void FTexturePanels::Load(char const* IniPath,
             InnerIndex -= MeshVertexCount;
 
         // Retail's operand order.
-        FVector LocalY;
-        LocalY.X = static_cast<float>(Sin * SizeY);
-        LocalY.Y = 0.0f;
-        LocalY.Z = static_cast<float>(SizeY * Cos);
-        FVector LocalX;
-        LocalX.X = static_cast<float>(Sin * SizeX);
-        LocalX.Y = 0.0f;
-        LocalX.Z = static_cast<float>(Cos * SizeX);
+        Vector LocalY;
+        LocalY.x = static_cast<float>(Sin * SizeY);
+        LocalY.y = 0.0f;
+        LocalY.z = static_cast<float>(SizeY * Cos);
+        Vector LocalX;
+        LocalX.x = static_cast<float>(Sin * SizeX);
+        LocalX.y = 0.0f;
+        LocalX.z = static_cast<float>(Cos * SizeX);
 
-        FVector World;
+        Vector World;
         AcquirePanelsMath()->TransformXform(World, ZoneXf, LocalX);
-        Mesh[OuterIndex * 3 + 0] = World.X;
-        Mesh[OuterIndex * 3 + 1] = World.Y;
-        Mesh[OuterIndex * 3 + 2] = World.Z;
+        Mesh[OuterIndex * 3 + 0] = World.x;
+        Mesh[OuterIndex * 3 + 1] = World.y;
+        Mesh[OuterIndex * 3 + 2] = World.z;
         AcquirePanelsMath()->TransformXform(World, ZoneXf, LocalY);
-        Mesh[InnerIndex * 3 + 0] = World.X;
-        Mesh[InnerIndex * 3 + 1] = World.Y;
-        Mesh[InnerIndex * 3 + 2] = World.Z;
+        Mesh[InnerIndex * 3 + 0] = World.x;
+        Mesh[InnerIndex * 3 + 1] = World.y;
+        Mesh[InnerIndex * 3 + 2] = World.z;
 
         Angle = static_cast<float>(static_cast<double>(Angle) + AngleStep);
         Twice += 2;
@@ -1214,25 +1214,25 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
         return;
 
     // Twelve dwords copied from camera slot 4.
-    FTransform CamXform;
+    Transform CamXform;
     memcpy(&CamXform, Cam->GetOrientation(), sizeof(CamXform));
-    FVector UnitZ = {0.0f, 0.0f, 1.0f};
+    Vector UnitZ = {0.0f, 0.0f, 1.0f};
 
-    FVector W;
+    Vector W;
     CloudsMath()->Rotate(W, CamXform, UnitZ);
 
     // C1 = N x W (N = Up, +0x6c) through FUN_00422b80, each component stored as a float.
-    float* const N = Clouds->Up;
+    float* const N = &Clouds->Up.x;
     float C1[3];
-    C1[0] = static_cast<float>(static_cast<double>(W.Z) * N[1] - static_cast<double>(W.Y) * N[2]);
-    C1[1] = static_cast<float>(static_cast<double>(W.X) * N[2] - static_cast<double>(W.Z) * N[0]);
-    C1[2] = static_cast<float>(static_cast<double>(W.Y) * N[0] - static_cast<double>(W.X) * N[1]);
+    C1[0] = static_cast<float>(static_cast<double>(W.z) * N[1] - static_cast<double>(W.y) * N[2]);
+    C1[1] = static_cast<float>(static_cast<double>(W.x) * N[2] - static_cast<double>(W.z) * N[0]);
+    C1[2] = static_cast<float>(static_cast<double>(W.y) * N[0] - static_cast<double>(W.x) * N[1]);
 
     // C2 = W x C1, copied to N.
     float C2[3];
-    C2[0] = static_cast<float>(static_cast<double>(W.Y) * C1[2] - static_cast<double>(W.Z) * C1[1]);
-    C2[1] = static_cast<float>(static_cast<double>(W.Z) * C1[0] - static_cast<double>(W.X) * C1[2]);
-    C2[2] = static_cast<float>(static_cast<double>(W.X) * C1[1] - static_cast<double>(W.Y) * C1[0]);
+    C2[0] = static_cast<float>(static_cast<double>(W.y) * C1[2] - static_cast<double>(W.z) * C1[1]);
+    C2[1] = static_cast<float>(static_cast<double>(W.z) * C1[0] - static_cast<double>(W.x) * C1[2]);
+    C2[2] = static_cast<float>(static_cast<double>(W.x) * C1[1] - static_cast<double>(W.y) * C1[0]);
     N[0] = C2[0];
     N[1] = C2[1];
     N[2] = C2[2];
@@ -1292,11 +1292,11 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     // FUN_004215b0, FUN_00422690(0, &m).
     {
         float Ident12[12];
-        Win3DIdentityRotation3x3(Ident12);
+        Win3DIdentityRotation3x3(reinterpret_cast<Matrix*>(Ident12));
         Ident12[9] = 0.0f;
         Ident12[10] = 0.0f;
         Ident12[11] = 0.0f;
-        Win3DBindModelview(nullptr, Ident12);
+        Win3DBindModelview(nullptr, reinterpret_cast<Transform const*>(Ident12));
     }
 
     // Retail quirk: without alpha both stores name SRCBLEND (0x13); DESTBLEND is never set.
@@ -1323,8 +1323,8 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     Pipe->GetRenderState(D3DRS_ALPHAREF, &Saved18);
     Pipe->SetRenderState(D3DRS_ALPHAREF, 5);
 
-    FVector V;
-    CloudsMath()->InverseRotate(V, CamXform, *reinterpret_cast<FVector*>(N));
+    Vector V;
+    CloudsMath()->InverseRotate(V, CamXform, *reinterpret_cast<Vector*>(N));
 
     // P = V projected onto the view XY plane and normalised. P.z is float(Inv * 0); the FPU
     // keeps that product and multiplies it by 0 again for the cross product below.
@@ -1332,9 +1332,9 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
     double PzZero = 0.0;
     {
         double const Inv = CloudsInvSqrt(static_cast<float>(
-            static_cast<double>(V.X) * V.X + static_cast<double>(V.Y) * V.Y));
-        P[0] = static_cast<float>(V.X * Inv);
-        P[1] = static_cast<float>(V.Y * Inv);
+            static_cast<double>(V.x) * V.x + static_cast<double>(V.y) * V.y));
+        P[0] = static_cast<float>(V.x * Inv);
+        P[1] = static_cast<float>(V.y * Inv);
         double const Pz = Inv * 0.0f;
         P[2] = static_cast<float>(Pz);
         PzZero = Pz * 0.0f;
@@ -1377,9 +1377,9 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
         if (Puff->bActive == 0 || Puff->bHidden != 0)
             continue;
 
-        FVector VP;
-        CloudsMath()->InverseTransform(VP, CamXform, *reinterpret_cast<FVector*>(Puff->Position));
-        double const Depth = -static_cast<double>(VP.Z);
+        Vector VP;
+        CloudsMath()->InverseTransform(VP, CamXform, Puff->Position);
+        double const Depth = -static_cast<double>(VP.z);
         Puff->ViewDepth = static_cast<float>(Depth);
 
         // The ordered/unordered outcome of every compare below is retail's.
@@ -1393,7 +1393,7 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
             T[1] = 0.0f;
             T[2] = -Clouds->CentreAhead;
             float D[3];
-            Win3DVec3Sub(D, T, &VP.X);
+            Win3DVec3Sub(D, T, &VP.x);
             double const Dist2 = (static_cast<double>(D[2]) * D[2] + static_cast<double>(D[1]) * D[1]) +
                                  static_cast<double>(D[0]) * D[0];
             float const Dist2f = static_cast<float>(Dist2);
@@ -1500,16 +1500,16 @@ void TexturePanelDrawClouds(FNebulaClouds* Clouds, void* Camera, void* Exclusion
         ScaleVec3(SQ, Q, Size);
         float Tmp[3];
         float C0[3];
-        Win3DVec3Sub(Tmp, &VP.X, SQ);
+        Win3DVec3Sub(Tmp, &VP.x, SQ);
         Win3DVec3Sub(C0, Tmp, SP);
         float Cc1[3];
-        Win3DVec3Add(Tmp, &VP.X, SQ);
+        Win3DVec3Add(Tmp, &VP.x, SQ);
         Win3DVec3Sub(Cc1, Tmp, SP);
         float Cc2[3];
-        Win3DVec3Add(Tmp, &VP.X, SQ);
+        Win3DVec3Add(Tmp, &VP.x, SQ);
         Win3DVec3Add(Cc2, Tmp, SP);
         float Cc3[3];
-        Win3DVec3Sub(Tmp, &VP.X, SQ);
+        Win3DVec3Sub(Tmp, &VP.x, SQ);
         Win3DVec3Add(Cc3, Tmp, SP);
 
         // Two triangles, one diffuse word.

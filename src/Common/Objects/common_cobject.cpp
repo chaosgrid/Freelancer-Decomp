@@ -121,8 +121,7 @@ namespace CmnCobject
         Transposed.E[2][1] = Orient.E[1][2];
         Transposed.E[2][2] = Orient.E[2][2];
         Vector Out;
-        Acquire3DMathEngine()->TransformMatrix((FVector&)Out, (FMatrix const&)Transposed,
-                                               (FVector const&)World);
+        Acquire3DMathEngine()->TransformMatrix(Out, Transposed, World);
         return Out;
     }
 
@@ -204,7 +203,7 @@ CObject::~CObject()
     RemoveFromClassList(this);
     // The field is not reset.
     if (EngineInstanceId != -1)
-        DALib::Engine->DestroyInstance((void*)EngineInstanceId);
+        DALib::Engine->DestroyInstance(EngineInstanceId);
     // CBase::notify_of_destruction is the ICF body at 062ed730.
     for (std::list<CBase*>::iterator It = Advisors.begin(); It != Advisors.end(); ++It)
         (*It)->notify_of_destruction(this);
@@ -474,12 +473,11 @@ float CObject::get_physical_radius_r(Vector& OutCenter) const
     // Otherwise the engine extent (IEngine +0x88), centre transformed to world by the math
     // singleton (DAT_063fc41c) slot +0x28. No null tests.
     float Radius = 0.0f;
-    DALib::Engine->GetInstanceExtent((void*)EngineInstanceId, 0, &Radius, (float*)&OutCenter);
+    DALib::Engine->GetInstanceExtent(EngineInstanceId, 0, &Radius, &OutCenter);
     I3DMathEngine* const Math = Acquire3DMathEngine();
     Vector World;
     // this+0x08: Orientation followed by WorldPosition, one Transform.
-    Math->TransformXform((FVector&)World, *(FTransform const*)&Orientation,
-                         (FVector const&)OutCenter);
+    Math->TransformXform(World, *(Transform const*)&Orientation, OutCenter);
     OutCenter = World;
     return Radius;
 }
@@ -499,11 +497,11 @@ namespace
     void CollectHierarchyObjects(CObject* Parent, long Inst, CheapSet<CObject*, std::less<CObject*>>& Set)
     {
         // IEngine passes instance handles as pointer-sized values.
-        void* const InstHandle = (void*)Inst;
-        long Child = (long)DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)(intptr_t)-1);
+        const InstanceIndex InstHandle = Inst;
+        long Child = DALib::Engine->GetRelatedInstance(InstHandle, 1, (intptr_t)-1);
         while (Child != -1)
         {
-            CObject* const Obj = (CObject*)DALib::Engine->GetInstanceUserData((void*)Child);
+            CObject* const Obj = (CObject*)DALib::Engine->GetInstanceUserData(Child);
             if (Obj == Parent)
             {
                 CollectHierarchyObjects(Parent, Child, Set);
@@ -513,7 +511,7 @@ namespace
                 Set.Insert(Obj);
                 CollectHierarchyObjects(Obj, Obj->EngineInstanceId, Set);
             }
-            Child = (long)DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)Child);
+            Child = DALib::Engine->GetRelatedInstance(InstHandle, 1, Child);
         }
     }
 }
@@ -568,8 +566,7 @@ Vector CObject::get_angular_velocity() const
     {
         Vector const ObjSpace = PhySys::GetAngularVelocityOS(this);
         Vector World;
-        Acquire3DMathEngine()->TransformMatrix((FVector&)World, (FMatrix const&)Orientation,
-                                               (FVector const&)ObjSpace);
+        Acquire3DMathEngine()->TransformMatrix(World, Orientation, ObjSpace);
         return World;
     }
     return Vector{0.0f, 0.0f, 0.0f};

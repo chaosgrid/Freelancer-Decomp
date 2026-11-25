@@ -57,53 +57,53 @@ UiWinDeform::~UiWinDeform()
 void UiWinDeform::SetPosition(float const* NewPosition)
 {
     // LAB_0059bb40 (RET 4).
-    Position[0] = NewPosition[0];
-    Position[1] = NewPosition[1];
-    Position[2] = NewPosition[2];
+    Position.x = NewPosition[0];
+    Position.y = NewPosition[1];
+    Position.z = NewPosition[2];
 
     if (Body.Deformable == nullptr)
         return;
     PoseBody();
 }
 
-void UiWinDeform::SetTransform(float const* Transform)
+void UiWinDeform::SetTransform(Transform const* NewXform)
 {
     // LAB_0059b8f0 (RET 4).
     float Local[12];
-    memcpy(Local, Transform, sizeof(Local));
+    memcpy(Local, NewXform, sizeof(Local));
 
     // The widget's centre offset, turned by the incoming rotation.
-    FVector HalfExtent;
-    HalfExtent.X = Width * 0.5f;
-    HalfExtent.Y = Height * -0.5f;
-    HalfExtent.Z = 0.0f;
+    Vector HalfExtent;
+    HalfExtent.x = Width * 0.5f;
+    HalfExtent.y = Height * -0.5f;
+    HalfExtent.z = 0.0f;
 
-    FVector Rotated;
+    Vector Rotated;
     UiWidgetMathEngine()->TransformMatrix(Rotated,
-                                          *reinterpret_cast<FMatrix const*>(Transform),
+                                          *reinterpret_cast<Matrix const*>(NewXform),
                                           HalfExtent);
 
-    Local[9] = Rotated.X + Transform[9];
-    Local[10] = Rotated.Y + Transform[10];
-    Local[11] = Rotated.Z + Transform[11];
+    Local[9] = Rotated.x + NewXform->Translation.x;
+    Local[10] = Rotated.y + NewXform->Translation.y;
+    Local[11] = Rotated.z + NewXform->Translation.z;
 
     // Virtual calls, so this class's SetPosition poses the body.
-    SetOrientation(Local);
+    SetOrientation(reinterpret_cast<Matrix const*>(Local));
     SetPosition(Local + 9);
 
     // The top-left and bottom-right corners through the new orientation + position (+0x3c).
-    FTransform const& Xform = *reinterpret_cast<FTransform const*>(Orientation);
-    FVector Corner;
-    Corner.X = Width * -0.5f;
-    Corner.Y = Height * 0.5f;
-    Corner.Z = 0.0f;
-    FVector TopLeft;
+    Transform const& Xform = Placement;
+    Vector Corner;
+    Corner.x = Width * -0.5f;
+    Corner.y = Height * 0.5f;
+    Corner.z = 0.0f;
+    Vector TopLeft;
     UiWidgetMathEngine()->TransformXform(TopLeft, Xform, Corner);
 
-    Corner.X = Width * 0.5f;
-    Corner.Y = Height * -0.5f;
-    Corner.Z = 0.0f;
-    FVector BottomRight;
+    Corner.x = Width * 0.5f;
+    Corner.y = Height * -0.5f;
+    Corner.z = 0.0f;
+    Vector BottomRight;
     UiWidgetMathEngine()->TransformXform(BottomRight, Xform, Corner);
 
     // Both corners projected by the Win3D scene camera; the results are not tested.
@@ -111,11 +111,11 @@ void UiWinDeform::SetTransform(float const* Transform)
     float X1;
     float Y1;
     float Z1;
-    Scene->Project(&X1, &Y1, &Z1, &TopLeft.X);
+    Scene->Project(&X1, &Y1, &Z1, &TopLeft);
     float X2;
     float Y2;
     float Z2;
-    Scene->Project(&X2, &Y2, &Z2, &BottomRight.X);
+    Scene->Project(&X2, &Y2, &Z2, &BottomRight);
 
     // Truncated into {left, top, right, bottom}: the preview camera's viewport.
     int Rect[4];

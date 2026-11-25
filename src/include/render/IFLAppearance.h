@@ -20,11 +20,11 @@ struct IFLAppearance : IDAComponent
     virtual GENRESULT DACOM_API GetOverrideMaterial(unsigned long Index, void** Out) = 0;
     // +0x24/+0x28: Camera and engine instance passed to Renderer2 with the
     // Backdrop (066fe270) / Starsphere (066fe570) override material.
-    virtual GENRESULT DACOM_API DrawBackdrop(void* A, void* Extra) = 0;
-    virtual GENRESULT DACOM_API DrawStarsphere(void* A, void* Extra) = 0;
+    virtual GENRESULT DACOM_API DrawBackdrop(void* A, InstanceIndex Extra) = 0;
+    virtual GENRESULT DACOM_API DrawStarsphere(void* A, InstanceIndex Extra) = 0;
     virtual GENRESULT DACOM_API DrawFadingShadows(void* A, void* B, void* C, void* D) = 0;
     virtual GENRESULT DACOM_API DrawFixedShadows(void* A, void* B, void* C, void* D) = 0;
-    virtual GENRESULT DACOM_API CountVisibleGeometry(void* A, void* B, void* C) = 0;
+    virtual GENRESULT DACOM_API CountVisibleGeometry(void* A, InstanceIndex B, void* C) = 0;
 };
 
 struct FAggDesc18

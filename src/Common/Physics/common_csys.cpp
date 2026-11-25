@@ -95,12 +95,12 @@ void Csys::set_transform(Transform const& Xform)
 // FUN_06307490: TransformMatrix (slot +0x2c), then + Pos.
 Vector Csys::trans_from_frame(Vector const& Local) const
 {
-    FVector Rotated;
-    Acquire3DMathEngine()->TransformMatrix(Rotated, (FMatrix const&)Orient, (FVector const&)Local);
+    Vector Rotated;
+    Acquire3DMathEngine()->TransformMatrix(Rotated, Orient, Local);
     Vector Out;
-    Out.x = Rotated.X + Pos.x;
-    Out.y = Rotated.Y + Pos.y;
-    Out.z = Rotated.Z + Pos.z;
+    Out.x = Rotated.x + Pos.x;
+    Out.y = Rotated.y + Pos.y;
+    Out.z = Rotated.z + Pos.z;
     return Out;
 }
 
@@ -108,7 +108,7 @@ Vector Csys::trans_from_frame(Vector const& Local) const
 Matrix Csys::trans_from_frame(Matrix const& Local) const
 {
     Matrix Out;
-    Acquire3DMathEngine()->MulMatrix((FMatrix&)Out, (FMatrix const&)Orient, (FMatrix const&)Local);
+    Acquire3DMathEngine()->MulMatrix(Out, Orient, Local);
     return Out;
 }
 
@@ -129,7 +129,7 @@ Vector Csys::trans_to_frame(Vector const& World) const
     Delta.y = World.y - Pos.y;
     Delta.z = World.z - Pos.z;
     Vector Out;
-    Acquire3DMathEngine()->TransposeTransform((FVector&)Out, (FMatrix const&)Orient, (FVector const&)Delta);
+    Acquire3DMathEngine()->TransposeTransform(Out, Orient, Delta);
     return Out;
 }
 
@@ -139,7 +139,7 @@ Matrix Csys::trans_to_frame(Matrix const& World) const
     Matrix Transposed;
     TransposeMatrix(Transposed, Orient);
     Matrix Out;
-    Acquire3DMathEngine()->MulMatrix((FMatrix&)Out, (FMatrix const&)Transposed, (FMatrix const&)World);
+    Acquire3DMathEngine()->MulMatrix(Out, Transposed, World);
     return Out;
 }
 
@@ -155,12 +155,12 @@ Csys Csys::trans_to_frame(Csys const& World) const
 // FUN_063079b0: Pos' = -TransposeTransform(Orient, Pos); Orient' = transpose(Orient).
 Csys Csys::get_inverse() const
 {
-    FVector Back;
-    Acquire3DMathEngine()->TransposeTransform(Back, (FMatrix const&)Orient, (FVector const&)Pos);
+    Vector Back;
+    Acquire3DMathEngine()->TransposeTransform(Back, Orient, Pos);
     Csys Out;
-    Out.Pos.x = -Back.X;
-    Out.Pos.y = -Back.Y;
-    Out.Pos.z = -Back.Z;
+    Out.Pos.x = -Back.x;
+    Out.Pos.y = -Back.y;
+    Out.Pos.z = -Back.z;
     TransposeMatrix(Out.Orient, Orient);
     return Out;
 }
@@ -384,7 +384,7 @@ Matrix __cdecl RotateMatrix(Vector const& AnglesDegrees)
         Rot.E[0][0] = Cos;  Rot.E[0][1] = 0.0f; Rot.E[0][2] = Sin;
         Rot.E[1][0] = 0.0f; Rot.E[1][1] = 1.0f; Rot.E[1][2] = 0.0f;
         Rot.E[2][0] = -Sin; Rot.E[2][1] = 0.0f; Rot.E[2][2] = Cos;
-        Acquire3DMathEngine()->MulMatrix((FMatrix&)Tmp, (FMatrix const&)Accum, (FMatrix const&)Rot);
+        Acquire3DMathEngine()->MulMatrix(Tmp, Accum, Rot);
         CopyMatrix(Accum, Tmp);
     }
 
@@ -398,7 +398,7 @@ Matrix __cdecl RotateMatrix(Vector const& AnglesDegrees)
         Rot.E[0][0] = 1.0f; Rot.E[0][1] = 0.0f; Rot.E[0][2] = 0.0f;
         Rot.E[1][0] = 0.0f; Rot.E[1][1] = Cos;  Rot.E[1][2] = -Sin;
         Rot.E[2][0] = 0.0f; Rot.E[2][1] = Sin;  Rot.E[2][2] = Cos;
-        Acquire3DMathEngine()->MulMatrix((FMatrix&)Tmp, (FMatrix const&)Accum, (FMatrix const&)Rot);
+        Acquire3DMathEngine()->MulMatrix(Tmp, Accum, Rot);
         CopyMatrix(Accum, Tmp);
     }
 
@@ -411,7 +411,7 @@ Matrix __cdecl RotateMatrix(Vector const& AnglesDegrees)
         Rot.E[0][0] = Cos;  Rot.E[0][1] = -Sin; Rot.E[0][2] = 0.0f;
         Rot.E[1][0] = Sin;  Rot.E[1][1] = Cos;  Rot.E[1][2] = 0.0f;
         Rot.E[2][0] = 0.0f; Rot.E[2][1] = 0.0f; Rot.E[2][2] = 1.0f;
-        Acquire3DMathEngine()->MulMatrix((FMatrix&)Tmp, (FMatrix const&)Accum, (FMatrix const&)Rot);
+        Acquire3DMathEngine()->MulMatrix(Tmp, Accum, Rot);
         CopyMatrix(Accum, Tmp);
     }
 
@@ -561,7 +561,7 @@ Csys __cdecl DALib_Engine_get_csys(long Handle)
     // FUN_06307900: GetInstanceTransform (engine slot +0xa0) repacked as a Csys. Nothing is
     // tested.
     Transform const* const Xform =
-        (Transform const*)DALib::Engine->GetInstanceTransform((void*)Handle);
+        DALib::Engine->GetInstanceTransform(Handle);
 
     Csys Out;
     Out.Pos = Xform->Translation;
@@ -613,14 +613,14 @@ Csys __cdecl Csys_interpolate(Csys A, Csys B, float T)
     Result.Pos.y = (float)(DyT + (double)(A.Pos.y));
     Result.Pos.z = (float)(DzT + (double)(A.Pos.z));
 
-    FQuaternion QuatB;
-    FQuaternion QuatA;
-    FQuaternion QuatOut;
-    Acquire3DMathEngine()->MatrixToQuaternion(QuatB, (FMatrix const&)B.Orient);
-    Acquire3DMathEngine()->MatrixToQuaternion(QuatA, (FMatrix const&)A.Orient);
+    Quaternion QuatB;
+    Quaternion QuatA;
+    Quaternion QuatOut;
+    Acquire3DMathEngine()->MatrixToQuaternion(QuatB, B.Orient);
+    Acquire3DMathEngine()->MatrixToQuaternion(QuatA, A.Orient);
     Acquire3DMathEngine()->QuatSlerp(QuatOut, QuatA, QuatB, T);
-    FQuaternion const QuatTmp = QuatOut;
-    Acquire3DMathEngine()->QuaternionToMatrix((FMatrix&)Result.Orient, QuatTmp);
+    Quaternion const QuatTmp = QuatOut;
+    Acquire3DMathEngine()->QuaternionToMatrix(Result.Orient, QuatTmp);
     return Result;
 }
 
@@ -629,7 +629,7 @@ Csys __cdecl Csys_interpolate(Csys A, Csys B, float T)
 void __cdecl DALib_Engine_set_csys(long Handle, Csys const& InCsys)
 {
     Transform Xform = InCsys.get_transform();
-    DALib::Engine->SetInstanceMatrix((void*)Handle, &Xform);
+    DALib::Engine->SetInstanceMatrix(Handle, &Xform);
 }
 
 // FUN_06391cf0. DEVIATION: retail's body does not cache; it acquires and calls CreateInstance

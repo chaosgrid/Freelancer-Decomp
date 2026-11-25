@@ -230,14 +230,14 @@ unsigned long DACOM_API FRoomCamera::Release()
     return RefCount;
 }
 
-float const* DACOM_API FRoomCamera::GetPosition()
+const Vector* DACOM_API FRoomCamera::GetPosition()
 {
-    return Pos;
+    return (const Vector*)Pos;
 }
 
-float const* DACOM_API FRoomCamera::GetOrientation()
+const Matrix* DACOM_API FRoomCamera::GetOrientation()
 {
-    return Orient;
+    return (const Matrix*)Orient;
 }
 
 int const* DACOM_API FRoomCamera::GetViewport()
@@ -281,31 +281,31 @@ double DACOM_API FRoomCamera::GetYScaleOverNear()
     return static_cast<double>(YScale) / ZNear;
 }
 
-int DACOM_API FRoomCamera::Project(float* OutX, float* OutY, float* OutZ, float const* World)
+int DACOM_API FRoomCamera::Project(float* OutX, float* OutY, float* OutZ, const Vector* World)
 {
     // LAB_005568b0. Slot 4 hands back +0x5c, which retail passes to the math
-    // engine's InverseTransform (+0x3c) as a whole FTransform: the orientation and the
+    // engine's InverseTransform (+0x3c) as a whole Transform: the orientation and the
     // position that follows it at +0x80.
-    FTransform const* Xform = reinterpret_cast<FTransform const*>(GetOrientation());
+    Transform const* Xform = reinterpret_cast<Transform const*>(GetOrientation());
     I3DMathEngine* Math = LightsCameraMath();
-    FVector Local;
-    Math->InverseTransform(Local, *Xform, *reinterpret_cast<FVector const*>(World));
+    Vector Local;
+    Math->InverseTransform(Local, *Xform, *reinterpret_cast<Vector const*>(World));
 
     // Fails when -near < z or the compare is unordered.
-    if (!(-ZNear >= Local.Z))
+    if (!(-ZNear >= Local.z))
         return 0;
 
     // DAT_005c7500 = -1.0f.
-    const double K = -1.0 / static_cast<double>(Local.Z);
-    *OutX = static_cast<float>((static_cast<double>(Local.X) * XScale * K + Viewport[0]) +
+    const double K = -1.0 / static_cast<double>(Local.z);
+    *OutX = static_cast<float>((static_cast<double>(Local.x) * XScale * K + Viewport[0]) +
                                HalfWidth);
-    *OutY = static_cast<float>((static_cast<double>(Local.Y) * YScale * K + Viewport[1]) +
+    *OutY = static_cast<float>((static_cast<double>(Local.y) * YScale * K + Viewport[1]) +
                                HalfHeight);
-    *OutZ = -Local.Z;
+    *OutZ = -Local.z;
     return 1;
 }
 
-void DACOM_API FRoomCamera::Unproject(float* OutWorld3, float ScreenX, float ScreenY)
+void DACOM_API FRoomCamera::Unproject(Vector* OutWorld3, float ScreenX, float ScreenY)
 {
     // LAB_00556950. Both screen offsets are rounded to float in their argument
     // slots before the orientation is fetched through slot 4.
@@ -313,7 +313,7 @@ void DACOM_API FRoomCamera::Unproject(float* OutWorld3, float ScreenX, float Scr
         static_cast<float>((ScreenX - (static_cast<double>(Viewport[0]) + HalfWidth)) / XScale);
     const float B =
         static_cast<float>((ScreenY - (static_cast<double>(Viewport[1]) + HalfHeight)) / YScale);
-    float const* M = GetOrientation();
+    const float* M = (const float*)GetOrientation();
 
     // out = M * (A, B, -1), row by row, with retail's temporaries: M1*B, M0*A and M6*A are
     // rounded to floats; M4*B, M3*A and M7*B stay on the x87 stack.
@@ -326,22 +326,22 @@ void DACOM_API FRoomCamera::Unproject(float* OutWorld3, float ScreenX, float Scr
     const float R0 = static_cast<float>(static_cast<double>(M0A) + static_cast<double>(M1B));
     const float R1 = static_cast<float>(M3A + M4B);
     const float R2 = static_cast<float>(static_cast<double>(M6A) + M7B);
-    OutWorld3[0] = static_cast<float>(static_cast<double>(R0) - static_cast<double>(M[2]));
-    OutWorld3[1] = static_cast<float>(static_cast<double>(R1) - static_cast<double>(M[5]));
-    OutWorld3[2] = static_cast<float>(static_cast<double>(R2) - static_cast<double>(M[8]));
+    OutWorld3->x = static_cast<float>(static_cast<double>(R0) - static_cast<double>(M[2]));
+    OutWorld3->y = static_cast<float>(static_cast<double>(R1) - static_cast<double>(M[5]));
+    OutWorld3->z = static_cast<float>(static_cast<double>(R2) - static_cast<double>(M[8]));
 
-    OutWorld3[0] = ZNear * OutWorld3[0];
-    OutWorld3[1] = ZNear * OutWorld3[1];
-    OutWorld3[2] = ZNear * OutWorld3[2];
+    OutWorld3->x = ZNear * OutWorld3->x;
+    OutWorld3->y = ZNear * OutWorld3->y;
+    OutWorld3->z = ZNear * OutWorld3->z;
 }
 
-int DACOM_API FRoomCamera::ClassifySphere(float const* Center, float Radius)
+int DACOM_API FRoomCamera::ClassifySphere(const Vector* Center, float Radius)
 {
     // LAB_00556780. Centre is already in camera space (-Z forward).
     // 1 = outside, 2 = too small on screen, 3 = straddling a plane, 4 = inside. Every sum and
     // product below stays on the x87 stack in retail (double here); only the -R temporary is
     // stored as a float.
-    const double Z = Center[2];
+    const double Z = Center->z;
     const double R = Radius;
 
     // Each compare below keeps retail's polarity, so a NaN takes the same branch as on the x87.
@@ -359,14 +359,14 @@ int DACOM_API FRoomCamera::ClassifySphere(float const* Center, float Radius)
 
     // Side planes, against the float -R.
     const float NegRadius = -Radius;
-    double Dist = fabs(static_cast<double>(Center[0])) * static_cast<double>(PlaneX[0]) +
+    double Dist = fabs(static_cast<double>(Center->x)) * static_cast<double>(PlaneX[0]) +
                   static_cast<double>(PlaneX[2]) * Z;
     if (Dist > R)
         return 1;
     if (!(Dist < static_cast<double>(NegRadius)))
         Result = 3;
 
-    Dist = fabs(static_cast<double>(Center[1])) * static_cast<double>(PlaneY[1]) +
+    Dist = fabs(static_cast<double>(Center->y)) * static_cast<double>(PlaneY[1]) +
            static_cast<double>(PlaneY[2]) * Z;
     if (Dist > R)
         return 1;
@@ -386,13 +386,13 @@ int DACOM_API FRoomCamera::ClassifySphere(float const* Center, float Radius)
     return Result;
 }
 
-float const* DACOM_API FRoomCamera::GetViewTransform()
+const Transform* DACOM_API FRoomCamera::GetViewTransform()
 {
     // LAB_00556aa0.
     I3DMathEngine* Math = LightsCameraMath();
-    FVector Rotated;
-    Math->TransposeTransform(Rotated, *reinterpret_cast<FMatrix const*>(Orient),
-                             *reinterpret_cast<FVector const*>(Pos));
+    Vector Rotated;
+    Math->TransposeTransform(Rotated, *reinterpret_cast<Matrix const*>(Orient),
+                             *reinterpret_cast<Vector const*>(Pos));
 
     View[0] = Orient[0];
     View[1] = Orient[3];
@@ -403,13 +403,13 @@ float const* DACOM_API FRoomCamera::GetViewTransform()
     View[6] = Orient[2];
     View[7] = Orient[5];
     View[8] = Orient[8];
-    View[9] = -Rotated.X;
-    View[10] = -Rotated.Y;
-    View[11] = -Rotated.Z;
-    return View;
+    View[9] = -Rotated.x;
+    View[10] = -Rotated.y;
+    View[11] = -Rotated.z;
+    return (const Transform*)View;
 }
 
-int DACOM_API FRoomCamera::ProjectVec(float* /*Out3*/, float const* /*World*/)
+int DACOM_API FRoomCamera::ProjectVec(Vector* /*Out3*/, const Vector* /*World*/)
 {
     // This class's slot 17 is its scalar deleting destructor (FUN_005585e0), not a
     // ProjectVec; see room_camera.h. Destruction goes through Release / RoomCameraDestroy.
@@ -418,7 +418,7 @@ int DACOM_API FRoomCamera::ProjectVec(float* /*Out3*/, float const* /*World*/)
     return 0;
 }
 
-void FRoomCamera::GetVelocity(float* /*Out3*/)
+void FRoomCamera::GetVelocity(Vector* /*Out3*/)
 {
     // This class's slot 18 is LAB_00556a90 (GetOrientation again); see room_camera.h.
 }

@@ -139,7 +139,7 @@ void SolarSpheresApplyDetail(float Detail)
             Simple = Obj;
         ISphereMesh* Sphere = nullptr;
         GENRESULT const Result = DALib::Engine->QueryInstance(
-            reinterpret_cast<void*>(static_cast<intptr_t>(Simple->EngineInstanceId)),
+            Simple->EngineInstanceId,
             Iids::SphereMesh, reinterpret_cast<void**>(&Sphere));
         if (Result < 0)
         {

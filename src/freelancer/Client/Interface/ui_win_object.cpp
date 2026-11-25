@@ -53,54 +53,54 @@ void UiWinObject::SetPosition(float const* NewPosition)
     ClientMeshHolderUpdate(&MeshHolder);
 }
 
-void UiWinObject::SetTransform(float const* Transform)
+void UiWinObject::SetTransform(Transform const* NewXform)
 {
     // LAB_0059a900 (RET 4).
-    FTransform const& Block = *reinterpret_cast<FTransform const*>(Transform);
+    Transform const& Block = *NewXform;
 
     // Keep the page placement at +0xb8.
-    memcpy(PageBlock_, Transform, sizeof(PageBlock_));
+    memcpy(PageBlock_, NewXform, sizeof(PageBlock_));
 
-    FVector const Translation = Block.Translation;
+    Vector const Translation = Block.Translation;
 
     // The half extent rotated by the block, plus the block translation.
-    FVector HalfExtent;
-    HalfExtent.X = Width_ * 0.5f;
-    HalfExtent.Y = Height_ * -0.5f;
-    HalfExtent.Z = 0.0f;
-    FVector Rotated;
+    Vector HalfExtent;
+    HalfExtent.x = Width_ * 0.5f;
+    HalfExtent.y = Height_ * -0.5f;
+    HalfExtent.z = 0.0f;
+    Vector Rotated;
     UiWidgetMathEngine()->TransformMatrix(Rotated, Block.Rotation, HalfExtent);
-    FVector Center;
-    Center.X = Rotated.X + Translation.X;
-    Center.Y = Rotated.Y + Translation.Y;
-    Center.Z = Rotated.Z + Translation.Z;
+    Vector Center;
+    Center.x = Rotated.x + Translation.x;
+    Center.y = Rotated.y + Translation.y;
+    Center.z = Rotated.z + Translation.z;
 
     // x87: the quotient stays double for both products.
-    double const Scale = static_cast<double>(Depth_) / static_cast<double>(Translation.Z);
+    double const Scale = static_cast<double>(Depth_) / static_cast<double>(Translation.z);
     float Position[3];
-    Position[0] = static_cast<float>(static_cast<double>(Center.X) * Scale);
-    Position[1] = static_cast<float>(static_cast<double>(Center.Y) * Scale);
+    Position[0] = static_cast<float>(static_cast<double>(Center.x) * Scale);
+    Position[1] = static_cast<float>(static_cast<double>(Center.y) * Scale);
     Position[2] = Depth_;
 
-    FVector Zero;
-    Zero.X = 0.0f;
-    Zero.Y = 0.0f;
-    Zero.Z = 0.0f;
-    FVector OriginOut;
+    Vector Zero;
+    Zero.x = 0.0f;
+    Zero.y = 0.0f;
+    Zero.z = 0.0f;
+    Vector OriginOut;
     UiWidgetMathEngine()->TransformXform(OriginOut, Block, Zero);
-    Origin_[0] = OriginOut.X;
-    Origin_[1] = OriginOut.Y;
-    Origin_[2] = OriginOut.Z;
+    Origin_[0] = OriginOut.x;
+    Origin_[1] = OriginOut.y;
+    Origin_[2] = OriginOut.z;
 
-    FVector CornerIn;
-    CornerIn.X = Width_;
-    CornerIn.Y = -Height_;
-    CornerIn.Z = 0.0f;
-    FVector CornerOut;
+    Vector CornerIn;
+    CornerIn.x = Width_;
+    CornerIn.y = -Height_;
+    CornerIn.z = 0.0f;
+    Vector CornerOut;
     UiWidgetMathEngine()->TransformXform(CornerOut, Block, CornerIn);
-    Corner_[0] = CornerOut.X;
-    Corner_[1] = CornerOut.Y;
-    Corner_[2] = CornerOut.Z;
+    Corner_[0] = CornerOut.x;
+    Corner_[1] = CornerOut.y;
+    Corner_[2] = CornerOut.z;
 
     // Both through the vftable, so SetPosition is this class's override.
     float Identity[9];
@@ -113,7 +113,7 @@ void UiWinObject::SetTransform(float const* Transform)
     Identity[6] = 0.0f;
     Identity[7] = 0.0f;
     Identity[8] = 1.0f;
-    SetOrientation(Identity);
+    SetOrientation(reinterpret_cast<Matrix const*>(Identity));
     SetPosition(Position);
 }
 

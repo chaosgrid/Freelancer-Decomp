@@ -191,7 +191,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     if (DALib::TextureLib->GetTextureFrame(TextureId, 0, Frame) == 0)
         DALib::Pipeline->SetTextureStageTexture(0, reinterpret_cast<void*>(Frame[0]));
 
-    DALib::Pipeline->SetModelview(Orientation);
+    DALib::Pipeline->SetModelview((const Transform*)Orientation);
 
     FChatBgBatch Local;
     FEffectVertexBatch* const Batch = &Local.Batch;
@@ -542,7 +542,7 @@ void ChatTextInputDisplay::Draw()
                 Background.bLoaded = 1;
         }
         // Drawn whether or not the load succeeded.
-        Background.Draw(Orientation, NormWidth, NormHeight);   // FUN_0045e470
+        Background.Draw(&Orientation.E[0][0], NormWidth, NormHeight);   // FUN_0045e470
     }
     RichTextEditWin::Draw();   // FUN_0057c440
 }

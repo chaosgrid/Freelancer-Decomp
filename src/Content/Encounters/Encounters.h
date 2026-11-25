@@ -30,31 +30,31 @@ void __cdecl UnloadContentGameTables();    // FUN_06efe870
 // ---------------------------------------------------------------------------------------
 
 // FUN_06efc7a0 (thiscall on the matrix, no return): the 3x3 identity.
-void SetMatrixIdentity(FMatrix* Matrix);
+void SetMatrixIdentity(Matrix* Mat);
 
 struct FFormationSlot           // retail 0x34 bytes
 {
-    FVector Position;           // +0x00 "pos" / "pl_pos" x, y, z
-    FMatrix Orientation;        // +0x0c the loader always stores the identity
+    Vector Position;           // +0x00 "pos" / "pl_pos" x, y, z
+    Matrix Orientation;        // +0x0c the loader always stores the identity
     bool bPlayerSlot;           // +0x30 1 for "pl_pos", 0 for "pos"
 };
 
 struct FFormation               // map value, retail 0x44 bytes
 {
     ID_String Nickname;         // +0x00 CreateID("nickname")
-    FVector Position;           // +0x04 the loader leaves it zero
-    FMatrix Orientation;        // +0x10 the loader leaves it identity
+    Vector Position;           // +0x04 the loader leaves it zero
+    Matrix Orientation;        // +0x10 the loader leaves it identity
     std::vector<FFormationSlot> Slots;   // +0x34 (alloc byte) / +0x38..+0x40
 
     int CountPlayerSlots() const;                               // FUN_06efcac0
     int CountShipSlots() const;                                 // FUN_06efcaf0
     // Slot position in world space: Orientation * slot + Position; zero vector when
     // the slot vector is unallocated or Index is out of range.
-    FVector GetSlotPosition(unsigned int Index) const;          // FUN_06efcb20
+    Vector GetSlotPosition(unsigned int Index) const;          // FUN_06efcb20
     // Position as above plus Orientation * slot orientation; false (outputs untouched)
     // when the slot vector is unallocated or Index is out of range.
-    bool GetSlotTransform(unsigned int Index, FVector* OutPosition,
-                          FMatrix* OutOrientation) const;       // FUN_06efcbe0
+    bool GetSlotTransform(unsigned int Index, Vector* OutPosition,
+                          Matrix* OutOrientation) const;       // FUN_06efcbe0
     // No range check (retail).
     bool IsPlayerSlot(int Index) const;                         // FUN_06efccd0
 };

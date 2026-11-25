@@ -168,12 +168,12 @@ namespace AlchemyImpl
         void SubmitParticle(const float* Pos3, const float* Vel3, const float& AgeOffset,
                             const float* PosOffset3, const float* VelIn3);
 
-        float PrevNodePos_[3];      // +0xa0: world translation at the last emit
+        Vector PrevNodePos_;        // +0xa0: world translation at the last emit
         float LastEmitTime_;        // +0xac: Age at which emission was last settled
         float Pressure_;            // +0xb0: Emitter_Pressure, this frame
         float InitLifeSpan_;        // +0xb4: Emitter_InitLifeSpan, this frame
         unsigned char bResetEmitHistory_; // +0xb8: set by ctor / AssociateAppearance
-        float EmitterXform_[12];    // +0xbc: this node in the appearance's frame (slot 7)
+        Transform EmitterXform_;    // +0xbc: this node in the appearance's frame (slot 7)
         float EmitFraction_;        // +0xec: fractional particle carry-over
     };
 

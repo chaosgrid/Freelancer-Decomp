@@ -69,8 +69,8 @@ bool __cdecl OpenContentDataIni(char const* RelativePath, INI_Reader* Reader);
 // FUN_06f243d0 (ContentDataPath.cpp; callers TU31 06efc589, TU38 06f16339): Out's position is
 // Anchor * (cos Heading * Range, 0, -sin Heading * Range) and its rotation faces away from
 // Anchor's position (the z column points from the anchor to Out, y stays in the vertical plane).
-void __cdecl PlaceFacingAnchor(FTransform const* Anchor, float const* Heading, float const* Range,
-                               FTransform* Out);
+void __cdecl PlaceFacingAnchor(Transform const* Anchor, float const* Heading, float const* Range,
+                               Transform* Out);
 
 IDLL* CreateGameSupport(char const* Name, unsigned int ControllerId, void const* Parms);
 IDLL* CreateSpaceSupport(char const* Name, unsigned int ControllerId, void const* Parms);
@@ -103,7 +103,7 @@ unsigned char __cdecl SpacePopGetPopulationEnabled();
 void __cdecl SpacePopSetEncounterEnabled(unsigned char EnabledByte);
 unsigned char __cdecl SpacePopGetEncounterEnabled();
 void __cdecl SpacePopSetAttackClamp(unsigned char EnabledByte);
-bool __cdecl SpacePopPositionIsExcluded(float const* Position);
+bool __cdecl SpacePopPositionIsExcluded(Vector const* Position);
 void __cdecl SpacePopAddExclusionSphere(float X, float Y, float Z, float Radius);
 void __cdecl SpacePopRemoveExclusionSphere(float X, float Y, float Z, float Radius);
 void __cdecl SpacePopClearExclusionSpheres();

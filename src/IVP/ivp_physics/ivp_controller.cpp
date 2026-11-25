@@ -52,12 +52,12 @@ void IVP_Controller_Detach_From_All_Cores(IVP_Controller* Controller, int SkipFi
 
     if (static_cast<int8_t>(SimUnit->State & 0xFF) < 8)
     {
-        IVP_Simulation_Unit_Update_Cores_Last_Motion_Time(SimUnit); // FUN_063494f0
+        SimUnit->update_cores_last_motion_time(); // FUN_063494f0
     }
     else
     {
         IVP_Core* FirstCore = SimUnit->Cores.ElementAt(0);
-        IVP_Simulation_Unit_Revive_If_Sleeping(SimUnit, FirstCore->Environment); // FUN_06349490
+        SimUnit->revive_if_sleeping(FirstCore->Environment); // FUN_06349490
     }
 }
 
@@ -77,12 +77,12 @@ void IVP_Controller_Wake_Or_Refresh_Associated_Sim_Unit(IVP_Controller* Controll
 
     if (static_cast<int8_t>(SimUnit->State & 0xFF) < 8)
     {
-        IVP_Simulation_Unit_Update_Cores_Last_Motion_Time(SimUnit); // FUN_063494f0
+        SimUnit->update_cores_last_motion_time(); // FUN_063494f0
     }
     else
     {
         IVP_Core* UnitFirstCore = SimUnit->Cores.ElementAt(0);
-        IVP_Simulation_Unit_Revive_If_Sleeping(SimUnit, UnitFirstCore->Environment); // FUN_06349490
+        SimUnit->revive_if_sleeping(UnitFirstCore->Environment); // FUN_06349490
     }
 }
 
@@ -99,7 +99,7 @@ void IVP_Controller_Wake_Or_Refresh_Associated_Sim_Unit(IVP_Controller* Controll
 // OwningSimUnit as PrevSimUnit, and whenever two consecutive valid cores
 // disagree on SimUnit, merges them (absorbing the newer one into
 // PrevSimUnit and freeing the now-empty absorbed unit's vector buffers +
-// memory -- same pattern IVP_Simulation_Unit_Detach_Core already uses
+// memory -- same pattern IVP_Simulation_Unit::detach_core already uses
 // inline), then unconditionally re-registers the core with the controller
 // (IVP_Core::register_controller). After the walk: if any merge
 // happened, rebuilds PrevSimUnit's controller buckets from scratch; if the
@@ -128,13 +128,13 @@ void IVP_Controller_Reconcile_Associated_Cores(IVP_Environment* const* Environme
         {
             // Two neighbouring cores in the SAME controller's associated-list
             // disagree on their owning unit -- merge them (FUN_06348c10).
-            IVP_Simulation_Unit_Absorb_Cores_From(PrevSimUnit, CurrentSimUnit);
+            PrevSimUnit->absorb_cores_from(CurrentSimUnit);
             if (CurrentSimUnit != nullptr)
             {
                 // FUN_06348d80 (the unit's destructor body:
-                // Clear_Controller_Buckets, then both vector buffers) and
-                // operator delete (FUN_06391d5a), as in IVP_Simulation_Unit_Detach_Core.
-                IVP_Simulation_Unit_Free_Vector_Buffers(CurrentSimUnit);
+                // clear_controller_buckets, then both vector buffers) and
+                // operator delete (FUN_06391d5a), as in IVP_Simulation_Unit::detach_core.
+                CurrentSimUnit->free_vector_buffers();
                 ::operator delete(CurrentSimUnit);
             }
             MergeHappened = true;
@@ -149,13 +149,13 @@ void IVP_Controller_Reconcile_Associated_Cores(IVP_Environment* const* Environme
 
     if (MergeHappened)
     {
-        IVP_Simulation_Unit_Clear_Controller_Buckets(PrevSimUnit); // FUN_06348b80
-        IVP_Simulation_Unit_Rebuild_Controller_Buckets(PrevSimUnit); // FUN_063487f0
+        PrevSimUnit->clear_controller_buckets(); // FUN_06348b80
+        PrevSimUnit->rebuild_controller_buckets(); // FUN_063487f0
     }
 
     if (MovementByteAcc < 8)
     {
-        IVP_Simulation_Unit_Revive_If_Sleeping(PrevSimUnit, *EnvironmentPtrHolder); // FUN_06349490
+        PrevSimUnit->revive_if_sleeping(*EnvironmentPtrHolder); // FUN_06349490
     }
 }
 

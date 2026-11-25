@@ -15,39 +15,6 @@
 
 #include "common_ini.h"
 
-class Matrix
-{
-public:
-    Matrix() {}
-
-    // Not exported by Common.dll, Server.dll or freelancer.exe: every module compiles its own
-    // copy of this header body (Common .text:06284f70, freelancer.exe .text:00447b60 -- the
-    // same 20 instructions, arguments stored row-major to +0x00..+0x20, RET 0x24).
-    Matrix(float m00, float m01, float m02,
-           float m10, float m11, float m12,
-           float m20, float m21, float m22)
-    {
-        E[0][0] = m00;
-        E[0][1] = m01;
-        E[0][2] = m02;
-        E[1][0] = m10;
-        E[1][1] = m11;
-        E[1][2] = m12;
-        E[2][0] = m20;
-        E[2][1] = m21;
-        E[2][2] = m22;
-    }
-
-    float E[3][3];
-};
-
-class Transform
-{
-public:
-    Matrix Rotation;    // +0x00
-    Vector Translation; // +0x24
-};
-
 class COMMON_API Csys
 {
 public:

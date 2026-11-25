@@ -63,34 +63,34 @@ namespace
     // .rdata 0x005dd484, the FDUMP file argument.
     char const kCliLauncherCpp[] = "E:\\FL\\Scratch\\Source\\Client\\Space\\CliLauncher.cpp";
 
-    void MatrixStore9(FMatrix* Dst, float A0, float A1, float A2, float A3, float A4, float A5,
+    void MatrixStore9(Matrix* Dst, float A0, float A1, float A2, float A3, float A4, float A5,
                       float A6, float A7, float A8)
     {
-        Dst->D[0][0] = A0;
-        Dst->D[0][1] = A1;
-        Dst->D[0][2] = A2;
-        Dst->D[1][0] = A3;
-        Dst->D[1][1] = A4;
-        Dst->D[1][2] = A5;
-        Dst->D[2][0] = A6;
-        Dst->D[2][1] = A7;
-        Dst->D[2][2] = A8;
+        Dst->E[0][0] = A0;
+        Dst->E[0][1] = A1;
+        Dst->E[0][2] = A2;
+        Dst->E[1][0] = A3;
+        Dst->E[1][1] = A4;
+        Dst->E[1][2] = A5;
+        Dst->E[2][0] = A6;
+        Dst->E[2][1] = A7;
+        Dst->E[2][2] = A8;
     }
 
-    void MatrixSetIdentity(FMatrix* Out)
+    void MatrixSetIdentity(Matrix* Out)
     {
-        std::memset(Out, 0, sizeof(FMatrix));
-        Out->D[0][0] = 1.0f;
-        Out->D[1][1] = 1.0f;
-        Out->D[2][2] = 1.0f;
+        std::memset(Out, 0, sizeof(Matrix));
+        Out->E[0][0] = 1.0f;
+        Out->E[1][1] = 1.0f;
+        Out->E[2][2] = 1.0f;
     }
 
-    void MatrixCopyFromCommon(FMatrix* Dst, Matrix const& Src)
+    void MatrixCopyFromCommon(Matrix* Dst, Matrix const& Src)
     {
         for (int Row = 0; Row < 3; ++Row)
         {
             for (int Col = 0; Col < 3; ++Col)
-                Dst->D[Row][Col] = Src.E[Row][Col];
+                Dst->E[Row][Col] = Src.E[Row][Col];
         }
     }
 
@@ -104,11 +104,11 @@ namespace
         return Obj;
     }
 
-    void CopyOwnerOrientation(FMatrix* Out, CObject* OwnerObj)
+    void CopyOwnerOrientation(Matrix* Out, CObject* OwnerObj)
     {
         // Nine floats from owner+8 (the EngineObject orientation block).
         float const* Src = reinterpret_cast<float const*>(reinterpret_cast<unsigned char*>(OwnerObj) + 8);
-        std::memcpy(Out, Src, sizeof(FMatrix));
+        std::memcpy(Out, Src, sizeof(Matrix));
     }
 
     float OwnerVelocityLength(CObject* OwnerObj)
@@ -279,7 +279,7 @@ void CliEffectCompanionArmStop(void* Companion16)
         Ident[9] = 0.0f;
         Ident[10] = 0.0f;
         Ident[11] = 0.0f;
-        Sound->SetPose(-1, Ident);
+        Sound->SetPose(-1, (const Transform*)Ident);
         ((ISoundSource*)Slots[1])->Stop();
     }
     // FUN_005379b0, then the light's own vtable slot 2 -- FUN_005376f0 on a GameLight and on the
@@ -479,7 +479,7 @@ void CliEffectListDetachPart(void* ListOwnerPlus28, long PartIndex, FClientGameo
     }
 }
 
-void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, FTransform const* LocalXform)
+void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, Transform const* LocalXform)
 {
     // FUN_005377c0 (on the game light). No null test inside: all eight retail call sites test
     // the light first.
@@ -487,23 +487,23 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, FTransform
 
     // +0xec = the engine index, +0xf0 = the local transform.
     *reinterpret_cast<int*>(Base + 0xec) = EngineIndex;
-    std::memcpy(Base + 0xf0, LocalXform, sizeof(FTransform));
+    std::memcpy(Base + 0xf0, LocalXform, sizeof(Transform));
 
-    float* const InstRaw =
-        DALib::Engine->GetInstanceTransform(reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)));
+    const float* const InstRaw = (const float*)
+        DALib::Engine->GetInstanceTransform(EngineIndex);
 
     // DAT_006789c0.
     if (G_GameLightMath == nullptr)
         G_GameLightMath = Acquire3DMathEngine();
 
-    FTransform World;
-    G_GameLightMath->MulTransform(World, *reinterpret_cast<FTransform const*>(InstRaw),
-                                  *reinterpret_cast<FTransform const*>(Base + 0xf0));
+    Transform World;
+    G_GameLightMath->MulTransform(World, *reinterpret_cast<Transform const*>(InstRaw),
+                                  *reinterpret_cast<Transform const*>(Base + 0xf0));
 
     // Copied to a second local first, as retail does (FUN_00410fe0).
-    FTransform const Copy = World;
-    EngineLightSetTransform(static_cast<FEngineLight*>(ExplosionFx), &Copy.Rotation.D[0][0],
-                            &Copy.Translation.X);
+    Transform const Copy = World;
+    EngineLightSetTransform(static_cast<FEngineLight*>(ExplosionFx), &Copy.Rotation.E[0][0],
+                            &Copy.Translation.x);
 
     // The free-motion velocity +0x120..+0x128 = 0.
     *reinterpret_cast<float*>(Base + 0x120) = 0.0f;
@@ -519,7 +519,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
     Archetype::ICliObj* const Companion = NarrowBeamObject(This, 0x7u)->Archetype->Companion;
     if (Companion != nullptr)
     {
-        FTransform LocalXform;
+        Transform LocalXform;
         if (bUseLookDir == 0)
         {
             MatrixSetIdentity(&LocalXform.Rotation);
@@ -528,23 +528,23 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
         {
             // transpose(CBeam orientation, class & 0x67, no null test) x LookMatrix(*LookDir).
             Matrix const Look = LookMatrix(*LookDir);
-            FMatrix OwnerOri;
+            Matrix OwnerOri;
             CopyOwnerOrientation(&OwnerOri, NarrowBeamObject(This, 0x67u));
-            FMatrix OwnerT;
-            MatrixStore9(&OwnerT, OwnerOri.D[0][0], OwnerOri.D[1][0], OwnerOri.D[2][0],
-                         OwnerOri.D[0][1], OwnerOri.D[1][1], OwnerOri.D[2][1], OwnerOri.D[0][2],
-                         OwnerOri.D[1][2], OwnerOri.D[2][2]);
-            FMatrix LookM;
+            Matrix OwnerT;
+            MatrixStore9(&OwnerT, OwnerOri.E[0][0], OwnerOri.E[1][0], OwnerOri.E[2][0],
+                         OwnerOri.E[0][1], OwnerOri.E[1][1], OwnerOri.E[2][1], OwnerOri.E[0][2],
+                         OwnerOri.E[1][2], OwnerOri.E[2][2]);
+            Matrix LookM;
             MatrixCopyFromCommon(&LookM, Look);
             if (G_BeamActivateMath == nullptr)
                 G_BeamActivateMath = Acquire3DMathEngine();
-            FMatrix Combined;
+            Matrix Combined;
             G_BeamActivateMath->MulMatrix(Combined, OwnerT, LookM);
             LocalXform.Rotation = Combined;
         }
-        LocalXform.Translation.X = 0.0f;
-        LocalXform.Translation.Y = 0.0f;
-        LocalXform.Translation.Z = 0.0f;
+        LocalXform.Translation.x = 0.0f;
+        LocalXform.Translation.y = 0.0f;
+        LocalXform.Translation.z = 0.0f;
 
         // The companion's +0x58 const_effect; empty -> slot 92 only.
         ID_String const* const ConstEffect = Archetype::CliProjConstEffect(Companion);
@@ -575,7 +575,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
                 BeamEffectAttach(LiveBeam, This, EngineIndex, &LocalXform);
             ISoundSource* const Sound = static_cast<ISoundSource*>(This->Companion[1]);
             if (Sound != nullptr)
-                Sound->SetPose(EngineIndex, reinterpret_cast<float const*>(&LocalXform));
+                Sound->SetPose(EngineIndex, &LocalXform);
             if (This->Companion[3] != nullptr)
                 CliExplosionAttachLocalXform(This->Companion[3], EngineIndex, &LocalXform);
 
@@ -1079,11 +1079,11 @@ void CliLauncherPlayMuzzleFx(FCliLauncherFx* Launcher)
     Launcher->MuzzleEffect = Effect;
 
     // The barrel's frame as the local transform, on the barrel's part.
-    FTransform BarrelXform;
+    Transform BarrelXform;
     MatrixCopyFromCommon(&BarrelXform.Rotation, Barrel->Orient);
-    BarrelXform.Translation.X = Barrel->Position.x;
-    BarrelXform.Translation.Y = Barrel->Position.y;
-    BarrelXform.Translation.Z = Barrel->Position.z;
+    BarrelXform.Translation.x = Barrel->Position.x;
+    BarrelXform.Translation.y = Barrel->Position.y;
+    BarrelXform.Translation.z = Barrel->Position.z;
     ParticleEffectAttach(Effect, Launcher->Host, Barrel->EngineIndex, &BarrelXform);
 
     if (ParticleEffectStart(Effect, EffectArch) == 0)
@@ -1295,17 +1295,17 @@ unsigned CliShipFireWeapons(void* AdjustorThis, unsigned short const* HardpointI
                         Gun->GetTarget(Target, TargetSubObj);
                         if (Target != nullptr)
                         {
-                            FTransform TargetXform;
+                            Transform TargetXform;
                             std::memcpy(&TargetXform, &Target->get_transform(),
                                         sizeof(TargetXform));
                             if (G_FireLeadMath == nullptr)
                                 G_FireLeadMath = Acquire3DMathEngine();
-                            FVector World;
+                            Vector World;
                             G_FireLeadMath->TransformXform(
-                                World, TargetXform, *reinterpret_cast<FVector const*>(TargetPos));
-                            Aim.x = World.X;
-                            Aim.y = World.Y;
-                            Aim.z = World.Z;
+                                World, TargetXform, *TargetPos);
+                            Aim.x = World.x;
+                            Aim.y = World.y;
+                            Aim.z = World.z;
                         }
                         bLeadAimed = true;
                         Launcher->FireDirect(&Aim);
@@ -1697,14 +1697,14 @@ namespace
         return Simple->get_hit_pts() > 0.0f;
     }
 
-    // An identity FTransform.
-    FTransform IdentityTransform()
+    // An identity Transform.
+    Transform IdentityTransform()
     {
-        FTransform Xform;
+        Transform Xform;
         std::memset(&Xform, 0, sizeof(Xform));
-        Xform.Rotation.D[0][0] = 1.0f;
-        Xform.Rotation.D[1][1] = 1.0f;
-        Xform.Rotation.D[2][2] = 1.0f;
+        Xform.Rotation.E[0][0] = 1.0f;
+        Xform.Rotation.E[1][1] = 1.0f;
+        Xform.Rotation.E[2][2] = 1.0f;
         return Xform;
     }
 
@@ -1737,7 +1737,7 @@ FCliLauncherFx::~FCliLauncherFx()
     if (MuzzleEffect != nullptr)
     {
         FEffectBase* const Effect = static_cast<FEffectBase*>(MuzzleEffect);
-        FTransform const Identity = IdentityTransform();
+        Transform const Identity = IdentityTransform();
         EffectAttach(Effect, nullptr, -1, &Identity);
         Effect->Kill();
         EffectRelease(Effect);
@@ -1811,7 +1811,7 @@ bool FCliLauncherFx::Update(float Dt)
             {
                 ID_String SparksId;
                 SparksId.Id = CreateID("multi_sparks02");
-                FTransform const Local = IdentityTransform();
+                Transform const Local = IdentityTransform();
                 long const Part = static_cast<CAttachedEquip*>(Launch)->GetRootIndex();
                 // One-shot effect on DAT_00674c60 (FUN_00503070).
                 if (!SparksId.IsEmpty())
@@ -1897,8 +1897,8 @@ void FCliGunFx::notify(Event Code, void* Param)
         if (Voice != nullptr)
         {
             Voice->Stop();
-            FTransform const Identity = IdentityTransform();
-            Voice->SetPose(-1, reinterpret_cast<float const*>(&Identity));
+            Transform const Identity = IdentityTransform();
+            Voice->SetPose(-1, &Identity);
         }
         // With a voice, the gun companion's +0x84 sound archetype is unloaded.
         if (TurretVoice != nullptr)
@@ -1937,8 +1937,8 @@ bool FCliGunFx::Update(float Dt)
             if (Voice != nullptr)
             {
                 Voice->Stop();
-                FTransform const Identity = IdentityTransform();
-                Voice->SetPose(-1, reinterpret_cast<float const*>(&Identity));
+                Transform const Identity = IdentityTransform();
+                Voice->SetPose(-1, &Identity);
             }
         }
     }
@@ -1968,7 +1968,7 @@ namespace
             int const ScriptIndex = LaunchArch->AnimIndex;
             long const RootIndex = Launch->GetRootIndex();
             Wrapper->AnimJointIndex.Value = static_cast<int>(DALib::Anim->PlayScript(
-                AsOpaqueDword(ScriptIndex), AsOpaqueDword(static_cast<int>(RootIndex)),
+                AsOpaqueDword(ScriptIndex), RootIndex,
                 UseAnimation, nullptr, nullptr));
         }
 
@@ -2070,9 +2070,9 @@ FCliLauncherFx* CliGunEquipFxConstruct(CEquip* Equip, void* Host)
         // Looping, posed on the equipment's root with an identity frame.
         Wrapper->TurretVoice->SetLooping(1);
         long const RootIndex = Wrapper->LaunchEquip()->GetRootIndex();
-        FTransform const Identity = IdentityTransform();
+        Transform const Identity = IdentityTransform();
         Wrapper->TurretVoice->SetPose(static_cast<int>(RootIndex),
-                                      reinterpret_cast<float const*>(&Identity));
+                                      &Identity);
     }
     return Wrapper;
 }

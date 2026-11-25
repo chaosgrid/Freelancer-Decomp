@@ -14,7 +14,7 @@
 #include "common_id.h"      // ID_String
 #include "common_ini.h"     // Vector
 #include "common_server.h"  // pub::System::ZoneEnumerator
-#include "x86math.h"        // FMatrix
+#include "x86math.h"        // Matrix
 #include "Encounters/PatrolPaths.h"    // FPatrolPath (FSystemInfo +0x50)
 #include "NPCs/NpcCreate.h"      // FSolarNpc (FSystemInfo +0x88)
 #include "Encounters/EncounterParams.h" // FZoneEncounter (zone +0x38), FEncounterParameters (+0x120)
@@ -195,7 +195,7 @@ struct FTradeLaneRingInfo
     Vector Position;                // +0x04 "pos"
     // +0x10: 0x30-byte transform copied whole (FUN_06f594c0). Rotation = "rotate" (identity
     // when absent); the loader zeroes the translation and never sets it.
-    FTransform Placement;
+    Transform Placement;
     unsigned int PrevRing;          // +0x40 "prev_ring"
     unsigned int NextRing;          // +0x44 "next_ring"
     unsigned int Reputation;        // +0x48 "reputation" (uninitialised when absent)
@@ -207,7 +207,7 @@ struct FTradeLaneRing
 {
     unsigned int ObjectId;          // +0x00
     Vector Position;                // +0x04
-    FTransform Placement;           // +0x10 translation always zero
+    Transform Placement;           // +0x10 translation always zero
     unsigned int Reputation;        // +0x40 ring "reputation"; -1 from FUN_06f77090
 };
 
@@ -230,7 +230,7 @@ struct FTradeLane
     std::vector<FTradeLaneRing> Rings;          // +0x00 prev_ring -> next_ring order
     Vector StartPosition;                       // +0x10 ring with no prev_ring (else unset)
     Vector EndPosition;                         // +0x1c ring with no next_ring (else unset)
-    FTransform Placement;                       // +0x28 rotation of the first ring taken
+    Transform Placement;                       // +0x28 rotation of the first ring taken
     // +0x58 / +0x68 (copy FUN_06eb6560): the ids of the ships travelling the lane forward
     // (towards the last ring) / backward. FUN_06f78110 appends (GameSupport msg 0x16),
     // FUN_06f78dd0 removes (GameSupport msg 0x17, SpaceSupport).

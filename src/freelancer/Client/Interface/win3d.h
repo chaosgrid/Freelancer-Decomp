@@ -27,6 +27,8 @@
 
 #include <stddef.h>
 
+#include "math3d.h"
+
 struct Win3D;
 class WinControl;
 struct FSpaceCamera;
@@ -102,9 +104,9 @@ struct Win3D : public LinkTree<Win3D>
     // slot 6 (+0x18) LAB_0043d8e0 -- true
     virtual bool IsPositionInViewport(unsigned A);
     // slot 7 (+0x1c) FUN_004b5040 -- copy nine dwords to +0x3c
-    virtual void SetOrientation(float const* NewOrientation);
+    virtual void SetOrientation(Matrix const* NewOrientation);
     // slot 8 (+0x20) LAB_00595f70 -- slot 7 (Transform), then slot 5 (Transform + 9)
-    virtual void SetTransform(float const* Transform);
+    virtual void SetTransform(Transform const* NewXform);
     // slot 9 (+0x24) FUN_004b5060 -- reparent, register, flags = (flags & 0xfb) | 3, true
     virtual bool Create(Win3D* NewParent, void* Data);
     // slot 10 (+0x28) FUN_004b5090 -- flags &= 0xfc, children slot 10, FUN_0059dc00(this)
@@ -154,8 +156,17 @@ struct Win3D : public LinkTree<Win3D>
     unsigned NameLength;        // +0x14
     char Name[32];              // +0x18
     Win3D* CaptureNext;         // +0x38
-    float Orientation[9];       // +0x3c
-    float Position[3];          // +0x60
+    // +0x3c: the orientation, then the position -- together a Transform (FUN_00422690 and the
+    // layout code take the 12 floats at this+0x3c as one).
+    union
+    {
+        struct
+        {
+            Matrix Orientation;     // +0x3c
+            Vector Position;        // +0x60
+        };
+        Transform Placement;        // +0x3c
+    };
     unsigned char Flags;        // +0x6c
     unsigned char Pad6d[3];     // +0x6d (never written by the ctor)
     unsigned DrawLayer;         // +0x70
@@ -268,15 +279,15 @@ void Win3DStartupManager(int Width, int Height);
 // interface material, release the cursors and the line batchers.
 void Win3DShutdownManager();
 
-struct FVector;
-struct FMatrix;
+class Vector;
+class Matrix;
 // FUN_00423b90 (cdecl Out, Matrix, Source) -- TransformMatrix through the engine cached in
 // DAT_006679d8, into a local that is then copied to Out.
-void Win3DTransformByMatrix(FVector& Out, FMatrix const& Matrix, FVector const& Source);
+void Win3DTransformByMatrix(Vector& Out, Matrix const& Mat, Vector const& Source);
 // DAT_006679d8 itself, acquired when still null -- the test-and-fill the OpenGL.cpp sites repeat
 // inline before calling the engine directly.
 struct I3DMathEngine;
 I3DMathEngine* Win3DTransformMathEngine();
 // FUN_004bdd40 (thiscall on the camera) -- the camera-space point on the near plane under a
 // screen pixel: ((x - cx) * (znear / xscale), (y - cy) * (znear / yscale), -znear).
-void Win3DScreenToNearPlane(FSpaceCamera const* Cam, FVector& Out, float ScreenX, float ScreenY);
+void Win3DScreenToNearPlane(FSpaceCamera const* Cam, Vector& Out, float ScreenX, float ScreenY);

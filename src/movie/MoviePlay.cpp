@@ -235,7 +235,7 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::QueryInterface(REFIID Iid, void** Out)
 		return 0;
 	}
 	*Out = nullptr;
-	return (long)0x80004002;
+	return E_NOINTERFACE;
 }
 
 static long ForwardInnerAuthorizer(void* Inner, int Slot, void* Arg0, void* Arg1)
@@ -253,7 +253,7 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetCertCount(DWORD* Count)
 {
 	if (Count == nullptr)
 	{
-		return (long)0x80004003;
+		return E_POINTER;
 	}
 	if (Inner != nullptr)
 	{
@@ -269,7 +269,7 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetCert(DWORD Index, BYTE** CertOut)
 {
 	if (CertOut == nullptr)
 	{
-		return (long)0x80004003;
+		return E_POINTER;
 	}
 	if (Inner != nullptr)
 	{
@@ -277,13 +277,13 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetCert(DWORD Index, BYTE** CertOut)
 	}
 	if (Index >= (unsigned long)GAuthorizerCertCount)
 	{
-		return (long)0x80070057;
+		return E_INVALIDARG;
 	}
 	unsigned char* Blob = (unsigned char*)CoTaskMemAlloc(0x64);
 	*CertOut = Blob;
 	if (Blob == nullptr)
 	{
-		return (long)0x8007000E;
+		return E_OUTOFMEMORY;
 	}
 	const unsigned long* CertDwords = (const unsigned long*)(GAuthorizerCerts + Index * 0x78);
 	unsigned long* DestDwords = (unsigned long*)Blob;
@@ -302,7 +302,7 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 {
 	if (Cert == nullptr || SharedData == nullptr || OutShared == nullptr)
 	{
-		return (long)0x80004003;
+		return E_POINTER;
 	}
 
 	void* Context;
@@ -318,7 +318,7 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 	if (SharedScratch == nullptr)
 	{
 		Movie_ReleaseFieldContext(&Context);
-		return (long)0x8007000E;
+		return E_OUTOFMEMORY;
 	}
 
 	if (Inner != nullptr)
@@ -346,7 +346,7 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 		{
 			CoTaskMemFree(SharedScratch);
 			Movie_ReleaseFieldContext(&Context);
-			return (long)0x80070057;
+			return E_INVALIDARG;
 		}
 		const unsigned char* Record = GAuthorizerCerts + 0x64 + CertIndex * 0x78;
 		long StepHr = Movie_RecoverFieldLimbsLocked(&Context, (unsigned int*)Record, (unsigned int*)SharedData, (unsigned int*)SharedScratch);
@@ -360,21 +360,21 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 	if (SharedScratch == nullptr)
 	{
 		Movie_ReleaseFieldContext(&Context);
-		return (long)0x8000FFFF;
+		return E_UNEXPECTED;
 	}
 
 	unsigned char* SharedResult = (unsigned char*)CoTaskMemAlloc(0x50);
 	if (SharedResult == nullptr)
 	{
 		Movie_ReleaseFieldContext(&Context);
-		return (long)0x8007000E;
+		return E_OUTOFMEMORY;
 	}
 
 	long StepHr = Movie_MapFieldLimbsLocked(&Context, (unsigned int*)(Cert + 0x30), (unsigned int*)SharedScratch, (unsigned int*)SharedResult);
 	if (StepHr < 0)
 	{
 		Movie_ReleaseFieldContext(&Context);
-		return (long)0x8000FFFF;
+		return E_UNEXPECTED;
 	}
 
 	*OutShared = SharedResult;
@@ -389,17 +389,17 @@ static long __stdcall CreateAuthorizer(void** OutUnknown)
 {
 	if (OutUnknown == nullptr)
 	{
-		return (long)0x80004003;
+		return E_POINTER;
 	}
 	FAuthorizer* Object = new (std::nothrow) FAuthorizer;
 	if (Object == nullptr)
 	{
-		return (long)0x8007000E;
+		return E_OUTOFMEMORY;
 	}
 	long Hr = Object->QueryInterface(GIidUnknown, OutUnknown);
 	if (Hr < 0)
 	{
-		Hr = (long)0x8000FFFF;
+		Hr = E_UNEXPECTED;
 	}
 	Object->Release();
 	return Hr;
@@ -435,7 +435,7 @@ HRESULT STDMETHODCALLTYPE FServiceProvider::QueryInterface(REFIID Iid, void** Ou
 {
 	if (Out == nullptr)
 	{
-		return (long)0x80004003;
+		return E_POINTER;
 	}
 	if (GuidsMatch(&Iid, &GIidUnknown) || GuidsMatch(&Iid, &GIidServiceProvider))
 	{
@@ -443,7 +443,7 @@ HRESULT STDMETHODCALLTYPE FServiceProvider::QueryInterface(REFIID Iid, void** Ou
 		AddRef();
 		return 0;
 	}
-	return (long)0x80004002;
+	return E_NOINTERFACE;
 }
 
 // FUN_06ac1b60. IServiceProvider::QueryService. RET 0x10.
@@ -452,11 +452,11 @@ HRESULT STDMETHODCALLTYPE FServiceProvider::QueryService(REFGUID Service, REFIID
 {
 	if (Out == nullptr)
 	{
-		return (long)0x80004003;
+		return E_POINTER;
 	}
 	if (!GuidsMatch(&Service, &GIidWmReader) || !GuidsMatch(&Iid, &GIidUnknown))
 	{
-		return (long)0x80004002;
+		return E_NOINTERFACE;
 	}
 	void* Authorizer = Out;
 	long Hr = CreateAuthorizer(&Authorizer);
@@ -503,9 +503,9 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 
 	g_playing = 0;
 	g_hwndParent = Hwnd;
-	g_originalWndProc = (WNDPROC)SetWindowLongA(Hwnd, -4, (LONG)(LONG_PTR)MoviePlaybackWndProc);
+	g_originalWndProc = (WNDPROC)SetWindowLongA(Hwnd, GWL_WNDPROC, (LONG)(LONG_PTR)MoviePlaybackWndProc);
 
-	Hr = CoCreateInstance(GClsidFilterGraph, nullptr, 1, GIidGraphBuilder, (void**)&g_graphBuilder);
+	Hr = CoCreateInstance(GClsidFilterGraph, nullptr, CLSCTX_INPROC_SERVER, GIidGraphBuilder, (void**)&g_graphBuilder);
 	if (Hr < 0)
 	{
 		goto Epilogue;
@@ -526,12 +526,12 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 
 	if (g_graphBuilder == nullptr)
 	{
-		Hr = (long)0x80004003;
+		Hr = E_POINTER;
 		goto Epilogue;
 	}
 
 	AsfReader = nullptr;
-	Hr = CoCreateInstance(GClsidWmAsfReader, nullptr, 1, GIidBaseFilter, (void**)&AsfReader);
+	Hr = CoCreateInstance(GClsidWmAsfReader, nullptr, CLSCTX_INPROC_SERVER, GIidBaseFilter, (void**)&AsfReader);
 	if (Hr < 0)
 	{
 		goto Epilogue;
@@ -594,7 +594,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 	EnumPins->Release();
 	if (bRenderFailed)
 	{
-		Hr = (long)0x80004004;
+		Hr = E_ABORT;
 	}
 	FileSource->Release();
 	AsfReader->Release();
@@ -609,14 +609,14 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 	g_initSuccess = 1;
 
 	Video = g_videoWindow;
-	Video->put_AutoShow(0);
-	Video->put_Visible(0);
+	Video->put_AutoShow(OAFALSE);
+	Video->put_Visible(OAFALSE);
 	Video->put_Owner((OAHWND)g_hwndParent);
 
 	Control = g_mediaControl;
 	Hr = Control->Pause();
 	Movie_LogNegativeCode(Hr, GMoviePlayerSourceFile, 0x21D);
-	if (Hr == 1)
+	if (Hr == S_FALSE)
 	{
 		bPaused = false;
 		for (;;)
@@ -624,11 +624,11 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 			Control = g_mediaControl;
 			StateHr = Control->GetState(0xA, &State);
 			Movie_LogNegativeCode(StateHr, GMoviePlayerSourceFile, 0x227);
-			if (StateHr == (long)0x80004005 || StateHr == (long)0x00040268)
+			if (StateHr == E_FAIL || StateHr == VFW_S_CANT_CUE)
 			{
-				return (long)0x80004005;
+				return E_FAIL;
 			}
-			if (StateHr == 0 && (long)State == 1)
+			if (StateHr == S_OK && State == State_Paused)
 			{
 				bPaused = true;
 			}
@@ -639,7 +639,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 				{
 					if (GetMessageA(&Message, nullptr, 0, 0) == 0)
 					{
-						return (long)0x80004005;
+						return E_FAIL;
 					}
 					TranslateMessage(&Message);
 					DispatchMessageA(&Message);
@@ -650,7 +650,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 
 			if (g_graphBuilder == nullptr)
 			{
-				return (long)0x80004005;
+				return E_FAIL;
 			}
 			if (!bPaused)
 			{
@@ -662,12 +662,12 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 
 	LockWindowUpdate(g_hwndParent);
 	Video = g_videoWindow;
-	Video->put_Visible(-1);
+	Video->put_Visible(OATRUE);
 	Video->get_WindowStyle(&Style);
-	Style = (Style & (long)0xFF3BFFFF) | (long)0x46000000;
+	Style = (Style & ~(long)(WS_CAPTION | WS_THICKFRAME)) | (long)(WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
 	Video->put_WindowStyle(Style);
 	LockWindowUpdate(nullptr);
-	Hr = Video->SetWindowForeground(-1);
+	Hr = Video->SetWindowForeground(OATRUE);
 	Movie_LogNegativeCode(Hr, GMoviePlayerSourceFile, 0x263);
 
 	if ((unsigned char)Fullscreen != 0)
@@ -703,7 +703,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 	Movie_LogNegativeCode(Hr, GMoviePlayerSourceFile, 0x2C6);
 
 	g_graphBuilder->QueryInterface(GIidMediaEventEx, (void**)&g_mediaEventEx);
-	g_mediaEventEx->SetNotifyWindow((OAHWND)g_hwndParent, 0x8001, 0);
+	g_mediaEventEx->SetNotifyWindow((OAHWND)g_hwndParent, WM_APP + 1, 0);
 
 	Control = g_mediaControl;
 	Hr = Control->Run();
@@ -727,13 +727,13 @@ Epilogue:
 // LAB_06ac1cf0. Subclass proc installed by BuildAndRunWmAsfGraph. RET 0x10.
 static LRESULT CALLBACK MoviePlaybackWndProc(HWND Hwnd, UINT Message, WPARAM WParam, LPARAM LParam)
 {
-	if (Message <= 0x86)
+	if (Message <= WM_NCACTIVATE)
 	{
-		if (Message == 0x86 || Message == 0x6)
+		if (Message == WM_NCACTIVATE || Message == WM_ACTIVATE)
 		{
 			return 0;
 		}
-		if (Message == 0xF)
+		if (Message == WM_PAINT)
 		{
 			if (GetUpdateRect(Hwnd, nullptr, FALSE) == 0)
 			{
@@ -744,28 +744,28 @@ static LRESULT CALLBACK MoviePlaybackWndProc(HWND Hwnd, UINT Message, WPARAM WPa
 			EndPaint(Hwnd, &Paint);
 			return 0;
 		}
-		if (Message == 0x14)
+		if (Message == WM_ERASEBKGND)
 		{
 			return 0;
 		}
 	}
 	else
 	{
-		UINT Shifted = Message - 0x100;
+		UINT Shifted = Message - WM_KEYDOWN;
 		if (Shifted == 0)
 		{
-			if (WParam == 0x10 || WParam == 0x1B)
+			if (WParam == VK_SHIFT || WParam == VK_ESCAPE)
 			{
 				Movie_ReleaseComAndRestoreWndProc();
 			}
 			return 0;
 		}
-		Shifted -= 0x12;
+		Shifted -= WM_SYSCOMMAND - WM_KEYDOWN;
 		if (Shifted == 0)
 		{
 			return 0;
 		}
-		Shifted -= 0x7EEF;
+		Shifted -= (WM_APP + 1) - WM_SYSCOMMAND;
 		if (Shifted == 0)
 		{
 			IMediaEventEx* Events = g_mediaEventEx;

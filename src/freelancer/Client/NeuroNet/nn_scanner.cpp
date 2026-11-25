@@ -241,8 +241,8 @@ void OpenNnScanner(EquipDescList const* Cargo, unsigned ShipArchId)
         return;
 
     // {0, 0.076, -1.288}.
-    float const Position[3] = {0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f)};
-    Window->SetPosition(Position);
+    Vector const Position = {0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f)};
+    Window->SetPosition(&Position.x);
 
     Window->SetProperty(0x49, reinterpret_cast<uintptr_t>(Cargo), ShipArchId);
     Window->SetProperty(0x4a, 0, 0);

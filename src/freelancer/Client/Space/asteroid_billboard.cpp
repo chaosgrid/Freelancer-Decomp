@@ -229,9 +229,9 @@ namespace
         if ((Batch.Flags & 2u) == 0)
             return;
         float* const Pos = reinterpret_cast<float*>(Batch.PosCursor.Ptr);
-        Pos[0] = Batch.Saved[0].Pos[0];
-        Pos[1] = Batch.Saved[0].Pos[1];
-        Pos[2] = Batch.Saved[0].Pos[2];
+        Pos[0] = Batch.Saved[0].Pos.x;
+        Pos[1] = Batch.Saved[0].Pos.y;
+        Pos[2] = Batch.Saved[0].Pos.z;
         Batch.PosCursor.Advance(0);
         *reinterpret_cast<unsigned*>(Batch.ColorCursor.Ptr) = Batch.Saved[0].Color;
         Batch.ColorCursor.Advance(0);
@@ -436,9 +436,9 @@ void FAsteroidBillboardBatch::Vertex(float X, float Y, float Z)
         Saved[0].Color = Color;
         Saved[0].U = U;
         Saved[0].V = V;
-        Saved[0].Pos[0] = X;
-        Saved[0].Pos[1] = Y;
-        Saved[0].Pos[2] = Z;
+        Saved[0].Pos.x = X;
+        Saved[0].Pos.y = Y;
+        Saved[0].Pos.z = Z;
     }
 
     // Bit 2: quads. Vertices 0 and 2 of each four are saved; after the fourth
@@ -451,9 +451,9 @@ void FAsteroidBillboardBatch::Vertex(float X, float Y, float Z)
         Slot.Color = Color;
         Slot.U = U;
         Slot.V = V;
-        Slot.Pos[0] = X;
-        Slot.Pos[1] = Y;
-        Slot.Pos[2] = Z;
+        Slot.Pos.x = X;
+        Slot.Pos.y = Y;
+        Slot.Pos.z = Z;
     }
     ++QuadCounter;
     if (QuadCounter < 4)
@@ -463,9 +463,9 @@ void FAsteroidBillboardBatch::Vertex(float X, float Y, float Z)
     for (Index = 0; Index < 2; ++Index)
     {
         float* const OutPos = reinterpret_cast<float*>(PosCursor.Ptr);
-        OutPos[0] = Saved[Index].Pos[0];
-        OutPos[1] = Saved[Index].Pos[1];
-        OutPos[2] = Saved[Index].Pos[2];
+        OutPos[0] = Saved[Index].Pos.x;
+        OutPos[1] = Saved[Index].Pos.y;
+        OutPos[2] = Saved[Index].Pos.z;
         PosCursor.Ptr += PosCursor.Stride;
         *reinterpret_cast<unsigned*>(ColorCursor.Ptr) = Saved[Index].Color;
         ColorCursor.Ptr += ColorCursor.Stride;
@@ -690,15 +690,15 @@ void BillboardDraw(FAsteroidBillboardBlock* Bb, FSpaceCamera* Camera,
 {
     ICamera* const Cam = AsCamera(Camera);
 
-    float const* const CamPosSource = Cam->GetPosition();
-    float CamPos[3] = {CamPosSource[0], CamPosSource[1], CamPosSource[2]};
+    const Vector* const CamPosSource = Cam->GetPosition();
+    float CamPos[3] = {CamPosSource->x, CamPosSource->y, CamPosSource->z};
 
     // Forward = -(orientation column 2).
-    float const* const Orient = Cam->GetOrientation();
+    const Matrix* const Orient = Cam->GetOrientation();
     float Forward[3];
-    Forward[0] = -Orient[2];
-    Forward[1] = -Orient[5];
-    Forward[2] = -Orient[8];
+    Forward[0] = -Orient->E[0][2];
+    Forward[1] = -Orient->E[1][2];
+    Forward[2] = -Orient->E[2][2];
 
     // The centre of the rock sphere, SphereAhead ahead of the camera.
     float FarCenter[3];

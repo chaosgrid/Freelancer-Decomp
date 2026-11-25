@@ -42,7 +42,7 @@
 #include "common_newchar.h"         // RtcSlider
 #include "common_misc.h"            // SinglePlayer
 #include "dacom.h"                  // FDUMP
-#include "DALib.h"                  // DALib::Engine (IEngine::ReleaseHandle, G_InvalidEngineHandle)
+#include "DALib.h"                  // DALib::Engine (IEngine::ReleaseHandle)
 
 #include <math.h>
 #include <stddef.h>
@@ -578,7 +578,7 @@ namespace
         {
             for (int Index = 0; Index < 0x100; ++Index)
             {
-                Handles[Index] = G_InvalidEngineHandle;
+                Handles[Index] = InvalidArchetypeIndex;
                 Entries[Index] = nullptr;
             }
             Count = 0;
@@ -601,13 +601,13 @@ namespace
             }
             for (int Index = 0; Index < 0x100; ++Index)
             {
-                Handles[Index] = G_InvalidEngineHandle;
+                Handles[Index] = InvalidArchetypeIndex;
                 Entries[Index] = nullptr;
             }
             Count = 0;
         }
 
-        void* Handles[0x100];                         // +0x000
+        ArchetypeIndex Handles[0x100];                // +0x000
         Archetype::FCliMaterialEntry* Entries[0x100]; // +0x400 (DAT_00668250)
         int Count;                                    // +0x800 (DAT_00668650)
     };

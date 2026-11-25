@@ -18,6 +18,7 @@
 // LAB_00447500, 8 LAB_00447570, 9 LAB_004475b0, 10..12 the shared no-op
 // (IDPMsgHandler::OnReceive).
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_csys.h"
 #include "Space/Effects/equip_visual_set.h"
 #include "Common/Graphics/lights_camera.h"
@@ -67,14 +68,14 @@ struct FObjectShipEngineFx
     // FUN_00446ca0 -- the old effect destroyed, the frame kept, and for an engine (class 0xc)
     // with a flame_effect whose EffectArch resolves: the effect created and, on success,
     // Lifetime = InLifetime. An unknown flame effect FDUMPs (ObjectShip.cpp 0x84).
-    void Start(unsigned ArchId, float InLifetime, void* InInstance, Vector const& InPos,
+    void Start(unsigned ArchId, float InLifetime, InstanceIndex InInstance, Vector const& InPos,
                Matrix const& InOrient);
     // FUN_00446d90 -- with an effect: its frame placed and updated; then either the stop
     // count-down (a negative Lifetime never ends) or, once stopping, destroyed when finished.
     void Update(float Delta);
 
     FLightsCameraParticles Particles;  // +0x00
-    void* Instance;                    // +0x08 the hardpoint's engine instance
+    InstanceIndex Instance;            // +0x08 the hardpoint's engine instance
     Vector Pos;                        // +0x0c the hardpoint's local position
     Matrix Orient;                     // +0x18 the hardpoint's local orientation
     unsigned char bStopping;           // +0x3c
@@ -94,7 +95,7 @@ struct FObjectShipEngineSound
     // (retail).
     ~FObjectShipEngineSound();
 
-    void* Instance;                    // +0x00 the hardpoint's engine instance
+    InstanceIndex Instance;            // +0x00 the hardpoint's engine instance
     ISoundSource* Source;              // +0x04
 
 private:
@@ -121,7 +122,7 @@ public:
 
     bool IsVisible() override;                      // 2  FUN_0044fd00
     void Update(double DeltaSeconds) override;      // 5  LAB_004473a0
-    void* GetEngineInstance() override;             // 6  LAB_00451360
+    InstanceIndex GetEngineInstance() override;             // 6  LAB_00451360
     void DrawOpaque(ICamera* Camera) override;      // 7  LAB_00447500
     void DrawTranslucent(ICamera* Camera) override; // 8  LAB_00447570
     void DrawEffects(ICamera* Camera) override;     // 9  LAB_004475b0
@@ -182,7 +183,7 @@ public:
     char* LaunchScript;                 // +0x64 malloc_strcpy'd
     unsigned char bShadow;              // +0x68
     EquipDescList* Equipment;           // +0x6c owned (operator new(0xc))
-    void* Instance;                     // +0x70 -1 when no model
+    InstanceIndex Instance;             // +0x70 -1 when no model
     FEquipVisualSet Visuals;            // +0x74 (summary +0x74, count +0x78)
     FObjectShipEngineFx* EngineFx;      // +0xa0 new[count]
     FObjectShipEngineSound* LoopSounds; // +0xa4 new[count] character_loop_sound
@@ -242,10 +243,10 @@ public:
 
     bool IsVisible() override;                      // 2  FUN_0044fd00
     void Update(double DeltaSeconds) override;      // 5  LAB_00443a10
-    void* GetEngineInstance() override;             // 6  LAB_00443870
+    InstanceIndex GetEngineInstance() override;             // 6  LAB_00443870
     void DrawOpaque(ICamera* Camera) override;      // 7  FUN_00443a30
 
-    void* Instance;                    // +0x30 -1 when no model
+    InstanceIndex Instance;            // +0x30 -1 when no model
     unsigned char bShadow;             // +0x34
     FEquipVisualSet Visuals;           // +0x38 (count +0x3c)
 
@@ -261,23 +262,23 @@ private:
 // the compound whose group is destroyed (health 0) is removed, and each such group's dmg_obj
 // meshes are hung on their dmg_hp hardpoints ("DpConnect"). Callers: RebuildModel and
 // ShipViewControl.
-void GfShipApplyCollisionDamage(void* Instance);
+void GfShipApplyCollisionDamage(InstanceIndex Instance);
 
 // FUN_00448c40 (cdecl) -- place Instance so that its "HpMount" hardpoint (identity when it has
 // none) lands on Frame, then Engine UpdateInstance(Instance, 0, 0). Callers: the
 // FObjectShip and FDealerShipObject model loads.
-void GfShipPlaceOnMount(void* Instance, Csys const* Frame);
+void GfShipPlaceOnMount(InstanceIndex Instance, Csys const* Frame);
 
 // FUN_004478c0 (cdecl, hidden return) -- HpName's frame relative to RootInstance: the inverse
 // of the hardpoint's local frame times the inverse of its instance's world transform times the
 // root's world transform; {0, identity} when Summary does not know HpName. Caller: the Gf
 // spawn's PlayerShip target with "HpMount".
-Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, void* RootInstance);
+Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, InstanceIndex RootInstance);
 
 // FUN_00447be0 (cdecl Out, M, V) -- Out = M^T * V through ObjectShip.cpp's lazily acquired
 // 3DMathEngine DAT_00668a98 (TransposeTransform, slot +0x38) into a local, copied to *Out.
 // Retail has one body for all five call sites: FUN_004478c0 (twice), FUN_00448c40, the engine
 // nozzles FUN_00528d70 and Debris.cpp FUN_005301d0.
-struct FVector;
-struct FMatrix;
-void ShipTransposeRotate(FVector& Out, FMatrix const& M, FVector const& V);
+class Vector;
+class Matrix;
+void ShipTransposeRotate(Vector& Out, Matrix const& M, Vector const& V);

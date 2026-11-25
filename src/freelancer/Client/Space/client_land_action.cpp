@@ -197,11 +197,11 @@ Action_JumpOut::Action_JumpOut(FClientShipGameobj* InShip, float InDuration, uns
 
     // Retail converts the start frame a second time into a local nothing reads.
     ShipMath()->MatrixToQuaternion(StartRotation,
-                                   reinterpret_cast<FMatrix const&>(StartXform.Rotation));
+                                   StartXform.Rotation);
     ShipMath()->MatrixToQuaternion(EndRotation,
-                                   reinterpret_cast<FMatrix const&>(EndXform.Rotation));
-    FQuaternion Unused;
-    ShipMath()->MatrixToQuaternion(Unused, reinterpret_cast<FMatrix const&>(StartXform.Rotation));
+                                   EndXform.Rotation);
+    Quaternion Unused;
+    ShipMath()->MatrixToQuaternion(Unused, StartXform.Rotation);
 
     StartPosition = StartXform.Translation;
     EndPosition = EndXform.Translation;
@@ -252,14 +252,14 @@ void Action_JumpOut::do_simulation_controller(IVP_Event_Sim* EventSim,
         Eased = kJumpOutMaxFraction;
 
     // A gate type with bit 0x800 keeps the start orientation.
-    FQuaternion Rotation;
+    Quaternion Rotation;
     if ((GateType & 0x800u) != 0)
     {
         Rotation = StartRotation;
     }
     else
     {
-        FQuaternion Slerped;
+        Quaternion Slerped;
         ShipMath()->QuatSlerp(Slerped, StartRotation, EndRotation, Eased);
         Rotation = Slerped;
     }
@@ -276,6 +276,6 @@ void Action_JumpOut::do_simulation_controller(IVP_Event_Sim* EventSim,
     if (Object == nullptr || (static_cast<unsigned>(Object->ObjectClass) & CObject::ClassShip) != CObject::ClassShip)
         return;
     Matrix Orientation;
-    ShipMath()->QuaternionToMatrix(reinterpret_cast<FMatrix&>(Orientation), Rotation);
+    ShipMath()->QuaternionToMatrix(Orientation, Rotation);
     Object->beam_object(Position, Orientation, false);
 }

@@ -8,9 +8,7 @@
 // the CompoundInstance* walkers, hardpoint queries (HardpointPosition[A], HardpointToObject,
 // NumHardpoints) and JointEnumCallback.
 //
-// Engine instance handles are `long` here (-1 = none) and `void*` in the IEngine / IHardpoint
-// interfaces; the C-style casts between the two are value conversions of the same handle.
-// Vector / Matrix / Transform are layout-identical to x86math's FVector / FMatrix / FTransform.
+// Engine instance handles are `long` (InstanceIndex, -1 = none).
 #include "common_cobject.h"
 #include "x86math.h"
 
@@ -29,7 +27,7 @@ int __cdecl Hierarchy::GetDepth(long ParentInst, long ChildInst)
         if (ChildInst == ParentInst)
             return Depth;
         ++Depth;
-        ChildInst = (long)DALib::Engine->GetInstanceParent((void*)ChildInst);
+        ChildInst = DALib::Engine->GetInstanceParent(ChildInst);
     }
     return -1;
 }
@@ -48,7 +46,7 @@ bool __cdecl IsDescendant(long ParentInst, long ChildInst)
         if (ChildInst == ParentInst)
             break;
         ++Depth;
-        ChildInst = (long)DALib::Engine->GetInstanceParent((void*)ChildInst);
+        ChildInst = DALib::Engine->GetInstanceParent(ChildInst);
     }
     return Depth != -1;
 }
@@ -63,27 +61,26 @@ bool __cdecl HardpointPosition(long Instance, char const* HpName, Vector* OutPos
     if (!FindHardpoint_OS(Instance, HpName, FoundOn, Info))
         return false;
 
-    float const* const InstancePos = DALib::Engine->GetInstancePosition((void*)FoundOn);
-    float const PosX = InstancePos[0];
-    float const PosY = InstancePos[1];
-    float const PosZ = InstancePos[2];
-    FMatrix const InstanceOrient =
-        *(FMatrix const*)DALib::Engine->GetInstanceOrientation((void*)FoundOn);
+    const Vector* const InstancePos = DALib::Engine->GetInstancePosition(FoundOn);
+    float const PosX = InstancePos->x;
+    float const PosY = InstancePos->y;
+    float const PosZ = InstancePos->z;
+    Matrix const InstanceOrient =
+        *DALib::Engine->GetInstanceOrientation(FoundOn);
 
     if (OutPos != nullptr)
     {
-        FVector Rotated;
-        Acquire3DMathEngine()->TransformMatrix(Rotated, InstanceOrient,
-                                               (FVector const&)Info.Position);
-        OutPos->x = Rotated.X + PosX;
-        OutPos->y = Rotated.Y + PosY;
-        OutPos->z = Rotated.Z + PosZ;
+        Vector Rotated;
+        Acquire3DMathEngine()->TransformMatrix(Rotated, InstanceOrient, Info.Position);
+        OutPos->x = Rotated.x + PosX;
+        OutPos->y = Rotated.y + PosY;
+        OutPos->z = Rotated.z + PosZ;
     }
     if (OutOrient != nullptr)
     {
-        FMatrix Combined;
-        Acquire3DMathEngine()->MulMatrix(Combined, InstanceOrient, (FMatrix const&)Info.Orient);
-        *OutOrient = (Matrix const&)Combined;
+        Matrix Combined;
+        Acquire3DMathEngine()->MulMatrix(Combined, InstanceOrient, Info.Orient);
+        *OutOrient = Combined;
     }
     return true;
 }
@@ -99,7 +96,7 @@ namespace
     // first); -1 when there are no more.
     long NextChildInstance(long Instance, long Previous)
     {
-        return (long)DALib::Engine->GetRelatedInstance((void*)Instance, 1, (void*)Previous);
+        return DALib::Engine->GetRelatedInstance(Instance, 1, Previous);
     }
 }
 
@@ -144,7 +141,7 @@ namespace
     bool __cdecl CompoundInstanceNameMatches(long Instance, char const* Name)
     {
         FEngineName Info = {nullptr, 0};
-        FEngineName* const Result = DALib::Engine->GetInstanceName(&Info, (void*)Instance);
+        FEngineName* const Result = DALib::Engine->GetInstanceName(&Info, Instance);
         char const* Found = Result->Text;
         if (Found == nullptr)
             Found = "";
@@ -273,7 +270,7 @@ long __cdecl CompoundInstanceFindFirstName(long Instance, char const* Name)
 long __cdecl FindChild(long Instance, char const* Name)
 {
     long Found = -1;
-    long Child = (long)DALib::Engine->GetRelatedInstance((void*)Instance, 1, G_InvalidEngineHandle);
+    long Child = DALib::Engine->GetRelatedInstance(Instance, 1, InvalidInstanceIndex);
     if (Child != -1)
     {
         do
@@ -281,13 +278,13 @@ long __cdecl FindChild(long Instance, char const* Name)
             if (Found != -1)
                 return Found;
             FEngineName Info = {nullptr, 0};
-            char const* ChildName = DALib::Engine->GetInstanceName(&Info, (void*)Child)->Text;
+            char const* ChildName = DALib::Engine->GetInstanceName(&Info, Child)->Text;
             if (ChildName == nullptr)
                 ChildName = "";
             if (_stricmp(ChildName, Name) == 0)
                 return Child;
             Found = FindChild(Child, Name);
-            Child = (long)DALib::Engine->GetRelatedInstance((void*)Instance, 1, (void*)Child);
+            Child = DALib::Engine->GetRelatedInstance(Instance, 1, Child);
         } while (Child != -1);
     }
     return Found;
@@ -302,7 +299,7 @@ COMMON_API long __cdecl GetRoot(long Inst)
     do
     {
         ParentInst = Inst;
-        Inst = (long)DALib::Engine->GetInstanceParent((void*)ParentInst);
+        Inst = DALib::Engine->GetInstanceParent(ParentInst);
     } while (Inst != -1);
     return ParentInst;
 }
@@ -316,9 +313,9 @@ COMMON_API CObject* __cdecl GetRoot(CObject const* Obj)
         do
         {
             ParentInst = Inst;
-            Inst = (long)DALib::Engine->GetInstanceParent((void*)ParentInst);
+            Inst = DALib::Engine->GetInstanceParent(ParentInst);
         } while (Inst != -1);
-        return (CObject*)DALib::Engine->GetInstanceUserData((void*)ParentInst);
+        return (CObject*)DALib::Engine->GetInstanceUserData(ParentInst);
     }
     return const_cast<CObject*>(Obj);
 }
@@ -334,26 +331,24 @@ COMMON_API void __cdecl HardpointToObject(long Inst, HardpointInfo& Info)
     World.Translation = Info.Position;
 
     Transform const* const InstXform =
-        (Transform const*)DALib::Engine->GetInstanceTransform((void*)Inst);
+        DALib::Engine->GetInstanceTransform(Inst);
 
     I3DMathEngine* const Math = Acquire3DMathEngine();
-    FVector Rotated;
-    Math->TransposeTransform(Rotated, (FMatrix const&)InstXform->Rotation,
-                             (FVector const&)InstXform->Translation);
+    Vector Rotated;
+    Math->TransposeTransform(Rotated, InstXform->Rotation, InstXform->Translation);
     Matrix const& R = InstXform->Rotation;
     Transform Inverse;
     Inverse.Rotation = Matrix(R.E[0][0], R.E[1][0], R.E[2][0],
                               R.E[0][1], R.E[1][1], R.E[2][1],
                               R.E[0][2], R.E[1][2], R.E[2][2]);
-    Inverse.Translation.x = -Rotated.X;
-    Inverse.Translation.y = -Rotated.Y;
-    Inverse.Translation.z = -Rotated.Z;
+    Inverse.Translation.x = -Rotated.x;
+    Inverse.Translation.y = -Rotated.y;
+    Inverse.Translation.z = -Rotated.z;
 
-    FTransform Local;
-    Acquire3DMathEngine()->MulTransform(Local, (FTransform const&)Inverse,
-                                        (FTransform const&)World);
-    Info.Position = (Vector const&)Local.Translation;
-    Info.Orient = (Matrix const&)Local.Rotation;
+    Transform Local;
+    Acquire3DMathEngine()->MulTransform(Local, Inverse, World);
+    Info.Position = Local.Translation;
+    Info.Orient = Local.Rotation;
 }
 
 namespace
@@ -375,7 +370,7 @@ COMMON_API int __cdecl NumHardpoints(long Inst, bool bFlag)
     int Count = 0;
     auto const CountHardpointsOn = [&](long Handle)
     {
-        void* const Arch = DALib::Engine->GetInstanceArchetype((void*)Handle);
+        const ArchetypeIndex Arch = DALib::Engine->GetInstanceArchetype(Handle);
         DALib::Engine->ReleaseHandle(Arch);
         DALib::Hardpoint->EnumerateHardpoints(&NumHardpoints_CountCallback, Arch, &Count);
     };
@@ -384,9 +379,9 @@ COMMON_API int __cdecl NumHardpoints(long Inst, bool bFlag)
 
     if (bFlag)
     {
-        for (long Child = (long)DALib::Engine->GetRelatedInstance((void*)Inst, 0, G_InvalidEngineHandle);
+        for (long Child = DALib::Engine->GetRelatedInstance(Inst, 0, InvalidInstanceIndex);
              Child != -1;
-             Child = (long)DALib::Engine->GetRelatedInstance((void*)Inst, 0, (void*)Child))
+             Child = DALib::Engine->GetRelatedInstance(Inst, 0, Child))
         {
             CountHardpointsOn(Child);
         }
@@ -450,7 +445,7 @@ bool __cdecl HardpointPositionA(long Instance, char const* HpName, Vector* OutPo
     // in order; otherwise IHardpoint +0xc on Instance. The outputs are archetype-local, with no
     // world transform.
     bool bFound = false;
-    if (DALib::Engine->IsCompoundArchetype((void*)Instance) != 0)
+    if (DALib::Engine->IsCompoundArchetype(Instance) != 0)
     {
         JointEnumContext Children;
         Children.Allocator = (unsigned char)Instance;
@@ -461,7 +456,7 @@ bool __cdecl HardpointPositionA(long Instance, char const* HpName, Vector* OutPo
         // Retail passes JointEnumCallback itself; its exported signature differs from the
         // engine's callback type only in parameter and return types of the same width.
         DALib::Engine->EnumerateArchetypeChildren(
-            (void*)Instance, (int(__cdecl*)(void*, void*, int, void*))&JointEnumCallback, &Children);
+            Instance, (int(__cdecl*)(ArchetypeIndex, ArchetypeIndex, int, void*))&JointEnumCallback, &Children);
 
         for (JointEnumNode* Node = Children.Head->Next; Node != Children.Head; Node = Node->Next)
         {
@@ -491,7 +486,7 @@ bool __cdecl HardpointPositionA(long Instance, char const* HpName, Vector* OutPo
     Key.Crc = DACOM_CRC::GetCRC32(HpName);
     HardpointInfo Info;
     // Retail tests AL only.
-    if ((unsigned char)DALib::Hardpoint->GetHardpoint((void*)Instance, &Key, &Info) == 0)
+    if ((unsigned char)DALib::Hardpoint->GetHardpoint(Instance, &Key, &Info) == 0)
         return false;
     if (OutPos != nullptr)
         *OutPos = Info.Position;

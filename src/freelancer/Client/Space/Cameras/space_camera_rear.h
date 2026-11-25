@@ -34,7 +34,7 @@ struct FRearViewCamera : FHudCamera
     void Update(float DeltaSeconds) override;
     void DrawScene(unsigned LayerFlags, unsigned Param2) override;
 
-    float      ViewPosition[3];  // +0x100  [RearViewCamera] view_position, default (0, 5, 20)
+    Vector ViewPosition;  // +0x100  [RearViewCamera] view_position, default (0, 5, 20)
 };
 
 // The death camera sits at controller + 0x60c and this one at + 0x500.

@@ -58,12 +58,12 @@ namespace
     }
 
     // FUN_06f249c0: the foreign result is distinct, even if Dst aliases A/B.
-    void CoreQuatMul(FQuat& Dst, const FQuat& A, const FQuat& B)
+    void CoreQuatMul(Quaternion& Dst, const Quaternion& A, const Quaternion& B)
     {
         I3DMathEngine* Math = AcquireSplineCoreMathEngine();
-        FQuaternion InputA;
-        FQuaternion InputB;
-        FQuaternion Product;
+        Quaternion InputA;
+        Quaternion InputB;
+        Quaternion Product;
         // The actual factory precedes all foreign operand reads. The sole
         // MulQuat producer is callback-free, and writes a separate scratch.
         std::memcpy(&InputA, &A, sizeof(InputA));
@@ -72,19 +72,19 @@ namespace
         std::memcpy(&Dst, &Product, sizeof(Dst));
     }
 
-    void CoreQuatSlerpWithMath(I3DMathEngine* Math, FQuat& Dst,
-        const FQuat& A, const FQuat& B, const float* T)
+    void CoreQuatSlerpWithMath(I3DMathEngine* Math, Quaternion& Dst,
+        const Quaternion& A, const Quaternion& B, const float* T)
     {
-        FQuaternion InputA;
-        FQuaternion InputB;
-        FQuaternion Result;
+        Quaternion InputA;
+        Quaternion InputB;
+        Quaternion Result;
         std::memcpy(&InputA, &A, sizeof(InputA));
         std::memcpy(&InputB, &B, sizeof(InputB));
         Math->QuatSlerpValue(Result, InputA, InputB, T);
         std::memcpy(&Dst, &Result, sizeof(Dst));
     }
 
-    void CoreQuatSlerp(FQuat& Dst, const FQuat& A, const FQuat& B, const float* T)
+    void CoreQuatSlerp(Quaternion& Dst, const Quaternion& A, const Quaternion& B, const float* T)
     {
         I3DMathEngine* Math = AcquireSplineCoreMathEngine();
         CoreQuatSlerpWithMath(Math, Dst, A, B, T);
@@ -94,7 +94,7 @@ namespace
     // unconditional reciprocal, and one float store before quat scaling.
     // Debug C++ reads signalling Z before adding X^2+Y^2; at PC53 that
     // changes the first unmasked exception from precision to invalid.
-    void QuatInverseScaleRetail(const FQuat& Q, float& Scale)
+    void QuatInverseScaleRetail(const Quaternion& Q, float& Scale)
     {
         const float One = 1.0f;
         __asm
@@ -139,7 +139,7 @@ namespace
     // at PC24/round-down: tangent {-0, min-subnormal, -min-subnormal}
     // produces matrix X 0x3f7fffff instead of 0x3f800000 in Release.
     // Debug also adds denormal-operand status through extra reloads.
-    void BuildSlot5MatrixRetail(const FVec3& Tangent, float* Mat9)
+    void BuildSlot5MatrixRetail(const Vector& Tangent, float* Mat9)
     {
         float Scratch[27];
         std::memcpy(Scratch + 3, &Tangent, sizeof(Tangent));
@@ -254,16 +254,16 @@ namespace
         std::memcpy(Mat9, Scratch + 16, 9 * sizeof(float));
     }
 
-    void CatmullRomVec3(const FVec3& P0, const FVec3& P1, const FVec3& P2, const FVec3& P3, float U,
-                        FVec3& Out)
+    void CatmullRomVec3(const Vector& P0, const Vector& P1, const Vector& P2, const Vector& P3, float U,
+                        Vector& Out)
     {
-        ThornSplineMath::CatmullRom3D(&P0.X, &P1.X, &P2.X, &P3.X, U, &Out.X);
+        ThornSplineMath::CatmullRom3D(&P0.x, &P1.x, &P2.x, &P3.x, U, &Out.x);
     }
 
-    void CatmullRomTangent(const FVec3& P0, const FVec3& P1, const FVec3& P2, const FVec3& P3,
-                           float U, FVec3& Out)
+    void CatmullRomTangent(const Vector& P0, const Vector& P1, const Vector& P2, const Vector& P3,
+                           float U, Vector& Out)
     {
-        ThornSplineMath::CatmullRomTangent3D(&P0.X, &P1.X, &P2.X, &P3.X, U, &Out.X);
+        ThornSplineMath::CatmullRomTangent3D(&P0.x, &P1.x, &P2.x, &P3.x, U, &Out.x);
     }
 
     // FUN_06f34bc0 / FUN_06f35580 / LAB_06f34ca0 / LAB_06f356c0
@@ -345,7 +345,7 @@ namespace
     // quaternion tree orientation LoadPersist builds; the port's RAII containers replace them.
     struct FPersistPointTree
     {
-        std::map<unsigned int, FVec3> Entries;
+        std::map<unsigned int, Vector> Entries;
     };
 
     // FUN_06f36460: initialize the two retail sentinel nodes and size=0.
@@ -358,15 +358,15 @@ namespace
     // The returned node is the existing value for a duplicate key, otherwise
     // the newly inserted value; insertion is ordered by the uint key.
     bool ThornPersistTreeInsert(FPersistPointTree& Tree, unsigned int Key,
-                                const FVec3& Point, FVec3*& OutPoint)
+                                const Vector& Point, Vector*& OutPoint)
     {
-        std::map<unsigned int, FVec3>::iterator Found = Tree.Entries.lower_bound(Key);
+        std::map<unsigned int, Vector>::iterator Found = Tree.Entries.lower_bound(Key);
         if (Found != Tree.Entries.end() && Found->first == Key)
         {
             OutPoint = &Found->second;
             return false;
         }
-        std::pair<std::map<unsigned int, FVec3>::iterator, bool> Result =
+        std::pair<std::map<unsigned int, Vector>::iterator, bool> Result =
             Tree.Entries.insert(std::make_pair(Key, Point));
         if (!Result.second)
         {
@@ -378,9 +378,9 @@ namespace
     }
 
     // FUN_06f35cc0: return the first in-order node (retail head->next).
-    bool ThornPersistTreeBegin(FPersistPointTree& Tree, FVec3*& OutPoint)
+    bool ThornPersistTreeBegin(FPersistPointTree& Tree, Vector*& OutPoint)
     {
-        std::map<unsigned int, FVec3>::iterator Found = Tree.Entries.begin();
+        std::map<unsigned int, Vector>::iterator Found = Tree.Entries.begin();
         if (Found == Tree.Entries.end())
         {
             OutPoint = nullptr;
@@ -393,7 +393,7 @@ namespace
     // FUN_06f22030 22122..22176 keeps chord differences/norm extended.
     // C++ double spills and sqrt calls gave actual Debug/Release differences.
     // Publish the row directly: reloading a returned subnormal float adds DE.
-    void AccumulateSegmentSampleRetail(FVec3& Prev, const FVec3& Cur,
+    void AccumulateSegmentSampleRetail(Vector& Prev, const Vector& Cur,
                                        const float& GlobalOffset, float& SegmentLength,
                                        float& SampleTime)
     {
@@ -465,23 +465,23 @@ namespace
         }
     }
 
-    void LerpVec3(const FVec3& A, const FVec3& B, float F, FVec3& Out)
+    void LerpVec3(const Vector& A, const Vector& B, float F, Vector& Out)
     {
-        ThornSplineMath::Lerp3D(&A.X, &B.X, F, &Out.X);
+        ThornSplineMath::Lerp3D(&A.x, &B.x, F, &Out.x);
     }
 
-    void IdentityQuat(FQuat& Q)
+    void IdentityQuat(Quaternion& Q)
     {
-        Q.W = 1.0f;
-        Q.X = 0.0f;
-        Q.Y = 0.0f;
-        Q.Z = 0.0f;
+        Q.w = 1.0f;
+        Q.x = 0.0f;
+        Q.y = 0.0f;
+        Q.z = 0.0f;
     }
 
     // LAB_06f34180: normalize then negate the tangent, normalize
     // ExistingY x Forward, then negate normalize(RawFirstCross x ExistingX).
     // The two input columns are read before rotational output publication.
-    void NormalizeLookAtVector(FVec3& Vector)
+    void NormalizeLookAtVector(Vector& LookAt)
     {
         const float One = 1.0f;
         // The intrinsic C++ candidate changes PC24/RC_DOWN output bits and
@@ -489,7 +489,7 @@ namespace
         // all three float stores; 342b5..342f7 uses the same arithmetic.
         __asm
         {
-            mov edx, Vector
+            mov edx, LookAt
             fld dword ptr [edx + 8]
             fmul dword ptr [edx + 8]
             fld dword ptr [edx + 4]
@@ -513,7 +513,7 @@ namespace
         }
     }
 
-    void CrossLookAtVector(FVec3& Result, const FVec3& A, const FVec3& B, bool bReverseOrder)
+    void CrossLookAtVector(Vector& Result, const Vector& A, const Vector& B, bool bReverseOrder)
     {
         // Retain the old matrix column before products. First cross computes
         // X/Y/Z; the second computes Z/Y/X. The ordinary Release candidate
@@ -578,33 +578,33 @@ namespace
         }
     }
 
-    void BuildLookAtFromTangent(const FVec3& Tangent, float* OutXform)
+    void BuildLookAtFromTangent(const Vector& Tangent, float* OutXform)
     {
-        FVec3 Forward;
+        Vector Forward;
         std::memcpy(&Forward, &Tangent, sizeof(Forward));
         NormalizeLookAtVector(Forward);
-        Forward.Z = -Forward.Z;
-        Forward.Y = -Forward.Y;
-        Forward.X = -Forward.X;
+        Forward.z = -Forward.z;
+        Forward.y = -Forward.y;
+        Forward.x = -Forward.x;
 
-        FVec3 UpRef;
-        std::memcpy(&UpRef.X, OutXform + 1, sizeof(float));
-        std::memcpy(&UpRef.Y, OutXform + 4, sizeof(float));
-        std::memcpy(&UpRef.Z, OutXform + 7, sizeof(float));
+        Vector UpRef;
+        std::memcpy(&UpRef.x, OutXform + 1, sizeof(float));
+        std::memcpy(&UpRef.y, OutXform + 4, sizeof(float));
+        std::memcpy(&UpRef.z, OutXform + 7, sizeof(float));
 
-        FVec3 AxisYRaw;
+        Vector AxisYRaw;
         CrossLookAtVector(AxisYRaw, Forward, UpRef, false);
-        FVec3 AxisY;
+        Vector AxisY;
         std::memcpy(&AxisY, &AxisYRaw, sizeof(AxisY));
         NormalizeLookAtVector(AxisY);
 
         // 342f9..34333 reads the old X column, and uses the unnormalized
         // first cross retained in the other local vector.
-        FVec3 ExistingX;
-        std::memcpy(&ExistingX.X, OutXform, sizeof(float));
-        std::memcpy(&ExistingX.Y, OutXform + 3, sizeof(float));
-        std::memcpy(&ExistingX.Z, OutXform + 6, sizeof(float));
-        FVec3 AxisZ;
+        Vector ExistingX;
+        std::memcpy(&ExistingX.x, OutXform, sizeof(float));
+        std::memcpy(&ExistingX.y, OutXform + 3, sizeof(float));
+        std::memcpy(&ExistingX.z, OutXform + 6, sizeof(float));
+        Vector AxisZ;
         CrossLookAtVector(AxisZ, AxisYRaw, ExistingX, true);
         const float One = 1.0f;
         // 3435d..343d2: the Z product precedes the first caller store, its
@@ -632,19 +632,19 @@ namespace
             fld dword ptr [edx + 8]
             fmul st(0), st(1)
             mov ecx, OutXform
-            mov eax, Forward.X
+            mov eax, Forward.x
             mov dword ptr [ecx], eax
             fstp dword ptr [edx + 8]
-            mov eax, AxisY.X
+            mov eax, AxisY.x
             mov dword ptr [ecx + 4], eax
             fstp st(0)
-            mov eax, Forward.Y
+            mov eax, Forward.y
             mov dword ptr [ecx + 12], eax
-            mov eax, Forward.Z
+            mov eax, Forward.z
             mov dword ptr [ecx + 24], eax
-            mov eax, AxisY.Y
+            mov eax, AxisY.y
             mov dword ptr [ecx + 16], eax
-            mov eax, AxisY.Z
+            mov eax, AxisY.z
             mov dword ptr [ecx + 28], eax
             fld dword ptr [edx + 8]
             fchs
@@ -664,7 +664,7 @@ namespace
         }
     }
 
-    void QuatAdd(FQuat& Dst, const FQuat& A, const FQuat& B)
+    void QuatAdd(Quaternion& Dst, const Quaternion& A, const Quaternion& B)
     {
         // Ordinary double temporaries spill to qword in Debug. At PC64,
         // 1 + 2^-60 then traps on that spill before the retail W publication.
@@ -688,7 +688,7 @@ namespace
         }
     }
 
-    void QuatScale(FQuat& Dst, const FQuat& Q, float S)
+    void QuatScale(Quaternion& Dst, const Quaternion& Q, float S)
     {
         float W;
         float X;
@@ -724,18 +724,18 @@ namespace
     }
 
     // FUN_06f24070 is conjugation, with a raw retained W and negated XYZ.
-    void QuatConjugate(FQuat& Dst, const FQuat& Q)
+    void QuatConjugate(Quaternion& Dst, const Quaternion& Q)
     {
-        const float X = -Q.X;
+        const float X = -Q.x;
         unsigned int W;
-        std::memcpy(&W, &Q.W, sizeof(W));
-        const float Y = -Q.Y;
-        const double Z = -static_cast<double>(Q.Z);
-        std::memcpy(&Dst.W, &W, sizeof(W));
-        std::memcpy(&Dst.X, &X, sizeof(float));
+        std::memcpy(&W, &Q.w, sizeof(W));
+        const float Y = -Q.y;
+        const double Z = -static_cast<double>(Q.z);
+        std::memcpy(&Dst.w, &W, sizeof(W));
+        std::memcpy(&Dst.x, &X, sizeof(float));
         const float StoredZ = static_cast<float>(Z);
-        std::memcpy(&Dst.Y, &Y, sizeof(float));
-        std::memcpy(&Dst.Z, &StoredZ, sizeof(float));
+        std::memcpy(&Dst.y, &Y, sizeof(float));
+        std::memcpy(&Dst.z, &StoredZ, sizeof(float));
     }
 
     // Standalone FUN_06f24190 keeps the ratio extended; the three
@@ -748,21 +748,21 @@ namespace
         return std::fabs(static_cast<double>(W)) < 1.0;
     }
 
-    void QuatLogRetail(FQuat& Dst, const FQuat& Q, bool bRoundScale)
+    void QuatLogRetail(Quaternion& Dst, const Quaternion& Q, bool bRoundScale)
     {
-        if (!IsQuatLogAccepted(Q.W))
+        if (!IsQuatLogAccepted(Q.w))
         {
             const unsigned int Zero = 0;
-            std::memcpy(&Dst.W, &Zero, sizeof(Zero));
-            std::memcpy(&Dst.X, &Q.X, sizeof(float));
-            std::memcpy(&Dst.Y, &Q.Y, sizeof(float));
-            std::memcpy(&Dst.Z, &Q.Z, sizeof(float));
+            std::memcpy(&Dst.w, &Zero, sizeof(Zero));
+            std::memcpy(&Dst.x, &Q.x, sizeof(float));
+            std::memcpy(&Dst.y, &Q.y, sizeof(float));
+            std::memcpy(&Dst.z, &Q.z, sizeof(float));
             return;
         }
 
         // The mandatory modern std::acos call publishes a double result.
         // That published double is the input to the owned arithmetic below.
-        const double Angle = std::acos(static_cast<double>(Q.W));
+        const double Angle = std::acos(static_cast<double>(Q.w));
         const float Epsilon = G_QuatSinEps;
         float Scale;
         float X;
@@ -819,32 +819,32 @@ namespace
         if (bFallback)
         {
             const unsigned int Zero = 0;
-            std::memcpy(&Dst.W, &Zero, sizeof(Zero));
-            std::memcpy(&Dst.X, &Q.X, sizeof(float));
-            std::memcpy(&Dst.Y, &Q.Y, sizeof(float));
-            std::memcpy(&Dst.Z, &Q.Z, sizeof(float));
+            std::memcpy(&Dst.w, &Zero, sizeof(Zero));
+            std::memcpy(&Dst.x, &Q.x, sizeof(float));
+            std::memcpy(&Dst.y, &Q.y, sizeof(float));
+            std::memcpy(&Dst.z, &Q.z, sizeof(float));
             return;
         }
         if (bRoundScale)
         {
-            FVec3 Scaled;
-            ThornSplineMath::Scale(&Scaled.X, &Q.X, Scale);
+            Vector Scaled;
+            ThornSplineMath::Scale(&Scaled.x, &Q.x, Scale);
             const unsigned int Zero = 0;
-            std::memcpy(&Dst.W, &Zero, sizeof(Zero));
-            std::memcpy(&Dst.X, &Scaled.X, sizeof(float));
-            std::memcpy(&Dst.Y, &Scaled.Y, sizeof(float));
-            std::memcpy(&Dst.Z, &Scaled.Z, sizeof(float));
+            std::memcpy(&Dst.w, &Zero, sizeof(Zero));
+            std::memcpy(&Dst.x, &Scaled.x, sizeof(float));
+            std::memcpy(&Dst.y, &Scaled.y, sizeof(float));
+            std::memcpy(&Dst.z, &Scaled.z, sizeof(float));
         }
     }
 
-    void QuatLog(FQuat& Dst, const FQuat& Q)
+    void QuatLog(Quaternion& Dst, const Quaternion& Q)
     {
         QuatLogRetail(Dst, Q, false);
     }
 
     // The first inline exp (06f21970) differs from standalone FUN_06f24670: it keeps the norm
     // for FSIN, but publishes a float scale before Scale3D.
-    void QuatFirstControlExp(FQuat& Dst, const FQuat& Q)
+    void QuatFirstControlExp(Quaternion& Dst, const Quaternion& Q)
     {
         const float Epsilon = G_QuatSinEps;
         float Norm;
@@ -877,21 +877,21 @@ namespace
             fstp st(0)
         FirstExpVectorReady:
         }
-        FQuat Result;
+        Quaternion Result;
         if (bScaleVector)
-            ThornSplineMath::Scale(&Result.X, &Q.X, Scale);
+            ThornSplineMath::Scale(&Result.x, &Q.x, Scale);
         else
         {
-            std::memcpy(&Result.X, &Q.X, sizeof(float));
-            std::memcpy(&Result.Y, &Q.Y, sizeof(float));
-            std::memcpy(&Result.Z, &Q.Z, sizeof(float));
+            std::memcpy(&Result.x, &Q.x, sizeof(float));
+            std::memcpy(&Result.y, &Q.y, sizeof(float));
+            std::memcpy(&Result.z, &Q.z, sizeof(float));
         }
         // FCOS follows Scale3D, and consumes its explicit float norm.
         __asm
         {
             fld Norm
             fcos
-            fstp Result.W
+            fstp Result.w
         }
         std::memcpy(&Dst, &Result, sizeof(Result));
     }
@@ -899,14 +899,14 @@ namespace
     // FUN_06f24670 rounds the norm before FSIN. The first inline exp
     // in FUN_06f21770 keeps it extended for FSIN, but division/FCOS
     // still use its explicit float copy in both paths.
-    void QuatExpRetail(FQuat& Dst, const FQuat& Q, bool bKeepNormForSin)
+    void QuatExpRetail(Quaternion& Dst, const Quaternion& Q, bool bKeepNormForSin)
     {
         const float Epsilon = G_QuatSinEps;
         float Norm;
-        FQuat Result;
-        Result.X = Q.X;
-        Result.Y = Q.Y;
-        Result.Z = Q.Z;
+        Quaternion Result;
+        Result.x = Q.x;
+        Result.y = Q.y;
+        Result.z = Q.z;
         __asm
         {
             mov edx, Q
@@ -968,16 +968,16 @@ namespace
         Dst = Result;
     }
 
-    void QuatExp(FQuat& Dst, const FQuat& Q)
+    void QuatExp(Quaternion& Dst, const Quaternion& Q)
     {
         QuatExpRetail(Dst, Q, false);
     }
 
     // Retail (FUN_06f249c0, inlined in FUN_06f21770) never tests the MulQuat result before
     // taking its log.
-    void QuatLogDiff(FQuat& Dst, const FQuat& InvCenter, const FQuat& Neighbor, bool bRoundScale)
+    void QuatLogDiff(Quaternion& Dst, const Quaternion& InvCenter, const Quaternion& Neighbor, bool bRoundScale)
     {
-        FQuat Product;
+        Quaternion Product;
         CoreQuatMul(Product, InvCenter, Neighbor);
         if (bRoundScale)
             QuatLogRetail(Dst, Product, true);
@@ -996,29 +996,29 @@ namespace
 
     // Inner squad control: q * exp(-1/4 (log(q^{-1} q_prev) + log(q^{-1} q_next))).
     // Retail never checks any of the three math results.
-    void QuatSquadControl(FQuat& Dst, const FQuat& Prev, const FQuat& Center,
-                          const FQuat& Next, const FQuat& InvCenter, bool bFirstControl)
+    void QuatSquadControl(Quaternion& Dst, const Quaternion& Prev, const Quaternion& Center,
+                          const Quaternion& Next, const Quaternion& InvCenter, bool bFirstControl)
     {
-        FQuat LogPrev;
-        FQuat LogNext;
+        Quaternion LogPrev;
+        Quaternion LogNext;
         QuatLogDiff(LogPrev, InvCenter, Prev, true);
         QuatLogDiff(LogNext, InvCenter, Next, bFirstControl);
 
-        FQuat Sum;
+        Quaternion Sum;
         if (bFirstControl)
         {
             // Retail inlines four rounded sums in Z/Y/X/W order.
-            AddFirstControlComponent(&Sum.Z, &LogPrev.Z, &LogNext.Z);
-            AddFirstControlComponent(&Sum.Y, &LogPrev.Y, &LogNext.Y);
-            AddFirstControlComponent(&Sum.X, &LogPrev.X, &LogNext.X);
-            AddFirstControlComponent(&Sum.W, &LogPrev.W, &LogNext.W);
+            AddFirstControlComponent(&Sum.z, &LogPrev.z, &LogNext.z);
+            AddFirstControlComponent(&Sum.y, &LogPrev.y, &LogNext.y);
+            AddFirstControlComponent(&Sum.x, &LogPrev.x, &LogNext.x);
+            AddFirstControlComponent(&Sum.w, &LogPrev.w, &LogNext.w);
         }
         else
             QuatAdd(Sum, LogPrev, LogNext);
-        FQuat Scaled;
+        Quaternion Scaled;
         QuatScale(Scaled, Sum, -0.25f);
 
-        FQuat ExpQ;
+        Quaternion ExpQ;
         if (bFirstControl)
             QuatFirstControlExp(ExpQ, Scaled);
         else
@@ -1028,11 +1028,11 @@ namespace
 
     // FUN_06f248c0: squad(q1,a,b,q2,t) = slerp(slerp(q1,q2,t), slerp(a,b,t), 2t(1-t))
     // None of the three slerp results is tested; the output is always stored.
-    void QuatSquad(FQuat& Dst, const FQuat& Q1, const FQuat& A, const FQuat& B,
-                   const FQuat& Q2, const float* T)
+    void QuatSquad(Quaternion& Dst, const Quaternion& Q1, const Quaternion& A, const Quaternion& B,
+                   const Quaternion& Q2, const float* T)
     {
-        FQuat SlerpAb;
-        FQuat SlerpQ;
+        Quaternion SlerpAb;
+        Quaternion SlerpQ;
         CoreQuatSlerp(SlerpAb, A, B, T);
         CoreQuatSlerp(SlerpQ, Q1, Q2, T);
         // The math cache is acquired BEFORE T is read for Blend.
@@ -1043,22 +1043,22 @@ namespace
 
     // FUN_06f21770: Catmull-Rom quaternion on Q0..Q3 at U. No inner math result is tested and
     // the function always succeeds.
-    bool EvalCrOrientation(const FQuat& Q0, const FQuat& Q1, const FQuat& Q2,
-                           const FQuat& Q3, float U, FQuat& Out)
+    bool EvalCrOrientation(const Quaternion& Q0, const Quaternion& Q1, const Quaternion& Q2,
+                           const Quaternion& Q3, float U, Quaternion& Out)
     {
         // Both center inverses precede the first callback-capable math call.
         float ScaleA;
         QuatInverseScaleRetail(Q1, ScaleA);
-        FQuat InverseA;
+        Quaternion InverseA;
         QuatConjugate(InverseA, Q1);
         QuatScale(InverseA, InverseA, ScaleA);
         float ScaleB;
         QuatInverseScaleRetail(Q2, ScaleB);
-        FQuat InverseB;
+        Quaternion InverseB;
         QuatConjugate(InverseB, Q2);
         QuatScale(InverseB, InverseB, ScaleB);
-        FQuat ControlA;
-        FQuat ControlB;
+        Quaternion ControlA;
+        Quaternion ControlB;
         QuatSquadControl(ControlA, Q0, Q1, Q2, InverseA, true);
         QuatSquadControl(ControlB, Q1, Q2, Q3, InverseB, false);
         QuatSquad(Out, Q1, ControlA, ControlB, Q2, &U);
@@ -1068,8 +1068,8 @@ namespace
     struct FSplineCoreStorage
     {
         // Construction/unwind order: Points, Quats, Times, sample rows.
-        std::vector<FVec3> Points;
-        std::vector<FQuat> Quats;
+        std::vector<Vector> Points;
+        std::vector<Quaternion> Quats;
         std::vector<float> Times;
         std::vector<std::vector<float>> SampleRows;
     };
@@ -1182,9 +1182,9 @@ namespace
             if (bClosed_ && StorageIndex == LastLive_)
                 StorageIndex = FirstLive_;
 
-            std::memcpy(&Points_[StorageIndex].X, Point, sizeof(float));
-            std::memcpy(&Points_[StorageIndex].Y, Point + 1, sizeof(float));
-            std::memcpy(&Points_[StorageIndex].Z, Point + 2, sizeof(float));
+            std::memcpy(&Points_[StorageIndex].x, Point, sizeof(float));
+            std::memcpy(&Points_[StorageIndex].y, Point + 1, sizeof(float));
+            std::memcpy(&Points_[StorageIndex].z, Point + 2, sizeof(float));
 
             if (!bClosed_)
             {
@@ -1285,11 +1285,11 @@ namespace
             if (!bOrientation_)
                 return static_cast<GENRESULT>(-7);
             I3DMathEngine* Math = AcquireSplineMathEngine();
-            FMatrix MatrixInput;
-            FQuaternion QuaternionResult;
+            Matrix MatrixInput;
+            Quaternion QuaternionResult;
             std::memcpy(&MatrixInput, MatrixRecords, sizeof(MatrixInput));
             Math->MatrixToQuaternion(QuaternionResult, MatrixInput);
-            FQuat Quat;
+            Quaternion Quat;
             std::memcpy(&Quat, &QuaternionResult, sizeof(Quat));
 
             const float* NextRecord = MatrixRecords + 9;
@@ -1299,7 +1299,7 @@ namespace
             if (PositionResult != GR_OK)
                 return static_cast<GENRESULT>(-1);
 
-            return SetOrientation(Index, &Quat.W);
+            return SetOrientation(Index, &Quat.w);
         }
         // 06f352f0: the raw position copy precedes math acquisition; both bulk setters' results
         // are ignored. Position-only 06f34800 returns -7.
@@ -1318,8 +1318,8 @@ namespace
                 std::memcpy(PositionBuffer + Index * 3, Record + 9, 3 * sizeof(float));
 
                 I3DMathEngine* Math = AcquireSplineMathEngine();
-                FMatrix MatrixInput;
-                FQuaternion QuaternionResult;
+                Matrix MatrixInput;
+                Quaternion QuaternionResult;
                 std::memcpy(&MatrixInput, Record, sizeof(MatrixInput));
                 Math->MatrixToQuaternion(QuaternionResult, MatrixInput);
                 std::memcpy(QuatBuffer + Index * 4, &QuaternionResult, sizeof(QuaternionResult));
@@ -1342,16 +1342,16 @@ namespace
                 return static_cast<GENRESULT>(-7);
             if (!bInnerAllocated_ || static_cast<unsigned int>(LastLive_) < Index)
                 return static_cast<GENRESULT>(-1);
-            FQuat Quat;
-            FVec3 Position;
+            Quaternion Quat;
+            Vector Position;
             // Both getter results are discarded and their outputs consumed.
-            GetOrientationRetail(Index, &Quat.W);
-            GetPointRetail(Index, &Position.X);
+            GetOrientationRetail(Index, &Quat.w);
+            GetPointRetail(Index, &Position.x);
             std::memcpy(OutTransform + 9, &Position, sizeof(Position));
 
             I3DMathEngine* Math = AcquireSplineMathEngine();
-            FQuaternion QuaternionInput;
-            FMatrix MatrixResult;
+            Quaternion QuaternionInput;
+            Matrix MatrixResult;
             std::memcpy(&QuaternionInput, &Quat, sizeof(QuaternionInput));
             Math->QuaternionToMatrix(MatrixResult, QuaternionInput);
             std::memcpy(OutTransform, &MatrixResult, sizeof(MatrixResult));
@@ -1382,11 +1382,11 @@ namespace
         {
             if (Index >= static_cast<unsigned int>(PointCount_))
                 return static_cast<GENRESULT>(-2);
-            const FVec3& Point = Points_[Index + 1];
+            const Vector& Point = Points_[Index + 1];
             // One dword at a time, preserving overlap.
-            std::memcpy(Out, &Point.X, sizeof(float));
-            std::memcpy(Out + 1, &Point.Y, sizeof(float));
-            std::memcpy(Out + 2, &Point.Z, sizeof(float));
+            std::memcpy(Out, &Point.x, sizeof(float));
+            std::memcpy(Out + 1, &Point.y, sizeof(float));
+            std::memcpy(Out + 2, &Point.z, sizeof(float));
             return GR_OK;
         }
 
@@ -1404,11 +1404,11 @@ namespace
                 return static_cast<GENRESULT>(-8);
             if (Index >= static_cast<unsigned int>(PointCount_))
                 return static_cast<GENRESULT>(-2);
-            const FQuat& Quaternion = Quats_[Index + 1];
-            std::memcpy(Out, &Quaternion.W, sizeof(float));
-            std::memcpy(Out + 1, &Quaternion.X, sizeof(float));
-            std::memcpy(Out + 2, &Quaternion.Y, sizeof(float));
-            std::memcpy(Out + 3, &Quaternion.Z, sizeof(float));
+            const Quaternion& Orientation = Quats_[Index + 1];
+            std::memcpy(Out, &Orientation.w, sizeof(float));
+            std::memcpy(Out + 1, &Orientation.x, sizeof(float));
+            std::memcpy(Out + 2, &Orientation.y, sizeof(float));
+            std::memcpy(Out + 3, &Orientation.z, sizeof(float));
             return GR_OK;
         }
 
@@ -1444,7 +1444,7 @@ namespace
                 PointCount_ = static_cast<int>(UnsignedCount + 3u);
                 AllocStorage();
                 for (unsigned int Index = 0; Index < UnsignedCount; ++Index)
-                    std::memcpy(Points_ + FirstLive_ + Index, Pts + Index * 3u, sizeof(FVec3));
+                    std::memcpy(Points_ + FirstLive_ + Index, Pts + Index * 3u, sizeof(Vector));
                 ApplyCtorGhosts();
                 RebuildSampleTables();
             }
@@ -1478,17 +1478,17 @@ namespace
         {
             if (!bInnerAllocated_)
                 return static_cast<GENRESULT>(-1);
-            FVec3 Position;
+            Vector Position;
             if (bOrientation_)
             {
-                EvalPosition(T, &Position.X);
+                EvalPosition(T, &Position.x);
                 std::memcpy(OutXform + 9, &Position, sizeof(Position));
-                FQuat Orientation;
-                EvalOrientation(T, &Orientation.W);
+                Quaternion Orientation;
+                EvalOrientation(T, &Orientation.w);
                 I3DMathEngine* Math = AcquireSplineMathEngine();
-                FQuaternion QuaternionInput;
+                Quaternion QuaternionInput;
                 std::memcpy(&QuaternionInput, &Orientation, sizeof(QuaternionInput));
-                FMatrix MatrixResult;
+                Matrix MatrixResult;
                 Math->QuaternionToMatrix(MatrixResult, QuaternionInput);
                 std::memcpy(OutXform, &MatrixResult, sizeof(MatrixResult));
                 return GR_OK;
@@ -1496,11 +1496,11 @@ namespace
 
             // Allocated valid rows cannot fail these evaluations; the guards
             // cover only retail's missing-row/no-output storage domains.
-            if (!EvalPosition(T, &Position.X))
+            if (!EvalPosition(T, &Position.x))
                 return GR_GENERIC;
             std::memcpy(OutXform + 9, &Position, sizeof(Position));
-            FVec3 Tangent;
-            if (!EvalTangent(T, &Tangent.X))
+            Vector Tangent;
+            if (!EvalTangent(T, &Tangent.x))
                 return GR_GENERIC;
             BuildLookAtFromTangent(Tangent, OutXform);
             return GR_OK;
@@ -1519,18 +1519,18 @@ namespace
                 return GR_OK;
             }
 
-            FVec3 Tangent;
+            Vector Tangent;
             // A failed inner path has no defined retail tangent storage:
             // empty/open-one cores or segment zero read outside its row
             // or neighbor array. Preserve the defined output path below.
-            if (!EvalTangent(T, &Tangent.X))
+            if (!EvalTangent(T, &Tangent.x))
                 return static_cast<GENRESULT>(-1);
             float Mat9[9];
             BuildSlot5MatrixRetail(Tangent, Mat9);
             I3DMathEngine* Math = AcquireSplineMathEngine();
-            FMatrix MatrixInput;
+            Matrix MatrixInput;
             std::memcpy(&MatrixInput, Mat9, sizeof(MatrixInput));
-            FQuaternion QuaternionResult;
+            Quaternion QuaternionResult;
             Math->MatrixToQuaternion(QuaternionResult, MatrixInput);
             std::memcpy(Out, &QuaternionResult, sizeof(QuaternionResult));
             return GR_OK;
@@ -1557,7 +1557,7 @@ namespace
 
             FPersistPointTree Tree;
             ThornPersistTreeInit(Tree);
-            std::optional<std::vector<FQuat>> ParsedQuats;
+            std::optional<std::vector<Quaternion>> ParsedQuats;
             if (bOrientation_)
                 ParsedQuats.emplace();
 
@@ -1570,21 +1570,21 @@ namespace
             const char* Cursor = Text;
             while (Cursor != nullptr)
             {
-                FVec3 Point;
-                if (!ParsePersistFloats(&Cursor, &Point.X, 3))
+                Vector Point;
+                if (!ParsePersistFloats(&Cursor, &Point.x, 3))
                 {
                     // The parser's cursor controls retry, including a failed
                     // later number which leaves that cursor nonnull.
                     continue;
                 }
-                FVec3* StoredPoint = nullptr;
+                Vector* StoredPoint = nullptr;
                 ThornPersistTreeInsert(Tree, PointIndex, Point, StoredPoint);
                 std::memcpy(StoredPoint, &Point, sizeof(Point));
                 if (bReadQuaternions)
                 {
                     const char* SavedCursor = Cursor;
-                    FQuat Quat;
-                    if (ParsePersistFloats(&Cursor, &Quat.W, 4))
+                    Quaternion Quat;
+                    if (ParsePersistFloats(&Cursor, &Quat.w, 4))
                         ParsedQuats->push_back(Quat);
                     else
                     {
@@ -1608,13 +1608,13 @@ namespace
 
             // FUN_06f35cc0 + repeated FUN_06f35e40 lookups: enumerate the
             // ordered tree by keys 0..count-1, matching retail's packed array.
-            FVec3* FirstPoint = nullptr;
+            Vector* FirstPoint = nullptr;
             ThornPersistTreeBegin(Tree, FirstPoint);
             unsigned int Written = 0;
-            for (std::map<unsigned int, FVec3>::const_iterator It = Tree.Entries.begin();
+            for (std::map<unsigned int, Vector>::const_iterator It = Tree.Entries.begin();
                  It != Tree.Entries.end(); ++It)
             {
-                std::memcpy(Packed + Written * 3, &It->second, sizeof(FVec3));
+                std::memcpy(Packed + Written * 3, &It->second, sizeof(Vector));
                 if (bOrientation_)
                 {
                     if (bMissingQuaternion)
@@ -1623,7 +1623,7 @@ namespace
                         std::memcpy(PackedQuats + Written * 4, IdentityWords, sizeof(IdentityWords));
                     }
                     else
-                        std::memcpy(PackedQuats + Written * 4, &(*ParsedQuats)[Written], sizeof(FQuat));
+                        std::memcpy(PackedQuats + Written * 4, &(*ParsedQuats)[Written], sizeof(Quaternion));
                 }
                 Written++;
             }
@@ -1666,11 +1666,11 @@ namespace
             unsigned int Written = 0;
             while (Written < SavedCount)
             {
-                FVec3 Point;
-                GetPointRetail(Written, &Point.X);
-                volatile double PointZ = static_cast<double>(Point.Z);
-                volatile double PointY = static_cast<double>(Point.Y);
-                volatile double PointX = static_cast<double>(Point.X);
+                Vector Point;
+                GetPointRetail(Written, &Point.x);
+                volatile double PointZ = static_cast<double>(Point.z);
+                volatile double PointY = static_cast<double>(Point.y);
+                volatile double PointX = static_cast<double>(Point.x);
                 const int VecWrote =
                     sprintf(Buffer + Offset, G_PersistVec3Fmt, PointX, PointY, PointZ);
 
@@ -1678,12 +1678,12 @@ namespace
 
                 if (bOrientation_)
                 {
-                    FQuat Quat;
-                    GetOrientationRetail(Written, &Quat.W);
-                    volatile double QuatZ = static_cast<double>(Quat.Z);
-                    volatile double QuatY = static_cast<double>(Quat.Y);
-                    volatile double QuatX = static_cast<double>(Quat.X);
-                    volatile double QuatW = static_cast<double>(Quat.W);
+                    Quaternion Quat;
+                    GetOrientationRetail(Written, &Quat.w);
+                    volatile double QuatZ = static_cast<double>(Quat.z);
+                    volatile double QuatY = static_cast<double>(Quat.y);
+                    volatile double QuatX = static_cast<double>(Quat.x);
+                    volatile double QuatW = static_cast<double>(Quat.w);
                     const int QuatWrote =
                         sprintf(Buffer + Offset, G_PersistQuatFmt, QuatW, QuatX, QuatY, QuatZ);
 
@@ -1703,31 +1703,31 @@ namespace
         // QueryInterface / AddRef / Release are the forwarding overrides above. No facet slot
         // tests its `this`; the inner-core tests live in the helpers they call.
         // Slot 3, LAB_06f34180 (position) / LAB_06f354a0 (orientation).
-        GENRESULT DACOM_API GetTransformAt(float T, float* OutXform) override
+        GENRESULT DACOM_API GetTransformAt(float T, Transform* OutXform) override
         {
-            return EvaluateTransform(&T, OutXform);
+            return EvaluateTransform(&T, &OutXform->Rotation.E[0][0]);
         }
 
         // Slot 4, LAB_06f343f0: checks the inner core, not the public facade.
-        GENRESULT DACOM_API GetPositionAt(float T, float* OutVec3) override
+        GENRESULT DACOM_API GetPositionAt(float T, Vector* OutVec3) override
         {
             if (!HasInnerSpline())
                 return static_cast<GENRESULT>(-1);
-            EvaluatePosition(&T, OutVec3);
+            EvaluatePosition(&T, &OutVec3->x);
             return GR_OK;
         }
 
         // Slot 5: LAB_06f34420 (position) / LAB_06f35530 (orientation, which forces success
         // once its inner exists). EvaluateOrientation keeps both contracts.
-        GENRESULT DACOM_API GetOrientationAt(float T, float* Out) override
+        GENRESULT DACOM_API GetOrientationAt(float T, Quaternion* Out) override
         {
-            return EvaluateOrientation(&T, Out);
+            return EvaluateOrientation(&T, &Out->w);
         }
 
         // Slot 6, LAB_06f34640.
-        GENRESULT DACOM_API GetTangentAt(float T, float* OutVec3) override
+        GENRESULT DACOM_API GetTangentAt(float T, Vector* OutVec3) override
         {
-            return EvaluateLookAt(&T, OutVec3);
+            return EvaluateLookAt(&T, &OutVec3->x);
         }
 
         // Slot 7, LAB_06f34670: the inner core at object+0xc, null -> -1; see PathLength.
@@ -1762,8 +1762,8 @@ namespace
                     std::vector<float>().swap(Storage.SampleRows[Index]);
                 std::vector<std::vector<float>>().swap(Storage.SampleRows);
                 std::vector<float>().swap(Storage.Times);
-                std::vector<FQuat>().swap(Storage.Quats);
-                std::vector<FVec3>().swap(Storage.Points);
+                std::vector<Quaternion>().swap(Storage.Quats);
+                std::vector<Vector>().swap(Storage.Points);
                 CoreStorage_.reset();
             }
             Points_ = nullptr;
@@ -1800,20 +1800,20 @@ namespace
                 return;
             bOrientationReady_ = true;
             const unsigned int IdentityWords[4] = {0x3f800000u, 0u, 0u, 0u};
-            FQuat Identity;
+            Quaternion Identity;
             std::memcpy(&Identity, IdentityWords, sizeof(Identity));
             for (unsigned int Index = 0; Index < Last; ++Index)
-                SetOrientationInternal(Index, &Identity.W);
+                SetOrientationInternal(Index, &Identity.w);
         }
 
         // Copy each DWORD before reading the next, as 22a20's MOV pairs do.
         // This also preserves partial overlap and signaling-NaN payload bits.
-        static void CopyQuaternionWords(FQuat* Destination, const float* Source)
+        static void CopyQuaternionWords(Quaternion* Destination, const float* Source)
         {
-            std::memcpy(&Destination->W, Source, sizeof(float));
-            std::memcpy(&Destination->X, Source + 1, sizeof(float));
-            std::memcpy(&Destination->Y, Source + 2, sizeof(float));
-            std::memcpy(&Destination->Z, Source + 3, sizeof(float));
+            std::memcpy(&Destination->w, Source, sizeof(float));
+            std::memcpy(&Destination->x, Source + 1, sizeof(float));
+            std::memcpy(&Destination->y, Source + 2, sizeof(float));
+            std::memcpy(&Destination->z, Source + 3, sizeof(float));
         }
 
         // FUN_06f22a20: indexed orientation write followed by endpoint ghosts.
@@ -1830,15 +1830,15 @@ namespace
                 if (StorageIndex == static_cast<unsigned int>(LastLive_))
                     StorageIndex = static_cast<unsigned int>(FirstLive_);
                 CopyQuaternionWords(Quats_ + StorageIndex, Orientation);
-                CopyQuaternionWords(Quats_ + LastLive_, &Quats_[FirstLive_].W);
-                CopyQuaternionWords(Quats_ + LastLive_ + 1, &Quats_[FirstLive_ + 1].W);
-                CopyQuaternionWords(Quats_, &Quats_[LastLive_ - 1].W);
+                CopyQuaternionWords(Quats_ + LastLive_, &Quats_[FirstLive_].w);
+                CopyQuaternionWords(Quats_ + LastLive_ + 1, &Quats_[FirstLive_ + 1].w);
+                CopyQuaternionWords(Quats_, &Quats_[LastLive_ - 1].w);
             }
             else
             {
                 CopyQuaternionWords(Quats_ + StorageIndex, Orientation);
-                CopyQuaternionWords(Quats_, &Quats_[1].W);
-                CopyQuaternionWords(Quats_ + LastLive_ + 1, &Quats_[LastLive_].W);
+                CopyQuaternionWords(Quats_, &Quats_[1].w);
+                CopyQuaternionWords(Quats_ + LastLive_ + 1, &Quats_[LastLive_].w);
             }
             return GR_OK;
         }
@@ -1846,7 +1846,7 @@ namespace
         // 21f45/21f5b call 23570: retain Z/Y/X, then float-publish X/Y/Z.
         // Debug C++ spills Z to double first: at PC64, 1-2^-60 traps precision
         // before a signalling Y; retail instead reaches Y and traps invalid.
-        static void SubtractGhostVector(FVec3& OutputVector, const FVec3& A, const FVec3& B)
+        static void SubtractGhostVector(Vector& OutputVector, const Vector& A, const Vector& B)
         {
             __asm
             {
@@ -1870,19 +1870,19 @@ namespace
         {
             LastLive_ = LiveCount_;
             CatmullRomVec3(Points_[1], Points_[1], Points_[2], Points_[2], 0.1f, Points_[0]);
-            FVec3 Difference;
+            Vector Difference;
             SubtractGhostVector(Difference, Points_[0], Points_[1]);
-            FVec3 StartGhost;
+            Vector StartGhost;
             SubtractGhostVector(StartGhost, Points_[1], Difference);
-            std::memcpy(&Points_[0].X, &StartGhost.X, sizeof(float));
-            std::memcpy(&Points_[0].Y, &StartGhost.Y, sizeof(float));
-            std::memcpy(&Points_[0].Z, &StartGhost.Z, sizeof(float));
+            std::memcpy(&Points_[0].x, &StartGhost.x, sizeof(float));
+            std::memcpy(&Points_[0].y, &StartGhost.y, sizeof(float));
+            std::memcpy(&Points_[0].z, &StartGhost.z, sizeof(float));
 
             const int EndGhost = LiveCount_ + 1;
             CatmullRomVec3(Points_[LiveCount_ - 1], Points_[LiveCount_ - 1], Points_[LiveCount_],
                            Points_[LiveCount_], 0.9f, Points_[EndGhost]);
-            const FVec3* LastPoint = &Points_[LiveCount_];
-            FVec3* GhostPoint = &Points_[EndGhost];
+            const Vector* LastPoint = &Points_[LiveCount_];
+            Vector* GhostPoint = &Points_[EndGhost];
             float DifferenceZ;
             float X;
             float Y;
@@ -1960,10 +1960,10 @@ namespace
             for (unsigned int Segment = static_cast<unsigned int>(FirstLive_);
                  Segment < static_cast<unsigned int>(LastLive_); ++Segment, ++RowIndex)
             {
-                FVec3 P0;
-                FVec3 P1;
-                FVec3 P2;
-                FVec3 P3;
+                Vector P0;
+                Vector P1;
+                Vector P2;
+                Vector P3;
                 NeighborPoints(static_cast<int>(Segment), P0, P1, P2, P3);
 
                 float SegmentLength = 0.0f;
@@ -1972,12 +1972,12 @@ namespace
                 {
                     std::vector<float> SegmentSamples(G_SamplesPerSegment, 0.0f);
                     float* Table = SegmentSamples.data();
-                    FVec3 Prev;
+                    Vector Prev;
                     CatmullRomVec3(P0, P1, P2, P3, 0.0f, Prev);
                     Table[0] = IncomingTotal;
                     for (int Sample = 1; Sample <= G_CrSamples; ++Sample)
                     {
-                        FVec3 Cur;
+                        Vector Cur;
                         CatmullRomVec3(P0, P1, P2, P3, static_cast<float>(Sample) * G_CrStep, Cur);
                         AccumulateSegmentSampleRetail(Prev, Cur, IncomingTotal, SegmentLength, Table[Sample]);
                     }
@@ -2002,7 +2002,7 @@ namespace
             return true;
         }
 
-        void NeighborPoints(int Seg, FVec3& P0, FVec3& P1, FVec3& P2, FVec3& P3) const
+        void NeighborPoints(int Seg, Vector& P0, Vector& P1, Vector& P2, Vector& P3) const
         {
             P0 = Points_[Seg - 1];
             P1 = Points_[Seg];
@@ -2010,12 +2010,12 @@ namespace
             P3 = Points_[Seg + 2];
         }
 
-        void NeighborQuats(int Seg, FQuat& Q0, FQuat& Q1, FQuat& Q2, FQuat& Q3) const
+        void NeighborQuats(int Seg, Quaternion& Q0, Quaternion& Q1, Quaternion& Q2, Quaternion& Q3) const
         {
-            CopyQuaternionWords(&Q0, &Quats_[Seg - 1].W);
-            CopyQuaternionWords(&Q1, &Quats_[Seg].W);
-            CopyQuaternionWords(&Q2, &Quats_[Seg + 1].W);
-            CopyQuaternionWords(&Q3, &Quats_[Seg + 2].W);
+            CopyQuaternionWords(&Q0, &Quats_[Seg - 1].w);
+            CopyQuaternionWords(&Q1, &Quats_[Seg].w);
+            CopyQuaternionWords(&Q2, &Quats_[Seg + 1].w);
+            CopyQuaternionWords(&Q3, &Quats_[Seg + 2].w);
         }
 
         bool FindPathSegment(const float* T, int& Seg) const;
@@ -2031,16 +2031,16 @@ namespace
                 // OPEN-one interior reaches the named missing-row residual below.
                 if (*T <= 0.0f)
                 {
-                    std::memcpy(Out, &Points_[FirstLive_].X, sizeof(float));
-                    std::memcpy(Out + 1, &Points_[FirstLive_].Y, sizeof(float));
-                    std::memcpy(Out + 2, &Points_[FirstLive_].Z, sizeof(float));
+                    std::memcpy(Out, &Points_[FirstLive_].x, sizeof(float));
+                    std::memcpy(Out + 1, &Points_[FirstLive_].y, sizeof(float));
+                    std::memcpy(Out + 2, &Points_[FirstLive_].z, sizeof(float));
                     return true;
                 }
                 if (*T >= 1.0f)
                 {
-                    std::memcpy(Out, &Points_[LastLive_].X, sizeof(float));
-                    std::memcpy(Out + 1, &Points_[LastLive_].Y, sizeof(float));
-                    std::memcpy(Out + 2, &Points_[LastLive_].Z, sizeof(float));
+                    std::memcpy(Out, &Points_[LastLive_].x, sizeof(float));
+                    std::memcpy(Out + 1, &Points_[LastLive_].y, sizeof(float));
+                    std::memcpy(Out + 2, &Points_[LastLive_].z, sizeof(float));
                     return true;
                 }
             }
@@ -2060,16 +2060,16 @@ namespace
             if (!FindSample(Seg, T, SampleIndex, Fraction))
                 return false;
 
-            FVec3 P0;
-            FVec3 P1;
-            FVec3 P2;
-            FVec3 P3;
+            Vector P0;
+            Vector P1;
+            Vector P2;
+            Vector P3;
             NeighborPoints(Seg, P0, P1, P2, P3);
 
             const float U0 = ThornSplineMath::SampleParameter(SampleIndex, G_CrStep);
             const float U1 = ThornSplineMath::SampleParameter(SampleIndex + 1, G_CrStep);
-            FVec3 A;
-            FVec3 B;
+            Vector A;
+            Vector B;
             if (bTangent)
             {
                 CatmullRomTangent(P0, P1, P2, P3, U0, A);
@@ -2080,7 +2080,7 @@ namespace
                 CatmullRomVec3(P0, P1, P2, P3, U0, A);
                 CatmullRomVec3(P0, P1, P2, P3, U1, B);
             }
-            ThornSplineMath::Lerp3D(&A.X, &B.X, Fraction, Out);
+            ThornSplineMath::Lerp3D(&A.x, &B.x, Fraction, Out);
             return true;
         }
 
@@ -2099,18 +2099,18 @@ namespace
             // OPEN-one interior reaches the named missing-row residual below.
             if (*T <= 0.0f)
             {
-                std::memcpy(Out, &Quats_[FirstLive_].W, sizeof(float));
-                std::memcpy(Out + 1, &Quats_[FirstLive_].X, sizeof(float));
-                std::memcpy(Out + 2, &Quats_[FirstLive_].Y, sizeof(float));
-                std::memcpy(Out + 3, &Quats_[FirstLive_].Z, sizeof(float));
+                std::memcpy(Out, &Quats_[FirstLive_].w, sizeof(float));
+                std::memcpy(Out + 1, &Quats_[FirstLive_].x, sizeof(float));
+                std::memcpy(Out + 2, &Quats_[FirstLive_].y, sizeof(float));
+                std::memcpy(Out + 3, &Quats_[FirstLive_].z, sizeof(float));
                 return true;
             }
             if (*T >= 1.0f)
             {
-                std::memcpy(Out, &Quats_[LastLive_].W, sizeof(float));
-                std::memcpy(Out + 1, &Quats_[LastLive_].X, sizeof(float));
-                std::memcpy(Out + 2, &Quats_[LastLive_].Y, sizeof(float));
-                std::memcpy(Out + 3, &Quats_[LastLive_].Z, sizeof(float));
+                std::memcpy(Out, &Quats_[LastLive_].w, sizeof(float));
+                std::memcpy(Out + 1, &Quats_[LastLive_].x, sizeof(float));
+                std::memcpy(Out + 2, &Quats_[LastLive_].y, sizeof(float));
+                std::memcpy(Out + 3, &Quats_[LastLive_].z, sizeof(float));
                 return true;
             }
             int Seg = 0;
@@ -2121,25 +2121,25 @@ namespace
             if (!FindSample(Seg, T, SampleIndex, Fraction))
                 return false;
 
-            FQuat Q0;
-            FQuat Q1;
-            FQuat Q2;
-            FQuat Q3;
+            Quaternion Q0;
+            Quaternion Q1;
+            Quaternion Q2;
+            Quaternion Q3;
             NeighborQuats(Seg, Q0, Q1, Q2, Q3);
 
             const float U0 = ThornSplineMath::SampleParameter(SampleIndex, G_CrStep);
             const float U1 = ThornSplineMath::SampleParameter(SampleIndex + 1, G_CrStep);
-            FQuat SampleA;
-            FQuat SampleB;
+            Quaternion SampleA;
+            Quaternion SampleB;
             // Retail tests neither FUN_06f21770 result nor the final slerp's.
             EvalCrOrientation(Q0, Q1, Q2, Q3, U0, SampleA);
             EvalCrOrientation(Q0, Q1, Q2, Q3, U1, SampleB);
-            FQuat Result;
+            Quaternion Result;
             CoreQuatSlerp(Result, SampleA, SampleB, &Fraction);
-            std::memcpy(Out, &Result.W, sizeof(float));
-            std::memcpy(Out + 1, &Result.X, sizeof(float));
-            std::memcpy(Out + 2, &Result.Y, sizeof(float));
-            std::memcpy(Out + 3, &Result.Z, sizeof(float));
+            std::memcpy(Out, &Result.w, sizeof(float));
+            std::memcpy(Out + 1, &Result.x, sizeof(float));
+            std::memcpy(Out + 2, &Result.y, sizeof(float));
+            std::memcpy(Out + 3, &Result.z, sizeof(float));
             return true;
         }
 
@@ -2147,10 +2147,10 @@ namespace
         // PTR_LAB_06f5abc8), which holds the reference count.
         IDAComponent* Outer_;
         FThornInnerUnknown Inner_;
-        FVec3* Points_;
+        Vector* Points_;
         float* Times_;
         std::unique_ptr<FSplineCoreStorage> CoreStorage_;
-        FQuat* Quats_;
+        Quaternion* Quats_;
         int LiveCount_;
         int PointCount_;
         int FirstLive_;
@@ -2260,28 +2260,26 @@ IDAComponent* ThornCreateSplinePath(const char* FactoryName, bool bOrientation, 
     return CreateSplineObject(bOrientation, Outer, OutInnerUnknown);
 }
 
-GENRESULT ThornQuatMul(I3DMathEngine* Math, FQuat& Dst, const FQuat& A, const FQuat& B)
+GENRESULT ThornQuatMul(I3DMathEngine* Math, Quaternion& Dst, const Quaternion& A, const Quaternion& B)
 {
     if (Math == nullptr)
         return GR_GENERIC;
-    return Math->MulQuat(reinterpret_cast<FQuaternion&>(Dst), // +0x18
-                         reinterpret_cast<const FQuaternion&>(A),
-                         reinterpret_cast<const FQuaternion&>(B));
+    return Math->MulQuat(Dst, // +0x18
+                         A, B);
 }
 
-GENRESULT ThornQuatSlerp(I3DMathEngine* Math, FQuat& Dst, const FQuat& A, const FQuat& B, float T)
+GENRESULT ThornQuatSlerp(I3DMathEngine* Math, Quaternion& Dst, const Quaternion& A, const Quaternion& B, float T)
 {
     if (Math == nullptr)
         return GR_GENERIC;
-    return Math->QuatSlerp(reinterpret_cast<FQuaternion&>(Dst), // +0x58
-                           reinterpret_cast<const FQuaternion&>(A),
-                           reinterpret_cast<const FQuaternion&>(B), T);
+    return Math->QuatSlerp(Dst, // +0x58
+                           A, B, T);
 }
 
-GENRESULT ThornQuatToMatrix(I3DMathEngine* Math, float* Dst9, const FQuat& Quat)
+GENRESULT ThornQuatToMatrix(I3DMathEngine* Math, Matrix* Dst, const Quaternion& Quat)
 {
-    if (Math == nullptr || Dst9 == nullptr)
+    if (Math == nullptr || Dst == nullptr)
         return GR_GENERIC;
-    return Math->QuaternionToMatrix(*reinterpret_cast<FMatrix*>(Dst9), // +0x54
-                                    reinterpret_cast<const FQuaternion&>(Quat));
+    return Math->QuaternionToMatrix(*Dst, // +0x54
+                                    Quat);
 }

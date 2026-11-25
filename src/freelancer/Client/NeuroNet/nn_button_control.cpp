@@ -74,7 +74,7 @@ namespace
     {
         // The `CMP [ESI+0x84],-1` every slot below inlines.
         return Control->MeshHolder.EngineInstance !=
-               reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+               InvalidInstanceIndex;
     }
 
     // The parent notification the handlers spell out: the parent as a WinControl (slot 2),
@@ -116,23 +116,23 @@ namespace
         int CursorX = 0;
         int CursorY = 0;
         GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
-        FVector Local;
-        Local.X = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
+        Vector Local;
+        Local.x = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
                                      Cam->XScale * Cam->ZNear);
-        Local.Y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
+        Local.y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
                                      Cam->YScale * Cam->ZNear);
-        Local.Z = -Cam->ZNear;
-        FMatrix CamOrientation;
-        memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation)); // DAT_0067dbfc
-        FVector World;
+        Local.z = -Cam->ZNear;
+        Matrix CamOrientation;
+        memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation)); // DAT_0067dbfc
+        Vector World;
         Win3DTransformByMatrix(World, CamOrientation, Local); // FUN_00423b90
         double const Inv =
-            kOne / sqrt(static_cast<double>(World.X) * World.X +
-                        static_cast<double>(World.Y) * World.Y +
-                        static_cast<double>(World.Z) * World.Z);
-        Ray[0] = static_cast<float>(World.X * Inv);
-        Ray[1] = static_cast<float>(World.Y * Inv);
-        Ray[2] = static_cast<float>(World.Z * Inv);
+            kOne / sqrt(static_cast<double>(World.x) * World.x +
+                        static_cast<double>(World.y) * World.y +
+                        static_cast<double>(World.z) * World.z);
+        Ray[0] = static_cast<float>(World.x * Inv);
+        Ray[1] = static_cast<float>(World.y * Inv);
+        Ray[2] = static_cast<float>(World.z * Inv);
     }
 
     // The mouse ray FUN_0055b950 and LAB_0055c690 build inline: the near-plane
@@ -144,20 +144,20 @@ namespace
         int CursorX = 0;
         int CursorY = 0;
         GetClientSoftwareCursor(&CursorX, &CursorY, nullptr); // DAT_00616840 / DAT_00616844
-        FVector Local;
+        Vector Local;
         Win3DScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
                                static_cast<float>(CursorY));
-        FMatrix CamOrientation;
-        memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation));
-        FVector World;
+        Matrix CamOrientation;
+        memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation));
+        Vector World;
         ButtonMathEngine()->TransformMatrix(World, CamOrientation, Local);
         double const Inv =
-            kOne / sqrt(static_cast<double>(World.X) * World.X +
-                        static_cast<double>(World.Y) * World.Y +
-                        static_cast<double>(World.Z) * World.Z);
-        Ray[0] = static_cast<float>(World.X * Inv);
-        Ray[1] = static_cast<float>(World.Y * Inv);
-        Ray[2] = static_cast<float>(World.Z * Inv);
+            kOne / sqrt(static_cast<double>(World.x) * World.x +
+                        static_cast<double>(World.y) * World.y +
+                        static_cast<double>(World.z) * World.z);
+        Ray[0] = static_cast<float>(World.x * Inv);
+        Ray[1] = static_cast<float>(World.y * Inv);
+        Ray[2] = static_cast<float>(World.z * Inv);
     }
 
     // The holder tint FUN_00559aa0 and Draw write before FUN_0059efa0: bytes 0..2 into +0x14 / +0x18 / +0x1c, byte 3 into +0x24,
@@ -187,7 +187,7 @@ namespace
                 // GetInstanceExtent(+0x84, 1, &Size, &Centre) -- no instance test.
                 float Centre[3];
                 DALib::Engine->GetInstanceExtent(Button->MeshHolder.EngineInstance, 1, &Size,
-                                                 Centre);
+                                                 (Vector*)Centre);
             }
         }
         Size = Size * kSqrt2;
@@ -195,16 +195,16 @@ namespace
         float Where[3];
         if (HasInstance(Button))
         {
-            float const* const Placed = ClientMeshHolderGetPosition(&Button->MeshHolder); // FUN_00420fb0
-            Where[0] = Placed[0];
-            Where[1] = Placed[1];
-            Where[2] = Placed[2];
+            const Vector* const Placed = ClientMeshHolderGetPosition(&Button->MeshHolder); // FUN_00420fb0
+            Where[0] = Placed->x;
+            Where[1] = Placed->y;
+            Where[2] = Placed->z;
         }
         else
         {
-            Where[0] = Button->Offset[0] + Button->Position[0];
-            Where[1] = Button->Position[1] + Button->Offset[1];
-            Where[2] = Button->Position[2] + Button->Offset[2];
+            Where[0] = Button->Offset[0] + Button->Position.x;
+            Where[1] = Button->Position.y + Button->Offset[1];
+            Where[2] = Button->Position.z + Button->Offset[2];
         }
 
         if (NnMontageDrawTileAt(Tile, Where, Rgba, Size, 0, 0.0f)) // FUN_00559900
@@ -311,7 +311,7 @@ void NnButtonControl::SetPosition(float const* NewPosition)
     if ((PositionFlags & 1) != 0)
     {
         float Attach[3];
-        GetAttachPosition(Attach); // slot 41
+        GetAttachPosition(reinterpret_cast<Vector*>(Attach)); // slot 41
         Placed[0] = NewPosition[0] + Attach[0];
         Placed[1] = Attach[1] + NewPosition[1];
         Placed[2] = Attach[2] + NewPosition[2];
@@ -330,35 +330,35 @@ void NnButtonControl::SetPosition(float const* NewPosition)
     float Instance[3];
     if ((PositionFlags & 1) != 0)
     {
-        Instance[0] = Offset[0] + Position[0];
-        Instance[1] = Offset[1] + Position[1];
-        Instance[2] = Offset[2] + Position[2];
+        Instance[0] = Offset[0] + Position.x;
+        Instance[1] = Offset[1] + Position.y;
+        Instance[2] = Offset[2] + Position.z;
     }
     else
     {
-        Instance[0] = Position[0];
-        Instance[1] = Position[1];
-        Instance[2] = Position[2];
+        Instance[0] = Position.x;
+        Instance[1] = Position.y;
+        Instance[2] = Position.z;
     }
-    DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, Instance);
+    DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, (const Vector*)Instance);
     DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
 }
 
-void NnButtonControl::SetOrientation(float const* NewOrientation)
+void NnButtonControl::SetOrientation(Matrix const* NewOrientation)
 {
     // LAB_0055b5c0 (RET 4): the new orientation times the attach orientation (slot 40) through
     // the 3DMathEngine's MulMatrix (+0x20) into Win3D's +0x3c, then onto the instance. Unlike
     // WinControl's FUN_005a0950 it does not recurse into children.
     bAttached = 1;
-    FMatrix Attach;
-    GetAttachOrientation(&Attach.D[0][0]);
-    FMatrix Result;
-    ButtonMathEngine()->MulMatrix(Result, *reinterpret_cast<FMatrix const*>(NewOrientation),
+    Matrix Attach;
+    GetAttachOrientation(&Attach);
+    Matrix Result;
+    ButtonMathEngine()->MulMatrix(Result, *NewOrientation,
                                   Attach);
-    memcpy(Orientation, &Result, sizeof(Orientation));
+    memcpy(&Orientation, &Result, sizeof(Orientation));
     if (!HasInstance(this))
         return;
-    DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, Orientation);
+    DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, &Orientation);
     DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
 }
 
@@ -417,10 +417,10 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
                 {
                     // FUN_00422b80 builds {+0x60 + offset} and the instance moves.
                     float Placed[3];
-                    Placed[2] = Offset[2] + Position[2];
-                    Placed[1] = Offset[1] + Position[1];
-                    Placed[0] = Position[0] + Offset[0];
-                    DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, Placed);
+                    Placed[2] = Offset[2] + Position.z;
+                    Placed[1] = Offset[1] + Position.y;
+                    Placed[0] = Position.x + Offset[0];
+                    DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, (const Vector*)Placed);
                     DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
                 }
                 continue;
@@ -429,24 +429,24 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
             {
                 // The attach transform is reset, then filled from the NEW parent's
                 // hardpoint of that name. The name itself is not kept (+0x1d0 is untouched).
-                AttachOrientation[0] = 1.0f;
-                AttachOrientation[1] = 0.0f;
-                AttachOrientation[2] = 0.0f;
-                AttachOrientation[3] = 0.0f;
-                AttachOrientation[4] = 1.0f;
-                AttachOrientation[5] = 0.0f;
-                AttachOrientation[6] = 0.0f;
-                AttachOrientation[7] = 0.0f;
-                AttachOrientation[8] = 1.0f;
-                AttachPosition[0] = 0.0f;
-                AttachPosition[1] = 0.0f;
-                AttachPosition[2] = 0.0f;
+                AttachOrientation.E[0][0] = 1.0f;
+                AttachOrientation.E[0][1] = 0.0f;
+                AttachOrientation.E[0][2] = 0.0f;
+                AttachOrientation.E[1][0] = 0.0f;
+                AttachOrientation.E[1][1] = 1.0f;
+                AttachOrientation.E[1][2] = 0.0f;
+                AttachOrientation.E[2][0] = 0.0f;
+                AttachOrientation.E[2][1] = 0.0f;
+                AttachOrientation.E[2][2] = 1.0f;
+                AttachPosition.x = 0.0f;
+                AttachPosition.y = 0.0f;
+                AttachPosition.z = 0.0f;
                 if (NewParent == nullptr)
                     continue;
                 WinControl* const ParentControl = NewParent->AsWinControl();
                 if (ParentControl == nullptr)
                     continue;
-                ParentControl->GetHardpointTransform(Ini->get_value_string(), AttachOrientation);
+                ParentControl->GetHardpointTransform(Ini->get_value_string(), &AttachXform);
                 continue;
             }
             if (Ini->is_value("mouse_size"))
@@ -498,7 +498,7 @@ bool NnButtonControl::Create(Win3D* NewParent, void* Data)
     // The parent is re-placed at its own position (slot 5), which positions this
     // control with it.
     if (Parent != nullptr)
-        Parent->SetPosition(Parent->Position);
+        Parent->SetPosition(&Parent->Position.x);
     return true;
 }
 
@@ -823,9 +823,9 @@ void NnButtonControl::ShowToolTip()
     }
     else
     {
-        Info.WorldPos[0] = Position[0] + Offset[0];
-        Info.WorldPos[1] = Offset[1] + Position[1];
-        Info.WorldPos[2] = Offset[2] + Position[2];
+        Info.WorldPos[0] = Position.x + Offset[0];
+        Info.WorldPos[1] = Offset[1] + Position.y;
+        Info.WorldPos[2] = Offset[2] + Position.z;
     }
     Info.HalfExtents[0] = HalfExtents[0]; // +0x54 <- +0xb4
     Info.HalfExtents[1] = HalfExtents[1];
@@ -924,10 +924,10 @@ void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
     if (HasInstance(this))
     {
         float Placed[3];
-        Placed[0] = Offset[0] + Position[0];
-        Placed[1] = Offset[1] + Position[1];
-        Placed[2] = Offset[2] + Position[2];
-        DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, Placed);
+        Placed[0] = Offset[0] + Position.x;
+        Placed[1] = Offset[1] + Position.y;
+        Placed[2] = Offset[2] + Position.z;
+        DALib::Engine->SetInstancePosition(MeshHolder.EngineInstance, (const Vector*)Placed);
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
 
@@ -936,23 +936,23 @@ void NnButtonControl::Init(char const* NewMeshPath, char const* NewMesh2,
         // The name is kept, the attach transform reset and filled from the
         // parent's hardpoint of that name (slot 36; its answer is not used).
         strcpy(HardpointName, Hardpoint);
-        AttachOrientation[0] = 1.0f;
-        AttachOrientation[1] = 0.0f;
-        AttachOrientation[2] = 0.0f;
-        AttachOrientation[3] = 0.0f;
-        AttachOrientation[4] = 1.0f;
-        AttachOrientation[5] = 0.0f;
-        AttachOrientation[6] = 0.0f;
-        AttachOrientation[7] = 0.0f;
-        AttachOrientation[8] = 1.0f;
-        AttachPosition[0] = 0.0f;
-        AttachPosition[1] = 0.0f;
-        AttachPosition[2] = 0.0f;
+        AttachOrientation.E[0][0] = 1.0f;
+        AttachOrientation.E[0][1] = 0.0f;
+        AttachOrientation.E[0][2] = 0.0f;
+        AttachOrientation.E[1][0] = 0.0f;
+        AttachOrientation.E[1][1] = 1.0f;
+        AttachOrientation.E[1][2] = 0.0f;
+        AttachOrientation.E[2][0] = 0.0f;
+        AttachOrientation.E[2][1] = 0.0f;
+        AttachOrientation.E[2][2] = 1.0f;
+        AttachPosition.x = 0.0f;
+        AttachPosition.y = 0.0f;
+        AttachPosition.z = 0.0f;
         if (Parent != nullptr)
         {
             WinControl* const ParentControl = Parent->AsWinControl();
             if (ParentControl != nullptr)
-                ParentControl->GetHardpointTransform(Hardpoint, AttachOrientation);
+                ParentControl->GetHardpointTransform(Hardpoint, &AttachXform);
         }
     }
 
@@ -982,7 +982,7 @@ namespace
     {
         // The `CMP [reg+0x37c],-1` the slots inline.
         return Control->ToggleMesh.EngineInstance !=
-               reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+               InvalidInstanceIndex;
     }
 
     // The parent notification with a B argument (FUN_0055cc90's 0x30 carries the state).
@@ -1049,17 +1049,17 @@ void NnToggleButtonControl::PlaceToggleMesh()
     {
         // FUN_00422b80(+0xa8 + +0x60, +0xac + +0x64, +0xb0 + +0x68).
         float Placed[3];
-        Placed[0] = Offset[0] + Position[0];
-        Placed[1] = Offset[1] + Position[1];
-        Placed[2] = Offset[2] + Position[2];
-        DALib::Engine->SetInstancePosition(ToggleMesh.EngineInstance, Placed);
+        Placed[0] = Offset[0] + Position.x;
+        Placed[1] = Offset[1] + Position.y;
+        Placed[2] = Offset[2] + Position.z;
+        DALib::Engine->SetInstancePosition(ToggleMesh.EngineInstance, (const Vector*)Placed);
         DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
         if (HasInstance(this))
         {
             float Transform[12];
             memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
                    sizeof(Transform));
-            DALib::Engine->SetInstanceOrientation(ToggleMesh.EngineInstance, Transform);
+            DALib::Engine->SetInstanceOrientation(ToggleMesh.EngineInstance, (const Matrix*)Transform);
             DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
         }
     }
@@ -1133,24 +1133,24 @@ void NnToggleButtonControl::SetPosition(float const* NewPosition)
     float Transform[12];
     memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
            sizeof(Transform));
-    DALib::Engine->SetInstanceMatrix(ToggleMesh.EngineInstance, Transform);
+    DALib::Engine->SetInstanceMatrix(ToggleMesh.EngineInstance, (const ::Transform*)Transform);
     DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
 }
 
-void NnToggleButtonControl::SetOrientation(float const* NewOrientation)
+void NnToggleButtonControl::SetOrientation(Matrix const* NewOrientation)
 {
     // LAB_0055c5a0 (RET 4): the new orientation times the attach orientation (slot 40) through
     // FUN_0051a140 into +0x3c, onto the main instance, then the main instance's transform onto
     // the +0x378 one.
     bAttached = 1; // +0x328
     float Attach[9];
-    GetAttachOrientation(Attach);
+    GetAttachOrientation(reinterpret_cast<Matrix*>(Attach));
     float Result[9];
-    CockpitMulMatrix(Result, NewOrientation, Attach); // FUN_0051a140
-    memcpy(Orientation, Result, sizeof(Orientation));
+    CockpitMulMatrix(Result, &NewOrientation->E[0][0], Attach); // FUN_0051a140
+    memcpy(&Orientation, Result, sizeof(Orientation));
     if (HasInstance(this))
     {
-        DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, Orientation);
+        DALib::Engine->SetInstanceOrientation(MeshHolder.EngineInstance, &Orientation);
         DALib::Engine->UpdateInstance(MeshHolder.EngineInstance, 0, nullptr);
     }
     if (!HasToggleInstance(this))
@@ -1160,7 +1160,7 @@ void NnToggleButtonControl::SetOrientation(float const* NewOrientation)
     float Transform[12];
     memcpy(Transform, DALib::Engine->GetInstanceTransform(MeshHolder.EngineInstance),
            sizeof(Transform));
-    DALib::Engine->SetInstanceOrientation(ToggleMesh.EngineInstance, Transform);
+    DALib::Engine->SetInstanceOrientation(ToggleMesh.EngineInstance, (const Matrix*)Transform);
     DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
 }
 
@@ -1244,11 +1244,11 @@ void NnToggleButtonControl::Draw()
 {
     // LAB_0055c3b0: in state 1 ButtonControl's Draw runs with the +0x378 instance standing in
     // for +0x84 (restored after); the instance drawn is kept for the glow pass below.
-    void* Instance = nullptr;
+    InstanceIndex Instance = 0;
     if (ToggleState == 1)
     {
         Instance = ToggleMesh.EngineInstance;
-        void* const Saved = MeshHolder.EngineInstance;
+        const InstanceIndex Saved = MeshHolder.EngineInstance;
         MeshHolder.EngineInstance = Instance;
         NnButtonControl::Draw(); // FUN_0055af90
         MeshHolder.EngineInstance = Saved;
@@ -1264,7 +1264,7 @@ void NnToggleButtonControl::Draw()
     // the orientation {C,0,S, 0,1,0, -S,0,C} of DAT_005e1738 replaces the instance's (updated),
     // the tinted submit FUN_00434630 in the glow colour, and the saved orientation goes back
     // without an update.
-    if (GlowArgb != 0 && Instance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (GlowArgb != 0 && Instance != InvalidInstanceIndex)
     {
         float Saved[9];
         memcpy(Saved, DALib::Engine->GetInstanceOrientation(Instance), sizeof(Saved)); // vt+0x98
@@ -1280,7 +1280,7 @@ void NnToggleButtonControl::Draw()
         Turned[6] = -S;
         Turned[7] = 0.0f;
         Turned[8] = C;
-        DALib::Engine->SetInstanceOrientation(Instance, Turned);
+        DALib::Engine->SetInstanceOrientation(Instance, (const Matrix*)Turned);
         DALib::Engine->UpdateInstance(Instance, 0, nullptr);
         unsigned char Glow[4];
         Glow[0] = static_cast<unsigned char>(GlowArgb >> 16);
@@ -1289,7 +1289,7 @@ void NnToggleButtonControl::Draw()
         Glow[3] = static_cast<unsigned char>(GlowArgb >> 24);
         SubmitWin3DTintedEngineInstanceWrapped(Win3DGetCamera(), Instance, 1, Glow, 1, 1.0f,
                                                0); // FUN_00434630
-        DALib::Engine->SetInstanceOrientation(Instance, Saved);
+        DALib::Engine->SetInstanceOrientation(Instance, (const Matrix*)Saved);
     }
     Win3DDisable(kWin3DDepthTest); // FUN_00421ed0(0xb71)
 }
@@ -1329,17 +1329,17 @@ intptr_t NnToggleButtonControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             float Placed[3];
             if ((PositionFlags & 1) != 0)
             {
-                Placed[0] = Offset[0] + Position[0];
-                Placed[1] = Offset[1] + Position[1];
-                Placed[2] = Offset[2] + Position[2];
+                Placed[0] = Offset[0] + Position.x;
+                Placed[1] = Offset[1] + Position.y;
+                Placed[2] = Offset[2] + Position.z;
             }
             else
             {
-                Placed[0] = Position[0];
-                Placed[1] = Position[1];
-                Placed[2] = Position[2];
+                Placed[0] = Position.x;
+                Placed[1] = Position.y;
+                Placed[2] = Position.z;
             }
-            DALib::Engine->SetInstancePosition(ToggleMesh.EngineInstance, Placed);
+            DALib::Engine->SetInstancePosition(ToggleMesh.EngineInstance, (const Vector*)Placed);
             DALib::Engine->UpdateInstance(ToggleMesh.EngineInstance, 0, nullptr);
         }
         return NnButtonControl::SetProperty(Msg, A, B); // FUN_0055bc30

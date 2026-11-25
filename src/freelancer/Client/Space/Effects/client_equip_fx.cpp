@@ -113,7 +113,7 @@ namespace
     {
         explicit FCliEquipLight(unsigned char bPlayerOwnedParam);
         ~FCliEquipLight() override;
-        float GetWorldPos(FVector* Out) override;
+        float GetWorldPos(Vector* Out) override;
         unsigned char IsAlive() override;
         unsigned char UpdateVisibility(float Dt, FSpaceCamera* Cam) override;
         unsigned char TickDraw(float Dt, FSpaceCamera* Cam) override;
@@ -387,7 +387,7 @@ namespace
     // flare cone, then FUN_004038f0. Returns 1.
     unsigned char CliEquipLightDrawFlare(FCliEquipLight* Self, FSpaceCamera* Cam)
     {
-        FTransform World;
+        Transform World;
         EffectGetWorldTransform(Self, &World);
         ScreenQuadBeginBatchFrame(Self->TexFrame, 1, true);
 
@@ -396,11 +396,11 @@ namespace
         // Only FlareConeCos[0] strictly above FlareConeCos[1] fades.
         if (View->FlareConeCos[0] > View->FlareConeCos[1])
         {
-            float const* const CamPos = AsCamera(Cam)->GetPosition();
+            const Vector* const CamPos = AsCamera(Cam)->GetPosition();
             float Dir[3];
-            Dir[0] = World.Translation.X - CamPos[0];
-            Dir[1] = World.Translation.Y - CamPos[1];
-            Dir[2] = World.Translation.Z - CamPos[2];
+            Dir[0] = World.Translation.x - CamPos->x;
+            Dir[1] = World.Translation.y - CamPos->y;
+            Dir[2] = World.Translation.z - CamPos->z;
 
             // The fast inverse square root on the float length^2, one Newton step in double.
             float const LengthSq = static_cast<float>(
@@ -421,9 +421,9 @@ namespace
 
             // The dot with the forward column, (z + y) + x, rounded to float.
             float const Dot = static_cast<float>(
-                static_cast<double>(Dir[2]) * World.Rotation.D[2][2] +
-                static_cast<double>(Dir[1]) * World.Rotation.D[1][2] +
-                static_cast<double>(Dir[0]) * World.Rotation.D[0][2]);
+                static_cast<double>(Dir[2]) * World.Rotation.E[2][2] +
+                static_cast<double>(Dir[1]) * World.Rotation.E[1][2] +
+                static_cast<double>(Dir[0]) * World.Rotation.E[0][2]);
 
             // Below the outer cosine no flare, between the two a linear fade, otherwise (NaN
             // too) full.
@@ -462,7 +462,7 @@ namespace
         Glow[1] = Glow[1] * Fade;
         Glow[2] = Glow[2] * Fade;
 
-        float const Position[3] = {World.Translation.X, World.Translation.Y, World.Translation.Z};
+        float const Position[3] = {World.Translation.x, World.Translation.y, World.Translation.z};
         ScreenQuadEnqueueFlare(AsCamera(Cam), Position, Bulb, Glow, View->BulbSize,
                                View->GlowSize);
         return 1;
@@ -472,14 +472,14 @@ namespace
 
     // Slot 2 -- LAB_004fe040: the world position out, and the larger of bulb_size / glow_size
     // back (bulb_size unless it is strictly below glow_size).
-    float FCliEquipLight::GetWorldPos(FVector* Out)
+    float FCliEquipLight::GetWorldPos(Vector* Out)
     {
         FCliEquipLight* const Self = this;
-        FTransform World;
+        Transform World;
         EffectGetWorldTransform(Self, &World);
-        Out->X = World.Translation.X;
-        Out->Y = World.Translation.Y;
-        Out->Z = World.Translation.Z;
+        Out->x = World.Translation.x;
+        Out->y = World.Translation.y;
+        Out->z = World.Translation.z;
         FCliEQLightView const* const View = CompanionAsLight(Self->Companion);
         if (View->BulbSize < View->GlowSize)
             return View->GlowSize;
@@ -558,9 +558,9 @@ namespace
     {
         FCliEquipGameLight* const Self = this;
         GameLightTick(Self, Dt);
-        FTransform World;
+        Transform World;
         EffectGetWorldTransform(Self->Owner, &World);
-        EngineLightSetTransform((FEngineLight*)Self, &World.Rotation.D[0][0], &World.Translation.X);
+        EngineLightSetTransform((FEngineLight*)Self, &World.Rotation.E[0][0], &World.Translation.x);
     }
 
     FCliLightEquipFx::FCliLightEquipFx(CEquip* EquipParam, FClientGameobj* HostParam)
@@ -664,11 +664,11 @@ namespace
         }
 
         // The hardpoint as the local frame, on the parent connector's part.
-        FTransform Local;
+        Transform Local;
         std::memcpy(&Local.Rotation, &Hardpoint.Orient, sizeof(Local.Rotation));
-        Local.Translation.X = Hardpoint.Position.x;
-        Local.Translation.Y = Hardpoint.Position.y;
-        Local.Translation.Z = Hardpoint.Position.z;
+        Local.Translation.x = Hardpoint.Position.x;
+        Local.Translation.y = Hardpoint.Position.y;
+        Local.Translation.z = Hardpoint.Position.z;
         long const Part = External->GetParentConnector(false);
         EffectAttach(Light, Host, static_cast<int>(Part), &Local);
 
@@ -823,11 +823,11 @@ namespace
         if (Code == EquipActivating)
         {
             // cloakout_fx on the host's root part, identity frame, no companion.
-            FTransform Identity;
+            Transform Identity;
             std::memset(&Identity, 0, sizeof(Identity));
-            Identity.Rotation.D[0][0] = 1.0f;
-            Identity.Rotation.D[1][1] = 1.0f;
-            Identity.Rotation.D[2][2] = 1.0f;
+            Identity.Rotation.E[0][0] = 1.0f;
+            Identity.Rotation.E[1][1] = 1.0f;
+            Identity.Rotation.E[2][2] = 1.0f;
             long const Root = static_cast<CAttachedEquip*>(Device)->GetRootIndex();
             FClientGameobj* const Owner = Host;
             ID_String const* const FxId = reinterpret_cast<ID_String const*>(
@@ -851,7 +851,7 @@ namespace
             if (!FxId->IsEmpty())
             {
                 CliCreateEffectWorldOneShot(FindEffectArch(&FxId->Id),
-                                            reinterpret_cast<FTransform const*>(&Orientation),
+                                            reinterpret_cast<Transform const*>(&Orientation),
                                             reinterpret_cast<float const*>(&Velocity), nullptr);
             }
             return;
@@ -976,12 +976,12 @@ namespace
     }
 
     // The shield's world frame: its root part's engine transform (no test of the cast).
-    float const* CliShieldWorldFrame(CEquip* Equip)
+    Transform const* CliShieldWorldFrame(CEquip* Equip)
     {
         CEShield* const Shield = CEShield::cast(Equip);
         long const Root = Shield->GetRootIndex();
         return DALib::Engine->GetInstanceTransform(
-            reinterpret_cast<void*>(static_cast<intptr_t>(Root)));
+            Root);
     }
 
     void FCliShieldEquipFx::notify(Event Code, void* Param)
@@ -1021,7 +1021,7 @@ namespace
             unsigned char const* const Flag = static_cast<unsigned char const*>(Param);
             if (*Flag != 0 && RebuiltSound != nullptr)
             {
-                float const* const Frame = CliShieldWorldFrame(Equip);
+                const float* const Frame = (const float*)CliShieldWorldFrame(Equip);
                 CliShieldPlayAt(RebuiltSound, Frame + 9);
             }
             // Then the host's own INotify (EquippedObj +0xac) with the same code and Param.
@@ -1035,7 +1035,7 @@ namespace
                 break;
             if (CliEquipHostIsLivePlayer(Host, 0x503u))
                 NnVoiceEnqueue(G_ShieldFailedId, 0);
-            float const* const Frame = CliShieldWorldFrame(Equip);
+            const float* const Frame = (const float*)CliShieldWorldFrame(Equip);
             // With a generator companion: the owner's velocity (read before the id test), then
             // collapse_particle in world space at the frame, no companion.
             Archetype::ICliObj* const Comp = CliShieldGenCompanion(Equip);
@@ -1047,7 +1047,7 @@ namespace
                 if (!Particle->IsEmpty())
                 {
                     CliCreateEffectWorldOneShot(FindEffectArch(&Particle->Id),
-                                                reinterpret_cast<FTransform const*>(Frame),
+                                                reinterpret_cast<Transform const*>(Frame),
                                                 reinterpret_cast<float const*>(&Velocity),
                                                 nullptr);
                 }
@@ -1364,48 +1364,48 @@ namespace
             if (!Cur->GetHardpointOffset_NS(HpXform))
                 continue;
             // World = instance frame of the nozzle's part (no test) * hardpoint.
-            float const* const Instance = DALib::Engine->GetInstanceTransform(
-                reinterpret_cast<void*>(static_cast<intptr_t>(Cur->ParentInstance)));
+            const float* const Instance = (const float*)DALib::Engine->GetInstanceTransform(
+                Cur->ParentInstance);
             if (G_EngineNozzleMath == nullptr)
                 G_EngineNozzleMath = Acquire3DMathEngine();
-            FTransform Combined;
-            G_EngineNozzleMath->MulTransform(Combined, *reinterpret_cast<FTransform const*>(Instance),
-                                             *reinterpret_cast<FTransform const*>(&HpXform));
-            FTransform const World = Combined;
+            Transform Combined;
+            G_EngineNozzleMath->MulTransform(Combined, *reinterpret_cast<Transform const*>(Instance),
+                                             HpXform);
+            Transform const World = Combined;
 
             // The inverse of the host's frame (the Transform get_orientation points into carries
             // the position at +0x24): rotation transposed, position -(M^T * P).
             Transform const& HostFrame =
                 reinterpret_cast<Transform const&>(Wrapper->Host->get_orientation());
-            FMatrix const& HostRotation = reinterpret_cast<FMatrix const&>(HostFrame.Rotation);
-            FVector HostPos;
-            HostPos.X = HostFrame.Translation.x;
-            HostPos.Y = HostFrame.Translation.y;
-            HostPos.Z = HostFrame.Translation.z;
-            FVector Rotated;
+            Matrix const& HostRotation = HostFrame.Rotation;
+            Vector HostPos;
+            HostPos.x = HostFrame.Translation.x;
+            HostPos.y = HostFrame.Translation.y;
+            HostPos.z = HostFrame.Translation.z;
+            Vector Rotated;
             ShipTransposeRotate(Rotated, HostRotation, HostPos); // FUN_00447be0
-            FTransform Inverse;
+            Transform Inverse;
             for (int Row = 0; Row < 3; ++Row)
             {
                 for (int Col = 0; Col < 3; ++Col)
-                    Inverse.Rotation.D[Row][Col] = HostRotation.D[Col][Row];
+                    Inverse.Rotation.E[Row][Col] = HostRotation.E[Col][Row];
             }
-            Inverse.Translation.X = -Rotated.X;
-            Inverse.Translation.Y = -Rotated.Y;
-            Inverse.Translation.Z = -Rotated.Z;
+            Inverse.Translation.x = -Rotated.x;
+            Inverse.Translation.y = -Rotated.y;
+            Inverse.Translation.z = -Rotated.z;
 
             // Local = Inverse * World; its position is added into *OutPos.
             if (G_EngineNozzleMath == nullptr)
                 G_EngineNozzleMath = Acquire3DMathEngine();
-            FTransform Local;
+            Transform Local;
             G_EngineNozzleMath->MulTransform(Local, Inverse, World);
-            FTransform const LocalCopy = Local;
-            OutPos[0] = static_cast<float>(static_cast<double>(LocalCopy.Translation.X) +
+            Transform const LocalCopy = Local;
+            OutPos[0] = static_cast<float>(static_cast<double>(LocalCopy.Translation.x) +
                                            static_cast<double>(OutPos[0]));
             ++Count;
-            OutPos[1] = static_cast<float>(static_cast<double>(LocalCopy.Translation.Y) +
+            OutPos[1] = static_cast<float>(static_cast<double>(LocalCopy.Translation.y) +
                                            static_cast<double>(OutPos[1]));
-            OutPos[2] = static_cast<float>(static_cast<double>(LocalCopy.Translation.Z) +
+            OutPos[2] = static_cast<float>(static_cast<double>(LocalCopy.Translation.z) +
                                            static_cast<double>(OutPos[2]));
         }
 
@@ -1464,14 +1464,14 @@ namespace
             return;
 
         // Identity orientation, the average as the position.
-        FTransform PoseXform;
+        Transform PoseXform;
         std::memset(&PoseXform, 0, sizeof(PoseXform));
-        PoseXform.Rotation.D[0][0] = 1.0f;
-        PoseXform.Rotation.D[1][1] = 1.0f;
-        PoseXform.Rotation.D[2][2] = 1.0f;
-        PoseXform.Translation.X = NozzleAvg[0];
-        PoseXform.Translation.Y = NozzleAvg[1];
-        PoseXform.Translation.Z = NozzleAvg[2];
+        PoseXform.Rotation.E[0][0] = 1.0f;
+        PoseXform.Rotation.E[1][1] = 1.0f;
+        PoseXform.Rotation.E[2][2] = 1.0f;
+        PoseXform.Translation.x = NozzleAvg[0];
+        PoseXform.Translation.y = NozzleAvg[1];
+        PoseXform.Translation.z = NozzleAvg[2];
 
         // The companion (a null equipment gives a null companion that is read anyway): cone
         // angles +0x54 / +0x58 as unsigned ints to float, cone outside volume +0x5c raw.
@@ -1507,7 +1507,7 @@ namespace
                 SetClientSoundSourceConeOutsideVolume(Emitter, ConeOutsideVol);
             }
             Emitter->SetPose(static_cast<int>(Wrapper->Host->get_index()),
-                             reinterpret_cast<float const*>(&PoseXform));
+                             &PoseXform);
             Emitter->SetLooping(kEngineSoundLoop[Index]);
         }
 
@@ -1615,7 +1615,7 @@ namespace
             // An empty slot appended, then it takes the nozzle's +0 word.
             FCliEngineNozzleSlot* const Slot = CliEngineNozzlePushBack(Wrapper);
             Slot->SubObjId = Cur->SubObjId;
-            FTransform const* const Local = reinterpret_cast<FTransform const*>(&HpXform);
+            Transform const* const Local = &HpXform;
             int const Part = static_cast<int>(Cur->ParentInstance);
 
             // Trail: a failed allocation leaves null, used anyway; the creation reference is
@@ -1700,7 +1700,7 @@ namespace
     {
         float const Radians = Owner->SpinAngle * kTradeLaneDegToRad;
         int const Id = GetId();
-        DALib::Engine->SetJointParams(reinterpret_cast<void*>(static_cast<intptr_t>(Id)), 0,
+        DALib::Engine->SetJointParams(Id, 0,
                                       &Radians);
     }
 
@@ -1717,17 +1717,17 @@ namespace
         CEqObj* Owner = Wrapper->Equip->Owner;
         if (Owner == nullptr)
             return;
-        void* Root = reinterpret_cast<void*>(static_cast<ptrdiff_t>(Owner->EngineInstanceId));
-        void* Child = DALib::Engine->GetRelatedInstance(Root, 0, reinterpret_cast<void*>(-1));
-        while (Child != nullptr && Child != G_InvalidEngineHandle &&
-               reinterpret_cast<ptrdiff_t>(Child) != -1)
+        InstanceIndex Root = Owner->EngineInstanceId;
+        InstanceIndex Child = DALib::Engine->GetRelatedInstance(Root, 0, -1);
+        while (Child != 0 && Child != InvalidInstanceIndex &&
+               static_cast<ptrdiff_t>(Child) != -1)
         {
             FEngineName NameOut = {};
             FEngineName* Name = DALib::Engine->GetInstanceName(&NameOut, Child);
             char const* Text = "";
             if (Name != nullptr && Name->Text != nullptr)
                 Text = Name->Text;
-            int const ChildId = static_cast<int>(reinterpret_cast<ptrdiff_t>(Child));
+            int const ChildId = static_cast<int>(Child);
             if (std::strcmp(Text, "TLR_Right") == 0)
             {
                 Wrapper->TlrRight.ChildIndex = ChildId;
@@ -1762,21 +1762,21 @@ namespace
         {
             long HpHandle = 0;
             HardpointInfo HpInfo;
-            FTransform Xform;
+            Transform Xform;
             if (FindHardpoint_PS(Root, "HpRightLane", HpHandle, HpInfo))
             {
                 std::memcpy(&Xform.Rotation, &HpInfo.Orient, sizeof(Xform.Rotation));
-                Xform.Translation.X = HpInfo.Position.x;
-                Xform.Translation.Y = HpInfo.Position.y;
-                Xform.Translation.Z = HpInfo.Position.z;
+                Xform.Translation.x = HpInfo.Position.x;
+                Xform.Translation.y = HpInfo.Position.y;
+                Xform.Translation.z = HpInfo.Position.z;
                 CliCreateEffectOneShot(LaneFx, Host, static_cast<int>(Root), &Xform, nullptr);
             }
             if (FindHardpoint_PS(Root, "HpLeftLane", HpHandle, HpInfo))
             {
                 std::memcpy(&Xform.Rotation, &HpInfo.Orient, sizeof(Xform.Rotation));
-                Xform.Translation.X = HpInfo.Position.x;
-                Xform.Translation.Y = HpInfo.Position.y;
-                Xform.Translation.Z = HpInfo.Position.z;
+                Xform.Translation.x = HpInfo.Position.x;
+                Xform.Translation.y = HpInfo.Position.y;
+                Xform.Translation.z = HpInfo.Position.z;
                 CliCreateEffectOneShot(LaneFx, Host, static_cast<int>(Root), &Xform, nullptr);
             }
         }
@@ -1789,11 +1789,11 @@ namespace
             HardpointInfo HpInfo;
             if (FindHardpoint_PS(Root, "HpShield01", HpHandle, HpInfo))
             {
-                FTransform Xform;
+                Transform Xform;
                 std::memcpy(&Xform.Rotation, &HpInfo.Orient, sizeof(Xform.Rotation));
-                Xform.Translation.X = HpInfo.Position.x;
-                Xform.Translation.Y = HpInfo.Position.y;
-                Xform.Translation.Z = HpInfo.Position.z;
+                Xform.Translation.x = HpInfo.Position.x;
+                Xform.Translation.y = HpInfo.Position.y;
+                Xform.Translation.z = HpInfo.Position.z;
                 CliCreateEffectOneShot(ShieldFx, Host, static_cast<int>(Root), &Xform, nullptr);
             }
         }
@@ -1876,11 +1876,11 @@ namespace
             CliEffectCompanionArmStop(Companion);
             CliEffectCompanionClear(Companion);
             // The companion archetype is null without an equipment and read anyway.
-            FTransform Identity;
+            Transform Identity;
             std::memset(&Identity, 0, sizeof(Identity));
-            Identity.Rotation.D[0][0] = 1.0f;
-            Identity.Rotation.D[1][1] = 1.0f;
-            Identity.Rotation.D[2][2] = 1.0f;
+            Identity.Rotation.E[0][0] = 1.0f;
+            Identity.Rotation.E[1][1] = 1.0f;
+            Identity.Rotation.E[2][2] = 1.0f;
             unsigned char const* const Comp = reinterpret_cast<unsigned char const*>(
                 Equip != nullptr ? Equip->Arch->Companion : nullptr);
             long const Index = Host->get_index();
@@ -2051,11 +2051,11 @@ namespace
             StartBeam();
             if (OperatingEffect != nullptr)
             {
-                FTransform Identity;
+                Transform Identity;
                 std::memset(&Identity, 0, sizeof(Identity));
-                Identity.Rotation.D[0][0] = 1.0f;
-                Identity.Rotation.D[1][1] = 1.0f;
-                Identity.Rotation.D[2][2] = 1.0f;
+                Identity.Rotation.E[0][0] = 1.0f;
+                Identity.Rotation.E[1][1] = 1.0f;
+                Identity.Rotation.E[2][2] = 1.0f;
                 long const Index = Host->get_index();
                 CliCreateEffectOneShot(OperatingEffect, Host, static_cast<int>(Index), &Identity,
                                        OperatingCompanion);
@@ -2144,11 +2144,11 @@ namespace
                   "E:\\FL\\Scratch\\Source\\Client\\Space\\CliThruster.cpp", 0x2c, HpName);
             return Wrapper;
         }
-        FTransform Xform;
+        Transform Xform;
         std::memcpy(&Xform.Rotation, &HpInfo.Orient, sizeof(Xform.Rotation));
-        Xform.Translation.X = HpInfo.Position.x;
-        Xform.Translation.Y = HpInfo.Position.y;
-        Xform.Translation.Z = HpInfo.Position.z;
+        Xform.Translation.x = HpInfo.Position.x;
+        Xform.Translation.y = HpInfo.Position.y;
+        Xform.Translation.z = HpInfo.Position.z;
         // Particles tested again (retail).
         if (Particles->IsEmpty())
             return Wrapper;
@@ -2233,11 +2233,11 @@ namespace
         CExternalEquip const* const External = static_cast<CExternalEquip const*>(Equip);
         HardpointInfo Hardpoint;
         External->GetHardPointInfo(Hardpoint);
-        FTransform Local;
+        Transform Local;
         std::memcpy(&Local.Rotation, &Hardpoint.Orient, sizeof(Local.Rotation));
-        Local.Translation.X = Hardpoint.Position.x;
-        Local.Translation.Y = Hardpoint.Position.y;
-        Local.Translation.Z = Hardpoint.Position.z;
+        Local.Translation.x = Hardpoint.Position.x;
+        Local.Translation.y = Hardpoint.Position.y;
+        Local.Translation.z = Hardpoint.Position.z;
 
         // The companion read again, and a second IsEmpty on the same "particles".
         Archetype::ICliObj* const Comp2 = (Equip != nullptr) ? Equip->Arch->Companion : nullptr;
@@ -2316,13 +2316,13 @@ namespace
         ISoundSource* const Voice = static_cast<ISoundSource*>(CreateClientSoundSource3D());
         Wrapper->Voice = Voice;
         Voice->SetLooping(1);
-        FTransform IdentityXform;
+        Transform IdentityXform;
         std::memset(&IdentityXform, 0, sizeof(IdentityXform));
-        IdentityXform.Rotation.D[0][0] = 1.0f;
-        IdentityXform.Rotation.D[1][1] = 1.0f;
-        IdentityXform.Rotation.D[2][2] = 1.0f;
+        IdentityXform.Rotation.E[0][0] = 1.0f;
+        IdentityXform.Rotation.E[1][1] = 1.0f;
+        IdentityXform.Rotation.E[2][2] = 1.0f;
         Voice->SetPose(static_cast<int>(Host->get_index()),
-                       reinterpret_cast<float const*>(&IdentityXform));
+                       &IdentityXform);
         Voice->Start(SoundArch, 0);
         return Wrapper;
     }
@@ -2652,7 +2652,7 @@ namespace
                 {
                     CliCreateEffectOneShot(Wrapper->TrailEffect, Wrapper->Host,
                                            static_cast<int>(Cur->ParentInstance),
-                                           reinterpret_cast<FTransform const*>(&Xform), nullptr);
+                                           &Xform, nullptr);
                 }
             }
             break;
@@ -2706,14 +2706,14 @@ namespace
             CliEngineReleaseSoundEmitters(Wrapper);
         }
         // Retail goes on after the release; every emitter is null by then.
-        FTransform Pose;
+        Transform Pose;
         std::memset(&Pose, 0, sizeof(Pose));
-        Pose.Rotation.D[0][0] = 1.0f;
-        Pose.Rotation.D[1][1] = 1.0f;
-        Pose.Rotation.D[2][2] = 1.0f;
-        Pose.Translation.X = Avg[0];
-        Pose.Translation.Y = Avg[1];
-        Pose.Translation.Z = Avg[2];
+        Pose.Rotation.E[0][0] = 1.0f;
+        Pose.Rotation.E[1][1] = 1.0f;
+        Pose.Rotation.E[2][2] = 1.0f;
+        Pose.Translation.x = Avg[0];
+        Pose.Translation.y = Avg[1];
+        Pose.Translation.z = Avg[2];
         // The host's index is read per emitter.
         for (int Index = 0; Index < 9; ++Index)
         {
@@ -2721,7 +2721,7 @@ namespace
             if (Emitter != nullptr)
             {
                 Emitter->SetPose(static_cast<int>(Wrapper->Host->get_index()),
-                                 reinterpret_cast<float const*>(&Pose));
+                                 &Pose);
             }
         }
     }

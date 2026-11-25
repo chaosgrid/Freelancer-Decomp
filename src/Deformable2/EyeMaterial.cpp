@@ -1402,10 +1402,10 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
     Axis[0] = BoneLocal[2];
     Axis[1] = BoneLocal[5];
     Axis[2] = BoneLocal[8];
-    void* const Parent = G_Engine->GetInstanceParent(Bone->Instance);
-    if (Parent != (void*)((intptr_t)(-1)))
+    const InstanceIndex Parent = G_Engine->GetInstanceParent(Bone->Instance);
+    if (Parent != InvalidInstanceIndex)
     {
-        const float* const Orientation = G_Engine->GetInstanceOrientation(Parent);
+        const float* const Orientation = (const float*)G_Engine->GetInstanceOrientation(Parent);
         float InParent[3];
         MathTransformVec3(InParent, Orientation, Axis);
         Axis[0] = InParent[0];

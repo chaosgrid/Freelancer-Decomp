@@ -361,9 +361,9 @@ void PlayerData::teardown() {
     voice[0] = '\0';
     std::memset(&costume, 0xcd, sizeof(costume));
     for (int Axis = 0; Axis < 3; ++Axis)
-        initial_pos[Axis] = 0.0f;
+        (&initial_pos.x)[Axis] = 0.0f;
     for (int Cell = 0; Cell < 9; ++Cell)
-        initial_ornt[Cell] = (Cell % 4 == 0) ? 1.0f : 0.0f;
+        (&initial_ornt.E[0][0])[Cell] = (Cell % 4 == 0) ? 1.0f : 0.0f;
     // 0x29a (666), the retail fill value.
     cash = 0x29a;
     num_kills = 0;
@@ -448,9 +448,9 @@ PlayerData::PlayerData()
         AccountName[Index] = L'\0';
     // Zero Vector, identity 3x3.
     for (int Axis = 0; Axis < 3; ++Axis)
-        initial_pos[Axis] = 0.0f;
+        (&initial_pos.x)[Axis] = 0.0f;
     for (int Cell = 0; Cell < 9; ++Cell)
-        initial_ornt[Cell] = (Cell % 4 == 0) ? 1.0f : 0.0f;
+        (&initial_ornt.E[0][0])[Cell] = (Cell % 4 == 0) ? 1.0f : 0.0f;
 }
 
 // PlayerData::check_position_bound -- retail FUN_06d498f0 (thiscall). Outside single player, a
@@ -1493,8 +1493,8 @@ bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Descript
     // unconditionally before `system`, so {0,0,0} is retail. Retail UB not reproduced:
     // nothing initialises the orientation outside the `rotate` arm, so retail copies nine
     // uninitialised stack dwords into the record; the port copies zeros.
-    float SavedPos[3] = { 0.0f, 0.0f, 0.0f };
-    float SavedOrient[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+    Vector SavedPos = { 0.0f, 0.0f, 0.0f };
+    Matrix SavedOrient(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     {
         if (ship_object_id == 0 && (current_base & 0x3fffffffu) == 0)
             current_base = last_base_id;
@@ -1520,10 +1520,10 @@ bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Descript
             // No base: `pos` and `rotate`, skipped (with the newline) when
             // Server_LookupLiveObject (FUN_06d00670, lookup + is_destroyed reject) fails.
             // Angles: FUN_06d4ea60/ea80/eaa0 extract the matrix columns; H =
-            // sqrt(M0*M0 + M3*M3) is stored to float and compared with DAT_06d6b6a0
+            // sqrt(E00*E00 + E10*E10) is stored to float and compared with DAT_06d6b6a0
             // (1.9073486e-06f):
-            //   H > eps : A = atan2(M7, M8), B = atan2(-M6, H), C = atan2(M3, M0)
-            //   else    : A = atan2(-M5, M4), B = atan2(-M6, H), C = 0
+            //   H > eps : A = atan2(E21, E22), B = atan2(-E20, H), C = atan2(E10, E00)
+            //   else    : A = atan2(-E12, E11), B = atan2(-E20, H), C = 0
             // each times DAT_06d6b69c (57.2957763671875f), printed as degrees in order
             // A, B, C; the loader feeds them to EulerMatrix, which takes degrees.
             GameObject* const LiveObj = Server_LookupLiveObject(ship_object_id);
@@ -1536,9 +1536,9 @@ bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Descript
                 // retail read address 0x60 and fault; so does the port.
                 if (SinglePlayer()) {
                     Vector const& LivePos = LiveObj->get_position();
-                    SavedPos[0] = LivePos.x;
-                    SavedPos[1] = LivePos.y;
-                    SavedPos[2] = LivePos.z;
+                    SavedPos.x = LivePos.x;
+                    SavedPos.y = LivePos.y;
+                    SavedPos.z = LivePos.z;
                 } else {
                     CObject const* const Cobj = LiveObj->cobject();
                     CObject const* const Ship =
@@ -1553,43 +1553,43 @@ bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Descript
                     if (Remote != nullptr) {
                         if (Remote->GetSampleCount() != 0) {
                             Vector const Latest = Remote->GetLatestUpdate();
-                            SavedPos[0] = Latest.x;
-                            SavedPos[1] = Latest.y;
-                            SavedPos[2] = Latest.z;
+                            SavedPos.x = Latest.x;
+                            SavedPos.y = Latest.y;
+                            SavedPos.z = Latest.z;
                         } else {
                             Vector const& LivePos = LiveObj->get_position();
-                            SavedPos[0] = LivePos.x;
-                            SavedPos[1] = LivePos.y;
-                            SavedPos[2] = LivePos.z;
+                            SavedPos.x = LivePos.x;
+                            SavedPos.y = LivePos.y;
+                            SavedPos.z = LivePos.z;
                         }
                     }
                 }
                 char PosBuf[128];
-                sprintf(PosBuf, "%g,%g,%g", static_cast<double>(SavedPos[0]),
-                        static_cast<double>(SavedPos[1]),
-                        static_cast<double>(SavedPos[2]));
+                sprintf(PosBuf, "%g,%g,%g", static_cast<double>(SavedPos.x),
+                        static_cast<double>(SavedPos.y),
+                        static_cast<double>(SavedPos.z));
                 fprintf(Out, "%s = %s\n", "pos", PosBuf);
 
                 ::Matrix const& LiveOrient = LiveObj->get_transform().Rotation;
                 for (int I = 0; I < 9; ++I)
-                    SavedOrient[I] = LiveOrient.E[I / 3][I % 3];
+                    SavedOrient.E[I / 3][I % 3] = LiveOrient.E[I / 3][I % 3];
 
-                float const* const M = SavedOrient;
+                Matrix const& M = SavedOrient;
                 double const DegPerRad = static_cast<double>(57.2957763671875f);
-                double const HypotExact = sqrt(static_cast<double>(M[0]) * M[0] +
-                                               static_cast<double>(M[3]) * M[3]);
+                double const HypotExact = sqrt(static_cast<double>(M.E[0][0]) * M.E[0][0] +
+                                               static_cast<double>(M.E[1][0]) * M.E[1][0]);
                 float const Hypot = static_cast<float>(HypotExact);      // FST: compare uses the double
                 double AngleA = 0.0;
                 double AngleB = 0.0;
                 float AngleC = 0.0f;
                 if (HypotExact > static_cast<double>(1.9073486328125e-06f)) {
-                    AngleA = atan2(static_cast<double>(M[7]), static_cast<double>(M[8]));
-                    AngleB = atan2(-static_cast<double>(M[6]), static_cast<double>(Hypot));
-                    AngleC = static_cast<float>(atan2(static_cast<double>(M[3]),
-                                                      static_cast<double>(M[0])));
+                    AngleA = atan2(static_cast<double>(M.E[2][1]), static_cast<double>(M.E[2][2]));
+                    AngleB = atan2(-static_cast<double>(M.E[2][0]), static_cast<double>(Hypot));
+                    AngleC = static_cast<float>(atan2(static_cast<double>(M.E[1][0]),
+                                                      static_cast<double>(M.E[0][0])));
                 } else {
-                    AngleA = atan2(-static_cast<double>(M[5]), static_cast<double>(M[4]));
-                    AngleB = atan2(-static_cast<double>(M[6]), static_cast<double>(Hypot));
+                    AngleA = atan2(-static_cast<double>(M.E[1][2]), static_cast<double>(M.E[1][1]));
+                    AngleB = atan2(-static_cast<double>(M.E[2][0]), static_cast<double>(Hypot));
                     AngleC = 0.0f;
                 }
                 float const DegA = static_cast<float>(AngleA * DegPerRad); // retail stores A as float
@@ -1860,11 +1860,11 @@ bool PlayerData::serialize_to_file(char const* FileName, wchar_t const* Descript
         Record.WeaponGroups = weapon_group_name;
         Record.BaseId = current_base;
         Record.LastBaseId = last_base_id;
-        Record.Position[0] = SavedPos[0];
-        Record.Position[1] = SavedPos[1];
-        Record.Position[2] = SavedPos[2];
+        Record.Position[0] = SavedPos.x;
+        Record.Position[1] = SavedPos.y;
+        Record.Position[2] = SavedPos.z;
         for (int I = 0; I < 9; ++I)
-            Record.Orientation[I / 3][I % 3] = SavedOrient[I];
+            Record.Orientation[I / 3][I % 3] = SavedOrient.E[I / 3][I % 3];
         Record.ShipArchetype = ship_archetype;
         Record.LocationId = current_location;
         Record.SystemId = system_id;

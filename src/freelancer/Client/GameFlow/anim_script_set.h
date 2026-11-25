@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
+
 // The named-script table a RoomObject keeps for its DALib::Anim script (retail FUN_00555a40 ..
 // FUN_00555ca0, no source path string of its own). RoomControl holds one at +0x4c
 // (FUN_00449260 / FUN_004496b0) and Gf::ObjectProp holds one at +0x4c (FUN_00445f40); the mesh
@@ -36,7 +38,7 @@ struct FAnimScriptSet
     // FUN_00555ba0). Returns +0x00.
     int Load(unsigned long NewScript);
     // FUN_00555c70 (thiscall, RET 8) -- Anim +0x24 (PlayScript) on Script with Names[Index].
-    unsigned long Play(void* Root, int Index);
+    unsigned long Play(InstanceIndex Root, int Index);
 };
 
 static_assert(sizeof(FAnimScriptSet) == 0x18, "AnimScriptSet sizeof 0x18");

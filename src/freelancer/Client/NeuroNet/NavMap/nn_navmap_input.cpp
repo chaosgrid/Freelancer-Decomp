@@ -724,7 +724,7 @@ bool NeuroNetNavMap::CursorMapFraction(float* OutU, float* OutV)
     // fractions of the map frame: U = x / (MapSize x / 2), V = -y / (MapSize y / 2), each
     // then * 0.5 + 0.5.
     float Ray[3];
-    AsCamera(&Camera)->Unproject(Ray, ScreenX, ScreenY);
+    AsCamera(&Camera)->Unproject((Vector*)Ray, ScreenX, ScreenY);
     double const K = kNavMapPlaneDepth / static_cast<double>(Ray[2]);
     double const RayX = static_cast<double>(Ray[0]) * K;
     float const RayY = static_cast<float>(static_cast<double>(Ray[1]) * K);
@@ -886,11 +886,11 @@ void NeuroNetNavMap::ShowObjectTools()
     bObjectToolsShown = 1;
     OptionBridge->SetProperty(kWinPropHide, 0, 0);
     RayPos[0] = static_cast<float>(static_cast<double>(RayPos[0]) +
-                                   static_cast<double>(OptionBridge->AttachPosition[0]));
+                                   static_cast<double>(OptionBridge->AttachPosition.x));
     RayPos[1] = static_cast<float>(static_cast<double>(RayPos[1]) +
-                                   static_cast<double>(OptionBridge->AttachPosition[1]));
+                                   static_cast<double>(OptionBridge->AttachPosition.y));
     RayPos[2] = static_cast<float>(static_cast<double>(RayPos[2]) +
-                                   static_cast<double>(OptionBridge->AttachPosition[2]));
+                                   static_cast<double>(OptionBridge->AttachPosition.z));
     OptionBridge->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(RayPos), 0);
 
     // The zoom button of the view, hidden when the jump applies.

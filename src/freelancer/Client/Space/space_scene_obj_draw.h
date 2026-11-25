@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
+
 // Retail space-object mesh draw walk (camera +0x78 → Slot7).
 // Listing anchors: FUN_0051b250, FUN_0051c200, FUN_0051f2c0, FUN_00539980,
 // plus same-pass drain FUN_0051eda0 / FUN_0051f810 (required to close the queue).
@@ -71,7 +73,7 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
 // FUN_00533880 / FUN_00533930 -- DALib::Engine QI for IFLAppearance, then Slot3 (InstId,
 // Value) / Slot8 (Index, Out); true when the call returned >= 0, false when the QI failed.
 // Callers: the draw submits above and the Ship draw LAB_00546050.
-bool SetAppearanceInstanceValue(void* InstId, void* ArchPath);
+bool SetAppearanceInstanceValue(InstanceIndex InstId, void* ArchPath);
 bool GetAppearanceOverrideMaterial(unsigned long Index, void** Out);
 
 // FUN_0051c200 -- GameCamera slot 0x78, also called directly by

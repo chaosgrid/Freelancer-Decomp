@@ -676,11 +676,11 @@ void __cdecl PhySys::AttachGolemController(CObject* Object, CreateParms const& P
 
         I3DMathEngine* const Math = Acquire3DMathEngine();
 
-        FQuaternion MathQuat = {0.0f, 0.0f, 0.0f, 0.0f};
-        Math->MatrixToQuaternion(MathQuat, (FMatrix const&)Object->Orientation);
+        Quaternion MathQuat = {0.0f, 0.0f, 0.0f, 0.0f};
+        Math->MatrixToQuaternion(MathQuat, Object->Orientation);
 
-        // FQuaternion is (W,X,Y,Z); retail rotates it into IVP's (X,Y,Z,W).
-        float const IvpQuat[4] = {MathQuat.X, MathQuat.Y, MathQuat.Z, MathQuat.W};
+        // Quaternion is (W,X,Y,Z); retail rotates it into IVP's (X,Y,Z,W).
+        float const IvpQuat[4] = {MathQuat.x, MathQuat.y, MathQuat.z, MathQuat.w};
 
         Vector const ZeroSpeed = {0.0f, 0.0f, 0.0f};
 

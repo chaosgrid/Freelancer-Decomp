@@ -1909,25 +1909,25 @@ void NavBar::MakeScaledBackground(float Scale, char const* Mesh, float const* Po
 
     // The instance's rotation reset to identity scaled by Scale (its
     // translation kept), SetInstanceMatrix, UpdateInstance. No null or -1 test.
-    void* const Instance = ScaledBackground->MeshHolder.EngineInstance;
-    FTransform Transform;
-    Transform.Rotation.D[0][0] = 1.0f;
-    Transform.Rotation.D[0][1] = 0.0f;
-    Transform.Rotation.D[0][2] = 0.0f;
-    Transform.Rotation.D[1][0] = 0.0f;
-    Transform.Rotation.D[1][1] = 1.0f;
-    Transform.Rotation.D[1][2] = 0.0f;
-    Transform.Rotation.D[2][0] = 0.0f;
-    Transform.Rotation.D[2][1] = 0.0f;
-    Transform.Rotation.D[2][2] = 1.0f;
-    float const* const CurrentTransform = DALib::Engine->GetInstanceTransform(Instance);
-    Transform.Translation.X = CurrentTransform[9];
-    Transform.Translation.Y = CurrentTransform[10];
-    Transform.Translation.Z = CurrentTransform[11];
+    const InstanceIndex Instance = ScaledBackground->MeshHolder.EngineInstance;
+    Transform Xform;
+    Xform.Rotation.E[0][0] = 1.0f;
+    Xform.Rotation.E[0][1] = 0.0f;
+    Xform.Rotation.E[0][2] = 0.0f;
+    Xform.Rotation.E[1][0] = 0.0f;
+    Xform.Rotation.E[1][1] = 1.0f;
+    Xform.Rotation.E[1][2] = 0.0f;
+    Xform.Rotation.E[2][0] = 0.0f;
+    Xform.Rotation.E[2][1] = 0.0f;
+    Xform.Rotation.E[2][2] = 1.0f;
+    const Transform* const CurrentTransform = DALib::Engine->GetInstanceTransform(Instance);
+    Xform.Translation.x = CurrentTransform->Translation.x;
+    Xform.Translation.y = CurrentTransform->Translation.y;
+    Xform.Translation.z = CurrentTransform->Translation.z;
     if (G_NavBarMath == nullptr)
         G_NavBarMath = Acquire3DMathEngine();
-    G_NavBarMath->Scale(Transform.Rotation, Transform.Rotation, Scale);
-    DALib::Engine->SetInstanceMatrix(Instance, &Transform);
+    G_NavBarMath->Scale(Xform.Rotation, Xform.Rotation, Scale);
+    DALib::Engine->SetInstanceMatrix(Instance, &Xform);
     DALib::Engine->UpdateInstance(Instance, 0, nullptr);
 }
 

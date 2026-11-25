@@ -593,7 +593,7 @@ namespace
 
     // ------------------------------------------------------------------------
     // The evaluator EstimateBallVsLedgeFaceContact (FUN_0635df00) installs:
-    // vfptr PTR_LAB_0635d5b0 (:0635df83), slot Evaluate_0635d5b0.
+    // vfptr PTR_LAB_0635d5b0 (:0635df83), Evaluate = LAB_0635d5b0.
     //
     // Field offsets are the driver's own writes (there is no shared base
     // class beyond IVP_Ledge_Sweep_Evaluator; see the header):
@@ -611,9 +611,49 @@ namespace
         IVP_U_Point Normal;   // +0x24
         IVP_U_Point Anchor;   // +0x34
 
+        // LAB_0635d5b0, the largest of the nine and installed by every driver but
+        // FUN_0635e1d0. Signed distance of a point on A from a plane carried by B:
+        //   Position = FrameA->vmult4(P14)              // CALL FUN_063484e0
+        //   Anchor   = FrameB->vmult4(P34)              // inlined
+        //   Normal   = FrameB->vmult (P24)              // inlined
+        //   return dot(Position - Anchor, Normal)
+        // The inlined transforms do NOT round like FUN_063484e0: Anchor x/y are
+        // spilled as floats after two terms, Anchor.z stays extended to the final
+        // subtraction; each Normal component has its own association order.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635d5b0(this, FrameA, FrameB);
+            IVP_U_Point Position;
+            FrameA->vmult4(&PointA, &Position); // 0635d5c3
+
+            const IVP_U_Point *P34 = &Anchor;
+            const double Px = P34->k[0];
+            const double Py = P34->k[1];
+            const double Pz = P34->k[2];
+            float Tx = (float)(FrameB->rows[0].k[0] * Px);
+            float Ty = (float)(FrameB->rows[1].k[0] * Px);
+            double Ez = Px * FrameB->rows[2].k[0];
+            Tx = (float)(FrameB->rows[0].k[1] * Py + Tx);
+            Ty = (float)(FrameB->rows[1].k[1] * Py + Ty);
+            Ez = Ez + FrameB->rows[2].k[1] * Py;
+            const float AnchorX = (float)((FrameB->rows[0].k[2] * Pz + Tx) + FrameB->vv.k[0]);
+            const float AnchorY = (float)((FrameB->rows[1].k[2] * Pz + Ty) + FrameB->vv.k[1]);
+            const double AnchorZ = (Ez + FrameB->rows[2].k[2] * Pz) + FrameB->vv.k[2];
+
+            const IVP_U_Point *P24 = &Normal;
+            const float NormalX = (float)(((double)(FrameB->rows[0].k[0]) * P24->k[0] +
+                                                      (double)(FrameB->rows[0].k[2]) * P24->k[2]) +
+                                                     (double)(FrameB->rows[0].k[1]) * P24->k[1]);
+            const float NormalY = (float)(((double)(FrameB->rows[1].k[0]) * P24->k[0] +
+                                                      (double)(FrameB->rows[1].k[2]) * P24->k[2]) +
+                                                     (double)(FrameB->rows[1].k[1]) * P24->k[1]);
+            const float NormalZ = (float)(((double)(FrameB->rows[2].k[1]) * P24->k[1] +
+                                                      (double)(FrameB->rows[2].k[0]) * P24->k[0]) +
+                                                     (double)(FrameB->rows[2].k[2]) * P24->k[2]);
+
+            const float DeltaX = Position.k[0] - AnchorX;
+            const float DeltaY = Position.k[1] - AnchorY;
+            const double DeltaZ = (double)(Position.k[2]) - AnchorZ;
+            return (DeltaZ * NormalZ + (double)(DeltaY) * NormalY) + (double)(DeltaX) * NormalX;
         }
     };
     static_assert(sizeof(IVP_Sweep_PointPlane_Evaluator) == 0x44,
@@ -621,7 +661,7 @@ namespace
 
     // ------------------------------------------------------------------------
     // The second evaluator EstimateLedgeVertexVsLedgeFaceContact (FUN_0635da70)
-    // installs: vfptr PTR_LAB_0635da20 (:0635dc61), slot Evaluate_0635da20. Two
+    // installs: vfptr PTR_LAB_0635da20 (:0635dc61), Evaluate = LAB_0635da20. Two
     // points, and the base fields come from a different speed bound.
     //   +0x04 / +0x08  :0635dd05 / :0635dd2b
     //   +0x14 Direction  the unit edge direction
@@ -634,9 +674,18 @@ namespace
         IVP_U_Point Direction;   // +0x14
         IVP_U_Point Normal;      // +0x24
 
+        // LAB_0635da20: P24 rotated by FrameB, re-expressed in FrameA's local
+        // space (vimult), then dotted with the fixed local direction P14.
+        // Retail's association order, returned unrounded.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635da20(this, FrameA, FrameB);
+            const IVP_U_Point *P0 = &Direction;
+            const IVP_U_Point *P1 = &Normal;
+            IVP_U_Point Local1, Local2;
+            FrameB->vmult(P1, &Local1);
+            FrameA->vimult(&Local1, &Local2);
+            return ((double)(Local2.k[1]) * P0->k[1] + (double)(Local2.k[2]) * P0->k[2]) +
+                   (double)(Local2.k[0]) * P0->k[0];
         }
     };
     static_assert(sizeof(IVP_Sweep_EdgeNormal_Evaluator) == 0x34,
@@ -655,7 +704,7 @@ namespace
     // ------------------------------------------------------------------------
 
     // Evaluator 1, frame+0x6c, vfptr stored at :0635e263; slot
-    // Evaluate_0635e080 (skew-line edge-edge separation).
+    // LAB_0635e080 (skew-line edge-edge separation).
     //   +0x04 / +0x08  :0635e3b2 / :0635e3d5
     //   +0x14 PositionA  frame+0x80
     //   +0x24 DirectionA frame+0x90
@@ -672,9 +721,38 @@ namespace
         IVP_U_Point DirectionB;   // +0x44
         float Scale;              // +0x54
 
+        // LAB_0635e080: the signed distance between two skew lines along their
+        // common perpendicular, times the stored scale at +0x54.
+        //   Axis = cross(WorldDirectionA, WorldDirectionB)      // FUN_0628bed0
+        //   return (dot(Axis, WorldPositionA) - dot(Axis, WorldPositionB))
+        //              * (1.0f / sqrtf(Axis.quad_length())) * Float54;
+        // Two dots subtracted, not one dot of the difference (they differ in
+        // float). Numerator and Q rounded to float, the result unrounded.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635e080(this, FrameA, FrameB);
+            IVP_U_Point WorldPositionA;
+            IVP_U_Point WorldDirectionA;
+            IVP_U_Point WorldPositionB;
+            IVP_U_Point WorldDirectionB;
+            FrameA->vmult(&DirectionA, &WorldDirectionA);
+            FrameA->vmult4(&PositionA, &WorldPositionA);
+            FrameB->vmult(&DirectionB, &WorldDirectionB);
+            FrameB->vmult4(&PositionB, &WorldPositionB);
+
+            IVP_U_Point Axis;
+            Axis.calc_cross_product(&WorldDirectionA, &WorldDirectionB);
+
+            const double DotA = ((double)(Axis.k[2]) * WorldPositionA.k[2] +
+                                 (double)(Axis.k[1]) * WorldPositionA.k[1]) +
+                                (double)(WorldPositionA.k[0]) * Axis.k[0];
+            const double DotB = ((double)(Axis.k[2]) * WorldPositionB.k[2] +
+                                 (double)(Axis.k[1]) * WorldPositionB.k[1]) +
+                                (double)(WorldPositionB.k[0]) * Axis.k[0];
+            const float Numerator = (float)(DotA - DotB);
+            const float QuadLength = (float)(
+                ((double)(Axis.k[1]) * Axis.k[1] + (double)(Axis.k[2]) * Axis.k[2]) +
+                (double)(Axis.k[0]) * Axis.k[0]);
+            return (IVP_InvSqrtFloat(QuadLength) * Numerator) * Scale;
         }
     };
     // offsetof is not used: offsetof on a polymorphic type is only
@@ -683,7 +761,7 @@ namespace
                   "evaluator must be retail's 0x58-byte frame local");
 
     // Evaluator 2, frame+0xf8, vfptr stored at :0635e576; slot
-    // Evaluate_0635e160, the parallel-edge guard (the squared cross-product
+    // LAB_0635e160, the parallel-edge guard (the squared cross-product
     // length whose reciprocal square root evaluator 1 divides by).
     //   +0x04 / +0x08  :0635e553 / :0635e581
     //   +0x14 DirectionA frame+0x10c, copied from evaluator 1's +0x24
@@ -696,16 +774,27 @@ namespace
         IVP_U_Point DirectionA;   // +0x14
         IVP_U_Point DirectionB;   // +0x24
 
+        // LAB_0635e160: |cross(FrameA->vmult(P14), FrameB->vmult(P24))|^2, the
+        // parallel-edge guard for LAB_0635e080 (the quantity it divides by).
+        // Rotation-only transforms; result unrounded.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635e160(this, FrameA, FrameB);
+            IVP_U_Point WorldDirectionA;
+            IVP_U_Point WorldDirectionB;
+            FrameA->vmult(&DirectionA, &WorldDirectionA);
+            FrameB->vmult(&DirectionB, &WorldDirectionB);
+
+            IVP_U_Point Axis;
+            Axis.calc_cross_product(&WorldDirectionA, &WorldDirectionB);
+            return ((double)(Axis.k[2]) * Axis.k[2] + (double)(Axis.k[1]) * Axis.k[1]) +
+                   (double)(Axis.k[0]) * Axis.k[0];
         }
     };
     static_assert(sizeof(IVP_Sweep_EdgeParallel_Evaluator) == 0x34,
                   "evaluator must be retail's 0x34-byte frame local");
 
     // Evaluator 3, frame+0xc4, vfptr stored at :0635e67e; slot
-    // Evaluate_0635d6d0, `dot(FrameA->vmult(P14), FrameB->vmult(P24))`.
+    // LAB_0635d6d0, `dot(FrameA->vmult(P14), FrameB->vmult(P24))`.
     //   +0x04 / +0x08  :0635e5c1 / :0635e689
     //   +0x14 Direction  frame+0xd8, rewritten every loop iteration
     //   +0x24 Normal     frame+0xe8, face normal, normalized (:0635e714)
@@ -716,9 +805,17 @@ namespace
         IVP_U_Point Direction;   // +0x14
         IVP_U_Point Normal;      // +0x24
 
+        // LAB_0635d6d0: dot(FrameA->vmult(P14), FrameB->vmult(P24)), both through
+        // FUN_06348580; retail's association order, returned unrounded.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635d6d0(this, FrameA, FrameB);
+            const IVP_U_Point *P0 = &Direction;
+            const IVP_U_Point *P1 = &Normal;
+            IVP_U_Point Local1, Local2;
+            FrameA->vmult(P0, &Local1);
+            FrameB->vmult(P1, &Local2);
+            return ((double)(Local1.k[2]) * Local2.k[2] + (double)(Local1.k[1]) * Local2.k[1]) +
+                   (double)(Local2.k[0]) * Local1.k[0];
         }
     };
     static_assert(sizeof(IVP_Sweep_EdgeFace_Evaluator) == 0x34,
@@ -736,7 +833,7 @@ namespace
     // use, so nothing survives a rebind.
     // ------------------------------------------------------------------------
 
-    // Pass 1's evaluator, frame+0x34, vfptr PTR_LAB_0635d950 (Evaluate_0635d950).
+    // Pass 1's evaluator, frame+0x34, vfptr PTR_LAB_0635d950 (Evaluate = LAB_0635d950).
     // The odd one out: +0x14 is a float bias and the points start at +0x18
     // (the driver writes a scalar to evaluator +0x14 at :0635f32d).
     //   +0x14 Bias       (Ramp + CombinedRadius) * 0.5f
@@ -754,15 +851,48 @@ namespace
         IVP_U_Point DirectionB;    // +0x38
         IVP_U_Point MeasureB;      // +0x48
 
+        // LAB_0635d950.
+        //   Delta  = FrameB->vmult4(P28) - FrameA->vmult4(P18)
+        //   Moment = cross(Delta, WorldDirectionB)       // FUN_0628bed0; WorldDirectionB = vmult(P38)
+        //   Limit  = Moment.real_length()           // FUN_06347e60
+        //   Value  = dot(Moment, WorldMeasureB) + Float14   // WorldMeasureB = vmult(P48)
+        //   return (Value < Limit) ? Value : Limit;
+        // The odd one out: +0x14 is a float bias and the points start at +0x18.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635d950(this, FrameA, FrameB);
+            IVP_U_Point PositionA;
+            IVP_U_Point PositionB;
+            IVP_U_Point WorldDirectionB;
+            IVP_U_Point WorldMeasureB;
+            FrameA->vmult4(&PointA, &PositionA);
+            FrameB->vmult4(&PointB, &PositionB);
+            FrameB->vmult(&DirectionB, &WorldDirectionB);
+            FrameB->vmult(&MeasureB, &WorldMeasureB);
+
+            IVP_U_Point Delta;
+            Delta.subtract(&PositionB, &PositionA);
+
+            // Limit stays unrounded; Value is compared extended but returned as
+            // its float copy.
+            IVP_U_Point Moment;
+            Moment.calc_cross_product(&Delta, &WorldDirectionB);
+
+            const double Limit = Moment.real_length();
+            const double Value = (((double)(Moment.k[2]) * WorldMeasureB.k[2] +
+                                   (double)(Moment.k[1]) * WorldMeasureB.k[1]) +
+                                  (double)(WorldMeasureB.k[0]) * Moment.k[0]) +
+                                 Bias;
+            if (Value < Limit)
+            {
+                return (float)(Value);
+            }
+            return Limit;
         }
     };
     static_assert(sizeof(IVP_Sweep_VertexEdgeMoment_Evaluator) == 0x58,
                   "evaluator must be retail's 0x58-byte frame local");
 
-    // Pass 3's evaluator, frame+0x34, vfptr PTR_LAB_0635d830 (Evaluate_0635d830).
+    // Pass 3's evaluator, frame+0x34, vfptr PTR_LAB_0635d830 (Evaluate = LAB_0635d830).
     //   +0x14 PositionA  side A's feature vertex, A-local
     //   +0x24 DirectionA the current fan edge's unit direction, A-local
     //   +0x34 PositionB  side B's feature vertex, B-local
@@ -777,9 +907,47 @@ namespace
         IVP_U_Point PositionB;     // +0x34
         IVP_U_Point DirectionB;    // +0x44
 
+        // LAB_0635d830.
+        //   Delta = FrameA->vmult4(P14) - FrameB->vmult4(P34)
+        //   Perp  = normize(cross(cross(WorldDirectionB, Delta), WorldDirectionB))
+        //   return dot(WorldDirectionA, Perp)      // WorldDirectionA/B = vmult of P24/P44
+        // Perp is the unit direction from B's edge towards A's. Both crosses are
+        // inlined in retail with mixed float/extended intermediates; normize
+        // (FUN_06347ef0, :0635d91b) leaves a below-epsilon Perp unchanged.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635d830(this, FrameA, FrameB);
+            IVP_U_Point WorldPositionA;
+            IVP_U_Point WorldDirectionA;
+            IVP_U_Point WorldPositionB;
+            IVP_U_Point WorldDirectionB;
+            FrameA->vmult4(&PositionA, &WorldPositionA);
+            FrameA->vmult(&DirectionA, &WorldDirectionA);
+            FrameB->vmult4(&PositionB, &WorldPositionB);
+            FrameB->vmult(&DirectionB, &WorldDirectionB);
+
+            const double Dx = (double)(WorldPositionA.k[0]) - WorldPositionB.k[0];
+            const double Dy = (double)(WorldPositionA.k[1]) - WorldPositionB.k[1];
+            const double Dz = (double)(WorldPositionA.k[2]) - WorldPositionB.k[2];
+            const double Bx = WorldDirectionB.k[0];
+            const double By = WorldDirectionB.k[1];
+            const double Bz = WorldDirectionB.k[2];
+
+            const float Cx = (float)(Dz * By - Bz * Dy);
+            const float Cy = (float)(Bz * Dx - Dz * Bx);
+            const double Cz = Dy * Bx - By * Dx;
+
+            const float T1 = (float)(By * Cx);
+            const float T2 = (float)((double)(Cy) * Bx);
+
+            IVP_U_Point Perpendicular;
+            Perpendicular.k[0] = (float)((double)(Cy) * Bz - Cz * By);
+            Perpendicular.k[1] = (float)(Cz * Bx - Bz * Cx);
+            Perpendicular.k[2] = (float)((double)(T1) - T2);
+            Perpendicular.normize();
+
+            return ((double)(WorldDirectionA.k[2]) * Perpendicular.k[2] +
+                    (double)(WorldDirectionA.k[1]) * Perpendicular.k[1]) +
+                   (double)(Perpendicular.k[0]) * WorldDirectionA.k[0];
         }
     };
     static_assert(sizeof(IVP_Sweep_EdgeFanEdge_Evaluator) == 0x54,
@@ -798,15 +966,15 @@ namespace
 
     // ------------------------------------------------------------------------
     // The single evaluator EstimateBallVsBallContact (FUN_0635f020) installs:
-    // vfptr PTR_LAB_0635d720 (:0635f09c), slot Evaluate_0635d720. Frame tiling:
+    // vfptr PTR_LAB_0635d720 (:0635f09c), Evaluate = LAB_0635d720. Frame tiling:
     // evaluator at frame+0x10, CacheB at +0x54, CacheA at +0x5fc (0xba4 total).
     //   +0x04 / +0x08  :0635f0f4 / :0635f10f
     //   +0x14 PointA   frame+0x24, zeroed
     //   +0x24 PointB   frame+0x34, zeroed
     //   +0x34 Axis     frame+0x44, the normalized centre-to-centre direction
     // sizeof: 0x14 + 3*0x10 = 0x44. Not IVP_Sweep_PointPlane_Evaluator:
-    // Evaluate_0635d720 reads +0x34 as an UNTRANSFORMED direction, where
-    // Evaluate_0635d5b0 pushes it through FrameB as a point.
+    // LAB_0635d720 reads +0x34 as an UNTRANSFORMED direction, where
+    // LAB_0635d5b0 pushes it through FrameB as a point.
     // ------------------------------------------------------------------------
     class IVP_Sweep_CenterDistance_Evaluator : public IVP_Ledge_Sweep_Evaluator
     {
@@ -815,9 +983,34 @@ namespace
         IVP_U_Point PointB;   // +0x24
         IVP_U_Point Axis;     // +0x34
 
+        // LAB_0635d720.
+        //   Delta     = FrameB->vmult4(P24) - FrameA->vmult4(P14)
+        //   Projected = dot(Delta, P34) * 1.2f        // P34 read RAW, untransformed
+        //   return (fabsf(Projected) * Projected < Delta.quad_length())
+        //              ? Projected : sqrtf(Delta.quad_length());
+        // i.e. min(Projected, |Delta|) without a branch on the sign: a negative
+        // Projected is always returned. Unordered takes the square root. 1.2f is
+        // DAT_063a5668 (9a 99 99 3f). Q is rounded to float, the rest extended.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635d720(this, FrameA, FrameB);
+            IVP_U_Point PositionA;
+            IVP_U_Point PositionB;
+            FrameA->vmult4(&PointA, &PositionA);
+            FrameB->vmult4(&PointB, &PositionB);
+
+            const double DeltaX = (double)(PositionB.k[0]) - PositionA.k[0];
+            const double DeltaY = (double)(PositionB.k[1]) - PositionA.k[1];
+            const double DeltaZ = (double)(PositionB.k[2]) - PositionA.k[2];
+            const float QuadLength = (float)((DeltaY * DeltaY + DeltaZ * DeltaZ) + DeltaX * DeltaX);
+
+            const IVP_U_Point *Direction = &Axis;
+            const double Projected = ((DeltaY * Direction->k[1] + DeltaZ * Direction->k[2]) + DeltaX * Direction->k[0]) *
+                                     (double)(1.2f); // DAT_063a5668
+            if (std::fabs(Projected) * Projected < QuadLength)
+            {
+                return Projected;
+            }
+            return std::sqrt((double)(QuadLength));
         }
     };
     static_assert(sizeof(IVP_Sweep_CenterDistance_Evaluator) == 0x44,
@@ -827,7 +1020,7 @@ namespace
     // The fan-walk evaluator EstimateLedgeVertexVsLedgeVertexContact
     // (FUN_0635e790) and EstimateBallVsLedgeVertexContact (FUN_0635ec90)
     // install for their second pass: vfptr PTR_LAB_0635d7b0 (:0635eac4,
-    // :0635eebd), slot Evaluate_0635d7b0. Same size and offsets as PointPlane
+    // :0635eebd), Evaluate = LAB_0635d7b0. Same size and offsets as PointPlane
     // and CenterDistance, but its +0x34 goes through FrameB with vmult (a
     // direction) where PointPlane uses vmult4 and CenterDistance none.
     //
@@ -847,9 +1040,22 @@ namespace
         IVP_U_Point PointSelf;    // +0x24
         IVP_U_Point Direction;    // +0x34
 
+        // LAB_0635d7b0: dot(FrameB->vmult4(P24) - FrameA->vmult4(P14),
+        // FrameB->vmult(P34)) -- LAB_0635d5b0 with the difference reversed.
+        // Delta extended, result unrounded.
         double Evaluate(const IVP_U_Matrix *FrameA, const IVP_U_Matrix *FrameB) const override
         {
-            return IVP_LedgeSweepEvaluators::Evaluate_0635d7b0(this, FrameA, FrameB);
+            IVP_U_Point PositionA;
+            IVP_U_Point PositionB;
+            IVP_U_Point Normal;
+            FrameA->vmult4(&PointOther, &PositionA);
+            FrameB->vmult4(&PointSelf, &PositionB);
+            FrameB->vmult(&Direction, &Normal);
+
+            const double DeltaX = (double)(PositionB.k[0]) - PositionA.k[0];
+            const double DeltaY = (double)(PositionB.k[1]) - PositionA.k[1];
+            const double DeltaZ = (double)(PositionB.k[2]) - PositionA.k[2];
+            return (DeltaZ * Normal.k[2] + DeltaY * Normal.k[1]) + DeltaX * Normal.k[0];
         }
     };
     static_assert(sizeof(IVP_Sweep_VertexFanEdge_Evaluator) == 0x44,
@@ -905,8 +1111,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeFaceContact(
     Evaluator.MaxRelativeSpeed = this->ClosingBound;
     Evaluator.IMaxRelativeSpeed = 1.0f / Evaluator.MaxRelativeSpeed;
 
-    const IVP_Ledge_Mindist *const LedgeMindist =
-        static_cast<const IVP_Ledge_Mindist *>(this->Mindist);
+    const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
 
     const float CombinedRadius = LedgeMindist->CombinedRadius; // +0x50
 
@@ -928,7 +1133,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeFaceContact(
         this->NowBase, this->NowOffset,
         this->NextBase, this->NextOffset,
         &CacheA, &CacheB, &KnownDistance,
-        reinterpret_cast<IVP_Time *>(&this->OutEventBase));
+        &this->OutEvent);
 
     // The dispatcher zeroed OutCode before calling (:0635fda8).
     if (Hit != 0)
@@ -978,8 +1183,8 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
     const float SpeedBound =
         CacheB.Core->AbsOmega + CacheA.Core->AbsOmega;
 
-    this->OutEventBase = this->NextBase;
-    this->OutEventOffset = this->NextOffset;
+    this->OutEvent.time_base = this->NextBase;
+    this->OutEvent.time_offset = this->NextOffset;
 
     const IVP_Compact_Edge *const EdgeA = static_cast<const IVP_Compact_Edge *>(FeatureEdgeA);
     const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
@@ -1004,8 +1209,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
     VertexFace.IMaxRelativeSpeed = 1.0f / VertexFace.MaxRelativeSpeed;
 
     // The same scalar block as EstimateBallVsLedgeFaceContact.
-    const IVP_Ledge_Mindist *const LedgeMindist =
-        static_cast<const IVP_Ledge_Mindist *>(this->Mindist);
+    const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
     const float CombinedRadius = LedgeMindist->CombinedRadius;
     const uint32_t RampIndex = (LedgeMindist->StateFlags >> 22) & 0xff;
     const float Ramp = SweepToleranceRamp(RampIndex);
@@ -1017,9 +1221,9 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
     if (VertexFace.SearchContactTimeFromContact(
             Threshold, InnerThreshold,
             this->NowBase, this->NowOffset,
-            this->OutEventBase, this->OutEventOffset,
+            this->OutEvent.time_base, this->OutEvent.time_offset,
             &CacheA, &CacheB, &KnownDistance,
-            reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+            &this->OutEvent) != 0)
     {
         this->OutCode = 0x20;
     }
@@ -1056,7 +1260,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
 
     // Computed AFTER pass 1, so bounded by any event time pass 1 wrote.
     const float MaxTravel = (float)(
-        ((((double)(this->OutEventBase) - this->NowBase) + this->OutEventOffset)
+        ((((double)(this->OutEvent.time_base) - this->NowBase) + this->OutEvent.time_offset)
          - this->NowOffset)
         * EdgeNormal.MaxRelativeSpeed);
 
@@ -1105,10 +1309,10 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeFaceContact(
             if (EdgeNormal.SearchContactTime(
                     ApproachThreshold,
                     this->NowBase, this->NowOffset,
-                    this->OutEventBase, this->OutEventOffset,
+                    this->OutEvent.time_base, this->OutEvent.time_offset,
                     0,
                     &CacheA, &CacheB, &Alignment,
-                    reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+                    &this->OutEvent) != 0)
             {
                 this->OutCode = 0x21;
             }
@@ -1167,8 +1371,8 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
     const float SpeedBound =
         SideA->Object->core->AbsOmega + SideB->Object->core->AbsOmega;
 
-    this->OutEventBase = this->NextBase;
-    this->OutEventOffset = this->NextOffset;
+    this->OutEvent.time_base = this->NextBase;
+    this->OutEvent.time_offset = this->NextOffset;
 
     // The far vertex is the NEXT edge's start point.
     const IVP_Compact_Edge *const EdgeA = static_cast<const IVP_Compact_Edge *>(FeatureEdgeA);
@@ -1212,10 +1416,9 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
 
     // FUN_0628bed0: Axis = WorldDirectionA x WorldDirectionB.
     IVP_U_Point Axis;
-    IVP_CalcCrossProduct(&Axis, &WorldDirectionA, &WorldDirectionB);
+    Axis.calc_cross_product(&WorldDirectionA, &WorldDirectionB);
 
-    const IVP_Ledge_Mindist *const LedgeMindist =
-        static_cast<const IVP_Ledge_Mindist *>(this->Mindist);
+    const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
 
     // Retail's association order; negated whole and compared unrounded.
     // Mindist +0x60 is SeparatingNormal.
@@ -1247,9 +1450,9 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
     if (EdgeEdge.SearchContactTimeFromContact(
             Ramp, SweepToleranceBase(),
             this->NowBase, this->NowOffset,
-            this->OutEventBase, this->OutEventOffset,
+            this->OutEvent.time_base, this->OutEvent.time_offset,
             &CacheA, &CacheB, 0,
-            reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+            &this->OutEvent) != 0)
     {
         this->OutCode = 0x40;
     }
@@ -1268,10 +1471,10 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
     if (Parallel.SearchContactTime(
             1e-10f,
             this->NowBase, this->NowOffset,
-            this->OutEventBase, this->OutEventOffset,
+            this->OutEvent.time_base, this->OutEvent.time_offset,
             0,
             &CacheA, &CacheB, 0,
-            reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+            &this->OutEvent) != 0)
     {
         this->OutCode = 0x41;
     }
@@ -1290,7 +1493,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
     // upward and two downward (:0635e765); they are written here in the order
     // the loop consumes them. On each iteration the direction (+0x14) belongs
     // to the FIRST cache's object and the face normal (+0x24) to the SECOND's
-    // ledge, matching Evaluate_0635d6d0's FrameA / FrameB use.
+    // ledge, matching LAB_0635d6d0's FrameA / FrameB use.
     const int UseRawDirection[4] = { SwapFlag, 1 - SwapFlag, SwapFlag, 1 - SwapFlag };
     const IVP_U_Point *const FanDirection[4] = {
         &EdgeEdge.DirectionB, &EdgeEdge.DirectionB,
@@ -1332,10 +1535,10 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeEdgeVsLedgeEdgeContact(
         if (EdgeFace.SearchContactTime(
                 Threshold,
                 this->NowBase, this->NowOffset,
-                this->OutEventBase, this->OutEventOffset,
+                this->OutEvent.time_base, this->OutEvent.time_offset,
                 0,
                 FanFirstCache[FanIndex], FanSecondCache[FanIndex], 0,
-                reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+                &this->OutEvent) != 0)
         {
             this->OutCode = 0x42;
         }
@@ -1394,8 +1597,8 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     const IVP_Core *const CoreB = SideB->Object->core;
     const float SpeedBound = CoreA->AbsOmega + CoreB->AbsOmega;
 
-    this->OutEventBase = this->NextBase;
-    this->OutEventOffset = this->NextOffset;
+    this->OutEvent.time_base = this->NextBase;
+    this->OutEvent.time_offset = this->NextOffset;
 
     const IVP_Compact_Edge *const EdgeA = static_cast<const IVP_Compact_Edge *>(FeatureEdgeA);
     const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
@@ -1424,8 +1627,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     Moment.MaxRelativeSpeed = this->ClosingBound;
     Moment.IMaxRelativeSpeed = 1.0f / Moment.MaxRelativeSpeed;
 
-    const IVP_Ledge_Mindist *const LedgeMindist =
-        static_cast<const IVP_Ledge_Mindist *>(this->Mindist);
+    const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
     const float CombinedRadius = LedgeMindist->CombinedRadius;
     const uint32_t RampIndex = (LedgeMindist->StateFlags >> 22) & 0xff;
     const float Ramp = SweepToleranceRamp(RampIndex);
@@ -1449,7 +1651,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
                    WorldVertexB.k[2] - WorldVertexA.k[2]);
 
     IVP_U_Point WorldMoment;
-    IVP_CalcCrossProduct(&WorldMoment, &Separation, &WorldDirectionB); // FUN_0628bed0
+    WorldMoment.calc_cross_product(&Separation, &WorldDirectionB); // FUN_0628bed0
 
     // Back into B's frame (FUN_0634d970, transposed rotation).
     SideB->Source->WorldTransform.vimult(&WorldMoment, &Moment.MeasureB);
@@ -1463,7 +1665,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
             this->NowBase, this->NowOffset,
             this->NextBase, this->NextOffset,
             &CacheA, &CacheB, 0,
-            reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+            &this->OutEvent) != 0)
     {
         this->OutCode = 0x30;
     }
@@ -1509,7 +1711,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
                        (float)(EdgeXExt * PrevY - EdgeYExt * PrevX));
 
         // The in-plane outward normal of this edge (FUN_0628bed0).
-        IVP_CalcCrossProduct(&EdgePlane.Normal, &EdgeVector, &FaceNormal);
+        EdgePlane.Normal.calc_cross_product(&EdgeVector, &FaceNormal);
         EdgePlane.Normal.normize();
 
         // Anchored at this edge's own start vertex.
@@ -1518,10 +1720,10 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
         if (EdgePlane.SearchContactTime(
                 -SweepToleranceBias(),
                 this->NowBase, this->NowOffset,
-                this->OutEventBase, this->OutEventOffset,
+                this->OutEvent.time_base, this->OutEvent.time_offset,
                 0,
                 &CacheA, &CacheB, 0,
-                reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+                &this->OutEvent) != 0)
         {
             this->OutCode = 0x31;
         }
@@ -1535,7 +1737,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
     const float SeparationGap = LedgeMindist->SeparationGap;
     const double SpanExt =
         (double)(SeparationGap)
-        - ((((double)(this->OutEventBase) - this->NowBase) + this->OutEventOffset)
+        - ((((double)(this->OutEvent.time_base) - this->NowBase) + this->OutEvent.time_offset)
            - this->NowOffset)
               * this->MaxSpeedSum;
     float Span = (float)(SpanExt);
@@ -1589,10 +1791,10 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeEdgeContact(
         if (FanEdge.SearchContactTime(
                 FanThreshold,
                 this->NowBase, this->NowOffset,
-                this->OutEventBase, this->OutEventOffset,
+                this->OutEvent.time_base, this->OutEvent.time_offset,
                 0,
                 &CacheA, &CacheB, 0,
-                reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+                &this->OutEvent) != 0)
         {
             this->OutCode = 0x32;
         }
@@ -1629,8 +1831,8 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsBallContact(
 
     // The single solver call below gets Next*, so the seeding only leaves a
     // usable time behind on a miss.
-    this->OutEventBase = this->NextBase;
-    this->OutEventOffset = this->NextOffset;
+    this->OutEvent.time_base = this->NextBase;
+    this->OutEvent.time_offset = this->NextOffset;
 
     IVP_Sweep_CenterDistance_Evaluator CenterDistance;
 
@@ -1648,8 +1850,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsBallContact(
     CenterDistance.MaxRelativeSpeed = this->ClosingBound;
     CenterDistance.IMaxRelativeSpeed = 1.0f / CenterDistance.MaxRelativeSpeed;
 
-    const IVP_Ledge_Mindist *const LedgeMindist =
-        static_cast<const IVP_Ledge_Mindist *>(this->Mindist);
+    const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
     const float CombinedRadius = LedgeMindist->CombinedRadius;
     const float Ramp = SweepToleranceRamp((LedgeMindist->StateFlags >> 22) & 0xff);
 
@@ -1659,7 +1860,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsBallContact(
             this->NowBase, this->NowOffset,
             this->NextBase, this->NextOffset,
             &CacheA, &CacheB, 0,
-            reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+            &this->OutEvent) != 0)
     {
         // The lowest event code in the family (0x2x ledge-face, 0x3x
         // vertex-edge, 0x4x edge-edge).
@@ -1709,8 +1910,8 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
     const IVP_Core *const CoreA = SideA->Object->core;
     const IVP_Core *const CoreB = SideB->Object->core;
 
-    this->OutEventBase = this->NextBase;
-    this->OutEventOffset = this->NextOffset;
+    this->OutEvent.time_base = this->NextBase;
+    this->OutEvent.time_offset = this->NextOffset;
 
     const IVP_Compact_Edge *const EdgeA = static_cast<const IVP_Compact_Edge *>(FeatureEdgeA);
     const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
@@ -1721,8 +1922,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
     const IVP_U_Float_Point *const VertexA = PointsA + EdgeA->GetStartPointIndex();
     const IVP_U_Float_Point *const VertexB = PointsB + EdgeB->GetStartPointIndex();
 
-    const IVP_Ledge_Mindist *const LedgeMindist =
-        static_cast<const IVP_Ledge_Mindist *>(this->Mindist);
+    const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
 
     // ---- Pass 1: the two vertices along the separating normal ---------------
     IVP_Sweep_CenterDistance_Evaluator VertexVertex;
@@ -1751,7 +1951,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
             this->NowBase, this->NowOffset,
             this->NextBase, this->NextOffset,
             &CacheA, &CacheB, 0,
-            reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+            &this->OutEvent) != 0)
     {
         this->OutCode = 0x10;
     }
@@ -1760,7 +1960,7 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
     // MaxSpeedSum (+0x0c) is read here too. Retail's association order; one
     // rounding.
     const float Span = (float)(
-        (((((double)(this->OutEventBase) - this->NowBase) + this->OutEventOffset)
+        (((((double)(this->OutEvent.time_base) - this->NowBase) + this->OutEvent.time_offset)
           - this->NowOffset)
          * this->MaxSpeedSum)
         + LedgeMindist->SeparationGap);
@@ -1860,10 +2060,10 @@ void IVP_Sweep_Estimator_Context::EstimateLedgeVertexVsLedgeVertexContact(
             if (FanEdge.SearchContactTime(
                     Threshold,
                     this->NowBase, this->NowOffset,
-                    this->OutEventBase, this->OutEventOffset,
+                    this->OutEvent.time_base, this->OutEvent.time_offset,
                     0,
                     CacheOther, CacheSelf, 0,
-                    reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+                    &this->OutEvent) != 0)
             {
                 this->OutCode = 0x11;
             }
@@ -1910,16 +2110,15 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
     const IVP_Core *const CoreA = ObjectA->core;
     const IVP_Core *const CoreB = SideB->Object->core;
 
-    this->OutEventBase = this->NextBase;
-    this->OutEventOffset = this->NextOffset;
+    this->OutEvent.time_base = this->NextBase;
+    this->OutEvent.time_offset = this->NextOffset;
 
     const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
     const IVP_U_Float_Point *const PointsB =
         static_cast<const IVP_U_Float_Point *>(SideB->Points);
     const IVP_U_Float_Point *const VertexB = PointsB + EdgeB->GetStartPointIndex();
 
-    const IVP_Ledge_Mindist *const LedgeMindist =
-        static_cast<const IVP_Ledge_Mindist *>(this->Mindist);
+    const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
 
     // ---- Pass 1: A's origin against B's feature vertex ----------------------
     IVP_Sweep_CenterDistance_Evaluator OriginVertex;
@@ -1944,14 +2143,14 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
             this->NowBase, this->NowOffset,
             this->NextBase, this->NextOffset,
             &CacheA, &CacheB, 0,
-            reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+            &this->OutEvent) != 0)
     {
         this->OutCode = 0x10;
     }
 
     // ---- The pass-2 speed bound --------------------------------------------
     const float Span = (float)(
-        (((((double)(this->OutEventBase) - this->NowBase) + this->OutEventOffset)
+        (((((double)(this->OutEvent.time_base) - this->NowBase) + this->OutEvent.time_offset)
           - this->NowOffset)
          * this->MaxSpeedSum)
         + LedgeMindist->SeparationGap);
@@ -2013,10 +2212,10 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeVertexContact(
         if (FanEdge.SearchContactTime(
                 Threshold,
                 this->NowBase, this->NowOffset,
-                this->OutEventBase, this->OutEventOffset,
+                this->OutEvent.time_base, this->OutEvent.time_offset,
                 0,
                 &CacheA, &CacheB, 0,
-                reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+                &this->OutEvent) != 0)
         {
             this->OutCode = 0x11;
         }
@@ -2070,8 +2269,8 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
     IVP_Sweep_Frame_Cache CacheB;
     CacheB.Init(SideB->Source);
 
-    this->OutEventBase = this->NextBase;
-    this->OutEventOffset = this->NextOffset;
+    this->OutEvent.time_base = this->NextBase;
+    this->OutEvent.time_offset = this->NextOffset;
 
     const IVP_Compact_Edge *const EdgeB = static_cast<const IVP_Compact_Edge *>(FeatureEdgeB);
     const IVP_U_Float_Point *const PointsB =
@@ -2080,8 +2279,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
     const IVP_U_Float_Point *const VertexBNext =
         PointsB + EdgeB->GetNextEdge()->GetStartPointIndex();
 
-    const IVP_Ledge_Mindist *const LedgeMindist =
-        static_cast<const IVP_Ledge_Mindist *>(this->Mindist);
+    const IVP_Ledge_Mindist *const LedgeMindist = this->Mindist;
 
     // ---- Pass 1: the moment test -------------------------------------------
     IVP_Sweep_VertexEdgeMoment_Evaluator EdgeMoment;
@@ -2099,7 +2297,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
     EdgeMoment.MaxRelativeSpeed = this->ClosingBound;
     EdgeMoment.IMaxRelativeSpeed = 1.0f / EdgeMoment.MaxRelativeSpeed;
 
-    // Evaluate_0635d950 adds the bias to its moment dot product before the min
+    // LAB_0635d950 adds the bias to its moment dot product before the min
     // against the moment's own length.
     const float CombinedRadius = LedgeMindist->CombinedRadius;
     const float Ramp = SweepToleranceRamp((LedgeMindist->StateFlags >> 22) & 0xff);
@@ -2119,7 +2317,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
 
     // FUN_0628bed0: cross(WorldDelta, WorldDirectionB), in that order.
     IVP_U_Point WorldMoment;
-    IVP_CalcCrossProduct(&WorldMoment, &WorldDelta, &WorldDirectionB);
+    WorldMoment.calc_cross_product(&WorldDelta, &WorldDirectionB);
 
     SideB->Source->WorldTransform.vimult(&WorldMoment, &EdgeMoment.MeasureB);
     EdgeMoment.MeasureB.normize();
@@ -2133,7 +2331,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
             this->NowBase, this->NowOffset,
             this->NextBase, this->NextOffset,
             &CacheA, &CacheB, 0,
-            reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+            &this->OutEvent) != 0)
     {
         this->OutCode = 0x30;
     }
@@ -2182,7 +2380,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
         EdgeDirection.set(EdgeX, EdgeY, EdgeZ);
 
         // The in-plane normal of the edge's side plane (FUN_0628bed0).
-        IVP_CalcCrossProduct(&SidePlane.Normal, &EdgeDirection, &FaceNormal);
+        SidePlane.Normal.calc_cross_product(&EdgeDirection, &FaceNormal);
         SidePlane.Normal.normize();
 
         SidePlane.Anchor.set(PointCur->X, PointCur->Y, PointCur->Z);
@@ -2190,10 +2388,10 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
         if (SidePlane.SearchContactTime(
                 -SweepToleranceBias(),
                 this->NowBase, this->NowOffset,
-                this->OutEventBase, this->OutEventOffset,
+                this->OutEvent.time_base, this->OutEvent.time_offset,
                 0,
                 &CacheA, &CacheB, 0,
-                reinterpret_cast<IVP_Time *>(&this->OutEventBase)) != 0)
+                &this->OutEvent) != 0)
         {
             this->OutCode = 0x31;
         }
@@ -2203,7 +2401,7 @@ void IVP_Sweep_Estimator_Context::EstimateBallVsLedgeEdgeContact(
 // ============================================================================
 // THE DISPATCH LAYER
 //
-// Four handlers and a table between IVP_RescheduleCollisionEvent
+// Four handlers and a table between IVP_Ledge_Mindist::RescheduleCollisionEvent
 // (FUN_0634f320) and the drivers above; see the header for the table layout
 // and why these are __cdecl.
 //
@@ -2243,7 +2441,7 @@ namespace
 // ============================================================================
 void IVP_SweepEstimate_BallVsLedge(IVP_Sweep_Estimator_Context *Ctx)
 {
-    IVP_Ledge_Mindist *const Mindist = static_cast<IVP_Ledge_Mindist *>(Ctx->Mindist);
+    IVP_Ledge_Mindist *const Mindist = Ctx->Mindist;
     IVP_Real_Object *const ObjectA = Mindist->synapse[0].l_obj;
     IVP_Real_Object *const ObjectB = Mindist->synapse[1].l_obj;
     IVP_Compact_Edge *const FeatureB = Mindist->synapse[1].edge;
@@ -2296,7 +2494,7 @@ void IVP_SweepEstimate_BallVsLedge(IVP_Sweep_Estimator_Context *Ctx)
 // ============================================================================
 void IVP_SweepEstimate_BallVsBall(IVP_Sweep_Estimator_Context *Ctx)
 {
-    IVP_Ledge_Mindist *const Mindist = static_cast<IVP_Ledge_Mindist *>(Ctx->Mindist);
+    IVP_Ledge_Mindist *const Mindist = Ctx->Mindist;
     IVP_Real_Object *const ObjectA = Mindist->synapse[0].l_obj;
     IVP_Real_Object *const ObjectB = Mindist->synapse[1].l_obj;
 
@@ -2326,7 +2524,7 @@ void IVP_SweepEstimate_BallVsBall(IVP_Sweep_Estimator_Context *Ctx)
 // ============================================================================
 void IVP_SweepEstimate_LedgeVsLedge(IVP_Sweep_Estimator_Context *Ctx)
 {
-    IVP_Ledge_Mindist *const Mindist = static_cast<IVP_Ledge_Mindist *>(Ctx->Mindist);
+    IVP_Ledge_Mindist *const Mindist = Ctx->Mindist;
 
     const uint32_t TagA = (Mindist->StateFlags >> 8) & 3;
     const uint32_t TagB = ((Mindist->StateFlags ^ 0x100) >> 8) & 3;
@@ -2363,16 +2561,16 @@ void IVP_SweepEstimate_LedgeVsLedge(IVP_Sweep_Estimator_Context *Ctx)
     // accepts only tag 1 on B, tags 2/3 on side A are rejected.
     switch (SynapseA->status)
     {
-    case 0:
+    case IVP_SYNAPSE_POINT:
         switch (SynapseB->status)
         {
-        case 0:
+        case IVP_SYNAPSE_POINT:
             Ctx->EstimateLedgeVertexVsLedgeVertexContact(FeatureA, FeatureB, &SideA, &SideB);
             break;
-        case 1:
+        case IVP_SYNAPSE_EDGE:
             Ctx->EstimateLedgeVertexVsLedgeEdgeContact(FeatureA, FeatureB, &SideA, &SideB);
             break;
-        case 2:
+        case IVP_SYNAPSE_POLY:
             Ctx->EstimateLedgeVertexVsLedgeFaceContact(FeatureA, FeatureB, &SideA, &SideB);
             break;
         default:
@@ -2380,8 +2578,8 @@ void IVP_SweepEstimate_LedgeVsLedge(IVP_Sweep_Estimator_Context *Ctx)
             break;
         }
         break;
-    case 1:
-        if (SynapseB->status == 1)
+    case IVP_SYNAPSE_EDGE:
+        if (SynapseB->status == IVP_SYNAPSE_EDGE)
         {
             Ctx->EstimateLedgeEdgeVsLedgeEdgeContact(FeatureA, FeatureB, &SideA, &SideB);
         }

@@ -40,7 +40,7 @@ public:
     // --- Win3D / WinControl overrides ---
     bool HitTest(float const* Ray) override;                       // slot 4  LAB_0055fa80
     void SetPosition(float const* NewPosition) override;           // slot 5  LAB_0055f5a0
-    void SetOrientation(float const* NewOrientation) override;     // slot 7  LAB_0055f5f0
+    void SetOrientation(Matrix const* NewOrientation) override;     // slot 7  LAB_0055f5f0
     bool Create(Win3D* NewParent, void* Data) override;            // slot 9  LAB_0055eb40
     void Update() override;                                        // slot 11 LAB_0055f660
     void Draw() override;                                          // slot 13 LAB_0055ef60
@@ -48,8 +48,8 @@ public:
     void MouseLeave(float const* Ray) override;                    // slot 16 FUN_0055fa40
     int GetHitPriority() override;                                 // slot 27 LAB_0055e9e0
     void RefreshAttachment() override;                             // slot 35 FUN_00401e90
-    void GetAttachOrientation(float* OutOrientation9) override;    // slot 40 LAB_0055ea20
-    void GetAttachPosition(float* OutPosition3) override;          // slot 41 FUN_0055eaf0
+    void GetAttachOrientation(Matrix* OutOrientation) override;    // slot 40 LAB_0055ea20
+    void GetAttachPosition(Vector* OutPosition) override;          // slot 41 FUN_0055eaf0
     intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B) override; // slot 42 LAB_0055fb00
 
     int ToolTip2Ids;                  // +0x32c -- "tooltip2", the "%s %d/%d" caption prefix

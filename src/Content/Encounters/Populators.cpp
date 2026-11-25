@@ -97,25 +97,25 @@ namespace
     // (I3DMathEngine slot +0x28, TransformXform).
     Vector TransformByPlacement(FSpaceObjPlacement const* Placement, Vector const* Point)
     {
-        FTransform Xform;
+        Transform PlacementXform;
         for (int Row = 0; Row < 3; ++Row)
         {
             for (int Column = 0; Column < 3; ++Column)
-                Xform.Rotation.D[Row][Column] = Placement->Orientation.E[Row][Column];
+                PlacementXform.Rotation.E[Row][Column] = Placement->Orientation.E[Row][Column];
         }
-        Xform.Translation.X = Placement->Position.x;
-        Xform.Translation.Y = Placement->Position.y;
-        Xform.Translation.Z = Placement->Position.z;
-        FVector Source;
-        Source.X = Point->x;
-        Source.Y = Point->y;
-        Source.Z = Point->z;
-        FVector Result;
-        ContentMathEngine()->TransformXform(Result, Xform, Source);
+        PlacementXform.Translation.x = Placement->Position.x;
+        PlacementXform.Translation.y = Placement->Position.y;
+        PlacementXform.Translation.z = Placement->Position.z;
+        Vector Source;
+        Source.x = Point->x;
+        Source.y = Point->y;
+        Source.z = Point->z;
+        Vector Result;
+        ContentMathEngine()->TransformXform(Result, PlacementXform, Source);
         Vector Out;
-        Out.x = Result.X;
-        Out.y = Result.Y;
-        Out.z = Result.Z;
+        Out.x = Result.x;
+        Out.y = Result.y;
+        Out.z = Result.z;
         return Out;
     }
 
@@ -244,7 +244,7 @@ namespace
         // Retail has an empty vector local (EH state 0) that nothing fills or reads; its
         // element type is not recoverable (shared trivial vector dtor FUN_06eec8d0). No effect.
         std::vector<FSystemZone*> Unused;
-        if (SpacePopPositionIsExcluded(&Position->x))
+        if (SpacePopPositionIsExcluded(Position))
             return;
 
         std::vector<FSystemZone*> AtShip;
@@ -354,7 +354,7 @@ namespace
         // The position must be outside every exclusion sphere.
         bool const bAll = true;
         bool const bInside = false;
-        if (!TestExclusionSpheres(&Placement->Position.x, &GSpacePopExclusionSpheres, &bAll,
+        if (!TestExclusionSpheres(&Placement->Position, &GSpacePopExclusionSpheres, &bAll,
                                   &bInside))                                  // FUN_06f616e0
             return;
 
@@ -443,7 +443,7 @@ namespace
 
         bool const bAll = true;
         bool const bInside = false;
-        if (!TestExclusionSpheres(&Placement->Position.x, &GSpacePopExclusionSpheres, &bAll,
+        if (!TestExclusionSpheres(&Placement->Position, &GSpacePopExclusionSpheres, &bAll,
                                   &bInside))                                  // FUN_06f616e0
             return;
 
@@ -1114,13 +1114,13 @@ double __cdecl FastReciprocalSqrt(float Value)
     return Step * Guess;
 }
 
-bool __cdecl SpacePopPositionIsExcluded(float const* Position)
+bool __cdecl SpacePopPositionIsExcluded(Vector const* Position)
 {
     // Inlined in FUN_06f5ac10 before any transform construction or encounter selection.
     Vector Point;
-    Point.x = Position[0];
-    Point.y = Position[1];
-    Point.z = Position[2];
+    Point.x = Position->x;
+    Point.y = Position->y;
+    Point.z = Position->z;
     for (size_t Index = 0; Index < GSpacePopExclusionSpheres.size(); ++Index)
     {
         FSpacePopExclusionSphere const* Sphere = &GSpacePopExclusionSpheres[Index];

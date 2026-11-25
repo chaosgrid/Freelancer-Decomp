@@ -50,12 +50,13 @@ bool UiListBox::Create(Win3D* NewParent, void* Payload)
     return true;
 }
 
-void UiListBox::SetTransform(float const* Transform)
+void UiListBox::SetTransform(Transform const* NewXform)
 {
     // LAB_0059a530 (RET 4): then the shared extent projection (DAT_0067dbc0) with the new Z.
-    SetOrientation(Transform);
-    SetPosition(Transform + 9);
-    UiWidgetProjectExtent(Orientation, Transform[11], LocalWidth, LocalHeight, &Width, &Height);
+    SetOrientation(&NewXform->Rotation);
+    SetPosition(&NewXform->Translation.x);
+    UiWidgetProjectExtent(&Orientation, NewXform->Translation.z, LocalWidth, LocalHeight, &Width,
+                          &Height);
 }
 
 // DAT_0067daec.

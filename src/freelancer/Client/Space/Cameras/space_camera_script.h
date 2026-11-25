@@ -55,10 +55,10 @@ struct FScriptCamTransform : FScriptCamSink
     float          Position[3];     // +0x08  slot 0x0c writes it, slot 0x14 reads it
     float          Orientation[9];  // +0x14  slot 0x10 writes it, slot 0x18 reads it
 
-    GENRESULT DACOM_API SetPosition(float* Position3);
-    GENRESULT DACOM_API SetOrientation(float* Orientation9);
-    GENRESULT DACOM_API GetPosition(float* OutPosition3);
-    GENRESULT DACOM_API GetOrientation(float* OutOrientation9);
+    GENRESULT DACOM_API SetPosition(const Vector* Position3);
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orientation9);
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition3);
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrientation9);
 };
 
 // The transform sink for `main_object` -- retail's 0x70-byte heap object with vtable 0x005dc1f8.
@@ -77,10 +77,10 @@ struct FScriptCamObjectTransform : FScriptCamSink
 
     // Both setters are LAB_00451370, a `return 0` stub shared by twenty-one vtable slots across
     // the exe: this sink silently discards everything written to it.
-    GENRESULT DACOM_API SetPosition(float* Position3);
-    GENRESULT DACOM_API SetOrientation(float* Orientation9);
-    GENRESULT DACOM_API GetPosition(float* OutPosition3);
-    GENRESULT DACOM_API GetOrientation(float* OutOrientation9);
+    GENRESULT DACOM_API SetPosition(const Vector* Position3);
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orientation9);
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition3);
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrientation9);
 };
 
 // The longest script name the camera will hold. Retail clamps the copy at 0x103 characters and

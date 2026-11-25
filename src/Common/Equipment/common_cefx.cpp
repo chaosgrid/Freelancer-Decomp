@@ -120,7 +120,7 @@ CEInternalFX::CEInternalFX(CEqObj* OwnerObj, unsigned short EquipId,
     if (AnimName[0] != '\0')
     {
         Anim.Index = DALib::Anim->PlayScript(AsOpaqueDword(OwnerObj->Archetype->get_script_index()),
-                                             AsOpaqueDword(OwnerObj->EngineInstanceId),
+                                             OwnerObj->EngineInstanceId,
                                              AnimName, nullptr, nullptr);
         if (Anim.Index != -1)
         {

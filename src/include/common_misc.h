@@ -509,11 +509,11 @@ COMMON_API void __cdecl DAEngine_release_filesystem(IFileSystem** Filesys);
 struct ICamera : IDAComponent
 {
     // 3 +0x0C -- LAB_0040f370 `this + 0x28`; the other class LAB_00556a80 `this + 0x80`.
-    virtual float const* DACOM_API GetPosition() = 0;
+    virtual const Vector* DACOM_API GetPosition() = 0;
     // 4 +0x10 -- LAB_0040f380 `this + 0x04`; the other class LAB_00556a90 `this + 0x5C`.
     // Nine floats, row-major axes. The sound mixer feeds this straight into
     // ISoundManager::SetOrientationFromMatrix, which is what proves it is the 3x3.
-    virtual float const* DACOM_API GetOrientation() = 0;
+    virtual const Matrix* DACOM_API GetOrientation() = 0;
     // 5 +0x14 -- LAB_0040f470, the ViewRect (left, top, right, bottom), inclusive edges.
     virtual int const* DACOM_API GetViewport() = 0;
     virtual float DACOM_API GetHalfFovXDeg() = 0;      // 6  +0x18 LAB_0040f480
@@ -529,19 +529,19 @@ struct ICamera : IDAComponent
     virtual double DACOM_API GetYScaleOverNear() = 0;  // 12 +0x30 LAB_0040f4e0
     // 13 +0x34  0x0040ff50 — Project(out x, out y, out z, world point). RET 0x14.
     virtual int DACOM_API Project(float* OutX, float* OutY, float* OutZ,
-                                  float const* World) = 0;
+                                  const Vector* World) = 0;
     // 14 +0x38  0x0040f520 — Unproject(out dir, screenX, screenY). RET 0x10.
-    virtual void DACOM_API Unproject(float* OutWorld3, float ScreenX, float ScreenY) = 0;
+    virtual void DACOM_API Unproject(Vector* OutWorld3, float ScreenX, float ScreenY) = 0;
     // 15 +0x3C  0x0040ffe0 — sphere-vs-frustum (1=out, 3=straddle, 4=in). RET 0xC.
-    virtual int DACOM_API ClassifySphere(float const* Center, float Radius) = 0;
+    virtual int DACOM_API ClassifySphere(const Vector* Center, float Radius) = 0;
     // 16 +0x40 -- LAB_0040f390, the packed view transform, rebuilt lazily; the other class's
     // LAB_00556aa0 builds the same 12 floats.
-    virtual float const* DACOM_API GetViewTransform() = 0;
+    virtual const Transform* DACOM_API GetViewTransform() = 0;
     // 17 +0x44  0x0040f4f0 — project-to-vector (out3, world). RET 0xC. The body tail-calls
     // slot 13 Project and returns its result; HUD_Target tests it (0x004e3f60, 0x004e507f).
-    virtual int DACOM_API ProjectVec(float* Out3, float const* World) = 0;
+    virtual int DACOM_API ProjectVec(Vector* Out3, const Vector* World) = 0;
     // 18 +0x48  0x0040f5d0 — velocity out-vector. Retail __thiscall, one stack arg, RET 0x4.
-    virtual void GetVelocity(float* Out3) = 0;
+    virtual void GetVelocity(Vector* Out3) = 0;
     // 19 +0x4C  0x0040f5f0 — SpaceCamera "fovx"/"fovy"/"znear"/"zfar". Retail __thiscall,
     // two stack args, RET 0x8 (this in ECX). Room camera's same slot is SetPosition(Vector*)
     // (FUN_00556b70, stdcall RET 0x8) — different body, same cleanup width.

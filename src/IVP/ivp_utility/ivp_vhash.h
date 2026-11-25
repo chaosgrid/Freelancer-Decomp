@@ -90,9 +90,9 @@ unsigned __fastcall IVP_VHash_HashPointer(unsigned Key);
 //   +0x04 SizeMm      Size - 1, the index mask
 //   +0x08 NElems      occupied entries
 //   +0x0c ElemsStore  calloc'd entry array (FUN_06343f80(Size, 0xc))
-//   +0x10 Field_0x10  zeroed by the ctor; the dtor and the grow step leave
-//                     ElemsStore alone when it equals this field. No other
-//                     writer is known.
+//   +0x10 PreallocatedElemsStore  zeroed by the ctor; the dtor and the grow
+//                     step do not free ElemsStore when it equals this field.
+//                     No other writer is known.
 // Members defined in ivp_vhash.cpp.
 // Users: IVP_Controller_Phantom (ivp_phantom.h, +0x2c / +0x30) and
 // IVP_Core::ObjectHashMap (ivp_core.cpp).
@@ -105,7 +105,7 @@ public:
     int SizeMm;        // +0x04
     int NElems;        // +0x08
     void* ElemsStore;  // +0x0c
-    void* Field_0x10;  // +0x10
+    void* PreallocatedElemsStore; // +0x10
 
     // FUN_063525f0
     explicit IVP_VHash_Store(int InSize);

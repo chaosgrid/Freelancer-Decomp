@@ -564,8 +564,8 @@ void ChatInit()
         WinFactoryCreate("NN_GroupControl", "NN_GroupControl", nullptr, nullptr));
     if (G_ChatGroupControl != nullptr)
     {
-        float const Position[3] = {0.0f, 0.0f, -1.0f};
-        G_ChatGroupControl->SetPosition(Position);
+        Vector const Position = {0.0f, 0.0f, -1.0f};
+        G_ChatGroupControl->SetPosition(&Position.x);
         G_ChatGroupControl->Flags = static_cast<unsigned char>(G_ChatGroupControl->Flags & 0xfc);
     }
 }
@@ -757,8 +757,8 @@ void ChatSetInputOpen(bool bOpen)
             Input = WinFactoryCreate("CTID", "ChatTextInputDisplay", nullptr, nullptr);
             if (Input == nullptr)
                 return;
-            float const Position[3] = {G_ChatInputX, -0.265f, -1.0f};   // DAT_005ceee4
-            Input->SetPosition(Position);
+            Vector const Position = {G_ChatInputX, -0.265f, -1.0f};   // DAT_005ceee4
+            Input->SetPosition(&Position.x);
         }
         ChatTextInputDisplay* const Line = static_cast<ChatTextInputDisplay*>(Input);
         Line->bCloseAfterSend = 1;
@@ -904,15 +904,15 @@ void ChatPlaceMsgWinForTrade(int Mode)
     if (Mode == 0)
     {
         // The default place.
-        float const Position[3] = {-0.51f, 0.25f, -1.0f};
-        G_ChatMsgWin->SetPosition(Position);
+        Vector const Position = {-0.51f, 0.25f, -1.0f};
+        G_ChatMsgWin->SetPosition(&Position.x);
         G_ChatMsgWin->SetNormSize(1.0f, 0.39f);
     }
     else if (Mode == 1)
     {
         // Beside the trade window.
-        float const Position[3] = {-0.275f, 0.045f, -1.0f};
-        G_ChatMsgWin->SetPosition(Position);
+        Vector const Position = {-0.275f, 0.045f, -1.0f};
+        G_ChatMsgWin->SetPosition(&Position.x);
         G_ChatMsgWin->SetNormSize(0.56f, 0.39f);
     }
 }
@@ -1018,8 +1018,8 @@ void ChatCreateMsgWin()
     if (G_ChatMsgWin != nullptr)
     {
         // DAT_005ceec4 / DAT_005ceec8, then DAT_005ceebc / DAT_005ceec0.
-        float const Position[3] = {-0.51f, 0.25f, -1.0f};
-        G_ChatMsgWin->SetPosition(Position);
+        Vector const Position = {-0.51f, 0.25f, -1.0f};
+        G_ChatMsgWin->SetPosition(&Position.x);
         G_ChatMsgWin->SetNormSize(1.0f, 0.39f);
     }
     // Retail does not test the window again here.

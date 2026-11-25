@@ -105,8 +105,8 @@ FRpVertexSrcDesc* FMaterialBatcher::CloneVertexSource(const FRpVertexSrcDesc& So
 FBatchRecord::FBatchRecord()
 {
     std::memset(this, 0, sizeof(*this));
-    Context.World = MatrixDataA;
-    Context.View = MatrixDataB;
+    Context.World = (const Transform*)MatrixDataA;
+    Context.View = (const Transform*)MatrixDataB;
 }
 
 FBatchBin::FBatchBin() : OrderKey(0), SortKind(0), RecordCount(0) {}
@@ -636,11 +636,11 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
         int StateValue = 1;
         Pipeline->GetPipelineState(7, &StateValue);
         if (StateValue != 0)
-            Pipeline->SetModelview(Record.Combined);
+            Pipeline->SetModelview((const Transform*)Record.Combined);
         else
         {
-            Pipeline->SetWorld(Record.MatrixDataA);
-            Pipeline->SetView(Record.MatrixDataB);
+            Pipeline->SetWorld((const Transform*)Record.MatrixDataA);
+            Pipeline->SetView((const Transform*)Record.MatrixDataB);
         }
         if (Active != Item.Batched || (Item.MaterialFlags & 0x20) != 0)
         {
@@ -826,8 +826,8 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     Record.Context.Inst = Source->Inst;
     Record.Context.MaterialContext = Source->MaterialContext;
     Record.Context.ReplacedMaterial = Source->ReplacedMaterial;
-    const FTransform* MatrixA = (const FTransform*)Source->World;
-    const FTransform* MatrixB = (const FTransform*)Source->View;
+    const Transform* MatrixA = Source->World;
+    const Transform* MatrixB = Source->View;
     static I3DMathEngine* GBatchMathEngine = nullptr;
     if (GBatchMathEngine == nullptr)
     {
@@ -838,7 +838,7 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
         DACOM_Acquire()->CreateInstance((AGGDESC*)&Desc,
                                         (void**)&GBatchMathEngine);
     }
-    FTransform Combined;
+    Transform Combined;
     GBatchMathEngine->MulTransform(Combined, *MatrixB, *MatrixA);
     const unsigned long QueuedFlags = Record.Flags;
     std::memcpy(Record.Combined, &Combined, sizeof(Record.Combined));

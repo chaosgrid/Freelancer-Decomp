@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "math3d.h"
+
 // The pause/resume pair every NeuroNet modal dialog (NN_Exit, NN_NetworkOperation, NN_Error,
 // BlockingDialog) brackets itself with. NN_Prompt does not: neither its ctor (FUN_00474a30), dtor
 // (FUN_00472a20), Create (FUN_00472ab0) nor any close path (LAB_00473070 / LAB_00473240 /
@@ -84,7 +86,7 @@ void NnMainButtonOnModalOpen();
 // NN_MainButton stores the three floats as the origin of panel PanelId (0x63..0x6a map to
 // slots 0..6 at +0x444 + 12 * slot). Called by NN_Inventory's dtor (0x00477e4d) and
 // 0x00477b33.
-void NnMainButtonSetPanelOrigin(int PanelId, float const* Origin);
+void NnMainButtonSetPanelOrigin(int PanelId, Vector const* Origin);
 
 // FUN_0045a470 -- `DAT_0066d3f0 != 0 && FUN_0045da00(DAT_0066d3f0)`; FUN_0045da00 is
 // `[this + 0x3a8] != 0`, the panel the button has open (FUN_0045cf60 switches +0x3ac over the

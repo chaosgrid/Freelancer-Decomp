@@ -530,9 +530,7 @@ void TransformBoundingBoxCorners(Transform const& Xform, Vector const& Min,
                              ((Index & 1) != 0) ? Max.z : Min.z };
 
         Vector Transformed;
-        Acquire3DMathEngine()->TransformXform(reinterpret_cast<FVector&>(Transformed),
-                                              reinterpret_cast<FTransform const&>(Xform),
-                                              reinterpret_cast<FVector const&>(Corner));
+        Acquire3DMathEngine()->TransformXform(Transformed, Xform, Corner);
         OutCorners[Index] = Transformed;
     }
 }
@@ -558,9 +556,7 @@ Vector* ComputeShapeBiasedAvoidDirection(Vector* Out, FAiTarget* Elem, IObjInspe
 
     // The target centre in Elem's local space (InverseTransform, +0x3c).
     Vector LocalPos;
-    Acquire3DMathEngine()->InverseTransform(reinterpret_cast<FVector&>(LocalPos),
-                                            reinterpret_cast<FTransform const&>(Elem->Iface->get_transform()),
-                                            reinterpret_cast<FVector const&>(TargetCentre));
+    Acquire3DMathEngine()->InverseTransform(LocalPos, Elem->Iface->get_transform(), TargetCentre);
 
     // Fast length of the unrounded squared length against the double 1e-5
     // (DAT_0639f418); only "less" answers (1, 0, 0).
@@ -627,9 +623,7 @@ Vector* ComputeShapeBiasedAvoidDirection(Vector* Out, FAiTarget* Elem, IObjInspe
 
     // Back to world space (Rotate, +0x30).
     Vector World;
-    Acquire3DMathEngine()->Rotate(reinterpret_cast<FVector&>(World),
-                                  reinterpret_cast<FTransform const&>(Elem->Iface->get_transform()),
-                                  reinterpret_cast<FVector const&>(Direction));
+    Acquire3DMathEngine()->Rotate(World, Elem->Iface->get_transform(), Direction);
     *Out = World;
     return Out;
 }
@@ -693,14 +687,10 @@ double EstimateTurnCircleApproachCost(IObjInspect* Iface, Vector const& Point,
     // The two turn-circle centres, +/-TurnRadius along the local x axis.
     Vector const OffsetRight{ TurnRadius, 0.0f, 0.0f };
     Vector RightCentre;
-    Acquire3DMathEngine()->TransformXform(reinterpret_cast<FVector&>(RightCentre),
-                                          reinterpret_cast<FTransform const&>(Frame),
-                                          reinterpret_cast<FVector const&>(OffsetRight));
+    Acquire3DMathEngine()->TransformXform(RightCentre, Frame, OffsetRight);
     Vector const OffsetLeft{ -TurnRadius, 0.0f, 0.0f };
     Vector LeftCentre;
-    Acquire3DMathEngine()->TransformXform(reinterpret_cast<FVector&>(LeftCentre),
-                                          reinterpret_cast<FTransform const&>(Frame),
-                                          reinterpret_cast<FVector const&>(OffsetLeft));
+    Acquire3DMathEngine()->TransformXform(LeftCentre, Frame, OffsetLeft);
 
     // The right distance is rounded to float; the left one stays unrounded.
     Vector ToRight;

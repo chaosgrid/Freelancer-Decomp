@@ -31,7 +31,7 @@ namespace
     void SetInstanceUserData(long Instance, CBeam* Beam)
     {
         // IEngine takes the instance handle as a pointer-sized value.
-        DALib::Engine->SetInstanceUserData((void*)Instance, Beam);
+        DALib::Engine->SetInstanceUserData(Instance, Beam);
     }
 }
 

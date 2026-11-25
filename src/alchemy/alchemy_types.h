@@ -599,7 +599,7 @@ namespace AlchemyImpl
         // class override (the mesh's FUN_06225240). The caller, IAlchemy LAB_062016c0 /
         // FUN_06201620, pushes (A, &DAT_06257880); FUN_062401a0 never reads A.
         virtual GENRESULT DACOM_API ComposeNodeTransform(void* Unused,
-                                                         const float* Parent12) = 0;  // +0x10
+                                                         const Transform* Parent) = 0;  // +0x10
         // +0x14 -- the per-node update, forwarded to the node sub-object's slot 3. The shared
         // default is FUN_06240180 (TickLifetime through the vtable); FxNode's outer thunk
         // FUN_06202660 lands there. Overrides: the mesh FUN_06225470, FLBeamAppearance
@@ -642,9 +642,9 @@ namespace AlchemyImpl
         //   any other Index -> 0xfffffffe, nothing written.
         // The setter copies 12 floats in; the getter hands out the slot's address.
         virtual GENRESULT DACOM_API SetNodeTransform(unsigned long Index,
-                                                     const float* Source12) = 0;    // +0x3C
+                                                     const Transform* Source) = 0;  // +0x3C
         virtual GENRESULT DACOM_API GetNodeTransform(unsigned long Index,
-                                                     float** OutSlot) = 0;          // +0x40
+                                                     Transform** OutSlot) = 0;      // +0x40
         // LAB_06240150, shared by every node class: Age (+0x84) += Dt; flag bit 0 once
         // Age > Duration (+0x88), strictly. It is slot 17 (+0x44) of the NODE sub-object's
         // vtable (e.g. 0624d3c8+0x44 for the cone emitter), which the port folds into this
@@ -1001,7 +1001,7 @@ namespace AlchemyImpl
         virtual GENRESULT DACOM_API GetPackedModes(unsigned long* A, unsigned long* B,
                                                    unsigned long* C) = 0;            // +0x28
         virtual void DACOM_API Evaluate(unsigned long TimeA, unsigned long TimeB,
-                                        float* Out12) = 0;                          // +0x2C
+                                        Transform* Out) = 0;                        // +0x2C
         // +0x30 LAB_06243690: a shared one-argument "return 0" filler.
         virtual GENRESULT DACOM_API Slot0x30(unsigned long Arg) = 0;
     };

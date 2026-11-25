@@ -16,6 +16,7 @@
 // A Thorn_PlayerEnginePsys (operator new(0x70) in FUN_0044e3c0, ctor FUN_004540c0, identity
 // vtable 0x005cde3c) drives the Gf ObjectShip's engine effects instead ("PlayerShipEngines").
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_csys.h"
 #include "GameFlow/Thorn/gf_thorn_component.h"
 #include "Common/Graphics/lights_camera.h"
@@ -32,14 +33,14 @@ struct FThornPsys : FThornComponent
     void BindVisEffect(char const* EffectName);
 
     // ICompoundControl (0x005cdc58 / 0x005cdc5c)
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override; // 11 LAB_00453f00
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;    // 12 LAB_00453f60
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_00453f00
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_00453f60
 
     // IGeoTransformControl (0x005cdbcc..0x005cdbd8)
-    GENRESULT DACOM_API SetPosition(float* Position) override;           // 3  LAB_00453ec0
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;         // 4  LAB_00453ee0
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;        // 5  LAB_00454770
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;      // 6  LAB_00453f40
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;           // 3  LAB_00453ec0
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;         // 4  LAB_00453ee0
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;        // 5  LAB_00454770
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;      // 6  LAB_00453f40
 
     // IPSysControl (0x005cdb48..0x005cdb58)
     GENRESULT DACOM_API Start() override;                                // 3  LAB_00453fb0
@@ -50,7 +51,7 @@ struct FThornPsys : FThornComponent
 
     // identity tail
     void Stop() override;                                                // 14 FUN_00453e30
-    void* GetEngineInstance() override;                                  // 17 FUN_00450870
+    InstanceIndex GetEngineInstance() override;                                  // 17 FUN_00450870
     void DrawEffects(ICamera* Camera) override;                          // 18 LAB_00453e50
 
     FLightsCameraParticles Particles; // +0x6c the live effect and its VisEffect reference
@@ -74,7 +75,7 @@ struct FThornPlayerEnginePsys : FThornComponent
 
     // identity tail
     void Stop() override;                                                // 14 LAB_00454130
-    void* GetEngineInstance() override;                                  // 17 LAB_00454140
+    InstanceIndex GetEngineInstance() override;                                  // 17 LAB_00454140
 
     float Sparam; // +0x6c
 };

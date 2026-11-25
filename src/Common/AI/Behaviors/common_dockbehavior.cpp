@@ -10,7 +10,7 @@
 #include "common_gotobehavior.h"   // ComputeFormationFollowerEnvelope / ProxWatcherComputeSpeedCap
 #include "common_aisteer.h"        // FindObjectDockingAtBase (FUN_062e7400) -- CheckClearanceProgress
 #include "common_csys.h"           // Transform, Acquire3DMathEngine -- SetContext's hpmount offset
-#include "x86math.h"               // I3DMathEngine::TransposeTransform, FVector, FMatrix
+#include "x86math.h"               // I3DMathEngine::TransposeTransform, Vector, Matrix
 #include "common_cobject.h"        // CObject, CShip::request_exit_tradelane -- Disengage
 
 #include <cmath>
@@ -326,9 +326,7 @@ bool DockBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     I3DMathEngine* const Math = Acquire3DMathEngine();
     Vector Source;
     Source = HpMountOffset;
-    Math->TransposeTransform(reinterpret_cast<FVector&>(Delta),
-                             reinterpret_cast<FMatrix const&>(OwnerXform.Rotation),
-                             reinterpret_cast<FVector const&>(Source));
+    Math->TransposeTransform(Delta, OwnerXform.Rotation, Source);
     HpMountOffset = Delta;
     return bOk;
 }
@@ -1416,9 +1414,7 @@ void DockBehavior::BuildFinalApproachSpline()
         ObjInspectOf(OwnerContext)->get_formation_offset(FormationOffset);
         Transform const& ShipXform = Sys->SelfTarget.Iface->get_transform();
         Vector Rotated;
-        Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(Rotated),
-                                               reinterpret_cast<FMatrix const&>(ShipXform),
-                                               reinterpret_cast<FVector const&>(FormationOffset));
+        Acquire3DMathEngine()->TransformMatrix(Rotated, ShipXform.Rotation, FormationOffset);
         FormationOffset = Rotated;
     }
 

@@ -11,7 +11,7 @@
 #include "common_id.h"
 #include "common_server_controller.h" // pub::Controller::EMessage (Accept)
 #include "common_tstring.h"
-#include "x86math.h"            // FTransform
+#include "x86math.h"            // Transform
 
 #include <cstdio>
 #include <cstdlib>
@@ -103,7 +103,7 @@ public:
     // Choices / Names are the TU38 +0x8c record's lists at +0x3c / +0x48: the snapshot writer
     // FUN_06f130b0 (MissionSave.cpp) builds Choices as {npc +0x128 class ids,
     // 1.0f} and Names as the npcs' TString<0x30> nicknames -- the types declared here.
-    bool SpawnFormation(FTransform const* Placement, int Count,
+    bool SpawnFormation(Transform const* Placement, int Count,
                         std::list<FObjListDirective*> const* Directives,
                         std::list<FRandEncShipChoice> const* Choices,
                         std::list<TString<0x30>>* Names, int Priority, unsigned int DockTarget);
@@ -162,7 +162,7 @@ public:
     // npc_ship archs (a ship without an arch is skipped), named pilots, then the leader's
     // guide description (type 3) walking the path of the ring's zone, and the ships created in
     // +8's system. Always true.
-    bool SpawnLaneFormation(FTransform const* Placement, int Count,
+    bool SpawnLaneFormation(Transform const* Placement, int Count,
                             std::list<FObjListDirective*> const* Directives,
                             std::list<FRandEncShipChoice> const* Choices,
                             std::list<TString<0x30>>* Names);

@@ -68,9 +68,9 @@ void CAsteroid::init_physics(Vector const& Velocity, Vector const& AngularVeloci
     memset(&Phy, 0, sizeof(Phy));
     Phy.Mass = 1000.0f;
     Phy.LinearDamping = 1000000.0f;
-    Phy.AngularDamping[0] = 1000000.0f;
-    Phy.AngularDamping[1] = 1000000.0f;
-    Phy.AngularDamping[2] = 1000000.0f;
+    Phy.AngularDamping.x = 1000000.0f;
+    Phy.AngularDamping.y = 1000000.0f;
+    Phy.AngularDamping.z = 1000000.0f;
     Phy.SystemId = SystemId;
     Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     Phy.bPhysicalUnmoveable = 1;
@@ -174,9 +174,9 @@ void CDynamicAsteroid::init_physics(Vector const& Velocity, Vector const& Angula
     memset(&Phy, 0, sizeof(Phy));
     Phy.Mass = 1.0f;
     Phy.LinearDamping = 0.00001f;
-    Phy.AngularDamping[0] = 0.0f;
-    Phy.AngularDamping[1] = 0.0f;
-    Phy.AngularDamping[2] = 0.0f;
+    Phy.AngularDamping.x = 0.0f;
+    Phy.AngularDamping.y = 0.0f;
+    Phy.AngularDamping.z = 0.0f;
     Phy.SystemId = SystemId;
     Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     Phy.bPhysicalUnmoveable = 0;

@@ -32,7 +32,7 @@ namespace
         IEngine* const Engine = DALib::Engine;
 
         // The archetype (part) handle of the instance; -1 when there is none.
-        void* const Part = Engine->GetInstanceArchetype((void*)Handle);
+        const ArchetypeIndex Part = Engine->GetInstanceArchetype(Handle);
         if ((long)Part == kNoEngineHandle)
             return false;
 
@@ -54,7 +54,7 @@ namespace
         long Child = kNoEngineHandle;
         while (true)
         {
-            Child = (long)Engine->GetRelatedInstance((void*)Handle, 1, (void*)Child);
+            Child = Engine->GetRelatedInstance(Handle, 1, Child);
             if (Child == kNoEngineHandle)
                 return false;
             if (FindHardpointCore(Child, Name, OutHandle, OutInfo))
@@ -63,20 +63,18 @@ namespace
     }
 
     // Engine slot 40 (+0xa0) hands back the instance's transform: a 3x3 followed by a vector,
-    // which is exactly the port's Transform.
+    // which is a Transform.
     Transform const* EngineGetTransform(long Handle)
     {
         // No null gate, as in retail.
         IEngine* const Engine = DALib::Engine;
-        return (Transform const*)Engine->GetInstanceTransform((void*)Handle);
+        return Engine->GetInstanceTransform(Handle);
     }
 
-    // Out = Parent * Local via the 3DMathEngine's MulTransform. Transform and FTransform have
-    // the same layout.
+    // Out = Parent * Local via the 3DMathEngine's MulTransform.
     void ComposeTransform(Transform& Out, Transform const& Parent, Transform const& Local)
     {
-        Acquire3DMathEngine()->MulTransform((FTransform&)Out, (FTransform const&)Parent,
-                                            (FTransform const&)Local);
+        Acquire3DMathEngine()->MulTransform(Out, Parent, Local);
     }
 }
 
@@ -119,11 +117,10 @@ bool __cdecl FindHardpoint_PS(long Handle, char const* Name, long& OutHandle,
     Local = World;
 
     Transform const* const Space = EngineGetTransform(Handle);
-    FVector Rotated;
-    Acquire3DMathEngine()->TransposeTransform(Rotated, (FMatrix const&)Space->Rotation,
-                                              (FVector const&)Space->Translation);
+    Vector Rotated;
+    Acquire3DMathEngine()->TransposeTransform(Rotated, Space->Rotation, Space->Translation);
     Vector NegRotated;
-    Vec3Assign(&NegRotated, -Rotated.X, -Rotated.Y, -Rotated.Z);
+    Vec3Assign(&NegRotated, -Rotated.x, -Rotated.y, -Rotated.z);
     Matrix const& R = Space->Rotation;
     Matrix const Transposed(R.E[0][0], R.E[1][0], R.E[2][0],
                             R.E[0][1], R.E[1][1], R.E[2][1],
@@ -165,7 +162,7 @@ HardpointSummary::HardpointSummary()
     , Infos(nullptr)
     , Instances(nullptr)
     , FillInstance(-1)
-    , FillPart((void*)-1)
+    , FillPart(InvalidArchetypeIndex)
     , FillCursor(0)
 {
 }
@@ -210,7 +207,7 @@ void HardpointSummary::clear()
     Infos = nullptr;
     Instances = nullptr;
     FillInstance = -1;
-    FillPart = (void*)-1;
+    FillPart = InvalidArchetypeIndex;
     FillCursor = 0;
 }
 
@@ -303,7 +300,7 @@ void HardpointSummary::hardpoint_callback1(char const* Name, void* Context)
 // 06334820. No null tests.
 void HardpointSummary::count_hardpoints_callback(long Instance, void* Context)
 {
-    void* const Part = DALib::Engine->GetInstanceArchetype((void*)Instance);
+    const ArchetypeIndex Part = DALib::Engine->GetInstanceArchetype(Instance);
     DALib::Hardpoint->EnumerateHardpoints(&hardpoint_callback1, Part, Context);
     DALib::Engine->ReleaseHandle(Part);
 }
@@ -337,7 +334,7 @@ void HardpointSummary::hardpoint_callback2(char const* Name, void* Context)
 // 06334900. No null tests.
 void HardpointSummary::fill_hardpoints_callback(long Instance, void* Context)
 {
-    void* const Part = DALib::Engine->GetInstanceArchetype((void*)Instance);
+    const ArchetypeIndex Part = DALib::Engine->GetInstanceArchetype(Instance);
     HardpointSummary* const Self = (HardpointSummary*)Context;
     Self->FillInstance = Instance;
     Self->FillPart = Part;
@@ -378,7 +375,7 @@ int HardpointSummary::analyze_instance(long Instance)
 
     FillCursor = 0;
     FillInstance = -1;
-    FillPart = (void*)-1;
+    FillPart = InvalidArchetypeIndex;
     return Count;
 }
 

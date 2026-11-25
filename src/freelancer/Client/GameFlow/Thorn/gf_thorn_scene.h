@@ -23,6 +23,7 @@
 // (its RTTI and vtable live in freelancer.exe) and must not be confused with thorn.dll's own
 // scene, FThornScene (src/Thorn/ThornScene.h) -- nothing crosses between the two.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "GameFlow/Thorn/gf_thorn_component.h"
 
 struct FThorn_Scene : FThornComponent
@@ -53,7 +54,7 @@ struct FThorn_Scene : FThornComponent
                                   float* OutDamping) override;                    // 4  LAB_004547c0
 
     // identity tail
-    void* GetEngineInstance() override;                                           // 17 FUN_00450870
+    InstanceIndex GetEngineInstance() override;                                           // 17 FUN_00450870
 
     // The scene's own identity slots (stdcall, `this` on the stack). No caller of either is
     // known in Freelancer.exe; the RoomObject reads +0x6c directly.

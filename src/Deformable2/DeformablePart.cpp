@@ -126,9 +126,9 @@ unsigned char FDeformPart::BoundSphere(float* OutRadius, float* OutCenter)
         I3DMathEngine* Math = AcquireMathEngine();
         float* BoneAtC = Lod->BoneSlots[0].LocalTransform;
         float Transformed[3];
-        Math->TransformXform(*(FVector*)Transformed,
-                             *(const FTransform*)BoneAtC,
-                             *(const FVector*)OutCenter); // +0x28
+        Math->TransformXform(*(Vector*)Transformed,
+                             *(const Transform*)BoneAtC,
+                             *(const Vector*)OutCenter); // +0x28
         OutCenter[0] = Transformed[0];
         OutCenter[1] = Transformed[1];
         OutCenter[2] = Transformed[2];
@@ -315,10 +315,10 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
                 SkinnedBoneCount += 1;
                 if (bSkinned == 0)
                 {
-                    WriteIdentity3x3(Bone->Matrix);
-                    Bone->Matrix[11] = 0.0f;
-                    Bone->Matrix[10] = 0.0f;
-                    Bone->Matrix[9] = 0.0f;
+                    WriteIdentity3x3(Bone->WorldMatrix);
+                    Bone->WorldMatrix[11] = 0.0f;
+                    Bone->WorldMatrix[10] = 0.0f;
+                    Bone->WorldMatrix[9] = 0.0f;
                 }
                 else
                 {
@@ -378,7 +378,7 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
             const FSkinPair* const Pairs = SkinVertex->Pairs;
             const float* const Source =
                 (const float*)(Positions + (size_t)Vertex * 0x18);
-            const float* const First = Holder->BoneSlots[Pairs[0].BoneId].Matrix;
+            const float* const First = Holder->BoneSlots[Pairs[0].BoneId].WorldMatrix;
             float Out[6];
             const int Count = SkinVertex->BoneCount;
             if (Count == 1)
@@ -391,13 +391,13 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
                 float Blend[12];
                 ScaleBoneMatrix(Blend, First, Pairs[0].Weight);
                 if (Count == 4)
-                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[3].BoneId].Matrix,
+                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[3].BoneId].WorldMatrix,
                                          Pairs[3].Weight);
                 if (Count == 4 || Count == 3)
-                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[2].BoneId].Matrix,
+                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[2].BoneId].WorldMatrix,
                                          Pairs[2].Weight);
                 if (Count == 4 || Count == 3 || Count == 2)
-                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[1].BoneId].Matrix,
+                    AccumulateBoneMatrix(Blend, Holder->BoneSlots[Pairs[1].BoneId].WorldMatrix,
                                          Pairs[1].Weight);
                 TransformPoint(Out, Blend, Source);
                 TransformDirection(Out + 3, Blend, Source + 3);
@@ -461,9 +461,9 @@ void MathTransformVec3(float* Dest, const float* A, const float* B)
 {
     I3DMathEngine* Math = AcquireMathEngine();
     float Tmp[3];
-    Math->TransposeTransform(*(FVector*)Tmp,
-                                                          *(const FMatrix*)A,
-                                                          *(const FVector*)B); // +0x38
+    Math->TransposeTransform(*(Vector*)Tmp,
+                                                          *(const Matrix*)A,
+                                                          *(const Vector*)B); // +0x38
     Dest[0] = Tmp[0];
     Dest[1] = Tmp[1];
     Dest[2] = Tmp[2];
@@ -570,18 +570,18 @@ unsigned char FMeshArchetype::Draw(ICamera* Camera, FDeformPart* Part)
     FBoneRuntime* const BoneSlots = Part->Lod->BoneSlots;
     const float* const Root =
         BoneSlots[0].LocalTransform;
-    const float* const View = Camera->GetViewTransform();
+    const float* const View = (const float*)Camera->GetViewTransform();
     int bHaveView = 1;
     G_Pipeline->GetPipelineState(7, &bHaveView);
     if (bHaveView != 0)
     {
         float Composed[12];
-        AcquireMathEngine()->MulTransform(*(FTransform*)Composed,
-                                          *(const FTransform*)View,
-                                          *(const FTransform*)Root); // +0x1C
+        AcquireMathEngine()->MulTransform(*(Transform*)Composed,
+                                          *(const Transform*)View,
+                                          *(const Transform*)Root); // +0x1C
         float Modelview[12];
         std::memcpy(Modelview, Composed, sizeof(Modelview));
-        G_Pipeline->SetModelview(Modelview);
+        G_Pipeline->SetModelview((const Transform*)Modelview);
     }
     else
     {
@@ -598,14 +598,13 @@ unsigned char FMeshArchetype::Draw(ICamera* Camera, FDeformPart* Part)
         Identity[9] = 0.0f;
         Identity[10] = 0.0f;
         Identity[11] = 0.0f;
-        G_Pipeline->SetWorld(Identity);
+        G_Pipeline->SetWorld((const Transform*)Identity);
     }
 
     FMaterialSubmitContext Context;
     Context.Inst = BoneSlots[0].Instance;
-    // The mutable context ABI borrows these const transform views.
-    Context.World = const_cast<float*>(Root);
-    Context.View = const_cast<float*>(View);
+    Context.World = (const Transform*)Root;
+    Context.View = (const Transform*)View;
     Context.SourceVertices = nullptr;
     Context.Indices = nullptr;
     Context.VbListing = &Part->Vb.Listing;

@@ -139,7 +139,7 @@ HUD_Waypoint::HUD_Waypoint(INI_Reader& /*Reader*/)
     G_HudWaypoint = this;
     HUDItem::Name = "Waypoint";
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     Win3D::Create(nullptr, nullptr);
     SpawnCounter = 0;
     SpinAngle = 0.0f;
@@ -159,7 +159,7 @@ bool HUD_Waypoint::Create(Win3D* NewParent, void* Data)
 {
     // LAB_004f3d70 (this = the WinControl face).
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -552,7 +552,7 @@ void EqObjCreateParmsDefaults(CEqObj::CreateParms& Parms)
     Parms.AngularVelocity.y = 0.0f;
     Parms.AngularVelocity.z = 0.0f;
     Parms.Pad58 = 0;                                                // +0x58
-    Win3DIdentityRotation3x3(reinterpret_cast<float*>(&Parms.Orient)); // FUN_004215b0 on +0x1c
+    Win3DIdentityRotation3x3(&Parms.Orient); // FUN_004215b0 on +0x1c
     Parms.DockingBaseId = 0;                                        // +0x5c
     Parms.VibeId = 0xffffffffu;                                     // +0x60
     Parms.SpaceCostume.PartIds[0] = 0;                              // +0x64..+0x70

@@ -883,7 +883,7 @@ bool ChatControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
-            SetPosition(Parent->Position);
+            SetPosition(&Parent->Position.x);
         ChatControlRefreshAll(this);
         Flags = static_cast<unsigned char>(Flags | 0x03);
         // Retail does not test HistoryDisplay for null.

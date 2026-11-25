@@ -41,13 +41,13 @@ namespace
     // wrapper itself is dereferenced without a test.
     void PushLightOrientation(FThornLight& Self)
     {
-        FVector Rotated;
-        ThornLightMath()->TransformMatrix(Rotated, *reinterpret_cast<FMatrix const*>(&Self.Orient),
-                                          *reinterpret_cast<FVector const*>(&Self.Direction));
+        Vector Rotated;
+        ThornLightMath()->TransformMatrix(Rotated, Self.Orient,
+                                          Self.Direction);
         Vector Look;
-        Look.x = Rotated.X;
-        Look.y = Rotated.Y;
-        Look.z = Rotated.Z;
+        Look.x = Rotated.x;
+        Look.y = Rotated.y;
+        Look.z = Rotated.z;
         Matrix const LookOrient = LookMatrixYup(Look);
         FEngineLight* const Light = EngineLightOf(Self.Wrapper);
         if (Light != nullptr)
@@ -77,41 +77,41 @@ FThornLight::FThornLight(Csys const& ScriptFrame, FGfScript* InOwner, FThornEnti
 }
 
 // LAB_004531e0. No script-frame transform.
-GENRESULT DACOM_API FThornLight::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornLight::SetTransform(const Transform* Transform12)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
-        EngineLightSetPosition(Light, Transform12 + 9);
+        EngineLightSetPosition(Light, &Transform12->Translation.x);
     memcpy(&Orient, Transform12, sizeof(Orient));
     PushLightOrientation(*this);
     return GR_OK;
 }
 
 // LAB_004532d0. Without a light the position part of Out is not written.
-GENRESULT DACOM_API FThornLight::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornLight::GetTransform(Transform* OutTransform12)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
     {
-        OutTransform12[9] = Light->Position[0];
-        OutTransform12[10] = Light->Position[1];
-        OutTransform12[11] = Light->Position[2];
+        OutTransform12->Translation.x = Light->Position[0];
+        OutTransform12->Translation.y = Light->Position[1];
+        OutTransform12->Translation.z = Light->Position[2];
     }
     memcpy(OutTransform12, &Orient, sizeof(Orient));
     return GR_OK;
 }
 
 // LAB_00453130. EngineLightSetPosition is FUN_00410ef0.
-GENRESULT DACOM_API FThornLight::SetPosition(float* Position)
+GENRESULT DACOM_API FThornLight::SetPosition(const Vector* Position)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
-        EngineLightSetPosition(Light, Position);
+        EngineLightSetPosition(Light, &Position->x);
     return GR_OK;
 }
 
 // LAB_00453150.
-GENRESULT DACOM_API FThornLight::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornLight::SetOrientation(const Matrix* Orient9)
 {
     memcpy(&Orient, Orient9, sizeof(Orient));
     PushLightOrientation(*this);
@@ -119,20 +119,20 @@ GENRESULT DACOM_API FThornLight::SetOrientation(float* Orient9)
 }
 
 // LAB_00453280. Without a light nothing is written.
-GENRESULT DACOM_API FThornLight::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornLight::GetPosition(Vector* OutPosition)
 {
     FEngineLight* const Light = EngineLightOf(Wrapper);
     if (Light != nullptr)
     {
-        OutPosition[0] = Light->Position[0];
-        OutPosition[1] = Light->Position[1];
-        OutPosition[2] = Light->Position[2];
+        OutPosition->x = Light->Position[0];
+        OutPosition->y = Light->Position[1];
+        OutPosition->z = Light->Position[2];
     }
     return GR_OK;
 }
 
 // LAB_004532b0.
-GENRESULT DACOM_API FThornLight::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornLight::GetOrientation(Matrix* OutOrient9)
 {
     memcpy(OutOrient9, &Orient, sizeof(Orient));
     return GR_OK;
@@ -201,61 +201,61 @@ void FThornLight::Stop()
 }
 
 // FUN_00450870.
-void* FThornLight::GetEngineInstance()
+InstanceIndex FThornLight::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<intptr_t>(-1);
 }
 
 // ---------------------------------------------------------------------------------------
 // The reference forwarders (ICF-shared by the light, marker and sound references)
 // ---------------------------------------------------------------------------------------
 
-GENRESULT ThornReferenceSetPosition(FThornComponent* Target, float* Position)
+GENRESULT ThornReferenceSetPosition(FThornComponent* Target, const Vector* Position)
 {
     if (Target == nullptr)
         return kThornReferenceMissing;
     return Target->SetPosition(Position);
 }
 
-GENRESULT ThornReferenceSetOrientation(FThornComponent* Target, float* Orient9)
+GENRESULT ThornReferenceSetOrientation(FThornComponent* Target, const Matrix* Orient9)
 {
     if (Target == nullptr)
         return kThornReferenceMissing;
     return Target->SetOrientation(Orient9);
 }
 
-GENRESULT ThornReferenceGetPosition(FThornComponent* Target, float* OutPosition)
+GENRESULT ThornReferenceGetPosition(FThornComponent* Target, Vector* OutPosition)
 {
     if (Target == nullptr)
         return kThornReferenceMissing;
     return Target->GetPosition(OutPosition);
 }
 
-GENRESULT ThornReferenceGetOrientation(FThornComponent* Target, float* OutOrient9)
+GENRESULT ThornReferenceGetOrientation(FThornComponent* Target, Matrix* OutOrient9)
 {
     if (Target == nullptr)
         return kThornReferenceMissing;
     return Target->GetOrientation(OutOrient9);
 }
 
-GENRESULT ThornReferenceSetTransform(FThornComponent* Target, float const* Xform12)
+GENRESULT ThornReferenceSetTransform(FThornComponent* Target, const Transform* Xform12)
 {
     if (Target == nullptr)
         return kThornReferenceMissing;
     return Target->SetTransform(Xform12);
 }
 
-GENRESULT ThornReferenceGetTransform(FThornComponent* Target, float* OutXform12)
+GENRESULT ThornReferenceGetTransform(FThornComponent* Target, Transform* OutXform12)
 {
     if (Target == nullptr)
         return kThornReferenceMissing;
     return Target->GetTransform(OutXform12);
 }
 
-void* ThornReferenceGetEngineInstance(FThornComponent* Target)
+InstanceIndex ThornReferenceGetEngineInstance(FThornComponent* Target)
 {
     if (Target == nullptr)
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+        return static_cast<intptr_t>(-1);
     return Target->GetEngineInstance();
 }
 
@@ -276,33 +276,33 @@ FThornLightReference::FThornLightReference(Csys const& ScriptFrame, FGfScript* I
 }
 
 // LAB_00457c00 / LAB_00457c20.
-GENRESULT DACOM_API FThornLightReference::SetTransform(float const* Transform12)
+GENRESULT DACOM_API FThornLightReference::SetTransform(const Transform* Transform12)
 {
     return ThornReferenceSetTransform(Target, Transform12);
 }
 
-GENRESULT DACOM_API FThornLightReference::GetTransform(float* OutTransform12)
+GENRESULT DACOM_API FThornLightReference::GetTransform(Transform* OutTransform12)
 {
     return ThornReferenceGetTransform(Target, OutTransform12);
 }
 
 // LAB_00457bc0 / LAB_00457be0 / LAB_00453560 / LAB_00453580.
-GENRESULT DACOM_API FThornLightReference::SetPosition(float* Position)
+GENRESULT DACOM_API FThornLightReference::SetPosition(const Vector* Position)
 {
     return ThornReferenceSetPosition(Target, Position);
 }
 
-GENRESULT DACOM_API FThornLightReference::SetOrientation(float* Orient9)
+GENRESULT DACOM_API FThornLightReference::SetOrientation(const Matrix* Orient9)
 {
     return ThornReferenceSetOrientation(Target, Orient9);
 }
 
-GENRESULT DACOM_API FThornLightReference::GetPosition(float* OutPosition)
+GENRESULT DACOM_API FThornLightReference::GetPosition(Vector* OutPosition)
 {
     return ThornReferenceGetPosition(Target, OutPosition);
 }
 
-GENRESULT DACOM_API FThornLightReference::GetOrientation(float* OutOrient9)
+GENRESULT DACOM_API FThornLightReference::GetOrientation(Matrix* OutOrient9)
 {
     return ThornReferenceGetOrientation(Target, OutOrient9);
 }
@@ -357,7 +357,7 @@ void FThornLightReference::Stop()
 }
 
 // LAB_00453550.
-void* FThornLightReference::GetEngineInstance()
+InstanceIndex FThornLightReference::GetEngineInstance()
 {
     return ThornReferenceGetEngineInstance(Target);
 }

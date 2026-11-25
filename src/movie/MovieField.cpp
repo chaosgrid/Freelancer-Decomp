@@ -5,46 +5,17 @@
 // Author: Giperion.
 
 #include "MovieField.h"
+
+#include "MovieExp.h"
+#include "MovieFieldHigh.h"
+#include "MovieFieldMid.h"
+#include "MovieGraph.h"
 #include "MovieWindow.h"
 
 #include <windows.h>
 
-// DAT_06ae097c. Defined in MovieGraph.cpp.
-extern int GMovieGraphCode;
-
 // DAT_06ae0980. Allocation counter. Only 0x06ac4f80 and 0x06ac4fb0 touch it.
 int GMovieAllocCount = 0;
-
-// Callees outside this file.
-// 0x06ac45a0. Defined in MovieExp.cpp. RET 0x18.
-long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsigned int Mode, unsigned int* Dest, unsigned int* Modulus, void* Scratch);
-
-// 0x06ac85c0. Limb add, borrow/carry in EAX. RET 0x10.
-long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int Dest, int Count);
-
-// 0x06ac89d0. Limb subtract, borrow in EAX. RET 0x10.
-long __stdcall SubtractLimbs(unsigned int* Left, unsigned int* Right, int Dest, int Count);
-
-// 0x06ac8bd0. In-place limb shift. RET 0x10.
-unsigned int __stdcall ShiftLimbs(unsigned int* Source, unsigned int BitCount, unsigned int* Dest, int Count);
-
-// 0x06ac8630. Multiply a limb by the modulus and subtract. RET 0x10.
-unsigned int __stdcall Movie_SubtractScaledLimbs(int Modulus, unsigned int Digit, unsigned int* Buffer, int Count);
-
-// 0x06ac8490. RET 0x10.
-unsigned int __stdcall Movie_AddScaledLimbs(int Modulus, unsigned int Scale, unsigned int* Buffer, int Count);
-
-// 0x06ac8a90. Signed compare of two limb integers. RET 0x10.
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
-
-// 0x06aca7d0. RET 0x4.
-void __stdcall FillWindowTable(unsigned int Size);
-
-// 0x06ac52f0. Single-limb divisor. RET 0x14. Body in MovieFieldMid.cpp.
-unsigned int __stdcall Movie_DivideByLimb(unsigned int* Dividend, unsigned int DivisorLimb, unsigned int* Reciprocal, unsigned int Quotient, int DividendCount);
-
-// 0x06ac54d0. Writes two dwords: reciprocal, then shift. RET 0xC.
-void __stdcall StoreLeadingReciprocal(int Limbs, unsigned int Count, unsigned int* Reciprocal);
 
 static void Movie_CopyLimbs(unsigned int* Dest, unsigned int* Source, unsigned int Count)
 {
@@ -172,63 +143,61 @@ void __stdcall Movie_MultiplyModulo(unsigned int* Left, unsigned int* Right, uns
     unsigned int LimbCount = Modulus[0x40];
     unsigned int* Dispatch = (unsigned int*)Modulus[0x42];
     unsigned int* Work = Scratch;
-    unsigned char* Base;
-    unsigned int* At510;
-    unsigned int* AtA74;
+    FMovieModScratch* Block;
+    unsigned int* LeftMark;
+    unsigned int* Product;
     unsigned int* Aligned;
     if (Work == 0)
     {
-        Work = (unsigned int*)Movie_AllocateBlock(0x231c);
+        Work = (unsigned int*)Movie_AllocateBlock(sizeof(FMovieModScratch));
         if (Work == 0)
         {
             return;
         }
     }
-    Base = (unsigned char*)Work;
-    At510 = (unsigned int*)(Base + 0x510);
-    AtA74 = (unsigned int*)(Base + 0xa74);
-    Aligned = Movie_AlignDword((unsigned int*)(Base + 0x538), Base);
-    Movie_EvaluateWindow(Left, LimbCount, Work, (unsigned char*)At510, Dispatch);
+    Block = (FMovieModScratch*)Work;
+    LeftMark = Block->LeftMark;
+    Product = Block->Product;
+    Aligned = Movie_AlignDword(Block->RightWindow, (unsigned char*)Block);
+    Movie_EvaluateWindow(Left, LimbCount, Work, (unsigned char*)LeftMark, Dispatch);
     if (Left == Right)
     {
-        Movie_MultiplyWindows((unsigned int*)Work, (unsigned int*)At510, (unsigned int*)Work, (unsigned int*)At510, AtA74, (unsigned int*)Dispatch);
+        Movie_MultiplyWindows(Work, LeftMark, Work, LeftMark, Product, Dispatch);
     }
     else
     {
-        unsigned int* AtA4c = (unsigned int*)(Base + 0xa4c);
-        Movie_EvaluateWindow(Right, LimbCount, Aligned, (unsigned char*)AtA4c, Dispatch);
-        Movie_MultiplyWindows((unsigned int*)Work, (unsigned int*)At510, (unsigned int*)Aligned, (unsigned int*)AtA4c, AtA74, (unsigned int*)Dispatch);
+        unsigned int* RightMark = Block->RightMark;
+        Movie_EvaluateWindow(Right, LimbCount, Aligned, (unsigned char*)RightMark, Dispatch);
+        Movie_MultiplyWindows(Work, LeftMark, Aligned, RightMark, Product, Dispatch);
     }
-    ReduceLimbsModulo(AtA74, LimbCount + LimbCount, Modulus[0x44], Dest, Modulus, Work);
+    ReduceLimbsModulo(Product, LimbCount + LimbCount, Modulus[0x44], Dest, Modulus, Work);
     if (Scratch == 0)
     {
         Movie_FreeBlock(Work);
     }
 }
-
 // 0x06ac4250
 // Expands Source, multiplies it by the (Factor, FactorTail) pair, then reduces.
 void __stdcall Movie_MultiplyFactorModulo(unsigned int* Source, unsigned int* Factor, unsigned int* FactorTail, unsigned int* Dest, unsigned int* Modulus, unsigned int* Scratch)
 {
-    unsigned char* Base = (unsigned char*)Scratch;
-    unsigned int* At538 = (unsigned int*)(Base + 0x538);
-    unsigned int* AtA4c = (unsigned int*)(Base + 0xa4c);
-    unsigned int* AtA74 = (unsigned int*)(Base + 0xa74);
-    unsigned int* Aligned = Movie_AlignDword(At538, (unsigned char*)Factor);
+    FMovieModScratch* Block = (FMovieModScratch*)Scratch;
+    unsigned int* RightWindow = Block->RightWindow;
+    unsigned int* RightMark = Block->RightMark;
+    unsigned int* Product = Block->Product;
+    unsigned int* Aligned = Movie_AlignDword(RightWindow, (unsigned char*)Factor);
     unsigned int* Dispatch = (unsigned int*)Modulus[0x42];
     unsigned int LimbCount = Modulus[0x40];
-    Movie_EvaluateWindow(Source, LimbCount, Aligned, (unsigned char*)AtA4c, Dispatch);
-    Movie_MultiplyWindows((unsigned int*)Aligned, (unsigned int*)AtA4c, (unsigned int*)Factor, (unsigned int*)FactorTail, AtA74, (unsigned int*)Dispatch);
-    ReduceLimbsModulo(AtA74, LimbCount << 1, Modulus[0x44], Dest, Modulus, Scratch);
+    Movie_EvaluateWindow(Source, LimbCount, Aligned, (unsigned char*)RightMark, Dispatch);
+    Movie_MultiplyWindows(Aligned, RightMark, Factor, FactorTail, Product, Dispatch);
+    ReduceLimbsModulo(Product, LimbCount << 1, Modulus[0x44], Dest, Modulus, Scratch);
 }
-
 // 0x06ac42e0
 // Multiplies the four terms the caller already laid out, then reduces.
 void __stdcall Movie_MultiplyTermsModulo(unsigned int* TermA, unsigned int* TermB, unsigned int* TermC, unsigned int* TermD, unsigned int* Dest, unsigned int* Modulus, unsigned int* Scratch)
 {
-    unsigned int* Product = (unsigned int*)((unsigned char*)Scratch + 0xa74);
+    unsigned int* Product = ((FMovieModScratch*)Scratch)->Product;
     unsigned int LimbCount = Modulus[0x40];
-    Movie_MultiplyWindows((unsigned int*)TermA, (unsigned int*)TermB, (unsigned int*)TermC, (unsigned int*)TermD, Product, (unsigned int*)Modulus[0x42]);
+    Movie_MultiplyWindows(TermA, TermB, TermC, TermD, Product, (unsigned int*)Modulus[0x42]);
     ReduceLimbsModulo(Product, LimbCount << 1, Modulus[0x44], Dest, Modulus, Scratch);
 }
 

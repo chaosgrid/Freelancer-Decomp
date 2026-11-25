@@ -15,7 +15,7 @@
 
 #include "ivp_core.h"
 #include "ivp_environment.h"
-#include "../ivp_utility/ivp_crc32.h" // g_Crc32Table_063edcdc (GetHashIndex, FUN_06361530)
+#include "../ivp_utility/ivp_crc32.h" // g_IVP_Crc32Table (GetHashIndex, FUN_06361530)
 #include "../ivp_utility/ivp_hash.h"  // FUN_063569e0, the three-way name compare
 
 namespace
@@ -223,7 +223,7 @@ IVP_U_Active_Value_Hash::~IVP_U_Active_Value_Hash()
 }
 
 // FUN_06361530 (thiscall, RET 4; the receiver is unused). CRC-32 of the name
-// (IEEE table g_Crc32Table_063edcdc) | 0x80000000, the IVP_VHash "occupied"
+// (IEEE table g_IVP_Crc32Table) | 0x80000000, the IVP_VHash "occupied"
 // marker. Retail has no null-name guard (callers gate on FUN_063569c0 first).
 unsigned IVP_U_Active_Value_Hash::GetHashIndex(IVP_U_Active_Value* Value)
 {
@@ -231,7 +231,7 @@ unsigned IVP_U_Active_Value_Hash::GetHashIndex(IVP_U_Active_Value* Value)
     unsigned crc = 0xffffffffu;
     while (*s != 0)
     {
-        crc = (crc >> 8) ^ g_Crc32Table_063edcdc[(*s ^ crc) & 0xffu];
+        crc = (crc >> 8) ^ g_IVP_Crc32Table[(*s ^ crc) & 0xffu];
         ++s;
     }
     return crc | 0x80000000u;

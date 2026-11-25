@@ -72,7 +72,7 @@ private:
     FToolTipHoverInfo Entry;      // +0x0ec
     std::map<int, int> Table;     // +0x150
     float HoldSeconds;            // +0x164
-    float Anchor[3];              // +0x16c
+    Vector Anchor;                // +0x16c
     unsigned char bWasVisible;    // +0x178
     float HiddenGrace;            // +0x17c
     float CursorStillSeconds;     // +0x180

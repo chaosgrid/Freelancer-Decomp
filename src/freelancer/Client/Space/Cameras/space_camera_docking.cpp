@@ -110,23 +110,23 @@ void DockingCameraUpdate(FDockingCamera* Cam, float DeltaSeconds)
 
         // The camera's position comes through its slot 0x0c, not off the field.
         FSpaceCamera* const Base = (FSpaceCamera*)Cam;
-        const float* const CameraPosition = AsCamera(Base)->GetPosition();
+        const Vector* const CameraPosition = AsCamera(Base)->GetPosition();
 
         Vector Direction;
-        Direction.x = Ship3[0] - CameraPosition[0];
-        Direction.y = Ship3[1] - CameraPosition[1];
-        Direction.z = Ship3[2] - CameraPosition[2];
+        Direction.x = Ship3[0] - CameraPosition->x;
+        Direction.y = Ship3[1] - CameraPosition->y;
+        Direction.z = Ship3[2] - CameraPosition->z;
 
         const Matrix Look = LookMatrixYup(Direction);
 
         // Re-read after the call; it is the camera's OWN position -- the docking camera only
         // turns, never moves.
-        const float* const HoldPosition = AsCamera(Base)->GetPosition();
+        const Vector* const HoldPosition = AsCamera(Base)->GetPosition();
 
-        memcpy(Base->World, &Look.E[0][0], 9 * sizeof(float));
-        Base->WorldPos[0] = HoldPosition[0];
-        Base->WorldPos[1] = HoldPosition[1];
-        Base->WorldPos[2] = HoldPosition[2];
+        memcpy(&Base->World, &Look.E[0][0], 9 * sizeof(float));
+        Base->WorldPos.x = HoldPosition->x;
+        Base->WorldPos.y = HoldPosition->y;
+        Base->WorldPos.z = HoldPosition->z;
         Base->bViewDirty = 1;
     }
 

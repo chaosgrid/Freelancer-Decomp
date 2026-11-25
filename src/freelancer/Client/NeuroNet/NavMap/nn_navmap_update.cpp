@@ -27,7 +27,7 @@
 #include "Space/Cameras/space_camera.h"           // FSpaceCamera, AsCamera, FUN_0040f8c0 / FUN_0040fb80
 #include "Interface/tooltip_hover.h"
 #include "Interface/win3d.h"                  // Win3DGetMouseRay / Win3DGetCamera / FUN_00423b90
-#include "x86math.h"                // FTransform, FVector, FMatrix, I3DMathEngine
+#include "x86math.h"                // Transform, Vector, Matrix, I3DMathEngine
 #include "common_csys.h"            // Acquire3DMathEngine (FUN_005b73e0)
 #include "common_misc.h"            // Geometry::Sphere
 #include "common_reputation.h"      // Reputation::Vibe::GetAffiliation / GetName
@@ -709,7 +709,7 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
         // The camera ray to the map plane, then the map-frame fractions to
         // map units.
         float Ray[3];
-        AsCamera(&Camera)->Unproject(Ray, ScreenX, ScreenY);
+        AsCamera(&Camera)->Unproject((Vector*)Ray, ScreenX, ScreenY);
         double const K = kNavMapPlaneDepth / static_cast<double>(Ray[2]);
         double const A = static_cast<double>(Ray[0]) * K;
         double const B = static_cast<double>(Ray[1]) * K;
@@ -727,7 +727,7 @@ bool NeuroNetNavMap::MapPointUnderCursor(float* OutMapPos)
     // Zoomed in -- the ray's point as fractions of the zoomed frame, less
     // the pan, back to map units.
     float Ray[3];
-    AsCamera(&Camera)->Unproject(Ray, ScreenX, ScreenY);
+    AsCamera(&Camera)->Unproject((Vector*)Ray, ScreenX, ScreenY);
     double const K = kNavMapPlaneDepth / static_cast<double>(Ray[2]);
     double const A = static_cast<double>(Ray[0]) * K;
     float const B = static_cast<float>(static_cast<double>(Ray[1]) * K);
@@ -777,32 +777,32 @@ bool NeuroNetNavMap::CursorRayPoint(float* OutPoint)
     // The cursor on the Win3D camera's near plane, turned by the camera
     // (a copy of its orientation, FUN_00423b90).
     FSpaceCamera const* const Cam = Win3DGetCamera(); // DAT_0067dbf8
-    FVector Local;
-    Local.X = static_cast<float>((static_cast<double>(ScreenX) -
+    Vector Local;
+    Local.x = static_cast<float>((static_cast<double>(ScreenX) -
                                   static_cast<double>(Cam->ScreenCenterX)) /
                                  static_cast<double>(Cam->XScale) *
                                  static_cast<double>(Cam->ZNear));
-    Local.Y = static_cast<float>((static_cast<double>(ScreenY) -
+    Local.y = static_cast<float>((static_cast<double>(ScreenY) -
                                   static_cast<double>(Cam->ScreenCenterY)) /
                                  static_cast<double>(Cam->YScale) *
                                  static_cast<double>(Cam->ZNear));
-    Local.Z = -Cam->ZNear;
-    FMatrix Orientation;
-    memcpy(&Orientation, Cam->World, sizeof(Orientation));
-    FVector Turned;
+    Local.z = -Cam->ZNear;
+    Matrix Orientation;
+    memcpy(&Orientation, &Cam->World, sizeof(Orientation));
+    Vector Turned;
     Win3DTransformByMatrix(Turned, Orientation, Local);
 
     // Scaled onto this control's depth (Offset z + Position z), moved by
     // (0.0025, -0.001) and made relative to Offset + Position in x / y; z is the scaled ray's
     // own and then 0.
-    double const K = (static_cast<double>(Offset[2]) + static_cast<double>(Position[2])) /
-                     static_cast<double>(Turned.Z);
-    float const X = static_cast<float>(static_cast<double>(Turned.X) * K);
-    float const Y = static_cast<float>(static_cast<double>(Turned.Y) * K);
-    double const Z = K * static_cast<double>(Turned.Z);
-    double const OriginX = static_cast<double>(Position[0]) + static_cast<double>(Offset[0]);
+    double const K = (static_cast<double>(Offset[2]) + static_cast<double>(Position.z)) /
+                     static_cast<double>(Turned.z);
+    float const X = static_cast<float>(static_cast<double>(Turned.x) * K);
+    float const Y = static_cast<float>(static_cast<double>(Turned.y) * K);
+    double const Z = K * static_cast<double>(Turned.z);
+    double const OriginX = static_cast<double>(Position.x) + static_cast<double>(Offset[0]);
     float const OriginY = static_cast<float>(static_cast<double>(Offset[1]) +
-                                             static_cast<double>(Position[1]));
+                                             static_cast<double>(Position.y));
     OutPoint[0] = static_cast<float>(static_cast<double>(X) +
                                      static_cast<double>(kNavMapRayOffsetX));
     OutPoint[1] = static_cast<float>(static_cast<double>(Y) -
@@ -1274,25 +1274,25 @@ void NeuroNetNavMap::PlaceItems()
         double const Radians = static_cast<double>(Item->Heading) *
                                static_cast<double>(kNavMapDegToRad);
         float const RadiansF = static_cast<float>(Radians);
-        FTransform Transform;
-        memcpy(&Transform, Engine->GetInstanceTransform(Item->Mesh.EngineInstance),
-               sizeof(Transform));
+        Transform Xform;
+        memcpy(&Xform, Engine->GetInstanceTransform(Item->Mesh.EngineInstance),
+               sizeof(Xform));
         double const Cos = cos(Radians);
         double const Sin = sin(static_cast<double>(RadiansF));
-        Transform.Rotation.D[0][2] = 0.0f;
-        Transform.Rotation.D[1][2] = 0.0f;
-        Transform.Rotation.D[2][0] = 0.0f;
-        Transform.Rotation.D[2][1] = 0.0f;
-        Transform.Rotation.D[2][2] = 1.0f;
-        Transform.Rotation.D[0][0] = static_cast<float>(Cos);
-        Transform.Rotation.D[0][1] = static_cast<float>(-Sin);
-        Transform.Rotation.D[1][0] = static_cast<float>(Sin);
-        Transform.Rotation.D[1][1] = static_cast<float>(Cos);
+        Xform.Rotation.E[0][2] = 0.0f;
+        Xform.Rotation.E[1][2] = 0.0f;
+        Xform.Rotation.E[2][0] = 0.0f;
+        Xform.Rotation.E[2][1] = 0.0f;
+        Xform.Rotation.E[2][2] = 1.0f;
+        Xform.Rotation.E[0][0] = static_cast<float>(Cos);
+        Xform.Rotation.E[0][1] = static_cast<float>(-Sin);
+        Xform.Rotation.E[1][0] = static_cast<float>(Sin);
+        Xform.Rotation.E[1][1] = static_cast<float>(Cos);
         if (G_NavMapMath == nullptr)
             G_NavMapMath = Acquire3DMathEngine(); // FUN_005b73e0
-        G_NavMapMath->Scale(Transform.Rotation, Transform.Rotation, MeshScale);
-        Engine->SetInstanceMatrix(Item->Mesh.EngineInstance, &Transform);
-        Engine->SetInstancePosition(Item->Mesh.EngineInstance, Place);
+        G_NavMapMath->Scale(Xform.Rotation, Xform.Rotation, MeshScale);
+        Engine->SetInstanceMatrix(Item->Mesh.EngineInstance, &Xform);
+        Engine->SetInstancePosition(Item->Mesh.EngineInstance, (const Vector*)Place);
         Engine->UpdateInstance(Item->Mesh.EngineInstance, 0, nullptr);
 
         // An object with an id takes the visit map's flags; bit 0 shows it
@@ -1662,7 +1662,7 @@ void NeuroNetNavMap::Update()
                                    static_cast<double>(MapCorner2[1]));
     Corner[2] = -1.25f;
     AsCamera(SceneCamera)->Project(&ScreenRectMin[0], &ScreenRectMin[1], &ScreenRectMin[2],
-                                   Corner);
+                                   (const Vector*)Corner);
     ScreenRectMin[0] = static_cast<float>(floor(static_cast<double>(ScreenRectMin[0])));
     ScreenRectMin[1] = static_cast<float>(floor(static_cast<double>(ScreenRectMin[1])));
     Corner[0] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[0]) +
@@ -1670,7 +1670,7 @@ void NeuroNetNavMap::Update()
     Corner[1] = static_cast<float>(static_cast<double>(G_NavMapScreenRectOffset[1]) +
                                    static_cast<double>(MapCorner0[1]));
     float Far[3];
-    AsCamera(SceneCamera)->Project(&Far[0], &Far[1], &Far[2], Corner);
+    AsCamera(SceneCamera)->Project(&Far[0], &Far[1], &Far[2], (const Vector*)Corner);
     Far[0] = static_cast<float>(floor(static_cast<double>(Far[0])));
     Far[1] = static_cast<float>(floor(static_cast<double>(Far[1])));
     ScreenRectSize[0] = static_cast<float>(static_cast<double>(Far[0]) -

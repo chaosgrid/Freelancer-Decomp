@@ -972,9 +972,7 @@ SERVER_API int __cdecl GetEmptyPos(const unsigned int& system_id_ref, const Tran
             }
 
             Vector Candidate;
-            Server_MathEngine()->TransformXform(reinterpret_cast<FVector&>(Candidate),
-                                                reinterpret_cast<FTransform const&>(base_transform),
-                                                reinterpret_cast<FVector const&>(Offset));
+            Server_MathEngine()->TransformXform(Candidate, base_transform, Offset);
             out_pos = Candidate;
 
             bEmpty = true;
@@ -1099,9 +1097,9 @@ static void SpaceObj_InitTransferParms(PhySys::CreateParms& Parms)
     memset(&Parms, 0, sizeof(Parms));
     Parms.Mass = 1.0f;
     Parms.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-    Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-    Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-    Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+    Parms.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+    Parms.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+    Parms.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
     Parms.SystemId = 0;
     Parms.Type = 2;
     Parms.bPhysicalUnmoveable = 0;

@@ -96,20 +96,20 @@ namespace
         for (int Index = 0; Index < 3; ++Index, --Row)
         {
             double const V = static_cast<double>(Row) * 0.1 + SlideT;
-            float Position[3];
+            Vector Position;
             if (V > 0.0)
             {
-                Position[0] = 0.0f;
-                Position[1] = 0.0f;
-                Position[2] = 0.0f;
+                Position.x = 0.0f;
+                Position.y = 0.0f;
+                Position.z = 0.0f;
             }
             else
             {
-                Position[0] = static_cast<float>(V);
-                Position[1] = 0.0f;
-                Position[2] = 0.0f;
+                Position.x = static_cast<float>(V);
+                Position.y = 0.0f;
+                Position.z = 0.0f;
             }
-            Images[Index]->SetPosition(Position);
+            Images[Index]->SetPosition(&Position.x);
         }
     }
 }
@@ -731,9 +731,9 @@ void PageCharacterSelectSingle::Update()
         if (SlideT > 0.0)
         {
             // UpdateScrollVisibility's test is inlined here.
-            float const Home[3] = {0.0f, 0.0f, 0.0f};
-            BigBox->SetPosition(Home);
-            SmallBox->SetPosition(Home);
+            Vector const Home = {0.0f, 0.0f, 0.0f};
+            BigBox->SetPosition(&Home.x);
+            SmallBox->SetPosition(&Home.x);
             ShowWin3D(CharacterMoney);
             ShowWin3D(CharacterRank);
             ShowWin3D(CharacterLocation);
@@ -760,10 +760,10 @@ void PageCharacterSelectSingle::Update()
         else
         {
             // -1.5 is DAT_005e2bb0.
-            float const BigPosition[3] = {static_cast<float>(SlideT * -1.5), 0.0f, 0.0f};
-            BigBox->SetPosition(BigPosition);
-            float const SmallPosition[3] = {0.0f, static_cast<float>(SlideT), 0.0f};
-            SmallBox->SetPosition(SmallPosition);
+            Vector const BigPosition = {static_cast<float>(SlideT * -1.5), 0.0f, 0.0f};
+            BigBox->SetPosition(&BigPosition.x);
+            Vector const SmallPosition = {0.0f, static_cast<float>(SlideT), 0.0f};
+            SmallBox->SetPosition(&SmallPosition.x);
         }
 
         // -0.5 is DAT_005e2a50, -0.1 DAT_005d5070.
@@ -793,10 +793,10 @@ void PageCharacterSelectSingle::Update()
         }
         else
         {
-            float const BigPosition[3] = {static_cast<float>(SlideT * -1.5), 0.0f, 0.0f};
-            BigBox->SetPosition(BigPosition);
-            float const SmallPosition[3] = {0.0f, static_cast<float>(SlideT), 0.0f};
-            SmallBox->SetPosition(SmallPosition);
+            Vector const BigPosition = {static_cast<float>(SlideT * -1.5), 0.0f, 0.0f};
+            BigBox->SetPosition(&BigPosition.x);
+            Vector const SmallPosition = {0.0f, static_cast<float>(SlideT), 0.0f};
+            SmallBox->SetPosition(&SmallPosition.x);
         }
     }
 

@@ -112,8 +112,7 @@ void GameObject::enter_system(StarSystem* Sys, PhySys::CreateParms const* Parms)
     if (!SinglePlayer() && csimple()->OwnerPlayer != 0)
     {
         Quaternion Orientation;
-        Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orientation),
-                                                  reinterpret_cast<FMatrix const&>(Object->Orientation));
+        Server_MathEngine()->MatrixToQuaternion(Orientation, Object->Orientation);
 
         // Angular velocity is fetched before velocity, both from the raw Object.
         CSimple* const Simple = csimple();
@@ -160,7 +159,7 @@ void GameObject::leave_system(PhySys::CreateParms* OutParms)
         OutParms->Inertia = Inertia;
         OutParms->bEnableCollisions = PhySys::GetCollisionState(Raw) ? 1 : 0;
         PhySys::GetDamping(Raw, OutParms->LinearDamping,
-                           *reinterpret_cast<Vector*>(OutParms->AngularDamping));
+                           OutParms->AngularDamping);
         // Unbounded byte copy of the collision group name into +0x1e, terminator
         // included (retail's inlined strcpy).
         char const* Src = PhySys::GetCollisionGroup(Raw);
@@ -620,7 +619,7 @@ bool GameObject::CreateOfClass(CObject::Class ObjectClass, Archetype::Root* Arch
     Arch->create_instance(static_cast<IEngineInstance*>(Object));
 
     // IEngine::UpdateInstance (DALib::Engine vt +0x6c), as in Loot/Mine::create.
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Object->EngineInstanceId), 0, nullptr);
+    DALib::Engine->UpdateInstance(Object->EngineInstanceId, 0, nullptr);
 
     advise(true);
 

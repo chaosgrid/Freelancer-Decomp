@@ -401,15 +401,15 @@ FRmShipSpawn::~FRmShipSpawn()
 // FUN_06f865e0.
 FRmShipGroup::FRmShipGroup()
 {
-    Orientation.D[0][0] = 1.0f;
-    Orientation.D[0][1] = 0.0f;
-    Orientation.D[0][2] = 0.0f;
-    Orientation.D[1][0] = 0.0f;
-    Orientation.D[1][1] = 1.0f;
-    Orientation.D[1][2] = 0.0f;
-    Orientation.D[2][0] = 0.0f;
-    Orientation.D[2][1] = 0.0f;
-    Orientation.D[2][2] = 1.0f;
+    Orientation.E[0][0] = 1.0f;
+    Orientation.E[0][1] = 0.0f;
+    Orientation.E[0][2] = 0.0f;
+    Orientation.E[1][0] = 0.0f;
+    Orientation.E[1][1] = 1.0f;
+    Orientation.E[1][2] = 0.0f;
+    Orientation.E[2][0] = 0.0f;
+    Orientation.E[2][1] = 0.0f;
+    Orientation.E[2][2] = 1.0f;
     Position.x = 0.0f;
     Position.y = 0.0f;
     Position.z = 0.0f;

@@ -28,7 +28,7 @@ struct FGameLight; // engine_light.h
 // while the clouds' lightning_duration is positive (FUN_00550d40).
 struct FNebulaCloudPuff
 {
-    float Position[3];        // +0x00
+    Vector Position;          // +0x00
     float Color[3];           // +0x0c lerp of puff_colora / puff_colorb
     float Size;               // +0x18 puff_radius * detail * [0.8, 1.2)
     int ShapeIndex;           // +0x1c into PuffShapes, by puff_weights
@@ -62,9 +62,9 @@ struct FNebulaClouds
     FTexShape* PuffShapes[8];                  // +0x28 puff_shape
     float PuffWeights[8];                      // +0x48 puff_weights, normalised
     int PuffShapeCount;                        // +0x68
-    float Up[3];                               // +0x6c billboard up, re-squared to the camera per draw
-    float PuffColorA[3];                       // +0x78 puff_colora
-    float PuffColorB[3];                       // +0x84 puff_colorb
+    Vector Up;                                 // +0x6c billboard up, re-squared to the camera per draw
+    Vector PuffColorA;                         // +0x78 puff_colora
+    Vector PuffColorB;                         // +0x84 puff_colorb
     float LightningColor[3];                   // +0x90 lightning_color
     float LightningGap;                        // +0x9c lightning_gap
     float LightningDuration;                   // +0xa0 lightning_duration

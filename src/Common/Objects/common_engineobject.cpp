@@ -21,7 +21,7 @@ namespace
     // IEngine +0x6c, as update_tree calls it: no test on DALib::Engine.
     void UpdateEngineInstance(long Instance)
     {
-        DALib::Engine->UpdateInstance((void*)Instance, 0, nullptr);
+        DALib::Engine->UpdateInstance(Instance, 0, nullptr);
     }
 }
 

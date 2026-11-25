@@ -251,13 +251,13 @@ void StartExplosionAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                 HardpointToWorld(HpHandle, Info);
 
                 // pos_offset turned by the hardpoint's orientation, added to its position.
-                FVector Turned;
-                FuseMath()->TransformMatrix(Turned, reinterpret_cast<FMatrix const&>(Info.Orient),
-                                            reinterpret_cast<FVector const&>(PosOffset));
+                Vector Turned;
+                FuseMath()->TransformMatrix(Turned, Info.Orient,
+                                            PosOffset);
                 Vector Pos;
-                Pos.x = Turned.X + Info.Position.x;
-                Pos.y = Turned.Y + Info.Position.y;
-                Pos.z = Turned.Z + Info.Position.z;
+                Pos.x = Turned.x + Info.Position.x;
+                Pos.y = Turned.y + Info.Position.y;
+                Pos.z = Turned.z + Info.Position.z;
 
                 Action_Explode* const Explode = Action_Explode::Create(Arch, Host, &Pos);
                 if (Explode != nullptr)
@@ -348,7 +348,7 @@ void StartCameraParticlesAction::Trigger(unsigned SourceId, unsigned short SubOb
         {
             CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryCameraParticles,
                                           FindEffectArch(&Effect.Id),
-                                          reinterpret_cast<FTransform const*>(&HostOrient), Pos3,
+                                          reinterpret_cast<Transform const*>(&HostOrient), Pos3,
                                           nullptr);
         }
     }
@@ -505,12 +505,12 @@ void StartEffectAction::Trigger(unsigned SourceId, unsigned short SubObjId)
     if (!IsTriggered())
     {
         long EngineIndex = -1;
-        FTransform Local;
-        reinterpret_cast<Matrix&>(Local.Rotation) =
+        Transform Local;
+        Local.Rotation =
             Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
-        Local.Translation.X = 0.0f;
-        Local.Translation.Y = 0.0f;
-        Local.Translation.Z = 0.0f;
+        Local.Translation.x = 0.0f;
+        Local.Translation.y = 0.0f;
+        Local.Translation.z = 0.0f;
         bool bFound = false;
 
         // No hardpoints -> the host's root.
@@ -532,8 +532,8 @@ void StartEffectAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                 {
                     // "ROOT": the host's own index, the entry's frame as the local transform.
                     EngineIndex = Host->get_index();
-                    reinterpret_cast<Matrix&>(Local.Rotation) = Entry.Orientation;
-                    Local.Translation = reinterpret_cast<FVector const&>(Entry.PosOffset);
+                    Local.Rotation = Entry.Orientation;
+                    Local.Translation = Entry.PosOffset;
                     bFound = true;
                 }
                 else
@@ -544,18 +544,18 @@ void StartEffectAction::Trigger(unsigned SourceId, unsigned short SubObjId)
                                          Info))
                     {
                         // The offset turned by the hardpoint's orientation, plus its position.
-                        FVector Turned;
+                        Vector Turned;
                         FuseMath()->TransformMatrix(Turned,
-                                                    reinterpret_cast<FMatrix const&>(Info.Orient),
-                                                    reinterpret_cast<FVector const&>(Entry.PosOffset));
-                        Local.Translation.X = Turned.X + Info.Position.x;
-                        Local.Translation.Y = Turned.Y + Info.Position.y;
-                        Local.Translation.Z = Turned.Z + Info.Position.z;
+                                                    Info.Orient,
+                                                    Entry.PosOffset);
+                        Local.Translation.x = Turned.x + Info.Position.x;
+                        Local.Translation.y = Turned.y + Info.Position.y;
+                        Local.Translation.z = Turned.z + Info.Position.z;
                         // Rotation = hardpoint orientation * entry orientation.
-                        FMatrix Rotation;
+                        Matrix Rotation;
                         FuseMath()->MulMatrix(Rotation,
-                                              reinterpret_cast<FMatrix const&>(Info.Orient),
-                                              reinterpret_cast<FMatrix const&>(Entry.Orientation));
+                                              Info.Orient,
+                                              Entry.Orientation);
                         Local.Rotation = Rotation;
                         bFound = true;
                     }
@@ -592,10 +592,10 @@ void StartEffectAction::Trigger(unsigned SourceId, unsigned short SubObjId)
         }
         else if (bFound)
         {
-            float* const InstanceRaw = DALib::Engine->GetInstanceTransform(
-                reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)));
-            FTransform World;
-            FuseMath()->MulTransform(World, *reinterpret_cast<FTransform const*>(InstanceRaw),
+            const float* const InstanceRaw = (const float*)DALib::Engine->GetInstanceTransform(
+                EngineIndex);
+            Transform World;
+            FuseMath()->MulTransform(World, *reinterpret_cast<Transform const*>(InstanceRaw),
                                      Local);
             // Taken before the id test.
             Vector const Velocity = Host->get_velocity();
@@ -709,13 +709,13 @@ void ClientImpulseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
             HardpointToWorld(Host->get_index(), Info);
 
             // pos_offset through the TRANSPOSED hardpoint orientation, plus its position.
-            FVector Turned;
-            FuseMath()->TransposeTransform(Turned, reinterpret_cast<FMatrix const&>(Info.Orient),
-                                           reinterpret_cast<FVector const&>(PosOffset));
+            Vector Turned;
+            FuseMath()->TransposeTransform(Turned, Info.Orient,
+                                           PosOffset);
             Vector Pos;
-            Pos.x = Turned.X + Info.Position.x;
-            Pos.y = Turned.Y + Info.Position.y;
-            Pos.z = Turned.Z + Info.Position.z;
+            Pos.x = Turned.x + Info.Position.x;
+            Pos.y = Turned.y + Info.Position.y;
+            Pos.z = Turned.z + Info.Position.z;
 
             // Radius and force must both be strictly above 1e-4 (NaN fails).
             if (static_cast<double>(Radius) > kImpulseMinimum &&

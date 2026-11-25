@@ -28,6 +28,7 @@
 // Field offsets are retail's, in comments; the port's layout is not ABI (retail's VC6 lists and
 // FmtStr pairs are held as current-STL members).
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_csys.h"
 #include "common_text.h" // FmtStr
 #include "Core/event_handler.h"
@@ -276,7 +277,7 @@ struct FGfScriptSequence
     void ClearProps();
     // FUN_00455d20 (thiscall, RET 8) -- the first prop of Props whose engine instance (RoomObject
     // slot 6) is Instance gets bDetached (ObjectProp +0x48); none, nothing.
-    void SetPropDetached(void* Instance, unsigned char bDetached);
+    void SetPropDetached(InstanceIndex Instance, unsigned char bDetached);
     // FUN_00455d70 (thiscall, RET 8) -- append {Character, Name}. Caller: FUN_0044e870.
     void AddCharacter(FCharacterObject* Character, char const* CharName);
     // FUN_00455ed0 (thiscall, RET 4) -- the first character named CharName (stricmp), or null
@@ -440,4 +441,4 @@ void GfScriptSequenceSetSkipOption(float Value);
 // FUN_0044fa60 (cdecl) -- Levels times DALib::Engine slot 53 (the parent instance) up from
 // Instance; Levels not positive returns Instance itself. Caller: Thorn_Deformable's IK start
 // with the descriptor's count_to_root.
-void* GfEngineInstanceAncestor(void* Instance, int Levels);
+InstanceIndex GfEngineInstanceAncestor(InstanceIndex Instance, int Levels);

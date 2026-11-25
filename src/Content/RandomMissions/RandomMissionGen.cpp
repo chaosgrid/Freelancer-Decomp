@@ -2300,9 +2300,9 @@ void FRmDestroySolarsFilter::SpawnSolars(
 
                 Solar.Faction = EnemyGroup;
                 Solar.Orientation = Slot->Orientation;
-                Solar.Position.x = Slot->Position.X + Query->ObjectivePos.x;
-                Solar.Position.y = Slot->Position.Y + Query->ObjectivePos.y;
-                Solar.Position.z = Slot->Position.Z + Query->ObjectivePos.z;
+                Solar.Position.x = Slot->Position.x + Query->ObjectivePos.x;
+                Solar.Position.y = Slot->Position.y + Query->ObjectivePos.y;
+                Solar.Position.z = Slot->Position.z + Query->ObjectivePos.z;
                 Solar.ArchetypeId = Arch->ArchetypeId;
                 Solar.LoadoutId = Arch->LoadoutId;
 
@@ -2768,9 +2768,9 @@ void FRmAssassinateFilter::SpawnSolars(
 
                 Solar.Faction = EnemyGroup;
                 Solar.Orientation = Slot->Orientation;
-                Solar.Position.x = Slot->Position.X + Query->ObjectivePos.x;
-                Solar.Position.y = Slot->Position.Y + Query->ObjectivePos.y;
-                Solar.Position.z = Slot->Position.Z + Query->ObjectivePos.z;
+                Solar.Position.x = Slot->Position.x + Query->ObjectivePos.x;
+                Solar.Position.y = Slot->Position.y + Query->ObjectivePos.y;
+                Solar.Position.z = Slot->Position.z + Query->ObjectivePos.z;
                 Solar.ArchetypeId = Arch->ArchetypeId;
                 Solar.LoadoutId = Arch->LoadoutId;
 

@@ -80,7 +80,7 @@ public:
     double SlideT;                       // +0xd8 -- Create -1.0, 0..2 in; Leave 0, down to -0.9
     unsigned char bLeaving;              // +0xe0
     int LeaveDirection;                  // +0xe4 -- -1 back, 1 created, 2 failed (0 = none)
-    float DataFrameHome[3];              // +0xf4 -- DataFrame's position at Create
+    Vector DataFrameHome;                // +0xf4 -- DataFrame's position at Create
     UiWinObject* DataFrame;              // +0x100 -- "DataFrame"
     UiWinDeform* BaseCostume;            // +0x104 -- "BaseCostume"
     UiTextMsgButton* Back;               // +0x108 -- "Back" (command 0x300c)

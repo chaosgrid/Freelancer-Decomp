@@ -58,7 +58,6 @@ namespace
     // empty atexit; zero initialization here is that.
     FCharacterLodSet G_SharedCharacterLod;
 
-    void* const kNoInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
 
     // FUN_00443b60 (thiscall on Set) -- build Set's deformable from the four bodyparts
     // (0 body, 1 head, 2 left hand, 3 right hand) and read back its LOD switch table.
@@ -254,11 +253,11 @@ FCharacterHotspot::~FCharacterHotspot()
 void FCharacterHotspot::UpdateScreenRect(ICamera* Camera)
 {
     // FUN_00555f60.
-    float const* const Where = DALib::Engine->GetInstancePosition(Character->GetEngineInstance());
+    const Vector* const Where = DALib::Engine->GetInstancePosition(Character->GetEngineInstance());
     Vector Center;
-    Center.x = Where[0];
-    Center.y = Where[1];
-    Center.z = Where[2];
+    Center.x = Where->x;
+    Center.y = Where->y;
+    Center.z = Where->z;
 
     float ScreenX = 0.0f;
     float ScreenY = 0.0f;
@@ -369,7 +368,7 @@ FCharacterObject::~FCharacterObject()
     {
         if (AccessoryInstances[Index] != -1)
         {
-            DALib::Engine->DestroyInstance(reinterpret_cast<void*>(AccessoryInstances[Index]));
+            DALib::Engine->DestroyInstance(AccessoryInstances[Index]);
             AccessoryInstances[Index] = -1;
         }
         AccessoryHardpoints[Index].destroy();
@@ -490,7 +489,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
             Archetype::PushMaterialPathPair(&Paths, Name.Value, 0xffffffffu);
         }
 
-        void* const Instance = MiscUtilLoadEngineInstance(Found->Mesh.c_str(), DALib::Data,
+        const InstanceIndex Instance = MiscUtilLoadEngineInstance(Found->Mesh.c_str(), DALib::Data,
                                                           nullptr, nullptr, &Paths,
                                                           &MaterialEntries, nullptr);
         AccessoryInstances[Index] = reinterpret_cast<long>(Instance);
@@ -509,10 +508,9 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
                 FHardpointKey CharacterKey;
                 CharacterKey.Name = CharacterHp;
                 CharacterKey.Crc = DACOM_CRC::GetCRC32(CharacterHp);
-                void* const AccessoryPart = reinterpret_cast<void*>(
-                    AccessoryHardpoints[Index].get_instance(AccessoryIndex));
-                void* const CharacterPart =
-                    reinterpret_cast<void*>(Hardpoints.get_instance(CharacterIndex));
+                const InstanceIndex AccessoryPart = AccessoryHardpoints[Index].get_instance(AccessoryIndex);
+                const InstanceIndex CharacterPart =
+                    Hardpoints.get_instance(CharacterIndex);
                 DALib::Hardpoint->ConnectHardpoints(CharacterPart, &CharacterKey, AccessoryPart,
                                                     &AccessoryKey);
             }
@@ -579,12 +577,12 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
     Layer = 0;
 }
 
-void* FCharacterObject::GetEngineInstance()
+InstanceIndex FCharacterObject::GetEngineInstance()
 {
     // LAB_00444970: IDeformable slot 18 into an int that starts at -1.
     int Bone = -1;
     DALib::Deform->GetFirstBone(Lod.Instance, &Bone);
-    return reinterpret_cast<void*>(static_cast<intptr_t>(Bone));
+    return static_cast<intptr_t>(Bone);
 }
 
 void FCharacterObject::SetFloorHeight(float Value)
@@ -631,7 +629,7 @@ void FCharacterObject::Update(double DeltaSeconds)
     {
         float const Time = static_cast<float>(DeltaSeconds);
         DALib::Anim->MixerWalk(static_cast<unsigned long>(
-                                   reinterpret_cast<uintptr_t>(GetEngineInstance())),
+                                   static_cast<uintptr_t>(GetEngineInstance())),
                                Time);
         void* TimeArg = nullptr;
         memcpy(&TimeArg, &Time, sizeof(Time));
@@ -661,18 +659,18 @@ void FCharacterObject::Update(double DeltaSeconds)
     // 0067dc64 centre, 0067dc70 / 0067dc74 scale, 0067dc9c znear), turned by its orientation
     // DAT_0067dbfc (FUN_00423b90).
     FSpaceCamera* const Cam = Win3DGetCamera();
-    FVector Local;
+    Vector Local;
     Win3DScreenToNearPlane(Cam, Local, static_cast<float>(Hotspot->ScreenRect.Left),
                            static_cast<float>(Hotspot->ScreenRect.Top + -0x1e));
-    FMatrix CamOrientation;
-    memcpy(&CamOrientation, Cam->World, sizeof(CamOrientation));
-    FVector World;
+    Matrix CamOrientation;
+    memcpy(&CamOrientation, &Cam->World, sizeof(CamOrientation));
+    Vector World;
     Win3DTransformByMatrix(World, CamOrientation, Local);
 
     // Normalised with the sum order (z^2 + x^2) + y^2; 1.0 is DAT_005c75dc.
-    double const X = World.X;
-    double const Y = World.Y;
-    double const Z = World.Z;
+    double const X = World.x;
+    double const Y = World.y;
+    double const Z = World.z;
     double const Inv = 1.0 / sqrt(Z * Z + X * X + Y * Y);
     Info.WorldPos[0] = static_cast<float>(X * Inv);
     Info.WorldPos[1] = static_cast<float>(Y * Inv);
@@ -688,17 +686,17 @@ void FCharacterObject::PickLods(ICamera* Camera)
 {
     // FUN_00444f90. The camera distance is 1.0 without an instance.
     float Distance = 1.0f;
-    void* const Instance = GetEngineInstance();
-    if (Instance != kNoInstance)
+    const InstanceIndex Instance = GetEngineInstance();
+    if (Instance != InvalidInstanceIndex)
     {
-        float const* const Where = DALib::Engine->GetInstancePosition(Instance);
-        float const X = Where[0];
-        float const Y = Where[1];
-        float const Z = Where[2];
-        float const* const Eye = Camera->GetPosition();
-        double const Dx = static_cast<double>(X) - Eye[0];
-        double const Dy = static_cast<double>(Y) - Eye[1];
-        double const Dz = static_cast<double>(Z) - Eye[2];
+        const Vector* const Where = DALib::Engine->GetInstancePosition(Instance);
+        float const X = Where->x;
+        float const Y = Where->y;
+        float const Z = Where->z;
+        const Vector* const Eye = Camera->GetPosition();
+        double const Dx = static_cast<double>(X) - Eye->x;
+        double const Dy = static_cast<double>(Y) - Eye->y;
+        double const Dz = static_cast<double>(Z) - Eye->z;
         Distance = static_cast<float>(sqrt(Dx * Dx + Dy * Dy + Dz * Dz));
     }
     float const HalfFov = Camera->GetHalfFovXDeg();
@@ -775,8 +773,8 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
         return;
     if (Camera == nullptr)
         return;
-    void* const Instance = GetEngineInstance();
-    if (Instance == kNoInstance)
+    const InstanceIndex Instance = GetEngineInstance();
+    if (Instance == InvalidInstanceIndex)
         return;
 
     PickLods(Camera);
@@ -787,7 +785,7 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
     float const Height = GetFloorHeight();
     unsigned long HeightBits = 0;
     memcpy(&HeightBits, &Height, sizeof(HeightBits));
-    RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
+    RoomControlDrawShadow(Owner, static_cast<unsigned long>(Instance),
                           HeightBits, 1);
     RoomControlLightObject(Owner, this); // FUN_0044ae80
     // The out int is an uninitialised stack slot in retail.
@@ -1068,7 +1066,7 @@ long FCharacterObject::FindPart(char const* PartName)
         Unused = 0;
 
     long const Part = CompoundInstanceFindFirstName(
-        static_cast<long>(reinterpret_cast<intptr_t>(GetEngineInstance())), PartName);
+        GetEngineInstance(), PartName);
     if (Part != -1)
     {
         FPartCacheEntry& Entry = Parts[Unused];

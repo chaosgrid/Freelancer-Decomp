@@ -48,7 +48,7 @@ struct FBillboardVertexCursor
 // One saved vertex, 0x18 bytes (batch +0x28 and +0x40).
 struct FBillboardSavedVertex
 {
-    float Pos[3];       // +0x00
+    Vector Pos;         // +0x00
     unsigned Color;     // +0x0c
     float U;            // +0x10
     float V;            // +0x14

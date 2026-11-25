@@ -329,7 +329,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         }
 
         // Camera position copied.
-        float const* const CamPosPtr = ((ICamera*)Cam)->GetPosition();
+        const float* const CamPosPtr = (const float*)((ICamera*)Cam)->GetPosition();
         float CamPos[3] = {CamPosPtr[0], CamPosPtr[1], CamPosPtr[2]};
 
         // Owner position copied.
@@ -456,15 +456,15 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             // DAT_00675194.
             float const Radius = Obj->Radius;
             ICamera* const Camera = (ICamera*)Cam;
-            FTransform const* const View = (FTransform const*)Camera->GetViewTransform();
+            Transform const* const View = Camera->GetViewTransform();
             if (G_SunRayMath == nullptr)
                 G_SunRayMath = Acquire3DMathEngine();
-            FVector ViewPos;
+            Vector ViewPos;
             G_SunRayMath->TransformXform(ViewPos, *View,
-                                         *reinterpret_cast<FVector const*>(&Obj->WorldPosition));
+                                         Obj->WorldPosition);
 
             // z <= -0.1f (DAT_005db538), or unordered, is kept.
-            float Z = ViewPos.Z;
+            float Z = ViewPos.z;
             if (Z > -0.1f)
                 Z = -0.1f;
 
@@ -505,7 +505,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
                                       float Dist, float Sx, float Sy)
     {
         float Dir[3];
-        Camera->Unproject(Dir, Sx, Sy);
+        Camera->Unproject((Vector*)Dir, Sx, Sy);
         double const Inv =
             1.0 / std::sqrt(static_cast<double>(Dir[0]) * Dir[0] +
                             static_cast<double>(Dir[1]) * Dir[1] +
@@ -588,11 +588,11 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
             Margin = 50.0f;
 
         // Distance stored as float.
-        float const* const CamPosPtr = Camera->GetPosition();
+        const Vector* const CamPosPtr = Camera->GetPosition();
         Vector CamPos{};
-        CamPos.x = CamPosPtr[0];
-        CamPos.y = CamPosPtr[1];
-        CamPos.z = CamPosPtr[2];
+        CamPos.x = CamPosPtr->x;
+        CamPos.y = CamPosPtr->y;
+        CamPos.z = CamPosPtr->z;
         float const* const SunPtr = OwnerGetWorldPos(Sphere->Owner);
         double const Dx = static_cast<double>(SunPtr[0]) - CamPos.x;
         double const Dy = static_cast<double>(SunPtr[1]) - CamPos.y;
@@ -1627,10 +1627,10 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         // The unit direction from the camera. The z difference is stored as a float and squared
         // against its stored copy; the others
         // stay on the FPU.
-        float const* const CamPos = Camera->GetPosition();
-        double const Dx = static_cast<double>(Pos[0]) - CamPos[0];
-        double const Dy = static_cast<double>(Pos[1]) - CamPos[1];
-        double const DzExt = static_cast<double>(Pos[2]) - CamPos[2];
+        const Vector* const CamPos = Camera->GetPosition();
+        double const Dx = static_cast<double>(Pos[0]) - CamPos->x;
+        double const Dy = static_cast<double>(Pos[1]) - CamPos->y;
+        double const DzExt = static_cast<double>(Pos[2]) - CamPos->z;
         float const DzF = static_cast<float>(DzExt);
         double const SumSq = DzExt * DzF + Dy * Dy + Dx * Dx;
         float const InvLen = static_cast<float>(1.0 / sqrt(SumSq));
@@ -1640,10 +1640,10 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
         // R = Dir x (m[1], m[4], m[7]) of the camera orientation,
         // normalised; the z term stays on the FPU through the length.
-        float const* const M = Camera->GetOrientation();
-        double const M1 = M[1];
-        double const M4 = M[4];
-        double const M7 = M[7];
+        const Matrix* const M = Camera->GetOrientation();
+        double const M1 = M->E[0][1];
+        double const M4 = M->E[1][1];
+        double const M7 = M->E[2][1];
         float const RxRaw = static_cast<float>(DirY * M7 - M4 * DirZ);
         float const RyRaw = static_cast<float>(DirZ * M1 - M7 * DirX);
         double const RzExt = M4 * DirX - DirY * M1;
@@ -1751,24 +1751,24 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
         // DAT_00675198 = 0.
         float const* const OwnerPos = OwnerGetWorldPos(this->Owner);
-        FVector LocalPos;
-        LocalPos.X = OwnerPos[0];
-        LocalPos.Y = OwnerPos[1];
-        LocalPos.Z = OwnerPos[2];
+        Vector LocalPos;
+        LocalPos.x = OwnerPos[0];
+        LocalPos.y = OwnerPos[1];
+        LocalPos.z = OwnerPos[2];
         float const Radius = this->Radius;
         G_SunRayQueryCount = 0;
 
         // +0x68 = the position in view space through the lazily acquired math engine
         // DAT_00675194.
-        FTransform const* const View =
-            reinterpret_cast<FTransform const*>(Camera->GetViewTransform());
+        Transform const* const View =
+            Camera->GetViewTransform();
         if (G_SunRayMath == nullptr)
             G_SunRayMath = Acquire3DMathEngine();
-        FVector ViewPos;
+        Vector ViewPos;
         G_SunRayMath->TransformXform(ViewPos, *View, LocalPos);
-        this->WorldPos[0] = ViewPos.X;
-        this->WorldPos[1] = ViewPos.Y;
-        this->WorldPos[2] = ViewPos.Z;
+        this->WorldPos[0] = ViewPos.x;
+        this->WorldPos[1] = ViewPos.y;
+        this->WorldPos[2] = ViewPos.z;
 
         // 1.0 is the double DAT_005c89b8.
         this->CoronaOcclusion =
@@ -1777,7 +1777,7 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
         // Project takes the untransformed position, not +0x68.
         FSunEffectBody* const Body = this->SunBody;
         if (static_cast<unsigned char>(Camera->Project(&this->ScreenX, &this->ScreenY,
-                                                       &this->ScreenDepth, &LocalPos.X)) == 0)
+                                                       &this->ScreenDepth, &LocalPos)) == 0)
         {
             // Off screen. Only an ordered +0x38 < 1 goes on; then every
             // corona slot goes through FUN_00512460(1.0, Dt/+0x2e8, Dt/+0x2ec, 1.0), both steps
@@ -1957,19 +1957,19 @@ static FStarFxChild40* AllocChild40(float MinRadius, float MaxRadius)
 
 // -------------------------------------------------------------------- FUN_004215b0
 
-void Win3DIdentityRotation3x3(float* Out9)
+void Win3DIdentityRotation3x3(Matrix* Out)
 {
-    if (Out9 == nullptr)
+    if (Out == nullptr)
         return;
-    Out9[0] = 1.0f;
-    Out9[1] = 0.0f;
-    Out9[2] = 0.0f;
-    Out9[3] = 0.0f;
-    Out9[4] = 1.0f;
-    Out9[5] = 0.0f;
-    Out9[6] = 0.0f;
-    Out9[7] = 0.0f;
-    Out9[8] = 1.0f;
+    Out->E[0][0] = 1.0f;
+    Out->E[0][1] = 0.0f;
+    Out->E[0][2] = 0.0f;
+    Out->E[1][0] = 0.0f;
+    Out->E[1][1] = 1.0f;
+    Out->E[1][2] = 0.0f;
+    Out->E[2][0] = 0.0f;
+    Out->E[2][1] = 0.0f;
+    Out->E[2][2] = 1.0f;
 }
 
 // -------------------------------------------------------------------- FUN_00422690
@@ -1980,30 +1980,30 @@ namespace
     I3DMathEngine* G_Win3DModelviewMath = nullptr;
 }
 
-void Win3DBindModelview(void* ObjectOrNull, float const* Matrix12)
+void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform)
 {
     // FUN_00422690. ObjectOrNull is a camera-shaped object: its vt+0x40 is the view transform
     // getter.
 
-    FTransform Local;
-    float const* Src = Matrix12;
+    Transform Local;
+    Transform const* Src = Xform;
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
     // Port-only: without a camera the matrix is the modelview as it stands (the Win3D camera
     // is the identity), so a shifted HUD window's shear goes onto it here.
     float Sheared[12];
-    if (ObjectOrNull == nullptr && WidescreenHudShearModelview(Matrix12, Sheared))
-        Src = Sheared;
+    if (ObjectOrNull == nullptr &&
+        WidescreenHudShearModelview(reinterpret_cast<float const*>(Xform), Sheared))
+        Src = reinterpret_cast<Transform const*>(Sheared);
 #endif
     if (ObjectOrNull != nullptr)
     {
-        // Local = MulTransform(view, Matrix12).
-        FTransform const* const View =
-            (FTransform const*)((ICamera*)ObjectOrNull)->GetViewTransform();
+        // Local = MulTransform(view, Xform).
+        Transform const* const View =
+            (Transform const*)((ICamera*)ObjectOrNull)->GetViewTransform();
         if (G_Win3DModelviewMath == nullptr)
             G_Win3DModelviewMath = Acquire3DMathEngine();
-        G_Win3DModelviewMath->MulTransform(Local, *View,
-                                           *reinterpret_cast<FTransform const*>(Matrix12));
-        Src = reinterpret_cast<float const*>(&Local);
+        G_Win3DModelviewMath->MulTransform(Local, *View, *Xform);
+        Src = &Local;
     }
 
     // Into DAT_006648dc.
@@ -2015,32 +2015,32 @@ void Win3DBindModelview(void* ObjectOrNull, float const* Matrix12)
     Pipe->GetPipelineState(kPipelineStateViewspace, &Viewspace);
     if (Viewspace != 0)
     {
-        Pipe->SetModelview(GWin3DModelview);
+        Pipe->SetModelview((const Transform*)GWin3DModelview);
         return;
     }
 
     if (ObjectOrNull != nullptr)
     {
         // SetView with a second view-transform call.
-        FTransform const* const View =
-            (FTransform const*)((ICamera*)ObjectOrNull)->GetViewTransform();
-        Pipe->SetView(reinterpret_cast<float const*>(View));
+        Transform const* const View =
+            (Transform const*)((ICamera*)ObjectOrNull)->GetViewTransform();
+        Pipe->SetView(View);
     }
     else
     {
         // Identity rotation, zero translation.
         float Ident[12];
-        Win3DIdentityRotation3x3(Ident);
+        Win3DIdentityRotation3x3(reinterpret_cast<Matrix*>(Ident));
         Ident[9] = 0.0f;
         Ident[10] = 0.0f;
         Ident[11] = 0.0f;
-        Pipe->SetView(Ident);
+        Pipe->SetView((const Transform*)Ident);
     }
-    // SetWorld with the caller's Matrix12, not the product.
+    // SetWorld with the caller's Xform, not the product.
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
-    Pipe->SetWorld(ObjectOrNull == nullptr ? Src : Matrix12);
+    Pipe->SetWorld(ObjectOrNull == nullptr ? Src : Xform);
 #else
-    Pipe->SetWorld(Matrix12);
+    Pipe->SetWorld(reinterpret_cast<float const*>(Xform));
 #endif
 }
 

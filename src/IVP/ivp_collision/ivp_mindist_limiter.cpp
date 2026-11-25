@@ -6,7 +6,7 @@
 
 // IVP_Ledge_Mindist / IVP_Complex_Mindist (Common.dll 0x06362620-0x063632b0
 // plus the base ctor/dtor FUN_0634dd10 / FUN_0634dd60), the IVP_Mindist_Manager
-// insert/remove/recalc family, IVP_RescheduleCollisionEvent (FUN_0634f320),
+// insert/remove/recalc family, IVP_Ledge_Mindist::RescheduleCollisionEvent (FUN_0634f320),
 // the contact-frame dispatcher (FUN_0635a1e0), the pair-record find-or-create
 // chain and the IVP_ListManager (friction system) members. See ivp_mindist.h
 // for the class layouts.
@@ -24,7 +24,7 @@
 #include "ivp_ledge_sweep_solver.h" // the collision-time estimator dispatch layer and its drivers
 #include "ivp_mindist_create.h" // IVP_Create_Exact_Mindists (FUN_0634e0b0), called by SpawnOrDeferChild (06362c70)
 #include "../ivp_physics/ivp_phantom.h" // IVP_Controller_Phantom (06350310 / 06350350)
-#include "../ivp_physics/ivp_contact_point.h" // IVP_Try_To_Generate_Managed_Friction (06356bc0)
+#include "../ivp_physics/ivp_contact_point.h" // IVP_Ledge_Mindist::try_to_generate_managed_friction (06356bc0)
 #include "ivp_mindist_minimize.h" // IVP_Mindist_Minimize_Solver: 06352cf0 / 06352b90 build it on the stack
 #include "ivp_compact_ledge_solver.h" // IVP_Compact_Ledge_Solver: the contact-frame leaves 06359850 / 06359ae0 and 0635a1e0
 #include "../ivp_physics/ivp_impact.h" // IVP_Mindist_Do_Impact (FUN_06358680), called by 06358cb0
@@ -72,7 +72,6 @@ namespace
 }
 
 // FUN_0634f320, defined below next to IVP_Ledge_Mindist::UpdatePerTick.
-void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar, int32_t EventMode);
 
 namespace
 {
@@ -439,7 +438,7 @@ IVP_ListManager::IVP_ListManager(IVP_Environment* EnvironmentIn)
 
 namespace
 {
-    // FUN_06356bc0 is IVP_Try_To_Generate_Managed_Friction (ivp_contact_point.cpp).
+    // FUN_06356bc0 is IVP_Ledge_Mindist::try_to_generate_managed_friction (ivp_contact_point.cpp).
     // FUN_06358ee0 is in ivp_physics/ivp_impact.cpp; its callees FUN_06358bb0
     // and FUN_06358c50 follow.
 
@@ -451,53 +450,53 @@ namespace
         return (*Base >> 0x18) & 0x7F;
     }
 
-    // FUN_06358bb0, thiscall (this = Candidate), RET 4. Per side: tag 0 ->
-    // the object's material (+0x8c); otherwise the environment material
-    // manager's get_material_by_index(nullptr, Tag). The `else` branch always
-    // uses Object1's environment (EBX is loaded once before the loop).
-    // Callers: 06353b50, 063562d0, 06358c50, 06359390.
 } // namespace
 
-void IVP_ResolvePairRecordSideMaterialSlots(IVP_Contact_Point* Candidate, IVP_Material** OutArray)
+// FUN_06358bb0, thiscall (this = the contact point), RET 4. Per side: tag 0 ->
+// the object's material (+0x8c); otherwise the environment material
+// manager's get_material_by_index(nullptr, Tag). The `else` branch always
+// uses Object1's environment (EBX is loaded once before the loop).
+// Callers: 06353b50, 063562d0, 06358c50, 06359390.
+void IVP_Contact_Point::ResolveSideMaterials(IVP_Material** OutArray)
+{
+    for (int Side = 0; Side < 2; ++Side)
     {
-        for (int Side = 0; Side < 2; ++Side)
-        {
-            IVP_Real_Object* SideObject = (Side == 0) ? Candidate->Object1 : Candidate->Object2;
-            void* SideFeature = (Side == 0) ? Candidate->Feature1 : Candidate->Feature2;
+        IVP_Real_Object* SideObject = (Side == 0) ? Object1 : Object2;
+        void* SideFeature = (Side == 0) ? Feature1 : Feature2;
 
-            const uint32_t Tag = IVP_ReadFeatureTag7(SideFeature);
-            if (Tag == 0)
-            {
-                OutArray[Side] = SideObject->material;
-            }
-            else
-            {
-                OutArray[Side] = Candidate->Object1->environment->l_material_manager
-                    ->get_material_by_index(nullptr, static_cast<int>(Tag));
-            }
+        const uint32_t Tag = IVP_ReadFeatureTag7(SideFeature);
+        if (Tag == 0)
+        {
+            OutArray[Side] = SideObject->material;
+        }
+        else
+        {
+            OutArray[Side] = Object1->environment->l_material_manager
+                ->get_material_by_index(nullptr, static_cast<int>(Tag));
         }
     }
+}
 
-    // FUN_06358c50, thiscall (this = Candidate), RET 4. The manager pointer
-    // is read once and used for both dispatches.
-    void IVP_PopulatePairRecordIntoOwner(IVP_Contact_Point* Candidate, IVP_Impact_Solver_Long_Term* Owner)
-    {
-        IVP_Real_Object* Object1 = Candidate->Object1;
-        IVP_Real_Object* Object2 = Candidate->Object2;
+// FUN_06358c50, thiscall (this = the contact point), RET 4. The manager pointer
+// is read once and used for both dispatches.
+void IVP_Contact_Point::PopulateOwner(IVP_Impact_Solver_Long_Term* Owner)
+{
+    IVP_Real_Object* ObjectA = this->Object1;
+    IVP_Real_Object* ObjectB = this->Object2;
 
-        IVP_ResolvePairRecordSideMaterialSlots(Candidate, Owner->Materials);
+    ResolveSideMaterials(Owner->Materials);
 
-        Owner->Objects[0] = Object1;
-        Owner->Objects[1] = Object2;
-        Owner->Feature0 = Candidate->Feature1;
-        Owner->Feature1 = Candidate->Feature2;
+    Owner->Objects[0] = ObjectA;
+    Owner->Objects[1] = ObjectB;
+    Owner->Feature0 = this->Feature1;
+    Owner->Feature1 = this->Feature2;
 
-        // Slot 2 (elasticity) into Owner+0x60, then slot 1 (friction) into
-        // Candidate+0x44.
-        IVP_Material_Manager* Manager = Object1->environment->l_material_manager;
-        Owner->ContactElasticity = Manager->get_elasticity(Owner);
-        Candidate->FrictionCoefficient = Manager->get_friction_factor(Owner);
-    }
+    // Slot 2 (elasticity) into Owner+0x60, then slot 1 (friction) into
+    // this+0x44.
+    IVP_Material_Manager* Manager = ObjectA->environment->l_material_manager;
+    Owner->ContactElasticity = Manager->get_elasticity(Owner);
+    this->FrictionCoefficient = Manager->get_friction_factor(Owner);
+}
 
 namespace
 {
@@ -746,9 +745,9 @@ namespace
     }
 
     // FUN_06359d10, the edge vs edge leaf (first switch's case 1), is
-    // IVP_Contact_Point_Calc_Friction_Edge_Edge in ivp_contact_point.cpp.
+    // IVP_Contact_Point::CalcFrictionEdgeEdge in ivp_contact_point.cpp.
 
-} // namespace -- IVP_UpdatePairRecordContactFrame has external linkage
+} // namespace -- IVP_Contact_Point::UpdateContactFrame has external linkage
   // (ivp_friction_solver.cpp calls it too).
 
 // ---------------------------------------------------------------------------
@@ -770,30 +769,30 @@ namespace
 //     (rec+0x38 / +0x3c) is advanced by the tangential relative speed times
 //     the time since the record's stamp, and the stamp is renewed.
 // ---------------------------------------------------------------------------
-void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
+void IVP_Contact_Point::UpdateContactFrame()
 {
-    IVP_Impact_Solver_Long_Term* const Owner = IVP_AllocatePairRecordOwner(Candidate);
+    IVP_Impact_Solver_Long_Term* const NewOwner = IVP_AllocatePairRecordOwner(this);
 
-    const int32_t ShapeTag1 = static_cast<int8_t>(static_cast<uint8_t>(Candidate->Status1 & 0xFFu));
-    const int32_t ShapeTag2 = static_cast<int8_t>(static_cast<uint8_t>(Candidate->Status2 & 0xFFu));
+    const int32_t ShapeTag1 = static_cast<int8_t>(static_cast<uint8_t>(Status1 & 0xFFu));
+    const int32_t ShapeTag2 = static_cast<int8_t>(static_cast<uint8_t>(Status2 & 0xFFu));
     Vector Situation = { 0.0f, 0.0f, 0.0f };
 
-    IVP_Compact_Edge* const Edge2 = static_cast<IVP_Compact_Edge*>(Candidate->Feature2);
+    IVP_Compact_Edge* const Edge2 = Feature2;
     IVP_Cache_Ledge_Point Cache2;
     Cache2.compact_ledge = Edge2->GetCompactLedge();
-    Cache2.cache_object = Candidate->Object2->ResolveNarrowPhaseCacheSlot(); // FUN_06353510
-    Cache2.object = Candidate->Object2;
+    Cache2.cache_object = Object2->ResolveNarrowPhaseCacheSlot(); // FUN_06353510
+    Cache2.object = Object2;
     Cache2.compact_poly_points = Cache2.compact_ledge->GetPointArray();
     // The library's friction synapse (record+0x1c); none of the leaves reads it.
-    Cache2.synapse = reinterpret_cast<IVP_Synapse_Real*>(&Candidate->Next2);
+    Cache2.synapse = reinterpret_cast<IVP_Synapse_Real*>(&Next2);
 
-    IVP_Compact_Edge* const Edge1 = static_cast<IVP_Compact_Edge*>(Candidate->Feature1);
+    IVP_Compact_Edge* const Edge1 = Feature1;
     IVP_Cache_Ledge_Point Cache1;
     Cache1.compact_ledge = Edge1->GetCompactLedge();
-    Cache1.cache_object = Candidate->Object1->ResolveNarrowPhaseCacheSlot();
-    Cache1.object = Candidate->Object1;
+    Cache1.cache_object = Object1->ResolveNarrowPhaseCacheSlot();
+    Cache1.object = Object1;
     Cache1.compact_poly_points = Cache1.compact_ledge->GetPointArray();
-    Cache1.synapse = reinterpret_cast<IVP_Synapse_Real*>(&Candidate->Next1); // record+0x8
+    Cache1.synapse = reinterpret_cast<IVP_Synapse_Real*>(&Next1); // record+0x8
 
     IVP_U_Point PointA; // local_38
     IVP_U_Point PointB; // local_68
@@ -804,14 +803,14 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
         IVP_Compact_Ledge_Solver::give_world_coords_AT(Edge1, &Cache1, &PointA);
         break;
     case 1:
-        IVP_Contact_Point_Calc_Friction_Edge_Edge(Candidate, Edge1, Edge2, &Cache1, &Cache2, Owner, &Situation);
+        CalcFrictionEdgeEdge(Edge1, Edge2, &Cache1, &Cache2, NewOwner, &Situation);
         bSecondSwitch = false;
         break;
     case 3:
         PointA.x = Cache1.cache_object->WorldTransform.vv.x;
         PointA.y = Cache1.cache_object->WorldTransform.vv.y;
         PointA.z = Cache1.cache_object->WorldTransform.vv.z;
-        Candidate->RecheckFeatureFlags = (Candidate->RecheckFeatureFlags & 0xFFFFFF01u) | 0x1u;
+        RecheckFeatureFlags = (RecheckFeatureFlags & 0xFFFFFF01u) | 0x1u;
         break;
     default:
         // The library's CORE trap; retail then runs the tail.
@@ -826,16 +825,16 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
         {
         case 0:
             IVP_Compact_Ledge_Solver::give_world_coords_AT(Edge2, &Cache2, &PointB);
-            IVP_BuildPointPointContactFrame(Candidate, &PointA, &PointB, Owner, &Situation);
+            IVP_BuildPointPointContactFrame(this, &PointA, &PointB, NewOwner, &Situation);
             break;
         case 1:
-            IVP_BuildPointEdgeContactFrame(Candidate, &PointA, Edge2, &Cache2, Owner, &Situation);
+            IVP_BuildPointEdgeContactFrame(this, &PointA, Edge2, &Cache2, NewOwner, &Situation);
             break;
         case 2:
-            IVP_BuildPointPolyContactFrame(Candidate, &PointA, Edge2, &Cache2, Owner, &Situation);
+            IVP_BuildPointPolyContactFrame(this, &PointA, Edge2, &Cache2, NewOwner, &Situation);
             break;
         case 3:
-            IVP_BuildPointPointContactFrame(Candidate, &PointA, &Cache2.cache_object->WorldTransform.vv, Owner, &Situation);
+            IVP_BuildPointPointContactFrame(this, &PointA, &Cache2.cache_object->WorldTransform.vv, NewOwner, &Situation);
             break;
         default:
             IVP_CoreTrap();
@@ -844,54 +843,54 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
     }
 
     // FUN_0628be60(dst = base = &SolverContactPointWS, dir = &ContactNormalWS, r1).
-    const float Radius1 = Candidate->Object1->extra_radius;
-    Owner->SolverContactPointWS.y = (float)((double)(Radius1) * Owner->ContactNormalWS.y + Owner->SolverContactPointWS.y);
-    Owner->SolverContactPointWS.z = (float)((double)(Radius1) * Owner->ContactNormalWS.z + Owner->SolverContactPointWS.z);
-    Owner->SolverContactPointWS.x = (float)((double)(Radius1) * Owner->ContactNormalWS.x + Owner->SolverContactPointWS.x);
+    const float Radius1 = Object1->extra_radius;
+    NewOwner->SolverContactPointWS.y = (float)((double)(Radius1) * NewOwner->ContactNormalWS.y + NewOwner->SolverContactPointWS.y);
+    NewOwner->SolverContactPointWS.z = (float)((double)(Radius1) * NewOwner->ContactNormalWS.z + NewOwner->SolverContactPointWS.z);
+    NewOwner->SolverContactPointWS.x = (float)((double)(Radius1) * NewOwner->ContactNormalWS.x + NewOwner->SolverContactPointWS.x);
 
-    const double SurfaceGap = (double)(Candidate->GapDistance) -
-                              ((double)(Candidate->Object2->extra_radius) + Radius1);
-    Candidate->GapDistance = (float)(SurfaceGap);
+    const double SurfaceGap = (double)(GapDistance) -
+                              ((double)(Object2->extra_radius) + Radius1);
+    GapDistance = (float)(SurfaceGap);
     if (!(SurfaceGap >= 0.0))
-        Candidate->GapDistance = 0.0f;
+        GapDistance = 0.0f;
 
     --Cache1.cache_object->RefCount;
     --Cache2.cache_object->RefCount;
 
-    IVP_ContactFrameSlotAsPoint(&Owner->TangentAxis0)->normize(); // FUN_06347ef0
+    IVP_ContactFrameSlotAsPoint(&NewOwner->TangentAxis0)->normize(); // FUN_06347ef0
 
     // TangentAxis1 = n x t0.
-    const Vector& Normal = Owner->ContactNormalWS;
-    const Vector& Tangent0 = Owner->TangentAxis0;
-    Owner->TangentAxis1.x = (float)((double)(Normal.y) * Tangent0.z - (double)(Tangent0.y) * Normal.z);
-    Owner->TangentAxis1.y = (float)((double)(Normal.z) * Tangent0.x - (double)(Normal.x) * Tangent0.z);
-    Owner->TangentAxis1.z = (float)((double)(Tangent0.y) * Normal.x - (double)(Normal.y) * Tangent0.x);
+    const Vector& Normal = NewOwner->ContactNormalWS;
+    const Vector& Tangent0 = NewOwner->TangentAxis0;
+    NewOwner->TangentAxis1.x = (float)((double)(Normal.y) * Tangent0.z - (double)(Tangent0.y) * Normal.z);
+    NewOwner->TangentAxis1.y = (float)((double)(Normal.z) * Tangent0.x - (double)(Normal.x) * Tangent0.z);
+    NewOwner->TangentAxis1.z = (float)((double)(Tangent0.y) * Normal.x - (double)(Normal.y) * Tangent0.x);
 
     Vector RelativeSpeed; // local_58
 
     // ---- side 1, object1's core ----
-    IVP_Core* const Core0 = Candidate->Object1->core;
+    IVP_Core* const Core0 = Object1->core;
     if ((*reinterpret_cast<const uint8_t*>(Core0) & 0x0Cu) != 0)
     {
         RelativeSpeed.x = 0.0f;
         RelativeSpeed.y = 0.0f;
         RelativeSpeed.z = 0.0f;
-        Owner->EffectiveMassDenom = 0.0f;
-        Owner->CoordOS[0].x = 0.0f;
-        Owner->CoordOS[0].y = 0.0f;
-        Owner->CoordOS[0].z = 0.0f;
-        Owner->CoordOSCrossNormal[0].x = 0.0f;
-        Owner->CoordOSCrossNormal[0].y = 0.0f;
-        Owner->CoordOSCrossNormal[0].z = 0.0f;
-        Owner->ContactCores[0] = nullptr;
+        NewOwner->EffectiveMassDenom = 0.0f;
+        NewOwner->CoordOS[0].x = 0.0f;
+        NewOwner->CoordOS[0].y = 0.0f;
+        NewOwner->CoordOS[0].z = 0.0f;
+        NewOwner->CoordOSCrossNormal[0].x = 0.0f;
+        NewOwner->CoordOSCrossNormal[0].y = 0.0f;
+        NewOwner->CoordOSCrossNormal[0].z = 0.0f;
+        NewOwner->ContactCores[0] = nullptr;
     }
     else
     {
         const IVP_U_Matrix& M = Core0->MWorldFCore;
-        const double Dx = (double)(Owner->SolverContactPointWS.x) - M.vv.x;
-        const double Dy = (double)(Owner->SolverContactPointWS.y) - M.vv.y;
-        const double Dz = (double)(Owner->SolverContactPointWS.z) - M.vv.z;
-        Vector& Coord = Owner->CoordOS[0];
+        const double Dx = (double)(NewOwner->SolverContactPointWS.x) - M.vv.x;
+        const double Dy = (double)(NewOwner->SolverContactPointWS.y) - M.vv.y;
+        const double Dz = (double)(NewOwner->SolverContactPointWS.z) - M.vv.z;
+        Vector& Coord = NewOwner->CoordOS[0];
         Coord.x = (float)((M.rows[1].x * Dy + M.rows[2].x * Dz) + M.rows[0].x * Dx);
         Coord.y = (float)((M.rows[1].y * Dy + M.rows[2].y * Dz) + M.rows[0].y * Dx);
         Coord.z = (float)((M.rows[1].z * Dy + M.rows[2].z * Dz) + M.rows[0].z * Dx);
@@ -906,41 +905,41 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
 
         const float CrossZa = (float)((double)(NormalOSy) * Coord.x);
         const float CrossZb = (float)(NormalOSx * Coord.y);
-        Owner->CoordOSCrossNormal[0].x = (float)((double)(NormalOSz) * Coord.y - (double)(NormalOSy) * Coord.z);
-        Owner->CoordOSCrossNormal[0].y = (float)(NormalOSx * Coord.z - (double)(NormalOSz) * Coord.x);
-        Owner->CoordOSCrossNormal[0].z = (float)((double)(CrossZa) - CrossZb);
+        NewOwner->CoordOSCrossNormal[0].x = (float)((double)(NormalOSz) * Coord.y - (double)(NormalOSy) * Coord.z);
+        NewOwner->CoordOSCrossNormal[0].y = (float)(NormalOSx * Coord.z - (double)(NormalOSz) * Coord.x);
+        NewOwner->CoordOSCrossNormal[0].z = (float)((double)(CrossZa) - CrossZb);
 
-        Core0->calc_point_speed_ws(static_cast<const Vector*>(&Owner->CoordOS[0]), &Core0->Speed, &Core0->RotSpeed,
+        Core0->calc_point_speed_ws(static_cast<const Vector*>(&NewOwner->CoordOS[0]), &Core0->Speed, &Core0->RotSpeed,
                                    &RelativeSpeed); // FUN_063461a0
 
-        const Vector& Cross = Owner->CoordOSCrossNormal[0];
-        Owner->EffectiveMassDenom = (float)(
+        const Vector& Cross = NewOwner->CoordOSCrossNormal[0];
+        NewOwner->EffectiveMassDenom = (float)(
             (((double)(Cross.z) * Core0->InvRotInertia.z * Cross.z +
               (double)(Cross.y) * Core0->InvRotInertia.y * Cross.y) +
              (double)(Cross.x) * Core0->InvRotInertia.x * Cross.x) +
             Core0->InvMass);
-        Owner->ContactCores[0] = Core0;
+        NewOwner->ContactCores[0] = Core0;
     }
 
     // ---- side 2, object2's core: the same with its own operand order ----
-    IVP_Core* const Core1 = Candidate->Object2->core;
+    IVP_Core* const Core1 = Object2->core;
     if ((*reinterpret_cast<const uint8_t*>(Core1) & 0x0Cu) != 0)
     {
-        Owner->CoordOS[1].x = 0.0f;
-        Owner->CoordOS[1].y = 0.0f;
-        Owner->CoordOS[1].z = 0.0f;
-        Owner->CoordOSCrossNormal[1].x = 0.0f;
-        Owner->CoordOSCrossNormal[1].y = 0.0f;
-        Owner->CoordOSCrossNormal[1].z = 0.0f;
-        Owner->ContactCores[1] = nullptr;
+        NewOwner->CoordOS[1].x = 0.0f;
+        NewOwner->CoordOS[1].y = 0.0f;
+        NewOwner->CoordOS[1].z = 0.0f;
+        NewOwner->CoordOSCrossNormal[1].x = 0.0f;
+        NewOwner->CoordOSCrossNormal[1].y = 0.0f;
+        NewOwner->CoordOSCrossNormal[1].z = 0.0f;
+        NewOwner->ContactCores[1] = nullptr;
     }
     else
     {
         const IVP_U_Matrix& M = Core1->MWorldFCore;
-        const double Dx = (double)(Owner->SolverContactPointWS.x) - M.vv.x;
-        const double Dy = (double)(Owner->SolverContactPointWS.y) - M.vv.y;
-        const double Dz = (double)(Owner->SolverContactPointWS.z) - M.vv.z;
-        Vector& Coord = Owner->CoordOS[1];
+        const double Dx = (double)(NewOwner->SolverContactPointWS.x) - M.vv.x;
+        const double Dy = (double)(NewOwner->SolverContactPointWS.y) - M.vv.y;
+        const double Dz = (double)(NewOwner->SolverContactPointWS.z) - M.vv.z;
+        Vector& Coord = NewOwner->CoordOS[1];
         Coord.x = (float)((M.rows[2].x * Dz + M.rows[1].x * Dy) + M.rows[0].x * Dx);
         Coord.y = (float)((M.rows[0].y * Dx + M.rows[1].y * Dy) + M.rows[2].y * Dz);
         Coord.z = (float)((M.rows[2].z * Dz + M.rows[0].z * Dx) + M.rows[1].z * Dy);
@@ -954,43 +953,43 @@ void IVP_UpdatePairRecordContactFrame(IVP_Contact_Point* Candidate)
 
         const float CrossZa = (float)((double)(NormalOSy) * Coord.x);
         const float CrossZb = (float)(NormalOSx * Coord.y);
-        Owner->CoordOSCrossNormal[1].x = (float)((double)(NormalOSz) * Coord.y - (double)(NormalOSy) * Coord.z);
-        Owner->CoordOSCrossNormal[1].y = (float)(NormalOSx * Coord.z - (double)(NormalOSz) * Coord.x);
-        Owner->CoordOSCrossNormal[1].z = (float)((double)(CrossZa) - CrossZb);
+        NewOwner->CoordOSCrossNormal[1].x = (float)((double)(NormalOSz) * Coord.y - (double)(NormalOSy) * Coord.z);
+        NewOwner->CoordOSCrossNormal[1].y = (float)(NormalOSx * Coord.z - (double)(NormalOSz) * Coord.x);
+        NewOwner->CoordOSCrossNormal[1].z = (float)((double)(CrossZa) - CrossZb);
 
         Vector PointSpeed1; // local_38
-        Core1->calc_point_speed_ws(static_cast<const Vector*>(&Owner->CoordOS[1]), &Core1->Speed, &Core1->RotSpeed,
+        Core1->calc_point_speed_ws(static_cast<const Vector*>(&NewOwner->CoordOS[1]), &Core1->Speed, &Core1->RotSpeed,
                                    &PointSpeed1); // FUN_063461a0
         // FUN_0628bea0: RelativeSpeed -= PointSpeed1.
         RelativeSpeed.y = (float)((double)(RelativeSpeed.y) - PointSpeed1.y);
         RelativeSpeed.z = (float)((double)(RelativeSpeed.z) - PointSpeed1.z);
         RelativeSpeed.x = (float)((double)(RelativeSpeed.x) - PointSpeed1.x);
 
-        const Vector& Cross = Owner->CoordOSCrossNormal[1];
-        Owner->EffectiveMassDenom = (float)(
+        const Vector& Cross = NewOwner->CoordOSCrossNormal[1];
+        NewOwner->EffectiveMassDenom = (float)(
             ((((double)(Core1->InvRotInertia.z) * Cross.z * Cross.z +
                (double)(Cross.y) * Core1->InvRotInertia.y * Cross.y) +
               (double)(Core1->InvRotInertia.x) * Cross.x * Cross.x) +
              Core1->InvMass) +
-            Owner->EffectiveMassDenom);
-        Owner->ContactCores[1] = Core1;
+            NewOwner->EffectiveMassDenom);
+        NewOwner->ContactCores[1] = Core1;
     }
 
-    Owner->EffectiveMassDenomRecip = (float)(1.0 / (double)(Owner->EffectiveMassDenom)); // DAT_063a53d0 = 1.0f
+    NewOwner->EffectiveMassDenomRecip = (float)(1.0 / (double)(NewOwner->EffectiveMassDenom)); // DAT_063a53d0 = 1.0f
 
-    IVP_Environment* const Env = Candidate->Object1->environment;
+    IVP_Environment* const Env = Object1->environment;
     const float NowBase = Env->current_time.time_base;
     const float NowOffset = Env->current_time.time_offset;
-    const double DeltaTime = (((double)(NowBase) - Candidate->LastRecalcTimeBase) + NowOffset) - Candidate->LastRecalcTimeOffset;
-    Candidate->LastRecalcTimeBase = NowBase;
-    Candidate->LastRecalcTimeOffset = NowOffset;
+    const double DeltaTime = (((double)(NowBase) - LastRecalcTimeBase) + NowOffset) - LastRecalcTimeOffset;
+    LastRecalcTimeBase = NowBase;
+    LastRecalcTimeOffset = NowOffset;
 
-    const double Slip0 = ((double)(RelativeSpeed.z) * Owner->TangentAxis0.z + (double)(RelativeSpeed.y) * Owner->TangentAxis0.y) +
-                         (double)(RelativeSpeed.x) * Owner->TangentAxis0.x;
-    Candidate->SpanFrictionS[0] = (float)((double)(Candidate->SpanFrictionS[0]) - Slip0 * DeltaTime);
-    const double Slip1 = ((double)(RelativeSpeed.z) * Owner->TangentAxis1.z + (double)(RelativeSpeed.y) * Owner->TangentAxis1.y) +
-                         (double)(RelativeSpeed.x) * Owner->TangentAxis1.x;
-    Candidate->SpanFrictionS[1] = (float)((double)(Candidate->SpanFrictionS[1]) - Slip1 * DeltaTime);
+    const double Slip0 = ((double)(RelativeSpeed.z) * NewOwner->TangentAxis0.z + (double)(RelativeSpeed.y) * NewOwner->TangentAxis0.y) +
+                         (double)(RelativeSpeed.x) * NewOwner->TangentAxis0.x;
+    SpanFrictionS[0] = (float)((double)(SpanFrictionS[0]) - Slip0 * DeltaTime);
+    const double Slip1 = ((double)(RelativeSpeed.z) * NewOwner->TangentAxis1.z + (double)(RelativeSpeed.y) * NewOwner->TangentAxis1.y) +
+                         (double)(RelativeSpeed.x) * NewOwner->TangentAxis1.x;
+    SpanFrictionS[1] = (float)((double)(SpanFrictionS[1]) - Slip1 * DeltaTime);
 }
 
 
@@ -1496,7 +1495,7 @@ void IVP_Mindist_Manager::insert_exact_mindist(IVP_Ledge_Mindist* Mindist)
     // `< 0x21000000` -- the signed low byte of the OR (ivp_signed_byte.h).
     const int32_t Movement = IVP_SignedLowByte(
         Mindist->synapse[1].l_obj->core->MovementState | Mindist->synapse[0].l_obj->core->MovementState);
-    IVP_RescheduleCollisionEvent(Mindist, (Movement < 0x21) ? 1 : 0, 0);
+    Mindist->RescheduleCollisionEvent((Movement < 0x21) ? 1 : 0, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -1522,7 +1521,7 @@ void IVP_Mindist_Manager::insert_lazy_mindist(IVP_Ledge_Mindist* Mindist)
             if ((Mindist->StateFlags & 0xc00u) != 0)
                 IVP_RemoveMindistFromPhantoms(Mindist);
             insert_exact_mindist_no_recalc(Mindist);
-            IVP_RescheduleCollisionEvent(Mindist, 1, 2);
+            Mindist->RescheduleCollisionEvent(1, 2);
             return;
         }
         Slack = -Mindist->SeparationGap;
@@ -1743,7 +1742,7 @@ namespace
         IVP_ListManager* FrictionSystem = nullptr;
         int32_t HavingNew = 0;
         IVP_Contact_Point* const Cp =
-            IVP_Try_To_Generate_Managed_Friction(Mindist, &FrictionSystem, &HavingNew, nullptr, 1);
+            Mindist->try_to_generate_managed_friction(&FrictionSystem, &HavingNew, nullptr, 1);
         if (HavingNew == 1)
         {
             IVP_Contact_Point* const Old = reinterpret_cast<IVP_Contact_Point*>(
@@ -1753,7 +1752,7 @@ namespace
             IVP_Environment* const Env = Object->environment;
             std::memcpy(&Old->LastRecalcTimeBase, &Env->current_time.time_base, sizeof(float));   // raw dword copy
             std::memcpy(&Old->LastRecalcTimeOffset, &Env->current_time.time_offset, sizeof(float));
-            IVP_UpdatePairRecordContactFrame(Old); // FUN_0635a1e0
+            Old->UpdateContactFrame(); // FUN_0635a1e0
 
             Cp->NowFrictionPressure = Old->NowFrictionPressure;
             Old->NowFrictionPressure = 0.0f;
@@ -1838,13 +1837,13 @@ void IVP_Mindist_Manager::recalc_all_exact_mindists_events()
     while (Mindist != nullptr)
     {
         IVP_Ledge_Mindist* Next = Mindist->ManagerNext;
-        IVP_RescheduleCollisionEvent(Mindist, 1, 1);
+        Mindist->RescheduleCollisionEvent(1, 1);
         Mindist = Next;
     }
 }
 
 // ---------------------------------------------------------------------------
-// FUN_0634f320 -- IVP_RescheduleCollisionEvent (port name)
+// FUN_0634f320 -- IVP_Ledge_Mindist::RescheduleCollisionEvent (port name)
 // ---------------------------------------------------------------------------
 // Thiscall, RET 0x8. RearmWhenFar is the first stack argument. Call sites:
 // UpdatePerTick (:0634fea2 / :0634feb1, (0, 2) / (0, 1)), :06344f98,
@@ -1853,20 +1852,20 @@ void IVP_Mindist_Manager::recalc_all_exact_mindists_events()
 // Retail reuses the first argument's slot as float scratch from :0634f4a3
 // (RearmWhenFar is live only at :0634f3ee) and the second's (:0634f69b) to
 // cache Env->delta_time; EventMode is read once, at :0634f621.
-void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar, int32_t EventMode)
+void IVP_Ledge_Mindist::RescheduleCollisionEvent(int32_t RearmWhenFar, int32_t EventMode)
 {
     // 1. `XOR EAX,0x100` flips bit 8 only, so the indices are always i and
     //    i^1 (synapse slots at this + 0x28 + index*0x1c). No null tests.
-    const uint32_t FlagsAtEntry = This->StateFlags;
+    const uint32_t FlagsAtEntry = StateFlags;
     const int32_t SideI = static_cast<int32_t>((FlagsAtEntry >> 8) & 3u);
     const int32_t SideJ = static_cast<int32_t>(((FlagsAtEntry ^ 0x100u) >> 8) & 3u);
 
-    IVP_Real_Object* const ObjectI = This->synapse[SideI].l_obj;
-    IVP_Real_Object* const ObjectJ = This->synapse[SideJ].l_obj;
+    IVP_Real_Object* const ObjectI = synapse[SideI].l_obj;
+    IVP_Real_Object* const ObjectJ = synapse[SideJ].l_obj;
 
     const IVP_Core* const CoreI = ObjectI->core; // retail EDI
     const IVP_Core* const CoreJ = ObjectJ->core; // retail EBX
-    IVP_Environment* const Env = This->synapse[0].l_obj->environment; // retail EBP -- slot 0, NOT SideI
+    IVP_Environment* const Env = synapse[0].l_obj->environment; // retail EBP -- slot 0, NOT SideI
 
     // 2. Each sum rounded once. DAT_063a561c = 2e-10f.
     const float SurfaceRotSpeedSum = (float)((double)(CoreI->MaxSurfaceRotSpeed) + CoreJ->MaxSurfaceRotSpeed);
@@ -1874,19 +1873,19 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
         (((double)(CoreJ->CurrentSpeed) + CoreI->CurrentSpeed) + SurfaceRotSpeedSum) + 2.0e-10f);
 
     // 3. De-queue whatever slot this pair holds (env+0x04, FUN_063609f0).
-    if (This->EventQueueHandle != 0xffff)
+    if (EventQueueHandle != 0xffff)
     {
-        Env->sim_unit_manager->CancelEvent(This->EventQueueHandle); // FUN_063609f0
-        This->EventQueueHandle = 0xffff;
+        Env->sim_unit_manager->CancelEvent(EventQueueHandle); // FUN_063609f0
+        EventQueueHandle = 0xffff;
     }
 
     // 4. COARSE GATE (:0634f3ae): threshold < gap, or unordered, is the FAR
     //    case. DAT_063a5618 = 2.1f. The ramp value is reused at :0634f406.
-    const uint32_t FlagsAfterDequeue = This->StateFlags; // re-read
+    const uint32_t FlagsAfterDequeue = StateFlags; // re-read
     const uint32_t ToleranceIndex = (FlagsAfterDequeue >> 22) & 0xffu;
     const float ToleranceValue = IVP_ToleranceRamp(ToleranceIndex);
     const double CoarseThreshold = (((double)(Env->delta_time) * MaxSpeedSum) * 2.1f) + ToleranceValue;
-    const float Gap = This->SeparationGap;
+    const float Gap = SeparationGap;
 
     if (!(CoarseThreshold >= (double)(Gap)))
     {
@@ -1894,14 +1893,14 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
         //    watchdog so the pair wakes once the objects close by that much.
         if (RearmWhenFar == 0)
             return;
-        Env->mindist_manager->DetachMindist(This); // FUN_0634fec0
-        IVP_DistributeHullSlack(This, (float)((double)(This->SeparationGap) - ToleranceValue));
+        Env->mindist_manager->DetachMindist(this); // FUN_0634fec0
+        IVP_DistributeHullSlack(this, (float)((double)(SeparationGap) - ToleranceValue));
         return;
     }
 
     // 6. CLOSING-SPEED BOUND, retail's operand order. DAT_063a5614 = 1.001f.
     //    SpinI stays on the stack; SpinJ is spilled as a float.
-    const Vector& N = This->SeparatingNormal;
+    const Vector& N = SeparatingNormal;
     const double DotSpeedJ = ((double)(N.z) * CoreJ->Speed.z + (double)(N.y) * CoreJ->Speed.y) +
                              (double)(CoreJ->Speed.x) * N.x;
     const double DotSpeedI = ((double)(N.z) * CoreI->Speed.z + (double)(N.y) * CoreI->Speed.y) +
@@ -1946,23 +1945,23 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
         {
             // In-place DECREMENT of the 8-bit tolerance index in bits 22-29
             // (fresh read of +0x14); wraps at zero, as retail does.
-            const uint32_t S = This->StateFlags;
+            const uint32_t S = StateFlags;
             uint32_t Updated = (S & 0xffc00000u) - 1u;
             Updated ^= S;
             Updated &= 0x3fc00000u;
             Updated ^= S;
-            This->StateFlags = Updated;
+            StateFlags = Updated;
             Counter = 0;
         }
     }
 
     // 9. THE DISPATCH. StateFlags re-read (step 8 may have changed it);
     //    index = ShapeType[j] + ShapeType[i]*4.
-    const uint32_t FlagsAtDispatch = This->StateFlags;
+    const uint32_t FlagsAtDispatch = StateFlags;
     const int32_t DispatchJ = static_cast<int32_t>(((FlagsAtDispatch ^ 0x100u) >> 8) & 3u);
     const int32_t DispatchI = static_cast<int32_t>((FlagsAtDispatch >> 8) & 3u);
-    const int32_t ShapeJ = This->synapse[DispatchJ].status;
-    const int32_t ShapeI = This->synapse[DispatchI].status;
+    const int32_t ShapeJ = synapse[DispatchJ].status;
+    const int32_t ShapeI = synapse[DispatchI].status;
 
     // The context on retail's frame at ESP+0x20.
     IVP_Sweep_Estimator_Context Ctx;
@@ -1970,7 +1969,7 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
     Ctx.RelativeSpeed = RelativeSpeed;
     Ctx.ClosingBound = ClosingBound;
     Ctx.MaxSpeedSum = MaxSpeedSum;
-    Ctx.Mindist = This;
+    Ctx.Mindist = this;
     Ctx.Env = Env;
     Ctx.NowBase = NowHi;
     Ctx.NowOffset = NowLo;
@@ -1979,8 +1978,8 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
     // DEVIATION (no behavioural difference): retail leaves +0x28..+0x30
     // uninitialised (every handler zeroes OutCode itself).
     Ctx.OutCode = 0;
-    Ctx.OutEventBase = 0.0f;
-    Ctx.OutEventOffset = 0.0f;
+    Ctx.OutEvent.time_base = 0.0f;
+    Ctx.OutEvent.time_offset = 0.0f;
 
     IVP_InvokeSweepEstimator(ShapeJ + ShapeI * 4, &Ctx);
 
@@ -1988,11 +1987,11 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
         return;
 
     // 10. RESULT POST-PROCESSING. DAT_063a5610 = 1e-6f.
-    float EventHi = Ctx.OutEventBase;
-    float EventLo = Ctx.OutEventOffset;
+    float EventHi = Ctx.OutEvent.time_base;
+    float EventLo = Ctx.OutEvent.time_offset;
 
     // Not-less enqueues as is; less or unordered goes on.
-    const double RawLead = (((double)(Ctx.OutEventBase) - Ctx.NowBase) + Ctx.OutEventOffset) - Ctx.NowOffset;
+    const double RawLead = (((double)(Ctx.OutEvent.time_base) - Ctx.NowBase) + Ctx.OutEvent.time_offset) - Ctx.NowOffset;
     if (RawLead >= 1.0e-6f)
     {
         // Far enough ahead to use as-is; retail jumps straight to the enqueue.
@@ -2055,10 +2054,10 @@ void IVP_RescheduleCollisionEvent(IVP_Ledge_Mindist* This, int32_t RearmWhenFar,
 
     // 12. ENQUEUE (FUN_06362f90 on the pool pointer at sim_unit_manager+0x08,
     //     key rounded once), then fold the out-code into StateFlags' low byte.
-    This->EventQueueHandle = static_cast<int32_t>(
-        Env->sim_unit_manager->EnqueueEvent(This, EventHi, EventLo));
-    const uint32_t S = This->StateFlags;
-    This->StateFlags = S ^ ((S ^ static_cast<uint32_t>(Ctx.OutCode)) & 0xffu);
+    EventQueueHandle = static_cast<int32_t>(
+        Env->sim_unit_manager->EnqueueEvent(this, EventHi, EventLo));
+    const uint32_t S = StateFlags;
+    StateFlags = S ^ ((S ^ static_cast<uint32_t>(Ctx.OutCode)) & 0xffu);
 }
 
 // ---------------------------------------------------------------------------
@@ -2078,7 +2077,7 @@ void IVP_Ledge_Mindist::UpdatePerTick()
 
     if ((StateFlags & 0x0Fu) != 0)
     {
-        IVP_RescheduleCollisionEvent(this, 0, 1);
+        RescheduleCollisionEvent(0, 1);
         return;
     }
 
@@ -2087,7 +2086,7 @@ void IVP_Ledge_Mindist::UpdatePerTick()
     if (Threshold > (double)(SeparationGap))
         do_impact(); // virtual slot 8
     else
-        IVP_RescheduleCollisionEvent(this, 0, 2);
+        RescheduleCollisionEvent(0, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -2175,46 +2174,46 @@ void IVP_Complex_Mindist::do_impact()
     IVP_Compact_Edge* const FeatureA = synapse[0].edge;
     IVP_Compact_Edge* const FeatureB = synapse[1].edge;
 
-    if (ShapeTypeA < 0 || ShapeTypeA > 3)
+    if (ShapeTypeA < IVP_SYNAPSE_POINT || ShapeTypeA > IVP_SYNAPSE_BALL)
     {
         // Retail's release IVP_ASSERT: a deliberate store to address zero.
         IVP_CoreTrap();
     }
-    else if (ShapeTypeA == 2)
+    else if (ShapeTypeA == IVP_SYNAPSE_POLY)
     {
         if (TriangleFlagBit31Set(FeatureA)) WinnerFlag = 0;
         else { IVP_Ledge_Mindist::do_impact(); return; }
     }
-    else if (ShapeTypeA == 0 || ShapeTypeA == 3)
+    else if (ShapeTypeA == IVP_SYNAPSE_POINT || ShapeTypeA == IVP_SYNAPSE_BALL)
     {
-        if (ShapeTypeB < 0 || ShapeTypeB > 3)
+        if (ShapeTypeB < IVP_SYNAPSE_POINT || ShapeTypeB > IVP_SYNAPSE_BALL)
         {
             IVP_CoreTrap();
         }
-        else if (ShapeTypeB == 0 || ShapeTypeB == 3)
+        else if (ShapeTypeB == IVP_SYNAPSE_POINT || ShapeTypeB == IVP_SYNAPSE_BALL)
         {
             IVP_Ledge_Mindist::do_impact();
             return;
         }
-        else if (ShapeTypeB == 1)
+        else if (ShapeTypeB == IVP_SYNAPSE_EDGE)
         {
             if (FeatureB->IsPiercing()) WinnerFlag = 1;
             else { IVP_Ledge_Mindist::do_impact(); return; }
         }
-        else // ShapeTypeB == 2
+        else // ShapeTypeB == IVP_SYNAPSE_POLY
         {
             if (TriangleFlagBit31Set(FeatureB)) WinnerFlag = 1;
             else { IVP_Ledge_Mindist::do_impact(); return; }
         }
     }
-    else // ShapeTypeA == 1
+    else // ShapeTypeA == IVP_SYNAPSE_EDGE
     {
-        if (ShapeTypeB == 0 || ShapeTypeB == 3)
+        if (ShapeTypeB == IVP_SYNAPSE_POINT || ShapeTypeB == IVP_SYNAPSE_BALL)
         {
             if (TriangleFlagBit31Set(FeatureA)) WinnerFlag = 0;
             else { IVP_Ledge_Mindist::do_impact(); return; }
         }
-        else if (ShapeTypeB == 1)
+        else if (ShapeTypeB == IVP_SYNAPSE_EDGE)
         {
             if (!FeatureB->IsPiercing())
             {
@@ -2737,7 +2736,7 @@ void IVP_Ledge_Mindist::init_mindist(IVP_Real_Object* Object0, IVP_Real_Object* 
 
 // ---------------------------------------------------------------------------
 // FUN_06355c10 and FUN_063562d0 (declared in ivp_listmanager_topology.h) live
-// here next to the IVP_PopulatePairRecordIntoOwner / material helpers.
+// here next to the IVP_Contact_Point::PopulateOwner / material helpers.
 // ---------------------------------------------------------------------------
 
 // FUN_06355c10, thiscall on Entry (AttachedCtx is its first member), RET 4;
@@ -2746,17 +2745,17 @@ void IVP_Ledge_Mindist::init_mindist(IVP_Real_Object* Object0, IVP_Real_Object* 
 // Record->Owner is read AFTER FUN_0635a1e0 (which replaces it). A record whose
 // owner's packed +0x54 dword is 0x100 under mask 0x300 is removed
 // (FUN_06355490, RemoveDistFromSystem) and not counted.
-int IVP_ListManager_RefreshAttachedCtxAndCountLive(IVP_ListManager_CorePairEntry* Entry, IVP_ListManager* Manager)
+int IVP_ListManager_CorePairEntry::RefreshAttachedCtxAndCountLive(IVP_ListManager* Manager)
 {
-    int LiveCount = static_cast<int>(Entry->AttachedCtx.n_elems);
+    int LiveCount = static_cast<int>(AttachedCtx.n_elems);
 
     for (int I = LiveCount - 1; I >= 0; --I)
     {
-        IVP_Contact_Point* Record = Entry->AttachedCtx.elems[I];
+        IVP_Contact_Point* Record = AttachedCtx.elems[I];
 
-        IVP_UpdatePairRecordContactFrame(Record);
+        Record->UpdateContactFrame();
         IVP_Impact_Solver_Long_Term* Owner = Record->Owner;
-        IVP_PopulatePairRecordIntoOwner(Record, Owner);
+        Record->PopulateOwner(Owner);
 
         const uint32_t PackedState = *reinterpret_cast<uint32_t*>(
             reinterpret_cast<char*>(Owner) + offsetof(IVP_Impact_Solver_Long_Term, StateProcessed));
@@ -2782,36 +2781,36 @@ int IVP_ListManager_RefreshAttachedCtxAndCountLive(IVP_ListManager_CorePairEntry
 // (rounded once). SolverMode (low byte of +0x34) = 1 when either material has
 // SecondFrictionXEnabled (+0x08). In the two-sided case both masses are
 // rounded to float before the combination.
-void IVP_ComputePairRecordMassFactor(IVP_Contact_Point* Record)
+void IVP_Contact_Point::ComputeMassFactor()
 {
     IVP_Material* Materials[2];
-    IVP_ResolvePairRecordSideMaterialSlots(Record, Materials);
+    ResolveSideMaterials(Materials);
 
     if (Materials[0]->SecondFrictionXEnabled != 0 || Materials[1]->SecondFrictionXEnabled != 0)
     {
-        Record->SolverMode = 1;
+        SolverMode = 1;
     }
 
-    IVP_Core* Core1 = Record->Object1->core;
-    IVP_Core* Core2 = Record->Object2->core;
+    IVP_Core* Core1 = Object1->core;
+    IVP_Core* Core2 = Object2->core;
 
     if ((Core1->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0 || (Core1->Flags & IVP_CORE_PINNED) != 0)
     {
-        const double EffMass = Core2->calc_conservative_effective_mass(&Record->Owner->CoordOS[1]);
-        Record->MassFactor = (float)(1.0 / EffMass);
+        const double EffMass = Core2->calc_conservative_effective_mass(&Owner->CoordOS[1]);
+        MassFactor = (float)(1.0 / EffMass);
         return;
     }
     if ((Core2->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0 || (Core2->Flags & IVP_CORE_PINNED) != 0)
     {
-        const double EffMass = Core1->calc_conservative_effective_mass(&Record->Owner->CoordOS[0]);
-        Record->MassFactor = (float)(1.0 / EffMass);
+        const double EffMass = Core1->calc_conservative_effective_mass(&Owner->CoordOS[0]);
+        MassFactor = (float)(1.0 / EffMass);
         return;
     }
 
-    const float EffMass0 = (float)(Core1->calc_conservative_effective_mass(&Record->Owner->CoordOS[0]));
-    const float EffMass1 = (float)(Core2->calc_conservative_effective_mass(&Record->Owner->CoordOS[1]));
+    const float EffMass0 = (float)(Core1->calc_conservative_effective_mass(&Owner->CoordOS[0]));
+    const float EffMass1 = (float)(Core2->calc_conservative_effective_mass(&Owner->CoordOS[1]));
     const double Reduced = ((double)(EffMass1) * EffMass0) / ((double)(EffMass1) + EffMass0);
-    Record->MassFactor = (float)(1.0 / Reduced);
+    MassFactor = (float)(1.0 / Reduced);
 }
 
 
@@ -2821,12 +2820,12 @@ void IVP_ComputePairRecordMassFactor(IVP_Contact_Point* Record)
 // then stores 0 to all four, so those calls have no effect and are omitted.
 // Single caller 0x0637a4f0; the owning type (possibly a 4-float Hesse plane)
 // is not identified.
-extern "C" void* IVP_Compact_Triangle_Init(void* param_1_00)
+extern "C" void* IVP_Compact_Triangle_Init(void* Memory)
 {
-    float* fields = static_cast<float*>(param_1_00);
+    float* fields = static_cast<float*>(Memory);
     fields[0] = 0.0f;
     fields[1] = 0.0f;
     fields[2] = 0.0f;
     fields[3] = 0.0f;
-    return param_1_00;
+    return Memory;
 }

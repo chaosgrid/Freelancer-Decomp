@@ -47,7 +47,7 @@ bool Solar::create(Archetype::Root* Arch)
     // retail.
     Object = CObject::Alloc(CObject::ClassSolar);
     Arch->create_instance(static_cast<IEngineInstance*>(Object));
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Object->EngineInstanceId), 0, nullptr);
+    DALib::Engine->UpdateInstance(Object->EngineInstanceId, 0, nullptr);
     Object->open(Arch);
     advise(true);
     return Object != nullptr;
@@ -224,9 +224,7 @@ void Solar::ChooseSystemArrivalLocation(GameObject* Arriving, Vector& OutPos, Ma
         Local.y = static_cast<float>(sin(Angle) * 500.0);
         Local.z = -350.0f;
         Vector Out;
-        Server_MathEngine()->TransformXform(reinterpret_cast<FVector&>(Out),
-                                         reinterpret_cast<FTransform const&>(Xform),
-                                         reinterpret_cast<FVector const&>(Local));
+        Server_MathEngine()->TransformXform(Out, Xform, Local);
         OutPos = Out;
         OutOrient = Xform.Rotation;
         return;

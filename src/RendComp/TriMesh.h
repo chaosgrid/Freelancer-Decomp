@@ -8,6 +8,7 @@
 
 // TriMesh archetype, face groups and UV animation state.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "RendComp.h"
 #include "render/shading.h" // IMaterialLibrary (archetype +0x21C)
 
@@ -221,5 +222,5 @@ public:
     int DACOM_API RemoveFaceGroupChannels(unsigned long Flags) override;                       // LAB_06c23bd0
 
     // FUN_06c25730. Defined in Plugins.cpp.
-    int CreateInstance(void* InstId, FTriMeshAnim** Out);
+    int CreateInstance(InstanceIndex InstId, FTriMeshAnim** Out);
 };

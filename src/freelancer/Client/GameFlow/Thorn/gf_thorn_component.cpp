@@ -36,10 +36,6 @@ namespace
         {Iids::ReverbControl, 0x20},       {nullptr, 0},
     };
 
-    long InstanceHandle(void* Instance)
-    {
-        return static_cast<long>(reinterpret_cast<intptr_t>(Instance));
-    }
 }
 
 // FUN_0044fbe0. Name is not cleared first: malloc_strcpy overwrites it.
@@ -128,8 +124,8 @@ GENRESULT DACOM_API FThornComponent::GetFloorHeight(float* OutHeight)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FThornComponent::SetTransform(float const*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::GetTransform(float*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::SetTransform(const Transform*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::GetTransform(Transform*) { return kThornSlotNotImplemented; }
 
 GENRESULT DACOM_API FThornComponent::StartSound(void*, int) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::StopSound(void*) { return kThornSlotNotImplemented; }
@@ -144,10 +140,10 @@ GENRESULT DACOM_API FThornComponent::StartIk(void*, float*, float*) { return kTh
 GENRESULT DACOM_API FThornComponent::StopIk(void*) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::UpdateIk(void*, float*, float*) { return kThornSlotNotImplemented; }
 
-GENRESULT DACOM_API FThornComponent::SetPosition(float*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::SetOrientation(float*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::GetPosition(float*) { return kThornSlotNotImplemented; }
-GENRESULT DACOM_API FThornComponent::GetOrientation(float*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::SetPosition(const Vector*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::SetOrientation(const Matrix*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::GetPosition(Vector*) { return kThornSlotNotImplemented; }
+GENRESULT DACOM_API FThornComponent::GetOrientation(Matrix*) { return kThornSlotNotImplemented; }
 
 GENRESULT DACOM_API FThornComponent::SetFov(const float*) { return kThornSlotNotImplemented; }
 GENRESULT DACOM_API FThornComponent::CameraSlot4(void*) { return kThornSlotNotImplemented; }
@@ -229,8 +225,8 @@ void FThornComponent::ConnectEntityHardpoints(int IndexA, char const* HpA, int I
 
     HardpointSummary SummaryA;
     HardpointSummary SummaryB;
-    SummaryA.analyze_instance(InstanceHandle(EntityA->GetEngineInstance()));
-    SummaryB.analyze_instance(InstanceHandle(EntityB->GetEngineInstance()));
+    SummaryA.analyze_instance(EntityA->GetEngineInstance());
+    SummaryB.analyze_instance(EntityB->GetEngineInstance());
 
     FHardpointKey KeyA;
     KeyA.Name = HpA;
@@ -241,8 +237,8 @@ void FThornComponent::ConnectEntityHardpoints(int IndexA, char const* HpA, int I
 
     long const InstanceA = SummaryA.find_name_instance(HpA);
     long const InstanceB = SummaryB.find_name_instance(HpB);
-    if (DALib::Hardpoint->ConnectHardpoints(InstancePointer(InstanceB), &KeyB,
-                                            InstancePointer(InstanceA), &KeyA) != 0)
+    if (DALib::Hardpoint->ConnectHardpoints(InstanceB, &KeyB,
+                                            InstanceA, &KeyA) != 0)
     {
         FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Cannot connect hardpoint %s on entity %s to hardpoint %s on "
@@ -266,12 +262,12 @@ void FThornComponent::DisconnectEntityHardpoints(int IndexA, char const* HpA, in
 
     HardpointSummary SummaryA;
     HardpointSummary SummaryB;
-    SummaryA.analyze_instance(InstanceHandle(EntityA->GetEngineInstance()));
-    SummaryB.analyze_instance(InstanceHandle(EntityB->GetEngineInstance()));
+    SummaryA.analyze_instance(EntityA->GetEngineInstance());
+    SummaryB.analyze_instance(EntityB->GetEngineInstance());
 
     long const InstanceA = SummaryA.find_name_instance(HpA);
     long const InstanceB = SummaryB.find_name_instance(HpB);
-    if (DALib::Engine->DestroyJoint(InstancePointer(InstanceB), InstancePointer(InstanceA)) != 1)
+    if (DALib::Engine->DestroyJoint(InstanceB, InstanceA) != 1)
     {
         FDUMP(kFdumpError,
               "%s(%d) : *** ERROR: Cannot disconnect hardpoint %s on entity %s from hardpoint %s "

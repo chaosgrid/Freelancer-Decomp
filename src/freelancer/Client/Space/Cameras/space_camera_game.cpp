@@ -154,24 +154,24 @@ void GameCameraUpdate(FGameCamera* Cam, float DeltaSeconds)
 {
     // FUN_0051b650 (slot 0x6c). The position comes through the camera's own slot 0x0c.
     FSpaceCamera* const Space = SpaceCameraOf(Cam);
-    const float* const Position =
+    const Vector* const Position =
         Space->GetPosition();
 
     // Only an exact zero dt skips (a NaN does not). The reciprocal is taken once.
     if (!(DeltaSeconds == 0.0f))
     {
-        const float DiffZ = Position[2] - Cam->LastPosition[2];
-        const float DiffX = Position[0] - Cam->LastPosition[0];
-        const float DiffY = Position[1] - Cam->LastPosition[1];
+        const float DiffZ = Position->z - Cam->LastPosition[2];
+        const float DiffX = Position->x - Cam->LastPosition[0];
+        const float DiffY = Position->y - Cam->LastPosition[1];
         const float InvDt = 1.0f / DeltaSeconds;
         Cam->Velocity[0] = InvDt * DiffX;
         Cam->Velocity[1] = InvDt * DiffY;
         Cam->Velocity[2] = InvDt * DiffZ;
     }
 
-    Cam->LastPosition[0] = Position[0];
-    Cam->LastPosition[1] = Position[1];
-    Cam->LastPosition[2] = Position[2];
+    Cam->LastPosition[0] = Position->x;
+    Cam->LastPosition[1] = Position->y;
+    Cam->LastPosition[2] = Position->z;
 }
 
 void GameCameraBeginFrame(FGameCamera* Cam)
@@ -238,13 +238,13 @@ void GameCameraClear(FGameCamera* Cam)
     }
 }
 
-void GameCameraGetVelocity(const FGameCamera* Cam, float* OutVelocity)
+void GameCameraGetVelocity(const FGameCamera* Cam, Vector* OutVelocity)
 {
     // 0x0051b700. Replaces the base's zero-vector stub LAB_0040f5d0, so a camera bound to a
     // moving ship reports a velocity while a free camera reports standing still.
-    OutVelocity[0] = Cam->Velocity[0];
-    OutVelocity[1] = Cam->Velocity[1];
-    OutVelocity[2] = Cam->Velocity[2];
+    OutVelocity->x = Cam->Velocity[0];
+    OutVelocity->y = Cam->Velocity[1];
+    OutVelocity->z = Cam->Velocity[2];
 }
 
 bool GameCameraSetProperty(FGameCamera* Cam, const char* Key, const char* Value)
@@ -1084,7 +1084,7 @@ void CameraOrientFromForwardAndUp(float* Out, const float* M, const float* Up)
     Out[8] = A8;
 }
 
-void FGameCamera::GetVelocity(float* OutVelocity)
+void FGameCamera::GetVelocity(Vector* OutVelocity)
 {
     GameCameraGetVelocity(this, OutVelocity);
 }

@@ -303,7 +303,7 @@ bool NnGroupControl::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     if (Msg == kWinMsgShow)
     {
         if (Parent != nullptr)
-            SetPosition(Parent->Position);
+            SetPosition(&Parent->Position.x);
         RefreshRequestDisplay();
         return true;
     }

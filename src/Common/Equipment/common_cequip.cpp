@@ -496,7 +496,7 @@ bool CExternalEquip::GetHardPointInfo(HardpointInfo& Info) const
     if (GetParentConnector(false) == kInvalidEngineInstance)
         return false;
 
-    void* Handle = DALib::Engine->GetInstanceArchetype((void*)(GetParentConnector(false)));
+    ArchetypeIndex Handle = DALib::Engine->GetInstanceArchetype(GetParentConnector(false));
 
     FHardpointKey Key;
     Key.Name = HardpointName.Value;
@@ -522,22 +522,20 @@ bool CExternalEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) co
         return false;
 
     Transform const* XformPtr = (Transform const*)(
-        DALib::Engine->GetInstanceTransform((void*)(ConnectionIndex)));
+        DALib::Engine->GetInstanceTransform(ConnectionIndex));
 
     if (OutPos != nullptr)
     {
-        FVector Pos;
-        Acquire3DMathEngine()->TransformXform(Pos, *(FTransform const*)XformPtr,
-                                              (FVector const&)(Buf.Position));
-        *(FVector*)OutPos = Pos;
+        Vector Pos;
+        Acquire3DMathEngine()->TransformXform(Pos, *XformPtr, Buf.Position);
+        *OutPos = Pos;
     }
 
     if (OutMatrix != nullptr)
     {
-        FMatrix Rot;
-        Acquire3DMathEngine()->MulMatrix(Rot, *(FMatrix const*)XformPtr,
-                                         (FMatrix const&)(Buf.Orient));
-        *(FMatrix*)OutMatrix = Rot;
+        Matrix Rot;
+        Acquire3DMathEngine()->MulMatrix(Rot, XformPtr->Rotation, Buf.Orient);
+        *OutMatrix = Rot;
     }
 
     return true;
@@ -563,10 +561,10 @@ bool CExternalEquip::GetCenterOfMass(Vector& Out) const
     if (IsConnected())
     {
         long const ConnIdx = GetParentConnector(false);
-        float const* Pos = DALib::Engine->GetInstancePosition((void*)(ConnIdx));
-        Out.x = Pos[0];
-        Out.y = Pos[1];
-        Out.z = Pos[2];
+        const Vector* Pos = DALib::Engine->GetInstancePosition(ConnIdx);
+        Out.x = Pos->x;
+        Out.y = Pos->y;
+        Out.z = Pos->z;
     }
     return false;
 }

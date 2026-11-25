@@ -96,20 +96,20 @@ namespace
 
     // The rotation of kQuadrantTurn about Z both FlashFromPosition and FlashTowards build on
     // the stack.
-    FMatrix QuadrantMatrix()
+    Matrix QuadrantMatrix()
     {
         float const Cos = static_cast<float>(cos(kQuadrantTurn));
         float const Sin = static_cast<float>(sin(kQuadrantTurn));
-        FMatrix M;
-        M.D[0][0] = Cos;
-        M.D[0][1] = -Sin;
-        M.D[0][2] = 0.0f;
-        M.D[1][0] = Sin;
-        M.D[1][1] = Cos;
-        M.D[1][2] = 0.0f;
-        M.D[2][0] = 0.0f;
-        M.D[2][1] = 0.0f;
-        M.D[2][2] = 1.0f;
+        Matrix M;
+        M.E[0][0] = Cos;
+        M.E[0][1] = -Sin;
+        M.E[0][2] = 0.0f;
+        M.E[1][0] = Sin;
+        M.E[1][1] = Cos;
+        M.E[1][2] = 0.0f;
+        M.E[2][0] = 0.0f;
+        M.E[2][1] = 0.0f;
+        M.E[2][2] = 1.0f;
         return M;
     }
 
@@ -221,19 +221,19 @@ FHudDamageIndicatorPart::FHudDamageIndicatorPart(char const* Path, float Degrees
     float const AngleF = static_cast<float>(Angle);
     float const Cos = static_cast<float>(cos(Angle));
     float const Sin = static_cast<float>(sin(static_cast<double>(AngleF)));
-    FTransform Xform;
-    Xform.Rotation.D[0][0] = Cos;
-    Xform.Rotation.D[0][1] = -Sin;
-    Xform.Rotation.D[0][2] = 0.0f;
-    Xform.Rotation.D[1][0] = Sin;
-    Xform.Rotation.D[1][1] = Cos;
-    Xform.Rotation.D[1][2] = 0.0f;
-    Xform.Rotation.D[2][0] = 0.0f;
-    Xform.Rotation.D[2][1] = 0.0f;
-    Xform.Rotation.D[2][2] = 1.0f;
-    Xform.Translation.X = 0.0f;
-    Xform.Translation.Y = 0.0f;
-    Xform.Translation.Z = -1.0f;
+    Transform Xform;
+    Xform.Rotation.E[0][0] = Cos;
+    Xform.Rotation.E[0][1] = -Sin;
+    Xform.Rotation.E[0][2] = 0.0f;
+    Xform.Rotation.E[1][0] = Sin;
+    Xform.Rotation.E[1][1] = Cos;
+    Xform.Rotation.E[1][2] = 0.0f;
+    Xform.Rotation.E[2][0] = 0.0f;
+    Xform.Rotation.E[2][1] = 0.0f;
+    Xform.Rotation.E[2][2] = 1.0f;
+    Xform.Translation.x = 0.0f;
+    Xform.Translation.y = 0.0f;
+    Xform.Translation.z = -1.0f;
     // The instance is used as it is, -1 included, as in retail.
     DALib::Engine->SetInstanceMatrix(Holder.EngineInstance, &Xform);   // +0x9c
     DALib::Engine->UpdateInstance(Holder.EngineInstance, 0, nullptr);  // +0x6c
@@ -264,7 +264,7 @@ HUD_DamageIndicator::HUD_DamageIndicator(INI_Reader& /*Reader*/)
     G_HudDamageIndicator = this;
     HUDItem::Name = "DamageIndicator";
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     Win3D::Create(nullptr, nullptr);
     Win3D::SetName("HUD_DamageIndicator");
     ClassName = "HUD_DamageIndicator";
@@ -280,7 +280,7 @@ bool HUD_DamageIndicator::Create(Win3D* NewParent, void* Data)
 {
     // LAB_004f3d70 (this = the WinControl face).
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -371,19 +371,19 @@ void HUD_DamageIndicator::FlashFromPosition(Vector const* WorldPos)
     }
     // Slot 4's body is slot 3's (0x5F1F0 in Common, ICF), so the pointer is the whole
     // transform the math engine reads.
-    FTransform const& ShipXform = reinterpret_cast<FTransform const&>(Player->get_transform());
-    FVector Local;
+    Transform const& ShipXform = Player->get_transform();
+    Vector Local;
     DamageIndicatorMath()->InverseTransform(Local, ShipXform,
-                                            reinterpret_cast<FVector const&>(*WorldPos));
-    FVector const Source = Local;
-    FMatrix const Turn = QuadrantMatrix();
-    FVector Turned;
+                                            *WorldPos);
+    Vector const Source = Local;
+    Matrix const Turn = QuadrantMatrix();
+    Vector Turned;
     DamageIndicatorMath()->TransposeTransform(Turned, Turn, Source);
 
     // y, then x: <= 0 and NaN go the "no" way.
-    if (Turned.Y > 0.0f)
+    if (Turned.y > 0.0f)
     {
-        if (Turned.X > 0.0f)
+        if (Turned.x > 0.0f)
         {
             AddFlash(PartDeg180.Flash, kFlashSeconds);     // +0x38c
         }
@@ -394,7 +394,7 @@ void HUD_DamageIndicator::FlashFromPosition(Vector const* WorldPos)
     }
     else
     {
-        if (Turned.X > 0.0f)
+        if (Turned.x > 0.0f)
         {
             AddFlash(PartDeg90.Flash, kFlashSeconds);      // +0x410
         }
@@ -435,38 +435,38 @@ void HUD_DamageIndicator::FlashTowards(Vector const* Point)
     float Radius = 0.0f;
     Vector Center;
     Player->get_physical_radius(Radius, Center);
-    FTransform const& ShipXform = reinterpret_cast<FTransform const&>(Player->get_transform());
+    Transform const& ShipXform = Player->get_transform();
 
     // The ship's rotation at its physical centre, pushed back by (0, 0, -Radius).
-    FTransform Frame;
+    Transform Frame;
     Frame.Rotation = ShipXform.Rotation;
-    Frame.Translation.X = Center.x;
-    Frame.Translation.Y = Center.y;
-    Frame.Translation.Z = Center.z;
-    FVector Back;
-    Back.X = 0.0f;
-    Back.Y = 0.0f;
-    Back.Z = -Radius;
-    FVector Rotated;
+    Frame.Translation.x = Center.x;
+    Frame.Translation.y = Center.y;
+    Frame.Translation.z = Center.z;
+    Vector Back;
+    Back.x = 0.0f;
+    Back.y = 0.0f;
+    Back.z = -Radius;
+    Vector Rotated;
     DamageIndicatorMath()->Rotate(Rotated, Frame, Back);
     // FUN_004d7270 (Vector::operator+=).
-    Frame.Translation.X = Rotated.X + Frame.Translation.X;
-    Frame.Translation.Y = Rotated.Y + Frame.Translation.Y;
-    Frame.Translation.Z = Rotated.Z + Frame.Translation.Z;
+    Frame.Translation.x = Rotated.x + Frame.Translation.x;
+    Frame.Translation.y = Rotated.y + Frame.Translation.y;
+    Frame.Translation.z = Rotated.z + Frame.Translation.z;
 
-    FVector Local;
+    Vector Local;
     DamageIndicatorMath()->InverseTransform(Local, Frame,
-                                            reinterpret_cast<FVector const&>(*Point));
-    FVector const Source = Local;
+                                            *Point);
+    Vector const Source = Local;
 
     // A hit from straight ahead -- |z| above |x| and above |y| (NaN fails both) and z not below
     // zero -- adds 0.35 to all four arrows; z below zero leaves without touching anything.
-    float const AbsX = fabsf(Local.X);
-    float const AbsY = fabsf(Local.Y);
-    float const AbsZ = fabsf(Local.Z);
+    float const AbsX = fabsf(Local.x);
+    float const AbsY = fabsf(Local.y);
+    float const AbsZ = fabsf(Local.z);
     if (AbsZ > AbsX && AbsZ > AbsY)
     {
-        if (Local.Z < 0.0f)
+        if (Local.z < 0.0f)
         {
             return;
         }
@@ -477,12 +477,12 @@ void HUD_DamageIndicator::FlashTowards(Vector const* Point)
     }
 
     // The same quadrant pick as FlashFromPosition.
-    FMatrix const Turn = QuadrantMatrix();
-    FVector Turned;
+    Matrix const Turn = QuadrantMatrix();
+    Vector Turned;
     DamageIndicatorMath()->TransposeTransform(Turned, Turn, Source);
-    if (Turned.Y > 0.0f)
+    if (Turned.y > 0.0f)
     {
-        if (Turned.X > 0.0f)
+        if (Turned.x > 0.0f)
         {
             AddFlash(PartDeg180.Flash, kFlashSeconds);
         }
@@ -493,7 +493,7 @@ void HUD_DamageIndicator::FlashTowards(Vector const* Point)
     }
     else
     {
-        if (Turned.X > 0.0f)
+        if (Turned.x > 0.0f)
         {
             AddFlash(PartDeg90.Flash, kFlashSeconds);
         }

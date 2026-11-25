@@ -1305,8 +1305,8 @@ namespace
         Out->NearFadeB = C->NearFadeEnd;
         float ColourA[3];
         float ColourB[3];
-        memcpy(ColourA, C->PuffColorA, sizeof(ColourA));
-        memcpy(ColourB, C->PuffColorB, sizeof(ColourB));
+        memcpy(ColourA, &C->PuffColorA, sizeof(ColourA));
+        memcpy(ColourB, &C->PuffColorB, sizeof(ColourB));
         if (ColourA[0] + ColourA[1] + ColourA[2] > 0.0f)
         {
             for (int Channel = 0; Channel < 3; ++Channel)
@@ -1864,9 +1864,9 @@ namespace
 
         // Camera: position, view rotation (world -> game view, column-vector convention:
         // v = R p + T), projection as Win3DSetPerspective / RP9 SetPerspective build it.
-        float const* const CamPosF = Camera->GetPosition();
+        float const* const CamPosF = (const float*)Camera->GetPosition();
         const double CamPos[3] = {CamPosF[0], CamPosF[1], CamPosF[2]};
-        float const* const View = Camera->GetViewTransform();
+        const float* const View = (const float*)Camera->GetViewTransform();
         const float FovDeg = Camera->GetFovYDeg();
         const float Aspect = Camera->GetAspect();
         const float Cot = (float)(1.0 / std::tan(kPi / 180.0 * (double)(FovDeg)));
@@ -2646,9 +2646,9 @@ namespace
     {
         FNebulaVolumeSettings const& S = Entry.Settings;
         Universe::IZone const* const Zone = Entry.Nebula->Zone;
-        float const* const CamPosF = Camera->GetPosition();
+        float const* const CamPosF = (const float*)Camera->GetPosition();
         const double CamPos[3] = {CamPosF[0], CamPosF[1], CamPosF[2]};
-        float const* const View = Camera->GetViewTransform();
+        const float* const View = (const float*)Camera->GetViewTransform();
         const double TanY = std::tan(kPi / 180.0 * (double)(Camera->GetFovYDeg()));
         const double TanX = TanY * (double)(Camera->GetAspect());
         const Vector& ZonePos = Zone->GetPos();
@@ -2993,7 +2993,7 @@ namespace
         float CamPosF[3] = {0.0f, 0.0f, 0.0f};
         if (Camera != nullptr)
         {
-            float const* const Position = Camera->GetPosition();
+            const float* const Position = (const float*)Camera->GetPosition();
             for (int Axis = 0; Axis < 3; ++Axis)
             {
                 CamPosF[Axis] = Position[Axis];
@@ -3103,8 +3103,8 @@ namespace
 
         if (Camera != nullptr)
         {
-            float const* const CamPosF = Camera->GetPosition();
-            const double CamPos[3] = {CamPosF[0], CamPosF[1], CamPosF[2]};
+            const Vector* const CamPosF = Camera->GetPosition();
+            const double CamPos[3] = {CamPosF->x, CamPosF->y, CamPosF->z};
             for (int Index = 0; Index < GEntryCount; ++Index)
             {
                 FVolumeEntry const& Entry = GEntries[Index];
@@ -3395,8 +3395,8 @@ namespace
         // camera is inside (immersion +0x294 > 0, FNebulaEffect::Update), and with exterior
         // those whose surface is within exterior_max_distance. No allocation: insertion into
         // GEntries.
-        float const* const CamPosF = Camera->GetPosition();
-        const double CamPos[3] = {CamPosF[0], CamPosF[1], CamPosF[2]};
+        const Vector* const CamPosF = Camera->GetPosition();
+        const double CamPos[3] = {CamPosF->x, CamPosF->y, CamPosF->z};
         GFrameCamPos[0] = CamPos[0];
         GFrameCamPos[1] = CamPos[1];
         GFrameCamPos[2] = CamPos[2];

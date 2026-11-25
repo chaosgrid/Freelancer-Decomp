@@ -105,13 +105,14 @@ namespace
     // (Win3D +0x3c orientation, +0xa8 + +0x60 position); the caller then gives the four corners.
     void BindBarFrame(WinControl const* Bar)
     {
-        float Transform[12];
+        float Frame[12];
+        float const* const BarOrientation = &Bar->Orientation.E[0][0];
         for (int Index = 0; Index < 9; ++Index)
-            Transform[Index] = Bar->Orientation[Index];
-        Transform[9] = Bar->Offset[0] + Bar->Position[0];
-        Transform[10] = Bar->Offset[1] + Bar->Position[1];
-        Transform[11] = Bar->Offset[2] + Bar->Position[2];
-        Win3DBindModelview(nullptr, Transform); // FUN_00422690(0, &Transform)
+            Frame[Index] = BarOrientation[Index];
+        Frame[9] = Bar->Offset[0] + Bar->Position.x;
+        Frame[10] = Bar->Offset[1] + Bar->Position.y;
+        Frame[11] = Bar->Offset[2] + Bar->Position.z;
+        Win3DBindModelview(nullptr, reinterpret_cast<Transform const*>(Frame)); // FUN_00422690(0, &Transform)
         Win3DDisable(kWin3DTexture2D);          // FUN_00421ed0(0xde1)
         Win3DEnable(kWin3DBlend);               // FUN_00421dd0(0xbe2)
         Win3DSetBlendFunc(2, 4);                // FUN_004220c0
@@ -341,7 +342,7 @@ bool NnPlayerInfo::Create(Win3D* NewParent, void* Data)
     Scroll->SetProperty(kScrollPropSetRange, 0, static_cast<uintptr_t>(-1));
     FactionCount = 0;
     SetOffset(0.0f, 0.0f, 0.0f); // slot 31
-    SetPosition(Position);       // slot 5
+    SetPosition(&Position.x);       // slot 5
     StatsRequestTimer = 1.0f;
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }

@@ -8,7 +8,9 @@
 #include "MovieCca.h"
 #include "MovieD4.h"
 #include "MovieField.h"
+#include "MovieFieldHigh.h"
 #include "MovieGraph.h"
+#include "MovieWide.h"
 
 #include <intrin.h>
 
@@ -107,12 +109,6 @@ static unsigned int const GPowersOfThree[16] =
     0x000019a1u, 0x00004ce3u, 0x0000e6a9u, 0x0002b3fbu,
     0x00081bf1u, 0x001857d3u, 0x0048fb79u, 0x00daf26bu
 };
-
-// 0x06ac8910. RET 0x14. Same arity as AddLimbs. Chosen when the mark bytes match.
-long __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
-
-// 0x06ac8500.
-long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
 
 static void CopyOrZeroBytes(unsigned int* Dest, unsigned int* Source, unsigned int ByteCount, int FillZero)
 {

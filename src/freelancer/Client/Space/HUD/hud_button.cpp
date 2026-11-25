@@ -30,7 +30,7 @@ namespace
     // then UpdateInstance(+0x04, 0, 0).
     void HolderSetMatrixAndUpdate(FClientMeshHolder* Holder, float* Transform12)
     {
-        DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, Transform12);
+        DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, (const Transform*)Transform12);
         ClientMeshHolderUpdate(Holder);
     }
 }
@@ -43,9 +43,9 @@ WinButton::WinButton()
 {
     // Inlined in FUN_004c8d40; the rest pose starts at identity (FUN_004b5150).
     memset(&RestPose, 0, sizeof(RestPose));
-    RestPose.Rotation.D[2][2] = 1.0f;
-    RestPose.Rotation.D[1][1] = 1.0f;
-    RestPose.Rotation.D[0][0] = 1.0f;
+    RestPose.Rotation.E[2][2] = 1.0f;
+    RestPose.Rotation.E[1][1] = 1.0f;
+    RestPose.Rotation.E[0][0] = 1.0f;
     bHover = 0;
     SpinAngle = 0.0f;
     SpinSpeed = 180.0f;
@@ -62,12 +62,12 @@ bool WinButtonProjectedRect(FClientMeshHolder* Holder, float* OutRect4)
 
     float Radius = 0.0f;
     float Center[3];
-    DALib::Engine->GetInstanceExtent(Holder->EngineInstance, 0, &Radius, Center);
-    float const* const Pos = DALib::Engine->GetInstancePosition(Holder->EngineInstance);
+    DALib::Engine->GetInstanceExtent(Holder->EngineInstance, 0, &Radius, (Vector*)Center);
+    const Vector* const Pos = DALib::Engine->GetInstancePosition(Holder->EngineInstance);
     Vector World;
-    World.x = Center[0] + Pos[0];
-    World.y = Center[1] + Pos[1];
-    World.z = Center[2] + Pos[2];
+    World.x = Center[0] + Pos->x;
+    World.y = Center[1] + Pos->y;
+    World.z = Center[2] + Pos->z;
 
     ViewRect Rect;
     float Depth = 0.0f;
@@ -110,29 +110,29 @@ bool WinButton::HitTest(float const* Ray)
 void WinButton::SetPosition(float const* NewPosition)
 {
     // LAB_004c9320.
-    Position[0] = NewPosition[0];
-    Position[1] = NewPosition[1];
-    Position[2] = NewPosition[2];
-    RestPose.Translation.X = NewPosition[0];
-    RestPose.Translation.Y = NewPosition[1];
-    RestPose.Translation.Z = NewPosition[2];
-    memcpy(Orientation, &RestPose, 12 * sizeof(float));
-    HolderSetMatrixAndUpdate(&MeshHolder, Orientation);
+    Position.x = NewPosition[0];
+    Position.y = NewPosition[1];
+    Position.z = NewPosition[2];
+    RestPose.Translation.x = NewPosition[0];
+    RestPose.Translation.y = NewPosition[1];
+    RestPose.Translation.z = NewPosition[2];
+    memcpy(&Orientation, &RestPose, 12 * sizeof(float));
+    HolderSetMatrixAndUpdate(&MeshHolder, &Orientation.E[0][0]);
 }
 
-void WinButton::SetOrientation(float const* NewOrientation)
+void WinButton::SetOrientation(Matrix const* NewOrientation)
 {
     // LAB_004c92e0: the orientation, then the live orientation and position into the rest pose.
-    memcpy(Orientation, NewOrientation, 9 * sizeof(float));
-    memcpy(&RestPose, Orientation, 12 * sizeof(float));
-    HolderSetMatrixAndUpdate(&MeshHolder, Orientation);
+    memcpy(&Orientation, NewOrientation, 9 * sizeof(float));
+    memcpy(&RestPose, &Orientation, 12 * sizeof(float));
+    HolderSetMatrixAndUpdate(&MeshHolder, &Orientation.E[0][0]);
 }
 
-void WinButton::SetTransform(FTransform const* NewTransform)
+void WinButton::SetTransform(Transform const& NewTransform)
 {
     // FUN_004c92b0.
-    memcpy(Orientation, NewTransform, 12 * sizeof(float));
-    HolderSetMatrixAndUpdate(&MeshHolder, Orientation);
+    memcpy(&Orientation, &NewTransform, 12 * sizeof(float));
+    HolderSetMatrixAndUpdate(&MeshHolder, &Orientation.E[0][0]);
 }
 
 void WinButton::Update()
@@ -186,12 +186,12 @@ void WinButton::Update()
     // DAT_0067dd10 (G_Win3DObjectMath, shared with FUN_0059efa0), FUN_005b73e0 when null.
     if (G_Win3DObjectMath == nullptr)
         G_Win3DObjectMath = Acquire3DMathEngine();
-    FTransform Live;
+    Transform Live;
     G_Win3DObjectMath->MulMatrix(Live.Rotation, RestPose.Rotation,
-                                 *reinterpret_cast<FMatrix const*>(&Spin));
+                                 Spin);
     Live.Translation = RestPose.Translation;
-    memcpy(Orientation, &Live, 12 * sizeof(float));
-    HolderSetMatrixAndUpdate(&MeshHolder, Orientation);
+    memcpy(&Orientation, &Live, 12 * sizeof(float));
+    HolderSetMatrixAndUpdate(&MeshHolder, &Orientation.E[0][0]);
 
     // The Win3D child walk (FUN_005a17b0 inlined).
     Win3D* Child = ChildHead;
@@ -254,9 +254,9 @@ HUD_Button::HUD_Button(INI_Reader& Reader)
     Action.Length = 0;
     Action.Data[0] = '\0';
     HUDItem::Name = "Button";   // HUDItem's TString, not Win3D's +0x18 name
-    Position[0] = 0.0f;
-    Position[1] = 0.0f;
-    Position[2] = -5.0f;
+    Position.x = 0.0f;
+    Position.y = 0.0f;
+    Position.z = -5.0f;
     CommandId = 0;
 
     while (Reader.read_value())
@@ -289,13 +289,13 @@ HUD_Button::HUD_Button(INI_Reader& Reader)
             float const Y = Reader.get_value_float(1);
             float const X = Reader.get_value_float(0);
             float const Z = Reader.get_value_float(2);
-            Position[0] = X;
-            Position[1] = Y;
-            Position[2] = Z;
-            RestPose.Translation.X = X;
-            RestPose.Translation.Y = Y;
-            RestPose.Translation.Z = Z;
-            SetTransform(&RestPose);
+            Position.x = X;
+            Position.y = Y;
+            Position.z = Z;
+            RestPose.Translation.x = X;
+            RestPose.Translation.y = Y;
+            RestPose.Translation.z = Z;
+            SetTransform(RestPose);
         }
         else if (Reader.is_value("tool_tip_id"))
         {

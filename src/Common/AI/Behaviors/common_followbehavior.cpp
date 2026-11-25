@@ -11,7 +11,7 @@
                              // GetObjectTypeOrZero, SetFollowLeader
 #include "common_systemmanager.h" // SystemManager::FormationLeaders (SysMgr+0x1364)
 #include "common_csys.h"  // Matrix, Transform, MatrixSetIdentity, Acquire3DMathEngine
-#include "x86math.h"      // I3DMathEngine::TransformMatrix (vtable +0x2c), FVector, FMatrix
+#include "x86math.h"      // I3DMathEngine::TransformMatrix (vtable +0x2c), Vector, Matrix
 
 #include <cmath>
 
@@ -250,9 +250,7 @@ void FollowBehavior::UpdateFollowerSteering()
         // Retail has two identical copies (062cce8e zero offset, 062ccefd offset present)
         // that differ only in the block flag.
         Vector Rotated;
-        Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(Rotated),
-                                               reinterpret_cast<FMatrix const&>(LeaderBasis),
-                                               reinterpret_cast<FVector const&>(Offset290));
+        Acquire3DMathEngine()->TransformMatrix(Rotated, LeaderBasis, Offset290);
         TargetPoint.x = Rotated.x + LeaderPos.x;
         TargetPoint.y = Rotated.y + LeaderPos.y;
         TargetPoint.z = Rotated.z + LeaderPos.z;
@@ -347,8 +345,6 @@ Vector FollowBehavior::GetRotatedOffset()
     Transform const* const LeaderXform = Behavior_GetTransform(LeaderObjectOf(LeadWatcher));
 
     // No null tests in retail.
-    Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(Out),
-                                           reinterpret_cast<FMatrix const&>(LeaderXform->Rotation),
-                                           reinterpret_cast<FVector const&>(Offset290));
+    Acquire3DMathEngine()->TransformMatrix(Out, LeaderXform->Rotation, Offset290);
     return Out;
 }

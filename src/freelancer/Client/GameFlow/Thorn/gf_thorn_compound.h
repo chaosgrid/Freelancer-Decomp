@@ -14,6 +14,7 @@
 //
 // Built by FGfScript::SpawnCompound (FUN_0044dd80 -> FUN_0044e430, gf_script_spawn.cpp).
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_goods.h" // HardpointSummary
 #include "GameFlow/Thorn/gf_thorn_component.h"
 
@@ -34,18 +35,18 @@ struct FThornCompound : FThornComponent
     GENRESULT DACOM_API DisconnectHardpoints(void* Desc) override;       // 8  FUN_00451e90
     GENRESULT DACOM_API GetHardpointXform(int TargetType, char const* Name,
                                           float* OutXform12) override;   // 9  LAB_00451b90
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override; // 11 LAB_00451660
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;    // 12 LAB_00451a00
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_00451660
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_00451a00
 
     // IGeoTransformControl (0x005ccf0c..0x005ccf18)
-    GENRESULT DACOM_API SetPosition(float* Position) override;           // 3  LAB_004514f0
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;         // 4  LAB_004515b0
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;        // 5  LAB_004517b0
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;      // 6  LAB_00451930
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;           // 3  LAB_004514f0
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;         // 4  LAB_004515b0
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;        // 5  LAB_004517b0
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;      // 6  LAB_00451930
 
     // identity tail
     void Stop() override;                                                // 14 FUN_00451290
-    void* GetEngineInstance() override;                                  // 17 LAB_00451360
+    InstanceIndex GetEngineInstance() override;                                  // 17 LAB_00451360
     void SetScene(void* Scene) override;                                 // 19 LAB_00451ed0
     void SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,
                   unsigned char bRunningLights) override;                // 20 LAB_00451ef0

@@ -86,7 +86,7 @@ public:
     // slot 7 LAB_0058af70 (RET 4) -- +0x328 = 1; Orientation(+0x3c) = NewOrientation times the
     // attach orientation (slot 40) through the math engine's MulMatrix (DAT_0067d8c4). Unlike
     // WinControl's FUN_005a0950, no mesh update and no child walk.
-    void SetOrientation(float const* NewOrientation) override;
+    void SetOrientation(Matrix const* NewOrientation) override;
 
     // slot 12 LAB_0058afd0 -- slot 12 on every inactive child; a running typewriter (+0x389) is
     // stopped and the whole pending text (+0x370) shown.

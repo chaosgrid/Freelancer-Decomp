@@ -229,8 +229,8 @@ inline I3DMathEngine* MathEngineCached(I3DMathEngine*& Cache)
 
 // Materials use the shared vertex/index submission records.
 
-void PipelineApplySubmit(ICamera* Camera, void* Inst, const void* Transform,
-                         const FTransform** OutCameraView, const FTransform** OutWorld); // FUN_06c294f0 part
+void PipelineApplySubmit(ICamera* Camera, InstanceIndex Inst, const void* ExtraXform,
+                         const Transform** OutCameraView, const Transform** OutWorld); // FUN_06c294f0 part
 void VectorNegate3(const float* Src, float* Dest);                       // FUN_06c33090
 float* TransposeXform3x3(const float* Src12, float* Dest9);             // FUN_06c330b0
 float* TransformPoint3(float* Dest3, const float* Matrix12, const float* Vec3); // FUN_06c33100

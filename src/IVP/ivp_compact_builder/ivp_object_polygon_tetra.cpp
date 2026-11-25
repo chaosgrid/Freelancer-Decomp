@@ -33,7 +33,7 @@ namespace
 
     // .data:DAT_0658b9c8 -- a float in the zero-filled tail of .data with a
     // single XREF (the read at 06378b1e) and no writer, so it is always 0.
-    float G_DAT_0658b9c8 = 0.0f;
+    float g_HesseDistanceZero = 0.0f;
 
     // Retail stores 0xffffffff into the next link of an element it has just
     // unlinked from a list, right before deleting it.
@@ -173,7 +173,7 @@ int32_t P_Sur_2D_Line::point_lies_to_the_left(const P_Sur_2D_Point* Point) const
     {
         return 0;
     }
-    if (!(Dist > G_DAT_0658b9c8))
+    if (!(Dist > g_HesseDistanceZero))
     {
         return 2;
     }

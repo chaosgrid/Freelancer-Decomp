@@ -126,28 +126,28 @@ public:
         return Object->QueryInterface(Iid, Out);
     }
 
-    int DACOM_API CreateMeshInstance(void* /*InstId*/, void* Handle) override
+    int DACOM_API CreateMeshInstance(InstanceIndex /*InstId*/, void* Handle) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
             return 0;
         return 1;
     }
 
-    int DACOM_API DestroyMeshInstance(void* InstId, void* /*Handle*/) override
+    int DACOM_API DestroyMeshInstance(InstanceIndex InstId, void* /*Handle*/) override
     {
-        DropInstance(InstId);
+        DropInstance((void*)InstId);
         return 0;
     }
 
-    int DACOM_API UpdateMeshInstance(void* /*InstId*/, void* /*Arg*/) override
+    int DACOM_API UpdateMeshInstance(InstanceIndex /*InstId*/, void* /*Arg*/) override
     {
         return 0;
     }
 
-    int DACOM_API QueryMeshInstance(void* InstId, void* /*Handle*/, const char* Iid, void** Out) override
+    int DACOM_API QueryMeshInstance(InstanceIndex InstId, void* /*Handle*/, const char* Iid, void** Out) override
     {
         LookupCount += 1;
-        FTriMeshAnim* Anim = FindInstance(InstId);
+        FTriMeshAnim* Anim = FindInstance((void*)InstId);
         if (Anim == nullptr)
             return -1;
         return (TriMeshAnimQueryInterface(Anim, Iid, Out) >= 0) ? 0 : -1;
@@ -195,7 +195,7 @@ public:
 
     // FUN_06c21a00 (TriMesh table 06c36114; SphereMesh overrides it). Defined after
     // FTriMeshAnim.
-    int DACOM_API BindMeshInstance(void* InstId, void* Handle) override;
+    int DACOM_API BindMeshInstance(InstanceIndex InstId, void* Handle) override;
 };
 
 // DAT_06c37d80: the 0x400-byte buffer FUN_06c211a0 reads the "Tristrips" value into.
@@ -385,7 +385,7 @@ public:
     FTriMeshArch* MeshLive;       // +0x10
     FRpVertexStream* UvTrack;     // +0x14 operator new(0x14), FUN_06c24c60 copy of the UV0 stream
     float Clock;                  // +0x18 UV0_anim clock (LAB_06c293a0)
-    void* InstId;                 // +0x1C
+    InstanceIndex InstId;                 // +0x1C
 
     // FUN_06c292b0.
     FTriMeshAnim()
@@ -395,13 +395,13 @@ public:
         , MeshLive(nullptr)
         , UvTrack(nullptr)
         , Clock(0.0f)
-        , InstId((void*)((intptr_t)-1))
+        , InstId(InvalidInstanceIndex)
     {
     }
 
     // FUN_06c29310: an archetype with UV0_anim lookup entries (+0x8C) also gets a 0x14 track
     // copied from its texcoord-0 stream (+0x5C) with SrcCount (+0x88) indices (FUN_06c24c60).
-    int Init(FTriMeshArch* InMesh, void* InInstId)
+    int Init(FTriMeshArch* InMesh, InstanceIndex InInstId)
     {
         MeshLive = InMesh;
         Mesh = InMesh;
@@ -419,7 +419,7 @@ public:
     {
         MeshLive = nullptr;
         Mesh = nullptr;
-        InstId = (void*)((intptr_t)-1);
+        InstId = InvalidInstanceIndex;
         if (UvTrack != nullptr)
         {
             TriMeshStreamFree(UvTrack);
@@ -429,13 +429,13 @@ public:
         return 0;
     }
 
-    int Draw(ICamera* Camera, unsigned long Flags, const void* Transform, IMaterial* Extra)
+    int Draw(ICamera* Camera, unsigned long Flags, const void* ExtraXform, IMaterial* Extra)
     {
-        if (MeshLive == nullptr || InstId == (void*)((intptr_t)-1))
+        if (MeshLive == nullptr || InstId == InvalidInstanceIndex)
             return 0;
-        const FTransform* CameraView = nullptr;
-        const FTransform* World = nullptr;
-        PipelineApplySubmit(Camera, InstId, Transform, &CameraView, &World);
+        const Transform* CameraView = nullptr;
+        const Transform* World = nullptr;
+        PipelineApplySubmit(Camera, InstId, ExtraXform, &CameraView, &World);
 
         FTriMeshArch* Arch = MeshLive;
         FRpVertexSrcDesc* Desc = &Arch->Vertices;
@@ -465,8 +465,8 @@ public:
         FMaterialSubmitContext Context;
         std::memset(&Context, 0, sizeof(Context));
         Context.Inst = InstId;
-        Context.World = (FTransform*)World;
-        Context.View = (FTransform*)CameraView;
+        Context.World = World;
+        Context.View = CameraView;
         Context.VbListing = &Lock.Listing;
         for (size_t Index = 0; Index < Arch->Groups.size(); ++Index)
         {
@@ -672,7 +672,7 @@ static float TickArgAsFloat(void* Arg)
 
 // FUN_06c25730 (thiscall on the archetype): operator new(0x20). A failed init returns -1
 // without freeing the instance.
-int FTriMeshArch::CreateInstance(void* InstId, FTriMeshAnim** Out)
+int FTriMeshArch::CreateInstance(InstanceIndex InstId, FTriMeshAnim** Out)
 {
     *Out = nullptr;
     FTriMeshAnim* Anim = new FTriMeshAnim();
@@ -751,12 +751,12 @@ FRenderPlugin::~FRenderPlugin()
     DestroyInstanceMap();
 }
 
-int DACOM_API FRenderPlugin::BindMeshInstance(void* InstId, void* Handle)
+int DACOM_API FRenderPlugin::BindMeshInstance(InstanceIndex InstId, void* Handle)
 {
     if (Handle == (void*)((intptr_t)-1) || Handle == nullptr)
         return -1;
     LookupCount += 1;
-    FTriMeshAnim* Anim = FindInstance(InstId);
+    FTriMeshAnim* Anim = FindInstance((void*)InstId);
     if (Anim == nullptr)
         return -1;
     if (Anim->MeshLive != Anim->Mesh)
@@ -805,19 +805,19 @@ public:
         return (int)((intptr_t)Clone);
     }
 
-    int DACOM_API CreateMeshInstance(void* InstId, void* Handle) override
+    int DACOM_API CreateMeshInstance(InstanceIndex InstId, void* Handle) override
     {
         if (IrcHandleOk(Handle) == 0)
             return 0;
         LookupCount += 1;
-        if (FindInstance(InstId) != nullptr)
+        if (FindInstance((void*)InstId) != nullptr)
             return 1;
         FTriMeshArch* Arch = (FTriMeshArch*)Handle;
         FTriMeshAnim* Anim = nullptr;
         if (Arch->CreateInstance(InstId, &Anim) < 0)
             return 0;
-        InstanceMap[InstId] = Anim;
-        LastHitKey = InstId;
+        InstanceMap[(void*)InstId] = Anim;
+        LastHitKey = (void*)InstId;
         LastHitAnim = Anim;
         bLastHit = 1;
         float Center[3];
@@ -826,13 +826,13 @@ public:
         Center[2] = 0.0f;
         float Radius = 0.0f;
         Arch->GetSphere(Center, &Radius);
-        G_Engine->SetInstanceExtent(InstId, 1, Radius, Center);
+        G_Engine->SetInstanceExtent(InstId, 1, Radius, (const Vector*)Center);
         return 1;
     }
 
-    int DACOM_API UpdateMeshInstance(void* InstId, void* Arg) override
+    int DACOM_API UpdateMeshInstance(InstanceIndex InstId, void* Arg) override
     {
-        TickInstance(InstId, Arg);
+        TickInstance((void*)InstId, Arg);
         return 0;
     }
 
@@ -923,11 +923,11 @@ public:
         return 1;
     }
 
-    int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, void* Inst, unsigned long Flags,
+    int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, InstanceIndex Inst, unsigned long Flags,
                          void* Transform, void* Extra) override
     {
         LookupCount += 1;
-        FTriMeshAnim* Anim = FindInstance(Inst);
+        FTriMeshAnim* Anim = FindInstance((void*)Inst);
         if (Anim == nullptr)
             return 0;
         unsigned long Remapped = 0;
@@ -1210,7 +1210,7 @@ public:
 // rendcomp.dll writes it (one XREF, the read) and it is not exported, so it stays 0.
 static unsigned char G_SphereNoAtmosphere = 0;
 
-static void SphereFaceRotation(FTransform& Out, int Face, float HalfPi)
+static void SphereFaceRotation(Transform& Out, int Face, float HalfPi)
 {
     double Cos = 1.0;
     double Sin = 0.0;
@@ -1240,18 +1240,18 @@ static void SphereFaceRotation(FTransform& Out, int Face, float HalfPi)
         bAboutX = true;
         break;
     default:
-        Out.Rotation.D[0][0] = 1.0f;
-        Out.Rotation.D[0][1] = 0.0f;
-        Out.Rotation.D[0][2] = 0.0f;
-        Out.Rotation.D[1][0] = 0.0f;
-        Out.Rotation.D[1][1] = 1.0f;
-        Out.Rotation.D[1][2] = 0.0f;
-        Out.Rotation.D[2][0] = 0.0f;
-        Out.Rotation.D[2][1] = 0.0f;
-        Out.Rotation.D[2][2] = 1.0f;
-        Out.Translation.X = 0.0f;
-        Out.Translation.Y = 0.0f;
-        Out.Translation.Z = 0.0f;
+        Out.Rotation.E[0][0] = 1.0f;
+        Out.Rotation.E[0][1] = 0.0f;
+        Out.Rotation.E[0][2] = 0.0f;
+        Out.Rotation.E[1][0] = 0.0f;
+        Out.Rotation.E[1][1] = 1.0f;
+        Out.Rotation.E[1][2] = 0.0f;
+        Out.Rotation.E[2][0] = 0.0f;
+        Out.Rotation.E[2][1] = 0.0f;
+        Out.Rotation.E[2][2] = 1.0f;
+        Out.Translation.x = 0.0f;
+        Out.Translation.y = 0.0f;
+        Out.Translation.z = 0.0f;
         return;
     }
     const float C = (float)Cos;
@@ -1259,30 +1259,30 @@ static void SphereFaceRotation(FTransform& Out, int Face, float HalfPi)
     if (!bAboutX)
     {
         // [c 0 s; 0 1 0; -s 0 c], translation untouched (it stays 0).
-        Out.Rotation.D[0][0] = C;
-        Out.Rotation.D[0][1] = 0.0f;
-        Out.Rotation.D[0][2] = S;
-        Out.Rotation.D[1][0] = 0.0f;
-        Out.Rotation.D[1][1] = 1.0f;
-        Out.Rotation.D[1][2] = 0.0f;
-        Out.Rotation.D[2][0] = -S;
-        Out.Rotation.D[2][1] = 0.0f;
-        Out.Rotation.D[2][2] = C;
+        Out.Rotation.E[0][0] = C;
+        Out.Rotation.E[0][1] = 0.0f;
+        Out.Rotation.E[0][2] = S;
+        Out.Rotation.E[1][0] = 0.0f;
+        Out.Rotation.E[1][1] = 1.0f;
+        Out.Rotation.E[1][2] = 0.0f;
+        Out.Rotation.E[2][0] = -S;
+        Out.Rotation.E[2][1] = 0.0f;
+        Out.Rotation.E[2][2] = C;
         return;
     }
     // [1 0 0; 0 c -s; 0 s c], translation zeroed.
-    Out.Translation.X = 0.0f;
-    Out.Translation.Y = 0.0f;
-    Out.Translation.Z = 0.0f;
-    Out.Rotation.D[0][0] = 1.0f;
-    Out.Rotation.D[0][1] = 0.0f;
-    Out.Rotation.D[0][2] = 0.0f;
-    Out.Rotation.D[1][0] = 0.0f;
-    Out.Rotation.D[1][1] = C;
-    Out.Rotation.D[1][2] = -S;
-    Out.Rotation.D[2][0] = 0.0f;
-    Out.Rotation.D[2][1] = S;
-    Out.Rotation.D[2][2] = C;
+    Out.Translation.x = 0.0f;
+    Out.Translation.y = 0.0f;
+    Out.Translation.z = 0.0f;
+    Out.Rotation.E[0][0] = 1.0f;
+    Out.Rotation.E[0][1] = 0.0f;
+    Out.Rotation.E[0][2] = 0.0f;
+    Out.Rotation.E[1][0] = 0.0f;
+    Out.Rotation.E[1][1] = C;
+    Out.Rotation.E[1][2] = -S;
+    Out.Rotation.E[2][0] = 0.0f;
+    Out.Rotation.E[2][1] = S;
+    Out.Rotation.E[2][2] = C;
 }
 
 // A material slot; the first slot also owns the shared sphere geometry.
@@ -1666,7 +1666,7 @@ public:
     float Radius;                 // +0x0C archetype radius (Set/GetRadius); the tessellation
                                   //       radius and the level formula's scale
     FSphereHandle* Arch;          // +0x10
-    void* InstId;                 // +0x14
+    InstanceIndex InstId;                 // +0x14
     float LodDistanceScale;             // +0x18 1.5f (Set/GetLodDistanceScale). The draw multiplies
                                   //       the camera distance by it before the level update; the
                                   //       exe's level_of_detail option writes it
@@ -1688,7 +1688,7 @@ public:
         , Flags(0)
         , Radius(1.0f)
         , Arch(nullptr)
-        , InstId((void*)((intptr_t)-1))
+        , InstId(InvalidInstanceIndex)
         , LodDistanceScale(1.5f)
         , LevelMin(3)
         , LevelMax(9)
@@ -1698,7 +1698,7 @@ public:
         , bHasAtmosphere(0)
     {
         std::memset(&Desc, 0, sizeof(Desc));
-        Init(nullptr, (void*)((intptr_t)-1));
+        Init(nullptr, (intptr_t)-1);
     }
 
     // FUN_06c2b190: FUN_06c2b3c0, then both lists are emptied and their heads freed.
@@ -1712,7 +1712,7 @@ public:
     {
         Flags = 0;
         Arch = nullptr;
-        InstId = (void*)((intptr_t)-1);
+        InstId = InvalidInstanceIndex;
         for (std::list<FSphereMaterialSlot*>::iterator Walk = MaterialSlots.begin();
              Walk != MaterialSlots.end(); ++Walk)
         {
@@ -1743,7 +1743,7 @@ public:
         return 0;
     }
 
-    int Init(FSphereHandle* InArch, void* InInstId)
+    int Init(FSphereHandle* InArch, InstanceIndex InInstId)
     {
         Reset();
         Arch = InArch;
@@ -1843,26 +1843,26 @@ public:
         Desc.Tex[0].Count = Desc.SrcCount;
     }
 
-    bool Draw(ICamera* Camera, const FTransform* Matrix, IMaterial* Override)
+    bool Draw(ICamera* Camera, const Transform* Mat, IMaterial* Override)
     {
-        if (Arch == nullptr || InstId == (void*)((intptr_t)-1))
+        if (Arch == nullptr || InstId == InvalidInstanceIndex)
             return false;
-        const FTransform* View = (const FTransform*)(Camera->GetViewTransform());
-        const FTransform* World =
-            (const FTransform*)(G_Engine->GetInstanceTransform(InstId));
+        const Transform* View = (Camera->GetViewTransform());
+        const Transform* World =
+            (const Transform*)(G_Engine->GetInstanceTransform(InstId));
 
-        FTransform Modelview;
-        if (Matrix != nullptr)
+        Transform Modelview;
+        if (Mat != nullptr)
         {
-            FTransform Product;
-            MathEngineCached(G_MathSphere)->MulTransform(Product, *Matrix, *World);
-            const FTransform Local = Product; // FUN_06c2c610
+            Transform Product;
+            MathEngineCached(G_MathSphere)->MulTransform(Product, *Mat, *World);
+            const Transform Local = Product; // FUN_06c2c610
             MathEngineCached(G_MathSphere)->MulTransform(Modelview, *View, Local);
         }
         else
             MathEngineCached(G_MathSphere)->MulTransform(Modelview, *View, *World);
-        FTransform Oriented = Modelview;  // FUN_06c2c610
-        FTransform Pipelined = Oriented;
+        Transform Oriented = Modelview;  // FUN_06c2c610
+        Transform Pipelined = Oriented;
         const float ScaledRadius = Arch->Scale * Arch->Radius;
         const float ArchRadius = Arch->Radius;
 
@@ -1870,39 +1870,39 @@ public:
         const int FaceCorners[6][4] = {
             {0, 3, 4, 7}, {0, 1, 4, 5}, {1, 2, 5, 6}, {2, 3, 6, 7}, {0, 1, 2, 3}, {4, 5, 6, 7}};
         // The face normals.
-        FVector Normals[6] = {{0.0f, 0.0f, 1.0f},  {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f},
+        Vector Normals[6] = {{0.0f, 0.0f, 1.0f},  {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f},
                               {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
         // The cube corners, +-k with k = 0x3f13cd3a.
         const float K = 0.57735026f;
-        FVector Corners[8] = {{K, K, K},   {K, K, -K},   {-K, K, -K},  {-K, K, K},
+        Vector Corners[8] = {{K, K, K},   {K, K, -K},   {-K, K, -K},  {-K, K, K},
                               {K, -K, K},  {K, -K, -K},  {-K, -K, -K}, {-K, -K, K}};
-        const FMatrix WorldRotation = World->Rotation;
+        const Matrix WorldRotation = World->Rotation;
         unsigned char bVisible[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         for (int Face = 0; Face < 6; ++Face)
         {
-            FVector Turned;
+            Vector Turned;
             MathEngineCached(G_MathSphere)->TransformMatrix(Turned, WorldRotation, Normals[Face]);
             Normals[Face] = Turned;
         }
 
-        const float* CameraPos = Camera->GetPosition();
-        FVector ToCamera; // FUN_06c25cc0
-        ToCamera.X = CameraPos[0] - World->Translation.X;
-        ToCamera.Y = CameraPos[1] - World->Translation.Y;
-        ToCamera.Z = CameraPos[2] - World->Translation.Z;
+        const Vector* CameraPos = Camera->GetPosition();
+        Vector ToCamera; // FUN_06c25cc0
+        ToCamera.x = CameraPos->x - World->Translation.x;
+        ToCamera.y = CameraPos->y - World->Translation.y;
+        ToCamera.z = CameraPos->z - World->Translation.z;
         float Best = -1.0f;
         int BestFace = -1;
         const float Distance = (float)(std::sqrt(
-            (double)ToCamera.X * ToCamera.X + (double)ToCamera.Z * ToCamera.Z +
-            (double)ToCamera.Y * ToCamera.Y));
+            (double)ToCamera.x * ToCamera.x + (double)ToCamera.z * ToCamera.z +
+            (double)ToCamera.y * ToCamera.y));
         const float InvDistance = 1.0f / Distance;
-        ToCamera.X *= InvDistance;
-        ToCamera.Y *= InvDistance;
-        ToCamera.Z *= InvDistance;
+        ToCamera.x *= InvDistance;
+        ToCamera.y *= InvDistance;
+        ToCamera.z *= InvDistance;
         for (int Face = 0; Face < 6; ++Face)
         {
-            const float Dot = ToCamera.X * Normals[Face].X + ToCamera.Z * Normals[Face].Z +
-                              ToCamera.Y * Normals[Face].Y;
+            const float Dot = ToCamera.x * Normals[Face].x + ToCamera.z * Normals[Face].z +
+                              ToCamera.y * Normals[Face].y;
             if (Dot > Best)
             {
                 Best = Dot;
@@ -1917,20 +1917,20 @@ public:
         for (int Index = 0; Index < 4; ++Index)
         {
             const int Corner = BestCorners[Index];
-            FVector Turned;
+            Vector Turned;
             MathEngineCached(G_MathSphere)->TransformMatrix(Turned, WorldRotation, Corners[Corner]);
             Corners[Corner] = Turned;
-            const float Dot = ToCamera.Z * Corners[Corner].Z + ToCamera.Y * Corners[Corner].Y +
-                              ToCamera.X * Corners[Corner].X;
+            const float Dot = ToCamera.z * Corners[Corner].z + ToCamera.y * Corners[Corner].y +
+                              ToCamera.x * Corners[Corner].x;
             bVisible[Corner] = (Dot > Threshold) ? 1 : 0;
         }
 
         // The modelview origin into a local nothing reads afterwards (as retail).
-        FVector Origin;
-        Origin.X = 0.0f;
-        Origin.Y = 0.0f;
-        Origin.Z = 0.0f;
-        FVector ViewCentre;
+        Vector Origin;
+        Origin.x = 0.0f;
+        Origin.y = 0.0f;
+        Origin.z = 0.0f;
+        Vector ViewCentre;
         MathEngineCached(G_MathSphere)->TransformXform(ViewCentre, Pipelined, Origin);
 
         const float Biased = Distance * LodDistanceScale;
@@ -1952,7 +1952,7 @@ public:
         FMaterialSubmitContext Context;
         Context.Inst = InstId;
         Context.World = nullptr;
-        Context.View = (FTransform*)View;
+        Context.View = View;
         Context.SourceVertices = &Desc;
         Context.Indices = nullptr;
         Context.VbListing = &Lock.Listing;
@@ -1960,9 +1960,9 @@ public:
         Context.ReplacedMaterial = nullptr;
         Context.MaterialContext = nullptr;
 
-        FTransform Rotation;
+        Transform Rotation;
         SphereFaceRotation(Rotation, 0, HalfPi);
-        FTransform FaceWorld;
+        Transform FaceWorld;
         const std::list<FSphereMaterialSlot*>::iterator First = MaterialSlots.begin();
         std::list<FSphereMaterialSlot*>::iterator Walk = First;
         for (int Face = 0; Face < 6; ++Face)
@@ -1996,14 +1996,14 @@ public:
                 G_Pipeline->GetPipelineState(7, &State);
                 if (State != 0)
                 {
-                    FTransform Product;
+                    Transform Product;
                     MathEngineCached(G_MathSphere)->MulTransform(Product, *View, FaceWorld);
                     Modelview = Product;
                     Pipelined = Modelview;
-                    G_Pipeline->SetModelview((const float*)(&Pipelined));
+                    G_Pipeline->SetModelview(&Pipelined);
                 }
                 else
-                    G_Pipeline->SetWorld((const float*)(&FaceWorld));
+                    G_Pipeline->SetWorld(&FaceWorld);
                 Context.World = &FaceWorld;
                 if (Material != nullptr)
                 {
@@ -2035,13 +2035,13 @@ public:
         for (int Index = 0; Index < 4; ++Index)
         {
             const int Corner = BestCorners[Index];
-            const double Dot = (double)ToCamera.Z * Corners[Corner].Z +
-                               (double)ToCamera.Y * Corners[Corner].Y +
-                               (double)ToCamera.X * Corners[Corner].X;
+            const double Dot = (double)ToCamera.z * Corners[Corner].z +
+                               (double)ToCamera.y * Corners[Corner].y +
+                               (double)ToCamera.x * Corners[Corner].x;
             bVisible[Corner] = (Dot > AtmosphereThreshold) ? 1 : 0;
         }
         Context.MaterialContext = G_Engine; // DAT_06c37d4c
-        FTransform AtmosphereWorld;
+        Transform AtmosphereWorld;
         for (int Face = 0; Face < 6; ++Face)
         {
             FSphereMaterialSlot* Geometry = *First;
@@ -2246,10 +2246,10 @@ public:
     }
 
     // FUN_06c29f70 (the SphereMesh table entry 06c362e8).
-    int DACOM_API QueryMeshInstance(void* InstId, void* /*Handle*/, const char* Iid, void** Out) override
+    int DACOM_API QueryMeshInstance(InstanceIndex InstId, void* /*Handle*/, const char* Iid, void** Out) override
     {
         LookupCount += 1;
-        FSphereAnim* Anim = FindSphereCached(InstId);
+        FSphereAnim* Anim = FindSphereCached((void*)InstId);
         if (Anim == nullptr)
             return -1;
         return (Anim->QueryInterface(Iid, Out) >= 0) ? 0 : -1;
@@ -2264,13 +2264,13 @@ public:
 
     FSphereAnim* FindSphere(void* InstId)
     {
-        std::map<void*, FSphereAnim*>::iterator Found = SphereMap.find(InstId);
+        std::map<void*, FSphereAnim*>::iterator Found = SphereMap.find((void*)InstId);
         if (Found == SphereMap.end())
             return nullptr;
         return Found->second;
     }
 
-    int DACOM_API CreateMeshInstance(void* InstId, void* Handle) override
+    int DACOM_API CreateMeshInstance(InstanceIndex InstId, void* Handle) override
     {
         if (Handle == nullptr || Handle == (void*)G_HandleFail)
             return 0;
@@ -2291,29 +2291,29 @@ public:
         float Extent = Sphere->Radius;
         if (0.0f <= Sphere->Radius)
             Extent = Sphere->Scale * Sphere->Radius;
-        G_Engine->SetInstanceExtent(InstId, 1, Extent, Center);
+        G_Engine->SetInstanceExtent(InstId, 1, Extent, (const Vector*)Center);
         // FUN_06c2a060: a non-multi insert. An InstId already mapped keeps its old node and the
         // new instance leaks; the returned iterator is never end(), so retail's == end branch
         // (FUN_06c2b3c0 on the instance, return 0) cannot run.
         std::pair<std::map<void*, FSphereAnim*>::iterator, bool> Inserted =
-            SphereMap.insert(std::map<void*, FSphereAnim*>::value_type(InstId, Anim));
+            SphereMap.insert(std::map<void*, FSphereAnim*>::value_type((void*)InstId, Anim));
         LastHitKey = Inserted.first->first;
         LastHitSphere = Inserted.first->second;
         bLastHit = 1;
         return 1;
     }
 
-    int DACOM_API DestroyMeshInstance(void* InstId, void* /*Handle*/) override
+    int DACOM_API DestroyMeshInstance(InstanceIndex InstId, void* /*Handle*/) override
     {
         LookupCount += 1;
-        FSphereAnim* Anim = FindSphereCached(InstId);
+        FSphereAnim* Anim = FindSphereCached((void*)InstId);
         if (Anim == nullptr)
             return 0;
         Anim->Reset();
         delete Anim;
-        if (bLastHit != 0 && LastHitKey == InstId)
+        if (bLastHit != 0 && LastHitKey == (void*)InstId)
             bLastHit = 0;
-        SphereMap.erase(InstId);
+        SphereMap.erase((void*)InstId);
         return 0;
     }
 
@@ -2390,21 +2390,21 @@ public:
         return 1;
     }
 
-    int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, void* Inst, unsigned long /*Flags*/,
+    int DACOM_API RenderInstance(ICamera* Camera, void* /*Handle*/, InstanceIndex Inst, unsigned long /*Flags*/,
                          void* Matrix, void* Extra) override
     {
         LookupCount += 1;
-        FSphereAnim* Anim = FindSphereCached(Inst);
+        FSphereAnim* Anim = FindSphereCached((void*)Inst);
         if (Anim == nullptr)
             return 0;
-        return Anim->Draw(Camera, (const FTransform*)Matrix,
+        return Anim->Draw(Camera, (const Transform*)Matrix,
                           (IMaterial*)Extra)
                    ? 1
                    : 0;
     }
 
     // LAB_06c29ff0. The sphere plugin binds nothing.
-    int DACOM_API BindMeshInstance(void* /*Inst*/, void* /*Handle*/) override
+    int DACOM_API BindMeshInstance(InstanceIndex /*Inst*/, void* /*Handle*/) override
     {
         return -1;
     }

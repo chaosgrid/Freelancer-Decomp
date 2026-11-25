@@ -4,22 +4,17 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
+#include "MovieFieldHigh.h"
+
 #include "MovieCca.h"
 #include "MovieField.h"
+#include "MovieFieldMid.h"
 #include "MovieGraph.h"
+#include "MovieMod.h"
 #include "MovieWindow.h"
 
 #include <intrin.h>
-
-// Callees this file does not define. Signatures are the pushes at the call
-// sites (stdcall: the caller does not adjust ESP).
-
-long __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
-long __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
-long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
-long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
-unsigned int __stdcall Movie_DrawBoundedLimb(unsigned int Minuend, unsigned int Subtrahend);
-int __stdcall Movie_ExponentiateByWindow(unsigned int* Base, unsigned int* Exponent, unsigned int Count, unsigned int* Dest, unsigned int* Context);
+#include <stddef.h>
 
 // DAT_06ada800. Powers of three consumed by FillWindowTable.
 static const unsigned int GPowersOfThree[8] =
@@ -632,7 +627,7 @@ long __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* Field
     {
         return 0;
     }
-    if (Movie_CopyFieldGroups((unsigned int*)((unsigned char*)Field + 0x12c), Work + (LimbCount * 2u), 1, (int*)Field) == 0)
+    if (Movie_CopyFieldGroups(((FMovieField*)Field)->One, Work + (LimbCount * 2u), 1, (int*)Field) == 0)
     {
         return 0;
     }
@@ -643,9 +638,10 @@ long __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* Field
     return 1;
 }
 
-// 0x06ac8010. Multiply the value through the two field factors at +4 and +0x104.
+// 0x06ac8010. Multiply the value through the record's Left (+4) and Right (+0x104).
 long __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder)
 {
+    FMovieFieldRecord* Record = (FMovieFieldRecord*)FieldHolder;
     unsigned int* Field = (unsigned int*)FieldHolder[0];
     unsigned int* High = Value + Field[0];
     unsigned int TempLow[64];
@@ -660,7 +656,7 @@ long __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder)
     }
     if (Field[2] == 1u)
     {
-        if (Movie_AddFieldLimbs(TempLow, (unsigned int*)((unsigned char*)FieldHolder + 4), TempLow, (int*)Field) == 0)
+        if (Movie_AddFieldLimbs(TempLow, Record->Left, TempLow, (int*)Field) == 0)
         {
             return 0;
         }
@@ -668,7 +664,7 @@ long __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder)
         {
             return 0;
         }
-        if (Movie_AddFieldLimbs(TempLow, (unsigned int*)((unsigned char*)FieldHolder + 0x104), TempLow, (int*)Field) == 0)
+        if (Movie_AddFieldLimbs(TempLow, Record->Right, TempLow, (int*)Field) == 0)
         {
             return 0;
         }
@@ -679,7 +675,7 @@ long __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder)
     }
     else
     {
-        if (Movie_AddFieldLimbs(Value, (unsigned int*)((unsigned char*)FieldHolder + 4), TempHigh, (int*)Field) == 0)
+        if (Movie_AddFieldLimbs(Value, Record->Left, TempHigh, (int*)Field) == 0)
         {
             return 0;
         }
@@ -687,7 +683,7 @@ long __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder)
         {
             return 0;
         }
-        if (Movie_AddFieldLimbs(TempLow, (unsigned int*)((unsigned char*)FieldHolder + 0x104), TempLow, (int*)Field) == 0)
+        if (Movie_AddFieldLimbs(TempLow, Record->Right, TempLow, (int*)Field) == 0)
         {
             return 0;
         }
@@ -736,6 +732,7 @@ long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder)
 // 0x06ac7210. Field multiply of Left by Right through Scratch. Kind selects the factor chain.
 long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch)
 {
+    FMovieFieldRecord* Record = (FMovieFieldRecord*)FieldHolder;
     unsigned int* Field = (unsigned int*)FieldHolder[0];
     unsigned int LimbCount = Field[0];
     unsigned int* LeftOnce = Left + LimbCount;
@@ -759,7 +756,7 @@ long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* 
             Movie_MultiplyFieldLimbs(LeftTwice, LeftTwice, ScratchOnce, Field) == 0 ||
             Movie_MultiplyFieldLimbs(ScratchOnce, ScratchOnce, ScratchTwice, Field) == 0 ||
             Movie_MultiplyFieldLimbs(ScratchTwice, ScratchTwice, ScratchTwice, Field) == 0 ||
-            Movie_MultiplyFieldLimbs((unsigned int*)((unsigned char*)FieldHolder + 0x104), ScratchTwice, ScratchTwice, Field) == 0 ||
+            Movie_MultiplyFieldLimbs(Record->Right, ScratchTwice, ScratchTwice, Field) == 0 ||
             Movie_MultiplyFieldLimbs(LeftOnce, LeftTwice, ScratchThrice, Field) == 0 ||
             Movie_AddFieldLimbs(Scratch, ScratchThrice, ScratchThrice, (int*)Field) == 0 ||
             Movie_MultiplyFieldLimbs(Left, ScratchOnce, RightTwice, Field) == 0 ||
@@ -784,7 +781,7 @@ long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* 
             Movie_AddFieldLimbs(Scratch, ScratchThrice, ScratchThrice, (int*)Field) == 0 ||
             Movie_MultiplyFieldLimbs(LeftTwice, LeftTwice, ScratchTwice, Field) == 0 ||
             Movie_MultiplyFieldLimbs(ScratchTwice, ScratchTwice, ScratchTwice, Field) == 0 ||
-            Movie_MultiplyFieldLimbs((unsigned int*)((unsigned char*)FieldHolder + 4), ScratchTwice, ScratchTwice, Field) == 0 ||
+            Movie_MultiplyFieldLimbs(Record->Left, ScratchTwice, ScratchTwice, Field) == 0 ||
             Movie_AddFieldLimbs(ScratchThrice, ScratchTwice, ScratchThrice, (int*)Field) == 0 ||
             Movie_AddFieldLimbs(LeftOnce, LeftOnce, ScratchFour, (int*)Field) == 0 ||
             Movie_MultiplyFieldLimbs(ScratchFour, LeftTwice, RightTwice, Field) == 0 ||
@@ -808,13 +805,26 @@ long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* 
     }
 }
 
+// The 0x1000-byte block 0x06ac5d70 allocates. Work receives the five groups SeedFieldWork writes;
+// Upper is the scratch of the squarings.
+struct FMovieRowWorkspace
+{
+    unsigned int Base[0x40];   // +0x000 one group: the unary result and the running product
+    unsigned int Work[0x140];  // +0x100
+    unsigned int Upper[0x280]; // +0x600
+};
+
+static_assert(offsetof(FMovieRowWorkspace, Work) == 0x100, "0x06ac5d70 passes block+0x100 as the work buffer");
+static_assert(offsetof(FMovieRowWorkspace, Upper) == 0x600, "0x06ac5d70 passes block+0x600 as the scratch");
+static_assert(sizeof(FMovieRowWorkspace) == 0x1000, "0x06ac5d70 allocates 0x1000 bytes");
+
 // 0x06ac5d70. For each row, square the work buffer, then keep the row or store the field unit.
 long __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowCount, void* Table, void* FieldHolder)
 {
     unsigned int* Field = *(unsigned int**)FieldHolder;
     unsigned int LimbCount = Field[0];
-    void* Allocated = Movie_AllocateBlock(0x1000);
-    void* Workspace = Allocated;
+    void* Allocated = Movie_AllocateBlock(sizeof(FMovieRowWorkspace));
+    FMovieRowWorkspace* Workspace = (FMovieRowWorkspace*)Allocated;
     unsigned int* Rows = 0;
     unsigned int* Work = 0;
     unsigned int* Upper = 0;
@@ -835,8 +845,8 @@ long __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowC
         else
         {
             Rows = AllocatedRows;
-            Upper = (unsigned int*)((unsigned char*)Workspace + 0x600);
-            Work = (unsigned int*)((unsigned char*)Workspace + 0x100);
+            Upper = Workspace->Upper;
+            Work = Workspace->Work;
             if (MultiplyByFieldFactors(Value, (int*)FieldHolder) != 0 &&
                 Movie_CopyFieldGroups(Value, (unsigned int*)Table, 2, (int*)Field) != 0 &&
                 SeedFieldWork(Value, Work, (int*)FieldHolder, Upper) != 0)
@@ -912,7 +922,7 @@ long __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowC
         else if (Hits != 0u)
         {
             unsigned int* Second = (unsigned int*)((unsigned int)Rows + LimbCount * (unsigned int)RowCount * 4u);
-            unsigned int* Base = (unsigned int*)Workspace;
+            unsigned int* Base = Workspace->Base;
             long Flag = 0;
             unsigned int Back;
             if (Ok != 0)

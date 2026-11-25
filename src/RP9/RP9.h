@@ -403,12 +403,12 @@ public:
     GENRESULT DACOM_API SetWindow(HWND Hwnd, int X, int Y, int W, int H) override;
     GENRESULT DACOM_API GetWindow(HWND* OutHwnd, int* OutLeft, int* OutRight, int* OutW,
                                   int* OutH) override;
-    GENRESULT DACOM_API SetWorld(const float* M12) override;
-    GENRESULT DACOM_API GetWorld(float* Out12) override;
-    GENRESULT DACOM_API SetView(const float* M12) override;
-    GENRESULT DACOM_API GetView(float* Out12) override;
-    GENRESULT DACOM_API SetModelview(const float* M12) override;
-    GENRESULT DACOM_API GetModelview(float* Out12) override;
+    GENRESULT DACOM_API SetWorld(const Transform* M12) override;
+    GENRESULT DACOM_API GetWorld(Transform* Out12) override;
+    GENRESULT DACOM_API SetView(const Transform* M12) override;
+    GENRESULT DACOM_API GetView(Transform* Out12) override;
+    GENRESULT DACOM_API SetModelview(const Transform* M12) override;
+    GENRESULT DACOM_API GetModelview(Transform* Out12) override;
     GENRESULT DACOM_API SetProjection(const float* M16) override;
     GENRESULT DACOM_API GetProjection(float* Out16) override;
     GENRESULT DACOM_API SetLookat(float EyeX, float EyeY, float EyeZ, float AtX, float AtY,
@@ -466,7 +466,7 @@ public:
     GENRESULT DACOM_API AddLight(void* Handle) override;
     GENRESULT DACOM_API RemoveLight(void* Handle) override;
     GENRESULT DACOM_API UpdateLight(void* Handle) override;
-    GENRESULT DACOM_API SetWorldN(int WorldIndex, const float* M12) override;
+    GENRESULT DACOM_API SetWorldN(int WorldIndex, const Transform* M12) override;
 
     GENRESULT DACOM_API VbMgrInit(void* A, void* B, void* C, void* D) override;
     GENRESULT DACOM_API VbMgrReleaseAll() override;

@@ -7,6 +7,7 @@
 #include "MovieObject.h"
 #include "MediaPlayer.h"
 #include "MoviePlay.h"
+#include "MovieRuntime.h"
 
 #include <new>
 #include <string.h>
@@ -19,15 +20,9 @@ static_assert((WS_CHILD | WS_VISIBLE) == 0x50000000u, "CreateWindowEx style");
 static_assert(SWP_NOZORDER == 4, "SetWindowPos flags");
 static_assert(WM_CREATE == 1 && WM_SIZE == 5 && WM_PAINT == 0x0F && WM_ERASEBKGND == 0x14, "window messages");
 static_assert(GWL_USERDATA == -21, "SetWindowLong index");
-
-// FUN_06ad970e. Throws the "string too long" C++ exception. No return on the retail path.
-void __cdecl MovieThrowStringTooLong();
-
-// FUN_06acf876. movie.dll atexit registration (not the CRT atexit import).
-int __cdecl MovieRegisterAtexit(void (__cdecl* Callback)());
-
-// LAB_06acf7ef. __amsg_exit(0x19). Slots +0x04..+0x28 of PTR_LAB_06ada20c.
-void __cdecl MovieAbortRuntime();
+static_assert((CS_OWNDC | CS_PARENTDC) == 0xA0, "WNDCLASSEXA style at 0x06ac1060");
+static_assert((WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | MCIWNDF_NOOPEN | MCIWNDF_NOTIFYMODE | MCIWNDF_NOMENU | MCIWNDF_NOPLAYBAR) == 0x5200810Au, "MCIWndCreateA style at 0x06ac1190");
+static_assert(MCIWNDM_OPENA == 0x499 && MCI_PLAY == 0x806 && MCI_STOP == 0x808 && MCI_CLOSE == 0x804, "MCI window messages");
 
 uint8_t g_movieAtexitGuard;
 
@@ -146,8 +141,8 @@ void __cdecl Approach2RegisterParentClass()
 {
     WNDCLASSEXA WindowClass;
     memset(&WindowClass, 0, sizeof(WindowClass));
-    WindowClass.cbSize = 0x30;
-    WindowClass.style = 0xA0;
+    WindowClass.cbSize = sizeof(WNDCLASSEXA);
+    WindowClass.style = CS_OWNDC | CS_PARENTDC;
     WindowClass.lpfnWndProc = &Approach2ParentWindowProc;
     WindowClass.hInstance = GetModuleHandleA(nullptr);
     WindowClass.lpszClassName = "MPMCIParent";
@@ -232,9 +227,9 @@ LRESULT FApproach2Player::HandleParentMessage(UINT Message, WPARAM WParam, LPARA
         {
             return 1;
         }
-        if (Message == 0x4C8u)
+        if (Message == MCIWNDM_NOTIFYMODE)
         {
-            if (LParam == 0x20D)
+            if (LParam == MCI_MODE_STOP)
             {
                 This->bStopped = 1;
             }
@@ -259,7 +254,7 @@ LRESULT FApproach2Player::HandleParentMessage(UINT Message, WPARAM WParam, LPARA
             FileName = GApproach2EmptyFile;
         }
         HMODULE Instance = GetModuleHandleA(nullptr);
-        HWND Mci = MCIWndCreateA(This->ParentWindow, Instance, 0x5200810Au, FileName);
+        HWND Mci = MCIWndCreateA(This->ParentWindow, Instance, WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | MCIWNDF_NOOPEN | MCIWNDF_NOTIFYMODE | MCIWNDF_NOMENU | MCIWNDF_NOPLAYBAR, FileName);
         This->MciWindow = Mci;
         if (Mci != nullptr)
         {
@@ -390,7 +385,7 @@ void FApproach2Player::DestroyWindows()
 bool FApproach2Player::OpenFile(const char* File)
 {
     FApproach2Player* This = this;
-    LRESULT Result = SendMessageA(This->MciWindow, 0x499, 0, (LPARAM)File);
+    LRESULT Result = SendMessageA(This->MciWindow, MCIWNDM_OPENA, 0, (LPARAM)File);
     if (Result == 0)
     {
         return true;
@@ -403,7 +398,7 @@ bool FApproach2Player::OpenFile(const char* File)
 void FApproach2Player::Play(int /*Unused*/)
 {
     FApproach2Player* This = this;
-    LRESULT Result = SendMessageA(This->MciWindow, 0x806, 0, 0);
+    LRESULT Result = SendMessageA(This->MciWindow, MCI_PLAY, 0, 0);
     if (Result == 0)
     {
         This->bStopped = 0;
@@ -416,14 +411,14 @@ void FApproach2Player::Play(int /*Unused*/)
 LRESULT FApproach2Player::MciStop()
 {
     FApproach2Player* This = this;
-    return SendMessageA(This->MciWindow, 0x808, 0, 0);
+    return SendMessageA(This->MciWindow, MCI_STOP, 0, 0);
 }
 
 // 0x06ac14b0. MCI_CLOSE (0x804).
 LRESULT FApproach2Player::MciClose()
 {
     FApproach2Player* This = this;
-    return SendMessageA(This->MciWindow, 0x804, 0, 0);
+    return SendMessageA(This->MciWindow, MCI_CLOSE, 0, 0);
 }
 
 // 0x06ac14d0. True when bStopped is 0.

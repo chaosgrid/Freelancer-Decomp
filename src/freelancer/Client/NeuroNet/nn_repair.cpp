@@ -340,7 +340,7 @@ intptr_t NnRepair::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     {
         float const* const Target = reinterpret_cast<float const*>(A);
         SetOffset(Target[0], Target[1], Target[2]);
-        SetPosition(Position);
+        SetPosition(&Position.x);
         PlayOrRewindUiSoundSlot(2); // FUN_005645c0
         return 0;
     }

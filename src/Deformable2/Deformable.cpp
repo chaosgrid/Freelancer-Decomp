@@ -63,16 +63,16 @@ void FBoneRuntime::ComposeWorldMatrix(const float* InverseRoot)
 {
     float Local[12];
     AcquireMathEngine()->MulTransform(
-        *(FTransform*)Local,
-        *(const FTransform*)LocalTransform,
-        *(const FTransform*)Source->BoneToRoot); // +0x1C
+        *(Transform*)Local,
+        *(const Transform*)LocalTransform,
+        *(const Transform*)Source->BoneToRoot); // +0x1C
     float LocalCopy[12];
     std::memcpy(LocalCopy, Local, sizeof(LocalCopy));
     float World[12];
-    AcquireMathEngine()->MulTransform(*(FTransform*)World,
-                                      *(const FTransform*)InverseRoot,
-                                      *(const FTransform*)LocalCopy); // +0x1C
-    std::memcpy(Matrix, World, sizeof(World));
+    AcquireMathEngine()->MulTransform(*(Transform*)World,
+                                      *(const Transform*)InverseRoot,
+                                      *(const Transform*)LocalCopy); // +0x1C
+    std::memcpy(WorldMatrix, World, sizeof(World));
 }
 
 // EngBase's IEngine, acquired by QI. Every slot this module calls (+0x20, +0x24,
@@ -87,14 +87,14 @@ void FSkeleton::DestroyHandles()
     while (Index < BoneCount)
     {
         G_Engine->ReleaseHandle(
-            (void*)((ptrdiff_t)(Bones[Index].Parent)));
+            Bones[Index].Parent);
         Index += 1;
     }
     G_Engine->ReleaseHandle(EngineHandle);
 }
 
 // DAT_06603150 / DAT_06603154, set by FUN_065f1d90.
-static bool (__cdecl* G_BoneLinkFn)(void*, int, FLodHolder*) = nullptr;
+static bool (__cdecl* G_BoneLinkFn)(InstanceIndex, int, FLodHolder*) = nullptr;
 
 // FUN_065f1100 (thiscall on the skeleton: Name, Fs).
 bool FSkeleton::Load(const char* Name, IFileSystem* Fs)
@@ -152,7 +152,7 @@ bool FSkeleton::Load(const char* Name, IFileSystem* Fs)
     }
 
     IDAComponent* Saved = nullptr;
-    G_Engine->GetSearchPath((void**)(&Saved));
+    G_Engine->GetSearchPath(&Saved);
     G_Engine->SetFilesystem(Fs);
     FEngineName SkelName;
     SkelName.Text = Name;
@@ -160,7 +160,7 @@ bool FSkeleton::Load(const char* Name, IFileSystem* Fs)
     EngineHandle = G_Engine->CreateArchetypeHandle(&SkelName, Fs);
     G_Engine->SetFilesystem(Saved);
     Saved->Release();
-    return EngineHandle != G_InvalidEngineHandle;
+    return EngineHandle != InvalidArchetypeIndex;
 }
 
 // FUN_065f13e0 (thiscall).
@@ -196,7 +196,7 @@ int ReleaseSkeleton(FSkeleton* Skel)
 }
 
 // LAB_065f1450 (cdecl): forwards to the thiscall FUN_065f14f0 with the holder as this.
-static bool __cdecl BoneLinkCallbackThunk(void* BoneInst, int Parent, FLodHolder* Holder)
+static bool __cdecl BoneLinkCallbackThunk(InstanceIndex BoneInst, int Parent, FLodHolder* Holder)
 {
     return Holder->LinkBoneByParent(BoneInst, Parent);
 }
@@ -219,7 +219,7 @@ static void DestroyLodHolderBody(FLodHolder* Holder)
 }
 
 // FUN_065f14a0 (thiscall on the holder: Index, BoneInst).
-FBoneRuntime* FLodHolder::BindOneBoneRuntime(int Index, void* BoneInst)
+FBoneRuntime* FLodHolder::BindOneBoneRuntime(int Index, InstanceIndex BoneInst)
 {
     FBoneRuntime* Slot = &BoneSlots[Index];
     unsigned char Flags = Slot->Flags;
@@ -231,7 +231,7 @@ FBoneRuntime* FLodHolder::BindOneBoneRuntime(int Index, void* BoneInst)
 }
 
 // FUN_065f14f0: parent-link walk from BindCursor.
-bool FLodHolder::LinkBoneByParent(void* BoneInst, int Parent)
+bool FLodHolder::LinkBoneByParent(InstanceIndex BoneInst, int Parent)
 {
     FSkeleton* Skel = Skeleton;
     int Cursor = BindCursor;
@@ -254,14 +254,14 @@ bool FLodHolder::LinkBoneByParent(void* BoneInst, int Parent)
 // The per-slot body of the FUN_065f1550 construct loop.
 FBoneRuntime::FBoneRuntime()
 {
-    Instance = G_InvalidEngineHandle;
+    Instance = InvalidInstanceIndex;
     Source = nullptr;
     Flags = 0;
     std::memset(FlagPadding, 0, sizeof(FlagPadding));
-    WriteIdentity3x3(Matrix);
-    Matrix[9] = 0.0f;
-    Matrix[10] = 0.0f;
-    Matrix[11] = 0.0f;
+    WriteIdentity3x3(WorldMatrix);
+    WorldMatrix[9] = 0.0f;
+    WorldMatrix[10] = 0.0f;
+    WorldMatrix[11] = 0.0f;
 }
 
 // The FUN_065f1550 construct loop body for one slot. The memset stands in for the operator
@@ -274,7 +274,7 @@ static void InitBoneRuntimeSlot(FBoneRuntime* Slot)
 
 static FLodHolder* G_BoneLinkHolder = nullptr;
 
-static void RegisterBoneLinkCallback(bool (__cdecl* Fn)(void*, int, FLodHolder*), FLodHolder* Holder)
+static void RegisterBoneLinkCallback(bool (__cdecl* Fn)(InstanceIndex, int, FLodHolder*), FLodHolder* Holder)
 {
     G_BoneLinkFn = Fn;
     G_BoneLinkHolder = Holder;
@@ -307,19 +307,18 @@ unsigned char FLodHolder::AttachSkeleton(FSkeleton* Skel)
     }
     BoneSlots = Slots;
     RegisterBoneLinkCallback(&BoneLinkCallbackThunk, this);
-    void* RootInst = G_Engine->CreateInstance(Skel->EngineHandle, nullptr);
+    InstanceIndex RootInst = G_Engine->CreateInstance(Skel->EngineHandle, nullptr);
     RegisterBoneLinkCallback(nullptr, nullptr);
-    if (RootInst == G_InvalidEngineHandle)
+    if (RootInst == InvalidInstanceIndex)
         return 1;
 
     int BoneIndex = 0;
     while (BoneIndex < Skeleton->BoneCount)
     {
-        if (BoneSlots[BoneIndex].Instance == G_InvalidEngineHandle)
+        if (BoneSlots[BoneIndex].Instance == InvalidInstanceIndex)
         {
-            void* ArchHandle = (void*)(
-                (ptrdiff_t)(Skeleton->Bones[BoneIndex].Parent));
-            void* BoneInst = G_Engine->CreateInstance(ArchHandle, nullptr);
+            ArchetypeIndex ArchHandle = Skeleton->Bones[BoneIndex].Parent;
+            InstanceIndex BoneInst = G_Engine->CreateInstance(ArchHandle, nullptr);
             FBoneRuntime* Slot = BindOneBoneRuntime(BoneIndex, BoneInst);
             Slot->Flags = (unsigned char)(Slot->Flags | 1u);
         }
@@ -337,14 +336,14 @@ void WriteIdentity3x3(float* Matrix)
     Matrix[8] = 1.0f;
 }
 
-// LAB_065f1690 (RET 8), slot 0: [this+4] = the instance.
-GENRESULT DACOM_API FBoneRuntime::Init(void* InInstance)
+// LAB_065f1690 (RET 8), slot 0: [this+4] = the instance. Retail leaves `this` in EAX; the
+// slot returns nothing.
+void DACOM_API FBoneRuntime::initialize_instance(long Inst)
 {
-    Instance = InInstance;
-    return GR_OK; // retail returns this; nobody reads it
+    Instance = Inst;
 }
 
-// --- FBoneRuntime : IInstanceTransform, vtable PTR_LAB_066010a0 (14 slots) ---
+// --- FBoneRuntime : IEngineInstance, vtable PTR_LAB_066010a0 (14 slots) ---
 // Every slot is stdcall with the engine instance as its first argument (EngBase pushes it);
 // only slot 0 uses it. None of them tests `this` or a pointer argument.
 
@@ -356,83 +355,80 @@ static unsigned long DACOM_API BoneRuntimeRet8(void* /*This*/, void* /*A*/)
 }
 
 // FUN_065f16a0, slot 1.
-GENRESULT DACOM_API FBoneRuntime::AddRef(void* InInstance)
+void DACOM_API FBoneRuntime::create_instance(long Inst)
 {
-    return (GENRESULT)(BoneRuntimeRet8(this, InInstance));
+    BoneRuntimeRet8(this, (void*)Inst);
 }
 
 // FUN_065f16a0, slot 2.
-GENRESULT DACOM_API FBoneRuntime::Release(void* InInstance)
+void DACOM_API FBoneRuntime::destroy_instance(long Inst)
 {
-    return (GENRESULT)(BoneRuntimeRet8(this, InInstance));
+    BoneRuntimeRet8(this, (void*)Inst);
 }
 
-// LAB_065f16b0, slot 3.
-GENRESULT DACOM_API FBoneRuntime::SetPosition(void* /*InInstance*/, const float* Position)
+// LAB_065f16b0, slot 3. Retail leaves the flag byte in AL; the slot returns nothing.
+void DACOM_API FBoneRuntime::set_position(long /*Inst*/, Vector const& Pos)
 {
     float* const Dest = LocalTransform + 9;
-    Dest[0] = Position[0];
-    Dest[1] = Position[1];
-    Dest[2] = Position[2];
+    Dest[0] = Pos.x;
+    Dest[1] = Pos.y;
+    Dest[2] = Pos.z;
     if ((this->Flags & 1u) != 0)
         this->Flags = (unsigned char)(this->Flags | 2u);
-    return GR_OK; // retail returns the flag byte; nobody reads it
 }
 
 // LAB_065f16e0, slot 4.
-float* DACOM_API FBoneRuntime::GetPosition(void* /*InInstance*/)
+Vector const& DACOM_API FBoneRuntime::get_position(long /*Inst*/) const
 {
-    return LocalTransform + 9;
+    return *(const Vector*)(LocalTransform + 9);
 }
 
 // LAB_065f16f0, slot 5. The copy is unconditional; the bit 0 test made before it only decides
 // the |= 2 after it.
-GENRESULT DACOM_API FBoneRuntime::SetOrientation(void* /*InInstance*/, const float* Rows)
+void DACOM_API FBoneRuntime::set_orientation(long /*Inst*/, Matrix const& Orient)
 {
     const unsigned char Flags = this->Flags;
-    std::memcpy(LocalTransform, Rows, 9 * sizeof(float));
+    std::memcpy(LocalTransform, &Orient, 9 * sizeof(float));
     if ((Flags & 1u) != 0)
         this->Flags = (unsigned char)(Flags | 2u);
-    return GR_OK;
 }
 
 // LAB_065f1720, slots 6 and 8.
-float* DACOM_API FBoneRuntime::GetOrientation(void* /*InInstance*/)
+Matrix const& DACOM_API FBoneRuntime::get_orientation(long /*Inst*/) const
 {
-    return LocalTransform;
+    return *(const Matrix*)LocalTransform;
 }
 
 // LAB_065f1720, slot 8 (the same body as slot 6).
-float* DACOM_API FBoneRuntime::GetMatrix(void* /*InInstance*/)
+Transform const& DACOM_API FBoneRuntime::get_transform(long /*Inst*/) const
 {
-    return LocalTransform;
+    return *(const Transform*)LocalTransform;
 }
 
 // LAB_065f1730, slot 7: as slot 5, with rotation + position.
-GENRESULT DACOM_API FBoneRuntime::SetMatrix(void* /*InInstance*/, const float* InMatrix)
+void DACOM_API FBoneRuntime::set_transform(long /*Inst*/, Transform const& Xform)
 {
     const unsigned char Flags = this->Flags;
-    std::memcpy(LocalTransform, InMatrix, 12 * sizeof(float));
+    std::memcpy(LocalTransform, &Xform, 12 * sizeof(float));
     if ((Flags & 1u) != 0)
         this->Flags = (unsigned char)(Flags | 2u);
-    return GR_OK;
 }
 
-// LAB_065f1760, slot 9. The instance is not read.
-GENRESULT DACOM_API FBoneRuntime::GetExtra(void* /*InInstance*/, float* OutExtra, float* OutVec)
+// LAB_065f1760, slot 9. The instance is not read. Retail leaves OutCenter in EAX; the slot
+// returns nothing.
+void DACOM_API FBoneRuntime::get_centered_radius(long /*Inst*/, float* OutRadius,
+                                                 Vector* OutCenter) const
 {
-    *(unsigned long*)OutExtra = 0;
-    ((unsigned long*)OutVec)[0] = 0;
-    ((unsigned long*)OutVec)[1] = 0;
-    ((unsigned long*)OutVec)[2] = 0;
-    return GR_OK; // retail returns OutVec; nobody reads it
+    *(unsigned long*)OutRadius = 0;
+    ((unsigned long*)OutCenter)[0] = 0;
+    ((unsigned long*)OutCenter)[1] = 0;
+    ((unsigned long*)OutCenter)[2] = 0;
 }
 
 // LAB_065f1780, slot 10.
-GENRESULT DACOM_API FBoneRuntime::SetExtra(void* /*InInstance*/, float /*Extra*/,
-                                           const float* /*Vec*/)
+void DACOM_API FBoneRuntime::set_centered_radius(long /*Inst*/, float /*Radius*/,
+                                                 Vector const& /*Center*/)
 {
-    return GR_OK;
 }
 
 // LAB_065f1790: slot 11 SetUser, shared with IEngineComponent slots 5/10.
@@ -441,27 +437,26 @@ static void DACOM_API BoneRuntimeRetC(void* /*This*/, void* /*A*/, void* /*B*/)
 }
 
 // LAB_065f1790, slot 11.
-GENRESULT DACOM_API FBoneRuntime::SetUser(void* InInstance, unsigned long User)
+void DACOM_API FBoneRuntime::set_instance_flags(long Inst, unsigned long InstFlags)
 {
-    BoneRuntimeRetC(this, InInstance, (void*)((ptrdiff_t)User));
-    return GR_OK;
+    BoneRuntimeRetC(this, (void*)Inst, (void*)((ptrdiff_t)InstFlags));
 }
 
 // LAB_065f17a0, slot 12.
-unsigned long DACOM_API FBoneRuntime::GetUser(void* /*InInstance*/)
+unsigned long DACOM_API FBoneRuntime::get_instance_flags(long /*Inst*/) const
 {
     return 0;
 }
 
 // LAB_065f17b0, slot 13.
-unsigned long DACOM_API FBoneRuntime::MarkWorldDirty(void* /*InInstance*/)
+bool DACOM_API FBoneRuntime::joint_changed(long /*Inst*/)
 {
     unsigned char Flags = this->Flags;
     if ((Flags & 2u) != 0)
-        return 0;
+        return false;
     Flags = (unsigned char)(Flags | 2u);
     this->Flags = Flags;
-    return (unsigned long)((~Flags) & 1u);
+    return ((~Flags) & 1u) != 0;
 }
 
 // FUN_065f17d0 (thiscall).
@@ -822,7 +817,7 @@ static GENRESULT DACOM_API EngineCallbackTrampoline(void* /*This*/, void* Arg1, 
     if (G_BoneLinkFn == nullptr)
         return GR_OK;
     return (GENRESULT)(
-        G_BoneLinkFn(Arg1, (int)((ptrdiff_t)Arg2), G_BoneLinkHolder));
+        G_BoneLinkFn((InstanceIndex)Arg1, (int)((ptrdiff_t)Arg2), G_BoneLinkHolder));
 }
 
 // FUN_065f1df0: only these four, in retail order.
@@ -871,14 +866,14 @@ GENRESULT DACOM_API FDeformable::Play(void* Instance, int* Out, void* Name, void
 
 GENRESULT DACOM_API FDeformable::PlayAlt(void* Instance, int* Out, void* Name, void* Extra,
                                                 void* ArgC, void* ArgD, void* ArgE, void* ArgF,
-                                                void* ArgG, void* ArgH, void* Script)
+                                                void* ArgG, void* ArgH, InstanceIndex Joint)
 {
     FDeformInstance* DeformInstance = (FDeformInstance*)Instance;
     // LAB_065f1f50 -> FUN_065f4660.
     if (DeformInstance == nullptr)
         return GR_GENERIC;
     const int Handle =
-        DeformInstance->PlayAnimChain(Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, Script);
+        DeformInstance->PlayAnimChain(Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, Joint);
     *Out = Handle;
     if (Handle == -1)
         return GR_GENERIC;
@@ -1044,9 +1039,8 @@ GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, float* Pos3)
     }
     if (bHit == 0)
         Vec[1] = DeformInstance->RootHeightOffset + DeformInstance->BaseHeight;
-    G_Engine->SetInstancePosition((void*)((ptrdiff_t)(
-                                      FirstBoneInstance(DeformInstance))),
-                                  Vec);
+    G_Engine->SetInstancePosition(FirstBoneInstance(DeformInstance),
+                                  (const Vector*)Vec);
     return GR_OK;
 }
 
@@ -1065,8 +1059,7 @@ GENRESULT DACOM_API FDeformable::SetPoseOri(void* Instance, void* Ori)
                 (float*)Ori);
         Node = Node->Next;
     }
-    G_Engine->SetInstanceOrientation(
-        (void*)((ptrdiff_t)(FirstBoneInstance(DeformInstance))), Ori);
+    G_Engine->SetInstanceOrientation(FirstBoneInstance(DeformInstance), (const Matrix*)Ori);
     return GR_OK;
 }
 
@@ -1297,20 +1290,20 @@ static GENRESULT DACOM_API EngineUpdateOk(void* /*This*/, void* /*A*/, void* /*B
     return GR_OK;
 }
 
-int DACOM_API FDeformable::CreateArchetype(void* Arg1, void* Arg2)
+int DACOM_API FDeformable::CreateArchetype(ArchetypeIndex Arg1, IFileSystem* Arg2)
 {
-    return (int)(EngineUpdateOk(this, Arg1, Arg2));
+    return (int)(EngineUpdateOk(this, (void*)Arg1, Arg2));
 }
 
-int DACOM_API FDeformable::DuplicateArchetype(void* Arg1, void* Arg2)
+int DACOM_API FDeformable::DuplicateArchetype(ArchetypeIndex Arg1, ArchetypeIndex Arg2)
 {
-    BoneRuntimeRetC(this, Arg1, Arg2);
+    BoneRuntimeRetC(this, (void*)Arg1, (void*)Arg2);
     return 0;
 }
 
-int DACOM_API FDeformable::DestroyArchetype(void* Arg1)
+int DACOM_API FDeformable::DestroyArchetype(ArchetypeIndex Arg1)
 {
-    return (int)(BoneRuntimeRet8(this, Arg1));
+    return (int)(BoneRuntimeRet8(this, (void*)Arg1));
 }
 
 static GENRESULT DACOM_API EngineStub10(void* /*This*/, void* /*A*/, void* /*B*/, void* /*C*/)
@@ -1318,32 +1311,32 @@ static GENRESULT DACOM_API EngineStub10(void* /*This*/, void* /*A*/, void* /*B*/
     return GR_GENERIC;
 }
 
-int DACOM_API FDeformable::QueryArchetype(void* Arg1, const char* Iid, void** Out)
+int DACOM_API FDeformable::QueryArchetype(ArchetypeIndex Arg1, const char* Iid, void** Out)
 {
     // The callback ABI carries the const IID through an opaque mutable token.
-    return (int)(EngineStub10(this, Arg1, const_cast<char*>(Iid), Out));
+    return (int)(EngineStub10(this, (void*)Arg1, const_cast<char*>(Iid), Out));
 }
 
-int DACOM_API FDeformable::CreateInstance(void* Arg1, void* Arg2)
+int DACOM_API FDeformable::CreateInstance(InstanceIndex Arg1, ArchetypeIndex Arg2)
 {
-    return (int)(EngineCallbackTrampoline(this, Arg1, Arg2));
+    return (int)(EngineCallbackTrampoline(this, (void*)Arg1, (void*)Arg2));
 }
 
-int DACOM_API FDeformable::DestroyInstance(void* Arg1)
+int DACOM_API FDeformable::DestroyInstance(InstanceIndex Arg1)
 {
-    return (int)(BoneRuntimeRet8(this, Arg1));
+    return (int)(BoneRuntimeRet8(this, (void*)Arg1));
 }
 
-int DACOM_API FDeformable::UpdateInstance(void* Arg1, void* Arg2)
+int DACOM_API FDeformable::UpdateInstance(InstanceIndex Arg1, void* Arg2)
 {
-    BoneRuntimeRetC(this, Arg1, Arg2);
+    BoneRuntimeRetC(this, (void*)Arg1, Arg2);
     return 0;
 }
 
-int DACOM_API FDeformable::QueryInstance(void* Arg1, const char* Iid, void** Out)
+int DACOM_API FDeformable::QueryInstance(InstanceIndex Arg1, const char* Iid, void** Out)
 {
     // The callback ABI carries the const IID through an opaque mutable token.
-    return (int)(EngineStub10(this, Arg1, const_cast<char*>(Iid), Out));
+    return (int)(EngineStub10(this, (void*)Arg1, const_cast<char*>(Iid), Out));
 }
 
 int DACOM_API FDeformable::Notify(void* Arg1)

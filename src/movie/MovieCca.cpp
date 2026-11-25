@@ -8,16 +8,17 @@
 
 #include "MovieAce.h"
 #include "MovieField.h"
+#include "MovieFieldHigh.h"
 
 #include <stddef.h>
 #include <windows.h>
-
-// 0x06ac8d40. Defined in MovieFieldHigh.cpp.
-int __stdcall LimbBitLength(int Limbs, int Count);
+#include <winternl.h>
 
 static_assert(sizeof(FRngState) == 0x120u, "rng state");
 static_assert(sizeof(OSVERSIONINFOA) == 0x94u, "version info");
 static_assert(offsetof(OSVERSIONINFOA, dwPlatformId) == 0x10u, "platform id");
+static_assert(sizeof(SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION) == 0x30u && sizeof(SYSTEM_PERFORMANCE_INFORMATION) == 0x138u, "NtQuerySystemInformation buffer sizes");
+static_assert(sizeof(SYSTEM_EXCEPTION_INFORMATION) == 0x10u && sizeof(SYSTEM_LOOKASIDE_INFORMATION) == 0x20u, "NtQuerySystemInformation buffer sizes");
 
 // DAT_06add3c0, DAT_06add3c4, DAT_06add3c8, with their retail initial bytes.
 static unsigned int GPoolCapacity = 0x200u;
@@ -413,24 +414,24 @@ static unsigned int CollectEntropy(unsigned char* Entropy, const unsigned char* 
     {
         return Remaining;
     }
-    if (!AppendSystemInfo(Cursor, Remaining, 8u, 0x30u))
+    if (!AppendSystemInfo(Cursor, Remaining, SystemProcessorPerformanceInformation, sizeof(SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION)))
     {
         return Remaining;
     }
-    if (!AppendSystemInfo(Cursor, Remaining, 2u, 0x138u))
+    if (!AppendSystemInfo(Cursor, Remaining, SystemPerformanceInformation, sizeof(SYSTEM_PERFORMANCE_INFORMATION)))
     {
         return Remaining;
     }
-    if (!AppendSystemInfo(Cursor, Remaining, 0x21u, 0x10u))
+    if (!AppendSystemInfo(Cursor, Remaining, SystemExceptionInformation, sizeof(SYSTEM_EXCEPTION_INFORMATION)))
     {
         return Remaining;
     }
-    if (!AppendSystemInfo(Cursor, Remaining, 0x2du, 0x20u))
+    if (!AppendSystemInfo(Cursor, Remaining, SystemLookasideInformation, sizeof(SYSTEM_LOOKASIDE_INFORMATION)))
     {
         return Remaining;
     }
     Returned = Remaining;
-    Status = GNtQuerySystemInformation(0x17u, Cursor, Remaining, &Returned);
+    Status = GNtQuerySystemInformation(SystemInterruptInformation, Cursor, Remaining, &Returned);
     if (Status >= 0)
     {
         if (!Commit(Cursor, Remaining, Returned))
@@ -439,7 +440,7 @@ static unsigned int CollectEntropy(unsigned char* Entropy, const unsigned char* 
         }
     }
     Returned = Remaining;
-    Status = GNtQuerySystemInformation(5u, Cursor, Remaining, &Returned);
+    Status = GNtQuerySystemInformation(SystemProcessInformation, Cursor, Remaining, &Returned);
     if (Status < 0)
     {
         return Remaining;

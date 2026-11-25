@@ -138,7 +138,7 @@ bool CAttachedEquip::Connect(char const* HpName)
 
     unsigned long const HpCrc = DACOM_CRC::GetCRC32(HpName);
     CObject* const Parent = (CObject*)(
-        DALib::Engine->GetInstanceUserData((void*)(ConnectionIndex)));
+        DALib::Engine->GetInstanceUserData(ConnectionIndex));
     // A parent part whose hardpoint id list holds the CRC makes this a non-physical attachment.
     PhyArch::Part const* const Part = Parent->PhyPart;
     if (Part != nullptr &&
@@ -224,8 +224,8 @@ void CAttachedEquip::ComputeBoundingSphere(float& OutRadius, Vector& OutCenter) 
 {
     // FUN_06293740: the root instance's extent.
     long Root = GetRootIndex();
-    DALib::Engine->GetInstanceExtent((void*)(Root), 0, &OutRadius,
-                                     &OutCenter.x);
+    DALib::Engine->GetInstanceExtent(Root, 0, &OutRadius,
+                                     &OutCenter);
 }
 
 bool CAttachedEquip::GetCenterOfMass(Vector& Out) const
@@ -245,10 +245,8 @@ bool CAttachedEquip::GetCenterOfMass(Vector& Out) const
         ComputeBoundingSphere(BoundRadius, BoundCenter);
     }
     long Root = Attachment->GetRootIndex();
-    float* Xform = DALib::Engine->GetInstanceTransform((void*)(Root));
-    Acquire3DMathEngine()->TransformXform((FVector&)(World),
-                                          *(FTransform const*)Xform,
-                                          (FVector const&)(BoundCenter));
+    const float* Xform = (const float*)DALib::Engine->GetInstanceTransform(Root);
+    Acquire3DMathEngine()->TransformXform(World, *(Transform const*)Xform, BoundCenter);
     Out = World;
     return true;
 }

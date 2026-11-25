@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include <cstddef>
 #include "Common/client_cliobj.h"
 
@@ -31,7 +32,7 @@ struct FMeshHolder
 {
     FMeshHolder() = default;
     virtual ~FMeshHolder(); // FUN_00420d10; scalar deleting wrapper LAB_00420d20
-    void* EngineInstance = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1)); // +0x04
+    InstanceIndex EngineInstance = InvalidInstanceIndex;   // +0x04
     Archetype::FCliMaterialEntry* MaterialEntry = nullptr;    // +0x08
     Archetype::FCliMaterialEntry* AuxMaterialEntry = nullptr; // +0x0c
 };
@@ -96,10 +97,10 @@ void ClientMeshHolderSetMaterials(FMeshHolder* Holder, char const* Path, char co
 // FUN_00420d70 (thiscall on the holder, RET 4) - a bound instance is destroyed and BOTH
 // material-cache slots released (FUN_0041b030); then CreateInstance(ArchHandle, 0). True when
 // that is not -1. Callers: FLFxMeshFactory, FUN_0059ec80.
-bool ClientMeshHolderBindInstance(FMeshHolder* Holder, void* ArchHandle);
+bool ClientMeshHolderBindInstance(FMeshHolder* Holder, ArchetypeIndex ArchHandle);
 
 // FUN_00421030 (thiscall on the holder) - IEngine GetInstanceTransform.
-float* ClientMeshHolderGetTransform(FMeshHolder const* Holder);
+const Transform* ClientMeshHolderGetTransform(FMeshHolder const* Holder);
 
 // FUN_00421090 (thiscall on the holder, RET 4) - the instance's bounding sphere in world space
 // (the centre through the instance transform). The math engine is cached in DAT_00616870.
@@ -107,7 +108,7 @@ float* ClientMeshHolderGetTransform(FMeshHolder const* Holder);
 float ClientMeshHolderGetBoundingSphere(FMeshHolder const* Holder, float* OutCenter);
 
 // FUN_00421050 (thiscall on the holder, RET 4) - IEngine SetInstanceMatrix.
-void ClientMeshHolderSetMatrix(FMeshHolder* Holder, void* Transform);
+void ClientMeshHolderSetMatrix(FMeshHolder* Holder, const Transform* Xform);
 
 // FUN_00421120 (thiscall on the holder, RET 8) - IRenderer2 slot 7 at lod 1.0.
 void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Flags);
@@ -116,11 +117,11 @@ void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Fla
 void ClientMeshHolderSetPosition(FMeshHolder* Holder, float const Position[3]);
 
 // FUN_00420fb0 (thiscall on the holder) - IEngine GetInstancePosition.
-float* ClientMeshHolderGetPosition(FMeshHolder const* Holder);
+const Vector* ClientMeshHolderGetPosition(FMeshHolder const* Holder);
 
 // FUN_00420ff0 (thiscall on the holder) - IEngine GetInstanceOrientation: nine floats,
 // row-major.
-float* ClientMeshHolderGetOrientation(FMeshHolder const* Holder);
+const Matrix* ClientMeshHolderGetOrientation(FMeshHolder const* Holder);
 
 // FUN_00421010 (thiscall on the holder, RET 4) - IEngine SetInstanceOrientation.
 void ClientMeshHolderSetOrientation(FMeshHolder* Holder, float const Orientation[9]);
@@ -147,7 +148,7 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
 // material-cache entries -- alive until the Win3D manager shuts down.
 struct FWin3DModelCacheEntry
 {
-    void* ArchHandle;                                   // +0x00
+    ArchetypeIndex ArchHandle;                          // +0x00
     Archetype::FCliMaterialEntry* MaterialEntry;        // +0x04
     Archetype::FCliMaterialEntry* AuxMaterialEntry;     // +0x08
 };

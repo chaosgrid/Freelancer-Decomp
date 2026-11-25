@@ -27,7 +27,7 @@ public:
     // slot 5 LAB_00599eb0 (RET 4) -- places the style mesh, then the base SetPosition.
     void SetPosition(float const* NewPosition) override;
     // slot 7 LAB_00599e00 (RET 4) -- keeps the style mesh upright.
-    void SetOrientation(float const* NewOrientation) override;
+    void SetOrientation(Matrix const* NewOrientation) override;
     // slot 9 FUN_00599f60 (RET 8); Data is an FUiPayloadTextMsgButton*.
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 13 LAB_0059a260

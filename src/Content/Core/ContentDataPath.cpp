@@ -33,24 +33,24 @@ namespace
 
 // FUN_06f243d0 (06f243d0-06f24601), cdecl. x87 arithmetic is kept in double (the process's
 // 53-bit precision control); every retail float store is a float store here.
-void __cdecl PlaceFacingAnchor(FTransform const* Anchor, float const* Heading, float const* Range,
-                               FTransform* Out)
+void __cdecl PlaceFacingAnchor(Transform const* Anchor, float const* Heading, float const* Range,
+                               Transform* Out)
 {
-    FVector Offset;
-    Offset.X = static_cast<float>(std::cos(static_cast<double>(*Heading)) * *Range);
-    Offset.Y = 0.0f;
-    Offset.Z = static_cast<float>(-(std::sin(static_cast<double>(*Heading)) * *Range));
+    Vector Offset;
+    Offset.x = static_cast<float>(std::cos(static_cast<double>(*Heading)) * *Range);
+    Offset.y = 0.0f;
+    Offset.z = static_cast<float>(-(std::sin(static_cast<double>(*Heading)) * *Range));
 
     // 3DMathEngine slot +0x28.
-    FVector Position;
+    Vector Position;
     ContentMathEngine()->TransformXform(Position, *Anchor, Offset);
     Out->Translation = Position;
 
     // Forward = normalize(Out position - Anchor position); 1.0f = DAT_06fb5810. The sum order
     // under the sqrt is retail's.
-    float ForwardX = static_cast<float>(static_cast<double>(Out->Translation.X) - Anchor->Translation.X);
-    float ForwardY = static_cast<float>(static_cast<double>(Out->Translation.Y) - Anchor->Translation.Y);
-    float ForwardZ = static_cast<float>(static_cast<double>(Out->Translation.Z) - Anchor->Translation.Z);
+    float ForwardX = static_cast<float>(static_cast<double>(Out->Translation.x) - Anchor->Translation.x);
+    float ForwardY = static_cast<float>(static_cast<double>(Out->Translation.y) - Anchor->Translation.y);
+    float ForwardZ = static_cast<float>(static_cast<double>(Out->Translation.z) - Anchor->Translation.z);
     double Inverse = 1.0 / std::sqrt((static_cast<double>(ForwardY) * ForwardY +
                                       static_cast<double>(ForwardZ) * ForwardZ) +
                                      static_cast<double>(ForwardX) * ForwardX);
@@ -83,13 +83,13 @@ void __cdecl PlaceFacingAnchor(FTransform const* Anchor, float const* Heading, f
                                            static_cast<double>(RightY) * ForwardX));
 
     // The columns Right, Up, Forward.
-    Out->Rotation.D[0][0] = RightX;
-    Out->Rotation.D[0][1] = UpX;
-    Out->Rotation.D[0][2] = ForwardX;
-    Out->Rotation.D[1][0] = RightY;
-    Out->Rotation.D[1][1] = UpY;
-    Out->Rotation.D[1][2] = ForwardY;
-    Out->Rotation.D[2][0] = RightZ;
-    Out->Rotation.D[2][1] = UpZ;
-    Out->Rotation.D[2][2] = ForwardZ;
+    Out->Rotation.E[0][0] = RightX;
+    Out->Rotation.E[0][1] = UpX;
+    Out->Rotation.E[0][2] = ForwardX;
+    Out->Rotation.E[1][0] = RightY;
+    Out->Rotation.E[1][1] = UpY;
+    Out->Rotation.E[1][2] = ForwardY;
+    Out->Rotation.E[2][0] = RightZ;
+    Out->Rotation.E[2][1] = UpZ;
+    Out->Rotation.E[2][2] = ForwardZ;
 }

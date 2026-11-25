@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <cstddef>
 
+class IVP_Event_Sim; // ivp_controller.h
+
 // ============================================================================
 // IVP_Simulation_Unit: a group of cores simulated together, 0x24 bytes
 // (operator_new(0x24) in IVP_Core's ctor FUN_06347550).
@@ -51,6 +53,109 @@ public:
     // pushed onto a manager list; the port zeroes them. Only the low byte of
     // State and the pushed links are ever read, so this is not observable.
     IVP_Simulation_Unit();
+
+    // FUN_06348cb0: detach_core, called from IVP_Core::~IVP_Core (FUN_063477e0)
+    // when the core's sim unit (+0x15C) is set. Removes Core from the unit and
+    // from every controller bucket; a unit left without cores is unlinked from
+    // Core->Environment->sim_units_manager and freed.
+    void detach_core(IVP_Core* Core);
+
+    // FUN_06349210: removes Core from the bucket keyed by Controller; an emptied
+    // bucket is deleted and its slot removed. Caller: IVP_Core::detach_controller
+    // (FUN_06349110).
+    void detach_core_from_controller_bucket(IVP_Controller* Controller, IVP_Core* Core);
+
+    // FUN_063491d0: the insertion twin -- ensure a bucket for Controller, append
+    // Core, re-sort by priority. Caller: FUN_06349180 (IVP_Core's controller add).
+    void register_core_with_controller(IVP_Controller* Controller, IVP_Core* Core);
+
+    // FUN_063492c0: insertion sort of ControllerBuckets by each controller's
+    // get_controller_priority() (signed compare).
+    void sort_controller_buckets_by_priority();
+
+    // FUN_06349350: swaps ControllerBuckets.elems[i] and [j].
+    void swap_controller_buckets(int i, int j);
+
+    // FUN_063494f0: update_time_of_last_motion on every core, backwards. The same
+    // loop IVP_Core::ensure_in_simulation inlines.
+    void update_cores_last_motion_time();
+
+    // FUN_06349490 (ECX = unit, stack = environment): the library's
+    // sim_unit_revive_for_simulation. IVP_Core::revive_sleeping_core forwards here.
+    void revive_if_sleeping(IVP_Environment* Environment);
+
+    // FUN_063495e0: per-PSI motion classification. Each core's
+    // classify_motion_state result goes into its MovementState low byte; when all
+    // report 3 ("long idle") every core is frozen (FUN_0634b5e0) and the unit moves
+    // to the sleeping list with State low byte 8. Returns 1 if it went to sleep.
+    int update_motion_and_maybe_sleep(IVP_Environment* Environment);
+
+    // FUN_063495c0: clear and rebuild the controller buckets, rebalance (split off
+    // disconnected core groups), then clear State bits 0x300.
+    void rebalance_and_clear_topology_flag();
+
+    // FUN_06348860: does a bucket keyed by Controller exist? (Retail keeps this
+    // and FUN_06348c80's index search as separate leaves.)
+    bool has_controller_bucket(IVP_Controller* Controller);
+
+    // FUN_06348900: new bucket (operator_new(0x14)) keyed by Controller, appended.
+    void create_controller_bucket(IVP_Controller* Controller);
+
+    // FUN_063488a0: re-finds the bucket for Controller (a second search, as in
+    // retail) and appends Core. The bucket must exist.
+    void add_core_to_controller_bucket(IVP_Controller* Controller, IVP_Core* Core);
+
+    // FUN_063487f0: rebuilds the buckets from every core's Controllers, then sorts
+    // them by priority (FUN_063492c0).
+    void rebuild_controller_buckets();
+
+    // FUN_06348b80: deletes every bucket, then the bucket array; safe at any time,
+    // not only at teardown.
+    void clear_controller_buckets();
+
+    // FUN_06348d80: the unit's destructor body -- clear_controller_buckets, then
+    // the ControllerBuckets and Cores buffers. The caller frees the unit
+    // (06348cb0, 06356eef / 06356f05).
+    void free_vector_buffers();
+
+    // FUN_06348ad0: union-find connectivity check. Clears every core's
+    // MergedCoreWhichReplacedIt, unions the cores each bucket's controller
+    // connects (slot 2, get_associated_controlled_cores), and returns the first
+    // core whose master differs from the first core's, or null when the unit is
+    // one connected group.
+    IVP_Core* find_disconnected_core();
+
+    // FUN_06348960: moves every core whose master is TargetMaster (and any further
+    // disconnected group found among the rest) into new units, pushed onto the
+    // same manager with State 1 ("awake"), each with rebuilt buckets.
+    void split_off_core_group(IVP_Core* TargetMaster);
+
+    // FUN_06348aa0: when a disconnected group exists, clear the buckets, split it
+    // off and rebuild.
+    void rebalance();
+
+    // FUN_06348c10: moves every core of Source into Unit and unlinks Source from
+    // the manager, reached through the last moved core's environment (an empty
+    // Source dereferences null, as in retail). Source is not freed here.
+    void absorb_cores_from(IVP_Simulation_Unit* Source);
+
+    // FUN_06348c60: merge two units (clear buckets, absorb, rebuild); the inverse
+    // of split_off_core_group.
+    void merge_from(IVP_Simulation_Unit* Source);
+
+    // FUN_06348ef0: removes Core from Cores (backward search, shift-remove).
+    void remove_core(IVP_Core* Core);
+
+    // FUN_06348c80: index of the bucket keyed by Controller; -1 when absent.
+    int find_controller_bucket_index(IVP_Controller* Controller);
+
+    // FUN_06348e60: deletes the bucket keyed by Controller and removes its slot.
+    void free_controller_bucket(IVP_Controller* Controller);
+
+    // FUN_063496a0 (ECX = unit; EventSim, OutputCoreList on the stack): the
+    // library's simulate_single_sim_unit_psi, called by
+    // IVP_Sim_Units_Manager::simulate_sim_units_psi.
+    void simulate_single_sim_unit_psi(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* OutputCoreList);
 };
 static_assert(offsetof(IVP_Simulation_Unit, Prev) == 0x04, "IVP_Simulation_Unit+0x04");
 static_assert(offsetof(IVP_Simulation_Unit, Next) == 0x08, "IVP_Simulation_Unit+0x08");
@@ -97,108 +202,4 @@ static_assert(offsetof(IVP_Sim_Units_Manager, sim_units_head) == 0x14, "IVP_Sim_
 static_assert(offsetof(IVP_Sim_Units_Manager, still_units_head) == 0x1a4, "IVP_Sim_Units_Manager+0x1a4");
 static_assert(sizeof(IVP_Sim_Units_Manager) == 0x1a8, "IVP_Sim_Units_Manager is 0x1a8 bytes (operator_new(0x1a8), 0634c2cf)");
 
-// FUN_06348cb0: detach_core, called from IVP_Core::~IVP_Core (FUN_063477e0)
-// when the core's sim unit (+0x15C) is set. Removes Core from the unit and
-// from every controller bucket; a unit left without cores is unlinked from
-// Core->Environment->sim_units_manager and freed.
-void IVP_Simulation_Unit_Detach_Core(IVP_Simulation_Unit* Unit, IVP_Core* Core);
 
-// ============================================================================
-// Controller detach / per-unit wake / motion classification
-// ============================================================================
-
-// FUN_06349210: removes Core from the bucket keyed by Controller; an emptied
-// bucket is deleted and its slot removed. Caller: IVP_Core::detach_controller
-// (FUN_06349110).
-void IVP_Simulation_Unit_Detach_Core_From_Controller_Bucket(IVP_Simulation_Unit* Unit,
-                                                              IVP_Controller* Controller,
-                                                              IVP_Core* Core);
-
-// FUN_063491d0: the insertion twin -- ensure a bucket for Controller, append
-// Core, re-sort by priority. Caller: FUN_06349180 (IVP_Core's controller add).
-void IVP_Simulation_Unit_Register_Core_With_Controller(IVP_Simulation_Unit* Unit,
-                                                        IVP_Controller* Controller,
-                                                        IVP_Core* Core);
-
-// FUN_063492c0: insertion sort of ControllerBuckets by each controller's
-// get_controller_priority() (signed compare).
-void IVP_Simulation_Unit_Sort_Controller_Buckets_By_Priority(IVP_Simulation_Unit* Unit);
-
-// FUN_06349350: swaps ControllerBuckets.elems[i] and [j].
-void IVP_Simulation_Unit_Swap_Controller_Buckets(IVP_Simulation_Unit* Unit, int i, int j);
-
-// FUN_063494f0: update_time_of_last_motion on every core, backwards. The same
-// loop IVP_Core::ensure_in_simulation inlines.
-void IVP_Simulation_Unit_Update_Cores_Last_Motion_Time(IVP_Simulation_Unit* Unit);
-
-// FUN_06349490 (ECX = unit, stack = environment): the library's
-// sim_unit_revive_for_simulation. IVP_Core::revive_sleeping_core forwards here.
-void IVP_Simulation_Unit_Revive_If_Sleeping(IVP_Simulation_Unit* Unit, IVP_Environment* Environment);
-
-// FUN_063495e0: per-PSI motion classification. Each core's
-// classify_motion_state result goes into its MovementState low byte; when all
-// report 3 ("long idle") every core is frozen (FUN_0634b5e0) and the unit moves
-// to the sleeping list with State low byte 8. Returns 1 if it went to sleep.
-int IVP_Simulation_Unit_Update_Motion_And_Maybe_Sleep(IVP_Simulation_Unit* Unit, IVP_Environment* Environment);
-
-// FUN_063495c0: clear and rebuild the controller buckets, rebalance (split off
-// disconnected core groups), then clear State bits 0x300.
-void IVP_Simulation_Unit_Rebalance_And_Clear_Topology_Flag(IVP_Simulation_Unit* Unit);
-
-// FUN_063496a0: the library's simulate_single_sim_unit_psi, called by
-// IVP_Sim_Units_Manager::simulate_sim_units_psi.
-class IVP_Event_Sim; // ivp_controller.h
-void IVP_Simulation_Unit_Process_One_Psi_Step(IVP_Event_Sim* EventSim, IVP_Simulation_Unit* Unit, IVP_U_Vector<IVP_Core>* OutputCoreList);
-
-// ============================================================================
-// Controller-bucket build / merge / split (free functions taking the unit)
-// ============================================================================
-
-// FUN_06348860: does a bucket keyed by Controller exist? (Retail keeps this
-// and FUN_06348c80's index search as separate leaves.)
-bool IVP_Simulation_Unit_Has_Controller_Bucket(IVP_Simulation_Unit* Unit, IVP_Controller* Controller);
-
-// FUN_06348900: new bucket (operator_new(0x14)) keyed by Controller, appended.
-void IVP_Simulation_Unit_Create_Controller_Bucket(IVP_Simulation_Unit* Unit, IVP_Controller* Controller);
-
-// FUN_063488a0: re-finds the bucket for Controller (a second search, as in
-// retail) and appends Core. The bucket must exist.
-void IVP_Simulation_Unit_Add_Core_To_Controller_Bucket(IVP_Simulation_Unit* Unit, IVP_Controller* Controller, IVP_Core* Core);
-
-// FUN_063487f0: rebuilds the buckets from every core's Controllers, then sorts
-// them by priority (FUN_063492c0).
-void IVP_Simulation_Unit_Rebuild_Controller_Buckets(IVP_Simulation_Unit* Unit);
-
-// FUN_06348b80: deletes every bucket, then the bucket array; safe at any time,
-// not only at teardown.
-void IVP_Simulation_Unit_Clear_Controller_Buckets(IVP_Simulation_Unit* Unit);
-
-// FUN_06348d80: the unit's destructor body -- Clear_Controller_Buckets, then
-// the ControllerBuckets and Cores buffers. The caller frees the unit
-// (06348cb0, 06356eef / 06356f05).
-void IVP_Simulation_Unit_Free_Vector_Buffers(IVP_Simulation_Unit* Unit);
-
-// FUN_06348ad0: union-find connectivity check. Clears every core's
-// MergedCoreWhichReplacedIt, unions the cores each bucket's controller
-// connects (slot 2, get_associated_controlled_cores), and returns the first
-// core whose master differs from the first core's, or null when the unit is
-// one connected group.
-IVP_Core* IVP_Simulation_Unit_Find_Disconnected_Core(IVP_Simulation_Unit* Unit);
-
-// FUN_06348960: moves every core whose master is TargetMaster (and any further
-// disconnected group found among the rest) into new units, pushed onto the
-// same manager with State 1 ("awake"), each with rebuilt buckets.
-void IVP_Simulation_Unit_Split_Off_Core_Group(IVP_Simulation_Unit* Unit, IVP_Core* TargetMaster);
-
-// FUN_06348aa0: when a disconnected group exists, clear the buckets, split it
-// off and rebuild.
-void IVP_Simulation_Unit_Rebalance(IVP_Simulation_Unit* Unit);
-
-// FUN_06348c10: moves every core of Source into Unit and unlinks Source from
-// the manager, reached through the last moved core's environment (an empty
-// Source dereferences null, as in retail). Source is not freed here.
-void IVP_Simulation_Unit_Absorb_Cores_From(IVP_Simulation_Unit* Unit, IVP_Simulation_Unit* Source);
-
-// FUN_06348c60: merge two units (clear buckets, absorb, rebuild); the inverse
-// of Split_Off_Core_Group.
-void IVP_Simulation_Unit_Merge_From(IVP_Simulation_Unit* Unit, IVP_Simulation_Unit* Source);

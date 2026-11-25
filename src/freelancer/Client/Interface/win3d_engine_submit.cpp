@@ -65,7 +65,7 @@ namespace
     {
         if (Cache == nullptr)
             Cache = Acquire3DMathEngine();
-        Cache->Scale(*reinterpret_cast<FMatrix*>(Mtx12), *reinterpret_cast<FMatrix const*>(Mtx12),
+        Cache->Scale(*reinterpret_cast<Matrix*>(Mtx12), *reinterpret_cast<Matrix const*>(Mtx12),
                      Scale);
     }
 
@@ -127,7 +127,7 @@ void Win3DUnprojectScreenRayDir(FSpaceCamera* Cam, float ScreenX, float ScreenY,
     float const Ly = (ScreenY - Cam->ScreenCenterY) * (Cam->ZNear / Cam->YScale);
     float const Lz = -Cam->ZNear;
 
-    float const* R = Cam->World;
+    float const* R = &Cam->World.E[0][0];
     float Wx = R[0] * Lx + R[1] * Ly + R[2] * Lz;
     float Wy = R[3] * Lx + R[4] * Ly + R[5] * Lz;
     float Wz = R[6] * Lx + R[7] * Ly + R[8] * Lz;
@@ -167,7 +167,7 @@ void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
     DALib::Renderer->RenderInstance(ArchAnchor, Holder->EngineInstance, 1.0f, SlotFlags, Matrix, nullptr);
 }
 
-void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
+void SubmitWin3DTintedEngineInstance(void* ArchAnchor, InstanceIndex EngineInstance,
                                      unsigned char MaterialSelector, unsigned long Flags,
                                      unsigned char const ColorRgba[4],
                                      unsigned char bDepthTested, float Scale)
@@ -175,7 +175,7 @@ void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
     // FUN_00434310 (cdecl, 7 args).
     if (GetGameOption(kGameOptShipWires) == 0)
         return;
-    if (EngineInstance == reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1)))
+    if (EngineInstance == InvalidInstanceIndex)
         return;
 
     // The two depth states saved, then set; restored at the end.
@@ -228,7 +228,7 @@ void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
     Pipe->SetRenderState(kRsZWriteEnable, SavedZWrite);
 }
 
-void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, void* EngineInstance,
+void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, InstanceIndex EngineInstance,
                                             unsigned char bFrontCull,
                                             unsigned char const ColorRgba[4],
                                             unsigned char bDepthTested, float Scale,
@@ -243,13 +243,13 @@ void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, void* EngineInstan
                                     bDepthTested, Scale);
 }
 
-int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsigned char bFrontCull,
+int SubmitWin3DMaterialEngineInstance(void* Camera, InstanceIndex EngineInstance, unsigned char bFrontCull,
                                       unsigned char const ColorRgba[4],
                                       unsigned char bDepthTested, float Scale,
                                       unsigned char bParam10, unsigned long Flags)
 {
     // FUN_00433f40
-    if (EngineInstance == reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1)))
+    if (EngineInstance == InvalidInstanceIndex)
         return 1;
 
     IRenderPipeline* const Pipe = DALib::Pipeline;
@@ -310,7 +310,7 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsign
     return Result;
 }
 
-void SubmitWin3DOutlinedEngineInstance(void* Camera, void* EngineInstance,
+void SubmitWin3DOutlinedEngineInstance(void* Camera, InstanceIndex EngineInstance,
                                        unsigned char bFrontCull, unsigned char const ColorRgba[4],
                                        float Scale, unsigned long Flags)
 {
@@ -337,13 +337,13 @@ bool Win3DRayHitsAabbHalfExtents(float const HalfExtents[3], float const Matrix3
     if (G_RayBoxMathEngine == nullptr)
         G_RayBoxMathEngine = Acquire3DMathEngine();
 
-    static_assert(sizeof(FTransform) == 12 * sizeof(float), "FTransform is the 3x4 transform");
-    FVector Out;
-    G_RayBoxMathEngine->InverseTransform(Out, *reinterpret_cast<FTransform const*>(Matrix3x4),
-                                         *reinterpret_cast<FVector const*>(RayDir));
+    static_assert(sizeof(Transform) == 12 * sizeof(float), "Transform is the 3x4 transform");
+    Vector Out;
+    G_RayBoxMathEngine->InverseTransform(Out, *reinterpret_cast<Transform const*>(Matrix3x4),
+                                         *reinterpret_cast<Vector const*>(RayDir));
 
-    float const LocalDir[3] = {Out.X + Matrix3x4[9], Out.Y + Matrix3x4[10],
-                               Out.Z + Matrix3x4[11]};
+    float const LocalDir[3] = {Out.x + Matrix3x4[9], Out.y + Matrix3x4[10],
+                               Out.z + Matrix3x4[11]};
     float const LocalOrigin[3] = {-Matrix3x4[9], -Matrix3x4[10], -Matrix3x4[11]};
 
     if (SlabHitStrict(LocalOrigin[0], LocalOrigin[1], LocalOrigin[2], LocalDir[0], LocalDir[1],

@@ -322,7 +322,7 @@ namespace AlchemyImpl
         float Normal_[3];       // node+0xa8: unit plane normal
         float Corner_[3];       // node+0xb4: TransformXform(slot 7, (1, 0, 1))
         float ScaledNormal_[3]; // node+0xc0: Normal_ * 5.0f (DAT_0624d160)
-        float BeginXform_[12];  // node+0xcc: slot 7 output (no reader besides Begin)
+        Transform BeginXform_;  // node+0xcc: slot 7 output (no reader besides Begin)
     };
 
     // retail LAB_0620ed20 (Begin) / LAB_0620ed30 (Apply) are no-ops returning 0, as the
@@ -390,7 +390,7 @@ namespace AlchemyImpl
         FFxDustFieldPropertySet* DustPropertySet_; // inner +0x9c, non-owning cache
         float Radius_;          // node+0xa0: Eval(radius ramp), this frame
         float RadiusSq_;        // node+0xa4: Radius^2 (float)
-        float BeginXform_[12];  // node+0xa8: slot 7 output (no reader besides Begin)
+        Transform BeginXform_;  // node+0xa8: slot 7 output (no reader besides Begin)
         float UpdateDt_;        // node+0xd8: the Dt of the last update
     };
 

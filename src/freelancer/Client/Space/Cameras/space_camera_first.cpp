@@ -74,14 +74,14 @@ namespace
         return G_FirstPersonMathEngine;
     }
 
-    FMatrix const& AsMatrix(const float* Nine)
+    Matrix const& AsMatrix(const float* Nine)
     {
-        return *reinterpret_cast<FMatrix const*>(Nine);
+        return *reinterpret_cast<Matrix const*>(Nine);
     }
 
-    FVector const& AsVector(const float* Three)
+    Vector const& AsVector(const float* Three)
     {
-        return *reinterpret_cast<FVector const*>(Three);
+        return *reinterpret_cast<Vector const*>(Three);
     }
 
     // FUN_00517130 -- the CompoundInstanceAnalyze callback. Asks the engine for the part's name
@@ -92,7 +92,7 @@ namespace
     {
         FEngineName Name;
         const char* Text =
-            DALib::Engine->GetInstanceName(&Name, reinterpret_cast<void*>(Instance))->Text;
+            DALib::Engine->GetInstanceName(&Name, Instance)->Text;
         if (Text == nullptr)
             Text = "";
         if (strstr(Text, "cam") != nullptr)
@@ -119,19 +119,19 @@ void FirstPersonCameraConstruct(FFirstPersonCamera* Cam)
 
     // Three transforms, each a zero position and an identity matrix (retail stores them in a
     // different order, same result).
-    Cam->CockpitHpPosition[0] = 0.0f;
-    Cam->CockpitHpPosition[1] = 0.0f;
-    Cam->CockpitHpPosition[2] = 0.0f;
-    SetIdentity(Cam->CockpitHpOrientation);
+    Cam->CockpitHpPosition.x = 0.0f;
+    Cam->CockpitHpPosition.y = 0.0f;
+    Cam->CockpitHpPosition.z = 0.0f;
+    SetIdentity(&Cam->CockpitHpOrientation.E[0][0]);
 
-    Cam->HeadPosition[0] = 0.0f;
-    Cam->HeadPosition[1] = 0.0f;
-    Cam->HeadPosition[2] = 0.0f;
-    SetIdentity(Cam->HeadOrientation);
+    Cam->HeadPosition.x = 0.0f;
+    Cam->HeadPosition.y = 0.0f;
+    Cam->HeadPosition.z = 0.0f;
+    SetIdentity(&Cam->HeadOrientation.E[0][0]);
 
-    Cam->EyePosition[0] = 0.0f;
-    Cam->EyePosition[1] = 0.0f;
-    Cam->EyePosition[2] = 0.0f;
+    Cam->EyePosition.x = 0.0f;
+    Cam->EyePosition.y = 0.0f;
+    Cam->EyePosition.z = 0.0f;
     SetIdentity(Cam->EyeOrientation);
 
     // Clears BOTH HUDCamera bytes +0xfc and +0xfd -- the only evidence +0xfd is a field rather
@@ -178,32 +178,32 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         // the whole transform: twelve dwords into the world rotation + position.
         Transform const& ObjectXform = Inspect->get_transform();
         Space->bViewDirty = 1;
-        memcpy(Space->World, &ObjectXform, 12 * sizeof(float));
+        memcpy(&Space->World, &ObjectXform, 12 * sizeof(float));
 
         long Handle = 0;
         HardpointInfo Info;
         if (FindHardpoint_PS(Inspect->get_index(), "HpCockpit", Handle, Info))
         {
-            Cam->CockpitHpPosition[0] = Info.Position.x;                           // +0x100
-            Cam->CockpitHpPosition[1] = Info.Position.y;
-            Cam->CockpitHpPosition[2] = Info.Position.z;
-            memcpy(Cam->CockpitHpOrientation, &Info.Orient, 9 * sizeof(float));   // +0x10c
+            Cam->CockpitHpPosition.x = Info.Position.x;                           // +0x100
+            Cam->CockpitHpPosition.y = Info.Position.y;
+            Cam->CockpitHpPosition.z = Info.Position.z;
+            memcpy(&Cam->CockpitHpOrientation, &Info.Orient, 9 * sizeof(float));   // +0x10c
         }
         else
         {
             // No cockpit hardpoint: four units behind the origin, identity.
-            Cam->CockpitHpPosition[0] = 0.0f;
-            Cam->CockpitHpPosition[1] = 0.0f;
-            Cam->CockpitHpPosition[2] = -4.0f;                                     // 0xc0800000
-            Cam->CockpitHpOrientation[8] = 1.0f;
-            Cam->CockpitHpOrientation[4] = 1.0f;
-            Cam->CockpitHpOrientation[0] = 1.0f;
-            Cam->CockpitHpOrientation[7] = 0.0f;
-            Cam->CockpitHpOrientation[6] = 0.0f;
-            Cam->CockpitHpOrientation[5] = 0.0f;
-            Cam->CockpitHpOrientation[3] = 0.0f;
-            Cam->CockpitHpOrientation[2] = 0.0f;
-            Cam->CockpitHpOrientation[1] = 0.0f;
+            Cam->CockpitHpPosition.x = 0.0f;
+            Cam->CockpitHpPosition.y = 0.0f;
+            Cam->CockpitHpPosition.z = -4.0f;                                     // 0xc0800000
+            Cam->CockpitHpOrientation.E[2][2] = 1.0f;
+            Cam->CockpitHpOrientation.E[1][1] = 1.0f;
+            Cam->CockpitHpOrientation.E[0][0] = 1.0f;
+            Cam->CockpitHpOrientation.E[2][1] = 0.0f;
+            Cam->CockpitHpOrientation.E[2][0] = 0.0f;
+            Cam->CockpitHpOrientation.E[1][2] = 0.0f;
+            Cam->CockpitHpOrientation.E[1][0] = 0.0f;
+            Cam->CockpitHpOrientation.E[0][2] = 0.0f;
+            Cam->CockpitHpOrientation.E[0][1] = 0.0f;
         }
     }
 
@@ -214,36 +214,36 @@ void FirstPersonCameraAttach(FFirstPersonCamera* Cam, void* Object)
         I3DMathEngine* const Math = FirstPersonMathEngine();
 
         // The head's base orientation in world space; kept in a second stack copy.
-        FMatrix Product;
-        Math->MulMatrix(Product, AsMatrix(Space->World), AsMatrix(Cam->CockpitHpOrientation));
-        FMatrix const Head = Product;
+        Matrix Product;
+        Math->MulMatrix(Product, Space->World, Cam->CockpitHpOrientation);
+        Matrix const Head = Product;
 
         Vector const& ObjectPosition = static_cast<IObjInspect*>(Again)->get_position();
         float Position[3] = {ObjectPosition.x, ObjectPosition.y, ObjectPosition.z};
 
         // + world rotation x hardpoint position.
-        FVector Offset;
-        FirstPersonMathEngine()->TransformMatrix(Offset, AsMatrix(Space->World),
-                                                 AsVector(Cam->CockpitHpPosition));
-        Position[0] = Offset.X + Position[0];
-        Position[1] = Offset.Y + Position[1];
-        Position[2] = Offset.Z + Position[2];
+        Vector Offset;
+        FirstPersonMathEngine()->TransformMatrix(Offset, Space->World,
+                                                 Cam->CockpitHpPosition);
+        Position[0] = Offset.x + Position[0];
+        Position[1] = Offset.y + Position[1];
+        Position[2] = Offset.z + Position[2];
 
         // + head orientation x the cockpit mesh's camera-part position (+0x130).
-        FirstPersonMathEngine()->TransformMatrix(Offset, Head, AsVector(Cam->HeadPosition));
-        Position[0] = Offset.X + Position[0];
-        Position[1] = Offset.Y + Position[1];
-        Position[2] = Offset.Z + Position[2];
+        FirstPersonMathEngine()->TransformMatrix(Offset, Head, Cam->HeadPosition);
+        Position[0] = Offset.x + Position[0];
+        Position[1] = Offset.y + Position[1];
+        Position[2] = Offset.z + Position[2];
 
         // +0x160 keeps the eye point; world = {head orientation, eye point}.
-        Cam->EyePosition[0] = Position[0];
-        Cam->EyePosition[1] = Position[1];
-        Cam->EyePosition[2] = Position[2];
+        Cam->EyePosition.x = Position[0];
+        Cam->EyePosition.y = Position[1];
+        Cam->EyePosition.z = Position[2];
         Space->bViewDirty = 1;
-        memcpy(Space->World, &Head, 9 * sizeof(float));
-        Space->WorldPos[0] = Position[0];
-        Space->WorldPos[1] = Position[1];
-        Space->WorldPos[2] = Position[2];
+        memcpy(&Space->World, &Head, 9 * sizeof(float));
+        Space->WorldPos.x = Position[0];
+        Space->WorldPos.y = Position[1];
+        Space->WorldPos.z = Position[2];
     }
 
     Cam->bJustAttached = 1;
@@ -262,12 +262,12 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
 
         // The ship's rotation is read through this reference for the rest of the function.
         Transform const& ShipXform = Object->get_transform();
-        FMatrix const& ShipRot = AsMatrix(&ShipXform.Rotation.E[0][0]);
+        Matrix const& ShipRot = ShipXform.Rotation;
 
         // Ship rotation x cockpit hardpoint orientation (+0x10c) -> this frame's mesh rotation.
-        FMatrix CockpitRot;
-        FirstPersonMathEngine()->MulMatrix(CockpitRot, ShipRot, AsMatrix(Cam->CockpitHpOrientation));
-        FMatrix MeshRot = CockpitRot;
+        Matrix CockpitRot;
+        FirstPersonMathEngine()->MulMatrix(CockpitRot, ShipRot, Cam->CockpitHpOrientation);
+        Matrix MeshRot = CockpitRot;
 
         Vector const& ShipPos = Object->get_position();
         float Eye[3] = {ShipPos.x, ShipPos.y, ShipPos.z};
@@ -278,32 +278,32 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
             Manager->set_camera_mode(IBehaviorManager::CameraModeNormal);
 
         // + ship rotation x cockpit hardpoint position (+0x100), kept in +0x160.
-        FVector Offset;
-        FirstPersonMathEngine()->TransformMatrix(Offset, ShipRot, AsVector(Cam->CockpitHpPosition));
-        Eye[0] = Offset.X + Eye[0];
-        Cam->EyePosition[0] = Eye[0];
-        Eye[1] = Offset.Y + Eye[1];
-        Cam->EyePosition[1] = Eye[1];
-        Eye[2] = Offset.Z + Eye[2];
-        Cam->EyePosition[2] = Eye[2];
+        Vector Offset;
+        FirstPersonMathEngine()->TransformMatrix(Offset, ShipRot, Cam->CockpitHpPosition);
+        Eye[0] = Offset.x + Eye[0];
+        Cam->EyePosition.x = Eye[0];
+        Eye[1] = Offset.y + Eye[1];
+        Cam->EyePosition.y = Eye[1];
+        Eye[2] = Offset.z + Eye[2];
+        Cam->EyePosition.z = Eye[2];
 
         // The cockpit mesh follows.
         ClientMeshHolderSetPosition(&Cam->Mesh, Eye);
-        ClientMeshHolderSetOrientation(&Cam->Mesh, &MeshRot.D[0][0]);
+        ClientMeshHolderSetOrientation(&Cam->Mesh, &MeshRot.E[0][0]);
         ClientMeshHolderUpdate(&Cam->Mesh);
 
         // Velocity into ship space.
         const Vector Velocity = Object->get_velocity();
-        FVector LocalVelocity;
+        Vector LocalVelocity;
         FirstPersonMathEngine()->TransposeTransform(LocalVelocity, ShipRot,
-                                                    AsVector(&Velocity.x));
+                                                    Velocity);
 
         // Forward acceleration, 0 unless dt > 0.
         float Accel = 0.0f;
         if (DeltaSeconds > 0.0)
         {
             Accel = static_cast<float>(
-                (static_cast<double>(LocalVelocity.Z) - G_CockpitLastForwardSpeed) / DeltaSeconds);
+                (static_cast<double>(LocalVelocity.z) - G_CockpitLastForwardSpeed) / DeltaSeconds);
         }
 
         // The lag the head wants, (1 - 1/(|a| + 1)) * 0.3f with a's sign, less the current lag,
@@ -312,7 +312,7 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         if (Accel < 0.0f)
             Step = -Step;
         Step = Step - G_CockpitHeadLag;
-        G_CockpitLastForwardSpeed = LocalVelocity.Z;
+        G_CockpitLastForwardSpeed = LocalVelocity.z;
         Step = Step * 0.01;
 
         // At most 3 * dt either way.
@@ -329,13 +329,13 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         memcpy(&MeshRot, ClientMeshHolderGetOrientation(&Cam->Mesh), sizeof(MeshRot));
 
         // The rigid eye: mesh position + mesh rotation x the camera part's position (+0x130).
-        FVector HeadOffset;
-        FirstPersonMathEngine()->TransformMatrix(HeadOffset, MeshRot, AsVector(Cam->HeadPosition));
+        Vector HeadOffset;
+        FirstPersonMathEngine()->TransformMatrix(HeadOffset, MeshRot, Cam->HeadPosition);
         {
-            float const* const MeshPos = ClientMeshHolderGetPosition(&Cam->Mesh);
-            Eye[0] = MeshPos[0] + HeadOffset.X;
-            Eye[1] = MeshPos[1] + HeadOffset.Y;
-            Eye[2] = MeshPos[2] + HeadOffset.Z;
+            const float* const MeshPos = (const float*)ClientMeshHolderGetPosition(&Cam->Mesh);
+            Eye[0] = MeshPos[0] + HeadOffset.x;
+            Eye[1] = MeshPos[1] + HeadOffset.y;
+            Eye[2] = MeshPos[2] + HeadOffset.z;
         }
         // Retail also writes an identity to a stack matrix the roll overwrites before any read.
 
@@ -343,11 +343,11 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         // its ship-space version.
         static Vector LocalSpin = {0.0f, 0.0f, 0.0f};   // DAT_00675204..DAT_0067520c
         LocalSpin = Object->get_angular_velocity();
-        FVector Spin;
-        FirstPersonMathEngine()->TransposeTransform(Spin, ShipRot, AsVector(&LocalSpin.x));
-        LocalSpin.x = Spin.X;
-        LocalSpin.y = Spin.Y;
-        LocalSpin.z = Spin.Z;
+        Vector Spin;
+        FirstPersonMathEngine()->TransposeTransform(Spin, ShipRot, LocalSpin);
+        LocalSpin.x = Spin.x;
+        LocalSpin.y = Spin.y;
+        LocalSpin.z = Spin.z;
 
         // Roll from the ship-space spin about Y, clamped.
         double Roll = static_cast<double>(LocalSpin.y) * G_CockpitRollPerSpin;
@@ -368,69 +368,69 @@ void FirstPersonCameraUpdate(FFirstPersonCamera* Cam, float DeltaSeconds)
         Pivot.x = 0.0f;
         Pivot.y = G_CockpitHeadPivot;
         Pivot.z = 0.0f;
-        FVector PivotOffset;
-        FirstPersonMathEngine()->TransformMatrix(PivotOffset, AsMatrix(Cam->HeadOrientation),
-                                                 AsVector(&Pivot.x));
+        Vector PivotOffset;
+        FirstPersonMathEngine()->TransformMatrix(PivotOffset, Cam->HeadOrientation,
+                                                 Pivot);
         float Base[3];
-        Base[0] = Cam->HeadPosition[0] - PivotOffset.X;
-        Base[1] = Cam->HeadPosition[1] - PivotOffset.Y;
-        Base[2] = Cam->HeadPosition[2] - PivotOffset.Z;
+        Base[0] = Cam->HeadPosition.x - PivotOffset.x;
+        Base[1] = Cam->HeadPosition.y - PivotOffset.y;
+        Base[2] = Cam->HeadPosition.z - PivotOffset.z;
 
         // The pivot pushed back by the lag, rolled, put back on the base.
         Vector Swing;
         Swing.x = Pivot.x;
         Swing.y = Pivot.y;
         Swing.z = static_cast<float>(static_cast<double>(Pivot.z) + -static_cast<double>(Lag));
-        FVector Swung;
-        FirstPersonMathEngine()->TransformMatrix(Swung, AsMatrix(&RollMatrix.E[0][0]),
-                                                 AsVector(&Swing.x));
+        Vector Swung;
+        FirstPersonMathEngine()->TransformMatrix(Swung, RollMatrix,
+                                                 Swing);
         float Local[3];
-        Local[0] = Swung.X + Base[0];
-        Local[1] = Swung.Y + Base[1];
-        Local[2] = Swung.Z + Base[2];
+        Local[0] = Swung.x + Base[0];
+        Local[1] = Swung.y + Base[1];
+        Local[2] = Swung.z + Base[2];
 
         // Into the mesh's frame, onto the mesh position -> +0x160.
-        FVector Moved;
+        Vector Moved;
         FirstPersonMathEngine()->TransformMatrix(Moved, MeshRot, AsVector(Local));
         {
-            float const* const MeshPos = ClientMeshHolderGetPosition(&Cam->Mesh);
-            Cam->EyePosition[0] = Moved.X + MeshPos[0];
-            Cam->EyePosition[1] = Moved.Y + MeshPos[1];
-            Cam->EyePosition[2] = Moved.Z + MeshPos[2];
+            const Vector* const MeshPos = ClientMeshHolderGetPosition(&Cam->Mesh);
+            Cam->EyePosition.x = Moved.x + MeshPos->x;
+            Cam->EyePosition.y = Moved.y + MeshPos->y;
+            Cam->EyePosition.z = Moved.z + MeshPos->z;
         }
 
         // The "cockpit" perf option (no null test) under 0.999 keeps the head rigid; otherwise
         // the lag and roll stay.
-        FMatrix Final;
+        Matrix Final;
         if (FindPerfOption("cockpit")->Applied < 0.999)
         {
             // The eye back to the rigid point; mesh x part (+0x13c) x +0x16c.
-            Cam->EyePosition[0] = Eye[0];
-            Cam->EyePosition[1] = Eye[1];
-            Cam->EyePosition[2] = Eye[2];
-            FMatrix Head;
-            FirstPersonMathEngine()->MulMatrix(Head, MeshRot, AsMatrix(Cam->HeadOrientation));
-            const FMatrix HeadCopy = Head;
+            Cam->EyePosition.x = Eye[0];
+            Cam->EyePosition.y = Eye[1];
+            Cam->EyePosition.z = Eye[2];
+            Matrix Head;
+            FirstPersonMathEngine()->MulMatrix(Head, MeshRot, Cam->HeadOrientation);
+            const Matrix HeadCopy = Head;
             FirstPersonMathEngine()->MulMatrix(Final, HeadCopy, AsMatrix(Cam->EyeOrientation));
         }
         else
         {
             // The same product, then x the roll.
-            FMatrix Head;
-            FirstPersonMathEngine()->MulMatrix(Head, MeshRot, AsMatrix(Cam->HeadOrientation));
-            const FMatrix HeadCopy = Head;
-            FMatrix Offsetted;
+            Matrix Head;
+            FirstPersonMathEngine()->MulMatrix(Head, MeshRot, Cam->HeadOrientation);
+            const Matrix HeadCopy = Head;
+            Matrix Offsetted;
             FirstPersonMathEngine()->MulMatrix(Offsetted, HeadCopy, AsMatrix(Cam->EyeOrientation));
-            const FMatrix OffsettedCopy = Offsetted;
-            FirstPersonMathEngine()->MulMatrix(Final, OffsettedCopy, AsMatrix(&RollMatrix.E[0][0]));
+            const Matrix OffsettedCopy = Offsetted;
+            FirstPersonMathEngine()->MulMatrix(Final, OffsettedCopy, RollMatrix);
         }
 
-        HudCameraApplyShake(Hud, &Final.D[0][0]);
+        HudCameraApplyShake(Hud, &Final.E[0][0]);
 
-        memcpy(Space->World, &Final, 9 * sizeof(float));
-        Space->WorldPos[0] = Cam->EyePosition[0];
-        Space->WorldPos[1] = Cam->EyePosition[1];
-        Space->WorldPos[2] = Cam->EyePosition[2];
+        memcpy(&Space->World, &Final, 9 * sizeof(float));
+        Space->WorldPos.x = Cam->EyePosition.x;
+        Space->WorldPos.y = Cam->EyePosition.y;
+        Space->WorldPos.z = Cam->EyePosition.z;
         Space->bViewDirty = 1;
     }
 
@@ -605,13 +605,13 @@ void FirstPersonCameraLoad(FFirstPersonCamera* Cam, const char* CockpitIniPath)
                             &FindCockpitCameraPart, &CameraPart);
     if (CameraPart != -1)
     {
-        void* const Part = reinterpret_cast<void*>(CameraPart);
-        memcpy(Cam->HeadOrientation, DALib::Engine->GetInstanceOrientation(Part),
+        const InstanceIndex Part = CameraPart;
+        memcpy(&Cam->HeadOrientation, DALib::Engine->GetInstanceOrientation(Part),
                9 * sizeof(float));
-        const float* const Position = DALib::Engine->GetInstancePosition(Part);
-        Cam->HeadPosition[0] = Position[0];
-        Cam->HeadPosition[1] = Position[1];
-        Cam->HeadPosition[2] = Position[2];
+        const Vector* Position = DALib::Engine->GetInstancePosition(Part);
+        Cam->HeadPosition.x = Position->x;
+        Cam->HeadPosition.y = Position->y;
+        Cam->HeadPosition.z = Position->z;
     }
 
     // The closing 4:3 check, read through the vtable as the third-person loader does.

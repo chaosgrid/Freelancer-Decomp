@@ -416,21 +416,21 @@ namespace
 {
     // The object's Orientation (+0x08) and WorldPosition (+0x2c) as one 12-float transform,
     // as retail copies it.
-    FTransform& PhySys_ObjectTransform(CObject* Object)
+    Transform& PhySys_ObjectTransform(CObject* Object)
     {
-        static_assert(offsetof(CObject, WorldPosition) == offsetof(CObject, Orientation) + sizeof(FMatrix),
-                      "CObject: Orientation and WorldPosition are one FTransform");
-        return *(FTransform*)&Object->Orientation;
+        static_assert(offsetof(CObject, WorldPosition) == offsetof(CObject, Orientation) + sizeof(Matrix),
+                      "CObject: Orientation and WorldPosition are one Transform");
+        return *(Transform*)&Object->Orientation;
     }
 
     // FUN_06284f70, called with the nine elements pushed in column order: the transpose.
-    FMatrix PhySys_Transpose(Matrix const& M)
+    Matrix PhySys_Transpose(Matrix const& M)
     {
-        FMatrix Out;
+        Matrix Out;
         for (int Row = 0; Row < 3; ++Row)
         {
             for (int Column = 0; Column < 3; ++Column)
-                Out.D[Row][Column] = M.E[Column][Row];
+                Out.E[Row][Column] = M.E[Column][Row];
         }
         return Out;
     }
@@ -438,21 +438,21 @@ namespace
     // FUN_06284fc0 (cdecl): beams Object's body to NewXform, carries every attached phantom
     // along (its offset kept in the object's old frame), then the object takes NewXform and its
     // jointed children are re-posed.
-    void PhySys_BeamObject(CObject* Object, FTransform const* NewXform, bool bOptimize)
+    void PhySys_BeamObject(CObject* Object, Transform const* NewXform, bool bOptimize)
     {
         I3DMathEngine* const Math = Acquire3DMathEngine();
 
         IVP_U_Point Position;
-        Position.set(NewXform->Translation.X, NewXform->Translation.Y, NewXform->Translation.Z);
+        Position.set(NewXform->Translation.x, NewXform->Translation.y, NewXform->Translation.z);
 
         // The engine's (W, X, Y, Z) stored as IVP's (x, y, z, w).
-        FQuaternion Quat;
+        Quaternion Quat;
         Math->MatrixToQuaternion(Quat, NewXform->Rotation);
         IVP_U_Quat Rotation;
-        Rotation.x = Quat.X;
-        Rotation.y = Quat.Y;
-        Rotation.z = Quat.Z;
-        Rotation.w = Quat.W;
+        Rotation.x = Quat.x;
+        Rotation.y = Quat.y;
+        Rotation.z = Quat.z;
+        Rotation.w = Quat.w;
 
         // The body is not tested.
         Object->BodyPtr->beam_object_to_new_position(&Rotation, &Position, bOptimize ? 1 : 0);
@@ -461,25 +461,25 @@ namespace
         // (PhantomPos - old WorldPosition), NewPos = NewXform * Local.
         if (!Object->Phantoms.empty())
         {
-            FMatrix const InvRotation = PhySys_Transpose(Object->Orientation);
+            Matrix const InvRotation = PhySys_Transpose(Object->Orientation);
             for (std::list<void*>::iterator It = Object->Phantoms.begin(); It != Object->Phantoms.end(); ++It)
             {
                 Vector PhantomPosition;
                 PhySys_GetPhantomPosition(*It, &PhantomPosition);
-                FVector Offset;
-                Offset.X = (float)((double)(PhantomPosition.x) - Object->WorldPosition.x);
-                Offset.Y = (float)((double)(PhantomPosition.y) - Object->WorldPosition.y);
-                Offset.Z = (float)((double)(PhantomPosition.z) - Object->WorldPosition.z);
+                Vector Offset;
+                Offset.x = (float)((double)(PhantomPosition.x) - Object->WorldPosition.x);
+                Offset.y = (float)((double)(PhantomPosition.y) - Object->WorldPosition.y);
+                Offset.z = (float)((double)(PhantomPosition.z) - Object->WorldPosition.z);
 
-                FVector Local;
+                Vector Local;
                 Math->TransformMatrix(Local, InvRotation, Offset);
 
-                FVector NewPosition;
+                Vector NewPosition;
                 Math->TransformXform(NewPosition, *NewXform, Local);
                 Vector Target;
-                Target.x = NewPosition.X;
-                Target.y = NewPosition.Y;
-                Target.z = NewPosition.Z;
+                Target.x = NewPosition.x;
+                Target.y = NewPosition.y;
+                Target.z = NewPosition.z;
                 PhySys_SetPhantomPosition(*It, &Target);
             }
         }
@@ -493,8 +493,8 @@ namespace
     // (InvXform * ChildOld), then by its control mode: 1 -> the body is beamed, 2 -> the
     // transform is stored and the jointed children re-posed, else an error; then it is
     // recursed into. The child object is not tested for null.
-    void PhySys_BeamR_Children(CObject* Object, long Instance, FTransform const* NewXform,
-                               FTransform const* InvXform, bool bOptimize)
+    void PhySys_BeamR_Children(CObject* Object, long Instance, Transform const* NewXform,
+                               Transform const* InvXform, bool bOptimize)
     {
         for (long ChildInstance = PhySys_RelatedInstance(Instance, 1, -1); ChildInstance != -1;
              ChildInstance = PhySys_RelatedInstance(Instance, 1, ChildInstance))
@@ -507,10 +507,10 @@ namespace
             }
 
             I3DMathEngine* const Math = Acquire3DMathEngine();
-            FTransform const ChildOld = PhySys_ObjectTransform(ChildObject);
-            FTransform Relative;
+            Transform const ChildOld = PhySys_ObjectTransform(ChildObject);
+            Transform Relative;
             Math->MulTransform(Relative, *InvXform, ChildOld);
-            FTransform ChildNew;
+            Transform ChildNew;
             Math->MulTransform(ChildNew, *NewXform, Relative);
 
             if (ChildObject->PhysicsControlMode == PhySys::ANIM_TECHNIQUE_GOLEM)
@@ -536,21 +536,20 @@ namespace
 // FUN_06284e50
 void __cdecl PhySys::BeamR(CObject* Object, Vector const& Pos, Matrix const& Orient, bool bFlag)
 {
-    FTransform NewXform;
-    NewXform.Rotation = (FMatrix const&)Orient;   // Matrix and FMatrix: the same nine floats
-    NewXform.Translation.X = Pos.x;
-    NewXform.Translation.Y = Pos.y;
-    NewXform.Translation.Z = Pos.z;
+    Transform NewXform;
+    NewXform.Rotation = Orient;
+    NewXform.Translation.x = Pos.x;
+    NewXform.Translation.y = Pos.y;
+    NewXform.Translation.z = Pos.z;
 
     // The inverse of Object's current transform. Object is not tested.
-    FVector Rotated;
-    Acquire3DMathEngine()->TransposeTransform(Rotated, (FMatrix const&)Object->Orientation,
-                                              (FVector const&)Object->WorldPosition);
-    FTransform InvXform;
+    Vector Rotated;
+    Acquire3DMathEngine()->TransposeTransform(Rotated, Object->Orientation, Object->WorldPosition);
+    Transform InvXform;
     InvXform.Rotation = PhySys_Transpose(Object->Orientation);
-    InvXform.Translation.X = -Rotated.X;
-    InvXform.Translation.Y = -Rotated.Y;
-    InvXform.Translation.Z = -Rotated.Z;
+    InvXform.Translation.x = -Rotated.x;
+    InvXform.Translation.y = -Rotated.y;
+    InvXform.Translation.z = -Rotated.z;
 
     PhySys_BeamObject(Object, &NewXform, bFlag);
     PhySys_BeamR_Children(Object, Object->EngineInstanceId, &NewXform, &InvXform, bFlag);

@@ -51,17 +51,17 @@ namespace
 }
 
 // FUN_06efc7a0.
-void SetMatrixIdentity(FMatrix* Matrix)
+void SetMatrixIdentity(Matrix* Mat)
 {
-    Matrix->D[2][2] = 1.0f;
-    Matrix->D[1][1] = 1.0f;
-    Matrix->D[0][0] = 1.0f;
-    Matrix->D[2][1] = 0.0f;
-    Matrix->D[2][0] = 0.0f;
-    Matrix->D[1][2] = 0.0f;
-    Matrix->D[1][0] = 0.0f;
-    Matrix->D[0][2] = 0.0f;
-    Matrix->D[0][1] = 0.0f;
+    Mat->E[2][2] = 1.0f;
+    Mat->E[1][1] = 1.0f;
+    Mat->E[0][0] = 1.0f;
+    Mat->E[2][1] = 0.0f;
+    Mat->E[2][0] = 0.0f;
+    Mat->E[1][2] = 0.0f;
+    Mat->E[1][0] = 0.0f;
+    Mat->E[0][2] = 0.0f;
+    Mat->E[0][1] = 0.0f;
 }
 
 // FUN_06efcac0.
@@ -89,41 +89,41 @@ int FFormation::CountShipSlots() const
 }
 
 // FUN_06efcb20 (hidden return pointer).
-FVector FFormation::GetSlotPosition(unsigned int Index) const
+Vector FFormation::GetSlotPosition(unsigned int Index) const
 {
-    FVector Result;
+    Vector Result;
     if (Index < Slots.size())
     {
-        FVector Rotated;
+        Vector Rotated;
         GetFormationMath()->TransformMatrix(Rotated, Orientation, Slots[Index].Position);
-        Result.X = Rotated.X + Position.X;
-        Result.Y = Rotated.Y + Position.Y;
-        Result.Z = Rotated.Z + Position.Z;
+        Result.x = Rotated.x + Position.x;
+        Result.y = Rotated.y + Position.y;
+        Result.z = Rotated.z + Position.z;
         return Result;
     }
-    Result.X = 0.0f;
-    Result.Y = 0.0f;
-    Result.Z = 0.0f;
+    Result.x = 0.0f;
+    Result.y = 0.0f;
+    Result.z = 0.0f;
     return Result;
 }
 
 // FUN_06efcbe0.
-bool FFormation::GetSlotTransform(unsigned int Index, FVector* OutPosition,
-                                  FMatrix* OutOrientation) const
+bool FFormation::GetSlotTransform(unsigned int Index, Vector* OutPosition,
+                                  Matrix* OutOrientation) const
 {
     if (Index >= Slots.size())
         return false;
 
     FFormationSlot const& Slot = Slots[Index];
-    FVector Rotated;
+    Vector Rotated;
     GetFormationMath()->TransformMatrix(Rotated, Orientation, Slot.Position);
-    FVector World;
-    World.X = Rotated.X + Position.X;
-    World.Y = Rotated.Y + Position.Y;
-    World.Z = Rotated.Z + Position.Z;
+    Vector World;
+    World.x = Rotated.x + Position.x;
+    World.y = Rotated.y + Position.y;
+    World.z = Rotated.z + Position.z;
     *OutPosition = World;
 
-    FMatrix Combined;
+    Matrix Combined;
     GetFormationMath()->MulMatrix(Combined, Orientation, Slot.Orientation);
     *OutOrientation = Combined;
     return true;
@@ -141,16 +141,16 @@ void __cdecl LoadFormation(INI_Reader* Reader)
 {
     FFormation Formation;
     Formation.Nickname.clear();
-    Formation.Position.X = 0.0f;                       // FUN_06eb7810(0, 0, 0)
-    Formation.Position.Y = 0.0f;
-    Formation.Position.Z = 0.0f;
+    Formation.Position.x = 0.0f;                       // FUN_06eb7810(0, 0, 0)
+    Formation.Position.y = 0.0f;
+    Formation.Position.z = 0.0f;
     SetMatrixIdentity(&Formation.Orientation);
 
     ID_String Key;
     Key.clear();
 
     // The orientation copied into every slot.
-    FMatrix SlotOrientation;
+    Matrix SlotOrientation;
     SetMatrixIdentity(&SlotOrientation);
 
     while (Reader->read_value())
@@ -164,9 +164,9 @@ void __cdecl LoadFormation(INI_Reader* Reader)
         else if (Reader->is_value("pos"))
         {
             FFormationSlot Slot;
-            Slot.Position.X = Reader->get_value_float(0);
-            Slot.Position.Y = Reader->get_value_float(1);
-            Slot.Position.Z = Reader->get_value_float(2);
+            Slot.Position.x = Reader->get_value_float(0);
+            Slot.Position.y = Reader->get_value_float(1);
+            Slot.Position.z = Reader->get_value_float(2);
             Slot.Orientation = SlotOrientation;
             Slot.bPlayerSlot = false;
             Formation.Slots.insert(Formation.Slots.end(), Slot);          // FUN_06efd1f0
@@ -174,9 +174,9 @@ void __cdecl LoadFormation(INI_Reader* Reader)
         else if (Reader->is_value("pl_pos"))
         {
             FFormationSlot Slot;
-            Slot.Position.X = Reader->get_value_float(0);
-            Slot.Position.Y = Reader->get_value_float(1);
-            Slot.Position.Z = Reader->get_value_float(2);
+            Slot.Position.x = Reader->get_value_float(0);
+            Slot.Position.y = Reader->get_value_float(1);
+            Slot.Position.z = Reader->get_value_float(2);
             Slot.Orientation = SlotOrientation;
             Slot.bPlayerSlot = true;
             Formation.Slots.insert(Formation.Slots.end(), 1, Slot);       // FUN_06efd610

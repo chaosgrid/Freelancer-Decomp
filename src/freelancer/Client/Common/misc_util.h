@@ -12,6 +12,7 @@
 // mad-lib template named by FmtStr::MadLibId against the FmtStr's Val list, resolving each
 // value through Universe / GoodList / Reputation into display text.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_text.h"
 #include "Common/client_cliobj.h"
 
@@ -68,7 +69,7 @@ int MiscUtilLoadMaterialLibrary(char const* File);
 // into Scripts, and hand the material entries to Entries -- or release them when Entries is
 // null. When it does: instance it, and read Scripts from a fresh file system. *OutHandle
 // receives the archetype handle when OutHandle is not null. Data is never read.
-void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* Data, FAnimScriptSet* Scripts,
+InstanceIndex MiscUtilLoadEngineInstance(char const* File, IFileSystem* Data, FAnimScriptSet* Scripts,
                                  void* Unused,
                                  Archetype::FCliVc6Vector<Archetype::FCliMaterialPathPair> const*
                                      MaterialPaths,

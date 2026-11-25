@@ -2521,38 +2521,38 @@ static I3DMathEngine* Rp9MathEngine()
 // FUN_06d15d10 plus the inline normalise set_lookat does three times. The squared length and
 // sqrt stay on the x87 stack (double); the reciprocal and each component are stored as float.
 // No zero-length check, as in retail.
-static void Rp9NormalizeInPlace(FVector& Vector)
+static void Rp9NormalizeInPlace(Vector& Vec)
 {
-    const double Length = std::sqrt((double)Vector.X * Vector.X +
-                                    (double)Vector.Y * Vector.Y +
-                                    (double)Vector.Z * Vector.Z);
+    const double Length = std::sqrt((double)Vec.x * Vec.x +
+                                    (double)Vec.y * Vec.y +
+                                    (double)Vec.z * Vec.z);
     const float Inverse = (float)(1.0 / Length);
-    Vector.X = (float)((double)Vector.X * Inverse);
-    Vector.Y = (float)((double)Vector.Y * Inverse);
-    Vector.Z = (float)((double)Vector.Z * Inverse);
+    Vec.x = (float)((double)Vec.x * Inverse);
+    Vec.y = (float)((double)Vec.y * Inverse);
+    Vec.z = (float)((double)Vec.z * Inverse);
 }
 
-static_assert(sizeof(FTransform) == 12 * sizeof(float), "FTransform is the 12-float DA transform");
+static_assert(sizeof(Transform) == 12 * sizeof(float), "Transform is the 12-float DA transform");
 
 // RP8: FDirectX8::MulZFlip12
 void FDirectX9::MulZFlip12(float* Out12, const float* In12)
 {
     // The engine product uses a temporary, so Out12 may alias In12.
-    FTransform ZFlip;
-    ZFlip.Rotation.D[0][0] = 1.0f;
-    ZFlip.Rotation.D[0][1] = 0.0f;
-    ZFlip.Rotation.D[0][2] = 0.0f;
-    ZFlip.Rotation.D[1][0] = 0.0f;
-    ZFlip.Rotation.D[1][1] = 1.0f;
-    ZFlip.Rotation.D[1][2] = 0.0f;
-    ZFlip.Rotation.D[2][0] = 0.0f;
-    ZFlip.Rotation.D[2][1] = 0.0f;
-    ZFlip.Rotation.D[2][2] = -1.0f;
-    ZFlip.Translation.X = 0.0f;
-    ZFlip.Translation.Y = 0.0f;
-    ZFlip.Translation.Z = 0.0f;
-    FTransform Product;
-    Rp9MathEngine()->MulTransform(Product, ZFlip, *(const FTransform*)(In12));
+    Transform ZFlip;
+    ZFlip.Rotation.E[0][0] = 1.0f;
+    ZFlip.Rotation.E[0][1] = 0.0f;
+    ZFlip.Rotation.E[0][2] = 0.0f;
+    ZFlip.Rotation.E[1][0] = 0.0f;
+    ZFlip.Rotation.E[1][1] = 1.0f;
+    ZFlip.Rotation.E[1][2] = 0.0f;
+    ZFlip.Rotation.E[2][0] = 0.0f;
+    ZFlip.Rotation.E[2][1] = 0.0f;
+    ZFlip.Rotation.E[2][2] = -1.0f;
+    ZFlip.Translation.x = 0.0f;
+    ZFlip.Translation.y = 0.0f;
+    ZFlip.Translation.z = 0.0f;
+    Transform Product;
+    Rp9MathEngine()->MulTransform(Product, ZFlip, *(const Transform*)(In12));
     std::memcpy(Out12, &Product, sizeof(Product));
 }
 
@@ -4027,42 +4027,42 @@ GENRESULT DACOM_API FDirectX9::GetWindow(HWND* OutHwnd, int* OutLeft, int* OutRi
 // its dirty byte (+0x40); FUN_06d04138 (FlushDrawState) sends it at draw time. None of them
 // tests the matrix pointer.
 // RP8: FDirectX8::SetWorld
-GENRESULT DACOM_API FDirectX9::SetWorld(const float* M12)
+GENRESULT DACOM_API FDirectX9::SetWorld(const Transform* M12)
 {
     // FUN_06d0b09d: no flip.
     const GENRESULT Ready =
         NeedDeviceLifetime("set_world() called outside of device lifetime", 0xa9a);
     if (Ready != GR_OK)
         return Ready;
-    Transforms_.World.StoreAffine(M12);
+    Transforms_.World.StoreAffine((const float*)M12);
     return GR_OK;
 }
 // RP8: FDirectX8::GetWorld
-GENRESULT DACOM_API FDirectX9::GetWorld(float* Out12)
+GENRESULT DACOM_API FDirectX9::GetWorld(Transform* Out12)
 {
     // FUN_06d0b3dd: unpack +0x2240, no flip.
     const GENRESULT Ready =
         NeedDeviceLifetime("get_world() called outside of device lifetime", 0xaa5);
     if (Ready != GR_OK)
         return Ready;
-    Transforms_.World.LoadAffine(Out12);
+    Transforms_.World.LoadAffine((float*)Out12);
     return GR_OK;
 }
 // RP8: FDirectX8::SetView
-GENRESULT DACOM_API FDirectX9::SetView(const float* M12)
+GENRESULT DACOM_API FDirectX9::SetView(const Transform* M12)
 {
-    // FUN_06d0b607: ZFlip * M12 into +0x21FC, dirty, no commit.
+    // FUN_06d0b607: ZFlip * (const float*)M12 into +0x21FC, dirty, no commit.
     const GENRESULT Ready =
         NeedDeviceLifetime("set_view() called outside of device lifetime", 0xaaf);
     if (Ready != GR_OK)
         return Ready;
     float Flipped[12];
-    MulZFlip12(Flipped, M12);
+    MulZFlip12(Flipped, (const float*)M12);
     Transforms_.View.StoreAffine(Flipped);
     return GR_OK;
 }
 // RP8: FDirectX8::GetView
-GENRESULT DACOM_API FDirectX9::GetView(float* Out12)
+GENRESULT DACOM_API FDirectX9::GetView(Transform* Out12)
 {
     // FUN_06d0b939 (retail's message really says get_modelview): ZFlip * stored, which undoes
     // set_view.
@@ -4072,14 +4072,14 @@ GENRESULT DACOM_API FDirectX9::GetView(float* Out12)
         return Ready;
     float Stored[12];
     Transforms_.View.LoadAffine(Stored);
-    MulZFlip12(Out12, Stored);
+    MulZFlip12((float*)Out12, Stored);
     return GR_OK;
 }
 // RP8: FDirectX8::SetModelview
-GENRESULT DACOM_API FDirectX9::SetModelview(const float* M12)
+GENRESULT DACOM_API FDirectX9::SetModelview(const Transform* M12)
 {
-    // FUN_06d0bb58. bOff = VIEWSPACE_LIGHTS (state 7, +0x3A8) == 0. WORLD: !bOff -> ZFlip * M12,
-    // else M12; dirty, no commit. VIEW, only while its apply marker (+0x41) is clear: an identity
+    // FUN_06d0bb58. bOff = VIEWSPACE_LIGHTS (state 7, +0x3A8) == 0. WORLD: !bOff -> ZFlip * (const float*)M12,
+    // else (const float*)M12; dirty, no commit. VIEW, only while its apply marker (+0x41) is clear: an identity
     // transform, flipped when bOff, then the marker is set.
     const GENRESULT Ready =
         NeedDeviceLifetime("set_modelview() called outside of device lifetime", 0xac4);
@@ -4090,12 +4090,12 @@ GENRESULT DACOM_API FDirectX9::SetModelview(const float* M12)
     if (!bViewspaceLightsOff)
     {
         float Flipped[12];
-        MulZFlip12(Flipped, M12);
+        MulZFlip12(Flipped, (const float*)M12);
         Transforms_.World.StoreAffine(Flipped);
     }
     else
     {
-        Transforms_.World.StoreAffine(M12);
+        Transforms_.World.StoreAffine((const float*)M12);
     }
 
     if (Transforms_.View.bApplyMarker == 0)
@@ -4117,7 +4117,7 @@ GENRESULT DACOM_API FDirectX9::SetModelview(const float* M12)
     return GR_OK;
 }
 // RP8: FDirectX8::GetModelview
-GENRESULT DACOM_API FDirectX9::GetModelview(float* Out12)
+GENRESULT DACOM_API FDirectX9::GetModelview(Transform* Out12)
 {
     // Undo the stored flips before multiplying View by World.
     const GENRESULT Ready =
@@ -4126,21 +4126,21 @@ GENRESULT DACOM_API FDirectX9::GetModelview(float* Out12)
         return Ready;
     const bool bViewspaceLightsOff = PipelineStateValue(7) == 0;
 
-    FTransform World;
+    Transform World;
     float* World12 = (float*)(&World);
     Transforms_.World.LoadAffine(World12);
     if (!bViewspaceLightsOff)
         MulZFlip12(World12, World12);
 
-    FTransform View;
+    Transform View;
     float* View12 = (float*)(&View);
     Transforms_.View.LoadAffine(View12);
     if (bViewspaceLightsOff)
         MulZFlip12(View12, View12);
 
-    FTransform Modelview;
+    Transform Modelview;
     Rp9MathEngine()->MulTransform(Modelview, View, World);
-    std::memcpy(Out12, &Modelview, sizeof(Modelview));
+    std::memcpy((float*)Out12, &Modelview, sizeof(Modelview));
     return GR_OK;
 }
 // RP8: FDirectX8::SetProjection
@@ -4176,62 +4176,62 @@ GENRESULT DACOM_API FDirectX9::SetLookat(float EyeX, float EyeY, float EyeZ, flo
     if (Ready != GR_OK)
         return Ready;
 
-    FVector Eye;
-    Eye.X = EyeX;
-    Eye.Y = EyeY;
-    Eye.Z = EyeZ;
+    Vector Eye;
+    Eye.x = EyeX;
+    Eye.y = EyeY;
+    Eye.z = EyeZ;
 
     // FUN_06d15da0(&Fwd, &At, &Eye): Fwd = At - Eye, then normalised (no zero check).
-    FVector Fwd;
-    Fwd.X = AtX - EyeX;
-    Fwd.Y = AtY - EyeY;
-    Fwd.Z = AtZ - EyeZ;
+    Vector Fwd;
+    Fwd.x = AtX - EyeX;
+    Fwd.y = AtY - EyeY;
+    Fwd.z = AtZ - EyeZ;
     Rp9NormalizeInPlace(Fwd);
 
     // FUN_06d15d50: Z = -Fwd.
-    FVector AxisZ;
-    AxisZ.X = -Fwd.X;
-    AxisZ.Y = -Fwd.Y;
-    AxisZ.Z = -Fwd.Z;
+    Vector AxisZ;
+    AxisZ.x = -Fwd.x;
+    AxisZ.y = -Fwd.y;
+    AxisZ.z = -Fwd.z;
 
     // X = Up x Z: each component a*b - c*d on the x87 stack, stored as float by FUN_06d15ce0;
     // then normalised. No fallback axis.
-    FVector AxisX;
-    AxisX.X = (float)((double)UpY * AxisZ.Z -
-                                 (double)UpZ * AxisZ.Y);
-    AxisX.Y = (float)((double)UpZ * AxisZ.X -
-                                 (double)UpX * AxisZ.Z);
-    AxisX.Z = (float)((double)UpX * AxisZ.Y -
-                                 (double)UpY * AxisZ.X);
+    Vector AxisX;
+    AxisX.x = (float)((double)UpY * AxisZ.z -
+                                 (double)UpZ * AxisZ.y);
+    AxisX.y = (float)((double)UpZ * AxisZ.x -
+                                 (double)UpX * AxisZ.z);
+    AxisX.z = (float)((double)UpX * AxisZ.y -
+                                 (double)UpY * AxisZ.x);
     Rp9NormalizeInPlace(AxisX);
 
     // Y = Z x X, then normalised as well.
-    FVector AxisY;
-    AxisY.X = (float)((double)AxisZ.Y * AxisX.Z -
-                                 (double)AxisZ.Z * AxisX.Y);
-    AxisY.Y = (float)((double)AxisZ.Z * AxisX.X -
-                                 (double)AxisZ.X * AxisX.Z);
-    AxisY.Z = (float)((double)AxisZ.X * AxisX.Y -
-                                 (double)AxisZ.Y * AxisX.X);
+    Vector AxisY;
+    AxisY.x = (float)((double)AxisZ.y * AxisX.z -
+                                 (double)AxisZ.z * AxisX.y);
+    AxisY.y = (float)((double)AxisZ.z * AxisX.x -
+                                 (double)AxisZ.x * AxisX.z);
+    AxisY.z = (float)((double)AxisZ.x * AxisX.y -
+                                 (double)AxisZ.y * AxisX.x);
     Rp9NormalizeInPlace(AxisY);
 
     // FUN_06d15e00: rotation rows X, Y, Z. FUN_06d15e60 = MathEngine->TransformMatrix(Rotation,
     // Eye) (slot +0x2C), negated by FUN_06d15d50 into the translation.
-    FTransform Xform;
-    Xform.Rotation.D[0][0] = AxisX.X;
-    Xform.Rotation.D[0][1] = AxisX.Y;
-    Xform.Rotation.D[0][2] = AxisX.Z;
-    Xform.Rotation.D[1][0] = AxisY.X;
-    Xform.Rotation.D[1][1] = AxisY.Y;
-    Xform.Rotation.D[1][2] = AxisY.Z;
-    Xform.Rotation.D[2][0] = AxisZ.X;
-    Xform.Rotation.D[2][1] = AxisZ.Y;
-    Xform.Rotation.D[2][2] = AxisZ.Z;
-    FVector Rotated;
+    Transform Xform;
+    Xform.Rotation.E[0][0] = AxisX.x;
+    Xform.Rotation.E[0][1] = AxisX.y;
+    Xform.Rotation.E[0][2] = AxisX.z;
+    Xform.Rotation.E[1][0] = AxisY.x;
+    Xform.Rotation.E[1][1] = AxisY.y;
+    Xform.Rotation.E[1][2] = AxisY.z;
+    Xform.Rotation.E[2][0] = AxisZ.x;
+    Xform.Rotation.E[2][1] = AxisZ.y;
+    Xform.Rotation.E[2][2] = AxisZ.z;
+    Vector Rotated;
     Rp9MathEngine()->TransformMatrix(Rotated, Xform.Rotation, Eye);
-    Xform.Translation.X = -Rotated.X;
-    Xform.Translation.Y = -Rotated.Y;
-    Xform.Translation.Z = -Rotated.Z;
+    Xform.Translation.x = -Rotated.x;
+    Xform.Translation.y = -Rotated.y;
+    Xform.Translation.z = -Rotated.z;
     const float* Xform12 = (const float*)(&Xform);
 
     // Every store goes through FUN_06d172f0 with its last argument 0: the matrix is written
@@ -5181,7 +5181,7 @@ GENRESULT DACOM_API FDirectX9::UpdateLight(void* Handle)
     return GR_OK;
 }
 // RP8: FDirectX8::SetWorldN
-GENRESULT DACOM_API FDirectX9::SetWorldN(int WorldIndex, const float* M12)
+GENRESULT DACOM_API FDirectX9::SetWorldN(int WorldIndex, const Transform* M12)
 {
     const GENRESULT Ready = NeedDeviceLifetime(
         "set_world_n() called outside of device lifetime", 2681);
@@ -5190,18 +5190,18 @@ GENRESULT DACOM_API FDirectX9::SetWorldN(int WorldIndex, const float* M12)
     // FUN_06d0af55: unpack into the global DAT_06d70500 (a function-static here) and send at
     // once. The matrix pointer is not tested.
     static float Scratch[16];
-    Scratch[0] = M12[0];
-    Scratch[4] = M12[1];
-    Scratch[8] = M12[2];
-    Scratch[1] = M12[3];
-    Scratch[5] = M12[4];
-    Scratch[9] = M12[5];
-    Scratch[2] = M12[6];
-    Scratch[6] = M12[7];
-    Scratch[10] = M12[8];
-    Scratch[12] = M12[9];
-    Scratch[13] = M12[10];
-    Scratch[14] = M12[11];
+    Scratch[0] = M12->Rotation.E[0][0];
+    Scratch[4] = M12->Rotation.E[0][1];
+    Scratch[8] = M12->Rotation.E[0][2];
+    Scratch[1] = M12->Rotation.E[1][0];
+    Scratch[5] = M12->Rotation.E[1][1];
+    Scratch[9] = M12->Rotation.E[1][2];
+    Scratch[2] = M12->Rotation.E[2][0];
+    Scratch[6] = M12->Rotation.E[2][1];
+    Scratch[10] = M12->Rotation.E[2][2];
+    Scratch[12] = M12->Translation.x;
+    Scratch[13] = M12->Translation.y;
+    Scratch[14] = M12->Translation.z;
     Scratch[3] = 0.0f;
     Scratch[7] = 0.0f;
     Scratch[11] = 0.0f;

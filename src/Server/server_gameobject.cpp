@@ -496,11 +496,10 @@ bool SrvGun::fire_forward(int SourceClient)
         static_cast<CEGun*>(Equip)->GetTarget(LockTarget, LockSubId);
         if (LockTarget != nullptr)
         {
-            FVector Local;
+            Vector Local;
             Server_MathEngine()->InverseTransform(
-                Local, *reinterpret_cast<FTransform const*>(&LockTarget->Orientation),
-                reinterpret_cast<FVector const&>(Target));
-            Target = reinterpret_cast<Vector const&>(Local);
+                Local, *reinterpret_cast<Transform const*>(&LockTarget->Orientation), Target);
+            Target = Local;
         }
     }
 

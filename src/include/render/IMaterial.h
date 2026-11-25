@@ -7,6 +7,7 @@
 #pragma once
 
 #include "dacom.h"
+#include "engine/engine_instance.h" // InstanceIndex
 #include "render/IRenderPipeline.h"
 
 #include <cstddef>
@@ -88,9 +89,9 @@ struct FIbScratch
 // Borrowed context for Bind, Teardown and Submit.
 struct FMaterialSubmitContext
 {
-    void* Inst;
-    void* World;
-    void* View;
+    InstanceIndex Inst;
+    const Transform* World;
+    const Transform* View;
     const FRpVertexSrcDesc* SourceVertices; // +0x0C
     unsigned short* Indices;    // deformable2 0
     FVbListing* VbListing;

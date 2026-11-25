@@ -15,7 +15,7 @@
 #include "ivp_compact_surface.h"
 #include "ivp_mindist_minimize.h"          // IVP_Cache_Ledge_Point
 #include "../ivp_physics/ivp_real_object.h" // IVP_NarrowPhaseCacheSlot (the cache object)
-#include "../ivp_utility/ivp_u_bigvector.h" // IVP_U_BigVector_Grow (FUN_0635d3e0)
+#include "../ivp_utility/ivp_u_bigvector.h" // IVP_SurfaceManager_OutList::grow (FUN_0635d3e0)
 #include "../ivp_utility/ivp_core_trap.h"   // IVP_CoreTrap: retail's `MOV dword ptr [0],0`
 
 namespace
@@ -158,7 +158,7 @@ void IVP_Compact_Ledge_Solver::get_all_ledges(const IVP_Compact_Ledgetree_Node* 
 
     const IVP_Compact_Ledge* Ledge = Node->get_compact_ledge();
     if (!(OutLedges->Count < OutLedges->Capacity))
-        IVP_U_BigVector_Grow(OutLedges); // FUN_0635d3e0
+        OutLedges->grow(); // FUN_0635d3e0
     OutLedges->Elems[OutLedges->Count] = const_cast<IVP_Compact_Ledge*>(Ledge);
     OutLedges->Count = OutLedges->Count + 1;
 }
@@ -325,7 +325,7 @@ IVP_KK_Input::IVP_KK_Input(const IVP_Compact_Edge* KIn, const IVP_Compact_Edge* 
     L_vec_Los.k[2] = (float)((double)(L1->Z) - L0->Z);
     L_vec_Los.k[0] = (float)((double)(L1->X) - L0->X);
 
-    IVP_CalcCrossProduct(&cross_KL_Los, &K_vec_Los, &L_vec_Los);
+    cross_KL_Los.calc_cross_product(&K_vec_Los, &L_vec_Los);
 }
 
 // FUN_0635b4d0, thiscall. q <= 1e-12f (DAT_063a5494) or unordered takes the point-edge fallback.
@@ -356,9 +356,9 @@ int32_t IVP_Compact_Ledge_Solver::calc_unscaled_KK_vals(const IVP_KK_Input* In, 
     if (QuadCross > (double)(1.0e-6f))
     {
         IVP_U_Point NormalK;
-        IVP_CalcCrossProduct(&NormalK, &In->K_vec_Los, C);
+        NormalK.calc_cross_product(&In->K_vec_Los, C);
         IVP_U_Point NormalL;
-        IVP_CalcCrossProduct(&NormalL, &In->L_vec_Los, C);
+        NormalL.calc_cross_product(&In->L_vec_Los, C);
 
         const IVP_U_Float_Point* const L0 = In->L_Los[0];
         const IVP_U_Float_Point* const L1 = In->L_Los[1];

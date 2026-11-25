@@ -30,8 +30,8 @@ static const char* const G_FdumpFileDeformableObject =
 // Pair bone instances by hardpoint-name CRC for connection.
 struct FHardpointInstancePair
 {
-    void* First;  // node +0x10
-    void* Second; // node +0x14
+    InstanceIndex First;  // node +0x10
+    InstanceIndex Second; // node +0x14
 };
 
 struct FHardpointConnectContext
@@ -41,16 +41,16 @@ struct FHardpointConnectContext
 };
 
 // LAB_065f3540 (cdecl: BoneInst, Name, Context).
-static void __cdecl HardpointConnectCallback(void* BoneInst, char const* Name, void* Context)
+static void __cdecl HardpointConnectCallback(InstanceIndex BoneInst, char const* Name, void* Context)
 {
     FHardpointConnectContext* Ctx = (FHardpointConnectContext*)Context;
     FHardpointInstancePair Unset;
-    Unset.First = G_InvalidEngineHandle;
-    Unset.Second = G_InvalidEngineHandle;
+    Unset.First = InvalidInstanceIndex;
+    Unset.Second = InvalidInstanceIndex;
     std::pair<std::map<unsigned long, FHardpointInstancePair>::iterator, bool> Inserted =
         Ctx->Pairs.insert(std::make_pair(DACOM_CRC::GetCRC32(Name), Unset));
     FHardpointInstancePair* Pair = &Inserted.first->second;
-    if (Pair->First == G_InvalidEngineHandle)
+    if (Pair->First == InvalidInstanceIndex)
     {
         Pair->First = BoneInst;
         return;
@@ -104,7 +104,7 @@ static FSkeleton* ConstructSkeleton()
         Skel->Bones[Index].Parent = -1;
         Index += 1;
     }
-    Skel->EngineHandle = G_InvalidEngineHandle;
+    Skel->EngineHandle = InvalidArchetypeIndex;
     Skel->RefCount = 1;
     return Skel;
 }
@@ -309,10 +309,10 @@ bool FDeformInstance::ConnectParts(int* Parts, void* Arg3, void* Arg4)
         while (Bone < Lod->BindCursor)
         {
             FBoneRuntime* Slot = &Lod->BoneSlots[Bone];
-            if (G_Engine->GetInstanceParent(Slot->Instance) == G_InvalidEngineHandle)
+            if (G_Engine->GetInstanceParent(Slot->Instance) == InvalidInstanceIndex)
             {
                 G_Engine->DestroyInstance(Slot->Instance);
-                Slot->Instance = G_InvalidEngineHandle;
+                Slot->Instance = InvalidInstanceIndex;
             }
             Bone += 1;
         }
@@ -381,8 +381,8 @@ void FDeformInstance::Teardown()
 
     if (PartArray != nullptr)
     {
-        void* Root = PartArray[0].Lod->BoneSlots[0].Instance;
-        if (Root != G_InvalidEngineHandle)
+        InstanceIndex Root = PartArray[0].Lod->BoneSlots[0].Instance;
+        if (Root != InvalidInstanceIndex)
             G_Engine->DestroyInstance(Root);
         int* Header = (int*)PartArray - 1;
         int Index = *Header;
@@ -398,12 +398,11 @@ void FDeformInstance::Teardown()
 }
 
 // The root-bone read retail inlines at several sites; PartArray (+8) is the only test.
-int FirstBoneInstance(FDeformInstance* Instance)
+InstanceIndex FirstBoneInstance(FDeformInstance* Instance)
 {
     if (Instance->PartArray == nullptr)
-        return -1;
-    return (int)(
-        (ptrdiff_t)(Instance->PartArray[0].Lod->BoneSlots[0].Instance));
+        return InvalidInstanceIndex;
+    return Instance->PartArray[0].Lod->BoneSlots[0].Instance;
 }
 
 
@@ -426,16 +425,16 @@ void FDeformInstance::DrawParts(void* /*Unused*/, ICamera* Camera, int* OutLod, 
     {
         FDeformPart* const Part = &PartArray[Index];
         Part->BoundSphere(&Radius, Center);
-        const float* const View = Camera->GetViewTransform();
+        const float* const View = (const float*)Camera->GetViewTransform();
         float ViewCenter[3];
-        AcquireMathEngine()->TransformXform(*(FVector*)ViewCenter,
-                                            *(const FTransform*)View,
-                                            *(const FVector*)Center); // +0x28
+        AcquireMathEngine()->TransformXform(*(Vector*)ViewCenter,
+                                            *(const Transform*)View,
+                                            *(const Vector*)Center); // +0x28
         float Probe[3];
         Probe[0] = ViewCenter[0];
         Probe[1] = ViewCenter[1];
         Probe[2] = ViewCenter[2];
-        const int Rank = Camera->ClassifySphere(Probe, Radius);
+        const int Rank = Camera->ClassifySphere((const Vector*)Probe, Radius);
         if (Rank > 2)
             Part->DrawLive(Camera, RenderArg);
         if (Index == 0)
@@ -452,7 +451,7 @@ void FDeformInstance::DrawParts(void* /*Unused*/, ICamera* Camera, int* OutLod, 
 
     if (*OutLod < 3)
         return;
-    void* const Bone = (void*)((ptrdiff_t)(FirstBoneInstance(this)));
+    const InstanceIndex Bone = FirstBoneInstance(this);
     // Submit the root instance and merge its renderer rank into the LOD result.
     const int Rank = G_Renderer->RenderInstance(
         Camera, Bone, 1.0f, Flags | 0x108ul, nullptr, RenderArg);
@@ -492,7 +491,7 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
     if (Script == nullptr)
         Script = DefaultScript;
     const int Handle = (int)(G_Animation->PlayScript(
-        Name, AsOpaqueDword(BoneHandle), (const char*)Extra,
+        Name, BoneHandle, (const char*)Extra,
         (IChannelSink*)this, Script));
     if (Handle == -1)
         return -1;
@@ -558,8 +557,8 @@ int FDeformInstance::PlayAnim(void* Name, void* Extra, void* ArgC, void* ArgD, v
 
     float Xform[12];
     I3DMathEngine* Math = AcquireMathEngine();
-    Math->QuaternionToMatrix(*(FMatrix*)Xform,
-                             *(const FQuaternion*)Quat); // +0x54
+    Math->QuaternionToMatrix(*(Matrix*)Xform,
+                             *(const Quaternion*)Quat); // +0x54
     Xform[9] = Pos[0];
     Xform[10] = Pos[1];
     Xform[11] = Pos[2];
@@ -613,20 +612,20 @@ static void AxisAngleToQuat(float* Quat, const float* Axis, float Angle)
 
 // FUN_065f4660 (thiscall: Name, Extra, Time, ArgD, ArgE, ArgF, ArgG, ArgH, Joint).
 int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* ArgD, void* ArgE,
-                                   void* ArgF, void* ArgG, void* ArgH, void* Joint)
+                                   void* ArgF, void* ArgG, void* ArgH, InstanceIndex Joint)
 {
-    const float* const JointPos = G_Engine->GetInstancePosition(Joint);
+    const Vector* JointPos = G_Engine->GetInstancePosition(Joint);
     float StartPos[3];
-    StartPos[0] = JointPos[0];
-    StartPos[1] = JointPos[1];
-    StartPos[2] = JointPos[2];
+    StartPos[0] = JointPos->x;
+    StartPos[1] = JointPos->y;
+    StartPos[2] = JointPos->z;
 
     const int PlayHandle =
         PlayAnim(Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, nullptr);
     const unsigned long Play = (unsigned long)PlayHandle;
     const float Time = FloatFromOpaqueDword(ArgC);
 
-    void* const Stop = (void*)((ptrdiff_t)(FirstBoneInstance(this)));
+    const InstanceIndex Stop = FirstBoneInstance(this);
 
     // EngBase FAnimBindOut {Kind, Sink, SinkContext, Instance}; +0x10 of the frame is outside it.
     unsigned long Query[4];
@@ -636,11 +635,11 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
     Query[3] = 0xFFFFFFFF;
 
     std::vector<const unsigned char*> Relatives;
-    std::vector<FQuaternion> ChainQuats;
-    void* Cursor = Joint;
+    std::vector<Quaternion> ChainQuats;
+    InstanceIndex Cursor = Joint;
     while (Cursor != Stop)
     {
-        void* const Parent = G_Engine->GetInstanceParent(Cursor);
+        const InstanceIndex Parent = G_Engine->GetInstanceParent(Cursor);
         Relatives.push_back(
             (const unsigned char*)(G_Engine->GetInstanceRelative(Cursor)));
         Query[3] = (unsigned long)((ptrdiff_t)Cursor);
@@ -654,9 +653,9 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
         float Alpha = 0.0f;
         Archetype->Sample(Time, &KeyA, &KeyB, &Alpha);
         Archetype->Release();
-        FQuaternion Quat;
-        AcquireMathEngine()->QuatSlerp(Quat, *(const FQuaternion*)KeyA,
-                                       *(const FQuaternion*)KeyB, Alpha);
+        Quaternion Quat;
+        AcquireMathEngine()->QuatSlerp(Quat, *(const Quaternion*)KeyA,
+                                       *(const Quaternion*)KeyB, Alpha);
         ChainQuats.push_back(Quat);
         Cursor = Parent;
     }
@@ -683,37 +682,37 @@ int FDeformInstance::PlayAnimChain(void* Name, void* Extra, void* ArgC, void* Ar
     float Accum[3];
     WriteVec3(Accum, Tail[0] + PosA[0], Tail[1] + PosA[1], Tail[2] + PosA[2]);
 
-    FQuaternion RootQuat;
-    AcquireMathEngine()->QuatSlerp(RootQuat, *(const FQuaternion*)(RootA + 0xC),
-                                   *(const FQuaternion*)(RootB + 0xC), RootAlpha);
+    Quaternion RootQuat;
+    AcquireMathEngine()->QuatSlerp(RootQuat, *(const Quaternion*)(RootA + 0xC),
+                                   *(const Quaternion*)(RootB + 0xC), RootAlpha);
     RootArchetype->Release();
 
-    FMatrix Rot;
+    Matrix Rot;
     AcquireMathEngine()->QuaternionToMatrix(Rot, RootQuat);
-    FMatrix Running = Rot;
+    Matrix Running = Rot;
     int Index = ChainCount - 1;
     while (Index >= 0)
     {
-        FMatrix Step;
+        Matrix Step;
         AcquireMathEngine()->QuaternionToMatrix(Step, ChainQuats[Index]);
         const unsigned char* const Relative = Relatives[Index];
-        FMatrix Mul;
+        Matrix Mul;
         AcquireMathEngine()->MulMatrix(Mul, Running, Step);
         AcquireMathEngine()->MulMatrix(Rot, Mul,
-                                       *(const FMatrix*)(Relative + 0x1C));
-        FVector XfA;
+                                       *(const Matrix*)(Relative + 0x1C));
+        Vector XfA;
         AcquireMathEngine()->TransformMatrix(XfA, Rot,
-                                             *(const FVector*)(Relative + 0x10));
-        FVector XfB;
+                                             *(const Vector*)(Relative + 0x10));
+        Vector XfB;
         AcquireMathEngine()->TransformMatrix(XfB, Running,
-                                             *(const FVector*)(Relative + 4));
+                                             *(const Vector*)(Relative + 4));
         const float SumZ =
-            (float)((double)XfB.Z + (double)Accum[2]);
+            (float)((double)XfB.z + (double)Accum[2]);
         const float X = (float)(
-            (double)XfB.X + (double)Accum[0] - (double)XfA.X);
+            (double)XfB.x + (double)Accum[0] - (double)XfA.x);
         const float Y = (float)(
-            (double)XfB.Y + (double)Accum[1] - (double)XfA.Y);
-        const float Z = (float)((double)SumZ - (double)XfA.Z);
+            (double)XfB.y + (double)Accum[1] - (double)XfA.y);
+        const float Z = (float)((double)SumZ - (double)XfA.z);
         Accum[0] = X;
         Accum[1] = Y;
         Accum[2] = Z;
@@ -896,11 +895,11 @@ void DACOM_API FDeformInstance::OnLoop(unsigned long ChannelKey, float* Transfor
     Quat[0] = (float)(std::cos(Half));
     const float Side = SinScaled * 0.0f;
     WriteVec3(&Quat[1], Side, SinScaled, Side);
-    float Matrix[9];
+    float Mat[9];
     I3DMathEngine* Math = AcquireMathEngine();
-    Math->QuaternionToMatrix(*(FMatrix*)Matrix,
-                             *(const FQuaternion*)Quat); // +0x54
-    std::memcpy(Xform, Matrix, sizeof(Matrix));
+    Math->QuaternionToMatrix(*(Matrix*)Mat,
+                             *(const Quaternion*)Quat); // +0x54
+    std::memcpy(Xform, Mat, sizeof(Mat));
     if (ForwardSink == nullptr)
         return;
     ForwardSink->OnLoop(ChannelKey, Xform, Context);
@@ -933,8 +932,8 @@ static const char* const G_StartAimBlocked = "deform::start_aim(): instance bloc
 
 void IkMathQuatToMatrix(float* Out9, const float* Quat4)
 {
-    AcquireMathEngine()->QuaternionToMatrix(*(FMatrix*)Out9,
-                                            *(const FQuaternion*)Quat4); // +0x54
+    AcquireMathEngine()->QuaternionToMatrix(*(Matrix*)Out9,
+                                            *(const Quaternion*)Quat4); // +0x54
 }
 
 // The StartAim descriptor FUN_065f5400 reads (+0x00 is not read).
@@ -980,7 +979,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
                     {
                         G_Animation->HasAnyHandle((unsigned long)WalkBack);
                         WalkBack = (int)((ptrdiff_t)(
-                            G_Engine->GetInstanceParent((void*)((ptrdiff_t)WalkBack))));
+                            G_Engine->GetInstanceParent(WalkBack)));
                     }
                     FDUMP(kFdumpWarning, "%s(%d) : WARNING:General:%s", G_FdumpFileDeformableObject, 0x44D,
                           G_StartAimBlocked);
@@ -989,7 +988,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
                 G_Animation->RegisterHandle((unsigned long)Cursor);
             }
             Chain.push_back(Cursor);
-            void* const CursorInstance = (void*)((ptrdiff_t)Cursor);
+            const InstanceIndex CursorInstance = Cursor;
             Parent = (int)((ptrdiff_t)(G_Engine->GetInstanceParent(CursorInstance)));
             const unsigned long* Relative = G_Engine->GetInstanceRelative(CursorInstance);
             if (Relative[0] == 4)
@@ -1065,7 +1064,7 @@ FIkListNode* FDeformInstance::AllocAimEvent(const unsigned char* Desc, void* Pla
     for (int Index = 0; Index < Count; ++Index)
     {
         const int JointId = JointIds[Index];
-        void* const JointInstance = (void*)((ptrdiff_t)JointId);
+        const InstanceIndex JointInstance = JointId;
         CreateCookie[3] = (unsigned long)JointId;
         const unsigned long Key = G_Channel->CreateTyped(
             (IChannelOwner*)Event, 4, CreateCookie, (void*)((ptrdiff_t)BindB));
@@ -1122,7 +1121,7 @@ void StopAimNode(FIkListNode* Node)
     {
         G_Animation->HasAnyHandle((unsigned long)Cursor);
         Cursor = (int)((ptrdiff_t)(
-            G_Engine->GetInstanceParent((void*)((ptrdiff_t)Cursor))));
+            G_Engine->GetInstanceParent(Cursor)));
     }
 }
 
@@ -1131,7 +1130,7 @@ struct FHardpointWalkCtx
 {
     void* UserFn;
     void* UserData;
-    void* BoneInst;
+    InstanceIndex BoneInst;
 };
 
 // LAB_065f59b0 (cdecl): calls UserFn(bone instance, name, user data). The first argument is the
@@ -1139,7 +1138,7 @@ struct FHardpointWalkCtx
 static void __cdecl HardpointWalkThunk(char const* Name, void* Context)
 {
     FHardpointWalkCtx* Ctx = (FHardpointWalkCtx*)Context;
-    using FnUser = void(__cdecl*)(void*, char const*, void*);
+    using FnUser = void(__cdecl*)(InstanceIndex, char const*, void*);
     ((FnUser)Ctx->UserFn)(Ctx->BoneInst, Name, Ctx->UserData);
 }
 
@@ -1169,7 +1168,7 @@ unsigned char FDeformInstance::WalkHardpoints(void* UserFn, void* UserData)
             Ctx.BoneInst = Lod->BoneSlots[Bone].Instance;
             Hardpoint->EnumerateHardpoints(
                 &HardpointWalkThunk,
-                (void*)((ptrdiff_t)(Lod->Skeleton->Bones[Bone].Parent)),
+                (ptrdiff_t)(Lod->Skeleton->Bones[Bone].Parent),
                 &Ctx);
             Bone += 1;
         }

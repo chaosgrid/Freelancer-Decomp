@@ -787,6 +787,6 @@ bool BuzzBehavior::CheckNavHelperFlagB(SystemManager* SysMgr)
 // SelfTarget.CachedPos itself (SysMgr+0x1508), not a copy.
 double BuzzBehavior::ReadCandidateMetric(SystemManager* SysMgr, Vector const& CandidatePos)
 {
-    Vector const* const Basis = reinterpret_cast<Vector const*>(&FetchNavCandidateBasis(SysMgr));
+    Matrix const* const Basis = &FetchNavCandidateBasis(SysMgr);
     return AngleToBasisZColumn3(Basis, &SysMgr->SelfTarget.CachedPos, &CandidatePos);
 }

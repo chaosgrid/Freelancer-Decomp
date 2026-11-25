@@ -296,7 +296,7 @@ struct FCliDynamicAsteroid
     float MaxAngularVelocity;                    // +0x1C  default 5
     float PlacementRadius;                       // +0x20  default 150
     float PlacementRadiusInner;                  // +0x24  default 75 / radius*0.7
-    float CameraPos[3];                          // +0x28  FUN_005261b0: the camera's position
+    Vector CameraPos;                            // +0x28  FUN_005261b0: the camera's position
     unsigned char bSpawnAllowed;                 // +0x34  FUN_00525c80 (zone, tradelane, exclusion)
     unsigned char bAnyVisible;                   // +0x35  FUN_00525c80: some slot above alpha 0.005
     unsigned char Pad36[2];

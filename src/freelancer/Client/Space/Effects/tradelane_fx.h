@@ -94,10 +94,10 @@ FTradeLaneRingRuntime* TradeLaneRingFindOrCreate(FClientGameobj* RingGameobj,
 
 // FUN_00514110 -- HpRightLane (Side != 0) / HpLeftLane position of the ring, cached in
 // DAT_006751dc / DAT_006751d0 on the first call for the process (DAT_006751fc).
-void TradeLaneRingLaneHardpoint(FVector* Out, FClientGameobj* RingGameobj, unsigned char Side);
+void TradeLaneRingLaneHardpoint(Vector* Out, FClientGameobj* RingGameobj, unsigned char Side);
 
 // FUN_00514010 -- identity orientation, Translation as the position.
-void TradeLaneRingMakeTranslationXform(FTransform* Out, FVector const* Translation);
+void TradeLaneRingMakeTranslationXform(Transform* Out, Vector const* Translation);
 
 // FUN_00515890 -- the start tradelane command: the rings must be contiguous (else FDUMP,
 // false); the ship moves onto the (entrance or exit, side) node.

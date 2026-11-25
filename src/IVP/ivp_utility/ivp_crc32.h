@@ -10,7 +10,7 @@
 // The IVP hash containers' CRC-32 table (retail .data:DAT_063edcdc, the
 // reflected IEEE 802.3 table, polynomial 0xEDB88320). Retail keeps it as
 // initialised data; the port fills it at load time from a dynamic initializer
-// in ivp_vhash.cpp (g_Crc32Table_063edcdc_init). Nothing reads it during
+// in ivp_vhash.cpp (g_IVP_Crc32TableInit). Nothing reads it during
 // static initialisation, so the order does not matter.
 //
 // Users: IVP_VHash_Store and IVP_VHash_HashPointer (ivp_vhash.cpp), IVP_Hash
@@ -18,19 +18,19 @@
 // IVP_OV_HashNodeKey (ivp_ov_element.cpp).
 // ============================================================================
 
-extern unsigned g_Crc32Table_063edcdc[256];
+extern unsigned g_IVP_Crc32Table[256];
 
 // The byte-at-a-time CRC-32 over the four bytes of a 32-bit key, with the
 // 0xffffffff start value and no final inversion. Retail inlines this loop at
 // 0x63526d0 / 0x63527e0 / 0x6352930 / 0x63529e0 and keeps a called copy at
 // 0x635d4d0 (IVP_VHash_HashPointer); the callers OR in 0x80000000 themselves.
-inline unsigned HashKey_063edcdc(unsigned key)
+inline unsigned IVP_Crc32HashKey(unsigned key)
 {
     unsigned char* bytes = reinterpret_cast<unsigned char*>(&key);
     unsigned crc = 0xffffffff;
     for (int i = 0; i < 4; ++i)
     {
-        crc = (crc >> 8) ^ g_Crc32Table_063edcdc[(bytes[i] ^ crc) & 0xff];
+        crc = (crc >> 8) ^ g_IVP_Crc32Table[(bytes[i] ^ crc) & 0xff];
     }
     return crc;
 }

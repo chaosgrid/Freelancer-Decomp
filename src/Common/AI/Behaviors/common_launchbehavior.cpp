@@ -15,7 +15,7 @@
 // DAT_063fc538 caches FUN_06391cf0, the DACOM_Acquire("3DMathEngine") ported as
 // Acquire3DMathEngine().
 #include "common_csys.h"   // Transform / Matrix / Acquire3DMathEngine
-#include "x86math.h"       // I3DMathEngine::TransposeTransform, FVector, FMatrix
+#include "x86math.h"       // I3DMathEngine::TransposeTransform, Vector, Matrix
 #include "x87_trig.h"      // retail's inline FSIN / FCOS (RotateBasisRowsXZ)
 #include "common_ini.h"    // VecNormalize3 (FUN_062e1680) -- StartLaunchSequence
 #include "common_aisteer.h" // ClampedDot3 (FUN_062e1630), GetObjectTypeOrZero (FUN_062e6200)
@@ -436,9 +436,7 @@ void LaunchBehavior::ComputeLaunchApproachTransform()
 
     // Slot +0x38: the world-space hardpoint offset rotated into the owner's local frame.
     Vector Rotated = {0.0f, 0.0f, 0.0f};
-    Math->TransposeTransform(reinterpret_cast<FVector&>(Rotated),
-                             reinterpret_cast<FMatrix const&>(OwnerXform.Rotation),
-                             reinterpret_cast<FVector const&>(LaunchOffset));
+    Math->TransposeTransform(Rotated, OwnerXform.Rotation, LaunchOffset);
     LaunchOffset = Rotated;
 
     Move.Offset4c = LaunchOffset;                              // FUN_062d5a80
@@ -566,9 +564,9 @@ void LaunchBehavior::ReleaseApproachStep(int Flag)
 }
 
 // FUN_062d5840, MoveIdea::SetPosition.
-void LaunchBehavior::SetApproachOffset(void const* OffsetVector)
+void LaunchBehavior::SetApproachOffset(Vector const* OffsetVector)
 {
-    Move.SetPosition(*static_cast<Vector const*>(OffsetVector));
+    Move.SetPosition(*OffsetVector);
 }
 
 // FUN_062d75c0: FaceIdea+0xa0 = 4 and nine dwords copied from the caller's basis into
@@ -576,7 +574,7 @@ void LaunchBehavior::SetApproachOffset(void const* OffsetVector)
 void LaunchBehavior::PushApproachBasisToSubObjectB(void const* SrcVectorBlock)
 {
     Face.TargetKind = 4;
-    std::memcpy(Face.ZeroBlock34, SrcVectorBlock, sizeof(Face.ZeroBlock34));
+    std::memcpy(&Face.ZeroBlock34, SrcVectorBlock, sizeof(Face.ZeroBlock34));
 }
 
 // FUN_062d5a20, MoveIdea::SetThrottleScale (also called from DockBehavior::AdvancePreamble).

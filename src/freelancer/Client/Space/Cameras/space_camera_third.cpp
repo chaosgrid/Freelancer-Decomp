@@ -68,19 +68,19 @@ namespace
         return G_FirstPersonMathEngine;
     }
 
-    FMatrix const& AsMatrix(const float* M9)
+    Matrix const& AsMatrix(const float* M9)
     {
-        return *reinterpret_cast<FMatrix const*>(M9);
+        return *reinterpret_cast<Matrix const*>(M9);
     }
 
-    FMatrix& AsMatrix(float* M9)
+    Matrix& AsMatrix(float* M9)
     {
-        return *reinterpret_cast<FMatrix*>(M9);
+        return *reinterpret_cast<Matrix*>(M9);
     }
 
-    FVector const& AsVector(const float* V3)
+    Vector const& AsVector(const float* V3)
     {
-        return *reinterpret_cast<FVector const*>(V3);
+        return *reinterpret_cast<Vector const*>(V3);
     }
 
     // FUN_00423b30: Out = A + B, z summed first, each sum rounded to float.
@@ -371,10 +371,10 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
         const float* const Xform =
             reinterpret_cast<const float*>(&WatchedObject(Cam)->get_orientation());
         Space->bViewDirty = 1;
-        memcpy(Space->World, Xform, 9 * sizeof(float));
-        Space->WorldPos[0] = Xform[9];
-        Space->WorldPos[1] = Xform[10];
-        Space->WorldPos[2] = Xform[11];
+        memcpy(&Space->World, Xform, 9 * sizeof(float));
+        Space->WorldPos.x = Xform[9];
+        Space->WorldPos.y = Xform[10];
+        Space->WorldPos.z = Xform[11];
 
         // The "HpCockpit" hardpoint in parent space; the fallback is (0, 0, -4) and identity.
         long HardpointHandle = 0;
@@ -420,10 +420,10 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
     MakeIdentityView(View);
     ThirdPersonCameraSolve(Cam, View, 0.0f, true);
     FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
-    memcpy(Space->World, View, 9 * sizeof(float));
-    Space->WorldPos[0] = View[9];
-    Space->WorldPos[1] = View[10];
-    Space->WorldPos[2] = View[11];
+    memcpy(&Space->World, View, 9 * sizeof(float));
+    Space->WorldPos.x = View[9];
+    Space->WorldPos.y = View[10];
+    Space->WorldPos.z = View[11];
     Cam->TranslationCache[0] = View[9];
     Cam->TranslationCache[1] = View[10];
     Cam->TranslationCache[2] = View[11];
@@ -443,10 +443,10 @@ void ThirdPersonCameraUpdate(FThirdPersonCamera* Cam, float DeltaSeconds)
         if (ThirdPersonCameraSolve(Cam, View, DeltaSeconds, false))
         {
             FSpaceCamera* const Space = SpaceCameraOf((FHudCamera*)Cam);
-            memcpy(Space->World, View, 9 * sizeof(float));
-            Space->WorldPos[0] = View[9];
-            Space->WorldPos[1] = View[10];
-            Space->WorldPos[2] = View[11];
+            memcpy(&Space->World, View, 9 * sizeof(float));
+            Space->WorldPos.x = View[9];
+            Space->WorldPos.y = View[10];
+            Space->WorldPos.z = View[11];
             Space->bViewDirty = 1;
         }
         else
@@ -587,8 +587,8 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     CameraOffset[2] = static_cast<float>(static_cast<double>(CameraOffset[2]) + OffsetPlusLookAhead[2]);
 
     // Every slerp below writes QSlerp and converts back from the copy QSlerpCopy, as retail does.
-    FQuaternion QSlerp;
-    FQuaternion QSlerpCopy;
+    Quaternion QSlerp;
+    Quaternion QSlerpCopy;
 
     // Auto-level only with +0x13c set, a manager, and the manager's camera-level status.
     if (Cam->bCameraLevelEnabled != 0 && Manager != nullptr && Manager->get_camera_level_status())
@@ -605,14 +605,14 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             // q(M levelled to +0x204).
             float Levelled[9];
             CameraOrientFromForwardAndUp(Levelled, M, Cam->UpAxis);
-            FQuaternion QFromUpAxis;
+            Quaternion QFromUpAxis;
             CockpitMathEngine()->MatrixToQuaternion(QFromUpAxis, AsMatrix(Levelled));
 
             // q(M levelled to the reset up).
             float HistoryUp[3];
             GetColumn(HistoryUp, Cam->ResetOrient, 1);
             CameraOrientFromForwardAndUp(Levelled, M, HistoryUp);
-            FQuaternion QFromHistory;
+            Quaternion QFromHistory;
             CockpitMathEngine()->MatrixToQuaternion(QFromHistory, AsMatrix(Levelled));
 
             const float T = static_cast<float>(static_cast<double>(DeltaSeconds) * Cam->TurnRateScale);
@@ -683,9 +683,9 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
                 {
                     float FromUpAxis[9];
                     CameraOrientFromForwardAndUp(FromUpAxis, M, Cam->UpAxis);
-                    FQuaternion QTowards;
+                    Quaternion QTowards;
                     CockpitMathEngine()->MatrixToQuaternion(QTowards, AsMatrix(Levelled));
-                    FQuaternion QFrom;
+                    Quaternion QFrom;
                     CockpitMathEngine()->MatrixToQuaternion(QFrom, AsMatrix(FromUpAxis));
                     if (Dot < 0.0f)
                         Dot = 0.0f;
@@ -726,16 +726,16 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
     if (bReset)
     {
         memcpy(Cam->ResetOrient, M, sizeof(M));
-        FVector Offset;
+        Vector Offset;
         CockpitMathEngine()->TransformMatrix(Offset, AsMatrix(M), AsVector(CameraOffset));
-        Pos[0] = static_cast<float>(static_cast<double>(Offset.X) + Pos[0]);
-        Pos[1] = static_cast<float>(static_cast<double>(Offset.Y) + Pos[1]);
-        Pos[2] = static_cast<float>(static_cast<double>(Offset.Z) + Pos[2]);
+        Pos[0] = static_cast<float>(static_cast<double>(Offset.x) + Pos[0]);
+        Pos[1] = static_cast<float>(static_cast<double>(Offset.y) + Pos[1]);
+        Pos[2] = static_cast<float>(static_cast<double>(Offset.z) + Pos[2]);
     }
     else
     {
         // q(M) before the turn.
-        FQuaternion QBeforeTurn;
+        Quaternion QBeforeTurn;
         CockpitMathEngine()->MatrixToQuaternion(QBeforeTurn, AsMatrix(M));
 
         // The object's axis throttle (answer ignored), into M's frame. Retail's out buffer is
@@ -746,13 +746,13 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         Throttle.y = OffsetPlusLookAhead[1];
         Throttle.z = OffsetPlusLookAhead[2];
         WatchedObject(Cam)->get_axis_throttle(Throttle);
-        FVector Local;
+        Vector Local;
         CockpitMathEngine()->TransposeTransform(Local, AsMatrix(M),
-                                                *reinterpret_cast<FVector const*>(&Throttle));
+                                                Throttle);
         float LocalThrottle[3];
-        LocalThrottle[0] = Local.X;
-        LocalThrottle[1] = Local.Y;
-        LocalThrottle[2] = Local.Z;
+        LocalThrottle[0] = Local.x;
+        LocalThrottle[1] = Local.y;
+        LocalThrottle[2] = Local.z;
 
         // ThrottleTurn = identity, turned by the throttle.
         float ThrottleTurn[9];
@@ -783,14 +783,14 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
         memcpy(M, Product, sizeof(M));
 
         // The level axis through the ship's live rotation, against M's column 1.
-        FVector LevelWorld;
+        Vector LevelWorld;
         CockpitMathEngine()->TransformMatrix(LevelWorld, AsMatrix(ShipRot), AsVector(Cam->LevelAxis));
         float CamUp[3];
         GetColumn(CamUp, M, 1);
         float LevelDir[3];
-        LevelDir[0] = LevelWorld.X;
-        LevelDir[1] = LevelWorld.Y;
-        LevelDir[2] = LevelWorld.Z;
+        LevelDir[0] = LevelWorld.x;
+        LevelDir[1] = LevelWorld.y;
+        LevelDir[2] = LevelWorld.z;
         const double AxisDot = Vec3DotZyx(CamUp, LevelDir);
 
         // Unless the two are (anti)parallel, the target frame is {normalise(LevelDir x CamUp),
@@ -814,9 +814,9 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
             memcpy(TargetFrame, M, sizeof(TargetFrame));
         }
 
-        FQuaternion QTarget;
+        Quaternion QTarget;
         CockpitMathEngine()->MatrixToQuaternion(QTarget, AsMatrix(TargetFrame));
-        FQuaternion QTurned;
+        Quaternion QTurned;
         CockpitMathEngine()->MatrixToQuaternion(QTurned, AsMatrix(M));
 
         // The angle between their column 2s: the cosine clamped to [0, 1] (the low test on the
@@ -862,24 +862,24 @@ bool ThirdPersonCameraSolve(FThirdPersonCamera* Cam, float* Out12, float DeltaSe
 
         // The offset through M onto the position -- via the Win3D engine cache DAT_006679d8,
         // not the cockpit one.
-        FVector Offset;
+        Vector Offset;
         Win3DTransformByMatrix(Offset, AsMatrix(M), AsVector(CameraOffset));
-        Pos[0] = static_cast<float>(static_cast<double>(Offset.X) + Pos[0]);
-        Pos[1] = static_cast<float>(static_cast<double>(Pos[1]) + Offset.Y);
-        Pos[2] = static_cast<float>(static_cast<double>(Pos[2]) + Offset.Z);
+        Pos[0] = static_cast<float>(static_cast<double>(Offset.x) + Pos[0]);
+        Pos[1] = static_cast<float>(static_cast<double>(Pos[1]) + Offset.y);
+        Pos[2] = static_cast<float>(static_cast<double>(Pos[2]) + Offset.z);
 
         // The new level axis = -(ship rotation^T * M's column 2).
         float NewBack[3];
         GetColumn(NewBack, M, 2);
-        FVector BackLocal;
+        Vector BackLocal;
         CockpitMathEngine()->TransposeTransform(BackLocal, AsMatrix(ShipRot), AsVector(NewBack));
-        Cam->LevelAxis[0] = -BackLocal.X;
-        Cam->LevelAxis[1] = -BackLocal.Y;
-        Cam->LevelAxis[2] = -BackLocal.Z;
+        Cam->LevelAxis[0] = -BackLocal.x;
+        Cam->LevelAxis[1] = -BackLocal.y;
+        Cam->LevelAxis[2] = -BackLocal.z;
 
         // The history = M, then M = slerp(q(M), q(before), +0x1e8).
         memcpy(Cam->ResetOrient, M, sizeof(M));
-        FQuaternion QAfterTurn;
+        Quaternion QAfterTurn;
         CockpitMathEngine()->MatrixToQuaternion(QAfterTurn, AsMatrix(M));
         const float LookAheadSlerp = Cam->TurnLookAheadSlerpAmount;
         CockpitMathEngine()->QuatSlerp(QSlerp, QAfterTurn, QBeforeTurn, LookAheadSlerp);

@@ -9,7 +9,7 @@
 // The Csys sweep-test family (Common.dll 0x0635d5b0-0x06360090 and the
 // solvers at 0x06369280-0x06369720): time-of-contact estimates between ledge
 // features (vertex / edge / face) and balls, reached from
-// IVP_RescheduleCollisionEvent (FUN_0634f320, ivp_mindist_limiter.cpp).
+// IVP_Ledge_Mindist::RescheduleCollisionEvent (FUN_0634f320, ivp_mindist_limiter.cpp).
 // The neighbouring range 0x0635cbd0-0x0635d360 is the IVP broadphase, ported
 // behaviourally in src/Common/common_physys.cpp, not here.
 //
@@ -39,7 +39,7 @@
 //   FUN_06347df0(x) == 1.0f / sqrtf(x)
 //   FUN_06347ef0 == IVP_U_Point::normize, but retail's returns a bool (0 when
 //                   too small to normalize); every caller here ignores it
-//   FUN_0628bed0 == IVP_CalcCrossProduct (ivp_math.h)
+//   FUN_0628bed0 == IVP_U_Point::calc_cross_product (ivp_math.h)
 //   FUN_06347e60 == real_length()
 //   FUN_0634d8d0 / FUN_0634d9d0 / FUN_0634d970 == vmult4 / vmult / vimult on
 //                   the matrix at this+0x1c of an IVP_NarrowPhaseCacheSlot
@@ -57,9 +57,12 @@
 
 #include "../ivp_utility/ivp_math.h"
 
+#include "../ivp_physics/ivp_core.h" // IVP_Time
+
 class IVP_Real_Object;
 class IVP_Core;
-class IVP_Time;
+class IVP_Ledge_Mindist;
+class IVP_Environment;
 
 // ============================================================================
 // IVP_Sweep_Frame_Cache -- port-local name (retail's is not recovered; it is
@@ -145,291 +148,6 @@ public:
     int Field_0x10;           // +0x10 -- unidentified, see comment above
 };
 
-namespace IVP_LedgeSweepEvaluators
-{
-    // LAB_0635d6d0: dot(FrameA->vmult(P14), FrameB->vmult(P24)), both through
-    // FUN_06348580; retail's association order, returned unrounded.
-    inline double Evaluate_0635d6d0(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                     const IVP_U_Matrix *FrameB)
-    {
-        const IVP_U_Point *P0 =
-            reinterpret_cast<const IVP_U_Point *>(static_cast<const char *>(EvaluatorThis) + 0x14);
-        const IVP_U_Point *P1 =
-            reinterpret_cast<const IVP_U_Point *>(static_cast<const char *>(EvaluatorThis) + 0x24);
-        IVP_U_Point Local1, Local2;
-        FrameA->vmult(P0, &Local1);
-        FrameB->vmult(P1, &Local2);
-        return ((double)(Local1.k[2]) * Local2.k[2] + (double)(Local1.k[1]) * Local2.k[1]) +
-               (double)(Local2.k[0]) * Local1.k[0];
-    }
-
-    // LAB_0635da20: P24 rotated by FrameB, re-expressed in FrameA's local
-    // space (vimult), then dotted with the fixed local direction P14.
-    // Retail's association order, returned unrounded.
-    inline double Evaluate_0635da20(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                     const IVP_U_Matrix *FrameB)
-    {
-        const IVP_U_Point *P0 =
-            reinterpret_cast<const IVP_U_Point *>(static_cast<const char *>(EvaluatorThis) + 0x14);
-        const IVP_U_Point *P1 =
-            reinterpret_cast<const IVP_U_Point *>(static_cast<const char *>(EvaluatorThis) + 0x24);
-        IVP_U_Point Local1, Local2;
-        FrameB->vmult(P1, &Local1);
-        FrameA->vimult(&Local1, &Local2);
-        return ((double)(Local2.k[1]) * P0->k[1] + (double)(Local2.k[2]) * P0->k[2]) +
-               (double)(Local2.k[0]) * P0->k[0];
-    }
-
-    // ------------------------------------------------------------------------
-    // The evaluator bodies are free functions taking `const void *` with
-    // measured offsets because the nine are distinct retail classes with
-    // different layouts (0635d950 puts a float at +0x14 and its points at
-    // +0x18). The .cpp's concrete classes forward here.
-    // ------------------------------------------------------------------------
-    inline const IVP_U_Point *EvaluatorPoint(const void *EvaluatorThis, int Offset)
-    {
-        return reinterpret_cast<const IVP_U_Point *>(
-            static_cast<const char *>(EvaluatorThis) + Offset);
-    }
-
-    inline float EvaluatorFloat(const void *EvaluatorThis, int Offset)
-    {
-        return *reinterpret_cast<const float *>(
-            static_cast<const char *>(EvaluatorThis) + Offset);
-    }
-
-    // LAB_0635d5b0, the largest of the nine and installed by every driver but
-    // FUN_0635e1d0. Signed distance of a point on A from a plane carried by B:
-    //   Position = FrameA->vmult4(P14)              // CALL FUN_063484e0
-    //   Anchor   = FrameB->vmult4(P34)              // inlined
-    //   Normal   = FrameB->vmult (P24)              // inlined
-    //   return dot(Position - Anchor, Normal)
-    // The inlined transforms do NOT round like FUN_063484e0: Anchor x/y are
-    // spilled as floats after two terms, Anchor.z stays extended to the final
-    // subtraction; each Normal component has its own association order.
-    inline double Evaluate_0635d5b0(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                    const IVP_U_Matrix *FrameB)
-    {
-        IVP_U_Point Position;
-        FrameA->vmult4(EvaluatorPoint(EvaluatorThis, 0x14), &Position); // 0635d5c3
-
-        const IVP_U_Point *P34 = EvaluatorPoint(EvaluatorThis, 0x34);
-        const double Px = P34->k[0];
-        const double Py = P34->k[1];
-        const double Pz = P34->k[2];
-        float Tx = (float)(FrameB->rows[0].k[0] * Px);
-        float Ty = (float)(FrameB->rows[1].k[0] * Px);
-        double Ez = Px * FrameB->rows[2].k[0];
-        Tx = (float)(FrameB->rows[0].k[1] * Py + Tx);
-        Ty = (float)(FrameB->rows[1].k[1] * Py + Ty);
-        Ez = Ez + FrameB->rows[2].k[1] * Py;
-        const float AnchorX = (float)((FrameB->rows[0].k[2] * Pz + Tx) + FrameB->vv.k[0]);
-        const float AnchorY = (float)((FrameB->rows[1].k[2] * Pz + Ty) + FrameB->vv.k[1]);
-        const double AnchorZ = (Ez + FrameB->rows[2].k[2] * Pz) + FrameB->vv.k[2];
-
-        const IVP_U_Point *P24 = EvaluatorPoint(EvaluatorThis, 0x24);
-        const float NormalX = (float)(((double)(FrameB->rows[0].k[0]) * P24->k[0] +
-                                                  (double)(FrameB->rows[0].k[2]) * P24->k[2]) +
-                                                 (double)(FrameB->rows[0].k[1]) * P24->k[1]);
-        const float NormalY = (float)(((double)(FrameB->rows[1].k[0]) * P24->k[0] +
-                                                  (double)(FrameB->rows[1].k[2]) * P24->k[2]) +
-                                                 (double)(FrameB->rows[1].k[1]) * P24->k[1]);
-        const float NormalZ = (float)(((double)(FrameB->rows[2].k[1]) * P24->k[1] +
-                                                  (double)(FrameB->rows[2].k[0]) * P24->k[0]) +
-                                                 (double)(FrameB->rows[2].k[2]) * P24->k[2]);
-
-        const float DeltaX = Position.k[0] - AnchorX;
-        const float DeltaY = Position.k[1] - AnchorY;
-        const double DeltaZ = (double)(Position.k[2]) - AnchorZ;
-        return (DeltaZ * NormalZ + (double)(DeltaY) * NormalY) + (double)(DeltaX) * NormalX;
-    }
-
-    // LAB_0635d720.
-    //   Delta     = FrameB->vmult4(P24) - FrameA->vmult4(P14)
-    //   Projected = dot(Delta, P34) * 1.2f        // P34 read RAW, untransformed
-    //   return (fabsf(Projected) * Projected < Delta.quad_length())
-    //              ? Projected : sqrtf(Delta.quad_length());
-    // i.e. min(Projected, |Delta|) without a branch on the sign: a negative
-    // Projected is always returned. Unordered takes the square root. 1.2f is
-    // DAT_063a5668 (9a 99 99 3f). Q is rounded to float, the rest extended.
-    inline double Evaluate_0635d720(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                    const IVP_U_Matrix *FrameB)
-    {
-        IVP_U_Point PositionA;
-        IVP_U_Point PositionB;
-        FrameA->vmult4(EvaluatorPoint(EvaluatorThis, 0x14), &PositionA);
-        FrameB->vmult4(EvaluatorPoint(EvaluatorThis, 0x24), &PositionB);
-
-        const double DeltaX = (double)(PositionB.k[0]) - PositionA.k[0];
-        const double DeltaY = (double)(PositionB.k[1]) - PositionA.k[1];
-        const double DeltaZ = (double)(PositionB.k[2]) - PositionA.k[2];
-        const float QuadLength = (float)((DeltaY * DeltaY + DeltaZ * DeltaZ) + DeltaX * DeltaX);
-
-        const IVP_U_Point *Direction = EvaluatorPoint(EvaluatorThis, 0x34);
-        const double Projected = ((DeltaY * Direction->k[1] + DeltaZ * Direction->k[2]) + DeltaX * Direction->k[0]) *
-                                 (double)(1.2f); // DAT_063a5668
-        if (std::fabs(Projected) * Projected < QuadLength)
-        {
-            return Projected;
-        }
-        return std::sqrt((double)(QuadLength));
-    }
-
-    // LAB_0635d7b0: dot(FrameB->vmult4(P24) - FrameA->vmult4(P14),
-    // FrameB->vmult(P34)) -- Evaluate_0635d5b0 with the difference reversed.
-    // Delta extended, result unrounded.
-    inline double Evaluate_0635d7b0(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                    const IVP_U_Matrix *FrameB)
-    {
-        IVP_U_Point PositionA;
-        IVP_U_Point PositionB;
-        IVP_U_Point Normal;
-        FrameA->vmult4(EvaluatorPoint(EvaluatorThis, 0x14), &PositionA);
-        FrameB->vmult4(EvaluatorPoint(EvaluatorThis, 0x24), &PositionB);
-        FrameB->vmult(EvaluatorPoint(EvaluatorThis, 0x34), &Normal);
-
-        const double DeltaX = (double)(PositionB.k[0]) - PositionA.k[0];
-        const double DeltaY = (double)(PositionB.k[1]) - PositionA.k[1];
-        const double DeltaZ = (double)(PositionB.k[2]) - PositionA.k[2];
-        return (DeltaZ * Normal.k[2] + DeltaY * Normal.k[1]) + DeltaX * Normal.k[0];
-    }
-
-    // LAB_0635d830.
-    //   Delta = FrameA->vmult4(P14) - FrameB->vmult4(P34)
-    //   Perp  = normize(cross(cross(DirectionB, Delta), DirectionB))
-    //   return dot(DirectionA, Perp)      // DirectionA/B = vmult of P24/P44
-    // Perp is the unit direction from B's edge towards A's. Both crosses are
-    // inlined in retail with mixed float/extended intermediates; normize
-    // (FUN_06347ef0, :0635d91b) leaves a below-epsilon Perp unchanged.
-    inline double Evaluate_0635d830(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                    const IVP_U_Matrix *FrameB)
-    {
-        IVP_U_Point PositionA;
-        IVP_U_Point DirectionA;
-        IVP_U_Point PositionB;
-        IVP_U_Point DirectionB;
-        FrameA->vmult4(EvaluatorPoint(EvaluatorThis, 0x14), &PositionA);
-        FrameA->vmult(EvaluatorPoint(EvaluatorThis, 0x24), &DirectionA);
-        FrameB->vmult4(EvaluatorPoint(EvaluatorThis, 0x34), &PositionB);
-        FrameB->vmult(EvaluatorPoint(EvaluatorThis, 0x44), &DirectionB);
-
-        const double Dx = (double)(PositionA.k[0]) - PositionB.k[0];
-        const double Dy = (double)(PositionA.k[1]) - PositionB.k[1];
-        const double Dz = (double)(PositionA.k[2]) - PositionB.k[2];
-        const double Bx = DirectionB.k[0];
-        const double By = DirectionB.k[1];
-        const double Bz = DirectionB.k[2];
-
-        const float Cx = (float)(Dz * By - Bz * Dy);
-        const float Cy = (float)(Bz * Dx - Dz * Bx);
-        const double Cz = Dy * Bx - By * Dx;
-
-        const float T1 = (float)(By * Cx);
-        const float T2 = (float)((double)(Cy) * Bx);
-
-        IVP_U_Point Perpendicular;
-        Perpendicular.k[0] = (float)((double)(Cy) * Bz - Cz * By);
-        Perpendicular.k[1] = (float)(Cz * Bx - Bz * Cx);
-        Perpendicular.k[2] = (float)((double)(T1) - T2);
-        Perpendicular.normize();
-
-        return ((double)(DirectionA.k[2]) * Perpendicular.k[2] +
-                (double)(DirectionA.k[1]) * Perpendicular.k[1]) +
-               (double)(Perpendicular.k[0]) * DirectionA.k[0];
-    }
-
-    // LAB_0635d950.
-    //   Delta  = FrameB->vmult4(P28) - FrameA->vmult4(P18)
-    //   Moment = cross(Delta, DirectionB)       // FUN_0628bed0; DirectionB = vmult(P38)
-    //   Limit  = Moment.real_length()           // FUN_06347e60
-    //   Value  = dot(Moment, MeasureB) + Float14   // MeasureB = vmult(P48)
-    //   return (Value < Limit) ? Value : Limit;
-    // The odd one out: +0x14 is a float bias and the points start at +0x18.
-    inline double Evaluate_0635d950(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                    const IVP_U_Matrix *FrameB)
-    {
-        IVP_U_Point PositionA;
-        IVP_U_Point PositionB;
-        IVP_U_Point DirectionB;
-        IVP_U_Point MeasureB;
-        FrameA->vmult4(EvaluatorPoint(EvaluatorThis, 0x18), &PositionA);
-        FrameB->vmult4(EvaluatorPoint(EvaluatorThis, 0x28), &PositionB);
-        FrameB->vmult(EvaluatorPoint(EvaluatorThis, 0x38), &DirectionB);
-        FrameB->vmult(EvaluatorPoint(EvaluatorThis, 0x48), &MeasureB);
-
-        IVP_U_Point Delta;
-        Delta.subtract(&PositionB, &PositionA);
-
-        // Limit stays unrounded; Value is compared extended but returned as
-        // its float copy.
-        IVP_U_Point Moment;
-        IVP_CalcCrossProduct(&Moment, &Delta, &DirectionB);
-
-        const double Limit = Moment.real_length();
-        const double Value = (((double)(Moment.k[2]) * MeasureB.k[2] +
-                               (double)(Moment.k[1]) * MeasureB.k[1]) +
-                              (double)(MeasureB.k[0]) * Moment.k[0]) +
-                             EvaluatorFloat(EvaluatorThis, 0x14);
-        if (Value < Limit)
-        {
-            return (float)(Value);
-        }
-        return Limit;
-    }
-
-    // LAB_0635e080: the signed distance between two skew lines along their
-    // common perpendicular, times the stored scale at +0x54.
-    //   Axis = cross(DirectionA, DirectionB)      // FUN_0628bed0
-    //   return (dot(Axis, PositionA) - dot(Axis, PositionB))
-    //              * (1.0f / sqrtf(Axis.quad_length())) * Float54;
-    // Two dots subtracted, not one dot of the difference (they differ in
-    // float). Numerator and Q rounded to float, the result unrounded.
-    inline double Evaluate_0635e080(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                    const IVP_U_Matrix *FrameB)
-    {
-        IVP_U_Point PositionA;
-        IVP_U_Point DirectionA;
-        IVP_U_Point PositionB;
-        IVP_U_Point DirectionB;
-        FrameA->vmult(EvaluatorPoint(EvaluatorThis, 0x24), &DirectionA);
-        FrameA->vmult4(EvaluatorPoint(EvaluatorThis, 0x14), &PositionA);
-        FrameB->vmult(EvaluatorPoint(EvaluatorThis, 0x44), &DirectionB);
-        FrameB->vmult4(EvaluatorPoint(EvaluatorThis, 0x34), &PositionB);
-
-        IVP_U_Point Axis;
-        IVP_CalcCrossProduct(&Axis, &DirectionA, &DirectionB);
-
-        const double DotA = ((double)(Axis.k[2]) * PositionA.k[2] +
-                             (double)(Axis.k[1]) * PositionA.k[1]) +
-                            (double)(PositionA.k[0]) * Axis.k[0];
-        const double DotB = ((double)(Axis.k[2]) * PositionB.k[2] +
-                             (double)(Axis.k[1]) * PositionB.k[1]) +
-                            (double)(PositionB.k[0]) * Axis.k[0];
-        const float Numerator = (float)(DotA - DotB);
-        const float QuadLength = (float)(
-            ((double)(Axis.k[1]) * Axis.k[1] + (double)(Axis.k[2]) * Axis.k[2]) +
-            (double)(Axis.k[0]) * Axis.k[0]);
-        return (IVP_InvSqrtFloat(QuadLength) * Numerator) * EvaluatorFloat(EvaluatorThis, 0x54);
-    }
-
-    // LAB_0635e160: |cross(FrameA->vmult(P14), FrameB->vmult(P24))|^2, the
-    // parallel-edge guard for Evaluate_0635e080 (the quantity it divides by).
-    // Rotation-only transforms; result unrounded.
-    inline double Evaluate_0635e160(const void *EvaluatorThis, const IVP_U_Matrix *FrameA,
-                                    const IVP_U_Matrix *FrameB)
-    {
-        IVP_U_Point DirectionA;
-        IVP_U_Point DirectionB;
-        FrameA->vmult(EvaluatorPoint(EvaluatorThis, 0x14), &DirectionA);
-        FrameB->vmult(EvaluatorPoint(EvaluatorThis, 0x24), &DirectionB);
-
-        IVP_U_Point Axis;
-        IVP_CalcCrossProduct(&Axis, &DirectionA, &DirectionB);
-        return ((double)(Axis.k[2]) * Axis.k[2] + (double)(Axis.k[1]) * Axis.k[1]) +
-               (double)(Axis.k[0]) * Axis.k[0];
-    }
-}
-
 // ============================================================================
 // The driver layer.
 // ============================================================================
@@ -472,15 +190,14 @@ struct IVP_Sweep_Estimator_Context
     float RelativeSpeed;        // +0x04: closing speed along the separating normal
     float ClosingBound;         // +0x08
     float MaxSpeedSum;          // +0x0c: SurfaceRotSpeedSum + both CurrentSpeeds + 2e-10f
-    void *Mindist;              // +0x10 -- IVP_Ledge_Mindist *
-    void *Env;                  // +0x14 -- IVP_Environment *
+    IVP_Ledge_Mindist *Mindist; // +0x10
+    IVP_Environment *Env;       // +0x14
     float NowBase;              // +0x18
     float NowOffset;            // +0x1c
     float NextBase;             // +0x20
     float NextOffset;           // +0x24
     int32_t OutCode;            // +0x28
-    float OutEventBase;         // +0x2c
-    float OutEventOffset;       // +0x30
+    IVP_Time OutEvent;          // +0x2c
 
     // FUN_0635df00, thiscall, RET 0xc. From LAB_0635fd10's ShapeTypeB == 2 arm.
     void EstimateBallVsLedgeFaceContact(const void *FeatureEdge,
@@ -540,12 +257,12 @@ static_assert(offsetof(IVP_Sweep_Estimator_Context, Mindist) == 0x10, "IVP_Sweep
 static_assert(offsetof(IVP_Sweep_Estimator_Context, NowBase) == 0x18, "IVP_Sweep_Estimator_Context::NowBase");
 static_assert(offsetof(IVP_Sweep_Estimator_Context, NextBase) == 0x20, "IVP_Sweep_Estimator_Context::NextBase");
 static_assert(offsetof(IVP_Sweep_Estimator_Context, OutCode) == 0x28, "IVP_Sweep_Estimator_Context::OutCode");
-static_assert(offsetof(IVP_Sweep_Estimator_Context, OutEventBase) == 0x2c, "IVP_Sweep_Estimator_Context::OutEventBase");
+static_assert(offsetof(IVP_Sweep_Estimator_Context, OutEvent) == 0x2c, "IVP_Sweep_Estimator_Context::OutEvent");
 
 // ============================================================================
 // The dispatch layer.
 //
-// IVP_RescheduleCollisionEvent (FUN_0634f320, ivp_mindist_limiter.cpp) builds
+// IVP_Ledge_Mindist::RescheduleCollisionEvent (FUN_0634f320, ivp_mindist_limiter.cpp) builds
 // the 0x34-byte context and calls `[Index*4 + DAT_0658af9c]` with
 // `Index = ShapeType[j] + ShapeType[i] * 4` (:0634f5ea).
 //

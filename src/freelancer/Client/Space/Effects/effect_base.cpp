@@ -97,9 +97,9 @@ void EffectBaseConstruct(FEffectBase* This, unsigned TypeId)
     std::memset((unsigned char*)This + sizeof(void*), 0, sizeof(FEffectBase) - sizeof(void*));
     This->Priority = 1.0f;
     // Identity rotation.
-    This->LocalXform.Rotation.D[0][0] = 1.0f;
-    This->LocalXform.Rotation.D[1][1] = 1.0f;
-    This->LocalXform.Rotation.D[2][2] = 1.0f;
+    This->LocalXform.Rotation.E[0][0] = 1.0f;
+    This->LocalXform.Rotation.E[1][1] = 1.0f;
+    This->LocalXform.Rotation.E[2][2] = 1.0f;
     This->EngineIndex = -1;
     This->RefCount = 1;
     This->EffectTypeId = TypeId;
@@ -178,7 +178,7 @@ void FEffectBase::SetIntensity(float /*Intensity*/)
     // Slot +0x0c: empty.
 }
 
-void FEffectBase::Attach(void* WatchableOwner, int EngineIndex, FTransform const* LocalXform)
+void FEffectBase::Attach(void* WatchableOwner, int EngineIndex, Transform const* LocalXform)
 {
     FEffectBase* const This = this;
     // FUN_004f7d20. No null test on the transform.
@@ -195,7 +195,7 @@ void FEffectBase::Attach(void* WatchableOwner, int EngineIndex, FTransform const
 }
 
 void EffectAttach(FEffectBase* This, void* WatchableOwner, int EngineIndex,
-                  FTransform const* LocalXform)
+                  Transform const* LocalXform)
 {
     This->Attach(WatchableOwner, EngineIndex, LocalXform);
 }
@@ -224,7 +224,7 @@ namespace
     // object; FUN_004f7bd0 and LAB_004f84d0 carry the same instructions inlined.
     void EffectBakeInstance(FEffectBase* This)
     {
-        void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex));
+        const InstanceIndex Instance = This->EngineIndex;
 
         // The instance's CObject velocity into +0x4c.
         float* const Velocity = reinterpret_cast<float*>(This->FrozenVelocity);
@@ -245,19 +245,18 @@ namespace
 
         // The watcher and the index are tested again (the object may have been the one the
         // velocity call just touched); only then is the instance transform multiplied in.
-        FTransform Product;
-        FTransform const* Source = &This->LocalXform;
+        Transform Product;
+        Transform const* Source = &This->LocalXform;
         if (EffectWatchedObject(This) != nullptr && This->EngineIndex != -1)
         {
-            FTransform const* const InstanceXform = reinterpret_cast<FTransform const*>(
-                DALib::Engine->GetInstanceTransform(
-                    reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex))));
+            Transform const* const InstanceXform = DALib::Engine->GetInstanceTransform(
+                    This->EngineIndex);
             EffectMathEngine()->MulTransform(Product, *InstanceXform, This->LocalXform);
             Source = &Product;
         }
 
         // Two 0xc-dword copies through a stack temporary: source -> temp -> +0x10.
-        FTransform const Temp = *Source;
+        Transform const Temp = *Source;
         This->LocalXform = Temp;
         This->EngineIndex = -1;
     }
@@ -309,15 +308,14 @@ void EffectKill(FEffectBase* This)
     This->FEffectBase::Kill();
 }
 
-void EffectGetWorldTransform(FEffectBase const* This, FTransform* Out)
+void EffectGetWorldTransform(FEffectBase const* This, Transform* Out)
 {
     // FUN_004f7ef0.
     if (EffectWatchedObject(This) != nullptr && This->EngineIndex != -1)
     {
-        FTransform const* const InstanceXform = reinterpret_cast<FTransform const*>(
-            DALib::Engine->GetInstanceTransform(
-                reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex))));
-        FTransform Product;
+        Transform const* const InstanceXform = DALib::Engine->GetInstanceTransform(
+                This->EngineIndex);
+        Transform Product;
         EffectMathEngine()->MulTransform(Product, *InstanceXform, This->LocalXform);
         *Out = Product;
         return;
@@ -328,17 +326,17 @@ void EffectGetWorldTransform(FEffectBase const* This, FTransform* Out)
 unsigned char EffectInCameraView(FEffectBase* This, FSpaceCamera* Cam)
 {
     // FUN_004f7b50. The effect's own slot +8 gives the world position and radius.
-    FVector WorldPos;
+    Vector WorldPos;
     float const Radius = This->GetWorldPos(&WorldPos);
 
     ICamera* const CamIface = AsCamera(Cam);
-    FTransform const* const ViewXform =
-        reinterpret_cast<FTransform const*>(CamIface->GetViewTransform());
-    FVector ViewPos;
+    Transform const* const ViewXform =
+        CamIface->GetViewTransform();
+    Vector ViewPos;
     EffectMathEngine()->TransformXform(ViewPos, *ViewXform, WorldPos);
 
     // The camera's sphere classification (slot +0x3c); 3 and up is visible.
-    FVector Centre = ViewPos;
-    int const Class = CamIface->ClassifySphere(&Centre.X, Radius);
+    Vector Centre = ViewPos;
+    int const Class = CamIface->ClassifySphere(&Centre, Radius);
     return static_cast<unsigned char>(Class >= 3 ? 1 : 0);
 }

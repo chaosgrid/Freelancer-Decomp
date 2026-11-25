@@ -7,6 +7,7 @@
 #pragma once
 
 #include "dacom.h"
+#include "math3d.h"
 
 // Thorn entity control interfaces.
 //
@@ -39,10 +40,10 @@
 // Retail: the only control every entity type answers to.
 struct IGeoTransformControl : IDAComponent
 {
-    virtual GENRESULT DACOM_API SetPosition(float* Position) = 0;     // 3
-    virtual GENRESULT DACOM_API SetOrientation(float* Orient9) = 0;   // 4
-    virtual GENRESULT DACOM_API GetPosition(float* OutPosition) = 0;  // 5
-    virtual GENRESULT DACOM_API GetOrientation(float* OutOrient9) = 0; // 6
+    virtual GENRESULT DACOM_API SetPosition(const Vector* Position) = 0;     // 3
+    virtual GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) = 0;   // 4
+    virtual GENRESULT DACOM_API GetPosition(Vector* OutPosition) = 0;  // 5
+    virtual GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) = 0; // 6
     // The interface stops here: the two retail sinks in freelancer.exe's script camera
     // (.rdata tables behind 0x0051e830) are seven entries long.
 };
@@ -119,8 +120,8 @@ struct ICompoundControl : IDAComponent
     virtual GENRESULT DACOM_API GetFloorHeight(float* OutHeight) = 0;
     // 11 / 12: the whole frame as a Common Transform (orientation, then position at +0x24):
     // Compound LAB_00451660 / LAB_00451a00, Deformable LAB_00452b50 / LAB_00452c70. Both RET 8.
-    virtual GENRESULT DACOM_API SetTransform(float const* Transform12) = 0;
-    virtual GENRESULT DACOM_API GetTransform(float* OutTransform12) = 0;
+    virtual GENRESULT DACOM_API SetTransform(const Transform* Transform12) = 0;
+    virtual GENRESULT DACOM_API GetTransform(Transform* OutTransform12) = 0;
 };
 
 // "1.11_IIKControl" -- inverse kinematics on deformable entities. Three slots

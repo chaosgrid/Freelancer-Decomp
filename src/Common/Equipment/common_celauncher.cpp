@@ -61,10 +61,9 @@ namespace
     // members). No guards.
     Vector BarrelPointWS(long Instance, Vector const& Local)
     {
-        Transform const Xform = *(Transform const*)DALib::Engine->GetInstanceTransform((void*)Instance);
+        Transform const Xform = *DALib::Engine->GetInstanceTransform(Instance);
         Vector Out;
-        Acquire3DMathEngine()->TransformXform((FVector&)Out, (FTransform const&)Xform,
-                                              (FVector const&)Local);
+        Acquire3DMathEngine()->TransformXform(Out, Xform, Local);
         return Out;
     }
 
@@ -72,9 +71,9 @@ namespace
     // No guards.
     Vector BarrelDirWS(long Instance, Matrix const& HpOrient)
     {
-        Matrix const Ori = *(Matrix const*)DALib::Engine->GetInstanceOrientation((void*)Instance);
+        Matrix const Ori = *DALib::Engine->GetInstanceOrientation(Instance);
         Matrix World;
-        Acquire3DMathEngine()->MulMatrix((FMatrix&)World, (FMatrix const&)Ori, (FMatrix const&)HpOrient);
+        Acquire3DMathEngine()->MulMatrix(World, Ori, HpOrient);
         Vector Out;
         Out.x = -World.E[0][2];
         Out.y = -World.E[1][2];

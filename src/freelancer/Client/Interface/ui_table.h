@@ -76,7 +76,7 @@ public:
     // slot 5 LAB_00598850
     void SetPosition(float const* NewPosition) override;
     // slot 8 LAB_005987e0
-    void SetTransform(float const* Transform) override;
+    void SetTransform(Transform const* NewXform) override;
     // slot 9 LAB_00598490 (RET 8)
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 11 LAB_005988c0
@@ -112,7 +112,7 @@ public:
     float GrabDistance;                   // +0x0ec -- 0.004f
     unsigned char bColumnsResizable;      // +0x0f0 -- ctor 1, nothing clears it
     unsigned char bRowsResizable;         // +0x0f1 -- ctor 1, nothing clears it
-    float InverseTransform[12];           // +0x0f4 -- inverse of the +0x3c transform
+    Transform InverseTransform;           // +0x0f4 -- inverse of the +0x3c transform
     HCURSOR RowResizeCursor;              // +0x124 -- IDC_SIZENS
     HCURSOR ColumnResizeCursor;           // +0x128 -- IDC_SIZEWE
     HCURSOR DefaultCursor;                // +0x12c -- the cursor at construction

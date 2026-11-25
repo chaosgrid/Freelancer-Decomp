@@ -28,6 +28,7 @@ void __stdcall Movie_RecordWindowSumDiff(unsigned int* SumSlot, unsigned int* Di
 void __stdcall Movie_AssignWindowSlot(unsigned int* First, unsigned int* Second, int Slot, int* State, int Sign);
 
 // 0x06ac7e60. RET 0x8. Kind 1: both halves equal Field[4]. Otherwise the 2*Count limbs are zero.
+// 0x06ac69a0 takes a nonzero EAX as success and skips the slot write.
 long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
 
 // 0x06ac7f20. RET 0x10. Sign 1 copies two groups. Sign -1 runs 0x06ac7f80. Any other sign returns 0.

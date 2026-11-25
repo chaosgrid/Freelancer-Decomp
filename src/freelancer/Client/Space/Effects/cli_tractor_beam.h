@@ -26,7 +26,7 @@ struct FTexShape;
 struct FCliTractorBeam : FEffectBase
 {
     FCliTractorBeam();
-    float GetWorldPos(FVector* Out) override;
+    float GetWorldPos(Vector* Out) override;
     unsigned char IsAlive() override { return 1; }
     unsigned char UpdateVisibility(float Dt, FSpaceCamera* Cam) override;
     unsigned char TickDraw(float Dt, FSpaceCamera* Cam) override { return 1; }

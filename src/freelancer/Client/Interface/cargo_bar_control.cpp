@@ -30,17 +30,17 @@ namespace
     // DAT_00679b4c -- SetOrientation's lazily acquired 3DMathEngine.
     I3DMathEngine* G_CargoBarMath = nullptr;
 
-    void SetIdentity9(float* M)
+    void SetIdentity9(Matrix* M)
     {
-        M[0] = 1.0f;
-        M[1] = 0.0f;
-        M[2] = 0.0f;
-        M[3] = 0.0f;
-        M[4] = 1.0f;
-        M[5] = 0.0f;
-        M[6] = 0.0f;
-        M[7] = 0.0f;
-        M[8] = 1.0f;
+        M->E[0][0] = 1.0f;
+        M->E[0][1] = 0.0f;
+        M->E[0][2] = 0.0f;
+        M->E[1][0] = 0.0f;
+        M->E[1][1] = 1.0f;
+        M->E[1][2] = 0.0f;
+        M->E[2][0] = 0.0f;
+        M->E[2][1] = 0.0f;
+        M->E[2][2] = 1.0f;
     }
 } // namespace
 
@@ -148,30 +148,30 @@ void CargoBarControl::RefreshAttachment()
     // FUN_00401e90 (empty): the bar does not re-attach to a hardpoint.
 }
 
-void CargoBarControl::GetAttachOrientation(float* OutOrientation9)
+void CargoBarControl::GetAttachOrientation(Matrix* OutOrientation)
 {
     // LAB_0055ea20 (RET 4). Retail also returns the out pointer; the port's slot is void.
-    float Identity[9];
-    SetIdentity9(Identity);
-    float const* Source = Identity;
+    Matrix Identity;
+    SetIdentity9(&Identity);
+    Matrix const* Source = &Identity;
     if (Parent != nullptr && Parent->AsWinControl() != nullptr)
-        Source = AttachOrientation;
-    memcpy(OutOrientation9, Source, 9 * sizeof(float));
+        Source = &AttachOrientation;
+    memcpy(OutOrientation, Source, sizeof(Matrix));
 }
 
-void CargoBarControl::GetAttachPosition(float* OutPosition3)
+void CargoBarControl::GetAttachPosition(Vector* OutPosition)
 {
     // FUN_0055eaf0 (RET 4).
     if (Parent != nullptr && Parent->AsWinControl() != nullptr)
     {
-        OutPosition3[0] = AttachPosition[0];
-        OutPosition3[1] = AttachPosition[1];
-        OutPosition3[2] = AttachPosition[2];
+        OutPosition->x = AttachPosition.x;
+        OutPosition->y = AttachPosition.y;
+        OutPosition->z = AttachPosition.z;
         return;
     }
-    OutPosition3[0] = 0.0f;
-    OutPosition3[1] = 0.0f;
-    OutPosition3[2] = 0.0f;
+    OutPosition->x = 0.0f;
+    OutPosition->y = 0.0f;
+    OutPosition->z = 0.0f;
 }
 
 bool CargoBarControl::Create(Win3D* NewParent, void* Data)
@@ -202,16 +202,16 @@ bool CargoBarControl::Create(Win3D* NewParent, void* Data)
         if (Ini->is_value("hardpoint"))
         {
             // The NEW parent's hardpoint; neither +0x1d0 nor +0x328 is written.
-            SetIdentity9(AttachOrientation);
-            AttachPosition[2] = 0.0f;
-            AttachPosition[1] = 0.0f;
-            AttachPosition[0] = 0.0f;
+            SetIdentity9(&AttachOrientation);
+            AttachPosition.z = 0.0f;
+            AttachPosition.y = 0.0f;
+            AttachPosition.x = 0.0f;
             if (NewParent == nullptr)
                 continue;
             WinControl* const ParentControl = NewParent->AsWinControl();
             if (ParentControl == nullptr)
                 continue;
-            ParentControl->GetHardpointTransform(Ini->get_value_string(), AttachOrientation);
+            ParentControl->GetHardpointTransform(Ini->get_value_string(), &AttachXform);
             continue;
         }
         if (Ini->is_value("mouse_size"))
@@ -281,15 +281,15 @@ void CargoBarControl::Init(char const* MeshPath, float const* NewOffset, char co
     Offset[2] = NewOffset[2];
     if (Hardpoint != nullptr)
     {
-        SetIdentity9(AttachOrientation);
-        AttachPosition[2] = 0.0f;
-        AttachPosition[1] = 0.0f;
-        AttachPosition[0] = 0.0f;
+        SetIdentity9(&AttachOrientation);
+        AttachPosition.z = 0.0f;
+        AttachPosition.y = 0.0f;
+        AttachPosition.x = 0.0f;
         if (Parent != nullptr)
         {
             WinControl* const ParentControl = Parent->AsWinControl();
             if (ParentControl != nullptr)
-                ParentControl->GetHardpointTransform(Hardpoint, AttachOrientation);
+                ParentControl->GetHardpointTransform(Hardpoint, &AttachXform);
         }
     }
     HalfExtents[0] = NewHalfExtents[0];
@@ -310,12 +310,12 @@ void CargoBarControl::Draw()
 
     WinControl::Draw();
 
-    float Matrix[12];
-    memcpy(Matrix, Orientation, 9 * sizeof(float));
-    Matrix[9] = Position[0] + Offset[0];
-    Matrix[10] = Position[1] + Offset[1];
-    Matrix[11] = Position[2] + Offset[2];
-    Win3DBindModelview(nullptr, Matrix);
+    Transform Matrix;
+    memcpy(&Matrix, &Orientation, 9 * sizeof(float));
+    Matrix.Translation.x = Position.x + Offset[0];
+    Matrix.Translation.y = Position.y + Offset[1];
+    Matrix.Translation.z = Position.z + Offset[2];
+    Win3DBindModelview(nullptr, &Matrix);
     Win3DDisable(kWin3DTexture2D);
     Win3DDisable(kWin3DDepthTest);
 
@@ -407,7 +407,7 @@ void CargoBarControl::SetPosition(float const* NewPosition)
 {
     // LAB_0055f5a0 (RET 4): WinControl's with the attach position added.
     float Attach[3];
-    GetAttachPosition(Attach);
+    GetAttachPosition(reinterpret_cast<Vector*>(Attach));
     float Placed[3];
     Placed[0] = Attach[0] + NewPosition[0];
     Placed[1] = Attach[1] + NewPosition[1];
@@ -415,19 +415,19 @@ void CargoBarControl::SetPosition(float const* NewPosition)
     WinControl::SetPosition(Placed);
 }
 
-void CargoBarControl::SetOrientation(float const* NewOrientation)
+void CargoBarControl::SetOrientation(Matrix const* NewOrientation)
 {
     // LAB_0055f5f0 (RET 4): WinControl's on NewOrientation * the attach orientation.
     float Attach[9];
-    GetAttachOrientation(Attach);
+    GetAttachOrientation(reinterpret_cast<Matrix*>(Attach));
     if (G_CargoBarMath == nullptr)
         G_CargoBarMath = Acquire3DMathEngine();
-    FMatrix Product;
-    G_CargoBarMath->MulMatrix(Product, *reinterpret_cast<FMatrix const*>(NewOrientation),
-                              *reinterpret_cast<FMatrix const*>(Attach));
+    Matrix Product;
+    G_CargoBarMath->MulMatrix(Product, *reinterpret_cast<Matrix const*>(NewOrientation),
+                              *reinterpret_cast<Matrix const*>(Attach));
     float Copy[9];
     memcpy(Copy, &Product, sizeof(Copy));
-    WinControl::SetOrientation(Copy);
+    WinControl::SetOrientation(reinterpret_cast<Matrix const*>(Copy));
 }
 
 void CargoBarControl::Update()
@@ -510,10 +510,10 @@ bool CargoBarControl::HitTest(float const* Ray)
     // LAB_0055fa80 (RET 4). Unlike WinControl's there is no instance transform, no hit offset
     // and no parent notification.
     float Matrix[12];
-    memcpy(Matrix, Orientation, 9 * sizeof(float));
-    Matrix[9] = Position[0] + Offset[0];
-    Matrix[10] = Position[1] + Offset[1];
-    Matrix[11] = Position[2] + Offset[2];
+    memcpy(Matrix, &Orientation, 9 * sizeof(float));
+    Matrix[9] = Position.x + Offset[0];
+    Matrix[10] = Position.y + Offset[1];
+    Matrix[11] = Position.z + Offset[2];
     return Win3DRayHitsAabbHalfExtents(HalfExtents, Matrix, Ray);
 }
 

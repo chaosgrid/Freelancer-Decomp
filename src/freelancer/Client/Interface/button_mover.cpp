@@ -214,29 +214,29 @@ void ButtonScaler::Update()
 
         // Identity rotation, translation copied from the instance's current transform (+0x24),
         // the rotation scaled by the math engine, then SetInstanceMatrix + UpdateInstance.
-        void* const Instance = Entry.Control->MeshHolder.EngineInstance;
-        FTransform Transform;
-        Transform.Rotation.D[0][0] = 1.0f;
-        Transform.Rotation.D[0][1] = 0.0f;
-        Transform.Rotation.D[0][2] = 0.0f;
-        Transform.Rotation.D[1][0] = 0.0f;
-        Transform.Rotation.D[1][1] = 1.0f;
-        Transform.Rotation.D[1][2] = 0.0f;
-        Transform.Rotation.D[2][0] = 0.0f;
-        Transform.Rotation.D[2][1] = 0.0f;
-        Transform.Rotation.D[2][2] = 1.0f;
-        float const* const Current = DALib::Engine->GetInstanceTransform(Instance);
-        Transform.Translation.X = Current[9];
-        Transform.Translation.Y = Current[10];
-        Transform.Translation.Z = Current[11];
+        const InstanceIndex Instance = Entry.Control->MeshHolder.EngineInstance;
+        Transform Xform;
+        Xform.Rotation.E[0][0] = 1.0f;
+        Xform.Rotation.E[0][1] = 0.0f;
+        Xform.Rotation.E[0][2] = 0.0f;
+        Xform.Rotation.E[1][0] = 0.0f;
+        Xform.Rotation.E[1][1] = 1.0f;
+        Xform.Rotation.E[1][2] = 0.0f;
+        Xform.Rotation.E[2][0] = 0.0f;
+        Xform.Rotation.E[2][1] = 0.0f;
+        Xform.Rotation.E[2][2] = 1.0f;
+        const Transform* const Current = DALib::Engine->GetInstanceTransform(Instance);
+        Xform.Translation.x = Current->Translation.x;
+        Xform.Translation.y = Current->Translation.y;
+        Xform.Translation.z = Current->Translation.z;
 
         if (G_ButtonScalerMath == nullptr)
         {
             G_ButtonScalerMath = Acquire3DMathEngine();
         }
-        G_ButtonScalerMath->Scale(Transform.Rotation, Transform.Rotation, Scale);
+        G_ButtonScalerMath->Scale(Xform.Rotation, Xform.Rotation, Scale);
 
-        DALib::Engine->SetInstanceMatrix(Instance, &Transform);
+        DALib::Engine->SetInstanceMatrix(Instance, &Xform);
         DALib::Engine->UpdateInstance(Instance, 0, nullptr);
     }
 

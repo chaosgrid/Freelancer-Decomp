@@ -36,7 +36,7 @@
 #include "Space/space_letterbox.h"         // IsLetterboxVisible (FUN_0041a3e0)
 #include "Interface/ui_scroll.h"
 #include "Interface/win3d.h"                   // Win3DGetCamera, Win3DTransformByMatrix
-#include "x86math.h"                 // FVector, FMatrix, I3DMathEngine
+#include "x86math.h"                 // Vector, Matrix, I3DMathEngine
 
 #include "common_archetype.h"
 #include "common_cequip.h"
@@ -308,15 +308,15 @@ namespace
         int CursorX = 0;
         int CursorY = 0;
         GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
-        FVector Local;
-        Local.X = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
+        Vector Local;
+        Local.x = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
                                      Cam->XScale * Cam->ZNear);
-        Local.Y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
+        Local.y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
                                      Cam->YScale * Cam->ZNear);
-        Local.Z = -Cam->ZNear;
-        FMatrix Orientation;
-        memcpy(&Orientation, Cam->World, sizeof(Orientation));
-        FVector World;
+        Local.z = -Cam->ZNear;
+        Matrix Orientation;
+        memcpy(&Orientation, &Cam->World, sizeof(Orientation));
+        Vector World;
         if (bThroughEngine)
         {
             if (G_ContactListMath == nullptr)
@@ -329,12 +329,12 @@ namespace
         {
             Win3DTransformByMatrix(World, Orientation, Local); // FUN_00423b90
         }
-        double const Inv = 1.0 / sqrt(static_cast<double>(World.X) * World.X +
-                                      static_cast<double>(World.Y) * World.Y +
-                                      static_cast<double>(World.Z) * World.Z);
-        OutRay[0] = static_cast<float>(World.X * Inv);
-        OutRay[1] = static_cast<float>(World.Y * Inv);
-        OutRay[2] = static_cast<float>(World.Z * Inv);
+        double const Inv = 1.0 / sqrt(static_cast<double>(World.x) * World.x +
+                                      static_cast<double>(World.y) * World.y +
+                                      static_cast<double>(World.z) * World.z);
+        OutRay[0] = static_cast<float>(World.x * Inv);
+        OutRay[1] = static_cast<float>(World.y * Inv);
+        OutRay[2] = static_cast<float>(World.z * Inv);
     }
 
     // The label both name paths of the layout pass build: the client object's Font::String
@@ -669,7 +669,7 @@ bool HUD_ContactList::Create(Win3D* NewParent, void* Data)
     Scroll = CreateUIScroll("ContactListScroll", ScrollPos3, 0.016f, 0.118f, 0, 5, 8, 0);
 
     SetOffset(-0.323f, -0.241f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     SetHiddenWithChildren(true);
 
     // Previous / next contact.

@@ -996,7 +996,7 @@ bool NeuroNetStoryStar::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     {
         // Onto the parent's position, shown.
         if (Parent != nullptr)
-            SetPosition(Parent->Position);
+            SetPosition(&Parent->Position.x);
         Flags = static_cast<unsigned char>(Flags | 3);
         return true;
     }

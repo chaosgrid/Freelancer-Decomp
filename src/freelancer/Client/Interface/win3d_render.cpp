@@ -53,7 +53,7 @@ void Win3DApplyCamera(ICamera* Camera)
     float const FovY = Camera->GetFovYDeg();
     Win3DSetPerspective(FovY, Aspect, ZNear, ZFar);
 
-    float const* const View12 = Camera->GetViewTransform();
+    const float* const View12 = (const float*)Camera->GetViewTransform();
     memcpy(GWin3DModelview, View12, sizeof(float) * 12);
 
     IRenderPipeline* const Pipe = DALib::Pipeline;
@@ -61,12 +61,12 @@ void Win3DApplyCamera(ICamera* Camera)
     Pipe->GetPipelineState(7, &bViewspace);
     if (bViewspace != 0)
     {
-        Pipe->SetModelview(GWin3DModelview);
+        Pipe->SetModelview((const Transform*)GWin3DModelview);
         return;
     }
 
     float Identity[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
                           0.0f, 0.0f, 0.0f};
-    Pipe->SetView(Identity);
-    Pipe->SetWorld(View12);
+    Pipe->SetView((const Transform*)Identity);
+    Pipe->SetWorld((const Transform*)View12);
 }

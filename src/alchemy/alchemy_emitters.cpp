@@ -217,14 +217,14 @@ namespace AlchemyImpl
           bResetEmitHistory_(1),
           EmitFraction_(0.0f)
     {
-        PrevNodePos_[0] = 0.0f;
-        PrevNodePos_[1] = 0.0f;
-        PrevNodePos_[2] = 0.0f;
+        PrevNodePos_.x = 0.0f;
+        PrevNodePos_.y = 0.0f;
+        PrevNodePos_.z = 0.0f;
         // FUN_06206c70 on +0xbc (identity rotation), then +0xe0..+0xe8 = 0.
-        FillIdentity3x3(EmitterXform_);
-        EmitterXform_[9] = 0.0f;
-        EmitterXform_[10] = 0.0f;
-        EmitterXform_[11] = 0.0f;
+        FillIdentity3x3(&EmitterXform_.Rotation.E[0][0]);
+        EmitterXform_.Translation.x = 0.0f;
+        EmitterXform_.Translation.y = 0.0f;
+        EmitterXform_.Translation.z = 0.0f;
         bIsEmitterNode_ = 1; // byte +0x95
     }
 
@@ -334,7 +334,7 @@ namespace AlchemyImpl
         }
 
         // Node slot 7 (FUN_0623ffb0) into +0xbc.
-        ComputeRelativeTransform(AssociatedAppearance_, EmitterXform_);
+        ComputeRelativeTransform(AssociatedAppearance_, &EmitterXform_);
 
         // Each stored as float.
         FFxEmitterPropertySet* const Set = EmitterProps(); // node+0x9c
@@ -357,9 +357,9 @@ namespace AlchemyImpl
             bResetEmitHistory_ = 0;
             EmitCount =
                 static_cast<long>(static_cast<unsigned long>(EmitCount) + Set->InitialParticles);
-            PrevNodePos_[0] = NodeWorldXform_[9];
-            PrevNodePos_[1] = NodeWorldXform_[10];
-            PrevNodePos_[2] = NodeWorldXform_[11];
+            PrevNodePos_.x = NodeWorldXform_.Translation.x;
+            PrevNodePos_.y = NodeWorldXform_.Translation.y;
+            PrevNodePos_.z = NodeWorldXform_.Translation.z;
         }
 
         // Keyed bursts (EmitCount +0x5c): every key with LastEmitTime_ <= time <= Age adds
@@ -411,15 +411,15 @@ namespace AlchemyImpl
         // 1.0f / EmitNowF stays in the FPU for the per-particle step and is rounded to float
         // for the time step.
         float Delta[3] = { 0.0f, 0.0f, 0.0f };
-        Acquire3DMath()->InverseTransform(*reinterpret_cast<FVector*>(Delta),
-                                          *reinterpret_cast<const FTransform*>(NodeWorldXform_),
-                                          *reinterpret_cast<const FVector*>(PrevNodePos_)); // +0x3C
+        Acquire3DMath()->InverseTransform(*reinterpret_cast<Vector*>(Delta),
+                                          NodeWorldXform_,
+                                          PrevNodePos_); // +0x3C
         const double InvCountExt = 1.0 / static_cast<double>(EmitNowF);
         float FullDelta[3] = { Delta[0], Delta[1], Delta[2] };
         float Velocity[3] = { 0.0f, 0.0f, 0.0f };
-        PrevNodePos_[0] = NodeWorldXform_[9];
-        PrevNodePos_[1] = NodeWorldXform_[10];
-        PrevNodePos_[2] = NodeWorldXform_[11];
+        PrevNodePos_.x = NodeWorldXform_.Translation.x;
+        PrevNodePos_.y = NodeWorldXform_.Translation.y;
+        PrevNodePos_.z = NodeWorldXform_.Translation.z;
         const float InvCount = static_cast<float>(InvCountExt);
         float Step[3] = { static_cast<float>(Delta[0] * InvCountExt),
                           static_cast<float>(Delta[1] * InvCountExt),
@@ -509,15 +509,15 @@ namespace AlchemyImpl
 
         I3DMathEngine* Math = Shared3DMath();
         float Rotated[3] = { 0.0f, 0.0f, 0.0f };
-        Math->Rotate(*reinterpret_cast<FVector*>(Rotated),
-                     *reinterpret_cast<const FTransform*>(EmitterXform_),
-                     *reinterpret_cast<const FVector*>(Vel)); // +0x30
+        Math->Rotate(*reinterpret_cast<Vector*>(Rotated),
+                     EmitterXform_,
+                     *reinterpret_cast<const Vector*>(Vel)); // +0x30
         float Six[6];
         std::memcpy(Six + 3, Rotated, sizeof(Rotated));
         float Placed[3] = { 0.0f, 0.0f, 0.0f };
-        Math->TransformXform(*reinterpret_cast<FVector*>(Placed),
-                             *reinterpret_cast<const FTransform*>(EmitterXform_),
-                             *reinterpret_cast<const FVector*>(Pos)); // +0x28
+        Math->TransformXform(*reinterpret_cast<Vector*>(Placed),
+                             EmitterXform_,
+                             *reinterpret_cast<const Vector*>(Pos)); // +0x28
 
         std::memcpy(Six, Placed, sizeof(Placed));
         IGenericFx* const Appearance = AsFxNode(AssociatedAppearance_);

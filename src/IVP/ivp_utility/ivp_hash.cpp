@@ -18,7 +18,7 @@
 // A fixed-key-length chained hash, separate from IVP_VHash_Store
 // (ivp_vhash.cpp): entries own malloc'd copies of their key bytes. It uses the
 // same CRC-32 table (DAT_063edcdc) but over KeyLength bytes, hence its own
-// loop instead of HashKey_063edcdc.
+// loop instead of IVP_Crc32HashKey.
 //
 // Node (KeyLength + 0xc bytes, malloc'd per insert; retail over-allocates by
 // 4 bytes, reproduced):
@@ -46,7 +46,7 @@ namespace
         unsigned Crc = 0xffffffffu;
         for (int32_t I = 0; I < Length; ++I)
         {
-            Crc = (Crc >> 8) ^ g_Crc32Table_063edcdc[(Key[I] ^ Crc) & 0xff];
+            Crc = (Crc >> 8) ^ g_IVP_Crc32Table[(Key[I] ^ Crc) & 0xff];
         }
         return Crc;
     }

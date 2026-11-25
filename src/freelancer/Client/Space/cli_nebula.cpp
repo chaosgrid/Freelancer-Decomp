@@ -378,9 +378,9 @@ namespace
                                    Vector const& MinCorner, Vector const& MaxCorner,
                                    float const* Weights, int WeightCount)
     {
-        Puff->Position[0] = Sample.x;
-        Puff->Position[1] = Sample.y;
-        Puff->Position[2] = Sample.z;
+        Puff->Position.x = Sample.x;
+        Puff->Position.y = Sample.y;
+        Puff->Position.z = Sample.z;
 
         // Constants: double 0x005e0bd8, double(0.8f) 0x005e0bd0.
         int const RSize = rand();
@@ -456,8 +456,8 @@ namespace
             Vector const Sample = random_inside_sphere(Clouds->CloudRadius);
             float const Scale = Clouds->PuffRadius * Clouds->DetailRadiusScale;
             LocalNebulaCloudsFillPuff(Puff, Sample, Scale,
-                                      *reinterpret_cast<Vector*>(Clouds->PuffColorA),
-                                      *reinterpret_cast<Vector*>(Clouds->PuffColorB),
+                                      Clouds->PuffColorA,
+                                      Clouds->PuffColorB,
                                       Clouds->PuffWeights, Clouds->PuffShapeCount);
 
             Vector const Drift = random_inside_sphere(Clouds->PuffDrift);
@@ -548,18 +548,18 @@ namespace
         Clouds->CentreAhead = Ahead;
         float CullDistSq = static_cast<float>(static_cast<double>(Radius) * Radius *
                                               static_cast<double>(kCloudsCullSlack));
-        FVector AheadLocal;
-        AheadLocal.X = 0.0f;
-        AheadLocal.Y = 0.0f;
-        AheadLocal.Z = -Ahead;
+        Vector AheadLocal;
+        AheadLocal.x = 0.0f;
+        AheadLocal.y = 0.0f;
+        AheadLocal.z = -Ahead;
 
         // Cloud centre +0xf4 = the camera transform applied to that vector.
-        FTransform const* const CamXf = reinterpret_cast<FTransform const*>(Cam->GetOrientation());
-        FVector Centre;
+        Transform const* const CamXf = reinterpret_cast<Transform const*>(Cam->GetOrientation());
+        Vector Centre;
         AcquireCloudsMath()->TransformXform(Centre, *CamXf, AheadLocal);
-        Clouds->Centre[0] = Centre.X;
-        Clouds->Centre[1] = Centre.Y;
-        Clouds->Centre[2] = Centre.Z;
+        Clouds->Centre[0] = Centre.x;
+        Clouds->Centre[1] = Centre.y;
+        Clouds->Centre[2] = Centre.z;
 
         FNebulaCloudPuff** const Table = Clouds->PuffTable;
 
@@ -577,9 +577,9 @@ namespace
             if (Puff->bActive == 0)
                 continue;
             // <= and unordered distances stay active.
-            double const Dx = static_cast<double>(Clouds->Centre[0]) - Puff->Position[0];
-            double const Dy = static_cast<double>(Clouds->Centre[1]) - Puff->Position[1];
-            double const Dz = static_cast<double>(Clouds->Centre[2]) - Puff->Position[2];
+            double const Dx = static_cast<double>(Clouds->Centre[0]) - Puff->Position.x;
+            double const Dy = static_cast<double>(Clouds->Centre[1]) - Puff->Position.y;
+            double const Dz = static_cast<double>(Clouds->Centre[2]) - Puff->Position.z;
             double const DistSq = Dz * Dz + Dy * Dy + Dx * Dx;
             if (DistSq > CullDistSq)
             {
@@ -629,7 +629,7 @@ namespace
                 float const SpawnRadius = Clouds->CloudRadius;
                 Vector const OnSphere = random_on_unit_sphere();
                 float const Sz = static_cast<float>(static_cast<double>(SpawnRadius) * OnSphere.z);
-                float* const Pos = Table[I]->Position;
+                float* const Pos = &Table[I]->Position.x;
                 Pos[0] = static_cast<float>(static_cast<double>(SpawnRadius) * OnSphere.x +
                                             Clouds->Centre[0]);
                 Pos[1] = static_cast<float>(static_cast<double>(SpawnRadius) * OnSphere.y +
@@ -669,7 +669,7 @@ namespace
                         Exclusion::NebulaExclusionZone* HitZone;
                         float Depth = -1.0f;
                         if (ExclusionMgr->is_in_exclusion_zone(
-                                *reinterpret_cast<Vector const*>(Table[I]->Position), &HitZone, &Depth,
+                                Table[I]->Position, &HitZone, &Depth,
                                 true) &&
                             Depth > kCloudsExclusionDepth)
                             Table[I]->bHidden = 1;
@@ -695,7 +695,7 @@ namespace
                     // Lightning anchor +0x20.
                     if (Clouds->LLightRange > 0.0f)
                     {
-                        float const* const CamPos = Cam->GetPosition();
+                        const float* const CamPos = (const float*)Cam->GetPosition();
                         double const Ax = static_cast<double>(Puff->LightningAnchor[0]) - CamPos[0];
                         double const Ay = static_cast<double>(Puff->LightningAnchor[1]) - CamPos[1];
                         double const Az = static_cast<double>(Puff->LightningAnchor[2]) - CamPos[2];
@@ -717,29 +717,29 @@ namespace
                 {
                     // The timer just crossed zero: anchor = position; the lightning direction is
                     // a random in-plane direction of LookMatrix(anchor - camera), length 5.0.
-                    Puff->LightningAnchor[0] = Puff->Position[0];
-                    Puff->LightningAnchor[1] = Puff->Position[1];
-                    Puff->LightningAnchor[2] = Puff->Position[2];
-                    float const* const CamPos = Cam->GetPosition();
+                    Puff->LightningAnchor[0] = Puff->Position.x;
+                    Puff->LightningAnchor[1] = Puff->Position.y;
+                    Puff->LightningAnchor[2] = Puff->Position.z;
+                    const Vector* const CamPos = Cam->GetPosition();
                     Vector ToAnchor;
-                    ToAnchor.x = Puff->LightningAnchor[0] - CamPos[0];
-                    ToAnchor.y = Puff->LightningAnchor[1] - CamPos[1];
-                    ToAnchor.z = Puff->LightningAnchor[2] - CamPos[2];
+                    ToAnchor.x = Puff->LightningAnchor[0] - CamPos->x;
+                    ToAnchor.y = Puff->LightningAnchor[1] - CamPos->y;
+                    ToAnchor.z = Puff->LightningAnchor[2] - CamPos->z;
                     Matrix const Look = LookMatrix(ToAnchor);
 
                     int const RAngle = rand();
                     double const Angle = static_cast<double>(RAngle) * kCloudsRandScale * kCloudsTwoPi;
-                    FVector InPlane;
-                    InPlane.X = static_cast<float>(cos(Angle));
-                    InPlane.Y = static_cast<float>(sin(Angle));
-                    InPlane.Z = 0.0f;
-                    FVector Dir;
+                    Vector InPlane;
+                    InPlane.x = static_cast<float>(cos(Angle));
+                    InPlane.y = static_cast<float>(sin(Angle));
+                    InPlane.z = 0.0f;
+                    Vector Dir;
                     AcquireCloudsMath()->TransformMatrix(
-                        Dir, *reinterpret_cast<FMatrix const*>(&Look), InPlane);
+                        Dir, Look, InPlane);
                     float* const DriftDir = Puff->LightningDir;
-                    DriftDir[0] = Dir.X;
-                    DriftDir[1] = Dir.Y;
-                    DriftDir[2] = Dir.Z;
+                    DriftDir[0] = Dir.x;
+                    DriftDir[1] = Dir.y;
+                    DriftDir[2] = Dir.z;
                     double const Len = sqrt(static_cast<double>(DriftDir[0]) * DriftDir[0] +
                                             static_cast<double>(DriftDir[1]) * DriftDir[1] +
                                             static_cast<double>(DriftDir[2]) * DriftDir[2]);
@@ -764,7 +764,7 @@ namespace
                 }
             }
 
-            float* const Pos = Puff->Position;
+            float* const Pos = &Puff->Position.x;
             float const StepZ = static_cast<float>(static_cast<double>(Dt) * Puff->Velocity[2]);
             Pos[0] = static_cast<float>(static_cast<double>(Dt) * Puff->Velocity[0] + Pos[0]);
             Pos[1] = static_cast<float>(static_cast<double>(Dt) * Puff->Velocity[1] + Pos[1]);
@@ -792,9 +792,9 @@ namespace
             }
 
             Vector const Sample = random_inside_sphere(Clouds->CloudRadius);
-            Puff->Position[0] = Clouds->Centre[0] + Sample.x;
-            Puff->Position[1] = Clouds->Centre[1] + Sample.y;
-            Puff->Position[2] = Clouds->Centre[2] + Sample.z;
+            Puff->Position.x = Clouds->Centre[0] + Sample.x;
+            Puff->Position.y = Clouds->Centre[1] + Sample.y;
+            Puff->Position.z = Clouds->Centre[2] + Sample.z;
             Vector const Drift = random_inside_sphere(Clouds->PuffDrift);
             Puff->Velocity[0] = Drift.x;
             Puff->Velocity[1] = Drift.y;
@@ -803,7 +803,7 @@ namespace
             // A null zone (+0xc4) counts as outside; only an immersion strictly above 0 is in.
             Universe::IZoneImmersion const* const Zone = Clouds->Owner;
             if (Zone == nullptr ||
-                !(Zone->GetImmersion(*reinterpret_cast<Vector const*>(Puff->Position)) > 0.0))
+                !(Zone->GetImmersion(Puff->Position) > 0.0))
             {
                 Puff->bActive = 0;
                 Puff->bHidden = 1;
@@ -817,7 +817,7 @@ namespace
             {
                 Exclusion::NebulaExclusionZone* HitZone = nullptr;
                 float HitDist = -1.0f;
-                if (ExclMgr->is_in_exclusion_zone(*reinterpret_cast<Vector*>(Puff->Position), &HitZone,
+                if (ExclMgr->is_in_exclusion_zone(Puff->Position, &HitZone,
                                                   &HitDist, true) &&
                     HitDist > 0.9f)
                 {
@@ -852,12 +852,12 @@ namespace
         Clouds->DisableLightningFlash = 0;
         Clouds->DisableLightningBolts = 0;
         Clouds->DisableClouds = 0;
-        Clouds->Up[2] = 0.0f;
-        Clouds->Up[0] = 1.0f;
-        Clouds->Up[1] = 1.0f;
+        Clouds->Up.z = 0.0f;
+        Clouds->Up.x = 1.0f;
+        Clouds->Up.y = 1.0f;
         {
             // Normalised on the FPU, no zero test.
-            float* const N = Clouds->Up;
+            float* const N = &Clouds->Up.x;
             double const Inv = 1.0f / sqrt((static_cast<double>(N[0]) * N[0] +
                                             static_cast<double>(N[1]) * N[1]) +
                                            static_cast<double>(N[2]) * N[2]);
@@ -904,13 +904,13 @@ namespace
                 {
                     float Color[3];
                     ReadColor255(Reader, Color);
-                    float* const Dest = ColorCount == 0 ? Clouds->PuffColorA : Clouds->PuffColorB;
+                    float* const Dest = ColorCount == 0 ? &Clouds->PuffColorA.x : &Clouds->PuffColorB.x;
                     Dest[0] = Color[0];
                     Dest[1] = Color[1];
                     Dest[2] = Color[2];
                     if (ColorCount == 0)
                     {
-                        float* const Second = Clouds->PuffColorB;
+                        float* const Second = &Clouds->PuffColorB.x;
                         Second[0] = Dest[0];
                         Second[1] = Dest[1];
                         Second[2] = Dest[2];
@@ -1561,7 +1561,7 @@ namespace
         for (int I = 0; I < 8; ++I)
         {
             if (Lightning->SegmentAge[I] < 3)
-                LightningDrawSegment(&Lightning->Segments[I], Cam->GetPosition());
+                LightningDrawSegment(&Lightning->Segments[I], (const float*)Cam->GetPosition());
         }
 
         Win3DEnd();
@@ -1958,18 +1958,18 @@ void FNebulaEffect::DrawExclusionShell(void* Camera)
     Universe::IZone const& Zone = *Excl->ZonePtr;
     float const Scale = static_cast<float>(
         static_cast<double>(Zone.GetRadius()) * Shell->ShellScalar * 0.001f);
-    FTransform ScaleXf;
+    Transform ScaleXf;
     memset(&ScaleXf, 0, sizeof(ScaleXf));
-    ScaleXf.Rotation.D[0][0] = Scale;
-    ScaleXf.Rotation.D[1][1] = Scale;
-    ScaleXf.Rotation.D[2][2] = Scale;
+    ScaleXf.Rotation.E[0][0] = Scale;
+    ScaleXf.Rotation.E[1][1] = Scale;
+    ScaleXf.Rotation.E[2][2] = Scale;
 
-    FTransform const& ZoneXf = reinterpret_cast<FTransform const&>(Zone.GetTransform());
-    FTransform Scaled;
+    Transform const& ZoneXf = Zone.GetTransform();
+    Transform Scaled;
     AcquireNebulaMath()->MulTransform(Scaled, ZoneXf, ScaleXf);
     DALib::Engine->SetInstanceMatrix(Shell->Handle.EngineInstance, &Scaled);
 
-    if (Shell->Handle.EngineInstance != reinterpret_cast<void*>(-1))
+    if (Shell->Handle.EngineInstance != InvalidInstanceIndex)
     {
         DALib::Renderer->RenderInstance(Camera, Shell->Handle.EngineInstance, 1.0f, 0x108u, nullptr,
                               nullptr);
@@ -2674,11 +2674,11 @@ void FNebulaEffect::Update(void* Camera, float Dt)
     }
 
     ICamera* const Cam = static_cast<ICamera*>(Camera);
-    float const* const CamPosPtr = Cam->GetPosition();
+    const Vector* const CamPosPtr = Cam->GetPosition();
     Vector CamPos;
-    CamPos.x = CamPosPtr[0];
-    CamPos.y = CamPosPtr[1];
-    CamPos.z = CamPosPtr[2];
+    CamPos.x = CamPosPtr->x;
+    CamPos.y = CamPosPtr->y;
+    CamPos.z = CamPosPtr->z;
     // The camera's cut flag, byte +0xbc of the camera object (FSpaceCamera::FlagBC, raised by
     // FUN_0054bd50 when the view jumps); retail reads it raw.
     unsigned char const CameraCut = static_cast<unsigned char const*>(Camera)[0xbc];
@@ -3066,22 +3066,22 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
         return;
 
     ICamera* const Cam = static_cast<ICamera*>(Camera);
-    FTransform View;
+    Transform View;
     memcpy(&View, Cam->GetOrientation(), sizeof(View));
-    Vector const CamPos = { View.Translation.X, View.Translation.Y, View.Translation.Z };
+    Vector const CamPos = { View.Translation.x, View.Translation.y, View.Translation.z };
     Vector const ZonePos = Nebula->Zone->GetPos();
 
     // Zone sphere in view space; a ClassifySphere result below 3 draws nothing.
     {
-        FVector ZoneWorld;
-        ZoneWorld.X = ZonePos.x;
-        ZoneWorld.Y = ZonePos.y;
-        ZoneWorld.Z = ZonePos.z;
-        FVector ZoneView = {};
+        Vector ZoneWorld;
+        ZoneWorld.x = ZonePos.x;
+        ZoneWorld.y = ZonePos.y;
+        ZoneWorld.z = ZonePos.z;
+        Vector ZoneView = {};
         AcquireNebulaMath()->InverseTransform(ZoneView, View, ZoneWorld);
-        float const Center[3] = { ZoneView.X, ZoneView.Y, ZoneView.Z };
+        float const Center[3] = { ZoneView.x, ZoneView.y, ZoneView.z };
         float const ZoneRadius = Nebula->Zone->GetRadius();
-        if (static_cast<unsigned short>(Cam->ClassifySphere(Center, ZoneRadius)) < 3)
+        if (static_cast<unsigned short>(Cam->ClassifySphere((const Vector*)Center, ZoneRadius)) < 3)
             return;
     }
 
@@ -3211,13 +3211,13 @@ void NebulaDrawExteriorBits(FNebulaEffect* Nebula, void* Camera)
         float const V[3] = { P[0] - CamPos.x, P[1] - CamPos.y, P[2] - CamPos.z };
 
         // A point on or behind the eye plane is skipped.
-        FVector PWorld;
-        PWorld.X = P[0];
-        PWorld.Y = P[1];
-        PWorld.Z = P[2];
-        FVector PView = {};
+        Vector PWorld;
+        PWorld.x = P[0];
+        PWorld.y = P[1];
+        PWorld.z = P[2];
+        Vector PView = {};
         AcquireNebulaMath()->InverseTransform(PView, View, PWorld);
-        float const Depth = -PView.Z;
+        float const Depth = -PView.z;
         if (Depth <= 0.0f)
             continue;
 

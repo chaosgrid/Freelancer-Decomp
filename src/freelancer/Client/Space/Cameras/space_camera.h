@@ -41,16 +41,15 @@ enum ESpaceCameraSlot
     kCamSlotSetProperty       = 0x4c   // FUN_0040f5f0  "fovx" / "fovy" / "znear" / "zfar"
 };
 
-// Retail object layout, byte for byte with FUN_0040f150. Everything is a raw float array so
-// this header stays independent of Common's Vector/Matrix (and of whatever is being changed
-// there); the offsets are what matters for a faithful port.
+// Retail object layout, byte for byte with FUN_0040f150. The world and view blocks are an
+// orientation followed by a position, so each is also reachable as one Transform.
 struct FSpaceCamera : ICamera
 {
     GENRESULT DACOM_API QueryInterface(char const* Iid, void** Out) override;
     unsigned long DACOM_API AddRef() override;
     unsigned long DACOM_API Release() override;
-    float const* DACOM_API GetPosition() override;
-    float const* DACOM_API GetOrientation() override;
+    const Vector* DACOM_API GetPosition() override;
+    const Matrix* DACOM_API GetOrientation() override;
     int const* DACOM_API GetViewport() override;
     float DACOM_API GetHalfFovXDeg() override;
     float DACOM_API GetFovYDeg() override;
@@ -59,20 +58,34 @@ struct FSpaceCamera : ICamera
     float DACOM_API GetAspect() override;
     double DACOM_API GetXScaleOverNear() override;
     double DACOM_API GetYScaleOverNear() override;
-    int DACOM_API Project(float* OutX, float* OutY, float* OutZ, float const* WorldPoint) override;
-    void DACOM_API Unproject(float* OutWorld3, float ScreenX, float ScreenY) override;
-    int DACOM_API ClassifySphere(float const* Center, float Radius) override;
-    float const* DACOM_API GetViewTransform() override;
-    int DACOM_API ProjectVec(float* Out3, float const* WorldPoint) override;
-    void GetVelocity(float* Out3) override;
+    int DACOM_API Project(float* OutX, float* OutY, float* OutZ, const Vector* WorldPoint) override;
+    void DACOM_API Unproject(Vector* OutWorld3, float ScreenX, float ScreenY) override;
+    int DACOM_API ClassifySphere(const Vector* Center, float Radius) override;
+    const Transform* DACOM_API GetViewTransform() override;
+    int DACOM_API ProjectVec(Vector* Out3, const Vector* WorldPoint) override;
+    void GetVelocity(Vector* Out3) override;
     int SetProperty(char const* Key, char const* Value) override;
 
-    float  World[9];            // +0x004  orientation, row-major; ctor writes identity
-    float  WorldPos[3];         // +0x028
+    union
+    {
+        struct
+        {
+            Matrix World;       // +0x004  orientation, row-major; ctor writes identity
+            Vector WorldPos;    // +0x028
+        };
+        Transform WorldXform;   // +0x004
+    };
     unsigned char bViewDirty;   // +0x034  ctor sets 1; slot 0x40 clears it after rebuilding
     unsigned char Pad035[3];
-    float  View[9];             // +0x038  cached transpose(World)
-    float  ViewPos[3];          // +0x05c  cached -(World * WorldPos)
+    union
+    {
+        struct
+        {
+            Matrix View;        // +0x038  cached transpose(World)
+            Vector ViewPos;     // +0x05c  cached -(World * WorldPos)
+        };
+        Transform ViewXform;    // +0x038
+    };
     float  ScreenCenterX;       // +0x068  NOT initialised by the base ctor
     float  ScreenCenterY;       // +0x06c  NOT initialised by the base ctor
     float  HalfWidth;           // +0x070  320.0f

@@ -27,6 +27,7 @@
 //   inherited), 11 FUN_004e7980 Update, 13 FUN_004e7890 Draw, 42 FUN_004e7950 SetProperty.
 // ButtonMover-face override: 0 FUN_004e79b0.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "Interface/button_mover.h"
 #include "Core/event_handler.h"
 #include "Common/Fonts/font_string.h"   // FHudWideText
@@ -60,37 +61,37 @@ struct CSimple;
 // -------------------------------------------------------------------------------------------
 struct FHudInstanceBounds
 {
-    FVector Max; // +0x00
-    FVector Min; // +0x0c
+    Vector Max; // +0x00
+    Vector Min; // +0x0c
 
     // FUN_004e65d0 -- root sphere (extent flag 0, centre through the instance transform, then
     // InverseTransform by Xform) gives Min = c - r, Max = c + r; every GetRelatedInstance(,1,)
     // child is folded in by ExpandChildren (the loop body is the same code as FUN_004e69c0).
-    FHudInstanceBounds(void* Instance, FTransform const* Xform, bool bIncludeShieldParts);
+    FHudInstanceBounds(InstanceIndex Instance, Transform const* Xform, bool bIncludeShieldParts);
 
     // No retail ctor: ShipViewControl::SetInstance fills Max / Min on its own stack and then
     // calls ExpandChildren on it.
     FHudInstanceBounds() = default;
 
     // FUN_004e6580 -- *Out = (Max + Min) * 0.5; returns Out.
-    FVector* GetCenter(FVector* Out) const;
+    Vector* GetCenter(Vector* Out) const;
 
     // FUN_004e69c0 -- for each child of Instance: unless bIncludeShieldParts,
     // skip a shield part (CObject::is_shield_part of the instance's user-data object); otherwise
     // grow Min / Max by the child's sphere and recurse into it.
-    void ExpandChildren(void* Instance, FTransform const* Xform, bool bIncludeShieldParts);
+    void ExpandChildren(InstanceIndex Instance, Transform const* Xform, bool bIncludeShieldParts);
 
     // FUN_004e68d0 -- the part's extent radius; OutCenter = its extent centre moved to world
     // space through the instance transform.
-    float GetPartSphere(void* Instance, FVector* OutCenter) const;
+    float GetPartSphere(InstanceIndex Instance, Vector* OutCenter) const;
 
     // FUN_004e6960 -- UserData(Instance)->is_shield_part(inst_to_part(Instance)) with both
     // CObject lookups inlined.
-    bool IsShieldPart(void* Instance) const;
+    bool IsShieldPart(InstanceIndex Instance) const;
 };
 
 // FUN_004e6880 (thiscall on the transform) -- *Out = InverseTransform(Xform, In); returns Out.
-FVector* HudInverseTransformPoint(FTransform const* Xform, FVector* Out, FVector const* In);
+Vector* HudInverseTransformPoint(Transform const* Xform, Vector* Out, Vector const* In);
 
 // -------------------------------------------------------------------------------------------
 // FHudSpherePick -- a ray against the part spheres of an instance hierarchy, keeping the nearest
@@ -99,8 +100,8 @@ FVector* HudInverseTransformPoint(FTransform const* Xform, FVector* Out, FVector
 // -------------------------------------------------------------------------------------------
 struct FHudSpherePick
 {
-    FVector Origin;             // +0x00
-    FVector Dir;                // +0x0c  unit
+    Vector Origin;             // +0x00
+    Vector Dir;                // +0x0c  unit
     float Field18;              // +0x18  -1.0f (Setup); not read by the traced users
     unsigned char Pad1c[0x30];  // +0x1c  never written by the traced users
     unsigned char Field4c;      // +0x4c  ctor argument; not read by the traced users
@@ -108,28 +109,28 @@ struct FHudSpherePick
     int Field50;                // +0x50  -1; not read by the traced users
     int HitCount;               // +0x54
     float BestKey;              // +0x58  -cosine of the best hit
-    FVector HitPoint;           // +0x5c  ray point of the best hit
-    FVector HitSurface;         // +0x68  sphere point of the best hit
+    Vector HitPoint;           // +0x5c  ray point of the best hit
+    Vector HitSurface;         // +0x68  sphere point of the best hit
 
     // FUN_00422ba0
     explicit FHudSpherePick(unsigned char Flag);
 
     // FUN_00422bc0 -- Origin = From, Dir = normalize(To - From), the rest reset.
-    void Setup(FVector const* From, FVector const* To);
+    void Setup(Vector const* From, Vector const* To);
 
     // FUN_00422e30 (recursive) -- children first (any hit makes the result
     // true), then this instance: extent flag 1 sphere, FUN_00422c70; accepted when the cosine
     // is above 0.5, the ray-to-sphere gap is <= Slack and (no hit yet or -cosine < BestKey).
-    bool Test(void* Instance, float Slack);
+    bool Test(InstanceIndex Instance, float Slack);
 };
 
 // FUN_00422c70 (cdecl) -- W = TransformXform(Xform, Center). t = (W - Origin) . Dir. t < 0:
 // OutRay = Origin, cosine 1; else OutRay = Origin + t * Dir, cosine = t / |W - Origin|. Q =
 // OutRay - W; OutSurface = W + Q * (Radius / |Q|); when |Q| < Radius, OutRay = OutSurface.
 // Returns the cosine.
-float HudRaySphereClosest(FVector const* Origin, FVector const* Dir, FVector const* Center,
-                          float Radius, FVector* OutRay, FVector* OutSurface,
-                          FTransform const* Xform);
+float HudRaySphereClosest(Vector const* Origin, Vector const* Dir, Vector const* Center,
+                          float Radius, Vector* OutRay, Vector* OutSurface,
+                          Transform const* Xform);
 
 // FUN_0045a740 -- true while the HUD must not pick under the mouse: a NeuroNet screen is up
 // (DAT_0067dcc8), the software cursor is hidden (FUN_0041dd90), the server tick is held
@@ -152,12 +153,12 @@ unsigned long* HudDamageColorArgb(unsigned long* OutArgb, float Damage);
 // camera (DAT_0067dbf8) slot 0x34 Project: A gives left / top, B right / bottom, each
 // truncated with ftol. A failed projection writes nothing, so that pair keeps whatever the
 // four scratch dwords held (see .cpp). Callers: HudTargetBase::SetupViewCamera and 0x004cc1c9.
-int* HudProjectScreenRect(int* OutRect4, FVector const* A, FVector const* B);
+int* HudProjectScreenRect(int* OutRect4, Vector const* A, Vector const* B);
 
 // FUN_004e7090 (thiscall on Xform, returns Out) -- Out = TransformXform(Xform, In) through the
 // HUD_Target_Base math engine DAT_00674b1c. 29 retail call sites, among them SetupViewCamera
 // and the beam effect (beam_effect.cpp).
-FVector* HudTransformPoint(FTransform const* Xform, FVector* Out, FVector const* In);
+Vector* HudTransformPoint(Transform const* Xform, Vector* Out, Vector const* In);
 
 // FUN_00543320 (thiscall on the IObjRW, no arguments) -- the CShip behind an IObjRW: null ObjRw,
 // a null IObjInspectImpl CBase (ObjRw + 0xc), a null CBase::Object or a class that is not a ship
@@ -351,7 +352,7 @@ protected:
 
 public:
     float ViewRadius;                  // +0x388
-    FVector ViewCenter;                // +0x38c
+    Vector ViewCenter;                // +0x38c
     BaseWatcher ViewObject;            // +0x398
     FPartCache PartCache;              // +0x3a0
     unsigned short SubTargetId;        // +0x3b4
@@ -359,14 +360,14 @@ public:
     FGameCamera ViewCamera;            // +0x3b8 .. +0x4b0
     unsigned char bSubTargetPickEnabled; // +0x4b0
     unsigned char Pad4b1[3];
-    FVector HitCenter;                 // +0x4b4  derived ctors (HUD_Target {-0.387, -0.29, -1})
+    Vector HitCenter;                 // +0x4b4  derived ctors (HUD_Target {-0.387, -0.29, -1})
     float HitHalfWidth;                // +0x4c0  HUD_Target 0.11
     float HitHalfHeight;               // +0x4c4  HUD_Target 0.11
     WinControl* ToggleButton;          // +0x4c8  SetProperty(0x26, this) -> ToggleExpanded
     WinControl* ViewPanel;             // +0x4cc  Draw -> DrawViewObject after drawing it
     unsigned char bExpanded;           // +0x4d0  toggled by OnMoveFinished
     unsigned char Pad4d1[3];
-    FVector HomePosition;              // +0x4d4  derived ctors
+    Vector HomePosition;              // +0x4d4  derived ctors
 
 private:
     HudTargetBase(HudTargetBase const&) = delete;

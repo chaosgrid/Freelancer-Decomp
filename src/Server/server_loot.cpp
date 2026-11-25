@@ -51,7 +51,7 @@ bool Loot::create(Archetype::Root* Arch)
     Arch->create_instance(static_cast<IEngineInstance*>(Object));
 
     // No null test on the engine.
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Object->EngineInstanceId), 0, nullptr);
+    DALib::Engine->UpdateInstance(Object->EngineInstanceId, 0, nullptr);
 
     return get_index() != -1;
 }

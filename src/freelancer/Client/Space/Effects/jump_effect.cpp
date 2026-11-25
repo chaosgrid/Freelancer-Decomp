@@ -162,15 +162,15 @@ void FJumpGateEffect::Update(float Dt)
         RingFx.bCreated = 1;
 
         // Identity orientation at the ring's hardpoint position, on the solar's own instance.
-        FTransform Local;
+        Transform Local;
         for (int Row = 0; Row < 3; ++Row)
         {
             for (int Col = 0; Col < 3; ++Col)
-                Local.Rotation.D[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
+                Local.Rotation.E[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
         }
-        Local.Translation.X = RingFx.Position.x;
-        Local.Translation.Y = RingFx.Position.y;
-        Local.Translation.Z = RingFx.Position.z;
+        Local.Translation.x = RingFx.Position.x;
+        Local.Translation.y = RingFx.Position.y;
+        Local.Translation.z = RingFx.Position.z;
         int const Index = static_cast<int>(Solar->get_index());
 
         // The solar is the list owner.
@@ -584,28 +584,28 @@ double FJumpShipEffect::ShakeAmplitude() const
 namespace
 {
     // The identity-rotation local transform the four state hooks build.
-    FTransform MakeLocalXform(float X, float Y, float Z)
+    Transform MakeLocalXform(float X, float Y, float Z)
     {
-        FTransform Xform;
+        Transform Xform;
         for (int Row = 0; Row < 3; ++Row)
         {
             for (int Col = 0; Col < 3; ++Col)
-                Xform.Rotation.D[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
+                Xform.Rotation.E[Row][Col] = (Row == Col) ? 1.0f : 0.0f;
         }
-        Xform.Translation.X = X;
-        Xform.Translation.Y = Y;
-        Xform.Translation.Z = Z;
+        Xform.Translation.x = X;
+        Xform.Translation.y = Y;
+        Xform.Translation.z = Z;
         return Xform;
     }
 
     // One companion moved onto the ship (each part only when present).
     void AttachCompanionToShip(FJumpFxCompanion& Fx, FClientShipGameobj* Ship, int Index,
-                               FTransform const& Xform)
+                               Transform const& Xform)
     {
         if (Fx.Particle != nullptr)
             ParticleEffectAttach(Fx.Particle, Ship, Index, &Xform);
         if (Fx.Sound != nullptr)
-            Fx.Sound->SetPose(Index, &Xform.Rotation.D[0][0]);
+            Fx.Sound->SetPose(Index, &Xform);
         if (Fx.Light != nullptr)
             CliExplosionAttachLocalXform(Fx.Light, Index, &Xform);
     }
@@ -627,7 +627,7 @@ void FJumpShipEffect::StartJumpOut()
     {
         bStarted = CliCreateEffectWorldOneShotOn(
                        &G_CliEffectFactoryJump, FindEffectArch(&TunnelEffect.Id),
-                       reinterpret_cast<FTransform const*>(&GateHardpointFrame), Velocity, &FxB) != 0;
+                       &GateHardpointFrame, Velocity, &FxB) != 0;
     }
     if (!bStarted)
     {
@@ -645,13 +645,13 @@ void FJumpShipEffect::EnterTunnel()
         Tunnel->SetState(2);
 
     {
-        FTransform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
+        Transform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
         int const Index = static_cast<int>(Ship->get_index());
         AttachCompanionToShip(FxB, Ship, Index, Local);
     }
 
     Vector const& ShipPos = Ship->get_position();
-    FTransform const World = MakeLocalXform(ShipPos.x, ShipPos.y, ShipPos.z);
+    Transform const World = MakeLocalXform(ShipPos.x, ShipPos.y, ShipPos.z);
     float const Velocity[3] = {0.0f, 0.0f, 0.0f};
 
     ID_String const& JumpOutEffect = Desc->Ids[1];
@@ -659,7 +659,7 @@ void FJumpShipEffect::EnterTunnel()
         CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryJump, FindEffectArch(&JumpOutEffect.Id),
                                       &World, Velocity, &FxA) != 0)
     {
-        FTransform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
+        Transform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
         int const Index = static_cast<int>(Ship->get_index());
         AttachCompanionToShip(FxA, Ship, Index, Local);
         return;
@@ -677,7 +677,7 @@ void FJumpShipEffect::StartJumpIn()
         Tunnel->SetState(3);
 
     Vector const& ShipPos = Ship->get_position();
-    FTransform const World = MakeLocalXform(ShipPos.x, ShipPos.y, ShipPos.z);
+    Transform const World = MakeLocalXform(ShipPos.x, ShipPos.y, ShipPos.z);
     float const Velocity[3] = {0.0f, 0.0f, 0.0f};
 
     ID_String const& JumpInEffect = Desc->Ids[2];
@@ -685,7 +685,7 @@ void FJumpShipEffect::StartJumpIn()
         CliCreateEffectWorldOneShotOn(&G_CliEffectFactoryJump, FindEffectArch(&JumpInEffect.Id),
                                       &World, Velocity, &FxC) != 0)
     {
-        FTransform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
+        Transform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
         int const Index = static_cast<int>(Ship->get_index());
         AttachCompanionToShip(FxC, Ship, Index, Local);
     }
@@ -714,7 +714,7 @@ void FJumpShipEffect::FinishJump()
         return;
 
     // The name is tested a second time (retail); the ship is the list owner.
-    FTransform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
+    Transform const Local = MakeLocalXform(0.0f, 0.0f, 0.0f);
     int const Index = static_cast<int>(Ship->get_index());
     if (!DoneEffect.IsEmpty() &&
         CliCreateEffectOneShot(FindEffectArch(&DoneEffect.Id), Ship, Index, &Local, &FxD) != 0)

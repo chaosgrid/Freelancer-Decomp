@@ -26,7 +26,7 @@ public:
     ~UiListBox() override;
 
     // slot 8 (+0x20) -- LAB_0059a530.
-    void SetTransform(float const* Transform) override;
+    void SetTransform(Transform const* NewXform) override;
     // slot 9 (+0x24) -- FUN_0059a490.
     bool Create(Win3D* NewParent, void* Payload) override;
 

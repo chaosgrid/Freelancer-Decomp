@@ -108,14 +108,14 @@ int FAnimScriptSet::Load(unsigned long NewScript)
     {
         // Count the names.
         Count = 0;
-        DALib::Anim->EnumScriptNames(reinterpret_cast<void*>(&CountScriptName),
+        DALib::Anim->EnumScriptNames(&CountScriptName,
                                      reinterpret_cast<void*>(NewScript), this);
         // One pointer and one float per name.
         Names = static_cast<char**>(operator new(static_cast<size_t>(Count) * 4));
         Durations = static_cast<float*>(operator new(static_cast<size_t>(Count) * 4));
         FillCursor = 0;
         // Fill them.
-        DALib::Anim->EnumScriptNames(reinterpret_cast<void*>(&FillScriptName),
+        DALib::Anim->EnumScriptNames(&FillScriptName,
                                      reinterpret_cast<void*>(LoadScript), this);
     }
     int Result = Count;
@@ -124,7 +124,7 @@ int FAnimScriptSet::Load(unsigned long NewScript)
     return Result;
 }
 
-unsigned long FAnimScriptSet::Play(void* Root, int Index)
+unsigned long FAnimScriptSet::Play(InstanceIndex Root, int Index)
 {
     // FUN_00555c70: Anim +0x24 (Script, Root, Names[Index], 0, 0).
     return DALib::Anim->PlayScript(reinterpret_cast<void*>(Script), Root, Names[Index], nullptr,

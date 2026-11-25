@@ -14,7 +14,7 @@
 #include "ivp_cluster_manager.h" // IVP_Cluster_Manager::fire_event_object_revived / _frozen (0634afd0 / 0634af70)
 #include "ivp_mindist.h" // IVP_Contact_Point / IVP_Impact_Solver_Long_Term / IVP_ListManager (063464a0 / 063465a0)
 #include "../ivp_collision/ivp_listmanager_topology.h" // contact-point helpers (063464a0 / 063465a0)
-#include "ivp_contact_point.h"    // IVP_Try_To_Generate_Managed_Friction (06356bc0)
+#include "ivp_contact_point.h"    // IVP_Ledge_Mindist::try_to_generate_managed_friction (06356bc0)
 #include "ivp_impact.h"           // IVP_Old_Sync_Rot_Z (06347240 / 063473b0)
 #include "ivp_mindist_settings.h" // G_IVP_MindistSettings (DAT_0658ab2c)
 
@@ -26,7 +26,7 @@
 
 // The Robin-Hood key -> value store behind IVP_Core::ObjectHashMap in
 // hashmap mode is IVP_VHash_Store: its destructor
-// (FUN_06352620) frees the map in IVP_Core_Remove_Object below, and its
+// (FUN_06352620) frees the map in IVP_Core::remove_object below, and its
 // ctor / AddElem / RemoveElem / FindElem (FUN_063525f0 / 063526d0 / 063527e0 /
 // 06352930) serve find_object_hash_entry() / register_object_hash_entry() /
 // unregister_object_hash_entry() further down. ObjectHashMap stays void*
@@ -111,7 +111,7 @@ void __fastcall IVP_Core_StopMovementWithoutCollisionRecheck(IVP_Core* Core)
 }
 
 // ============================================================================
-// FUN_063464a0 / IVP_Core_RefreshContactPoints
+// FUN_063464a0 / IVP_Core::refresh_contact_points
 // ============================================================================
 
 // FUN_063464a0, reached only from 063465a0's
@@ -122,15 +122,15 @@ void __fastcall IVP_Core_StopMovementWithoutCollisionRecheck(IVP_Core* Core)
 // core's objects are put back into simulation (06347db0) and the contact
 // point is recomputed (0635a1e0, 06358c50 into a reused stack long-term
 // info, 063562d0).
-static void IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(IVP_Core* Core)
+void IVP_Core::recalc_contact_points_of_fixed_core()
 {
-    IVP_U_Memory* const Arena = Core->Environment->sim_unit_mem; // :063464a9-:063464ac (+0xa4)
+    IVP_U_Memory* const Arena = Environment->sim_unit_mem; // :063464a9-:063464ac (+0xa4)
     ++Arena->State;                                                      // :063464b2
 
     IVP_Impact_Solver_Long_Term Info; // the stack long-term info (ESP+0x14), only +0x52 / +0x54 reset per use
-    for (int32_t ObjIndex = static_cast<int32_t>(Core->Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex) // count read once (:063464b8)
+    for (int32_t ObjIndex = static_cast<int32_t>(Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex) // count read once (:063464b8)
     {
-        char* Node = static_cast<char*>(Core->Objects.elems[ObjIndex]->mindist_list); // :063464cc-:063464d2
+        char* Node = static_cast<char*>(Objects.elems[ObjIndex]->mindist_list); // :063464cc-:063464d2
         while (Node != nullptr)
         {
             IVP_Contact_Point* const Record = IVP_Contact_Node_Record(Node);
@@ -140,7 +140,7 @@ static void IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(IVP_Core* Core)
             FrictionSystem->union_find_necessary = 1;                                      // :063464e8-:063464f4
 
             IVP_Core* OtherCore = Record->Object1->core;                                   // :063464f7-:063464fa
-            if (OtherCore == Core)
+            if (OtherCore == this)
             {
                 OtherCore = Record->Object2->core;                                         // :06346504-:06346507
             }
@@ -149,17 +149,17 @@ static void IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(IVP_Core* Core)
             {
                 if (Record != nullptr)                                                     // :06346512
                 {
-                    IVP_UnlinkPairRecordFromObjects(Record); // FUN_06355200
+                    Record->UnlinkFromObjects(); // FUN_06355200
                     delete Record;                           // FUN_06391d5a
                 }
             }
             else
             {
                 OtherCore->ensure_objects_in_simulation();  // :06346528 FUN_06347db0 (ECX = the other core)
-                IVP_UpdatePairRecordContactFrame(Record);   // :0634652f FUN_0635a1e0
+                Record->UpdateContactFrame();   // :0634652f FUN_0635a1e0
                 IVP_Mindist_Reset_Long_Term_State(&Info);   // :06346534-:0634654e
-                IVP_PopulatePairRecordIntoOwner(Record, &Info); // :06346552 FUN_06358c50
-                IVP_ComputePairRecordMassFactor(Record);    // :06346559 FUN_063562d0
+                Record->PopulateOwner(&Info); // :06346552 FUN_06358c50
+                Record->ComputeMassFactor();    // :06346559 FUN_063562d0
             }
             Node = Next;
         }
@@ -169,46 +169,45 @@ static void IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(IVP_Core* Core)
     Arena->reset_chunks(); // :06346587 FUN_06344070
 }
 
-// IVP_Core_RefreshContactPoints (063465a0), the library's
-// IVP_Core::values_changed_recalc_redundants. Name kept as the raw address
-// because ivp_real_object.cpp calls it so; rename with that caller.
-void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core)
+// FUN_063465a0. Possibly the library's IVP_Core::values_changed_recalc_redundants
+// (not confirmed).
+void IVP_Core::refresh_contact_points()
 {
     // :063465a9-:063465ca: inertia terms inside an arena bracket.
-    ++Core->Environment->sim_unit_mem->State;
-    Core->RecomputeInverseInertia();                    // FUN_06347410
-    --Core->Environment->sim_unit_mem->State;
-    Core->Environment->sim_unit_mem->reset_chunks(); // FUN_06344070
+    ++Environment->sim_unit_mem->State;
+    RecomputeInverseInertia();                    // FUN_06347410
+    --Environment->sim_unit_mem->State;
+    Environment->sim_unit_mem->reset_chunks(); // FUN_06344070
 
     // :063465cf-:0634660b: the movement byte every object takes over.
     int32_t ObjectMovement;
-    if ((static_cast<uint8_t>(Core->Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
+    if ((static_cast<uint8_t>(Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
     {
-        Core->MovementState = (Core->MovementState & 0xffffff08u) | 0x8u;
+        MovementState = (MovementState & 0xffffff08u) | 0x8u;
         ObjectMovement = 0x10;
     }
     else
     {
         // Signed compare of the low byte.
-        if (IVP_SignedLowByte(Core->MovementState) > 8)
+        if (IVP_SignedLowByte(MovementState) > 8)
         {
-            Core->MovementState = (Core->MovementState & 0xffffff08u) | 0x8u;
+            MovementState = (MovementState & 0xffffff08u) | 0x8u;
         }
-        ObjectMovement = static_cast<int8_t>(Core->MovementState & 0xffu); // re-read, sign-extended
+        ObjectMovement = static_cast<int8_t>(MovementState & 0xffu); // re-read, sign-extended
     }
 
     // :0634660e-:06346630: low byte of every object's flags := ObjectMovement.
-    for (int32_t ObjIndex = static_cast<int32_t>(Core->Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex)
+    for (int32_t ObjIndex = static_cast<int32_t>(Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex)
     {
-        IVP_Real_Object* const Object = Core->Objects.elems[ObjIndex];
+        IVP_Real_Object* const Object = Objects.elems[ObjIndex];
         Object->flags = ((Object->flags ^ static_cast<uint32_t>(ObjectMovement)) & 0xffu) ^ Object->flags;
     }
 
-    if ((static_cast<uint8_t>(Core->Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0) // :06346632 (re-tested)
+    if ((static_cast<uint8_t>(Flags) & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0) // :06346632 (re-tested)
     {
         // :0634672b-:06346732.
-        IVP_Core_StopMovementWithoutCollisionRecheck(Core);
-        IVP_Core_Recalc_Contact_Points_Of_Fixed_Core(Core);
+        IVP_Core_StopMovementWithoutCollisionRecheck(this);
+        recalc_contact_points_of_fixed_core();
         // :06346737-:0634675c: retail then walks every object's contact-node
         // list to its end without reading or writing anything else -- a loop
         // whose body was optimised away. No observable effect; not reproduced.
@@ -216,11 +215,11 @@ void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core)
     }
 
     // :0634663d-:06346721.
-    Core->wake_or_ensure_simulation(); // FUN_06347d80
-    ++Core->Environment->sim_unit_mem->State;
-    for (int32_t ObjIndex = static_cast<int32_t>(Core->Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex) // count read once (:06346651)
+    wake_or_ensure_simulation(); // FUN_06347d80
+    ++Environment->sim_unit_mem->State;
+    for (int32_t ObjIndex = static_cast<int32_t>(Objects.n_elems) - 1; ObjIndex >= 0; --ObjIndex) // count read once (:06346651)
     {
-        char* Node = static_cast<char*>(Core->Objects.elems[ObjIndex]->mindist_list); // :06346661-:06346667
+        char* Node = static_cast<char*>(Objects.elems[ObjIndex]->mindist_list); // :06346661-:06346667
         if (Node == nullptr)
         {
             continue;
@@ -240,15 +239,15 @@ void __fastcall IVP_Core_RefreshContactPoints(IVP_Core* Core)
             // point (three trivial vector ctor iterators 06273bc0, then 06346770).
             IVP_Impact_Solver_Long_Term Info;
             IVP_Mindist_Reset_Long_Term_State(&Info);
-            IVP_UpdatePairRecordContactFrame(Record);       // :063466dd FUN_0635a1e0
-            IVP_PopulatePairRecordIntoOwner(Record, &Info);  // :063466e9 FUN_06358c50
-            IVP_ComputePairRecordMassFactor(Record);         // :063466f0 FUN_063562d0
+            Record->UpdateContactFrame();       // :063466dd FUN_0635a1e0
+            Record->PopulateOwner(&Info);  // :063466e9 FUN_06358c50
+            Record->ComputeMassFactor();         // :063466f0 FUN_063562d0
 
             Node = IVP_Contact_Node_Next(Node); // :063466f5, read after the calls
         } while (Node != nullptr);
     }
-    --Core->Environment->sim_unit_mem->State;        // :0634670f-:06346718
-    Core->Environment->sim_unit_mem->reset_chunks(); // :0634671c
+    --Environment->sim_unit_mem->State;        // :0634670f-:06346718
+    Environment->sim_unit_mem->reset_chunks(); // :0634671c
 }
 
 // IVP_Core_UnionFindGetFather: IVP_Core::get_master_core() equivalent. Cores can be merged
@@ -273,62 +272,62 @@ IVP_Core* __fastcall IVP_Core_UnionFindGetFather(IVP_Core* Core)
 // Core Management (Attachment / Detachment)
 // ============================================================================
 
-void IVP_Core_Add_Object(IVP_Core* Core, IVP_Real_Object* Object)
+void IVP_Core::add_object(IVP_Real_Object* Object)
 {
-    Core->Objects.Add(Object);
+    Objects.Add(Object);
 }
 
-void IVP_Core_Remove_Object(IVP_Core* Core, IVP_Real_Object* Object)
+void IVP_Core::remove_object(IVP_Real_Object* Object)
 {
-    int RemovedIndex = Core->Objects.RemoveElement(Object);
+    int RemovedIndex = Objects.RemoveElement(Object);
 
-    if (Core->Objects.n_elems == 0)
+    if (Objects.n_elems == 0)
     {
         // FUN_06346f20 compares MovementState's low byte against 8 SIGNED (0x80-0xFF
         // count as "< 8").
-        if (static_cast<int8_t>(Core->MovementState & 0xFF) < 8)
+        if (static_cast<int8_t>(MovementState & 0xFF) < 8)
         {
-            Core->freeze_simulation_core(); // :06346f87 FUN_06347040 (its object loop is empty here)
+            freeze_simulation_core(); // :06346f87 FUN_06347040 (its object loop is empty here)
         }
 
         // IVP_Core::~IVP_Core() (FUN_063477e0), four steps before the vector buffers
         // (which `delete Core` frees through IVP_U_Vector's destructor).
 
         // Step 1: dequeue Core from Environment->event_queue (clears Flags 0x30).
-        IVP_Environment_Dequeue_Core(Core->Environment, Core);
+        Environment->dequeue_core(this);
 
         // Step 2: (Flags & 0xC) == 4 -> destroy ObjectHashMap (FUN_06352620) and
         // free it (FUN_06391d5a). Otherwise every controller gets
         // core_is_going_to_be_deleted_event(Core) (vtable slot 0).
-        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
+        if ((Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == IVP_CORE_PHYSICAL_UNMOVEABLE_TRUE)
         {
-            if (Core->ObjectHashMap != nullptr)
+            if (ObjectHashMap != nullptr)
             {
-                ((IVP_VHash_Store*)Core->ObjectHashMap)->~IVP_VHash_Store(); // FUN_06352620
-                free(Core->ObjectHashMap); // FUN_06391d5a
-                Core->ObjectHashMap = nullptr;
+                ((IVP_VHash_Store*)ObjectHashMap)->~IVP_VHash_Store(); // FUN_06352620
+                free(ObjectHashMap); // FUN_06391d5a
+                ObjectHashMap = nullptr;
             }
         }
         else
         {
-            int ControllerCount = Core->Controllers.Len();
+            int ControllerCount = Controllers.Len();
             for (int i = ControllerCount - 1; i >= 0; --i) // :06347839-06347852, count read once, elems re-read, no null test
             {
-                Core->Controllers.ElementAt(i)->core_is_going_to_be_deleted_event(Core);
+                Controllers.ElementAt(i)->core_is_going_to_be_deleted_event(this);
             }
         }
 
         // Step 3: detach from the owning sim unit (FUN_06348cb0).
-        if (Core->OwningSimUnit != nullptr)
+        if (OwningSimUnit != nullptr)
         {
-            IVP_Simulation_Unit_Detach_Core(Core->OwningSimUnit, Core);
+            OwningSimUnit->detach_core(this);
         }
 
         // Step 4: free SpinClipping (+0x4c) unconditionally (FUN_06391d5a).
-        free(Core->SpinClipping);
-        Core->SpinClipping = nullptr;
+        free(SpinClipping);
+        SpinClipping = nullptr;
 
-        delete Core;
+        delete this;
     }
 }
 
@@ -363,7 +362,7 @@ IVP_Core::IVP_Core(IVP_Real_Object* Owner, const IVP_U_Quat* InitialOrientation,
 
     // Step 5 (FUN_06347660): Flags bits [3:2] from FlagsHi, then FUN_06349400 on
     // Environment->+0x08 with OwningSimUnit, unconditionally.
-    Flags = (Flags & ~0xCu) | ((FlagsHi & 0x3u) << 2);
+    Flags = (Flags & ~IVP_CORE_PHYSICAL_UNMOVEABLE) | ((FlagsHi & 0x3u) << 2);
     Environment->sim_units_manager->add_sim_unit_to_manager(OwningSimUnit); // FUN_06349400
 
     // Step 6: initial orientation, normalized, duplicated into QWorldFCoreNext.
@@ -388,7 +387,7 @@ IVP_Core::IVP_Core(IVP_Real_Object* Owner, const IVP_U_Quat* InitialOrientation,
     SetRadius(1000.0f, 1000.0f); // FUN_06346870
 
     // Step 9: Flags bits [1:0] from FlagsLo.
-    Flags = (Flags & ~0x3u) | (FlagsLo & 0x3u);
+    Flags = (Flags & ~IVP_CORE_FAST_PILING_ALLOWED) | (FlagsLo & 0x3u);
 }
 
 // FUN_06346870.
@@ -402,7 +401,7 @@ void IVP_Core::SetRadius(float NewUpperLimitRadius, float NewMaxSurfaceDeviation
 // no null test on the unit or the cores' environments.
 void IVP_Core::ensure_in_simulation()
 {
-    IVP_Simulation_Unit_Update_Cores_Last_Motion_Time(OwningSimUnit); // FUN_063494f0
+    OwningSimUnit->update_cores_last_motion_time(); // FUN_063494f0
 }
 
 // FUN_063470e0. Retail computes the (Sum, IntPart, Frac) triple twice, once per
@@ -728,7 +727,7 @@ int IVP_Core::grow_friction_system()
                         ++Environment->sim_unit_mem->State;
                         IVP_ListManager* FrictionSystem = nullptr;
                         int32_t HavingNew = 0;
-                        IVP_Try_To_Generate_Managed_Friction(Mdist, &FrictionSystem, &HavingNew, OwningSimUnit, 1);
+                        Mdist->try_to_generate_managed_friction(&FrictionSystem, &HavingNew, OwningSimUnit, 1);
                         IVP_U_Memory* const Arena = Environment->sim_unit_mem;
                         --Arena->State;
                         Arena->reset_chunks(); // FUN_06344070
@@ -797,7 +796,7 @@ int IVP_Core::revive_pass()
         IVP_Environment_Object_Notify_Event RevivedEvent{ this->Environment, Obj };
         this->Environment->cluster_manager->fire_event_object_revived(&RevivedEvent); // FUN_0634afd0
         IVP_Environment_Object_Notify_Event ListenerEvent{ this->Environment, Obj };
-        IVP_Environment_Fire_Event_Object_Revived(this->Environment, &ListenerEvent);  // FUN_0634cf30
+        this->Environment->fire_event_object_revived(&ListenerEvent);  // FUN_0634cf30
     }
 
     return Result;
@@ -807,14 +806,14 @@ int IVP_Core::revive_pass()
 // OwningSimUnit->FUN_06349490(Environment) that 06347d80 (:06347d8b) emits.
 void IVP_Core::revive_sleeping_core()
 {
-    IVP_Simulation_Unit_Revive_If_Sleeping(OwningSimUnit, Environment);
+    OwningSimUnit->revive_if_sleeping(Environment);
 }
 
 // FUN_06349180.
 void IVP_Core::register_controller(IVP_Controller* Controller)
 {
     Controllers.Add(Controller);
-    IVP_Simulation_Unit_Register_Core_With_Controller(OwningSimUnit, Controller, this);
+    OwningSimUnit->register_core_with_controller(Controller, this);
 }
 
 // FUN_06349110.
@@ -823,7 +822,7 @@ void IVP_Core::detach_controller(IVP_Controller* Controller)
     Controllers.RemoveElement(Controller);
 
     // No null test on OwningSimUnit, as retail.
-    IVP_Simulation_Unit_Detach_Core_From_Controller_Bucket(OwningSimUnit, Controller, this);
+    OwningSimUnit->detach_core_from_controller_bucket(Controller, this);
 }
 
 // FUN_06347c40. Hashmap mode: FUN_06352930(Key) with ObjectHashMap as `this`
@@ -1428,13 +1427,6 @@ void IVP_Core::freeze_simulation_core()
 // ============================================================================
 void IVP_Core::fire_event_object_frozen()
 {
-    // IVP_Event_Object as built on the stack twice per object: {environment, object}.
-    struct FIvpEventObject
-    {
-        IVP_Environment* Environment; // +0x00
-        IVP_Real_Object* RealObject;  // +0x04
-    };
-
     for (int32_t Index = static_cast<int32_t>(Objects.n_elems) - 1; Index >= 0; --Index)
     {
         IVP_Real_Object* Object = Objects.elems[Index];
@@ -1446,11 +1438,12 @@ void IVP_Core::fire_event_object_frozen()
         ClusterEvent.Object = Object;
         Environment->cluster_manager->fire_event_object_frozen(&ClusterEvent);
 
-        // Environment object listeners.
-        FIvpEventObject EnvironmentEvent;
-        EnvironmentEvent.Environment = Environment;
-        EnvironmentEvent.RealObject = Object;
-        IVP_Environment_Fire_Event_Object_Frozen(Environment, &EnvironmentEvent); // FUN_0634cf00
+        // Environment object listeners; the same {environment, object} record,
+        // built a second time.
+        IVP_Environment_Object_Notify_Event EnvironmentEvent;
+        EnvironmentEvent.Env = Environment;
+        EnvironmentEvent.Object = Object;
+        Environment->fire_event_object_frozen(&EnvironmentEvent); // FUN_0634cf00
     }
 }
 

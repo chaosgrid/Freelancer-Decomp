@@ -102,11 +102,10 @@ void FlashLightSetInfo::fixup(long Instance, HardpointSummary const* HpSum, Room
                 Local.Rotation = Info->Orient;
                 Local.Translation = Info->Position;
                 Transform const* const InstanceXform =
-                    (Transform const*)DALib::Engine->GetInstanceTransform((void*)HpInstance);
+                    DALib::Engine->GetInstanceTransform(HpInstance);
                 I3DMathEngine* const Math = Acquire3DMathEngine();
                 Transform World;
-                Math->MulTransform((FTransform&)World, (FTransform const&)*InstanceXform,
-                                   (FTransform const&)Local);
+                Math->MulTransform(World, *InstanceXform, Local);
                 LightFrames[Index].set_transform(World);
             }
             else

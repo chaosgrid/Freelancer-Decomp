@@ -15,13 +15,15 @@
 
 #include <cstddef>
 
-// FUN_004215b0 — write identity 3×3 into Out9 (nine floats, no translation).
-void Win3DIdentityRotation3x3(float* Out9);
+#include "math3d.h"
 
-// FUN_00422690 — GWin3DModelview = ObjectOrNull ? view(vt+0x40) * Matrix12 : Matrix12;
-// pipeline state 7 set -> SetModelview, else SetView(view or identity) + SetWorld(Matrix12).
+// FUN_004215b0 — write identity 3×3 into *Out (nine floats, no translation).
+void Win3DIdentityRotation3x3(Matrix* Out);
+
+// FUN_00422690 — GWin3DModelview = ObjectOrNull ? view(vt+0x40) * Xform : Xform;
+// pipeline state 7 set -> SetModelview, else SetView(view or identity) + SetWorld(Xform).
 // ObjectOrNull is a camera (TexturePanelsDrawPiece) or null (DrawClouds, the UI tables).
-void Win3DBindModelview(void* ObjectOrNull, float const* Matrix12);
+void Win3DBindModelview(void* ObjectOrNull, Transform const* Xform);
 
 struct FTexShape;
 

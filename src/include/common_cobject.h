@@ -20,6 +20,7 @@
 #include "common_reputation.h" // Costume (CEqObj::SpaceCostume)
 #include "common_cheapset.h" // CheapSet<CObject*> (CObject::get_intruder_set_r)
 #include "dacom.h"
+#include "engine/engine_instance.h" // IEngineInstance (EngineObject's base)
 
 // Forward declarations for CShip's watcher members and its atmosphere pointer
 struct IObjRW;
@@ -55,29 +56,6 @@ namespace Archetype
     struct Root;
     struct Ship;
 }
-
-// Retail EngineObject vtable @ .rdata 0002:000025BC. Slots 0–13 are IEngineInstance
-// stdcall (same layout as EngBase FInstanceTransform). IEngine+0xa0 = slot 8
-// get_transform → this+8 (3×3 then pos). CObject thiscall open starts at slot 19.
-struct IEngineInstance
-{
-    virtual void DACOM_API initialize_instance(long Inst) = 0;                         // +0x00
-    virtual void DACOM_API create_instance(long Inst) = 0;                             // +0x04 RET
-    virtual void DACOM_API destroy_instance(long Inst) = 0;                            // +0x08
-    virtual void DACOM_API set_position(long Inst, Vector const& Pos) = 0;             // +0x0C
-    virtual Vector const& DACOM_API get_position(long Inst) const = 0;                 // +0x10
-    virtual void DACOM_API set_orientation(long Inst, Matrix const& Orient) = 0;       // +0x14
-    virtual Matrix const& DACOM_API get_orientation(long Inst) const = 0;              // +0x18
-    virtual void DACOM_API set_transform(long Inst, Transform const& Xform) = 0;       // +0x1C
-    virtual Transform const& DACOM_API get_transform(long Inst) const = 0;             // +0x20 IEngine+0xa0
-    virtual void DACOM_API get_centered_radius(long Inst, float* OutRadius,
-                                               Vector* OutCenter) const = 0;           // +0x24
-    virtual void DACOM_API set_centered_radius(long Inst, float Radius,
-                                               Vector const& Center) = 0;              // +0x28
-    virtual void DACOM_API set_instance_flags(long Inst, unsigned long Flags) = 0;     // +0x2C
-    virtual unsigned long DACOM_API get_instance_flags(long Inst) const = 0;           // +0x30
-    virtual bool DACOM_API joint_changed(long Inst) = 0;                               // +0x34 false
-};
 
 // EngineObject ctor 0xa98a0. Prefix of every CObject. sizeof 0x4c. Retail spells it a struct
 // (??4EngineObject@@QAEAAU0@ABU0@@Z) and keeps every IEngineInstance override private

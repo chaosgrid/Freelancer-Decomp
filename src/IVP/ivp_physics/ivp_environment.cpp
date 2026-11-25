@@ -14,6 +14,7 @@
 #include "ivp_mindist.h" // IVP_Ledge_Mindist / IVP_Synapse_Real (IVP_Anomaly_Manager::inter_penetration)
 #include "../ivp_collision/ivp_collision.h" // IVP_Collision_Delegator_Root(_Mindist): collision_delegator_roots elements
 #include "../ivp_collision/ivp_mindist_minimize.h" // IVP_Mindist_Minimize_Solver::init_mms_function_table (06353940)
+#include "../ivp_collision/ivp_ledge_sweep_solver.h" // IVP_InitSweepEstimatorTable
 #include "ivp_listener.h" // IVP_Collision_Filter(_Coll_Group_Ident): collision_filter (+0x18); IVP_Listener_PSI
 #include "ivp_ov_element.h" // IVP_Mindist_Manager (mindist_manager, +0x10)
 #include "ivp_simulation_unit.h"       // IVP_Sim_Units_Manager (env+0x08; 06349380 / 063499c0)
@@ -22,6 +23,7 @@
 #include "../ivp_utility/ivp_math.h"
 #include "../ivp_utility/ivp_u_memory.h"
 #include "../ivp_utility/ivp_u_vector.h"
+#include "../ivp_utility/ivp_message.h"
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -43,16 +45,16 @@
 // FUN_0634bbe0: wakes every queued core from the top down, clears its queued
 // bits (0x30), then empties event_queue (inline buffer at +0xe0 kept).
 // ============================================================================
-void IVP_Environment_Process_Wake_Queue(IVP_Environment* env)
+void IVP_Environment::process_wake_queue()
 {
-    for (int i = static_cast<int>(env->event_queue.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(event_queue.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Core* core = env->event_queue.elems[i];
+        IVP_Core* core = event_queue.elems[i];
         core->wake_or_ensure_simulation(); // FUN_06347d80
-        core->Flags &= ~0x30;
+        core->Flags &= ~IVP_CORE_IS_IN_WAKEUP_VEC;
     }
 
-    env->event_queue.Clear();
+    event_queue.Clear();
 }
 
 // ============================================================================
@@ -61,9 +63,9 @@ void IVP_Environment_Process_Wake_Queue(IVP_Environment* env)
 // when absent. Called by the IVP_Core destructor (FUN_063477e0), which also
 // pushes a constant 1 into an unused stack slot.
 // ============================================================================
-void IVP_Environment_Dequeue_Core(IVP_Environment* env, IVP_Core* core)
+void IVP_Environment::dequeue_core(IVP_Core* core)
 {
-    IVP_U_Vector<IVP_Core>& Queue = env->event_queue;
+    IVP_U_Vector<IVP_Core>& Queue = event_queue;
 
     int FoundIndex = -1;
     for (int i = static_cast<int>(Queue.n_elems) - 1; i >= 0; --i)
@@ -86,7 +88,7 @@ void IVP_Environment_Dequeue_Core(IVP_Environment* env, IVP_Core* core)
     }
     --Queue.n_elems;
 
-    core->Flags &= ~0x30;
+    core->Flags &= ~IVP_CORE_IS_IN_WAKEUP_VEC;
 }
 
 // ============================================================================
@@ -95,7 +97,7 @@ void IVP_Environment_Dequeue_Core(IVP_Environment* env, IVP_Core* core)
 // ============================================================================
 void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core)
 {
-    if ((core->Flags & 0x30u) == 0x10u)
+    if ((core->Flags & IVP_CORE_IS_IN_WAKEUP_VEC) == 0x10u)
     {
         return;
     }
@@ -115,14 +117,14 @@ void IVP_Controller_Manager_Ensure_Core_To_Be_In_Simulation(IVP_Core* core)
 
 // FUN_0634cf60: top-down over the IVP_Listener_Collision vector, elems re-read
 // every pass, no null test; enabled_callbacks bit 0 gates event_pre_collision.
-void IVP_Environment_Fire_Event_Pre_Collision(IVP_Environment* env, void* arg)
+void IVP_Environment::fire_event_pre_collision(IVP_Event_Collision* arg)
 {
-    for (int i = static_cast<int>(env->collision_listeners.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->collision_listeners.elems[i];
+        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & 1) != 0)
         {
-            Listener->event_pre_collision((IVP_Event_Collision*)arg);
+            Listener->event_pre_collision(arg);
         }
     }
 }
@@ -132,11 +134,11 @@ void IVP_Environment_Fire_Event_Pre_Collision(IVP_Environment* env, void* arg)
 // (event_object_revived). Caller: IVP_Core::revive_pass (FUN_0634b480), which
 // builds the {Environment*, IVP_Real_Object*} record on its stack.
 // ============================================================================
-void IVP_Environment_Fire_Event_Object_Revived(IVP_Environment* env, void* event_data)
+void IVP_Environment::fire_event_object_revived(IVP_Environment_Object_Notify_Event* event_data)
 {
-    for (int i = static_cast<int>(env->object_listeners.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(object_listeners.n_elems) - 1; i >= 0; --i)
     {
-        ((IVP_Listener_Object*)env->object_listeners.elems[i])->event_object_revived((IVP_Environment_Object_Notify_Event*)event_data);
+        ((IVP_Listener_Object*)object_listeners.elems[i])->event_object_revived(event_data);
     }
 }
 
@@ -144,13 +146,13 @@ void IVP_Environment_Fire_Event_Object_Revived(IVP_Environment* env, void* event
 // FUN_0634caf0: top-down over collision_delegator_roots, elems re-read every pass, no gate;
 // slot 4 = object_is_removed_from_collision_detection.
 // ============================================================================
-void IVP_Environment_Notify_Object_Removed_From_Collision_Detection(IVP_Environment* env, void* arg)
+void IVP_Environment::notify_object_removed_from_collision_detection(IVP_Real_Object* arg)
 {
-    for (int i = static_cast<int>(env->collision_delegator_roots.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(collision_delegator_roots.n_elems) - 1; i >= 0; --i)
     {
         IVP_Collision_Delegator_Root* Delegator =
-            static_cast<IVP_Collision_Delegator_Root*>(env->collision_delegator_roots.elems[i]);
-        Delegator->object_is_removed_from_collision_detection(static_cast<IVP_Real_Object*>(arg));
+            static_cast<IVP_Collision_Delegator_Root*>(collision_delegator_roots.elems[i]);
+        Delegator->object_is_removed_from_collision_detection(arg);
     }
 }
 
@@ -171,9 +173,9 @@ IVP_Env_Buffer_Node::~IVP_Env_Buffer_Node()
 // IVP_Environment_Free_Field13c_Node runs on it (so that helper's own free is
 // a no-op here, as in retail), then the node itself is freed.
 // ============================================================================
-void IVP_Environment_Free_Buffer_Node_List(IVP_Environment* env)
+void IVP_Environment::free_buffer_node_list()
 {
-    IVP_Env_Buffer_Node* Node = env->buffer_node_list;
+    IVP_Env_Buffer_Node* Node = buffer_node_list;
     while (Node != nullptr)
     {
         if (Node->OwnedBuffer != nullptr)
@@ -186,7 +188,7 @@ void IVP_Environment_Free_Buffer_Node_List(IVP_Environment* env)
         delete Node; // ~IVP_Env_Buffer_Node (its free is a no-op now) + operator delete
         Node = Next;
     }
-    env->buffer_node_list = nullptr;
+    buffer_node_list = nullptr;
 }
 
 // ============================================================================
@@ -201,41 +203,40 @@ void IVP_Environment_Append_Object_Listener(IVP_Environment* env, void* listener
 // FUN_0634ced0 / FUN_0634cf00: top-down over object_listeners, no null test,
 // no gate; slots 0 and 3.
 // ============================================================================
-void IVP_Environment_Fire_Event_Object_Deleted(IVP_Environment* env, void* arg)
+void IVP_Environment::fire_event_object_deleted(IVP_Environment_Object_Notify_Event* arg)
 {
-    for (int i = static_cast<int>(env->object_listeners.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(object_listeners.n_elems) - 1; i >= 0; --i)
     {
-        ((IVP_Listener_Object*)env->object_listeners.elems[i])->event_object_deleted((IVP_Environment_Object_Notify_Event*)arg);
+        ((IVP_Listener_Object*)object_listeners.elems[i])->event_object_deleted(arg);
     }
 }
 
-void IVP_Environment_Fire_Event_Object_Frozen(IVP_Environment* env, void* arg)
+void IVP_Environment::fire_event_object_frozen(IVP_Environment_Object_Notify_Event* arg)
 {
-    for (int i = static_cast<int>(env->object_listeners.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(object_listeners.n_elems) - 1; i >= 0; --i)
     {
-        ((IVP_Listener_Object*)env->object_listeners.elems[i])->event_object_frozen((IVP_Environment_Object_Notify_Event*)arg);
+        ((IVP_Listener_Object*)object_listeners.elems[i])->event_object_frozen(arg);
     }
 }
 
 // Notify each object listener of a newly created object, last to first.
-void IVP_Environment_Fire_Event_Object_Created(IVP_Environment* env, void* arg)
+void IVP_Environment::fire_event_object_created(IVP_Environment_Object_Notify_Event* arg)
 {
-    for (int i = static_cast<int>(env->object_listeners.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(object_listeners.n_elems) - 1; i >= 0; --i)
     {
-        ((IVP_Listener_Object*)env->object_listeners.elems[i])->event_object_created(
-            (IVP_Environment_Object_Notify_Event*)arg);
+        ((IVP_Listener_Object*)object_listeners.elems[i])->event_object_created(arg);
     }
 }
 
 // ============================================================================
-// FUN_0634cfa0 / FUN_0634cfe0: like IVP_Environment_Fire_Event_Pre_Collision but
+// FUN_0634cfa0 / FUN_0634cfe0: like IVP_Environment::fire_event_pre_collision but
 // gated on enabled_callbacks bit 2 (&4); slots 2 and 3.
 // ============================================================================
-void IVP_Environment_Notify_Friction_Created(IVP_Environment* env, void* arg)
+void IVP_Environment::notify_friction_created(void* arg)
 {
-    for (int i = static_cast<int>(env->collision_listeners.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->collision_listeners.elems[i];
+        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & 4) != 0)
         {
             Listener->event_friction_created(arg);
@@ -243,11 +244,11 @@ void IVP_Environment_Notify_Friction_Created(IVP_Environment* env, void* arg)
     }
 }
 
-void IVP_Environment_Notify_Friction_Deleted(IVP_Environment* env, void* arg)
+void IVP_Environment::notify_friction_deleted(void* arg)
 {
-    for (int i = static_cast<int>(env->collision_listeners.n_elems) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(collision_listeners.n_elems) - 1; i >= 0; --i)
     {
-        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)env->collision_listeners.elems[i];
+        IVP_Listener_Collision* Listener = (IVP_Listener_Collision*)collision_listeners.elems[i];
         if ((Listener->enabled_callbacks & 4) != 0)
         {
             Listener->event_friction_deleted(arg);
@@ -475,7 +476,7 @@ void IVP_Environment_Destructor(IVP_Environment* env)
             }
         }
 
-        IVP_Environment_Free_Buffer_Node_List(env); // FUN_0634cd20
+        env->free_buffer_node_list(); // FUN_0634cd20
     }
 
     // Shared tail, also reached directly when state_magic does not match: the
@@ -493,13 +494,13 @@ void IVP_Environment_Destructor(IVP_Environment* env)
 // ============================================================================
 // FUN_0634d020: IVP_Environment::fire_event_PSI. PSI listeners last to first,
 // elems re-read each pass, slot 0 with a stack IVP_Event_PSI {env}.
-static void IVP_Environment_Fire_Event_PSI(IVP_Environment* env)
+void IVP_Environment::fire_event_PSI()
 {
     IVP_Event_PSI Event;
-    Event.environment = env;
-    for (int32_t I = static_cast<int32_t>(env->psi_listeners.n_elems) - 1; I >= 0; --I)
+    Event.environment = this;
+    for (int32_t I = static_cast<int32_t>(psi_listeners.n_elems) - 1; I >= 0; --I)
     {
-        IVP_Listener_PSI* Listener = static_cast<IVP_Listener_PSI*>(env->psi_listeners.elems[I]);
+        IVP_Listener_PSI* Listener = static_cast<IVP_Listener_PSI*>(psi_listeners.elems[I]);
         Listener->event_PSI(&Event);
     }
 }
@@ -507,26 +508,26 @@ static void IVP_Environment_Fire_Event_PSI(IVP_Environment* env)
 // FUN_0634d090: IVP_Environment::simulate_psi. The IVP_Time argument is never
 // read. The FPhysicsTickScope profiling is port-only and does not change the
 // calculations or call order.
-void IVP_Environment_Simulate_Psi(IVP_Environment* env, IVP_Time /*current_sim_time*/)
+void IVP_Environment::simulate_psi(IVP_Time /*current_sim_time*/)
 {
     FPhysicsTickScope PrepareProfile(EPhysicsTickSection::PsiPrepare);
-    env->sim_substate = 0;
+    sim_substate = 0;
 
-    if (env->event_queue.n_elems != 0)
+    if (event_queue.n_elems != 0)
     {
-        IVP_Environment_Process_Wake_Queue(env);                                   // FUN_0634bbe0
+        process_wake_queue();                                   // FUN_0634bbe0
     }
 
-    if (env->universe_manager != nullptr)
+    if (universe_manager != nullptr)
     {
-        env->cluster_manager->check_for_unused_objects(env->universe_manager);    // FUN_0634b230
+        cluster_manager->check_for_unused_objects(universe_manager);    // FUN_0634b230
     }
 
-    env->l_active_value_manager->RefreshPsiActiveValues(env); // slot 10
+    l_active_value_manager->RefreshPsiActiveValues(this); // slot 10
 
-    IVP_Environment_Fire_Event_PSI(env);
+    fire_event_PSI();
 
-    env->mindist_manager->recalc_all_exact_wheel_mindist(); // FUN_0634f230
+    mindist_manager->recalc_all_exact_wheel_mindist(); // FUN_0634f230
 
     // Two 128-slot inline vectors on the stack.
     IVP_U_Vector_Fixed<IVP_Core, 128> ActiveCores;
@@ -536,25 +537,25 @@ void IVP_Environment_Simulate_Psi(IVP_Environment* env, IVP_Time /*current_sim_t
     // FUN_063499c0: every sim unit's PSI; collects the cores that need
     // calc_next_PSI_matrix.
     FPhysicsTickScope UnitsProfile(EPhysicsTickSection::SimUnits);
-    env->sim_units_manager->simulate_sim_units_psi(env, &ActiveCores);
+    sim_units_manager->simulate_sim_units_psi(this, &ActiveCores);
     UnitsProfile.Stop();
 
     FPhysicsTickScope CommitProfile(EPhysicsTickSection::CommitHulls);
-    IVP_Calc_Next_PSI_Solver::commit_all_calc_next_PSI_matrix(env, &ActiveCores, &ActiveHullManagers); // FUN_06351eb0
+    IVP_Calc_Next_PSI_Solver::commit_all_calc_next_PSI_matrix(this, &ActiveCores, &ActiveHullManagers); // FUN_06351eb0
 
-    env->sim_substate = 2;
-    IVP_Calc_Next_PSI_Solver::commit_all_hull_managers(env, &ActiveHullManagers); // FUN_06351f80
+    sim_substate = 2;
+    IVP_Calc_Next_PSI_Solver::commit_all_hull_managers(this, &ActiveHullManagers); // FUN_06351f80
     CommitProfile.Stop();
 
-    env->sim_substate = 3;
+    sim_substate = 3;
     FPhysicsTickScope ContactsProfile(EPhysicsTickSection::Contacts);
-    env->mindist_manager->recalc_all_exact_mindists(); // FUN_0634f300
+    mindist_manager->recalc_all_exact_mindists(); // FUN_0634f300
 
-    env->sim_substate = 4;
-    env->mindist_manager->recalc_all_exact_mindists_events();                      // FUN_0634f210
+    sim_substate = 4;
+    mindist_manager->recalc_all_exact_mindists_events();                      // FUN_0634f210
     ContactsProfile.Stop();
 
-    env->sim_substate = 5;
+    sim_substate = 5;
 }
 
 // ============================================================================
@@ -686,9 +687,9 @@ void IVP_Anomaly_Manager::solve_inter_penetration_simple(IVP_Real_Object* Object
 void IVP_Anomaly_Manager::inter_penetration(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* Object0, IVP_Real_Object* Object1)
 {
     IVP_Real_Object* const Objects[2] = { Object0, Object1 };
-    const int32_t Idx = ((Object1->core->Flags & 0xcu) != 0) ? 1 : 0;
+    const int32_t Idx = ((Object1->core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0) ? 1 : 0;
     IVP_Real_Object* const Fixed = Objects[Idx];
-    if ((Fixed->core->Flags & 0xcu) == 0)
+    if ((Fixed->core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
     {
         solve_inter_penetration_simple(Object0, Object1);
         return;
@@ -856,9 +857,6 @@ void IVP_Environment_SetDeltaPsiTime(IVP_Environment* env, float dt)
 // ivp_ledge_sweep_solver.cpp.
 // ============================================================================
 
-// Declared locally to avoid pulling in ivp_ledge_sweep_solver.h.
-void IVP_InitSweepEstimatorTable();
-
 void IVP_InitSimUnitDispatchTable(void)
 {
     IVP_InitSweepEstimatorTable();
@@ -869,7 +867,7 @@ void IVP_InitSimUnitDispatchTable(void)
 // class comment in ivp_environment.h).
 // ============================================================================
 
-// Inlined by IVP_RescheduleCollisionEvent (0634f964): key = (EventHi -
+// Inlined by IVP_Ledge_Mindist::RescheduleCollisionEvent (0634f964): key = (EventHi -
 // TimeBaseHi) + EventLo - TimeBaseLo, then EventPool->Insert(payload, key)
 // (FUN_06362f90). The pool is a heap object pointed to from +0x08. No null
 // test on EventPool; the constructor always builds it.
@@ -949,7 +947,7 @@ void* IVP_SimUnitManager_Construct(void* self)
 // FUN_06360ab0: forwards to FUN_0634ccd0.
 void IVP_Sim_Unit_Manager::env_set_current_time(IVP_Environment* Environment, float TimeHi, float TimeLo)
 {
-    IVP_Environment_SetCurrentTime(Environment, TimeHi, TimeLo);
+    Environment->set_current_time(TimeHi, TimeLo);
 }
 
 // FUN_06360a40. The whole step runs with the x87 precision control set to a
@@ -1095,18 +1093,18 @@ void IVP_Time_Event_PSI::simulate_time_event(IVP_Environment* Environment)
     TimeManager->TimeBaseLo = Environment->time_of_last_psi.time_offset;
     TimeManager->LastEventRelTime = 0.0f;
 
-    IVP_Environment_Simulate_Psi(Environment, Environment->time_of_last_psi); // FUN_0634d090
+    Environment->simulate_psi(Environment->time_of_last_psi); // FUN_0634d090
 
     // Requeue at the following PSI.
     TimeManager->ScheduleListener(this, Environment->next_psi_time_base, Environment->next_psi_time_offset);
 }
 
 // FUN_0634ccd0
-void IVP_Environment_SetCurrentTime(IVP_Environment* env, float TimeHi, float TimeLo)
+void IVP_Environment::set_current_time(float TimeHi, float TimeLo)
 {
-    ++env->sim_step_count;
-    env->current_time.time_base = TimeHi;
-    env->current_time.time_offset = TimeLo;
+    ++sim_step_count;
+    current_time.time_base = TimeHi;
+    current_time.time_offset = TimeLo;
 }
 
 
@@ -1122,9 +1120,9 @@ void IVP_Environment_SimulateDTime(IVP_Environment* env, float DeltaTime)
 }
 
 // FUN_0634cb90
-IVP_Cluster* IVP_Environment_GetRootCluster(IVP_Environment* env)
+IVP_Cluster* IVP_Environment::get_root_cluster()
 {
-    return env->cluster_manager->get_root_cluster(); // 06261d90
+    return cluster_manager->get_root_cluster(); // 06261d90
 }
 
 // FUN_0634cd80: operator new(0xa8) + FUN_06362280. Retail's null result on a
@@ -1133,7 +1131,7 @@ IVP_Polygon* IVP_Environment_CreatePolygon(IVP_Environment* env, IVP_SurfaceMana
                                            const IVP_RealObjectConstructionTemplate* Template,
                                            const IVP_U_Quat* Rotation, const IVP_U_Point* Position)
 {
-    return new IVP_Polygon(IVP_Environment_GetRootCluster(env), SurfaceManager, Template, Rotation, Position);
+    return new IVP_Polygon(env->get_root_cluster(), SurfaceManager, Template, Rotation, Position);
 }
 
 // FUN_0634cdf0: as FUN_0634cd80 with FUN_06362570 (IVP_Ball).
@@ -1141,7 +1139,7 @@ IVP_Ball* IVP_Environment_CreateBall(IVP_Environment* env, const float* BallRadi
                                      const IVP_RealObjectConstructionTemplate* Template,
                                      const IVP_U_Quat* Rotation, const IVP_U_Point* Position)
 {
-    return new IVP_Ball(IVP_Environment_GetRootCluster(env), BallRadius, Template, Rotation, Position);
+    return new IVP_Ball(env->get_root_cluster(), BallRadius, Template, Rotation, Position);
 }
 
 // FUN_0634cb20
@@ -1173,7 +1171,7 @@ void IVP_Standard_Gravity_Controller::do_simulation_controller(IVP_Event_Sim* Ev
     for (int32_t I = static_cast<int32_t>(CoreList->n_elems) - 1; I >= 0; --I)
     {
         IVP_Core* Core = CoreList->elems[I];
-        if ((Core->Flags & 0x300u) != 0)
+        if ((Core->Flags & IVP_CORE_PINNED) != 0)
             continue;
 
         Core->damp_velocities(EventSim->delta_time);                            // FUN_06346980
@@ -1337,9 +1335,6 @@ void IVP_PerformanceCounter_Simple::environment_is_going_to_be_deleted(IVP_Envir
     delete this;
 }
 
-// FUN_06356960, in ivp_message.cpp (C linkage because qhull also calls it).
-extern "C" void ivp_message(const char* Format, ...);
-
 // FUN_06360110: reset_and_print_performance_counters(IVP_Time). No-op until
 // at least one PSI was counted.
 void IVP_PerformanceCounter_Simple::reset_and_print_performance_counters(float TimeHi, float TimeLo)
@@ -1398,7 +1393,7 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
                                            void* ClientData)
 {
     // ---- compiler-emitted member constructors, before the body -------------
-    IVP_Environment_Init_Block34(env->manager_context_34);         // FUN_063505f0
+    IVP_Environment_Init_Block34(&env->statistics_owner);          // FUN_063505f0
     IVP_Freeze_Manager_Construct(&env->freeze_check_dtime);          // FUN_0634bf30
 
     new (&env->collision_listeners) IVP_U_Vector<IVP_Listener_Collision>();             // +0xC8
@@ -1414,7 +1409,7 @@ IVP_Environment* IVP_Environment_Construct(IVP_Environment* env,
 
     env->sim_substate = 5;
     // The +0x34 block's first dword is a back-pointer to the owner.
-    *reinterpret_cast<IVP_Environment**>(env->manager_context_34) = env;
+    env->statistics_owner = env;
 
     // ---- adopt-or-construct, in retail's own order -------------------------
 

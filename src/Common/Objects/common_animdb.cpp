@@ -22,7 +22,7 @@
 #include "ivp_physics/ivp_core.h"  // ::IVP_Time, GetCurrentTime's return type
 #include "common_animdb.h"
 #include "dacom.h"
-#include "x86math.h"  // I3DMathEngine::MatrixToQuaternion, FQuaternion, FMatrix
+#include "x86math.h"  // I3DMathEngine::MatrixToQuaternion, Quaternion, Matrix
 
 #include <DALib.h>
 
@@ -269,7 +269,7 @@ void __cdecl Add(VChannel* Chan)
     Entry->Channel = Chan;
 
     // Retail calls GetId() three times and does not test Engine or the user data.
-    CObject* const InstObj = (CObject*)DALib::Engine->GetInstanceUserData((void*)(intptr_t)Chan->GetId());
+    CObject* const InstObj = (CObject*)DALib::Engine->GetInstanceUserData(Chan->GetId());
     Entry->Sub.Root = GetRoot(InstObj);
 
     if (InstObj->EngineInstanceId == Chan->GetId())
@@ -317,7 +317,7 @@ COMMON_API void __cdecl Add(int PlaybackId)
 
     // IAnimation2 slot 35 EnumObjects; its result is ignored.
     std::vector<void*> Channels;
-    DALib::Anim->EnumObjects((void*)&CollectChannel, (unsigned long)PlaybackId, &Channels);
+    DALib::Anim->EnumObjects(&CollectChannel, (unsigned long)PlaybackId, &Channels);
 
     // LastInstance is written before the EngineInstanceId compare, so a non-matching instance
     // still counts as the last one resolved.
@@ -328,7 +328,7 @@ COMMON_API void __cdecl Add(int PlaybackId)
         DALib::Channel->GetHeader(Header, (unsigned long)*ChanIt);   // IChannel slot 16
         if (Header[0] != 0)
             continue;
-        CObject* const Inst = (CObject*)DALib::Engine->GetInstanceUserData((void*)Header[3]);
+        CObject* const Inst = (CObject*)DALib::Engine->GetInstanceUserData(Header[3]);
         LastInstance = Inst;
         if (Inst->EngineInstanceId == (int)Header[3])   // no null test
         {
@@ -379,11 +379,11 @@ static std::pair<typename std::vector<T>::iterator, bool> InsertUnique(std::vect
 static void CollectInstanceChildren(CObject* Obj, long InstanceId, std::vector<CObject*>& Objs)
 {
     // IEngine carries the instance id in a void* (engine/engbase.h).
-    long Child = (long)(intptr_t)DALib::Engine->GetRelatedInstance((void*)(intptr_t)InstanceId, 1,
-                                                                   G_InvalidEngineHandle);
+    long Child = (long)(intptr_t)DALib::Engine->GetRelatedInstance(InstanceId, 1,
+                                                                   InvalidInstanceIndex);
     while (Child != -1)
     {
-        CObject* const ChildObj = (CObject*)DALib::Engine->GetInstanceUserData((void*)(intptr_t)Child);
+        CObject* const ChildObj = (CObject*)DALib::Engine->GetInstanceUserData(Child);
         if (ChildObj != nullptr && ChildObj != Obj)
         {
             InsertUnique(Objs, ChildObj);
@@ -393,8 +393,8 @@ static void CollectInstanceChildren(CObject* Obj, long InstanceId, std::vector<C
         {
             CollectInstanceChildren(Obj, Child, Objs);
         }
-        Child = (long)(intptr_t)DALib::Engine->GetRelatedInstance((void*)(intptr_t)InstanceId, 1,
-                                                                  (void*)(intptr_t)Child);
+        Child = (long)(intptr_t)DALib::Engine->GetRelatedInstance(InstanceId, 1,
+                                                                  (intptr_t)Child);
     }
 }
 
@@ -444,7 +444,7 @@ void __cdecl Update(float Dt)
 
     // ---- Phase C: IEngine slot 27 -----------------------------------------
     for (std::vector<int>::const_iterator It = SeenIds.begin(); It != SeenIds.end(); ++It)
-        DALib::Engine->UpdateInstance((void*)(intptr_t)*It, 0, nullptr);
+        DALib::Engine->UpdateInstance(*It, 0, nullptr);
 
     // ---- Phase D: FUN_0627e3b0 is open-coded one level deep at the call site --
     std::vector<CObject*> Objs;  // retail V3
@@ -480,9 +480,9 @@ void __cdecl Update(float Dt)
                 I3DMathEngine* const GolemMath = Acquire3DMathEngine();
 
                 // Same (W,X,Y,Z) -> (X,Y,Z,W) rotation as the mode-2 branch.
-                FQuaternion GolemQuat = {0.0f, 0.0f, 0.0f, 0.0f};
-                GolemMath->MatrixToQuaternion(GolemQuat, (FMatrix const&)Obj->Orientation);
-                float const GolemIvpQuat[4] = {GolemQuat.X, GolemQuat.Y, GolemQuat.Z, GolemQuat.W};
+                Quaternion GolemQuat = {0.0f, 0.0f, 0.0f, 0.0f};
+                GolemMath->MatrixToQuaternion(GolemQuat, Obj->Orientation);
+                float const GolemIvpQuat[4] = {GolemQuat.x, GolemQuat.y, GolemQuat.z, GolemQuat.w};
 
                 Vector const GolemZeroSpeed = {0.0f, 0.0f, 0.0f};
 
@@ -499,11 +499,11 @@ void __cdecl Update(float Dt)
         // Lazily cached singleton (DAT_063fc018), no null test.
         I3DMathEngine* const Math = Acquire3DMathEngine();
 
-        FQuaternion MathQuat = {0.0f, 0.0f, 0.0f, 0.0f};
-        Math->MatrixToQuaternion(MathQuat, (FMatrix const&)Obj->Orientation);   // slot +0x50
+        Quaternion MathQuat = {0.0f, 0.0f, 0.0f, 0.0f};
+        Math->MatrixToQuaternion(MathQuat, Obj->Orientation);   // slot +0x50
 
-        // Retail rotates the dwords by one slot: FQuaternion (W,X,Y,Z) becomes IVP's (X,Y,Z,W).
-        float const IvpQuat[4] = {MathQuat.X, MathQuat.Y, MathQuat.Z, MathQuat.W};
+        // Retail rotates the dwords by one slot: Quaternion (W,X,Y,Z) becomes IVP's (X,Y,Z,W).
+        float const IvpQuat[4] = {MathQuat.x, MathQuat.y, MathQuat.z, MathQuat.w};
 
         // FUN_06343cc0(0, BodyPtr, IvpQuat, &Pos, 0), see common_controllergolem.cpp. The fifth
         // argument is never read by the callee, so the port drops it.

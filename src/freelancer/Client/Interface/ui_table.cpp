@@ -49,16 +49,15 @@ namespace
 
     // The mouse ray scaled onto the table's z plane (the quotient stays double), then taken into
     // table space through the +0xf4 inverse.
-    FVector UiTableRayToLocal(UiTable const* Table, float const* Ray)
+    Vector UiTableRayToLocal(UiTable const* Table, float const* Ray)
     {
-        double const Scale = static_cast<double>(Table->Position[2]) / Ray[2];
-        FVector Scaled;
-        Scaled.X = static_cast<float>(Ray[0] * Scale);
-        Scaled.Y = static_cast<float>(Ray[1] * Scale);
-        Scaled.Z = static_cast<float>(Ray[2] * Scale);
-        FVector Local;
-        UiTableMath()->TransformXform(
-            Local, *reinterpret_cast<FTransform const*>(Table->InverseTransform), Scaled);
+        double const Scale = static_cast<double>(Table->Position.z) / Ray[2];
+        Vector Scaled;
+        Scaled.x = static_cast<float>(Ray[0] * Scale);
+        Scaled.y = static_cast<float>(Ray[1] * Scale);
+        Scaled.z = static_cast<float>(Ray[2] * Scale);
+        Vector Local;
+        UiTableMath()->TransformXform(Local, Table->InverseTransform, Scaled);
         return Local;
     }
 
@@ -104,10 +103,10 @@ UiTable::UiTable()
     , DragOffset(0.0f)
 {
     // FUN_00597cd0.
-    Win3DIdentityRotation3x3(InverseTransform);
-    InverseTransform[9] = 0.0f;
-    InverseTransform[10] = 0.0f;
-    InverseTransform[11] = 0.0f;
+    Win3DIdentityRotation3x3(&InverseTransform.Rotation);
+    InverseTransform.Translation.x = 0.0f;
+    InverseTransform.Translation.y = 0.0f;
+    InverseTransform.Translation.z = 0.0f;
     for (int I = 0; I < 4; ++I)
     {
         FrameRgba[I] = kUiTableFrameRgba[I];
@@ -215,16 +214,16 @@ void UiTable::Layout(unsigned RowStart, unsigned RowCount, unsigned ColStart, un
                 continue;
 
             // Cell transform = this transform * (identity, (column edge, row edge, 0)).
-            FTransform Offset;
-            Win3DIdentityRotation3x3(&Offset.Rotation.D[0][0]);
-            Offset.Translation.X = ColumnEdges[Col];
-            Offset.Translation.Y = RowEdges[Row];
-            Offset.Translation.Z = 0.0f;
-            FTransform World;
-            UiTableMath()->MulTransform(World, *reinterpret_cast<FTransform const*>(Orientation),
+            Transform Offset;
+            Win3DIdentityRotation3x3(&Offset.Rotation);
+            Offset.Translation.x = ColumnEdges[Col];
+            Offset.Translation.y = RowEdges[Row];
+            Offset.Translation.z = 0.0f;
+            Transform World;
+            UiTableMath()->MulTransform(World, Placement,
                                         Offset);
-            FTransform const Copy = World;
-            (*Cell)->SetTransform(reinterpret_cast<float const*>(&Copy));
+            Transform const Copy = World;
+            (*Cell)->SetTransform(&Copy);
 
             float const ColumnWidth = Col < static_cast<unsigned>(ColumnEdges.size()) - 1
                                           ? ColumnEdges[Col + 1] - ColumnEdges[Col]
@@ -271,28 +270,28 @@ bool UiTable::Create(Win3D* NewParent, void* Data)
     return true;
 }
 
-void UiTable::SetTransform(float const* Transform)
+void UiTable::SetTransform(Transform const* NewXform)
 {
     // LAB_005987e0: both setters are virtual calls; then the inverse and a full Layout.
-    SetOrientation(Transform);
-    SetPosition(Transform + 9);
+    SetOrientation(&NewXform->Rotation);
+    SetPosition(&NewXform->Translation.x);
     float W = 0.0f;
-    FTransform Inverse;
-    UiTableMath()->GeneralInverse(Inverse, W, *reinterpret_cast<FTransform const*>(Orientation));
-    *reinterpret_cast<FTransform*>(InverseTransform) = Inverse;
+    Transform Inverse;
+    UiTableMath()->GeneralInverse(Inverse, W, Placement);
+    InverseTransform = Inverse;
     Layout(0, 0, 0, 0);
 }
 
 void UiTable::SetPosition(float const* NewPosition)
 {
     // LAB_00598850.
-    Position[0] = NewPosition[0];
-    Position[1] = NewPosition[1];
-    Position[2] = NewPosition[2];
+    Position.x = NewPosition[0];
+    Position.y = NewPosition[1];
+    Position.z = NewPosition[2];
     float W = 0.0f;
-    FTransform Inverse;
-    UiTableMath()->GeneralInverse(Inverse, W, *reinterpret_cast<FTransform const*>(Orientation));
-    *reinterpret_cast<FTransform*>(InverseTransform) = Inverse;
+    Transform Inverse;
+    UiTableMath()->GeneralInverse(Inverse, W, Placement);
+    InverseTransform = Inverse;
     Layout(0, 0, 0, 0);
 }
 
@@ -306,15 +305,15 @@ void UiTable::Update()
         // Dragging an edge: follow the mouse with the grab offset kept.
         float Ray[3];
         Win3DGetMouseRay(Ray);
-        FVector const Local = UiTableRayToLocal(this, Ray);
+        Vector const Local = UiTableRayToLocal(this, Ray);
         if (bDragColumn != 0)
         {
-            SetColumnEdge(DragEdge, Local.X + DragOffset);
+            SetColumnEdge(DragEdge, Local.x + DragOffset);
             SetCursor(ColumnResizeCursor);
         }
         else
         {
-            SetRowEdge(DragEdge, Local.Y + DragOffset);
+            SetRowEdge(DragEdge, Local.y + DragOffset);
             SetCursor(RowResizeCursor);
         }
         return;
@@ -324,19 +323,19 @@ void UiTable::Update()
 
     float Ray[3];
     Win3DGetMouseRay(Ray);
-    FVector const Local = UiTableRayToLocal(this, Ray);
+    Vector const Local = UiTableRayToLocal(this, Ray);
     bHovered = 0;
     bDragArmed = 0;
     bDragging = 0;
     // Outside the table: nothing more, no SetCursor either.
-    if (!(Local.X >= 0.0f))
+    if (!(Local.x >= 0.0f))
         return;
-    if (!(Local.X < Width))
+    if (!(Local.x < Width))
         return;
-    if (!(Local.Y <= 0.0f))
+    if (!(Local.y <= 0.0f))
         return;
     float const Bottom = -Height;
-    if (!(Local.Y > Bottom))
+    if (!(Local.y > Bottom))
         return;
 
     if (bColumnsResizable != 0)
@@ -344,12 +343,12 @@ void UiTable::Update()
         for (unsigned I = 1; !ColumnEdges.empty() && I < ColumnEdges.size(); ++I)
         {
             float const Edge = ColumnEdges[I];
-            if (GrabDistance > fabs(static_cast<double>(Local.X) - Edge))
+            if (GrabDistance > fabs(static_cast<double>(Local.x) - Edge))
             {
                 SetCursor(ColumnResizeCursor);
                 DragEdge = I;
                 bDragArmed = 1;
-                DragOffset = Edge - Local.X;
+                DragOffset = Edge - Local.x;
                 bDragColumn = 1;
                 return;
             }
@@ -362,17 +361,17 @@ void UiTable::Update()
         float const Edge = RowEdges[I];
         float const Next = I + 1 < RowEdges.size() ? RowEdges[I + 1] : Bottom;
         if (bRowsResizable != 0 && I > 0
-            && GrabDistance > fabs(static_cast<double>(Local.Y) - Edge))
+            && GrabDistance > fabs(static_cast<double>(Local.y) - Edge))
         {
             SetCursor(RowResizeCursor);
             DragEdge = I;
             bDragColumn = 0;
-            DragOffset = Edge - Local.Y;
+            DragOffset = Edge - Local.y;
             bDragArmed = 1;
             return;
         }
         // Above this edge, at or below the next one, or unordered: next row.
-        if (!(Local.Y <= Edge) || !(Local.Y > Next))
+        if (!(Local.y <= Edge) || !(Local.y > Next))
         {
             ++I;
             continue;
@@ -390,7 +389,7 @@ void UiTable::Update()
 void UiTable::Draw()
 {
     // FUN_00598c40
-    Win3DBindModelview(nullptr, Orientation);
+    Win3DBindModelview(nullptr, &Placement);
     UiTableSetDrawStates();
     if (bSelected != 0)
         UiTableDrawRowQuad(this, SelectedRgba, SelectedRow);
@@ -399,7 +398,7 @@ void UiTable::Draw()
 
     Win3DDrawChildren(this);
 
-    Win3DBindModelview(nullptr, Orientation);
+    Win3DBindModelview(nullptr, &Placement);
     UiTableSetDrawStates();
     Win3DColor4ubv(FrameRgba);
     Win3DBegin(kWin3DLineLoop);
@@ -466,14 +465,14 @@ bool UiTable::HitTest(float const* Ray)
 {
     // LAB_00599160: the given ray on the table plane, in table space, inside
     // [0, Width) x (-Height, 0].
-    FVector const Local = UiTableRayToLocal(this, Ray);
-    if (!(Local.X >= 0.0f))
+    Vector const Local = UiTableRayToLocal(this, Ray);
+    if (!(Local.x >= 0.0f))
         return false;
-    if (!(Local.X < Width))
+    if (!(Local.x < Width))
         return false;
-    if (!(Local.Y <= 0.0f))
+    if (!(Local.y <= 0.0f))
         return false;
-    if (!(-Height < Local.Y))
+    if (!(-Height < Local.y))
         return false;
     return true;
 }

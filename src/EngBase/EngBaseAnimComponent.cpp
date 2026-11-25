@@ -40,7 +40,7 @@ static FAnimScript* AllocAnimScript()
 static FAnimScript* const G_InvalidAnimScript =
     (FAnimScript*)((ptrdiff_t)(-1));
 
-void* DACOM_API FAnimationObject::OpenScript(void* FileSystem)
+void* DACOM_API FAnimationObject::OpenScript(IFileSystem* FileSystem)
 {
     FAnimScript* Script = AllocAnimScript();
     IFileSystem* Fs = AsFileSystem(FileSystem);
@@ -65,7 +65,7 @@ static bool IsValidAnimScript(FAnimScript* Script)
     return Script != G_InvalidAnimScript && Script != nullptr;
 }
 
-unsigned long DACOM_API FAnimationObject::AddScriptNames(void* InScript, void* FileSystem,
+unsigned long DACOM_API FAnimationObject::AddScriptNames(void* InScript, IFileSystem* FileSystem,
                                                        const char** Names, int Count)
 {
     FAnimScript* Script = (FAnimScript*)InScript;
@@ -175,7 +175,7 @@ unsigned long DACOM_API FAnimationObject::FilterObjects(void* Filter)
 
 // LAB_06614920 (IAnimation2 slot 9). Sink / SinkContext become every bound channel's
 // IChannelSink and its context (typed +0x0C / +0x10); a root-bound (event) track needs a sink.
-unsigned long DACOM_API FAnimationObject::PlayScript(void* InScript, void* InRoot, const char* Name,
+unsigned long DACOM_API FAnimationObject::PlayScript(void* InScript, InstanceIndex InRoot, const char* Name,
                                                       void* Sink, void* SinkContext)
 {
     FAnimScript* Script = (FAnimScript*)InScript;
@@ -322,14 +322,13 @@ unsigned long DACOM_API FAnimationObject::ApplyChannels(unsigned long PlaybackId
     return 0;
 }
 
-GENRESULT DACOM_API FAnimationObject::EnumScriptNames(void* Callback, void* InScript, void* Context)
+GENRESULT DACOM_API FAnimationObject::EnumScriptNames(FAnimNameProc Callback, void* InScript, void* Context)
 {
     FAnimScript* Script = (FAnimScript*)InScript;
 
     if (Callback == nullptr || !IsValidAnimScript(Script))
         return GR_OK;
-    using FnCb = void(__cdecl*)(const char*, void*);
-    FnCb Enum = (FnCb)Callback;
+    FAnimNameProc Enum = Callback;
     FAnimNameMap::iterator It = Script->Names.begin();
     while (It != Script->Names.end())
     {
@@ -339,7 +338,7 @@ GENRESULT DACOM_API FAnimationObject::EnumScriptNames(void* Callback, void* InSc
     return GR_OK;
 }
 
-GENRESULT DACOM_API FAnimationObject::FindScriptName(void* Callback, void* InScript, const char* Name,
+GENRESULT DACOM_API FAnimationObject::FindScriptName(FAnimChannelProc Callback, void* InScript, const char* Name,
                                                      void* Context)
 {
     FAnimScript* Script = (FAnimScript*)InScript;
@@ -349,8 +348,7 @@ GENRESULT DACOM_API FAnimationObject::FindScriptName(void* Callback, void* InScr
     FAnimNameEntry* Entry = FindAnimName(Script, DACOM_CRC::GetCRC32(Name));
     if (Entry == nullptr)
         return Miss;
-    using FnCb = void(__cdecl*)(void*, void*);
-    FnCb Enum = (FnCb)Callback;
+    FAnimChannelProc Enum = Callback;
     std::vector<FAnimTrack>::iterator Track = Entry->Tracks.begin();
     while (Track != Entry->Tracks.end())
     {
@@ -784,7 +782,7 @@ GENRESULT DACOM_API FAnimationChannelFacet::GetMapped(unsigned long Key, unsigne
     return GR_OK;
 }
 
-unsigned long DACOM_API FAnimationObject::EnumFsScripts(void* Callback, void* FileSystem, void* Context)
+unsigned long DACOM_API FAnimationObject::EnumFsScripts(FAnimNameProc Callback, IFileSystem* FileSystem, void* Context)
 {
 
     if (FileSystemOpenNode(FileSystem, G_NameAnimation) == 0)
@@ -800,8 +798,7 @@ unsigned long DACOM_API FAnimationObject::EnumFsScripts(void* Callback, void* Fi
     const int FindHandle = FileSystemFindFirst(FileSystem, G_NameStar, &FindData);
     if (FindHandle != -1)
     {
-        using FnCb = void(__cdecl*)(const char*, void*);
-        FnCb Enum = (FnCb)Callback;
+        FAnimNameProc Enum = Callback;
         do
         {
 
@@ -864,14 +861,13 @@ GENRESULT DACOM_API FAnimationObject::Initialize()
     return GR_OK;
 }
 
-unsigned long DACOM_API FAnimationObject::EnumObjects(void* Callback, unsigned long PlaybackId,
+unsigned long DACOM_API FAnimationObject::EnumObjects(FAnimObjectProc Callback, unsigned long PlaybackId,
                                                        void* Context)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(this, PlaybackId, &Playback) == 0)
         return 0xFFFFFFFF;
-    using FnEnum = unsigned char(__cdecl*)(void* Object, void* User);
-    FnEnum Enum = (FnEnum)Callback;
+    FAnimObjectProc Enum = Callback;
     std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
     while (Cursor != Playback->Typed.end())
     {

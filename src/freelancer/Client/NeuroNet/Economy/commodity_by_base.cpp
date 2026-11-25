@@ -497,7 +497,7 @@ bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
 
     RegisterEvent(USER_CANCEL);
     SetOffset(0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f));
-    SetPosition(Position);
+    SetPosition(&Position.x);
 
     // FUN_004b5060 with the window's current parent and no data, not Create's arguments.
     return Win3D::Create(Parent, nullptr);
@@ -639,25 +639,25 @@ void NnCommodityByBase::Update()
     int CursorX = 0;
     int CursorY = 0;
     GetClientSoftwareCursor(&CursorX, &CursorY, nullptr); // DAT_00616840 / DAT_00616844
-    FVector Local;
-    Local.X = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
+    Vector Local;
+    Local.x = static_cast<float>((static_cast<double>(CursorX) - Cam->ScreenCenterX) /
                                  Cam->XScale * Cam->ZNear);
-    Local.Y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
+    Local.y = static_cast<float>((static_cast<double>(CursorY) - Cam->ScreenCenterY) /
                                  Cam->YScale * Cam->ZNear);
-    Local.Z = -Cam->ZNear;
-    FMatrix Orientation;
-    memcpy(&Orientation, Cam->World, sizeof(Orientation));
+    Local.z = -Cam->ZNear;
+    Matrix Orientation;
+    memcpy(&Orientation, &Cam->World, sizeof(Orientation));
     if (G_CommodityByBaseMath == nullptr)
         G_CommodityByBaseMath = Acquire3DMathEngine(); // FUN_005b73e0
-    FVector World;
+    Vector World;
     G_CommodityByBaseMath->TransformMatrix(World, Orientation, Local);
-    double const Inv = 1.0 / sqrt(static_cast<double>(World.X) * World.X +
-                                  static_cast<double>(World.Y) * World.Y +
-                                  static_cast<double>(World.Z) * World.Z);
+    double const Inv = 1.0 / sqrt(static_cast<double>(World.x) * World.x +
+                                  static_cast<double>(World.y) * World.y +
+                                  static_cast<double>(World.z) * World.z);
     float Ray[3];
-    Ray[0] = static_cast<float>(World.X * Inv);
-    Ray[1] = static_cast<float>(World.Y * Inv);
-    Ray[2] = static_cast<float>(World.Z * Inv);
+    Ray[0] = static_cast<float>(World.x * Inv);
+    Ray[1] = static_cast<float>(World.y * Inv);
+    Ray[2] = static_cast<float>(World.z * Inv);
 
     // Column titles: the sorted column is amber (DAT_00679ba4), one under the mouse pulses.
     WinControl* const Titles[5] = {nullptr, PriceTitle, BaseTitle, SystemTitle, BuySellTitle};

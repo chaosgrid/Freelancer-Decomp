@@ -69,30 +69,31 @@ bool UiShipViewControl::Create(Win3D* NewParent, void* Payload)
     return bCreated;
 }
 
-void UiShipViewControl::SetTransform(float const* Transform)
+void UiShipViewControl::SetTransform(Transform const* NewXform)
 {
     // LAB_0059c100 (RET 4). The half extent turned by the rotation is the view size; that plus
     // the translation (each sum rounded to float) is the box's corner, the position.
     float Block[12];
+    float const* const XformFloats = &NewXform->Rotation.E[0][0];
     for (int Index = 0; Index < 12; ++Index)
-        Block[Index] = Transform[Index];
-    float const Translation[3] = {Transform[9], Transform[10], Transform[11]};
+        Block[Index] = XformFloats[Index];
+    float const Translation[3] = {NewXform->Translation.x, NewXform->Translation.y,
+                                  NewXform->Translation.z};
 
-    FVector Turned;
-    FVector Source;
-    Source.X = HalfExtent[0];
-    Source.Y = HalfExtent[1];
-    Source.Z = HalfExtent[2];
-    UiWidgetMathEngine()->TransformMatrix(Turned, *reinterpret_cast<FMatrix const*>(Transform),
-                                          Source);
+    Vector Turned;
+    Vector Source;
+    Source.x = HalfExtent[0];
+    Source.y = HalfExtent[1];
+    Source.z = HalfExtent[2];
+    UiWidgetMathEngine()->TransformMatrix(Turned, NewXform->Rotation, Source);
 
     float Corner[3];
-    Corner[0] = Turned.X + Translation[0];
-    Corner[1] = Turned.Y + Translation[1];
-    Corner[2] = Turned.Z + Translation[2];
-    float const ViewExtent[3] = {Turned.X, Turned.Y, Turned.Z};
+    Corner[0] = Turned.x + Translation[0];
+    Corner[1] = Turned.y + Translation[1];
+    Corner[2] = Turned.z + Translation[2];
+    float const ViewExtent[3] = {Turned.x, Turned.y, Turned.z};
 
-    SetOrientation(Block);
+    SetOrientation(reinterpret_cast<Matrix const*>(Block));
     SetPosition(Corner);
     SetViewSize(ViewExtent);
 }

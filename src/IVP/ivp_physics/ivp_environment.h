@@ -149,14 +149,14 @@ public:
     float TimeBaseLo;               // +0x18
 
     // ((EventHi - TimeBaseHi) + EventLo) - TimeBaseLo, in this association
-    // order, as FUN_063609c0 and IVP_RescheduleCollisionEvent's inlined copy
+    // order, as FUN_063609c0 and IVP_Ledge_Mindist::RescheduleCollisionEvent's inlined copy
     // compute it. Stays on the x87 stack until one float store, hence double.
     float MakeEventKey(float EventHi, float EventLo) const
     {
         return (float)((((double)EventHi - TimeBaseHi) + EventLo) - TimeBaseLo);
     }
 
-    // The enqueue inlined in IVP_RescheduleCollisionEvent (0634f964). Returns
+    // The enqueue inlined in IVP_Ledge_Mindist::RescheduleCollisionEvent (0634f964). Returns
     // the pool slot; the caller stores it in the payload's +0x04 handle.
     uint16_t EnqueueEvent(void* Payload, float EventHi, float EventLo);
 
@@ -167,7 +167,7 @@ public:
     // FUN_063609c0: EnqueueEvent plus the write-back into the listener's handle.
     void ScheduleListener(IVP_Time_Event* Listener, float EventHi, float EventLo);
 
-    // FUN_06360ab0: forwards to IVP_Environment_SetCurrentTime (FUN_0634ccd0);
+    // FUN_06360ab0: forwards to IVP_Environment::set_current_time (FUN_0634ccd0);
     // `this` is not read.
     void env_set_current_time(IVP_Environment* Environment, float TimeHi, float TimeLo);
 
@@ -380,14 +380,17 @@ public:
     // +0x34..+0x87: statistics, zero-filled by FUN_063505f0. The *_count
     // dwords are only ever incremented (no reader in Common.dll); each is named
     // after its one increment site.
-    char                  manager_context_34[0x18]; // +0x34..+0x4B
+    IVP_Environment*      statistics_owner;      // +0x34: back-pointer to this environment, set by the ctor
+    char                  manager_context_38[0x14]; // +0x38..+0x4B
     int32_t               impact_solver_count;   // +0x4C: ++ per IVP_Impact_Solver::DoImpactSystem (06357918)
     int32_t               impact_loop_count;     // +0x50: += the impacts one impact system ran (Count + 1, 06359067)
     char                  manager_context_54[0x08]; // +0x54..+0x5B
     int32_t               impact_deferred_commit_count; // +0x5C: ++ on FinalizeImpact's deferred-commit path (06358204)
     int32_t               impact_priority_calc_count;   // +0x60: ++ per contact whose priority test_loop_all_pairs recomputes (0635921f)
     int32_t               impact_flagged_core_count;    // +0x64: ++ when DoImpactSystem leaves a core with MovementState bits 8-15 set (06357f14)
-    char                  manager_context_68[0x04]; // +0x68..+0x6B (float accumulator, see ivp_listmanager_topology.cpp)
+    // +0x68: += the energy each contact-axis impulse consumes
+    // (IVP_ListManager_CorePairEntry::TickBudget, ivp_listmanager_topology.cpp); no reader.
+    float                 contact_axis_energy_sum; // +0x68
     // +0x6c/+0x70/+0x74: the library's mindist statistics. The IVP_Mindist
     // ctor (FUN_0634dd10) increments +0x6c/+0x70; its dtor (FUN_0634dd60)
     // decrements +0x6c and increments +0x74.
@@ -489,6 +492,56 @@ public:
     IVP_Env_Buffer_Node*  buffer_node_list;      // +0x13C
     float                 field_140;             // +0x140
     int32_t               state_magic;           // +0x144 (0x1E240 = 123456)
+
+    // FUN_0634bbe0: drains the whole wake/event queue (ivp_environment.cpp).
+    void process_wake_queue();
+
+    // FUN_0634bb20: single-entry removal from the wake queue; used by
+    // IVP_Core::~IVP_Core.
+    void dequeue_core(IVP_Core* core);
+
+    // FUN_0634cf60: event_pre_collision to every collision_listeners entry whose
+    // enabled_callbacks bit 0 is set. Caller: FUN_06358680 (06358aa7).
+    void fire_event_pre_collision(IVP_Event_Collision* arg);
+
+    // FUN_0634cf30: object_listeners slot 2 (event_object_revived), backward, no
+    // gate; the argument is forwarded untouched.
+    void fire_event_object_revived(IVP_Environment_Object_Notify_Event* event_data);
+
+    // FUN_0634caf0: collision_delegator_roots slot 4 (object_is_removed_from_collision_detection),
+    // backward. The destructor's own collision_delegator_roots loop calls slot 6 instead.
+    void notify_object_removed_from_collision_detection(IVP_Real_Object* arg);
+
+    // FUN_0634cd20: frees each node's buffer inline, deletes the node, then nulls
+    // the head. Called from the destructor.
+    void free_buffer_node_list();
+
+    // FUN_0634ced0 / FUN_0634cf00: object_listeners slot 0 (event_object_deleted)
+    // / slot 3 (event_object_frozen), backward, no gate.
+    void fire_event_object_deleted(IVP_Environment_Object_Notify_Event* arg);
+    void fire_event_object_frozen(IVP_Environment_Object_Notify_Event* arg);
+
+    // FUN_0634cea0: object_listeners slot 1 (event_object_created), no null test.
+    // Called by the IVP_Polygon and IVP_Ball constructors.
+    void fire_event_object_created(IVP_Environment_Object_Notify_Event* arg);
+
+    // FUN_0634cfa0 / FUN_0634cfe0: collision_listeners slots 2 / 3, gated on
+    // enabled_callbacks bit 2 (&4, not the &1 of fire_event_pre_collision).
+    void notify_friction_created(void* arg);
+    void notify_friction_deleted(void* arg);
+
+    // FUN_0634ccd0: ++sim_step_count; current_time = {TimeHi, TimeLo}.
+    void set_current_time(float TimeHi, float TimeLo);
+
+    // FUN_0634cb90: IVP_Environment::get_root_cluster, cluster_manager->+0x00 (via
+    // the ICF-shared getter 06261d90). Every IVP object is created into it.
+    IVP_Cluster* get_root_cluster();
+
+    // FUN_0634d090 (RET 8: the IVP_Time by value, never read): one PSI step.
+    void simulate_psi(IVP_Time /*current_sim_time*/);
+
+    // FUN_0634d020: event_PSI to every psi_listeners entry, last to first.
+    void fire_event_PSI();
 };
 
 #pragma pack(pop)
@@ -497,7 +550,8 @@ static_assert(sizeof(IVP_Environment) == 0x148, "IVP_Environment size mismatch")
 static_assert(offsetof(IVP_Environment, ov_tree_manager) == 0x14, "IVP_Environment+0x14");
 static_assert(offsetof(IVP_Environment, anomaly_manager) == 0x20, "IVP_Environment+0x20");
 static_assert(offsetof(IVP_Environment, anomaly_limits) == 0x24, "IVP_Environment+0x24");
-static_assert(offsetof(IVP_Environment, manager_context_34) == 0x34, "IVP_Environment+0x34");
+static_assert(offsetof(IVP_Environment, statistics_owner) == 0x34, "IVP_Environment+0x34");
+static_assert(offsetof(IVP_Environment, contact_axis_energy_sum) == 0x68, "IVP_Environment+0x68");
 static_assert(offsetof(IVP_Environment, impact_solver_count) == 0x4C, "IVP_Environment+0x4C");
 static_assert(offsetof(IVP_Environment, impact_deferred_commit_count) == 0x5C, "IVP_Environment+0x5C");
 static_assert(offsetof(IVP_Environment, impact_flagged_core_count) == 0x64, "IVP_Environment+0x64");
@@ -506,16 +560,9 @@ static_assert(offsetof(IVP_Environment, long_term_solver_count) == 0x80, "IVP_En
 static_assert(offsetof(IVP_Environment, freeze_check_dtime) == 0x88, "IVP_Environment+0x88");
 static_assert(offsetof(IVP_Environment, inv_delta_time) == 0xB0, "IVP_Environment+0xB0");
 
-// FUN_0634bbe0: drains the whole wake/event queue (ivp_environment.cpp).
-void IVP_Environment_Process_Wake_Queue(IVP_Environment* env);
-
-// FUN_0634bb20: single-entry removal from the wake queue; used by
-// IVP_Core::~IVP_Core.
-void IVP_Environment_Dequeue_Core(IVP_Environment* env, IVP_Core* core);
-
 // FUN_0634bb90: the IVP SDK's add_revive_core. Appends `core` to event_queue
 // unless (core->Flags & 0x30) == 0x10, then sets Flags = (Flags & ~0x20) | 0x10.
-// Drained by IVP_Environment_Process_Wake_Queue. Callers: 06346170
+// Drained by IVP_Environment::process_wake_queue. Callers: 06346170
 // (IVP_Real_Object::EnsureInSimulation) and 06348f50 below.
 void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core);
 
@@ -526,10 +573,6 @@ void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core);
 // 062923f4 / 06292580 (common_physys.cpp).
 void IVP_Controller_Manager_Ensure_Core_To_Be_In_Simulation(IVP_Core* core);
 
-// FUN_0634cf60: event_pre_collision to every collision_listeners entry whose
-// enabled_callbacks bit 0 is set. Caller: FUN_06358680 (06358aa7).
-void IVP_Environment_Fire_Event_Pre_Collision(IVP_Environment* env, void* arg);
-
 // {Environment*, IVP_Real_Object*} record that FUN_0634b480 builds on its stack
 // for the object-listener notifications.
 struct IVP_Environment_Object_Notify_Event
@@ -538,37 +581,13 @@ struct IVP_Environment_Object_Notify_Event
     IVP_Real_Object* Object;
 };
 
-// FUN_0634cf30: object_listeners slot 2 (event_object_revived), backward, no
-// gate; the argument is forwarded untouched.
-void IVP_Environment_Fire_Event_Object_Revived(IVP_Environment* env, void* event_data);
+struct IVP_Event_Collision; // ivp_listener.h
 
 // FUN_0634c6f0: ~IVP_Environment().
 void IVP_Environment_Destructor(IVP_Environment* env);
 
-// FUN_0634caf0: collision_delegator_roots slot 4 (object_is_removed_from_collision_detection),
-// backward. The destructor's own collision_delegator_roots loop calls slot 6 instead.
-void IVP_Environment_Notify_Object_Removed_From_Collision_Detection(IVP_Environment* env, void* arg);
-
-// FUN_0634cd20: frees each node's buffer inline, deletes the node, then nulls
-// the head. Called from the destructor.
-void IVP_Environment_Free_Buffer_Node_List(IVP_Environment* env);
-
 // FUN_0634ce60: append onto object_listeners.
 void IVP_Environment_Append_Object_Listener(IVP_Environment* env, void* listener);
-
-// FUN_0634ced0 / FUN_0634cf00: object_listeners slot 0 (event_object_deleted)
-// / slot 3 (event_object_frozen), backward, no gate.
-void IVP_Environment_Fire_Event_Object_Deleted(IVP_Environment* env, void* arg);
-void IVP_Environment_Fire_Event_Object_Frozen(IVP_Environment* env, void* arg);
-
-// FUN_0634cea0: object_listeners slot 1 (event_object_created), no null test.
-// Called by the IVP_Polygon and IVP_Ball constructors.
-void IVP_Environment_Fire_Event_Object_Created(IVP_Environment* env, void* arg);
-
-// FUN_0634cfa0 / FUN_0634cfe0: collision_listeners slots 2 / 3, gated on
-// enabled_callbacks bit 2 (&4, not the &1 of Fire_Event_Pre_Collision).
-void IVP_Environment_Notify_Friction_Created(IVP_Environment* env, void* arg);
-void IVP_Environment_Notify_Friction_Deleted(IVP_Environment* env, void* arg);
 
 // FUN_0634d050: append onto collision_listeners.
 void IVP_Environment_Add_Listener_Collision(IVP_Environment* env, void* listener);
@@ -624,9 +643,6 @@ void* IVP_Freeze_Manager_Construct(void* FreezeManager);
 // and FUN_0628c900 (PhySys).
 void IVP_Environment_SetDeltaPsiTime(IVP_Environment* env, float dt);
 
-// FUN_0634ccd0: ++sim_step_count; current_time = {TimeHi, TimeLo}.
-void IVP_Environment_SetCurrentTime(IVP_Environment* env, float TimeHi, float TimeLo);
-
 // FUN_0634cc80: IVP_Environment::simulate_dtime. Feeds the target time to the
 // interval gate (+0x8c), then runs the variable time step. PhySys calls it
 // from its Update (0628caed / 0628cb63 / 0628cb9d).
@@ -636,10 +652,6 @@ void IVP_Environment_SimulateDTime(IVP_Environment* env, float DeltaTime);
 // (+0xc4), then standard_gravity_controller->set_grav_vector. Callers: the env
 // ctor and PhySys (0628ca2f).
 void IVP_Environment_SetGravity(IVP_Environment* env, const IVP_U_Point* Gravity);
-
-// FUN_0634cb90: IVP_Environment::get_root_cluster, cluster_manager->+0x00 (via
-// the ICF-shared getter 06261d90). Every IVP object is created into it.
-IVP_Cluster* IVP_Environment_GetRootCluster(IVP_Environment* env);
 
 // FUN_0634cd80: IVP_Environment::create_polygon: new(0xa8) + FUN_06362280.
 // Callers: PhySys 0628af7e / 0628b367 / 0628c838.

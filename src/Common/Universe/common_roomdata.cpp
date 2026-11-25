@@ -356,9 +356,7 @@ namespace
     {
         Vector Turned;
         I3DMathEngine* const Math = Acquire3DMathEngine();
-        Math->TransformMatrix(reinterpret_cast<FVector&>(Turned),
-                              reinterpret_cast<FMatrix const&>(Frame.Orient),
-                              reinterpret_cast<FVector const&>(BlobDirection));
+        Math->TransformMatrix(Turned, Frame.Orient, BlobDirection);
         double const LengthSq = static_cast<double>(Turned.x) * Turned.x +
                                 static_cast<double>(Turned.y) * Turned.y +
                                 static_cast<double>(Turned.z) * Turned.z;

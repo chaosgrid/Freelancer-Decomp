@@ -721,17 +721,16 @@ void CndDistCircle::OnActivate()
     CircleObjId = pub::GetNicknameId(CircleObj.Data);
     Matrix Orientation;
     pub::SpaceObj::GetLocation(CircleObjId, CircleCenter, Orientation);
-    FVector Forward;
-    Forward.X = 0.0f;
-    Forward.Y = 0.0f;
-    Forward.Z = -1.0f;
+    Vector Forward;
+    Forward.x = 0.0f;
+    Forward.y = 0.0f;
+    Forward.z = -1.0f;
     // TransformMatrix is engine vtbl +0x2c.
-    FVector Axis;
-    ContentMathEngine()->TransformMatrix(Axis, reinterpret_cast<FMatrix const&>(Orientation),
-                                        Forward);
-    Normal.x = Axis.X;
-    Normal.y = Axis.Y;
-    Normal.z = Axis.Z;
+    Vector Axis;
+    ContentMathEngine()->TransformMatrix(Axis, Orientation, Forward);
+    Normal.x = Axis.x;
+    Normal.y = Axis.y;
+    Normal.z = Axis.z;
     // (x*x + y*y) + z*z, 1/sqrt kept on the x87 stack.
     double const InvLength =
         1.0 / sqrt(static_cast<double>(Normal.x) * Normal.x +

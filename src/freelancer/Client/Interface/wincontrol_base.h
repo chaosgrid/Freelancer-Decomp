@@ -140,7 +140,7 @@ public:
     // slot 5 FUN_005a0880
     void SetPosition(float const* NewPosition) override;
     // slot 7 FUN_005a0950
-    void SetOrientation(float const* NewOrientation) override;
+    void SetOrientation(Matrix const* NewOrientation) override;
     // slot 10 FUN_0059fb60
     void Destroy() override;
     // slot 13 FUN_005a0760
@@ -177,7 +177,7 @@ public:
     // slot 35 (+0x8c) FUN_005a09d0
     virtual void RefreshAttachment();
     // slot 36 (+0x90) FUN_005a0a70
-    virtual bool GetHardpointTransform(char const* Name, float* OutTransform12);
+    virtual bool GetHardpointTransform(char const* Name, Transform* OutXform);
     // slot 37 (+0x94) FUN_005a0bc0
     virtual WinControl* FindChild(char const* Name);
     // slot 38 (+0x98) FUN_0059fbd0 -- MaterialPath is FUN_0059ec80's second argument.
@@ -186,9 +186,9 @@ public:
     // calling it
     virtual void PostDraw();
     // slot 40 (+0xa0) FUN_005a1670
-    virtual void GetAttachOrientation(float* OutOrientation9);
+    virtual void GetAttachOrientation(Matrix* OutOrientation);
     // slot 41 (+0xa4) FUN_005a1750
-    virtual void GetAttachPosition(float* OutPosition3);
+    virtual void GetAttachPosition(Vector* OutPosition);
     // slot 42 (+0xa8) FUN_005a13c0 -- property switch 1..11 (see wincontrol_base.cpp). A and B
     // are dwords that are an int, a flag or a pointer depending on Msg.
     virtual intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B);
@@ -343,8 +343,17 @@ public:
     int OwnerData;                   // +0x2f0 -- ctor 0
     unsigned char PositionFlags;    // +0x2f4 -- bit0: instance position includes +0xa8
     unsigned char Pad2f5[3];        // +0x2f5
-    float AttachOrientation[9];     // +0x2f8
-    float AttachPosition[3];        // +0x31c
+    // +0x2f8: the orientation, then the position of the hardpoint this control is attached to
+    // -- together the Transform GetHardpointTransform fills.
+    union
+    {
+        struct
+        {
+            Matrix AttachOrientation;   // +0x2f8
+            Vector AttachPosition;      // +0x31c
+        };
+        Transform AttachXform;          // +0x2f8
+    };
     unsigned char bAttached;        // +0x328
     unsigned char Pad329[3];        // +0x329
 

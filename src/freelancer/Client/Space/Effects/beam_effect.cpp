@@ -62,11 +62,11 @@ namespace
         return This;
     }
 
-    void SetVec(FVector* Out, float X, float Y, float Z)
+    void SetVec(Vector* Out, float X, float Y, float Z)
     {
-        Out->X = X;
-        Out->Y = Y;
-        Out->Z = Z;
+        Out->x = X;
+        Out->y = Y;
+        Out->z = Z;
     }
 
     // The builders' inline colour: Scale * colour * 255.0 in double, truncated, and only the
@@ -133,7 +133,7 @@ void BeamEffectDestroy(FBeamEffect* This, int FreeMemory)
 
 
 void BeamEffectAttach(FBeamEffect* This, void* WatchableOwner, int EngineIndex,
-                      FTransform const* LocalXform)
+                      Transform const* LocalXform)
 {
     This->Attach(WatchableOwner, EngineIndex, LocalXform);
 }
@@ -191,18 +191,18 @@ unsigned char BeamEffectStart(FBeamEffect* This, FEffectArch* EffectArch)
 
 // LAB_004f9480 — slot +8, shared with ParticleEffect: the world translation out, returns +0x74.
 // Retail inlines FUN_004f7ef0's body.
-float FBeamEffect::GetWorldPos(FVector* Out)
+float FBeamEffect::GetWorldPos(Vector* Out)
 {
     FBeamEffect* const This = this;
-    FTransform World;
+    Transform World;
     EffectGetWorldTransform(AsEffect(This), &World);
-    Out->X = World.Translation.X;
-    Out->Y = World.Translation.Y;
-    Out->Z = World.Translation.Z;
+    Out->x = World.Translation.x;
+    Out->y = World.Translation.y;
+    Out->z = World.Translation.z;
     return This->CullRadius;
 }
 
-float BeamEffectGetWorldPos(FBeamEffect* This, FVector* Out)
+float BeamEffectGetWorldPos(FBeamEffect* This, Vector* Out)
 {
     return This->FBeamEffect::GetWorldPos(Out);
 }
@@ -264,17 +264,17 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
         return static_cast<unsigned char>(This->Flags70 & 1u);
     }
 
-    FVector WorldPos;
+    Vector WorldPos;
     float const Radius = This->GetWorldPos(&WorldPos);
 
     ICamera* const CamIface = AsCamera(Cam);
-    FTransform const* const ViewXform =
-        reinterpret_cast<FTransform const*>(CamIface->GetViewTransform());
-    FVector ViewPos;
+    Transform const* const ViewXform =
+        CamIface->GetViewTransform();
+    Vector ViewPos;
     EffectMath()->TransformXform(ViewPos, *ViewXform, WorldPos);
 
     // The sphere's far edge must lie strictly beyond the near plane.
-    float const NegZ = -ViewPos.Z;
+    float const NegZ = -ViewPos.z;
     float const FarEdge = NegZ + Radius;
     if (!(CamIface->GetZNear() < FarEdge))
         return static_cast<unsigned char>(This->Flags70 & 1u);
@@ -292,8 +292,8 @@ unsigned char FBeamEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
 
     // The two side planes (camera +0x80/+0x88 and +0x90/+0x94): outside when the plane distance
     // is greater than the radius or NaN.
-    float const DistX = fabsf(ViewPos.X) * Cam->PlaneX[0] + ViewPos.Z * Cam->PlaneX[2];
-    float const DistY = fabsf(ViewPos.Y) * Cam->PlaneY[1] + ViewPos.Z * Cam->PlaneY[2];
+    float const DistX = fabsf(ViewPos.x) * Cam->PlaneX[0] + ViewPos.z * Cam->PlaneX[2];
+    float const DistY = fabsf(ViewPos.y) * Cam->PlaneY[1] + ViewPos.z * Cam->PlaneY[2];
     if (!(DistX <= Radius) || !(DistY <= Radius))
     {
         This->Flags70 = static_cast<unsigned char>(This->Flags70 & 0xfeu);
@@ -353,8 +353,8 @@ unsigned char FBeamEffect::BuildGeometry(FSpaceCamera* Cam)
     if (!BeamGeometryOptionEnabled())
         return 0;
 
-    FTransform StackXform;
-    FTransform* UseXform = &This->LocalXform;
+    Transform StackXform;
+    Transform* UseXform = &This->LocalXform;
 
     // With a watched object (+0x44, and that minus eight, non-null) and an engine instance
     // (+0x40 != -1): instance transform x local; otherwise the local transform at +0x10.
@@ -362,9 +362,9 @@ unsigned char FBeamEffect::BuildGeometry(FSpaceCamera* Cam)
     if (Watched != nullptr && reinterpret_cast<uintptr_t>(Watched) - 8u != 0u &&
         This->EngineIndex != -1)
     {
-        float* const InstanceRaw = DALib::Engine->GetInstanceTransform(
-            reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex)));
-        EffectMath()->MulTransform(StackXform, *reinterpret_cast<FTransform const*>(InstanceRaw),
+        const float* const InstanceRaw = (const float*)DALib::Engine->GetInstanceTransform(
+            This->EngineIndex);
+        EffectMath()->MulTransform(StackXform, *reinterpret_cast<Transform const*>(InstanceRaw),
                                    This->LocalXform);
         UseXform = &StackXform;
     }
@@ -411,7 +411,7 @@ unsigned char BeamEffectBuildGeometry(FBeamEffect* This, FSpaceCamera* Cam)
 }
 
 // FUN_004fa270 (returns 1).
-int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform, float T,
+int BeamEffectBuildSingleSegment(FBeamEffect* This, Transform const* WorldXform, float T,
                                  float Intensity)
 {
     FBeamEffectArch* const Arch = This->Arch;
@@ -434,51 +434,51 @@ int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform
     float const EndR = static_cast<float>(static_cast<double>(Delta1) * T + NearR);
     float const StartRNeg = static_cast<float>(-(static_cast<double>(Delta0) * T + NearR));
 
-    FVector WorldT;
-    WorldT.X = WorldXform->Translation.X;
-    WorldT.Y = WorldXform->Translation.Y;
-    WorldT.Z = WorldXform->Translation.Z;
+    Vector WorldT;
+    WorldT.x = WorldXform->Translation.x;
+    WorldT.y = WorldXform->Translation.y;
+    WorldT.z = WorldXform->Translation.z;
 
     // Local axis samples: cross arms in local XY, beam extent along local Z.
-    FVector VX;
+    Vector VX;
     SetVec(&VX, NearR, 0.0f, 0.0f);
-    FVector VY;
+    Vector VY;
     SetVec(&VY, 0.0f, NearR, 0.0f);
-    FVector TipX;
+    Vector TipX;
     SetVec(&TipX, TipR, 0.0f, 0.0f);
-    FVector TipY;
+    Vector TipY;
     SetVec(&TipY, 0.0f, TipR, 0.0f);
-    FVector EndZ;
+    Vector EndZ;
     SetVec(&EndZ, 0.0f, 0.0f, EndR);
-    FVector StartZ;
+    Vector StartZ;
     SetVec(&StartZ, 0.0f, 0.0f, StartRNeg);
 
-    FVector XfPosX;
-    FVector XfNegX;
-    FVector XfPosY;
-    FVector XfNegY;
-    FVector XfTipPosX;
-    FVector XfTipNegX;
-    FVector XfTipPosY;
-    FVector XfTipNegY;
-    FVector XfEnd;   // stack +0x30 after transforms
-    FVector XfStart; // stack +0x90
-    FVector Tmp;
+    Vector XfPosX;
+    Vector XfNegX;
+    Vector XfPosY;
+    Vector XfNegY;
+    Vector XfTipPosX;
+    Vector XfTipNegX;
+    Vector XfTipPosY;
+    Vector XfTipNegY;
+    Vector XfEnd;   // stack +0x30 after transforms
+    Vector XfStart; // stack +0x90
+    Vector Tmp;
 
     // The NearR axes and their negations go through HudTransformPoint (FUN_004e7090)...
     HudTransformPoint(WorldXform, &XfPosX, &VX);
-    SetVec(&Tmp, -VX.X, -VX.Y, -VX.Z);
+    SetVec(&Tmp, -VX.x, -VX.y, -VX.z);
     HudTransformPoint(WorldXform, &XfNegX, &Tmp);
     HudTransformPoint(WorldXform, &XfPosY, &VY);
-    SetVec(&Tmp, -VY.X, -VY.Y, -VY.Z);
+    SetVec(&Tmp, -VY.x, -VY.y, -VY.z);
     HudTransformPoint(WorldXform, &XfNegY, &Tmp);
 
     // ...the rest through inlined TransformXform on DAT_00674f50 (re-acquired before each).
     EffectMath()->TransformXform(XfTipPosX, *WorldXform, TipX);
-    SetVec(&Tmp, -TipX.X, -TipX.Y, -TipX.Z);
+    SetVec(&Tmp, -TipX.x, -TipX.y, -TipX.z);
     EffectMath()->TransformXform(XfTipNegX, *WorldXform, Tmp);
     EffectMath()->TransformXform(XfTipPosY, *WorldXform, TipY);
-    SetVec(&Tmp, -TipY.X, -TipY.Y, -TipY.Z);
+    SetVec(&Tmp, -TipY.x, -TipY.y, -TipY.z);
     EffectMath()->TransformXform(XfTipNegY, *WorldXform, Tmp);
     EffectMath()->TransformXform(XfStart, *WorldXform, StartZ);
     EffectMath()->TransformXform(XfEnd, *WorldXform, EndZ);
@@ -520,26 +520,26 @@ int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform
     Batch->U = kUvCore;
     Batch->V = UvVMid;
     unsigned short const I0 =
-        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.X, WorldT.Y, WorldT.Z));
+        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.x, WorldT.y, WorldT.z));
 
     SetBatchColorRgb(Batch, Scale0, Arch->ColorTipR, Arch->ColorTipG, Arch->ColorTipB);
     Batch->U = kHalf;
     Batch->V = UvV0;
     unsigned short const I1 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfTipPosX.X, XfTipPosX.Y, XfTipPosX.Z));
+        EffectVertexBatchAppend(Batch, XfTipPosX.x, XfTipPosX.y, XfTipPosX.z));
 
     Batch->V = UvV1;
     unsigned short const I2 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfTipPosY.X, XfTipPosY.Y, XfTipPosY.Z));
+        EffectVertexBatchAppend(Batch, XfTipPosY.x, XfTipPosY.y, XfTipPosY.z));
 
     Batch->U = kOne;
     Batch->V = UvV1;
     unsigned short const I3 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfTipNegX.X, XfTipNegX.Y, XfTipNegX.Z));
+        EffectVertexBatchAppend(Batch, XfTipNegX.x, XfTipNegX.y, XfTipNegX.z));
 
     Batch->V = UvV0;
     unsigned short const I4 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfTipNegY.X, XfTipNegY.Y, XfTipNegY.Z));
+        EffectVertexBatchAppend(Batch, XfTipNegY.x, XfTipNegY.y, XfTipNegY.z));
 
     // Second structure (NOT a tip-radius mirror): NearR XY arms + local-Z Start/End, Scale1,
     // UVs from Arch+0xc. The tip fan's indices are pushed AFTER these vertices.
@@ -552,32 +552,32 @@ int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform
     Batch->U = 0.0f;
     Batch->V = UvU0;
     unsigned short const A0 =
-        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.X, WorldT.Y, WorldT.Z));
+        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.x, WorldT.y, WorldT.z));
 
     SetBatchColorRgb(Batch, Scale1, Arch->ColorCoreR, Arch->ColorCoreG, Arch->ColorCoreB);
     Batch->U = kUvMid;
     Batch->V = UvU1;
     unsigned short const A1 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfStart.X, XfStart.Y, XfStart.Z));
+        EffectVertexBatchAppend(Batch, XfStart.x, XfStart.y, XfStart.z));
 
     SetBatchColorRgb(Batch, Scale1, Arch->ColorMidR, Arch->ColorMidG, Arch->ColorMidB);
     Batch->U = kUvMid;
     Batch->V = UvU1;
     unsigned short const A2 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfEnd.X, XfEnd.Y, XfEnd.Z));
+        EffectVertexBatchAppend(Batch, XfEnd.x, XfEnd.y, XfEnd.z));
 
     SetBatchColorRgb(Batch, Scale1, Arch->ColorTipR, Arch->ColorTipG, Arch->ColorTipB);
     Batch->U = kUvMid;
     Batch->V = UvU0;
     unsigned short const A3 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfPosX.X, XfPosX.Y, XfPosX.Z));
+        EffectVertexBatchAppend(Batch, XfPosX.x, XfPosX.y, XfPosX.z));
 
     unsigned short const A4 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfNegX.X, XfNegX.Y, XfNegX.Z));
+        EffectVertexBatchAppend(Batch, XfNegX.x, XfNegX.y, XfNegX.z));
     unsigned short const A5 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfPosY.X, XfPosY.Y, XfPosY.Z));
+        EffectVertexBatchAppend(Batch, XfPosY.x, XfPosY.y, XfPosY.z));
     unsigned short const A6 = static_cast<unsigned short>(
-        EffectVertexBatchAppend(Batch, XfNegY.X, XfNegY.Y, XfNegY.Z));
+        EffectVertexBatchAppend(Batch, XfNegY.x, XfNegY.y, XfNegY.z));
 
     // All indices (tip, then second).
     EffectVertexBatchEnsureIndices(Batch, 3);
@@ -606,26 +606,26 @@ int BeamEffectBuildSingleSegment(FBeamEffect* This, FTransform const* WorldXform
 }
 
 // FUN_00423b30: Out = A + B, per component.
-static void VecAdd(FVector* Out, FVector const* A, FVector const* B)
+static void VecAdd(Vector* Out, Vector const* A, Vector const* B)
 {
-    Out->X = A->X + B->X;
-    Out->Y = A->Y + B->Y;
-    Out->Z = A->Z + B->Z;
+    Out->x = A->x + B->x;
+    Out->y = A->y + B->y;
+    Out->z = A->z + B->z;
 }
 
 // FUN_00411350: Out = -In.
-static void VecNegate(FVector* Out, FVector const* In)
+static void VecNegate(Vector* Out, Vector const* In)
 {
-    Out->X = -In->X;
-    Out->Y = -In->Y;
-    Out->Z = -In->Z;
+    Out->x = -In->x;
+    Out->y = -In->y;
+    Out->z = -In->z;
 }
 
 // FUN_004fb1e0 (returns 1) -- the SegmentMode 1 ("BeamBolt") builder. A tip cross (TipR)
 // fanned from the origin, then a tube: origin -> Start behind it, the NearR ring around the
 // origin, the ring pushed forward to Mid, and Mid -> Mid+End in front. The trailing `+0x..`
 // comments on locals are retail's ESP-relative frame slots.
-int BeamEffectBuildMultiSegment(FBeamEffect* This, FTransform const* WorldXform, float T,
+int BeamEffectBuildMultiSegment(FBeamEffect* This, Transform const* WorldXform, float T,
                                 float Intensity)
 {
     FBeamEffectArch* const Arch = This->Arch;
@@ -651,37 +651,37 @@ int BeamEffectBuildMultiSegment(FBeamEffect* This, FTransform const* WorldXform,
         MidR = 0.0f;
 
     // The local vectors. The Z sums round once at the store.
-    FVector NearX;                                         // +0x60
+    Vector NearX;                                         // +0x60
     SetVec(&NearX, NearR, 0.0f, 0.0f);
-    FVector NearY;                                         // +0x3c
+    Vector NearY;                                         // +0x3c
     SetVec(&NearY, 0.0f, NearR, 0.0f);
-    FVector TipX;                                          // +0x6c
+    Vector TipX;                                          // +0x6c
     SetVec(&TipX, TipR, 0.0f, 0.0f);
-    FVector TipY;                                          // +0x78
+    Vector TipY;                                          // +0x78
     SetVec(&TipY, 0.0f, TipR, 0.0f);
-    FVector WorldT;                                        // +0x48
-    WorldT.X = WorldXform->Translation.X;
-    WorldT.Y = WorldXform->Translation.Y;
-    WorldT.Z = WorldXform->Translation.Z;
-    FVector MidLocal;                                      // +0x54
+    Vector WorldT;                                        // +0x48
+    WorldT.x = WorldXform->Translation.x;
+    WorldT.y = WorldXform->Translation.y;
+    WorldT.z = WorldXform->Translation.z;
+    Vector MidLocal;                                      // +0x54
     SetVec(&MidLocal, 0.0f, 0.0f, MidR * T);
-    FVector StartLocal;                                    // +0x14c
+    Vector StartLocal;                                    // +0x14c
     SetVec(&StartLocal, 0.0f, 0.0f,
            static_cast<float>(-(static_cast<double>(Delta0) * T + NearR)));
-    FVector EndLocal;                                      // +0x128
+    Vector EndLocal;                                      // +0x128
     SetVec(&EndLocal, 0.0f, 0.0f, static_cast<float>(static_cast<double>(Delta1) * T + NearR));
 
     // Nine HudTransformPoint calls: each axis, its negation, then the Start point.
-    FVector Tmp;                                           // +0x30
-    FVector XfNearPosX;                                    // +0x134
-    FVector XfNearNegX;                                    // +0x104
-    FVector XfNearPosY;                                    // +0x158
-    FVector XfNearNegY;                                    // +0xbc
-    FVector XfTipPosX;                                     // +0x140
-    FVector XfTipNegX;                                     // +0xd4
-    FVector XfTipPosY;                                     // +0x11c
-    FVector XfTipNegY;                                     // +0xb0
-    FVector XfStart;                                       // +0xec
+    Vector Tmp;                                           // +0x30
+    Vector XfNearPosX;                                    // +0x134
+    Vector XfNearNegX;                                    // +0x104
+    Vector XfNearPosY;                                    // +0x158
+    Vector XfNearNegY;                                    // +0xbc
+    Vector XfTipPosX;                                     // +0x140
+    Vector XfTipNegX;                                     // +0xd4
+    Vector XfTipPosY;                                     // +0x11c
+    Vector XfTipNegY;                                     // +0xb0
+    Vector XfStart;                                       // +0xec
     HudTransformPoint(WorldXform, &XfNearPosX, &NearX);
     VecNegate(&Tmp, &NearX);
     HudTransformPoint(WorldXform, &XfNearNegX, &Tmp);
@@ -697,13 +697,13 @@ int BeamEffectBuildMultiSegment(FBeamEffect* This, FTransform const* WorldXform,
     HudTransformPoint(WorldXform, &XfStart, &StartLocal);
 
     // Six inlined TransformXform calls through DAT_00674f50 (re-acquired before each).
-    FVector Sum;
-    FVector XfEndMid;                                      // +0xe0
-    FVector XfMid;                                         // +0xc8
-    FVector XfNearPosXMid;                                 // +0xf8
-    FVector XfNearNegXMid;                                 // +0x110
-    FVector XfNearPosYMid;                                 // +0xa4
-    FVector XfNearNegYMid;                                 // +0x30
+    Vector Sum;
+    Vector XfEndMid;                                      // +0xe0
+    Vector XfMid;                                         // +0xc8
+    Vector XfNearPosXMid;                                 // +0xf8
+    Vector XfNearNegXMid;                                 // +0x110
+    Vector XfNearPosYMid;                                 // +0xa4
+    Vector XfNearNegYMid;                                 // +0x30
     VecAdd(&Sum, &EndLocal, &MidLocal);
     EffectMath()->TransformXform(XfEndMid, *WorldXform, Sum);
     EffectMath()->TransformXform(XfMid, *WorldXform, MidLocal);
@@ -756,66 +756,66 @@ int BeamEffectBuildMultiSegment(FBeamEffect* This, FTransform const* WorldXform,
     Batch->U = kUvCore;
     Batch->V = UvVMid;
     unsigned short const I0 =                              // +0x90
-        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.X, WorldT.Y, WorldT.Z));
+        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.x, WorldT.y, WorldT.z));
 
     SetBatchColorRgb(Batch, Scale0, Arch->ColorTipR, Arch->ColorTipG, Arch->ColorTipB);
     Batch->U = kHalf;
     Batch->V = UvV0;
     unsigned short const I1 = static_cast<unsigned short>( // +0x98
-        EffectVertexBatchAppend(Batch, XfTipPosX.X, XfTipPosX.Y, XfTipPosX.Z));
+        EffectVertexBatchAppend(Batch, XfTipPosX.x, XfTipPosX.y, XfTipPosX.z));
     // V is read from +0x24 before that slot is reused for the position -- still V0.
     Batch->U = kOne;
     Batch->V = UvV0;
     unsigned short const I2 = static_cast<unsigned short>( // +0x2c
-        EffectVertexBatchAppend(Batch, XfTipPosY.X, XfTipPosY.Y, XfTipPosY.Z));
+        EffectVertexBatchAppend(Batch, XfTipPosY.x, XfTipPosY.y, XfTipPosY.z));
     Batch->U = kOne;
     Batch->V = UvV1;
     unsigned short const I3 = static_cast<unsigned short>( // EBP
-        EffectVertexBatchAppend(Batch, XfTipNegX.X, XfTipNegX.Y, XfTipNegX.Z));
+        EffectVertexBatchAppend(Batch, XfTipNegX.x, XfTipNegX.y, XfTipNegX.z));
     Batch->U = kHalf;
     Batch->V = UvV1;
     unsigned short const I4 = static_cast<unsigned short>( // +0x84
-        EffectVertexBatchAppend(Batch, XfTipNegY.X, XfTipNegY.Y, XfTipNegY.Z));
+        EffectVertexBatchAppend(Batch, XfTipNegY.x, XfTipNegY.y, XfTipNegY.z));
 
     // Tube, trail_brightness.
     SetBatchColorRgb(Batch, Scale1, Arch->ColorOuterR, Arch->ColorOuterG, Arch->ColorOuterB);
     Batch->U = 0.0f;
     Batch->V = UvU1;
     unsigned short const A0 =                              // +0x8c
-        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.X, WorldT.Y, WorldT.Z));
+        static_cast<unsigned short>(EffectVertexBatchAppend(Batch, WorldT.x, WorldT.y, WorldT.z));
 
     SetBatchColorRgb(Batch, Scale1, Arch->ColorCoreR, Arch->ColorCoreG, Arch->ColorCoreB);
     Batch->U = kUvMid;
     Batch->V = UvU0;
     unsigned short const A1 = static_cast<unsigned short>( // +0x88
-        EffectVertexBatchAppend(Batch, XfStart.X, XfStart.Y, XfStart.Z));
+        EffectVertexBatchAppend(Batch, XfStart.x, XfStart.y, XfStart.z));
 
     // outter_color, U 0.25, the second trail V: the NearR ring.
     SetBatchColorRgb(Batch, Scale1, Arch->ColorTipR, Arch->ColorTipG, Arch->ColorTipB);
     Batch->U = kUvMid;
     Batch->V = UvU1;
     unsigned short const A2 = static_cast<unsigned short>( // +0x1c
-        EffectVertexBatchAppend(Batch, XfNearPosX.X, XfNearPosX.Y, XfNearPosX.Z));
+        EffectVertexBatchAppend(Batch, XfNearPosX.x, XfNearPosX.y, XfNearPosX.z));
     unsigned short const B0 = static_cast<unsigned short>( // +0x18
-        EffectVertexBatchAppend(Batch, XfNearNegX.X, XfNearNegX.Y, XfNearNegX.Z));
+        EffectVertexBatchAppend(Batch, XfNearNegX.x, XfNearNegX.y, XfNearNegX.z));
     unsigned short const B1 = static_cast<unsigned short>( // +0x14
-        EffectVertexBatchAppend(Batch, XfNearPosY.X, XfNearPosY.Y, XfNearPosY.Z));
+        EffectVertexBatchAppend(Batch, XfNearPosY.x, XfNearPosY.y, XfNearPosY.z));
     unsigned short const B2 = static_cast<unsigned short>( // +0x24
-        EffectVertexBatchAppend(Batch, XfNearNegY.X, XfNearNegY.Y, XfNearNegY.Z));
+        EffectVertexBatchAppend(Batch, XfNearNegY.x, XfNearNegY.y, XfNearNegY.z));
 
     // sec_core_color, U 0, the first trail V: Mid.
     SetBatchColorRgb(Batch, Scale1, Arch->ColorBand1R, Arch->ColorBand1G, Arch->ColorBand1B);
     Batch->U = 0.0f;
     Batch->V = UvU0;
     unsigned short const B3 = static_cast<unsigned short>( // +0xa0
-        EffectVertexBatchAppend(Batch, XfMid.X, XfMid.Y, XfMid.Z));
+        EffectVertexBatchAppend(Batch, XfMid.x, XfMid.y, XfMid.z));
 
     // tail_color, U 0.25, the second trail V: Mid + End.
     SetBatchColorRgb(Batch, Scale1, Arch->ColorMidR, Arch->ColorMidG, Arch->ColorMidB);
     Batch->U = kUvMid;
     Batch->V = UvU1;
     unsigned short const B4 = static_cast<unsigned short>( // +0x94 (stored after SUB ESP,0xc)
-        EffectVertexBatchAppend(Batch, XfEndMid.X, XfEndMid.Y, XfEndMid.Z));
+        EffectVertexBatchAppend(Batch, XfEndMid.x, XfEndMid.y, XfEndMid.z));
 
     // FUN_004fc950 with the float-rounded products trail_brightness * sec_outter_color, U 0.25,
     // the first trail V: the ring pushed forward to Mid.
@@ -824,13 +824,13 @@ int BeamEffectBuildMultiSegment(FBeamEffect* This, FTransform const* WorldXform,
     Batch->V = UvU0;
     Batch->U = kUvMid;
     unsigned short const C0 = static_cast<unsigned short>( // +0x20
-        EffectVertexBatchAppend(Batch, XfNearPosXMid.X, XfNearPosXMid.Y, XfNearPosXMid.Z));
+        EffectVertexBatchAppend(Batch, XfNearPosXMid.x, XfNearPosXMid.y, XfNearPosXMid.z));
     unsigned short const C1 = static_cast<unsigned short>( // +0x10
-        EffectVertexBatchAppend(Batch, XfNearNegXMid.X, XfNearNegXMid.Y, XfNearNegXMid.Z));
+        EffectVertexBatchAppend(Batch, XfNearNegXMid.x, XfNearNegXMid.y, XfNearNegXMid.z));
     unsigned short const C2 = static_cast<unsigned short>( // +0x9c
-        EffectVertexBatchAppend(Batch, XfNearPosYMid.X, XfNearPosYMid.Y, XfNearPosYMid.Z));
+        EffectVertexBatchAppend(Batch, XfNearPosYMid.x, XfNearPosYMid.y, XfNearPosYMid.z));
     unsigned short const C3 = static_cast<unsigned short>( // +0x28 (stored after three PUSHes)
-        EffectVertexBatchAppend(Batch, XfNearNegYMid.X, XfNearNegYMid.Y, XfNearNegYMid.Z));
+        EffectVertexBatchAppend(Batch, XfNearNegYMid.x, XfNearNegYMid.y, XfNearNegYMid.z));
 
     EffectVertexBatchPushTriangle(Batch, I0, I1, I2);
     EffectVertexBatchPushTriangle(Batch, I0, I3, I2);

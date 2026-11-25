@@ -63,7 +63,7 @@ SERVER_API unsigned int __cdecl GetSpaceflightLocation() {
 // (base id) + DAT_06d8e57c/580/584 (the Vector), reset by LAB_06d17cf0.
 static unsigned int GCachedBasePosId = 0;
 
-static float GCachedBasePos[3] = { 0, 0, 0 };
+static Vector GCachedBasePos = { 0, 0, 0 };
 
 // Both ids are `unsigned int const&` (?GetBasePosition@GF@pub@@YAHABI0AAVVector@@@Z). The
 // base id is tested before the system id; get_system is not null-tested. Walks the
@@ -73,9 +73,9 @@ SERVER_API int __cdecl GetBasePosition(const unsigned int& system_id, const unsi
     if ((system_id & 0x3fffffff) == 0) return -2;
 
     if (base_id == GCachedBasePosId) {
-        out_pos.x = GCachedBasePos[0];
-        out_pos.y = GCachedBasePos[1];
-        out_pos.z = GCachedBasePos[2];
+        out_pos.x = GCachedBasePos.x;
+        out_pos.y = GCachedBasePos.y;
+        out_pos.z = GCachedBasePos.z;
         return 0;
     }
 
@@ -95,9 +95,9 @@ SERVER_API int __cdecl GetBasePosition(const unsigned int& system_id, const unsi
         if (!Sys->GetSystemObject(Index, &Record)) continue;
         if (Record.DockWith != base_id) continue;
         GCachedBasePosId = base_id;
-        GCachedBasePos[0] = Record.Pos.x;
-        GCachedBasePos[1] = Record.Pos.y;
-        GCachedBasePos[2] = Record.Pos.z;
+        GCachedBasePos.x = Record.Pos.x;
+        GCachedBasePos.y = Record.Pos.y;
+        GCachedBasePos.z = Record.Pos.z;
         out_pos.x = Record.Pos.x;
         out_pos.y = Record.Pos.y;
         out_pos.z = Record.Pos.z;

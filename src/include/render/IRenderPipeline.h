@@ -7,6 +7,7 @@
 #pragma once
 
 #include "dacom.h"
+#include "math3d.h" // Transform
 #include "render/d3d8_min.h"
 
 #include <cstddef>
@@ -81,17 +82,17 @@ struct IRenderPipeline : IDAComponent
     virtual GENRESULT DACOM_API GetWindow(HWND* OutHwnd, int* OutLeft, int* OutRight, int* OutW,
                                           int* OutH) = 0;
     // slot 27 FUN_06d0b09d
-    virtual GENRESULT DACOM_API SetWorld(const float* M12) = 0;
+    virtual GENRESULT DACOM_API SetWorld(const Transform* M12) = 0;
     // slot 28 FUN_06d0b3dd RET 0x8
-    virtual GENRESULT DACOM_API GetWorld(float* Out12) = 0;
+    virtual GENRESULT DACOM_API GetWorld(Transform* Out12) = 0;
     // slot 29 FUN_06d0b607 RET 0x8
-    virtual GENRESULT DACOM_API SetView(const float* M12) = 0;
+    virtual GENRESULT DACOM_API SetView(const Transform* M12) = 0;
     // slot 30 FUN_06d0b939 RET 0x8
-    virtual GENRESULT DACOM_API GetView(float* Out12) = 0;
+    virtual GENRESULT DACOM_API GetView(Transform* Out12) = 0;
     // slot 31 FUN_06d0bb58
-    virtual GENRESULT DACOM_API SetModelview(const float* M12) = 0;
+    virtual GENRESULT DACOM_API SetModelview(const Transform* M12) = 0;
     // slot 32 FUN_06d0bf39 RET 0x8
-    virtual GENRESULT DACOM_API GetModelview(float* Out12) = 0;
+    virtual GENRESULT DACOM_API GetModelview(Transform* Out12) = 0;
     // slot 33 FUN_06d0c29e RET 0x8
     virtual GENRESULT DACOM_API SetProjection(const float* M16) = 0;
     // slot 34 FUN_06d0c438
@@ -210,7 +211,7 @@ struct IRenderPipeline : IDAComponent
     // and erase from by the raw handle value (Ghidra's `uint` typing is an artifact).
     virtual GENRESULT DACOM_API UpdateLight(void* Handle) = 0;
     // slot 76 FUN_06d0af55
-    virtual GENRESULT DACOM_API SetWorldN(int WorldIndex, const float* M12) = 0;
+    virtual GENRESULT DACOM_API SetWorldN(int WorldIndex, const Transform* M12) = 0;
 };
 
 // The source-vertex descriptor IVertexBufferManager::CopyVertexData (slot 8) takes as its third

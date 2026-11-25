@@ -10,7 +10,7 @@
 // (DAT_063ee4dc) is multiplied by 75 each call (natural 32-bit wraparound) and
 // its low 16 bits scaled by 2^-16 (DAT_063a567c) to a float in [0, 1).
 //
-// Callers (06349855 / 063498bf): IVP_Simulation_Unit_Process_One_Psi_Step's
+// Callers (06349855 / 063498bf): IVP_Simulation_Unit::simulate_single_sim_unit_psi's
 // reseed of the environment's next_movement_check countdown
 // (15 - ftol(rand * -5.0f)); not gameplay-visible randomness.
 float IVP_FastRandomFloat();

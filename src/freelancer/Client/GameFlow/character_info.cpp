@@ -180,7 +180,7 @@ void FCharacterInfoDb::Load(CostumeDescriptions const* Descs)
             FScriptEnumContext Context;
             Context.Db = this;
             Context.File = Stored;
-            DALib::Anim->EnumFsScripts(reinterpret_cast<void*>(&AddEnumeratedScript), File,
+            DALib::Anim->EnumFsScripts(&AddEnumeratedScript, File,
                                        &Context);
             DAEngine_release_filesystem(&File);
         }

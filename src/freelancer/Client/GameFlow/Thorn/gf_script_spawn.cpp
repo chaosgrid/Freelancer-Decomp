@@ -51,8 +51,8 @@ namespace
     // snapshot's / a local's floats directly.
     void SetGeoPose(FThornComponent* Object, float const* Pos3, float const* Orient9)
     {
-        Object->SetPosition(const_cast<float*>(Pos3));
-        Object->SetOrientation(const_cast<float*>(Orient9));
+        Object->SetPosition((const Vector*)(const_cast<float*>(Pos3)));
+        Object->SetOrientation((const Matrix*)(const_cast<float*>(Orient9)));
     }
 
 }
@@ -572,7 +572,7 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
             return;
         }
         *OutObject = Prop;
-        *OutInstance = static_cast<long>(reinterpret_cast<intptr_t>(Prop->GetEngineInstance()));
+        *OutInstance = Prop->GetEngineInstance();
         *OutAnimScript = reinterpret_cast<void*>(static_cast<uintptr_t>(Prop->GetMainScript()));
         *OutCategory = 6;
         *bOutUseScene = 0;
@@ -588,9 +588,9 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
             FDUMP(kFdumpError, "%s(%d) : *** ERROR: %s", GScriptFile, 0x2d8, "No player ship");
         // Retail goes on with a null ship.
         *OutObject = Ship;
-        *OutInstance = static_cast<long>(reinterpret_cast<intptr_t>(Ship->GetEngineInstance()));
+        *OutInstance = Ship->GetEngineInstance();
         *OutAnimScript = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-        void* const ShipInstance = Ship->GetEngineInstance();
+        const InstanceIndex ShipInstance = Ship->GetEngineInstance();
         *OutOffset = GfShipMountOffset(Ship->GetHardpointSummary(), "HpMount", ShipInstance);
         return;
     }
@@ -612,7 +612,7 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, long* 
 
     FObjectProp* const Prop = new FObjectProp(Room, Data);
     *OutObject = Prop;
-    *OutInstance = static_cast<long>(reinterpret_cast<intptr_t>(Prop->GetEngineInstance()));
+    *OutInstance = Prop->GetEngineInstance();
     *OutAnimScript = reinterpret_cast<void*>(static_cast<uintptr_t>(Prop->GetMainScript()));
     *bOutUseScene = 1;
     if (bPropsToRoom == 0)

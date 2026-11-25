@@ -589,14 +589,14 @@ intptr_t NnLoadSave::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         // Each list goes to the window position plus its offset (float adds).
         float const* const Offset3 = reinterpret_cast<float const*>(A);
         SetOffset(Offset3[0], Offset3[1], Offset3[2]);
-        SetPosition(Position);
-        float const NamePosition[3] = {Position[0] + NameListOffset[0],
-                                       Position[1] + NameListOffset[1],
-                                       Position[2] + NameListOffset[2]};
+        SetPosition(&Position.x);
+        float const NamePosition[3] = {Position.x + NameListOffset[0],
+                                       Position.y + NameListOffset[1],
+                                       Position.z + NameListOffset[2]};
         NameList.SetPosition(NamePosition);
-        float const TimePosition[3] = {Position[0] + TimeListOffset[0],
-                                       Position[1] + TimeListOffset[1],
-                                       Position[2] + TimeListOffset[2]};
+        float const TimePosition[3] = {Position.x + TimeListOffset[0],
+                                       Position.y + TimeListOffset[1],
+                                       Position.z + TimeListOffset[2]};
         TimeList.SetPosition(TimePosition);
         return 0;
     }

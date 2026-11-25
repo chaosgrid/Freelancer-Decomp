@@ -263,9 +263,9 @@ bool PageCharacterCreate::Create(Win3D* NewParent, void* /*Payload*/)
     SlideT = -1.0;
     LeaveDirection = 0;
     bLeaving = 0;
-    DataFrameHome[0] = DataFrame->Position[0];
-    DataFrameHome[1] = DataFrame->Position[1];
-    DataFrameHome[2] = DataFrame->Position[2];
+    DataFrameHome.x = DataFrame->Position.x;
+    DataFrameHome.y = DataFrame->Position.y;
+    DataFrameHome.z = DataFrame->Position.z;
 
     // Hidden until the slide ends.
     HideWin3D(CharacterName);
@@ -527,16 +527,16 @@ void PageCharacterCreate::Update()
             float const ShipOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
             SetButtonOffset(SelectShip, ShipOffset);
             float const FrameOffset[3] = {0.0f, static_cast<float>(SlideT), 0.0f};
-            float FramePosition[3];
-            Win3DVec3Add(FramePosition, DataFrameHome, FrameOffset);
-            DataFrame->SetPosition(FramePosition);
+            Vector FramePosition;
+            Win3DVec3Add(&FramePosition.x, &DataFrameHome.x, FrameOffset);
+            DataFrame->SetPosition(&FramePosition.x);
         }
         else
         {
             float const Zero[3] = {0.0f, 0.0f, 0.0f};
             SetButtonOffset(Back, Zero);
             SetButtonOffset(SelectShip, Zero);
-            DataFrame->SetPosition(DataFrameHome);
+            DataFrame->SetPosition(&DataFrameHome.x);
             ShowWin3D(CharacterName);
             ShowWin3D(BaseCostume);
             ShowWin3D(NameLabel);
@@ -566,9 +566,9 @@ void PageCharacterCreate::Update()
         float const ShipOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
         SetButtonOffset(SelectShip, ShipOffset);
 
-        float const FramePosition[3] = {DataFrameHome[0], Slide + DataFrameHome[1],
-                                        DataFrameHome[2]};
-        DataFrame->SetPosition(FramePosition);
+        Vector const FramePosition = {DataFrameHome.x, Slide + DataFrameHome.y,
+                                        DataFrameHome.z};
+        DataFrame->SetPosition(&FramePosition.x);
 
         // -0.9 is DAT_005e1b90; unordered keeps sliding.
         if (SlideT <= -0.9)

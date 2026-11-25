@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
+
 // Gf\Script -- the two process-wide tables the Thorn script components share.
 //
 //   * The Thorn camera pool at .data 0x00668b00 (ScriptCamera.cpp unit, FUN_00450370 ..
@@ -126,7 +128,7 @@ void GfLightsSelectNearest(FGfLightWrapper* const* List, int Count, float const*
 // FUN_005572b0 (cdecl) -- the up to four best lights of Group for the engine instance's
 // position, applied through FUN_004102c0 with the camera and no position.
 struct ICamera;
-void GfLightsApplyNearest(FGfLightWrapper* const* List, int Count, void* Instance,
+void GfLightsApplyNearest(FGfLightWrapper* const* List, int Count, InstanceIndex Instance,
                           unsigned char Group, ICamera* Camera);
 
 // DAT_0066d2a8 -- the room fog state (ScriptFog unit). The Thorn fog facet (vtable

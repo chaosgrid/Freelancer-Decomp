@@ -307,22 +307,22 @@ namespace
     }
 
     // FUN_06ee54e0.
-    void StoreVec3(FVec3* Dest, float X, float Y, float Z)
+    void StoreVec3(Vector* Dest, float X, float Y, float Z)
     {
-        Dest->X = X;
-        Dest->Y = Y;
-        Dest->Z = Z;
+        Dest->x = X;
+        Dest->y = Y;
+        Dest->z = Z;
     }
 
     // FUN_06ee5500: each component is rounded to float; Z and Y are computed first.
-    void SubVec3(FVec3* Out, const FVec3* A, const FVec3* B)
+    void SubVec3(Vector* Out, const Vector* A, const Vector* B)
     {
-        const float Z = static_cast<float>(static_cast<double>(A->Z) - static_cast<double>(B->Z));
-        const float Y = static_cast<float>(static_cast<double>(A->Y) - static_cast<double>(B->Y));
-        const float X = static_cast<float>(static_cast<double>(A->X) - static_cast<double>(B->X));
-        Out->X = X;
-        Out->Y = Y;
-        Out->Z = Z;
+        const float Z = static_cast<float>(static_cast<double>(A->z) - static_cast<double>(B->z));
+        const float Y = static_cast<float>(static_cast<double>(A->y) - static_cast<double>(B->y));
+        const float X = static_cast<float>(static_cast<double>(A->x) - static_cast<double>(B->x));
+        Out->x = X;
+        Out->y = Y;
+        Out->z = Z;
     }
 
     void NoticeArch(int Line, const char* Fmt, ISoundSource* PlayKey)
@@ -786,12 +786,12 @@ namespace
         Node->DistSq = 0.0f;
         Node->MaxDistance = 0.0f;
         Node->MaxDistSq = 0.0f;
-        Node->Position.X = 0.0f;
-        Node->Position.Y = 0.0f;
-        Node->Position.Z = 0.0f;
-        Node->Direction.X = 0.0f;
-        Node->Direction.Y = 0.0f;
-        Node->Direction.Z = 0.0f;
+        Node->Position.x = 0.0f;
+        Node->Position.y = 0.0f;
+        Node->Position.z = 0.0f;
+        Node->Direction.x = 0.0f;
+        Node->Direction.y = 0.0f;
+        Node->Direction.z = 0.0f;
         Node->bIs3dCache = 0;
         Node->LastStartTick = 0;
     }
@@ -1335,21 +1335,21 @@ FSoundManager::FSoundManager()
     InstanceEmbeddedCount = 0;
     InitializeCriticalSection(&G_InstanceLock);
     memset(DeviceIdString, 0, sizeof(DeviceIdString));
-    Front.X = 0.0f;
-    Front.Y = 0.0f;
-    Front.Z = 1.0f;
-    Up.X = 0.0f;
-    Up.Y = 1.0f;
-    Up.Z = 0.0f;
+    Front.x = 0.0f;
+    Front.y = 0.0f;
+    Front.z = 1.0f;
+    Up.x = 0.0f;
+    Up.y = 1.0f;
+    Up.z = 0.0f;
     PadC0[0] = 0;
     PadC0[1] = 0;
     PadC0[2] = 0;
-    Position.X = 0.0f;
-    Position.Y = 0.0f;
-    Position.Z = 0.0f;
-    Velocity.X = 0.0f;
-    Velocity.Y = 0.0f;
-    Velocity.Z = 0.0f;
+    Position.x = 0.0f;
+    Position.y = 0.0f;
+    Position.z = 0.0f;
+    Velocity.x = 0.0f;
+    Velocity.y = 0.0f;
+    Velocity.z = 0.0f;
     Pad105[0] = 0;
     Pad105[1] = 0;
     Pad105[2] = 0;
@@ -1628,66 +1628,66 @@ void FSoundManager::ApplyListener()
     // setters below is DS3D_DEFERRED; the mixer commits them.
     if (Listener == nullptr)
         return;
-    Listener->SetOrientation(Front.X, Front.Y, Front.Z, Up.X, Up.Y, Up.Z, DS3D_DEFERRED);
-    Listener->SetPosition(Position.X, Position.Y, Position.Z, DS3D_DEFERRED);
-    Listener->SetVelocity(Velocity.X, Velocity.Y, Velocity.Z, DS3D_DEFERRED);
+    Listener->SetOrientation(Front.x, Front.y, Front.z, Up.x, Up.y, Up.z, DS3D_DEFERRED);
+    Listener->SetPosition(Position.x, Position.y, Position.z, DS3D_DEFERRED);
+    Listener->SetVelocity(Velocity.x, Velocity.y, Velocity.z, DS3D_DEFERRED);
     Listener->SetDistanceFactor(DistanceFactor, DS3D_DEFERRED);
     Listener->SetDopplerFactor(DopplerFactor, DS3D_DEFERRED);
     Listener->SetRolloffFactor(RolloffFactor, DS3D_DEFERRED);
 }
 
-GENRESULT DACOM_API FSoundManager::SetOrientation(FVec3* InFront, FVec3* InUp)
+GENRESULT DACOM_API FSoundManager::SetOrientation(Vector* InFront, Vector* InUp)
 {
     // LAB_06ee23d0: Front is stored negated; both Z components are scaled by CoordScale (+0xA4).
     const float Scale = static_cast<float>(CoordScale);
-    Front.X = -InFront->X;
-    Front.Y = -InFront->Y;
-    Front.Z = -InFront->Z * Scale;
-    Up.X = InUp->X;
-    Up.Y = InUp->Y;
-    Up.Z = InUp->Z * Scale;
+    Front.x = -InFront->x;
+    Front.y = -InFront->y;
+    Front.z = -InFront->z * Scale;
+    Up.x = InUp->x;
+    Up.y = InUp->y;
+    Up.z = InUp->z * Scale;
     if (Listener != nullptr)
     {
-        Listener->SetOrientation(Front.X, Front.Y, Front.Z, Up.X, Up.Y, Up.Z, DS3D_DEFERRED);
+        Listener->SetOrientation(Front.x, Front.y, Front.z, Up.x, Up.y, Up.z, DS3D_DEFERRED);
     }
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::SetOrientationFromMatrix(float* Matrix)
+GENRESULT DACOM_API FSoundManager::SetOrientationFromMatrix(const Matrix* Orient)
 {
     // LAB_06ee2380: Front = column 2, Up = column 1, through the vtable (+0x34).
-    FVec3 InUp;
-    FVec3 InFront;
-    InUp.X = Matrix[1];
-    InUp.Y = Matrix[4];
-    InUp.Z = Matrix[7];
-    InFront.X = Matrix[2];
-    InFront.Y = Matrix[5];
-    InFront.Z = Matrix[8];
+    Vector InUp;
+    Vector InFront;
+    InUp.x = Orient->E[0][1];
+    InUp.y = Orient->E[1][1];
+    InUp.z = Orient->E[2][1];
+    InFront.x = Orient->E[0][2];
+    InFront.y = Orient->E[1][2];
+    InFront.z = Orient->E[2][2];
     return SetOrientation(&InFront, &InUp);
 }
 
-GENRESULT DACOM_API FSoundManager::SetListenerPosition(FVec3* Pos)
+GENRESULT DACOM_API FSoundManager::SetListenerPosition(Vector* Pos)
 {
     // LAB_06ee24a0: the scaled Z is stored back.
     const float Scale = static_cast<float>(CoordScale);
-    Position.X = Pos->X;
-    Position.Y = Pos->Y;
-    Position.Z = Pos->Z * Scale;
+    Position.x = Pos->x;
+    Position.y = Pos->y;
+    Position.z = Pos->z * Scale;
     if (Listener != nullptr)
-        Listener->SetPosition(Position.X, Position.Y, Position.Z, DS3D_DEFERRED);
+        Listener->SetPosition(Position.x, Position.y, Position.z, DS3D_DEFERRED);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::SetListenerVelocity(FVec3* Vel)
+GENRESULT DACOM_API FSoundManager::SetListenerVelocity(Vector* Vel)
 {
     // LAB_06ee2500: the scaled Z is stored back.
     const float Scale = static_cast<float>(CoordScale);
-    Velocity.X = Vel->X;
-    Velocity.Y = Vel->Y;
-    Velocity.Z = Vel->Z * Scale;
+    Velocity.x = Vel->x;
+    Velocity.y = Vel->y;
+    Velocity.z = Vel->z * Scale;
     if (Listener != nullptr)
-        Listener->SetVelocity(Velocity.X, Velocity.Y, Velocity.Z, DS3D_DEFERRED);
+        Listener->SetVelocity(Velocity.x, Velocity.y, Velocity.z, DS3D_DEFERRED);
     return GR_OK;
 }
 
@@ -1715,78 +1715,78 @@ GENRESULT DACOM_API FSoundManager::SetRolloffFactor(float Value)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::GetOrientationSpace(FVec3* Pos, FVec3* Vel)
+GENRESULT DACOM_API FSoundManager::GetOrientationSpace(Vector* Pos, Vector* Vel)
 {
     // LAB_06ee2730: undoes SetOrientation's negation of Front.
     const float Scale = static_cast<float>(CoordScale);
-    Pos->X = Front.X;
-    Pos->Y = Front.Y;
-    Pos->Z = Front.Z * Scale;
-    Pos->X = -Pos->X;
-    Pos->Y = -Pos->Y;
-    Pos->Z = -Pos->Z;
-    Vel->X = Up.X;
-    Vel->Y = Up.Y;
-    Vel->Z = Up.Z * Scale;
+    Pos->x = Front.x;
+    Pos->y = Front.y;
+    Pos->z = Front.z * Scale;
+    Pos->x = -Pos->x;
+    Pos->y = -Pos->y;
+    Pos->z = -Pos->z;
+    Vel->x = Up.x;
+    Vel->y = Up.y;
+    Vel->z = Up.z * Scale;
     // Retail's EAX is left holding the second out pointer.
     return static_cast<GENRESULT>(reinterpret_cast<uintptr_t>(Vel));
 }
 
-GENRESULT DACOM_API FSoundManager::GetOrientationMatrix(float* Out9)
+GENRESULT DACOM_API FSoundManager::GetOrientationMatrix(Matrix* Out9)
 {
     // LAB_06ee25f0. Right comes from the stored +0xA8 / +0xB4; Flags bit 4 (+0x8C) picks the
     // operand order. Each term is a product of two floats (exact) and one subtraction, rounded
     // once to float. Column-major out: [0/3/6] Right (Z scaled), [1/4/7] Up, [2/5/8] Front.
-    FVec3 SpaceFront;
-    FVec3 SpaceUp;
+    Vector SpaceFront;
+    Vector SpaceUp;
     GetOrientationSpace(&SpaceFront, &SpaceUp);
-    const double Fx = Front.X;
-    const double Fy = Front.Y;
-    const double Fz = Front.Z;
-    const double Ux = Up.X;
-    const double Uy = Up.Y;
-    const double Uz = Up.Z;
-    FVec3 Right;
+    const double Fx = Front.x;
+    const double Fy = Front.y;
+    const double Fz = Front.z;
+    const double Ux = Up.x;
+    const double Uy = Up.y;
+    const double Uz = Up.z;
+    Vector Right;
     if ((Flags & 0x10) != 0)
     {
-        Right.X = static_cast<float>(Uz * Fy - Fz * Uy);
-        Right.Y = static_cast<float>(Fz * Ux - Uz * Fx);
-        Right.Z = static_cast<float>(Fx * Uy - Ux * Fy);
+        Right.x = static_cast<float>(Uz * Fy - Fz * Uy);
+        Right.y = static_cast<float>(Fz * Ux - Uz * Fx);
+        Right.z = static_cast<float>(Fx * Uy - Ux * Fy);
     }
     else
     {
-        Right.X = static_cast<float>(Uy * Fz - Fy * Uz);
-        Right.Y = static_cast<float>(Fx * Uz - Fz * Ux);
-        Right.Z = static_cast<float>(Fy * Ux - Fx * Uy);
+        Right.x = static_cast<float>(Uy * Fz - Fy * Uz);
+        Right.y = static_cast<float>(Fx * Uz - Fz * Ux);
+        Right.z = static_cast<float>(Fy * Ux - Fx * Uy);
     }
-    Out9[0] = Right.X;
-    Out9[1] = SpaceUp.X;
-    Out9[2] = SpaceFront.X;
-    Out9[3] = Right.Y;
-    Out9[4] = SpaceUp.Y;
-    Out9[5] = SpaceFront.Y;
-    Out9[6] = static_cast<float>(static_cast<double>(CoordScale) * Right.Z);
-    Out9[7] = SpaceUp.Z;
-    Out9[8] = SpaceFront.Z;
+    Out9->E[0][0] = Right.x;
+    Out9->E[0][1] = SpaceUp.x;
+    Out9->E[0][2] = SpaceFront.x;
+    Out9->E[1][0] = Right.y;
+    Out9->E[1][1] = SpaceUp.y;
+    Out9->E[1][2] = SpaceFront.y;
+    Out9->E[2][0] = static_cast<float>(static_cast<double>(CoordScale) * Right.z);
+    Out9->E[2][1] = SpaceUp.z;
+    Out9->E[2][2] = SpaceFront.z;
     // Retail returns Out9 in EAX.
     return static_cast<GENRESULT>(reinterpret_cast<uintptr_t>(Out9));
 }
 
-GENRESULT DACOM_API FSoundManager::GetListenerPosition(FVec3* Out)
+GENRESULT DACOM_API FSoundManager::GetListenerPosition(Vector* Out)
 {
     // FUN_06ee27c0. Retail returns Out in EAX (both getters).
-    Out->X = Position.X;
-    Out->Y = Position.Y;
-    Out->Z = Position.Z * static_cast<float>(CoordScale);
+    Out->x = Position.x;
+    Out->y = Position.y;
+    Out->z = Position.z * static_cast<float>(CoordScale);
     return static_cast<GENRESULT>(reinterpret_cast<uintptr_t>(Out));
 }
 
-GENRESULT DACOM_API FSoundManager::GetListenerVelocity(FVec3* Out)
+GENRESULT DACOM_API FSoundManager::GetListenerVelocity(Vector* Out)
 {
     // LAB_06ee2810.
-    Out->X = Velocity.X;
-    Out->Y = Velocity.Y;
-    Out->Z = Velocity.Z * static_cast<float>(CoordScale);
+    Out->x = Velocity.x;
+    Out->y = Velocity.y;
+    Out->z = Velocity.z * static_cast<float>(CoordScale);
     return static_cast<GENRESULT>(reinterpret_cast<uintptr_t>(Out));
 }
 
@@ -2088,15 +2088,15 @@ void FSoundManager::RefreshInstancePose(FSoundInstanceNode* Node)
     Node->PlayKey->GetPosition(&Node->Position);
     Node->PlayKey->GetMaxDistance(&Node->MaxDistance);
     Node->PlayKey->GetMinDistance(&Node->MinDistance);
-    Node->Position.Z *= static_cast<float>(CoordScale);
+    Node->Position.z *= static_cast<float>(CoordScale);
     Node->MaxDistSq = Node->MaxDistance * Node->MaxDistance;
     Node->MinDistSq = Node->MinDistance * Node->MinDistance;
-    FVec3 Delta;
+    Vector Delta;
     SubVec3(&Delta, &Node->Position, &Position);
     Node->Direction = Delta;
-    const double DirX = Node->Direction.X;
-    const double DirY = Node->Direction.Y;
-    const double DirZ = Node->Direction.Z;
+    const double DirX = Node->Direction.x;
+    const double DirY = Node->Direction.y;
+    const double DirZ = Node->Direction.z;
     Node->DistSq = static_cast<float>((DirX * DirX + DirY * DirY) + DirZ * DirZ);
 }
 
@@ -2114,20 +2114,20 @@ unsigned char FSoundManager::MixerAllowCreate(ISoundSource* PlayKey)
     if ((Archetype->Flags & 1) != 0)
     {
         // The position local is not pre-initialised; GetPosition fills it.
-        FVec3 SrcPos;
+        Vector SrcPos;
         PlayKey->GetPosition(&SrcPos);
-        SrcPos.Z *= static_cast<float>(CoordScale);
+        SrcPos.z *= static_cast<float>(CoordScale);
         float MaxDist = 3.402823466e+38f; // 0x7f7fffff
         PlayKey->GetMaxDistance(&MaxDist);
         // Each difference is rounded to float.
-        const float Dz = static_cast<float>(static_cast<double>(SrcPos.Z) - Position.Z);
-        const float Dy = static_cast<float>(static_cast<double>(SrcPos.Y) - Position.Y);
-        const float Dx = static_cast<float>(static_cast<double>(SrcPos.X) - Position.X);
-        FVec3 Delta;
+        const float Dz = static_cast<float>(static_cast<double>(SrcPos.z) - Position.z);
+        const float Dy = static_cast<float>(static_cast<double>(SrcPos.y) - Position.y);
+        const float Dx = static_cast<float>(static_cast<double>(SrcPos.x) - Position.x);
+        Vector Delta;
         StoreVec3(&Delta, Dx, Dy, Dz);
-        const double DistSq = (static_cast<double>(Delta.Z) * Delta.Z +
-                               static_cast<double>(Delta.Y) * Delta.Y) +
-                              static_cast<double>(Delta.X) * Delta.X;
+        const double DistSq = (static_cast<double>(Delta.z) * Delta.z +
+                               static_cast<double>(Delta.y) * Delta.y) +
+                              static_cast<double>(Delta.x) * Delta.x;
         const double MaxSq = static_cast<double>(MaxDist) * MaxDist;
         if (!(MaxSq > DistSq))
             bAllow = 0;
@@ -2252,11 +2252,11 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
                 Buffer3d->SetConeAngles(Inside, Outside, Apply);
 
                 // Zeroed vector, result ignored.
-                FVec3 ConeDir = {};
+                Vector ConeDir = {};
                 PlayKey->GetConeOrientation(&ConeDir);
-                ConeDir.Z = static_cast<float>(static_cast<double>(CoordScale) *
-                                               static_cast<double>(ConeDir.Z));
-                Buffer3d->SetConeOrientation(ConeDir.X, ConeDir.Y, ConeDir.Z, Apply);
+                ConeDir.z = static_cast<float>(static_cast<double>(CoordScale) *
+                                               static_cast<double>(ConeDir.z));
+                Buffer3d->SetConeOrientation(ConeDir.x, ConeDir.y, ConeDir.z, Apply);
 
                 // Zeroed, result ignored; NaN passes both clamps.
                 float OutsideVol = 0.0f;
@@ -2269,12 +2269,12 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
                 Buffer3d->SetConeOutsideVolume(static_cast<LONG>(ScaledVol), Apply);
             }
 
-            FVec3 Velocity = {};
+            Vector Velocity = {};
             if (PlayKey->GetVelocity(&Velocity) >= 0)
             {
-                Velocity.Z = static_cast<float>(static_cast<double>(CoordScale) *
-                                                static_cast<double>(Velocity.Z));
-                Buffer3d->SetVelocity(Velocity.X, Velocity.Y, Velocity.Z, Apply);
+                Velocity.z = static_cast<float>(static_cast<double>(CoordScale) *
+                                                static_cast<double>(Velocity.z));
+                Buffer3d->SetVelocity(Velocity.x, Velocity.y, Velocity.z, Apply);
             }
 
             // The clamped distances are written back.
@@ -2282,7 +2282,7 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
             Buffer3d->SetMinDistance(Node->MinDistance, Apply);
             Node->MaxDistance = ClampDsDistance(Node->MaxDistance);
             Buffer3d->SetMaxDistance(Node->MaxDistance, Apply);
-            Buffer3d->SetPosition(Node->Position.X, Node->Position.Y, Node->Position.Z, Apply);
+            Buffer3d->SetPosition(Node->Position.x, Node->Position.y, Node->Position.z, Apply);
         }
         else
         {
@@ -2296,19 +2296,19 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
             {
                 // Listener right = Up x Front on the FPU; the normalised direction is stored
                 // back as floats. No clamp on the pan.
-                const double RightX = static_cast<double>(Up.Y) * Front.Z -
-                                      static_cast<double>(Up.Z) * Front.Y;
-                const double RightY = static_cast<double>(Front.X) * Up.Z -
-                                      static_cast<double>(Front.Z) * Up.X;
-                const double RightZ = static_cast<double>(Front.Y) * Up.X -
-                                      static_cast<double>(Front.X) * Up.Y;
+                const double RightX = static_cast<double>(Up.y) * Front.z -
+                                      static_cast<double>(Up.z) * Front.y;
+                const double RightY = static_cast<double>(Front.x) * Up.z -
+                                      static_cast<double>(Front.z) * Up.x;
+                const double RightZ = static_cast<double>(Front.y) * Up.x -
+                                      static_cast<double>(Front.x) * Up.y;
                 const double InvDist = 1.0 / static_cast<double>(Dist);
-                Node->Direction.X = static_cast<float>(InvDist * Node->Direction.X);
-                Node->Direction.Y = static_cast<float>(InvDist * Node->Direction.Y);
-                Node->Direction.Z = static_cast<float>(InvDist * Node->Direction.Z);
-                const double Dot = (static_cast<double>(Node->Direction.Z) * RightZ +
-                                    static_cast<double>(Node->Direction.Y) * RightY) +
-                                   static_cast<double>(Node->Direction.X) * RightX;
+                Node->Direction.x = static_cast<float>(InvDist * Node->Direction.x);
+                Node->Direction.y = static_cast<float>(InvDist * Node->Direction.y);
+                Node->Direction.z = static_cast<float>(InvDist * Node->Direction.z);
+                const double Dot = (static_cast<double>(Node->Direction.z) * RightZ +
+                                    static_cast<double>(Node->Direction.y) * RightY) +
+                                   static_cast<double>(Node->Direction.x) * RightX;
                 const long WantPan = static_cast<long>(Ftol32(Dot * Max3dPan));
                 long CurrentPan = 0;
                 Node->Buffer->GetPan(&CurrentPan);
@@ -2413,18 +2413,18 @@ void FSoundManager::ApplyListenerFromSource(ISoundListenerPose* Pose)
     // FUN_06ee6e20 (sole caller MixerTick, which skips a null pose). The position and velocity
     // calls share one vector and the three factor calls share one float, so a failed getter
     // hands the next setter whatever the previous getter left there.
-    FVec3 InFront;
-    FVec3 InUp;
-    InFront.X = 0.0f;
-    InFront.Y = 0.0f;
-    InFront.Z = 1.0f;
-    InUp.X = 0.0f;
-    InUp.Y = 1.0f;
-    InUp.Z = 0.0f;
-    FVec3 InVec;
-    InVec.X = 0.0f;
-    InVec.Y = 0.0f;
-    InVec.Z = 0.0f;
+    Vector InFront;
+    Vector InUp;
+    InFront.x = 0.0f;
+    InFront.y = 0.0f;
+    InFront.z = 1.0f;
+    InUp.x = 0.0f;
+    InUp.y = 1.0f;
+    InUp.z = 0.0f;
+    Vector InVec;
+    InVec.x = 0.0f;
+    InVec.y = 0.0f;
+    InVec.z = 0.0f;
     float InScalar = 1.0f;
     if (Pose->GetOrientation(&InFront, &InUp) >= 0)
         SetOrientation(&InFront, &InUp);
@@ -2601,18 +2601,18 @@ FSoundInstanceNode* FSoundManager::CreateInstanceFromKey(ISoundSource* PlayKey)
         PlayKey->GetPosition(&Node->Position);
         PlayKey->GetMaxDistance(&Node->MaxDistance);
         PlayKey->GetMinDistance(&Node->MinDistance);
-        Node->Position.Z = Node->Position.Z * static_cast<float>(CoordScale);
+        Node->Position.z = Node->Position.z * static_cast<float>(CoordScale);
         Node->MaxDistSq = Node->MaxDistance * Node->MaxDistance;
         Node->MinDistSq = Node->MinDistance * Node->MinDistance;
         // Each difference is rounded to float (Z, Y, X); DistSq stays on the FPU and is
         // rounded once.
-        const float DiffZ = static_cast<float>(static_cast<double>(Node->Position.Z) - Position.Z);
-        const float DiffY = static_cast<float>(static_cast<double>(Node->Position.Y) - Position.Y);
-        const float DiffX = static_cast<float>(static_cast<double>(Node->Position.X) - Position.X);
+        const float DiffZ = static_cast<float>(static_cast<double>(Node->Position.z) - Position.z);
+        const float DiffY = static_cast<float>(static_cast<double>(Node->Position.y) - Position.y);
+        const float DiffX = static_cast<float>(static_cast<double>(Node->Position.x) - Position.x);
         StoreVec3(&Node->Direction, DiffX, DiffY, DiffZ);
-        const double DirX = Node->Direction.X;
-        const double DirY = Node->Direction.Y;
-        const double DirZ = Node->Direction.Z;
+        const double DirX = Node->Direction.x;
+        const double DirY = Node->Direction.y;
+        const double DirZ = Node->Direction.z;
         Node->DistSq = static_cast<float>((DirX * DirX + DirY * DirY) + DirZ * DirZ);
     }
 

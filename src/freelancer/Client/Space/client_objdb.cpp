@@ -467,11 +467,11 @@ void ClientObjDb_UpdateAll(float Dt)
     {
         // A sphere around the listener camera (FUN_0040f130).
         ICamera* const Camera = static_cast<ICamera*>(GetClientSoundListenerObject());
-        float const* const CameraPos = Camera->GetPosition();
+        const Vector* const CameraPos = Camera->GetPosition();
         Geometry::Sphere Query;
-        Query.Center.x = CameraPos[0];
-        Query.Center.y = CameraPos[1];
-        Query.Center.z = CameraPos[2];
+        Query.Center.x = CameraPos->x;
+        Query.Center.y = CameraPos->y;
+        Query.Center.z = CameraPos->z;
         Query.Radius = kSpatialUpdateRadius;
         // The result lives on the stack, as in retail's 0x201c-byte frame.
         FSpatialQueryResult Result;
@@ -827,9 +827,8 @@ void ClientObjDb_UpdateRemotePhysics(float Dt)
         if (G_RemotePhysMathEngine == nullptr)
             G_RemotePhysMathEngine = Acquire3DMathEngine();
         Quaternion Orientation;
-        G_RemotePhysMathEngine->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orientation),
-                                                   reinterpret_cast<FMatrix const&>(
-                                                       Ship->Orientation));
+        G_RemotePhysMathEngine->MatrixToQuaternion(Orientation,
+                                                   Ship->Orientation);
 
         // The position is passed twice.
         if (!Block->Simulation.CheckForSync(Ship->WorldPosition, Ship->WorldPosition,

@@ -229,7 +229,7 @@ void DeathCameraUpdate(FDeathCamera* Cam, float DeltaSeconds)
 
     FSpaceCamera* const Base = (FSpaceCamera*)Cam;
 
-    memcpy(Base->World, Cam->ShakeOrientation, 9 * sizeof(float));
+    memcpy(&Base->World, Cam->ShakeOrientation, 9 * sizeof(float));
 
     // The drift decays; the UNROUNDED result is compared with zero.
     const double Speed = static_cast<double>(Cam->DriftSpeed) -
@@ -252,9 +252,9 @@ void DeathCameraUpdate(FDeathCamera* Cam, float DeltaSeconds)
     Cam->DriftPosition[2] = static_cast<float>(static_cast<double>(StepZ) +
                                                static_cast<double>(Cam->DriftPosition[2]));
 
-    Base->WorldPos[0] = Cam->DriftPosition[0];
-    Base->WorldPos[1] = Cam->DriftPosition[1];
-    Base->WorldPos[2] = Cam->DriftPosition[2];
+    Base->WorldPos.x = Cam->DriftPosition[0];
+    Base->WorldPos.y = Cam->DriftPosition[1];
+    Base->WorldPos.z = Cam->DriftPosition[2];
     Base->bViewDirty = 1;
 }
 

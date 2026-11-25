@@ -185,9 +185,9 @@ namespace AlchemyImpl
         // Raw spawn words; the complete field Apply contract exposes only +0x0c..+0x27.
         // Particle's own operations never consume these six seeded words.
         std::uint32_t UnusedSpawnWords_0x30[3];
-        float BlendQuat[4];     // +0x3c, w x y z: the SmoothRotation slerp state
+        Quaternion BlendQuat;   // +0x3c, w x y z: the SmoothRotation slerp state
         std::uint32_t UnusedSpawnWords_0x4c[3];
-        float VelQuat[4];       // +0x58, w x y z: orientation from the velocity
+        Quaternion VelQuat;     // +0x58, w x y z: orientation from the velocity
         float Blend;            // +0x68
         IFxEffect* LifeEffect;  // +0x6c
         IFxEffect* DeathEffect; // +0x70
@@ -201,7 +201,7 @@ namespace AlchemyImpl
         ~FxParticleAppearance() override;
 
         // Outer +0x10 FUN_06231da0 -> FUN_0622fcf0: death effects, then FUN_062401a0.
-        GENRESULT DACOM_API ComposeNodeTransform(void* Unused, const float* Parent12) override;
+        GENRESULT DACOM_API ComposeNodeTransform(void* Unused, const Transform* Parent) override;
         // Outer +0x14 FUN_06231dc0 -> FUN_06230370: age, fields, records.
         GENRESULT DACOM_API UpdateNode(float Dt) override;
         // Outer +0x5C FUN_06231f40 -> FUN_0622f8b0 / +0x88 FUN_06232090 -> FUN_0622f960.
@@ -349,7 +349,7 @@ namespace AlchemyImpl
 
         // FUN_06225240 (node vtable 0x0624dd90 slot 2; outer thunk FUN_06226e60,
         // this+0xc): FUN_062401a0, then pose every instance's IFxMesh.
-        GENRESULT DACOM_API ComposeNodeTransform(void* Unused, const float* Parent12) override;
+        GENRESULT DACOM_API ComposeNodeTransform(void* Unused, const Transform* Parent) override;
         // Outer +0x18 FUN_06226ea0 -> FUN_062256a0: each instance's IFxMesh draws itself.
         GENRESULT DACOM_API DrawOrEnqueue() override;
 
@@ -507,7 +507,7 @@ namespace AlchemyImpl
             unsigned short Idx[4];  // +0x00
             long Counter;           // +0x08
             FLBeamAppearance* Node; // +0x0c
-            float Xform[12];        // +0x10
+            Transform Xform;        // +0x10
             float PrevPos[3];       // +0x40
         };
 

@@ -61,8 +61,6 @@ struct IVP_U_Point
         k[2] = Z;
     }
 
-    // The cross product is IVP_CalcCrossProduct below (FUN_0628bed0).
-
     // FUN_06347e60: sqrt((x*x + y*y) + z*z); the result is returned on the x87 stack unrounded.
     double real_length() const
     {
@@ -215,8 +213,11 @@ struct IVP_U_Point
         k[1] = -y;
     }
 
-    // FUN_063485e0, defined after IVP_CalcCrossProduct below.
+    // FUN_063485e0, defined after IVP_U_Point::calc_cross_product below.
     void set_arbitrary_perpendicular_to(const IVP_U_Point *v);
+
+    // FUN_0628bed0 (thiscall this = Out, RET 8), defined below.
+    void calc_cross_product(const IVP_U_Point* A, const IVP_U_Point* B);
 };
 
 // FUN_06347df0: 1 / sqrt(x), returned unrounded on the x87 stack.
@@ -228,16 +229,16 @@ inline double IVP_InvSqrtFloat(float Value)
 // FUN_0628bed0: Out = A x B, one rounding per component; every operand is read before
 // the first store (alias-safe). The PhySys copy of the same retail function is
 // PhySys_Vec3Cross (common_physys.cpp, on Vector).
-inline void IVP_CalcCrossProduct(IVP_U_Point* Out, const IVP_U_Point* A, const IVP_U_Point* B)
+inline void IVP_U_Point::calc_cross_product(const IVP_U_Point* A, const IVP_U_Point* B)
 {
     const double Ax = A->k[0], Ay = A->k[1], Az = A->k[2];
     const double Bx = B->k[0], By = B->k[1], Bz = B->k[2];
     const double Y = Bx * Az - Ax * Bz;
     const double X = Ay * Bz - Az * By;
     const double Z = Ax * By - Ay * Bx;
-    Out->k[0] = (float)(X);
-    Out->k[1] = (float)(Y);
-    Out->k[2] = (float)(Z);
+    k[0] = (float)(X);
+    k[1] = (float)(Y);
+    k[2] = (float)(Z);
 }
 
 // FUN_063485e0: a vector perpendicular to v. The largest |component| is found scanning
@@ -268,7 +269,7 @@ inline void IVP_U_Point::set_arbitrary_perpendicular_to(const IVP_U_Point *v)
     k[MaxAxis] = k[PrevAxis];
     k[PrevAxis] = Negated;
 
-    IVP_CalcCrossProduct(this, this, v);
+    calc_cross_product(this, v);
 }
 
 // 48-byte 3x3 rotation matrix (3 rows of 16-byte IVP_U_Point)

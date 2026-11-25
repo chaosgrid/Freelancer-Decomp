@@ -191,24 +191,24 @@ I3DMathEngine* AcquireMathEngine()
     return (I3DMathEngine*)Math;
 }
 
-void PipelineApplySubmit(ICamera* Camera, void* Inst, const void* Transform,
-                         const FTransform** OutCameraView, const FTransform** OutWorld)
+void PipelineApplySubmit(ICamera* Camera, InstanceIndex Inst, const void* ExtraXform,
+                         const Transform** OutCameraView, const Transform** OutWorld)
 {
-    const FTransform* CameraView = (const FTransform*)(Camera->GetViewTransform());
-    const FTransform* World =
-        (const FTransform*)(G_Engine->GetInstanceTransform(Inst));
+    const Transform* CameraView = (Camera->GetViewTransform());
+    const Transform* World =
+        (const Transform*)(G_Engine->GetInstanceTransform(Inst));
     *OutCameraView = CameraView;
     *OutWorld = World;
     int State = 1;
     G_Pipeline->GetPipelineState(7, &State);
 
-    const FTransform* Extra = (const FTransform*)Transform;
+    const Transform* Extra = (const Transform*)ExtraXform;
     if (State != 0)
     {
-        FTransform Modelview;
+        Transform Modelview;
         if (Extra != nullptr)
         {
-            FTransform ExtraWorld;
+            Transform ExtraWorld;
             MathEngineCached(G_MathTriMeshDraw)->MulTransform(ExtraWorld, *Extra, *World);
             MathEngineCached(G_MathTriMeshDraw)->MulTransform(Modelview, *CameraView, ExtraWorld);
         }
@@ -216,16 +216,16 @@ void PipelineApplySubmit(ICamera* Camera, void* Inst, const void* Transform,
         {
             MathEngineCached(G_MathTriMeshDraw)->MulTransform(Modelview, *CameraView, *World);
         }
-        G_Pipeline->SetModelview((const float*)(&Modelview));
+        G_Pipeline->SetModelview(&Modelview);
         return;
     }
 
     if (Extra != nullptr)
     {
-        FTransform Unused;
+        Transform Unused;
         MathEngineCached(G_MathTriMeshDraw)->MulTransform(Unused, *Extra, *World);
     }
-    G_Pipeline->SetWorld((const float*)World);
+    G_Pipeline->SetWorld(World);
 }
 
 // FUN_06c33090 (thiscall on Src). Only caller: IRenderer slot 7.
@@ -254,12 +254,12 @@ float* TransposeXform3x3(const float* Src12, float* Dest9)
 // FUN_06c33100: math engine DAT_06c37d48, TransposeTransform into a local. No fallback.
 float* TransformPoint3(float* Dest3, const float* Matrix12, const float* Vec3)
 {
-    FVector Local;
-    MathEngineCached(G_MathRenderMgr)->TransposeTransform(Local, *(const FMatrix*)Matrix12,
-                                            *(const FVector*)Vec3);
-    Dest3[0] = Local.X;
-    Dest3[1] = Local.Y;
-    Dest3[2] = Local.Z;
+    Vector Local;
+    MathEngineCached(G_MathRenderMgr)->TransposeTransform(Local, *(const Matrix*)Matrix12,
+                                            *(const Vector*)Vec3);
+    Dest3[0] = Local.x;
+    Dest3[1] = Local.y;
+    Dest3[2] = Local.z;
     return Dest3;
 }
 

@@ -136,16 +136,6 @@ namespace
         return Gameobj->bWatchListed;
     }
 
-    void* InstanceFromIndex(long Index)
-    {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Index));
-    }
-
-    void* NoInstance()
-    {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-    }
-
     void SetFlagBits(WinControl* Control)
     {
         Control->Flags |= 3;
@@ -444,9 +434,9 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
     // FUN_004e08b0; publishes this in DAT_00674b04.
     G_HudTargetPanel = this;
 
-    HomePosition.X = -0.296f;  // 0xbe978d50
-    HomePosition.Y = -0.367f;  // 0xbebbe76d
-    HomePosition.Z = 0.0f;
+    HomePosition.x = -0.296f;  // 0xbe978d50
+    HomePosition.y = -0.367f;  // 0xbebbe76d
+    HomePosition.z = 0.0f;
     // +0x524 is left alone (Create below sets it). Port-only: retail never writes +0x58c/+0x590,
     // the sweep block, the trail count or +0x634..+0x644 in the ctor; the init list zeroes them
     // for determinism -- Create, OnViewObjectChanged and DrawScanSweep write each before it is
@@ -457,9 +447,9 @@ HudTarget::HudTarget(INI_Reader& /*Reader*/)
     HudTarget::Create(nullptr, nullptr);
     Win3D::SetName("HUD_Target");
 
-    HitCenter.X = -0.387f;     // 0xbec624dd
-    HitCenter.Y = -0.29f;      // 0xbe947ae1
-    HitCenter.Z = -1.0f;
+    HitCenter.x = -0.387f;     // 0xbec624dd
+    HitCenter.y = -0.29f;      // 0xbe947ae1
+    HitCenter.z = -1.0f;
     ClassName = "HUD_Target";
     HitHalfWidth = 0.11f;      // 0x3de147ae
     HitHalfHeight = 0.11f;
@@ -520,7 +510,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
 
     float const ToggleHalf[3] = {0.02f, 0.02f, 0.0f};
     ToggleButton = CreateButtonControl("HudTargetOpen", "interface\\hud\\hud_ShipTarget.3db",
-                                       nullptr, "ui_window_open", nullptr, &HomePosition.X,
+                                       nullptr, "ui_window_open", nullptr, &HomePosition.x,
                                        nullptr, ToggleHalf, 0, 1, 0, 0, 0x3fe, 0, 0);
     ToggleButton->SetProperty(0x36, 1, 0);
 
@@ -636,7 +626,7 @@ bool HudTarget::Create(Win3D* NewParent, void* Data)
     }
 
     SetOffset(0.0f, 0.0f, -1.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -657,7 +647,7 @@ void HudTarget::ToggleExpanded()
         // Opening: slide the toggle from its rest spot to the panel corner and drop the bottom
         // row from y -0.37 to -0.4.
         ButtonMover::Start(kAnimSeconds);
-        ButtonMover::AddButton(ToggleButton, &HomePosition.X, kToggleOpen);
+        ButtonMover::AddButton(ToggleButton, &HomePosition.x, kToggleOpen);
 
         WinControl* const Row[8] = {NextEnemyButton, ScanButton, TractorButton,
                                     CommButton, RequestGroupButton, ContactListButton,
@@ -762,9 +752,7 @@ void HudTarget::DrawViewObject()
             Vector Center;
             float const Radius = Simple->get_physical_radius_r(Center);
             IObjRW* const Viewed = WatchedObjRw(ViewObject);
-            Win3DDrawWireSphere(&ViewCamera,
-                                reinterpret_cast<float const*>(&Viewed->get_transform()), Radius,
-                                0x10, 0x10);
+            Win3DDrawWireSphere(&ViewCamera, &Viewed->get_transform(), Radius, 0x10, 0x10);
         }
         else
         {
@@ -772,7 +760,7 @@ void HudTarget::DrawViewObject()
             ColourViewParts();
             IObjRW* const Viewed = WatchedObjRw(ViewObject);
             PartCacheDraw(&PartCache, AsCamera(&ViewCamera),
-                          reinterpret_cast<FTransform const*>(&Viewed->get_transform()));
+                          &Viewed->get_transform());
         }
         DrawScanSweep();
     }
@@ -799,7 +787,7 @@ void HudTarget::DrawViewObject()
         Where = WatchedObjRw(ViewObject)->get_position();
     }
     float Screen[3];
-    if (static_cast<unsigned char>(AsCamera(&ViewCamera)->ProjectVec(Screen, &Where.x)) == 0)
+    if (static_cast<unsigned char>(AsCamera(&ViewCamera)->ProjectVec((Vector*)Screen, &Where)) == 0)
     {
         return;
     }
@@ -1010,20 +998,20 @@ void HudTarget::OnViewObjectChanged()
         // The root instance's hardpoints and every related instance's. Each archetype handle is
         // released (slot 15) before it is enumerated -- retail's order.
         HardpointNames.clear();
-        void* const RootArch =
-            DALib::Engine->GetInstanceArchetype(InstanceFromIndex(View->get_index()));
+        const ArchetypeIndex RootArch =
+            DALib::Engine->GetInstanceArchetype(View->get_index());
         DALib::Engine->ReleaseHandle(RootArch);
         DALib::Hardpoint->EnumerateHardpoints(&CollectHardpointName, RootArch, this);
-        void* Cursor = NoInstance();
+        InstanceIndex Cursor = InvalidInstanceIndex;
         for (;;)
         {
-            Cursor = DALib::Engine->GetRelatedInstance(InstanceFromIndex(View->get_index()), 0,
+            Cursor = DALib::Engine->GetRelatedInstance(View->get_index(), 0,
                                                        Cursor);
-            if (Cursor == NoInstance())
+            if (Cursor == InvalidInstanceIndex)
             {
                 break;
             }
-            void* const Arch = DALib::Engine->GetInstanceArchetype(Cursor);
+            const ArchetypeIndex Arch = DALib::Engine->GetInstanceArchetype(Cursor);
             DALib::Engine->ReleaseHandle(Arch);
             DALib::Hardpoint->EnumerateHardpoints(&CollectHardpointName, Arch, this);
         }
@@ -1486,7 +1474,7 @@ void HudTarget::OnScaleFinished()
     // The view panel shrank away: slide the toggle home and raise the bottom row back from
     // -0.4 to -0.37 (the buttons are put at -0.4 first, the minimized frame shown there).
     ButtonMover::Start(kAnimSeconds);
-    ButtonMover::AddButton(ToggleButton, kToggleOpen, &HomePosition.X);
+    ButtonMover::AddButton(ToggleButton, kToggleOpen, &HomePosition.x);
 
     SetPos(NextEnemyButton, -0.479f, kRowLoweredY, 0.0f);
     SetPos(ScanButton, -0.411f, kRowLoweredY, 0.0f);
@@ -2182,22 +2170,21 @@ void HudTarget::NextHardpointScreenPos(float* OutScreen)
     {
         return;
     }
-    FTransform const* const Xform = reinterpret_cast<FTransform const*>(
-        DALib::Engine->GetInstanceTransform(InstanceFromIndex(Instance)));
+    Transform const* const Xform = DALib::Engine->GetInstanceTransform(Instance);
     if (G_HudTargetHardpointMath == nullptr)
     {
         G_HudTargetHardpointMath = Acquire3DMathEngine();
     }
-    FVector Local;
-    Local.X = Info.Position.x;
-    Local.Y = Info.Position.y;
-    Local.Z = Info.Position.z;
-    FVector World;
+    Vector Local;
+    Local.x = Info.Position.x;
+    Local.y = Info.Position.y;
+    Local.z = Info.Position.z;
+    Vector World;
     G_HudTargetHardpointMath->TransformXform(World, *Xform, Local);
 
     ICamera* const Camera = AsCamera(&ViewCamera);
-    float const WorldPoint[3] = {World.X, World.Y, World.Z};
-    if (Camera->ProjectVec(OutScreen, WorldPoint) == 0)
+    float const WorldPoint[3] = {World.x, World.y, World.z};
+    if (Camera->ProjectVec((Vector*)OutScreen, (const Vector*)WorldPoint) == 0)
     {
         // Off screen: the camera's screen centre (+0x68 / +0x6c).
         OutScreen[0] = ViewCamera.ScreenCenterX;

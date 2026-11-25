@@ -15,6 +15,7 @@
 // the room's character (FUN_00449cd0 / FUN_00449d50), the sequence's, or a new one from the
 // character factory FUN_00435b80 (gf_character_object.h).
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "GameFlow/Thorn/gf_thorn_component.h"
 
 struct FCharacterObject;
@@ -36,8 +37,8 @@ struct FThornDeformable : FThornComponent
     GENRESULT DACOM_API GetHardpointXform(int TargetType, char const* Name,
                                           float* OutXform12) override;   // 9  LAB_00452730
     GENRESULT DACOM_API GetFloorHeight(float* OutHeight) override;       // 10 LAB_00452d50
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override; // 11 LAB_00452b50
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;    // 12 LAB_00452c70
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_00452b50
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_00452c70
 
     // IIKControl (0x005cd1a8..0x005cd1b0)
     GENRESULT DACOM_API StartIk(void* Desc, float* Position, float* Orientation) override;  // LAB_00452460
@@ -45,16 +46,16 @@ struct FThornDeformable : FThornComponent
     GENRESULT DACOM_API UpdateIk(void* Desc, float* Position, float* Orientation) override; // LAB_00452680
 
     // IGeoTransformControl (0x005cd188..0x005cd194)
-    GENRESULT DACOM_API SetPosition(float* Position) override;           // LAB_00452ab0
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;         // LAB_00452b00
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;        // LAB_00452bd0
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;      // LAB_00452c20
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;           // LAB_00452ab0
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;         // LAB_00452b00
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;        // LAB_00452bd0
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;      // LAB_00452c20
 
     // identity tail
     void Stop() override;                                                // 14 FUN_00452130
     bool FindActor(char const* InActorName, void** OutActorField,
                    void** OutActor) override;                            // 16 LAB_00452df0
-    void* GetEngineInstance() override;                                  // 17 LAB_00452200
+    InstanceIndex GetEngineInstance() override;                                  // 17 LAB_00452200
     void SetScene(void* Scene) override;                                 // 19 LAB_00452ec0
     void SetFlags(unsigned char bVisible, unsigned char bLit, unsigned char bFog,
                   unsigned char bRunningLights) override;                // 20 LAB_00452ed0

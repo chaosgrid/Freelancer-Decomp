@@ -7,14 +7,15 @@
 #pragma once
 
 #include "dacom.h"
+#include "math3d.h"
 
 // 8-slot IMotionPath (SplinePath.cpp FSplinePath). T is the path parameter.
 struct IMotionPath : IDAComponent
 {
-    virtual GENRESULT DACOM_API GetTransformAt(float T, float* OutXform) = 0;      // 3  RET 0xC, 3x3 + pos
-    virtual GENRESULT DACOM_API GetPositionAt(float T, float* OutVec3) = 0;        // 4  RET 0xC, LAB_06f343f0
-    virtual GENRESULT DACOM_API GetOrientationAt(float T, float* OutQuat) = 0;     // 5  RET 0xC, quaternion
-    virtual GENRESULT DACOM_API GetTangentAt(float T, float* OutVec3) = 0;         // 6  RET 0xC, LOOK_AT direction
+    virtual GENRESULT DACOM_API GetTransformAt(float T, Transform* OutXform) = 0;      // 3  RET 0xC, 3x3 + pos
+    virtual GENRESULT DACOM_API GetPositionAt(float T, Vector* OutVec3) = 0;        // 4  RET 0xC, LAB_06f343f0
+    virtual GENRESULT DACOM_API GetOrientationAt(float T, Quaternion* OutQuat) = 0;     // 5  RET 0xC, quaternion
+    virtual GENRESULT DACOM_API GetTangentAt(float T, Vector* OutVec3) = 0;         // 6  RET 0xC, LOOK_AT direction
     // 7  RET 0x8 LAB_06f34670: *OutLength = inner+0x4 (FUN_06f224e0), the
     // un-normalised total arc length accumulated by FUN_06f22630; -1 when the
     // inner spline core has not been created yet.
@@ -549,8 +550,8 @@ struct IScriptEngine : IDAComponent
     virtual void* DACOM_API GetEntityHandle(int Order) = 0;                           // 7  RET 0x8, in-order walk
     virtual void* DACOM_API GetEntityDescInOrder(int Order) = 0;                      // 8  RET 0x8, same walk
     virtual void* DACOM_API GetEntityDesc(int Index) = 0;                             // 9  RET 0x8
-    virtual GENRESULT DACOM_API GetEntityPosition(int Index, float* OutVec3) = 0;     // 10 RET 0xC
-    virtual GENRESULT DACOM_API GetEntityOrientation(int Index, float* OutMat9) = 0;  // 11 RET 0xC
+    virtual GENRESULT DACOM_API GetEntityPosition(int Index, Vector* OutVec3) = 0;     // 10 RET 0xC
+    virtual GENRESULT DACOM_API GetEntityOrientation(int Index, Matrix* OutMat9) = 0;  // 11 RET 0xC
     virtual GENRESULT DACOM_API AttachEntity(int Index, void* EngineObj) = 0;         // 12 RET 0xC
     virtual GENRESULT DACOM_API DetachEntity(int Index) = 0;                          // 13 RET 0x8
     virtual unsigned long DACOM_API GetEventCount() = 0;                              // 14 RET 0x4

@@ -23,7 +23,7 @@
 #include <cstdint>
 #include <cstdlib>
 
-#include "../ivp_utility/ivp_u_bigvector.h" // IVP_U_BigVector_Grow (FUN_0635d3e0): grow a
+#include "../ivp_utility/ivp_u_bigvector.h" // IVP_SurfaceManager_OutList::grow (FUN_0635d3e0): grow a
                                             // {capacity, count, elems, inline buffer @+0xc}
                                             // list to 2*capacity+1
 
@@ -56,7 +56,7 @@ namespace
         void Add(const IVP_Compact_Ledge* Ledge)
         {
             if (List.Count >= List.Capacity)
-                IVP_U_BigVector_Grow(&List); // FUN_0635d3e0
+                List.grow(); // FUN_0635d3e0
             List.Elems[List.Count] = const_cast<IVP_Compact_Ledge*>(Ledge);
             ++List.Count;
         }

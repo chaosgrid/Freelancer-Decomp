@@ -16,6 +16,7 @@
 // 0x005cd734) looks up a created light of the same name in the running scripts (FUN_00456790)
 // and forwards to it.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "common_csys.h"
 #include "GameFlow/Thorn/gf_thorn_component.h"
 
@@ -27,14 +28,14 @@ struct FThornLight : FThornComponent
     FThornLight(Csys const& ScriptFrame, FGfScript* InOwner, FThornEntitySnap const* Desc);
 
     // ICompoundControl (0x005cd550 / 0x005cd554)
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override; // 11 LAB_004531e0
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;    // 12 LAB_004532d0
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_004531e0
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_004532d0
 
     // IGeoTransformControl (0x005cd4c4..0x005cd4d0)
-    GENRESULT DACOM_API SetPosition(float* Position) override;           // 3  LAB_00453130
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;         // 4  LAB_00453150
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;        // 5  LAB_00453280
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;      // 6  LAB_004532b0
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;           // 3  LAB_00453130
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;         // 4  LAB_00453150
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;        // 5  LAB_00453280
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;      // 6  LAB_004532b0
 
     // ID3DLightControl (0x005cd464..0x005cd478)
     GENRESULT DACOM_API SetOn(int On) override;                          // 3  LAB_00453310
@@ -46,7 +47,7 @@ struct FThornLight : FThornComponent
 
     // identity tail
     void Stop() override;                                                // 14 LAB_00453100
-    void* GetEngineInstance() override;                                  // 17 FUN_00450870
+    InstanceIndex GetEngineInstance() override;                                  // 17 FUN_00450870
 
     FGfLightWrapper* Wrapper; // +0x6c FUN_00556fd0's wrapper
     int RegistryIndex;        // +0x70 slot in DAT_0066d130 / DAT_0066d230, -1 when none
@@ -61,14 +62,14 @@ struct FThornLightReference : FThornComponent
                          FThornEntitySnap const* Desc);
 
     // ICompoundControl
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override; // 11 LAB_00457c00
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;    // 12 LAB_00457c20
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_00457c00
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_00457c20
 
     // IGeoTransformControl
-    GENRESULT DACOM_API SetPosition(float* Position) override;           // 3  LAB_00457bc0
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;         // 4  LAB_00457be0
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;        // 5  LAB_00453560
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;      // 6  LAB_00453580
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;           // 3  LAB_00457bc0
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;         // 4  LAB_00457be0
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;        // 5  LAB_00453560
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;      // 6  LAB_00453580
 
     // ID3DLightControl
     GENRESULT DACOM_API SetOn(int On) override;                          // 3  LAB_004535a0
@@ -80,17 +81,17 @@ struct FThornLightReference : FThornComponent
 
     // identity tail
     void Stop() override;                                                // 14 LAB_00450cd0
-    void* GetEngineInstance() override;                                  // 17 LAB_00453550
+    InstanceIndex GetEngineInstance() override;                                  // 17 LAB_00453550
 
     FThornComponent* Target; // +0x6c the created light of that name, or null
 };
 
 // The reference forwarders shared (ICF) by Thorn_LightReference, Thorn_MarkerReference and
 // Thorn_SoundReference: a null target answers -1 without a message.
-GENRESULT ThornReferenceSetPosition(FThornComponent* Target, float* Position);       // 00457bc0
-GENRESULT ThornReferenceSetOrientation(FThornComponent* Target, float* Orient9);     // 00457be0
-GENRESULT ThornReferenceGetPosition(FThornComponent* Target, float* OutPosition);    // 00453560
-GENRESULT ThornReferenceGetOrientation(FThornComponent* Target, float* OutOrient9);  // 00453580
-GENRESULT ThornReferenceSetTransform(FThornComponent* Target, float const* Xform12); // 00457c00
-GENRESULT ThornReferenceGetTransform(FThornComponent* Target, float* OutXform12);    // 00457c20
-void* ThornReferenceGetEngineInstance(FThornComponent* Target);                      // 00453550
+GENRESULT ThornReferenceSetPosition(FThornComponent* Target, const Vector* Position);       // 00457bc0
+GENRESULT ThornReferenceSetOrientation(FThornComponent* Target, const Matrix* Orient9);     // 00457be0
+GENRESULT ThornReferenceGetPosition(FThornComponent* Target, Vector* OutPosition);    // 00453560
+GENRESULT ThornReferenceGetOrientation(FThornComponent* Target, Matrix* OutOrient9);  // 00453580
+GENRESULT ThornReferenceSetTransform(FThornComponent* Target, const Transform* Xform12); // 00457c00
+GENRESULT ThornReferenceGetTransform(FThornComponent* Target, Transform* OutXform12);    // 00457c20
+InstanceIndex ThornReferenceGetEngineInstance(FThornComponent* Target);                      // 00453550

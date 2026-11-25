@@ -199,7 +199,7 @@ namespace
             Win3D* const Other = Sorted[InsertAt];
             if (Layer < Other->DrawLayer)
                 break;
-            if (Layer == Other->DrawLayer && Object->Position[2] < Other->Position[2])
+            if (Layer == Other->DrawLayer && Object->Position.z < Other->Position.z)
                 break;
             InsertAt = InsertAt + 1;
         }
@@ -324,18 +324,18 @@ Win3D::Win3D()
     Parent = nullptr;
     NameLength = 0;
     Name[0] = '\0';
-    Orientation[7] = 0.0f;
-    Orientation[6] = 0.0f;
-    Orientation[5] = 0.0f;
-    Orientation[3] = 0.0f;
-    Orientation[2] = 0.0f;
-    Orientation[1] = 0.0f;
-    Orientation[8] = 1.0f;
-    Orientation[4] = 1.0f;
-    Orientation[0] = 1.0f;
-    Position[2] = 0.0f;
-    Position[1] = 0.0f;
-    Position[0] = 0.0f;
+    Orientation.E[2][1] = 0.0f;
+    Orientation.E[2][0] = 0.0f;
+    Orientation.E[1][2] = 0.0f;
+    Orientation.E[1][0] = 0.0f;
+    Orientation.E[0][2] = 0.0f;
+    Orientation.E[0][1] = 0.0f;
+    Orientation.E[2][2] = 1.0f;
+    Orientation.E[1][1] = 1.0f;
+    Orientation.E[0][0] = 1.0f;
+    Position.z = 0.0f;
+    Position.y = 0.0f;
+    Position.x = 0.0f;
     ClassName = nullptr;
     DrawLayer = 0;
     CaptureNext = nullptr;
@@ -387,9 +387,9 @@ bool Win3D::HitTest(float const* /*Ray*/)
 void Win3D::SetPosition(float const* NewPosition)
 {
     // LAB_004b5020.
-    Position[0] = NewPosition[0];
-    Position[1] = NewPosition[1];
-    Position[2] = NewPosition[2];
+    Position.x = NewPosition[0];
+    Position.y = NewPosition[1];
+    Position.z = NewPosition[2];
 }
 
 bool Win3D::IsPositionInViewport(unsigned /*A*/)
@@ -398,17 +398,17 @@ bool Win3D::IsPositionInViewport(unsigned /*A*/)
     return true;
 }
 
-void Win3D::SetOrientation(float const* NewOrientation)
+void Win3D::SetOrientation(Matrix const* NewOrientation)
 {
     // FUN_004b5040.
-    memmove(Orientation, NewOrientation, sizeof(Orientation));
+    memmove(&Orientation, NewOrientation, sizeof(Orientation));
 }
 
-void Win3D::SetTransform(float const* Transform)
+void Win3D::SetTransform(Transform const* NewXform)
 {
     // LAB_00595f70: both virtual calls.
-    SetOrientation(Transform);
-    SetPosition(Transform + 9);
+    SetOrientation(&NewXform->Rotation);
+    SetPosition(&NewXform->Translation.x);
 }
 
 bool Win3D::Create(Win3D* NewParent, void* /*Data*/)
@@ -885,7 +885,7 @@ Win3D* Win3DPick(float const* Ray)
         if (Depth != BestDepth)
             continue;
         // Only a strictly greater +0x68 competes (unordered does not).
-        if (!(Object->Position[2] > Best->Position[2]))
+        if (!(Object->Position.z > Best->Position.z))
             continue;
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
         if (HitTestWidescreen(Object, Ray))
@@ -950,7 +950,7 @@ Win3D* Win3DPickWithin(Win3D* Capture, float const* Ray)
         }
         if (Depth != BestDepth)
             continue;
-        if (!(Object->Position[2] > Best->Position[2]))
+        if (!(Object->Position.z > Best->Position.z))
             continue;
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
         if (HitTestWidescreen(Object, Ray))
@@ -1378,37 +1378,37 @@ namespace
     I3DMathEngine* G_TransformMathEngine = nullptr;
 
     // FUN_00423b90
-    void TransformByMatrix(FVector& Out, FMatrix const& Matrix, FVector const& Source)
+    void TransformByMatrix(Vector& Out, Matrix const& Mat, Vector const& Source)
     {
         if (G_TransformMathEngine == nullptr)
             G_TransformMathEngine = Acquire3DMathEngine();
-        FVector Result;
-        G_TransformMathEngine->TransformMatrix(Result, Matrix, Source);
+        Vector Result;
+        G_TransformMathEngine->TransformMatrix(Result, Mat, Source);
         Out = Result;
     }
 
     // FUN_004bdd40 (thiscall on the camera). Each product is rounded to float.
-    void ScreenToNearPlane(FSpaceCamera const* Cam, FVector& Out, float ScreenX, float ScreenY)
+    void ScreenToNearPlane(FSpaceCamera const* Cam, Vector& Out, float ScreenX, float ScreenY)
     {
         double const ZNear = static_cast<double>(Cam->ZNear);
-        Out.X = static_cast<float>((static_cast<double>(ScreenX) - Cam->ScreenCenterX) *
+        Out.x = static_cast<float>((static_cast<double>(ScreenX) - Cam->ScreenCenterX) *
                                    (ZNear / Cam->XScale));
-        Out.Y = static_cast<float>((static_cast<double>(ScreenY) - Cam->ScreenCenterY) *
+        Out.y = static_cast<float>((static_cast<double>(ScreenY) - Cam->ScreenCenterY) *
                                    (ZNear / Cam->YScale));
-        Out.Z = static_cast<float>(-ZNear);
+        Out.z = static_cast<float>(-ZNear);
     }
 
     // FUN_0041a390 (thiscall on the vector): scale by 1 / |v|. There is no zero test: a zero
     // vector divides by zero exactly as retail does.
-    void NormalizeInPlace(FVector& V)
+    void NormalizeInPlace(Vector& V)
     {
-        double const X = V.X;
-        double const Y = V.Y;
-        double const Z = V.Z;
+        double const X = V.x;
+        double const Y = V.y;
+        double const Z = V.z;
         double const Inv = 1.0 / sqrt(X * X + Y * Y + Z * Z);
-        V.X = static_cast<float>(Inv * V.X);
-        V.Y = static_cast<float>(Inv * V.Y);
-        V.Z = static_cast<float>(Inv * V.Z);
+        V.x = static_cast<float>(Inv * V.x);
+        V.y = static_cast<float>(Inv * V.y);
+        V.z = static_cast<float>(Inv * V.z);
     }
 
     // The handler object at DAT_0067dbf0 (vftable 0x005e5dcc, one slot: the FHudCmdHandler
@@ -1501,17 +1501,17 @@ namespace
             int CursorY = 0;
             GetClientSoftwareCursor(&CursorX, &CursorY, nullptr);
             FSpaceCamera* const Cam = Win3DGetCamera();
-            FVector Local;
+            Vector Local;
             ScreenToNearPlane(Cam, Local, static_cast<float>(CursorX),
                               static_cast<float>(CursorY));
-            FMatrix Orientation;
-            memcpy(&Orientation, Cam->World, sizeof(Orientation));
-            FVector World;
+            Matrix Orientation;
+            memcpy(&Orientation, &Cam->World, sizeof(Orientation));
+            Vector World;
             TransformByMatrix(World, Orientation, Local);
             NormalizeInPlace(World);
-            G_MouseRay[0] = World.X;
-            G_MouseRay[1] = World.Y;
-            G_MouseRay[2] = World.Z;
+            G_MouseRay[0] = World.x;
+            G_MouseRay[1] = World.y;
+            G_MouseRay[2] = World.z;
 
             // With a capture, the pick inside it, falling back to the capture head itself;
             // without one, the global pick. Consumed when there is a hover object.
@@ -1588,10 +1588,10 @@ namespace
     FWin3DInputHandler G_Win3DInputHandler;
 }
 
-void Win3DTransformByMatrix(FVector& Out, FMatrix const& Matrix, FVector const& Source)
+void Win3DTransformByMatrix(Vector& Out, Matrix const& Mat, Vector const& Source)
 {
     // FUN_00423b90
-    TransformByMatrix(Out, Matrix, Source);
+    TransformByMatrix(Out, Mat, Source);
 }
 
 I3DMathEngine* Win3DTransformMathEngine()
@@ -1601,7 +1601,7 @@ I3DMathEngine* Win3DTransformMathEngine()
     return G_TransformMathEngine;
 }
 
-void Win3DScreenToNearPlane(FSpaceCamera const* Cam, FVector& Out, float ScreenX, float ScreenY)
+void Win3DScreenToNearPlane(FSpaceCamera const* Cam, Vector& Out, float ScreenX, float ScreenY)
 {
     // FUN_004bdd40.
     ScreenToNearPlane(Cam, Out, ScreenX, ScreenY);

@@ -239,7 +239,7 @@ public:
     // slot 5 LAB_0058e510 (RET 4)
     void SetPosition(float const* NewPosition) override;
     // slot 8 LAB_0058e470 (RET 4)
-    void SetTransform(float const* Transform) override;
+    void SetTransform(Transform const* NewXform) override;
     // slot 9 FUN_0058e000 (RET 8); Data = FUiPayloadTable {Width, Height, rows, columns}.
     bool Create(Win3D* NewParent, void* Data) override;
     // slot 11 FUN_0058e5a0
@@ -324,7 +324,7 @@ public:
     float GrabDistance;                     // +0x4fc
     unsigned char bColumnsResizable;        // +0x500
     unsigned char bRowsResizable;           // +0x501
-    float InverseTransform[12];             // +0x504
+    Transform InverseTransform;             // +0x504
     unsigned char bDragArmed;               // +0x540
     unsigned char bDragging;                // +0x541
     unsigned char bDragColumn;              // +0x542
@@ -348,7 +348,7 @@ public:
 protected:
     // The mouse ray scaled onto the table's z plane, then into table space through +0x504
     // (inlined three times in retail).
-    FVector RayToLocal(float const* Ray) const;
+    Vector RayToLocal(float const* Ray) const;
     // Draw's row highlight quad (inlined twice in retail).
     void DrawRowQuad(unsigned long const* Rgba, unsigned Row) const;
 

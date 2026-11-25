@@ -23,10 +23,10 @@ struct FEffectBase
     explicit FEffectBase(unsigned TypeId);
     void AddRef();
     int Release();
-    void Attach(void* WatchableOwner, int EngineIndex, FTransform const* LocalXform);
+    void Attach(void* WatchableOwner, int EngineIndex, Transform const* LocalXform);
     virtual unsigned char Start(FEffectArch* Arch);
     virtual void Kill();
-    virtual float GetWorldPos(FVector* Out) = 0;
+    virtual float GetWorldPos(Vector* Out) = 0;
     virtual void SetIntensity(float Intensity);
     virtual unsigned char IsAlive() = 0;
     virtual unsigned char UpdateVisibility(float Dt, FSpaceCamera* Cam) = 0;
@@ -43,7 +43,7 @@ struct FEffectBase
     unsigned char Flags08;         // +0x08  bit0 live (light), bit1 deactivated
     unsigned char Pad09[3];
     float Priority;                // +0x0C  1.0, or the type info's priority
-    FTransform LocalXform;         // +0x10 … +0x3F
+    Transform LocalXform;         // +0x10 … +0x3F
     int EngineIndex;               // +0x40  = -1
     BaseWatcher Watcher;           // +0x44 … +0x4B
     unsigned char FrozenVelocity[0x0C]; // +0x4C … +0x57  three floats; the freeze stores the
@@ -91,7 +91,7 @@ void EffectBaseDestruct(FEffectBase* This);
 
 // FUN_004f7d20 — attach Watchable(+8) + EngineIndex + local xform (shared).
 void EffectAttach(FEffectBase* This, void* WatchableOwner, int EngineIndex,
-                  FTransform const* LocalXform);
+                  Transform const* LocalXform);
 
 // The object the effect's watcher holds (+0x44 minus 8), or null. Retail spells this inline
 // everywhere: `[+0x44] == 0 → null; [+0x44] - 8 == 0 → null`.
@@ -119,4 +119,4 @@ unsigned char EffectInCameraView(FEffectBase* This, FSpaceCamera* Cam);
 
 // FUN_004f7ef0 — the world transform (instance × local through
 // DAT_00674f50 when watched and attached, else the local transform) copied into *Out.
-void EffectGetWorldTransform(FEffectBase const* This, FTransform* Out);
+void EffectGetWorldTransform(FEffectBase const* This, Transform* Out);

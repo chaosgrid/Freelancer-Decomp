@@ -564,9 +564,9 @@ namespace
     {
         I3DMathEngine* Math = AcquireSceneCsysMathEngine();
         // Snapshot the live input only after factory acquisition, as retail does.
-        FMatrix Orientation;
-        FVector Position;
-        FVector Result;
+        Matrix Orientation;
+        Vector Position;
+        Vector Result;
         std::memcpy(&Orientation, Csys->Orient, sizeof(Orientation));
         std::memcpy(&Position, Csys->Pos, sizeof(Position));
         Math->TransposeTransform(Result, Orientation, Position);
@@ -636,9 +636,9 @@ namespace
                                EEventInverseNegateOrder NegateOrder = EEventInverseNegateOrder::Shared)
     {
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
-        FMatrix OrientationInput;
-        FVector PositionInput;
-        FVector TransformedPosition;
+        Matrix OrientationInput;
+        Vector PositionInput;
+        Vector TransformedPosition;
         std::memcpy(&OrientationInput, Csys->Orient, sizeof(OrientationInput));
         std::memcpy(&PositionInput, Csys->Pos, sizeof(PositionInput));
         Math->TransposeTransform(TransformedPosition, OrientationInput, PositionInput);
@@ -667,9 +667,9 @@ namespace
     GENRESULT SceneMathTransform(I3DMathEngine* Math, float* Out, const float* Xform, const float* Source)
     {
         // All callers pass a distinct output buffer.
-        FTransform TransformInput;
-        FVector SourceInput;
-        FVector Result;
+        Transform TransformInput;
+        Vector SourceInput;
+        Vector Result;
         std::memcpy(&TransformInput, Xform, sizeof(TransformInput));
         std::memcpy(&SourceInput, Source, sizeof(SourceInput));
         const GENRESULT Status = Math->TransformXform(Result, TransformInput, SourceInput);
@@ -679,9 +679,9 @@ namespace
 
     GENRESULT SceneMathMulMatrix(I3DMathEngine* Math, float* Out, const float* A, const float* B)
     {
-        FMatrix LeftInput;
-        FMatrix RightInput;
-        FMatrix Result;
+        Matrix LeftInput;
+        Matrix RightInput;
+        Matrix Result;
         std::memcpy(&LeftInput, A, sizeof(LeftInput));
         std::memcpy(&RightInput, B, sizeof(RightInput));
         const GENRESULT Status = Math->MulMatrix(Result, LeftInput, RightInput);
@@ -691,9 +691,9 @@ namespace
 
     GENRESULT SceneMathMulTransform(I3DMathEngine* Math, float* Out, const float* A, const float* B)
     {
-        FTransform LeftInput;
-        FTransform RightInput;
-        FTransform Result;
+        Transform LeftInput;
+        Transform RightInput;
+        Transform Result;
         std::memcpy(&LeftInput, A, sizeof(LeftInput));
         std::memcpy(&RightInput, B, sizeof(RightInput));
         const GENRESULT Status = Math->MulTransform(Result, LeftInput, RightInput);
@@ -703,9 +703,9 @@ namespace
 
     GENRESULT SceneMathRotate(I3DMathEngine* Math, float* Out, const float* Xform, const float* Source)
     {
-        FTransform TransformInput;
-        FVector SourceInput;
-        FVector Result;
+        Transform TransformInput;
+        Vector SourceInput;
+        Vector Result;
         std::memcpy(&TransformInput, Xform, sizeof(TransformInput));
         std::memcpy(&SourceInput, Source, sizeof(SourceInput));
         const GENRESULT Status = Math->Rotate(Result, TransformInput, SourceInput);
@@ -713,10 +713,10 @@ namespace
         return Status;
     }
 
-    GENRESULT SceneQuatToMatrix(I3DMathEngine* Math, float* Out, const FQuat& Source)
+    GENRESULT SceneQuatToMatrix(I3DMathEngine* Math, float* Out, const Quaternion& Source)
     {
-        FQuaternion QuaternionInput;
-        FMatrix MatrixResult;
+        Quaternion QuaternionInput;
+        Matrix MatrixResult;
         std::memcpy(&QuaternionInput, &Source, sizeof(QuaternionInput));
         const GENRESULT Status = Math->QuaternionToMatrix(MatrixResult, QuaternionInput);
         std::memcpy(Out, &MatrixResult, sizeof(MatrixResult));
@@ -1547,12 +1547,12 @@ namespace
 
     // Control calls go through the typed interfaces in src/include/thorn_controls.h.
 
-    void IdentityQuat4(FQuaternion& Output)
+    void IdentityQuat4(Quaternion& Output)
     {
-        Output.W = 1.0f;
-        Output.X = 0.0f;
-        Output.Y = 0.0f;
-        Output.Z = 0.0f;
+        Output.w = 1.0f;
+        Output.x = 0.0f;
+        Output.y = 0.0f;
+        Output.z = 0.0f;
     }
 
     void CopyQuat4(float* Dst, const float* Src)
@@ -1563,9 +1563,9 @@ namespace
 
     // SPATIAL: math +0x50 writes straight into the event-owned destination, so
     // a later FP exception leaves the components already written.
-    void SpatialMatrixToQuaternion(I3DMathEngine* Math, FQuaternion& Destination, const void* Source)
+    void SpatialMatrixToQuaternion(I3DMathEngine* Math, Quaternion& Destination, const void* Source)
     {
-        FMatrix MatrixInput;
+        Matrix MatrixInput;
         std::memcpy(&MatrixInput, Source, sizeof(MatrixInput));
         Math->MatrixToQuaternion(Destination, MatrixInput);
     }
@@ -1574,18 +1574,18 @@ namespace
     // identity fallback.
     void Quat4ToMat9(float* Out9, const float* Src4)
     {
-        FQuat Quat;
+        Quaternion Quat;
         std::memcpy(&Quat, Src4, sizeof(Quat));
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
         SceneQuatToMatrix(Math, Out9, Quat);
     }
 
-    void SlerpQuat4(float* Out4, const FQuaternion& From4, const FQuaternion& To4, const float* U)
+    void SlerpQuat4(float* Out4, const Quaternion& From4, const Quaternion& To4, const float* U)
     {
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
-        FQuaternion FromQuat;
-        FQuaternion ToQuat;
-        FQuaternion ResultQuat;
+        Quaternion FromQuat;
+        Quaternion ToQuat;
+        Quaternion ResultQuat;
         // Inputs are read after the math cache is acquired; U stays a pointer.
         std::memcpy(&FromQuat, &From4, sizeof(FromQuat));
         std::memcpy(&ToQuat, &To4, sizeof(ToQuat));
@@ -1644,7 +1644,7 @@ namespace
     // Axis 0/3=X, 1/4=Y, 2/5=Z; unsigned >5 keeps identity without trig.
     void InitializeEventFrameWords(float* Frame);
 
-    void ApplyAxisRotFpu(float* Orient9, const FQuaternion& BaseQuat4, int AxisId, const float* DeltaDeg)
+    void ApplyAxisRotFpu(float* Orient9, const Quaternion& BaseQuat4, int AxisId, const float* DeltaDeg)
     {
         const unsigned int PiOver180Bits = 0x3c8efa35u;
         const unsigned int Kind = static_cast<unsigned int>(AxisId);
@@ -1740,8 +1740,8 @@ namespace
         }
 
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
-        FQuaternion BaseQuaternion;
-        FMatrix BaseMatrix;
+        Quaternion BaseQuaternion;
+        Matrix BaseMatrix;
         std::memcpy(&BaseQuaternion, &BaseQuat4, sizeof(BaseQuaternion));
         Math->QuaternionToMatrix(BaseMatrix, BaseQuaternion);
         float Base9[9];
@@ -1937,8 +1937,8 @@ namespace
         Copy9(Orient, Entity->Snap.Orient);
         if (Entity->GeoControl != nullptr)
         {
-            Entity->GeoControl->GetPosition(Pos);
-            Entity->GeoControl->GetOrientation(Orient);
+            Entity->GeoControl->GetPosition((Vector*)Pos);
+            Entity->GeoControl->GetOrientation((Matrix*)Orient);
         }
     }
 
@@ -2033,7 +2033,7 @@ namespace
     {
         if (Entity->GeoControl == nullptr)
             return;
-        Entity->GeoControl->GetPosition(Pos);
+        Entity->GeoControl->GetPosition((Vector*)Pos);
         if (Entity->ParentCsys != nullptr)
         {
             const FThornCsys* Parent = Entity->ParentCsys;
@@ -2053,7 +2053,7 @@ namespace
     {
         if (Entity->GeoControl == nullptr)
             return;
-        Entity->GeoControl->GetOrientation(Orient);
+        Entity->GeoControl->GetOrientation((Matrix*)Orient);
         if (Entity->ParentCsys != nullptr)
         {
             const FThornCsys* Parent = Entity->ParentCsys;
@@ -4553,9 +4553,9 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
     // The child is read only after the math engine is acquired.
     float TransformedPosition[3];
     I3DMathEngine* Math = AcquireSceneEventMathEngine();
-    FMatrix ChildOrientation;
-    FVector ChildPosition;
-    FVector ChildInversePosition;
+    Matrix ChildOrientation;
+    Vector ChildPosition;
+    Vector ChildInversePosition;
     std::memcpy(&ChildOrientation, Child, sizeof(ChildOrientation));
     std::memcpy(&ChildPosition, Child + 9, sizeof(ChildPosition));
     Math->TransposeTransform(ChildInversePosition, ChildOrientation, ChildPosition);
@@ -5560,7 +5560,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
 
     float PathVector[3];
     if ((Desc.Flags & kThornFlagPosition) != 0 &&
-        Secondary->MotionPath->GetPositionAt(Percent, PathVector) == GR_OK)
+        Secondary->MotionPath->GetPositionAt(Percent, (Vector*)PathVector) == GR_OK)
     {
         float PathXform[12];
         IdentityOrient(PathXform);
@@ -5583,7 +5583,7 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
     {
         if ((Desc.Flags & kThornFlagLookAt) != 0)
         {
-            if (Secondary->MotionPath->GetTangentAt(Percent, PathVector) == GR_OK)
+            if (Secondary->MotionPath->GetTangentAt(Percent, (Vector*)PathVector) == GR_OK)
             {
                 float PathXform[12];
                 IdentityOrient(PathXform);
@@ -5604,19 +5604,19 @@ unsigned char FThornEvent::TickPathAnim(int TimeMs, FThornScene* Scene)
         else
         {
             float QuaternionWords[4];
-            if (Secondary->MotionPath->GetOrientationAt(Percent, QuaternionWords) == GR_OK)
+            if (Secondary->MotionPath->GetOrientationAt(Percent, (Quaternion*)QuaternionWords) == GR_OK)
             {
-                FQuaternion Quaternion;
-                std::memcpy(&Quaternion, QuaternionWords, sizeof(Quaternion));
-                FMatrix PathMatrix;
+                Quaternion Quat;
+                std::memcpy(&Quat, QuaternionWords, sizeof(Quat));
+                Matrix PathMatrix;
                 I3DMathEngine* Math = AcquireSceneEventMathEngine();
-                Math->QuaternionToMatrix(PathMatrix, Quaternion);
+                Math->QuaternionToMatrix(PathMatrix, Quat);
                 GetRetailRelativeOrientation(Secondary, Secondary->Snap.Orient);
                 // The getter's result pointer is kept across the next acquire.
                 const float* SecondaryMatrix = Secondary->Snap.Orient;
                 Math = AcquireSceneEventMathEngine();
                 float Combined[9];
-                SceneMathMulMatrix(Math, Combined, SecondaryMatrix, &PathMatrix.D[0][0]);
+                SceneMathMulMatrix(Math, Combined, SecondaryMatrix, &PathMatrix.E[0][0]);
                 Copy9(Orientation, Combined);
             }
         }
@@ -6348,7 +6348,7 @@ void FThornEntity::InnerSetPos(const float* Pos)
             SceneMathTransform(Math, Out, Parent->Orient, Pos);
             std::memcpy(World, Out, sizeof(World));
         }
-        GeoControl->SetPosition(const_cast<float*>(World));
+        GeoControl->SetPosition((const Vector*)(const_cast<float*>(World)));
     }
     // Only CAMERA/MONITOR entities fan out (FUN_06f41490).
     if ((DescriptorOwnerType == kThornEntityCamera || DescriptorOwnerType == kThornEntityMonitor) &&
@@ -6387,7 +6387,7 @@ void FThornEntity::InnerSetOrient(const float* Mat9)
             SceneMathMulMatrix(Math, Out9, Parent->Orient, Mat9);
             std::memcpy(World, Out9, sizeof(World));
         }
-        GeoControl->SetOrientation(const_cast<float*>(World));
+        GeoControl->SetOrientation((const Matrix*)(const_cast<float*>(World)));
     }
     // Only CAMERA/MONITOR entities fan out (FUN_06f414d0).
     if ((DescriptorOwnerType == kThornEntityCamera || DescriptorOwnerType == kThornEntityMonitor) &&
@@ -6822,9 +6822,9 @@ GENRESULT FThornScene::GetEntityPos(int Index, float* OutVec3)
     if (Parent != nullptr)
     {
         I3DMathEngine* Math = AcquireSceneCsysMathEngine();
-        FTransform ParentInput;
-        FVector PositionInput;
-        FVector World;
+        Transform ParentInput;
+        Vector PositionInput;
+        Vector World;
         std::memcpy(&ParentInput.Rotation, Parent->Orient, sizeof(ParentInput.Rotation));
         std::memcpy(&ParentInput.Translation, Parent->Pos, sizeof(ParentInput.Translation));
         std::memcpy(&PositionInput, OutVec3, sizeof(PositionInput));
@@ -6849,9 +6849,9 @@ GENRESULT FThornScene::GetEntityOrient(int Index, float* OutMat9)
     if (Parent != nullptr)
     {
         I3DMathEngine* Math = AcquireSceneCsysMathEngine();
-        FMatrix ParentOrientation;
-        FMatrix OrientationInput;
-        FMatrix World;
+        Matrix ParentOrientation;
+        Matrix OrientationInput;
+        Matrix World;
         std::memcpy(&ParentOrientation, Parent->Orient, sizeof(ParentOrientation));
         std::memcpy(&OrientationInput, OutMat9, sizeof(OrientationInput));
         Math->MulMatrix(World, ParentOrientation, OrientationInput);
@@ -6971,7 +6971,7 @@ GENRESULT FThornScene::Detach(int Index)
 }
 
 
-void FThornScene::PushBoundGeoFromScene(const FTransform& OldInverse, bool bOrient)
+void FThornScene::PushBoundGeoFromScene(const Transform& OldInverse, bool bOrient)
 {
     // FUN_06f3b530/06f3b6c0: the entity pointer is kept across its getters and
     // setters; the iterator advances only after them.
@@ -6983,15 +6983,15 @@ void FThornScene::PushBoundGeoFromScene(const FTransform& OldInverse, bool bOrie
             continue;
         float PositionWords[3];
         float OrientationWords[9];
-        Entity->GeoControl->GetPosition(PositionWords);
+        Entity->GeoControl->GetPosition((Vector*)PositionWords);
         // GeoControl is reloaded without a second null check; orientation is
         // read before any math.
         if (bOrient)
-            Entity->GeoControl->GetOrientation(OrientationWords);
+            Entity->GeoControl->GetOrientation((Matrix*)OrientationWords);
 
         I3DMathEngine* Math = AcquireSceneCsysMathEngine();
-        FVector Position;
-        FVector PositionResult;
+        Vector Position;
+        Vector PositionResult;
         std::memcpy(&Position, PositionWords, sizeof(Position));
         Math->TransformXform(PositionResult, OldInverse, Position);
         std::memcpy(PositionWords, &PositionResult, sizeof(PositionWords));
@@ -7002,8 +7002,8 @@ void FThornScene::PushBoundGeoFromScene(const FTransform& OldInverse, bool bOrie
             // The math engine is reacquired after InnerSetPos; the orientation
             // was captured before it.
             Math = AcquireSceneCsysMathEngine();
-            FMatrix Orientation;
-            FMatrix OrientationResult;
+            Matrix Orientation;
+            Matrix OrientationResult;
             std::memcpy(&Orientation, OrientationWords, sizeof(Orientation));
             Math->MulMatrix(OrientationResult, OldInverse.Rotation, Orientation);
             std::memcpy(OrientationWords, &OrientationResult, sizeof(OrientationWords));
@@ -8755,13 +8755,13 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
                     // its first four values (column order) as q_orient.
                     if (G_SpatialWriterMathEngine == nullptr)
                         G_SpatialWriterMathEngine = ThornAcquire3DMathEngine();
-                    FQuaternion Quaternion;
+                    Quaternion Quat;
                     // Raw W/X/Y/Z, read after the lazy acquire.
-                    std::memcpy(&Quaternion, Packet->Quaternion, sizeof(Quaternion));
-                    FMatrix Orientation;
-                    G_SpatialWriterMathEngine->QuaternionToMatrix(Orientation, Quaternion);
+                    std::memcpy(&Quat, Packet->Quaternion, sizeof(Quat));
+                    Matrix Orientation;
+                    G_SpatialWriterMathEngine->QuaternionToMatrix(Orientation, Quat);
                     float Matrix[9];
-                    std::memcpy(Matrix, Orientation.D, sizeof(Matrix));
+                    std::memcpy(Matrix, Orientation.E, sizeof(Matrix));
                     SaveMatrixValues(&Buf, "q_orient = { %.6f, %.6f, %.6f, %.6f }", Matrix);
                 }
                 else

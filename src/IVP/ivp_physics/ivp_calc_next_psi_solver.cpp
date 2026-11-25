@@ -461,7 +461,7 @@ void IVP_Calc_Next_PSI_Solver::set_transformation(const IVP_U_Quat* Rotation, co
     // Re-stamp the environment's current time with itself.
     const float CurrentTimeHi = Env->current_time.time_base;
     const float CurrentTimeLo = Env->current_time.time_offset;
-    IVP_Environment_SetCurrentTime(Env, CurrentTimeHi, CurrentTimeLo); // FUN_0634ccd0
+    Env->set_current_time(CurrentTimeHi, CurrentTimeLo); // FUN_0634ccd0
 
     // Time since the last PSI, clamped up to delta_PSI_time (when delta_time > dt).
     float SinceLastPsi = (float)((((double)(CurrentTimeHi) - Core->TimeOfLastPsi.time_base) + CurrentTimeLo) -

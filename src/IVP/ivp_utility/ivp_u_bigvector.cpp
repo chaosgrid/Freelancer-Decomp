@@ -18,31 +18,31 @@ static_assert(sizeof(IVP_SurfaceManager_OutList) == 0xc, "the inline buffer star
 // 06362445, 0636247c). The new buffer is OldCapacity*8+8 bytes; the old one is
 // freed (and the field nulled) unless it is null or the inline buffer right
 // after the header.
-void __fastcall IVP_U_BigVector_Grow(IVP_SurfaceManager_OutList* Vector)
+void IVP_SurfaceManager_OutList::grow()
 {
-    void* newBuffer = malloc(static_cast<size_t>(Vector->Capacity) * 8 + 8); // FUN_06343f70
-    Vector->Capacity = Vector->Capacity * 2 + 1;
-    int count = Vector->Count;
+    void* newBuffer = malloc(static_cast<size_t>(Capacity) * 8 + 8); // FUN_06343f70
+    Capacity = Capacity * 2 + 1;
+    int count = Count;
     void** newElems = (void**)newBuffer;
-    void** oldElems = Vector->Elems;
+    void** oldElems = Elems;
     for (int i = 0; i < count; ++i)
     {
         newElems[i] = oldElems[i];
     }
-    void** oldBuffer = Vector->Elems;
-    if (oldBuffer != (void**)(Vector + 1) && oldBuffer != nullptr)
+    void** oldBuffer = Elems;
+    if (oldBuffer != (void**)(this + 1) && oldBuffer != nullptr)
     {
         free(oldBuffer); // FUN_06343fb0
-        Vector->Elems = nullptr;
+        Elems = nullptr;
     }
-    Vector->Elems = newElems;
+    Elems = newElems;
 }
 
 // FUN_06350590 (caller 0634e223): grow only when Count >= Capacity (signed).
-void __fastcall IVP_U_BigVector_EnsureRoom(IVP_SurfaceManager_OutList* Vector)
+void IVP_SurfaceManager_OutList::ensure_room()
 {
-    if (Vector->Count >= Vector->Capacity)
+    if (Count >= Capacity)
     {
-        IVP_U_BigVector_Grow(Vector);
+        grow();
     }
 }

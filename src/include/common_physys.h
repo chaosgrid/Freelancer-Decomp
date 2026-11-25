@@ -23,18 +23,6 @@ struct CBeam;
 
 struct IObjDB;
 
-// Quaternion for RCBegin / RCSet. Retail uses 4 floats (W,X,Y,Z) matching FQuaternion.
-class Quaternion
-{
-public:
-    float w;
-    float x;
-    float y;
-    float z;
-};
-
-static_assert(sizeof(Quaternion) == 0x10, "Quaternion 4 floats");
-
 namespace PhyArch
 {
     struct Part;
@@ -87,6 +75,7 @@ class FLControllerGolem;
 #include "../IVP/ivp_physics/ivp_phantom.h"
 // CheapSet<CObject*> -- PhyCollisionStateManager::get_intruding_cobjs' out set.
 #include "common_cheapset.h"
+#include "math3d.h"
 
 namespace PhySys
 {
@@ -149,7 +138,7 @@ namespace PhySys
     {
         float Mass;                  // +0x00  arch Root+0x20
         float LinearDamping;         // +0x04  DEFAULT_LINEAR_DAMPING
-        float AngularDamping[3];     // +0x08
+        Vector AngularDamping;       // +0x08
         // +0x14: the star-system id. BuildIVP_Sphere and ReMakePhysicalR copy it straight onto
         // CObject+0x50 (.text:06289471 / 0628a681, `MOV EDX,[EBP+0x14]` then `MOV [EDI+0x50],EDX`
         // right after the BodyPtr store at +0x54), and CObject+0x50 is then handed to
@@ -479,7 +468,7 @@ namespace PhySys
 
     // FUN_06343670 (.text:06343670-063436f1, __thiscall, RET 0x10).
     // set_target_quaternion(TargetQuat, Time, TargetRotQuatOrNull, DeltaTime). Both quaternion
-    // arguments are 4 floats in IVP's (X,Y,Z,W) order, NOT FQuaternion's (W,X,Y,Z).
+    // arguments are 4 floats in IVP's (X,Y,Z,W) order, NOT Quaternion's (W,X,Y,Z).
     void __cdecl GolemSetTargetQuaternion(::FLControllerGolem* Golem,
                                                     float const TargetQuat[4],
                                                     IVP_Time const& Time,

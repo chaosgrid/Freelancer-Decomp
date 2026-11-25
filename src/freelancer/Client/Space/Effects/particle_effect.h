@@ -27,7 +27,7 @@ struct FParticleEffect : FEffectBase
     explicit FParticleEffect(unsigned TypeId);
     unsigned char Start(FEffectArch* EffectArch) override;
     void Kill() override;
-    float GetWorldPos(FVector* Out) override;
+    float GetWorldPos(Vector* Out) override;
     void SetIntensity(float Intensity) override;
     unsigned char IsAlive() override { return 1; }
     unsigned char UpdateVisibility(float Dt, FSpaceCamera* Cam) override;
@@ -57,7 +57,7 @@ static_assert(offsetof(FParticleEffect, Flags7C) == 0x7c, "Flags7C @ +0x7c");
 struct FParticleEffectCruise : FParticleEffect
 {
     FParticleEffectCruise();
-    float GetWorldPos(FVector* Out) override;
+    float GetWorldPos(Vector* Out) override;
     void SetIntensity(float Scale) override;
     unsigned char UpdateVisibility(float Dt, FSpaceCamera* Cam) override;
     float CruiseScale;         // +0x84  = 1.0f at factory; FUN_004f92f0 setter
@@ -119,7 +119,7 @@ unsigned char ParticleEffectBuildGeometry(FParticleEffect* This, FSpaceCamera* C
 void ParticleEffectSetLod(FParticleEffect* This, float Lod);
 
 // FUN_004f91c0 — cruise vtable[+0x08]: radius = +0x84 * +0x74, at least 10; world position.
-float ParticleEffectCruiseGetWorldPos(FParticleEffectCruise* This, FVector* Out);
+float ParticleEffectCruiseGetWorldPos(FParticleEffectCruise* This, Vector* Out);
 
 // FUN_004f92f0 — cruise vtable[+0x0c]: +0x84 = Scale, then the SetIntensity clamp into
 // IFxEffect +0x18. Tradelane rings drive it (FUN_00514050).
@@ -147,7 +147,7 @@ int ParticleEffectRelease(FParticleEffect* This);
 
 // Shared attach FUN_004f7d20 (same layout as BeamEffect).
 void ParticleEffectAttach(FParticleEffect* This, void* WatchableOwner, int EngineIndex,
-                          FTransform const* LocalXform);
+                          Transform const* LocalXform);
 
 // LAB_004f6e70 — EffectAlloc(0x84) (Heap pool) + Construct(0).
 FParticleEffect* ParticleEffectCreate();
@@ -179,7 +179,7 @@ struct FCameraParticles : FEffectBase
 {
     FCameraParticles();
     unsigned char Start(FEffectArch* Arch) override;
-    float GetWorldPos(FVector* Out) override;
+    float GetWorldPos(Vector* Out) override;
     unsigned char IsAlive() override { return 1; }
     unsigned char UpdateVisibility(float Dt, FSpaceCamera* Cam) override { return 1; }
     unsigned char TickDraw(float Dt, FSpaceCamera* Cam) override;
@@ -211,7 +211,7 @@ unsigned char CreateEffectCompanionAlive(void* CompanionLocal);
 // the companion inserted into its effect list (FUN_004fcea0 on ListOwner+0x28).
 // This wrapper is FUN_00503070 on DAT_00674c60, the factory almost every caller passes.
 unsigned char CliCreateEffectOneShot(FEffectArch* EffectArch, void* ListOwner,
-                                     int EngineIndex, FTransform const* LocalXform,
+                                     int EngineIndex, Transform const* LocalXform,
                                      void* CompanionOut);
 
 struct FCliEffectFactory;
@@ -219,7 +219,7 @@ struct FCliEffectFactory;
 // (DAT_006751cc) and FUN_00514070, which forwards its own factory (DAT_006751cc or DAT_00674c60).
 unsigned char CliCreateEffectOneShotOn(FCliEffectFactory const* Factory, FEffectArch* EffectArch,
                                        void* ListOwner, int EngineIndex,
-                                       FTransform const* LocalXform, void* CompanionOut);
+                                       Transform const* LocalXform, void* CompanionOut);
 
 // The effect factories FUN_00503f40 / FUN_00503070 are called on: .data objects holding only
 // a vptr, stamped by static initializers, whose three slots make the particle (+0), the sound
@@ -279,10 +279,10 @@ extern FTunnelCliEffectFactory const G_CliEffectFactoryTunnel;
 // light EngIndex==-1); Pos3 → particle+0x4c / sound SetVelocity / GameLight+0x120.
 // CompanionOut may be null (tradelane player leave/approach). No FUN_004fcea0.
 unsigned char CliCreateEffectWorldOneShotOn(FCliEffectFactory const* Factory,
-                                            FEffectArch* EffectArch, FTransform const* LocalXform,
+                                            FEffectArch* EffectArch, Transform const* LocalXform,
                                             float const* Pos3, void* CompanionOut);
 
 // FUN_00503f40 on DAT_00674c60 (the explosion's factory, among others). The DAT_00674c5c
 // callers go through CliCreateEffectWorldOneShotOn with G_CliEffectFactoryCameraParticles.
-unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, FTransform const* LocalXform,
+unsigned char CliCreateEffectWorldOneShot(FEffectArch* EffectArch, Transform const* LocalXform,
                                           float const* Pos3, void* CompanionOut);

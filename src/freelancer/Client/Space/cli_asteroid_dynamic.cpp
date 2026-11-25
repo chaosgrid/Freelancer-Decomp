@@ -35,7 +35,7 @@
 #include "Space/space_scene_obj_draw.h"   // GameobjSweepEffectListRetail (FUN_004fd040)
 #include "Space/star_sys.h"               // StarSysGetActiveSystemId (FUN_00554e90)
 #include "Common/Graphics/vis_effect_arch.h"        // FindEffectArch (FUN_0040f080)
-#include "x86math.h"                // I3DMathEngine::MulTransform, FTransform
+#include "x86math.h"                // I3DMathEngine::MulTransform, Transform
 
 #include <cstdint>
 #include <cstdlib>
@@ -171,8 +171,7 @@ void FCliDynamicAsteroidGameobj::OnCollision(void const* A, void const* B, FClie
 
     // The manager's common field (no null test) at the camera position the draw last stored
     // (+0x28).
-    Universe::IZone const* const Zone =
-        Owner->CmnField->get_lootable_zone(*reinterpret_cast<Vector const*>(Owner->CameraPos));
+    Universe::IZone const* const Zone = Owner->CmnField->get_lootable_zone(Owner->CameraPos);
     if (Zone == nullptr)
         return;
     CmnAsteroid::LootableZoneEntry const* const Loot =
@@ -463,7 +462,7 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
         IMesh* Mesh = nullptr;
         IRenderableMesh* RMesh = nullptr;
         int const EngineIndex = static_cast<int>(This->Arch->EngineIndex);
-        if (DALib::Engine->QueryEngineComponent(EngineIndex, const_cast<char*>(Iids::Mesh),
+        if (DALib::Engine->QueryEngineComponent(EngineIndex, Iids::Mesh,
                                                 reinterpret_cast<void**>(&Mesh)) < 0)
         {
             // No mesh block and no vertex source descriptor.
@@ -479,10 +478,10 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
             Mesh->GetFaceGroupMaterial(&This->Material);
         Mesh->GetFaceGroupPrimitiveType(&This->PrimitiveType);
         Mesh->CloseFaceGroup();
-        DALib::Renderer->SetArchetypeLod(reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)), 0);
+        DALib::Renderer->SetArchetypeLod(static_cast<intptr_t>(EngineIndex), 0);
         // The result is not tested, as retail.
         DALib::Engine->QueryEngineComponent(EngineIndex,
-                                            const_cast<char*>(Iids::RenderableMesh),
+                                            Iids::RenderableMesh,
                                             reinterpret_cast<void**>(&RMesh));
         FCliDynamicAsteroidMesh* const Block =
             static_cast<FCliDynamicAsteroidMesh*>(::operator new(sizeof(FCliDynamicAsteroidMesh)));
@@ -580,16 +579,16 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
     // The spawn centre: the camera position plus the view axis (the orientation's third
     // column) times -PlacementRadiusInner.
     ICamera* const Camera = AsCamera(Cam);
-    float const* const Orient = Camera->GetOrientation();
+    const Matrix* const Orient = Camera->GetOrientation();
     float const NegInner = -This->PlacementRadiusInner;
-    float const OffsetX = Orient[2] * NegInner;
-    float const OffsetY = Orient[5] * NegInner;
-    float const OffsetZ = Orient[8] * NegInner;
-    float const* const CamPos = Camera->GetPosition();
+    float const OffsetX = Orient->E[0][2] * NegInner;
+    float const OffsetY = Orient->E[1][2] * NegInner;
+    float const OffsetZ = Orient->E[2][2] * NegInner;
+    const Vector* const CamPos = Camera->GetPosition();
     Vector Centre;
-    Centre.x = OffsetX + CamPos[0];
-    Centre.y = OffsetY + CamPos[1];
-    Centre.z = OffsetZ + CamPos[2];
+    Centre.x = OffsetX + CamPos->x;
+    Centre.y = OffsetY + CamPos->y;
+    Centre.z = OffsetZ + CamPos->z;
 
     // No spawning while the player's ship (class & 0x503) is in a tradelane; otherwise only
     // when there is no zone or its immersion at the centre is above 0.001 (NaN blocks).
@@ -723,19 +722,19 @@ void CliDynamicAsteroidUpdate(FCliDynamicAsteroid* This, FSpaceCamera* Cam, floa
         Archetype::ICliObj* const CliComp = Arch->Companion;
         if (CliComp != nullptr && Archetype::CliDynamicAsteroidHasParticleEffect(CliComp))
         {
-            FTransform Frame;
-            Frame.Rotation.D[0][0] = 1.0f;
-            Frame.Rotation.D[0][1] = 0.0f;
-            Frame.Rotation.D[0][2] = 0.0f;
-            Frame.Rotation.D[1][0] = 0.0f;
-            Frame.Rotation.D[1][1] = 1.0f;
-            Frame.Rotation.D[1][2] = 0.0f;
-            Frame.Rotation.D[2][0] = 0.0f;
-            Frame.Rotation.D[2][1] = 0.0f;
-            Frame.Rotation.D[2][2] = 1.0f;
-            Frame.Translation.X = 0.0f;
-            Frame.Translation.Y = 0.0f;
-            Frame.Translation.Z = 0.0f;
+            Transform Frame;
+            Frame.Rotation.E[0][0] = 1.0f;
+            Frame.Rotation.E[0][1] = 0.0f;
+            Frame.Rotation.E[0][2] = 0.0f;
+            Frame.Rotation.E[1][0] = 0.0f;
+            Frame.Rotation.E[1][1] = 1.0f;
+            Frame.Rotation.E[1][2] = 0.0f;
+            Frame.Rotation.E[2][0] = 0.0f;
+            Frame.Rotation.E[2][1] = 0.0f;
+            Frame.Rotation.E[2][2] = 1.0f;
+            Frame.Translation.x = 0.0f;
+            Frame.Translation.y = 0.0f;
+            Frame.Translation.z = 0.0f;
             int const EngineIndex = static_cast<int>(Go->get_index());
             ID_String const* const EffectId = Archetype::CliDynamicAsteroidParticleEffect(CliComp);
             if (!EffectId->IsEmpty())
@@ -763,10 +762,10 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
 
     // The camera position into +0x28 (read by the loot roll).
     ICamera* const Camera = AsCamera(Cam);
-    float const* const CamPos = Camera->GetPosition();
-    This->CameraPos[0] = CamPos[0];
-    This->CameraPos[1] = CamPos[1];
-    This->CameraPos[2] = CamPos[2];
+    const Vector* const CamPos = Camera->GetPosition();
+    This->CameraPos.x = CamPos->x;
+    This->CameraPos.y = CamPos->y;
+    This->CameraPos.z = CamPos->z;
     if (This->bAnyVisible == 0)
         return;
 
@@ -813,7 +812,7 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
         MaterialBlock[6] = MaterialBlock[2];
     }
 
-    FTransform View;
+    Transform View;
     std::memcpy(&View, Camera->GetViewTransform(), sizeof(View));
 
     for (int Index = 0; Index < This->SlotCount; ++Index)
@@ -832,21 +831,21 @@ void CliDynamicAsteroidDraw(FCliDynamicAsteroid* This, FSpaceCamera* Cam,
         }
 
         // Pipeline state 7 set -> the combined modelview; otherwise world and view apart.
-        FTransform World;
+        Transform World;
         std::memcpy(&World, &This->SlotPtrs[Index]->get_transform(), sizeof(World));
         int bModelview = 1;
         Pipe->GetPipelineState(7, &bModelview);
         if (bModelview != 0)
         {
-            FTransform Combined;
+            Transform Combined;
             CliAsteroidMathEngine()->MulTransform(Combined, View, World);
-            FTransform Modelview = Combined;
-            Pipe->SetModelview(reinterpret_cast<float const*>(&Modelview));
+            Transform Modelview = Combined;
+            Pipe->SetModelview(&Modelview);
         }
         else
         {
-            Pipe->SetWorld(reinterpret_cast<float const*>(&World));
-            Pipe->SetView(reinterpret_cast<float const*>(&View));
+            Pipe->SetWorld(&World);
+            Pipe->SetView(&View);
         }
 
         // Not below 1.0 (NaN included) -> the opaque states every time; below 1.0 -> the blend

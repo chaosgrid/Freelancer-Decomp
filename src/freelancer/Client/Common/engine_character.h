@@ -103,7 +103,7 @@ struct FEngineCharacterAccessoryLink
     // &MaterialPaths, 0, 0), FindHardpoint(Bone, CharacterHardpoint), then IHardpoint slot 6
     // ConnectHardpoints(hardpoint, {CharacterHardpoint, crc}, instance, {AccessoryHardpoint,
     // crc}); either failure FDUMPs (line 0x4e). Returns the instance whatever happened.
-    void* Connect(long Bone);
+    InstanceIndex Connect(long Bone);
 
     TString<0x80> Mesh;                                                     // +0x000
     TString<0x40> AccessoryHardpoint;                                       // +0x084
@@ -139,7 +139,7 @@ struct FEngineCharacterBody
     long GetRootBone() const;
     // FUN_004cba10 (thiscall, RET 4) -- Out = the 12 floats IEngine slot 40
     // GetInstanceTransform answers for the root bone. Returns Out.
-    FTransform* GetRootTransform(FTransform* Out) const;
+    Transform* GetRootTransform(Transform* Out) const;
     // FUN_004cba60 (thiscall, RET 4) -- with a deformable: IAnimation2 slot 27 MixerWalk(root
     // bone, Dt * AnimRate), IEngine slot 27 UpdateInstance(root bone, 0, Dt * AnimRate), and
     // when IDeformable slot 26 reports no running playback every animation slot is emptied.
@@ -164,7 +164,7 @@ struct FEngineCharacterBody
     TString<0x80> AnimNames[4];        // +0x044 the script each playback slot runs
     int AnimIds[4];                    // +0x254 playback ids, -1 = free
     float AnimRate;                    // +0x264 1.0
-    FTransform RootTransform;          // +0x268 last root-bone transform read
+    Transform RootTransform;          // +0x268 last root-bone transform read
 
 private:
     FEngineCharacterBody(FEngineCharacterBody const&) = delete;

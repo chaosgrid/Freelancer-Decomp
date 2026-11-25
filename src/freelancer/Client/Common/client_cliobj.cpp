@@ -1115,7 +1115,7 @@ namespace Archetype
         // The per-mesh body FUN_00425330 and its child callback LAB_004253f0 share: for every
         // LOD level from the last down, select it and hook up its materials through
         // IMatHookUp (no null test on the hook).
-        void UnloadMatHookUpsSimple(void* Handle)
+        void UnloadMatHookUpsSimple(ArchetypeIndex Handle)
         {
             int LodCount = 0;
             DALib::Renderer->GetArchetypeLodCount(Handle, &LodCount);
@@ -1125,8 +1125,8 @@ namespace Archetype
 
                 void* MatHook = nullptr;
                 GENRESULT const Qi = DALib::Engine->QueryEngineComponent(
-                    static_cast<int>(reinterpret_cast<ptrdiff_t>(Handle)),
-                    const_cast<char*>(Iids::MatHookUp), &MatHook);
+                    static_cast<int>(Handle),
+                    Iids::MatHookUp, &MatHook);
                 if (Qi >= 0)
                 {
                     IMatHookUp* const Hook = static_cast<IMatHookUp*>(MatHook);
@@ -1141,12 +1141,12 @@ namespace Archetype
         // globals.
         void UnloadEngineComponents(long EngineIndex)
         {
-            void* const Handle = reinterpret_cast<void*>(EngineIndex);
+            const ArchetypeIndex Handle = EngineIndex;
             if (DALib::Engine->IsCompoundArchetype(Handle) != 0)
             {
                 DALib::Engine->EnumerateArchetypeChildren(
                     Handle,
-                    [](void* Parent, void* ChildHandle, int Zero, void* Ctx) -> int {
+                    [](ArchetypeIndex Parent, ArchetypeIndex ChildHandle, int Zero, void* Ctx) -> int {
                         (void)Parent;
                         (void)Zero;
                         (void)Ctx;
@@ -1198,7 +1198,7 @@ namespace Archetype
         // FUN_004021b0 directly with (-1, mesh, 0, context). Nothing is null-tested.
         // The node's floats are read raw from the node base (Ranges, then whatever follows at
         // +0x20.. when the renderer reports more than eight levels), as retail indexes them.
-        int __cdecl ApplyArchLodRanges(void* ParentOrNeg1, void* MeshHandle, int /*Zero*/,
+        int __cdecl ApplyArchLodRanges(ArchetypeIndex ParentOrNeg1, ArchetypeIndex MeshHandle, int /*Zero*/,
                                        void* ContextRaw)
         {
             FArchLodContext* const Ctx = static_cast<FArchLodContext*>(ContextRaw);
@@ -1361,13 +1361,13 @@ namespace Archetype
 
             // A compound archetype runs FUN_00401ed0 over its children; otherwise on itself. The
             // answer is the context's maximum.
-            void* const Handle = reinterpret_cast<void*>(EngineIndex);
+            const ArchetypeIndex Handle = EngineIndex;
             if (DALib::Engine->IsCompoundArchetype(Handle) != 0)
             {
                 DALib::Engine->EnumerateArchetypeChildren(Handle, ApplyArchLodRanges, &Ctx);
                 return Ctx.MaxDistance;
             }
-            ApplyArchLodRanges(reinterpret_cast<void*>(-1), Handle, 0, &Ctx);
+            ApplyArchLodRanges(-1, Handle, 0, &Ctx);
             return Ctx.MaxDistance;
         }
 
@@ -4509,7 +4509,7 @@ namespace Archetype
         // The per-instance body FUN_00425480 inlines twice (the instance, then each related
         // instance): for every LOD index from the last down, select it and hook up the
         // instance's materials through IMatHookUp.
-        void HookUpInstanceMaterials(void* Instance)
+        void HookUpInstanceMaterials(InstanceIndex Instance)
         {
             int Count = 0;
             DALib::Renderer->GetInstanceLodCount(Instance, &Count);
@@ -4530,11 +4530,11 @@ namespace Archetype
     void HookUpInstanceTreeMaterials(long EngineIndex)
     {
         // FUN_00425480 (cdecl).
-        void* const Instance = reinterpret_cast<void*>(EngineIndex);
+        const InstanceIndex Instance = EngineIndex;
         HookUpInstanceMaterials(Instance);
         // The related-instance cursor starts from -1 and ends at -1.
-        void* const kNoInstance = reinterpret_cast<void*>(-1);
-        void* Related = DALib::Engine->GetRelatedInstance(Instance, 1, kNoInstance);
+        const InstanceIndex kNoInstance = -1;
+        InstanceIndex Related = DALib::Engine->GetRelatedInstance(Instance, 1, kNoInstance);
         while (Related != kNoInstance)
         {
             HookUpInstanceMaterials(Related);

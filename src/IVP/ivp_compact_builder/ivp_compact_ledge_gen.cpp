@@ -16,10 +16,6 @@
 #include "ivp_surface_builder_polygon_convex.h"
 #include "../ivp_utility/ivp_hash.h"
 
-// The IVP_Compact_Triangle constructor (FUN_0635aa20, 16 zero bytes), defined
-// in ivp_collision/ivp_mindist_limiter.cpp.
-extern "C" void* IVP_Compact_Triangle_Init(void* param_1_00);
-
 namespace
 {
     // FUN_0635aa50 (thiscall): the IVP_Compact_Ledge constructor, four zero

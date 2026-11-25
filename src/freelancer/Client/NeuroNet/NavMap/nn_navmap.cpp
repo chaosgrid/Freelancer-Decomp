@@ -25,7 +25,7 @@
 #include "Interface/win3d.h"                   // Win3DReparent, Win3DDeleteTree
 #include "Interface/win3d_engine_submit.h"     // Win3DRayHitsAabbHalfExtents (FUN_005a1130)
 #include "Interface/win_factory.h"
-#include "x86math.h"                 // FTransform, I3DMathEngine
+#include "x86math.h"                 // Transform, I3DMathEngine
 #include "common_csys.h"             // Acquire3DMathEngine (FUN_005b73e0)
 #include "common_id.h"               // CreateID
 #include "common_server.h"           // IServer
@@ -74,12 +74,12 @@ void NavMapScaleMeshRotation(FMeshHolder* Holder, float Factor)
 {
     // Inlined in retail. No test of the instance handle.
     IEngine* const Engine = DALib::Engine;
-    FTransform Transform;
-    memcpy(&Transform, Engine->GetInstanceTransform(Holder->EngineInstance), sizeof(Transform));
+    Transform Xform;
+    memcpy(&Xform, Engine->GetInstanceTransform(Holder->EngineInstance), sizeof(Xform));
     if (G_NavMapMath == nullptr)
         G_NavMapMath = Acquire3DMathEngine();
-    G_NavMapMath->Scale(Transform.Rotation, Transform.Rotation, Factor);
-    Engine->SetInstanceMatrix(Holder->EngineInstance, &Transform);
+    G_NavMapMath->Scale(Xform.Rotation, Xform.Rotation, Factor);
+    Engine->SetInstanceMatrix(Holder->EngineInstance, &Xform);
 }
 
 namespace
@@ -172,9 +172,9 @@ NeuroNetNavMap::NeuroNetNavMap()
     MapRotation[8] = 1.0f;
 
     // Retail re-stores the holders' instance slot (already -1).
-    ZoomedMapMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-    ZoomedMapMesh2.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-    PrettyMapMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    ZoomedMapMesh.EngineInstance = InvalidInstanceIndex;
+    ZoomedMapMesh2.EngineInstance = -1;
+    PrettyMapMesh.EngineInstance = static_cast<intptr_t>(-1);
     CachedObjectId = 0xffffffffu;
     HoveredObjective = -1;
 
@@ -228,7 +228,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     bResourcesLoaded = 0;
     bDebugShowAll = 0;
     bDrawZoneOutlines = 0;
-    GroupMarkerMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    GroupMarkerMesh.EngineInstance = InvalidInstanceIndex;
     Field_0x8c4 = 0;
     bViewSwitch = 0;
     bOutlineTerrainZonesOnly = 0;
@@ -237,7 +237,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     PulseIndex = -1;
     ZoomDistance = 1.0f;
     bBestPathObjectives = 1;
-    LegendMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    LegendMesh.EngineInstance = InvalidInstanceIndex;
     bItemClamped = 0;
 
     G_bNavMapNoBestPath = 0;
@@ -332,15 +332,15 @@ NeuroNetNavMap::~NeuroNetNavMap()
     operator delete(TradeLaneIndices);
     TradeLaneIndices = nullptr;
 
-    if (ZoomedMapMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (ZoomedMapMesh.EngineInstance != InvalidInstanceIndex)
         ClientUiMeshHolderRelease(&ZoomedMapMesh);
-    if (ZoomedMapMesh2.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (ZoomedMapMesh2.EngineInstance != InvalidInstanceIndex)
         ClientUiMeshHolderRelease(&ZoomedMapMesh2);
-    if (PrettyMapMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (PrettyMapMesh.EngineInstance != InvalidInstanceIndex)
         ClientUiMeshHolderRelease(&PrettyMapMesh);
-    if (GroupMarkerMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (GroupMarkerMesh.EngineInstance != InvalidInstanceIndex)
         ClientUiMeshHolderRelease(&GroupMarkerMesh);
-    if (LegendMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (LegendMesh.EngineInstance != InvalidInstanceIndex)
         ClientUiMeshHolderRelease(&LegendMesh);
 
     // The digit holders are released unconditionally.
@@ -915,7 +915,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
     // (through slot 5), then FUN_004b5060.
     Flags = static_cast<unsigned char>(Flags & 0xfc);
     SetOffset(0.624f, -0.23f, -0.22f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     return Win3D::Create(NewParent, Data);
 }
 
@@ -927,7 +927,7 @@ bool NeuroNetNavMap::ProcessMessage(unsigned Msg, unsigned A, unsigned B)
     if (Msg == kWinMsgShow)
     {
         if (GetParent() != nullptr)
-            SetPosition(GetParent()->Position);
+            SetPosition(&GetParent()->Position.x);
         InitialShow();
         TransitionTime = TransitionDuration;
         Flags = static_cast<unsigned char>(Flags | 3);
@@ -1028,26 +1028,26 @@ void NeuroNetNavMap::LoadMapResources()
     float Transform[12];
 
     // The first zoomed map at MeshPosition, its rotation scaled by 1.5.
-    Engine->SetInstancePosition(ZoomedMapMesh.EngineInstance, MeshPosition);
+    Engine->SetInstancePosition(ZoomedMapMesh.EngineInstance, (const Vector*)MeshPosition);
     memcpy(Transform, Engine->GetInstanceTransform(ZoomedMapMesh.EngineInstance),
            sizeof(Transform));
     for (int Index = 0; Index < 9; ++Index)
         Transform[Index] = Transform[Index] * 1.5f; // DAT_005ca220
-    Engine->SetInstanceMatrix(ZoomedMapMesh.EngineInstance, Transform);
+    Engine->SetInstanceMatrix(ZoomedMapMesh.EngineInstance, (const ::Transform*)Transform);
     Engine->UpdateInstance(ZoomedMapMesh.EngineInstance, 0, nullptr);
 
     // The second one only positioned.
-    Engine->SetInstancePosition(ZoomedMapMesh2.EngineInstance, MeshPosition);
+    Engine->SetInstancePosition(ZoomedMapMesh2.EngineInstance, (const Vector*)MeshPosition);
     Engine->UpdateInstance(ZoomedMapMesh2.EngineInstance, 0, nullptr);
 
     // The pretty map, [0] * 1.175 and [4] * 1.5 (double constants
     // DAT_005d3c50 / DAT_005d3c48).
-    Engine->SetInstancePosition(PrettyMapMesh.EngineInstance, MeshPosition);
+    Engine->SetInstancePosition(PrettyMapMesh.EngineInstance, (const Vector*)MeshPosition);
     memcpy(Transform, Engine->GetInstanceTransform(PrettyMapMesh.EngineInstance),
            sizeof(Transform));
     Transform[0] = static_cast<float>(static_cast<double>(Transform[0]) * 1.175);
     Transform[4] = static_cast<float>(static_cast<double>(Transform[4]) * 1.5);
-    Engine->SetInstanceMatrix(PrettyMapMesh.EngineInstance, Transform);
+    Engine->SetInstanceMatrix(PrettyMapMesh.EngineInstance, (const ::Transform*)Transform);
     Engine->UpdateInstance(PrettyMapMesh.EngineInstance, 0, nullptr);
 
     // The shapes (the inline ShapeDB.h:0xf2 find, "cmn\shapedb.h").

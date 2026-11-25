@@ -496,8 +496,8 @@ void IClientImpl::SendCommonPlayerTradeInitiateTrade(unsigned int /*ClientId*/, 
 {
     NnMainButtonOnModalOpen(); // FUN_0045a460
     WinFactoryCreate("NN_Trade", "NN_Trade", nullptr, nullptr);
-    float const Where[3] = {0.0f, 0.35f, -1.4f};
-    G_NnTrade->SetPosition(Where);
+    Vector const Where = {0.0f, 0.35f, -1.4f};
+    G_NnTrade->SetPosition(&Where.x);
     G_NnTrade->Flags = static_cast<unsigned char>(G_NnTrade->Flags | 0x03);
     G_NnTrade->SetTarget(ShipId); // FUN_004c2510
     ChatGroupTradeRequestRemoved(ShipId); // FUN_0046b520

@@ -141,7 +141,7 @@ bool PageAccountSelect::Create(Win3D* NewParent, void* /*Payload*/)
     SelectServer->SetSkipUpload(true);
     HideWin3D(AccountId);
     HideWin3D(Explain);
-    memcpy(BoxHome, AccountBox->Position, sizeof(BoxHome));
+    memcpy(&BoxHome, &AccountBox->Position, sizeof(BoxHome));
     return true;
 }
 
@@ -176,16 +176,16 @@ void PageAccountSelect::Update()
             float const Lift[3] = {0.0f, T, 0.0f};
             Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BackOffset), 0);
             SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ServerOffset), 0);
-            float BoxPosition[3];
-            Win3DVec3Add(BoxPosition, BoxHome, Lift);
-            AccountBox->SetPosition(BoxPosition);
+            Vector BoxPosition;
+            Win3DVec3Add(&BoxPosition.x, &BoxHome.x, Lift);
+            AccountBox->SetPosition(&BoxPosition.x);
         }
         else
         {
             float ZeroOffset[3] = {0.0f, 0.0f, 0.0f};
             Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
             SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ZeroOffset), 0);
-            AccountBox->SetPosition(BoxHome);
+            AccountBox->SetPosition(&BoxHome.x);
             ShowWin3D(Explain);
             ShowWin3D(AccountId);
             Back->SetSkipUpload(false);
@@ -209,8 +209,8 @@ void PageAccountSelect::Update()
         float ServerOffset[3] = {static_cast<float>(-SlideT), 0.0f, 0.0f};
         Back->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(BackOffset), 0);
         SelectServer->SetProperty(kWinPropOffset, reinterpret_cast<uintptr_t>(ServerOffset), 0);
-        float BoxPosition[3] = {BoxHome[0], T + BoxHome[1], BoxHome[2]}; // FUN_00422b80
-        AccountBox->SetPosition(BoxPosition);
+        Vector BoxPosition = {BoxHome.x, T + BoxHome.y, BoxHome.z}; // FUN_00422b80
+        AccountBox->SetPosition(&BoxPosition.x);
 
         if (SlideT <= -0.9)
         {

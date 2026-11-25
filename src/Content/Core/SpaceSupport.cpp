@@ -1040,7 +1040,7 @@ namespace
 // x87 stack (z*z + y*y + x*x; double here); the length is the square times the 0x5f3759df
 // estimate refined once (0.5f DAT_06fb605c, 1.5f DAT_06fb6058) from the square stored as
 // float. Strictly below the radius is inside; equal, greater or unordered is outside.
-bool __cdecl TestExclusionSpheres(float const* Position,
+bool __cdecl TestExclusionSpheres(Vector const* Position,
                                   std::vector<FSpacePopExclusionSphere> const* Spheres,
                                   bool const* bAll, bool const* bInside)
 {
@@ -1052,9 +1052,9 @@ bool __cdecl TestExclusionSpheres(float const* Position,
     for (std::vector<FSpacePopExclusionSphere>::const_iterator It = Spheres->begin();
          It != Spheres->end(); ++It)
     {
-        double DX = static_cast<double>(Position[0]) - It->X;
-        double DY = static_cast<double>(Position[1]) - It->Y;
-        double DZ = static_cast<double>(Position[2]) - It->Z;
+        double DX = static_cast<double>(Position->x) - It->X;
+        double DY = static_cast<double>(Position->y) - It->Y;
+        double DZ = static_cast<double>(Position->z) - It->Z;
         double Square = DZ * DZ + DY * DY + DX * DX;
         float StoredSquare = static_cast<float>(Square);
         int Bits;

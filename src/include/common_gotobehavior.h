@@ -72,9 +72,7 @@ public:
     // +0x2d8..+0x2e0: the steering triple set_direction (FUN_062fe970) writes -- -Dir.y and
     // -Dir.x scaled by 1/turn-sensitivity and clamped to [-1,1], then -Dir.z
     // (FSTP dword at .text:062fe9cb/062fe9de/062feaca).
-    float SteerAxisX;             // +0x2d8. Zeroed by ctor.
-    float SteerAxisY;              // +0x2dc. Zeroed by ctor.
-    float SteerAxisZ;               // +0x2e0. Zeroed by ctor.
+    Vector SteerAxis;             // +0x2d8. Zeroed by ctor.
     // +0x2e4: a throttle. set_throttle (LAB_062feae0) stores its float argument here and
     // set_cruise / OnEngage copy MaxThrottle into it.
     float UserThrottle;                // +0x2e4. Zeroed by ctor.
@@ -169,9 +167,7 @@ public:
 static_assert(offsetof(GotoBehavior, Move) == 0x2c, "GotoBehavior::Move offset");
 static_assert(offsetof(GotoBehavior, Face) == 0xa4, "GotoBehavior::Face offset");
 static_assert(offsetof(GotoBehavior, SplineMove) == 0x164, "GotoBehavior::SplineMove offset");
-static_assert(offsetof(GotoBehavior, SteerAxisX) == 0x2d8, "GotoBehavior::SteerAxisX offset");
-static_assert(offsetof(GotoBehavior, SteerAxisY) == 0x2dc, "GotoBehavior::SteerAxisY offset");
-static_assert(offsetof(GotoBehavior, SteerAxisZ) == 0x2e0, "GotoBehavior::SteerAxisZ offset");
+static_assert(offsetof(GotoBehavior, SteerAxis) == 0x2d8, "GotoBehavior::SteerAxis offset");
 static_assert(offsetof(GotoBehavior, UserThrottle) == 0x2e4, "GotoBehavior::UserThrottle offset");
 static_assert(offsetof(GotoBehavior, Flag2e8) == 0x2e8, "GotoBehavior::Flag2e8 offset");
 static_assert(offsetof(GotoBehavior, Flag2e9) == 0x2e9, "GotoBehavior::Flag2e9 offset");

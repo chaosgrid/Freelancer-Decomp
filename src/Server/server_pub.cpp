@@ -505,9 +505,9 @@ SERVER_API int __cdecl SetInitialPos(const unsigned int& player_id, const Vector
     if (!IsValidPlayer(player_id)) return -2;
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
     if (!p) return -2;
-    p->initial_pos[0] = pos.x;
-    p->initial_pos[1] = pos.y;
-    p->initial_pos[2] = pos.z;
+    p->initial_pos.x = pos.x;
+    p->initial_pos.y = pos.y;
+    p->initial_pos.z = pos.z;
     return 0;
 }
 
@@ -517,7 +517,7 @@ SERVER_API int __cdecl SetInitialOrnt(const unsigned int& player_id, const Matri
     PlayerSlot* p = PlayerDB_GetPlayer(player_id);
     if (!p) return -2;
     for (int i = 0; i < 9; i++) {
-        ((float*)p->initial_ornt)[i] = ((const float*)&orient)[i];
+        (&p->initial_ornt.E[0][0])[i] = (&orient.E[0][0])[i];
     }
     return 0;
 }
@@ -641,8 +641,7 @@ SERVER_API int __cdecl SetCamera(unsigned int player_id, const Transform& transf
 
     // No null test on the engine and no seed for the quaternion (the call writes all
     // four dwords). Retail passes &transform, which works because Rotation is at +0x00.
-    Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Block.Orient),
-                                             reinterpret_cast<FMatrix const&>(transform.Rotation));
+    Server_MathEngine()->MatrixToQuaternion(Block.Orient, transform.Rotation);
 
     Block.Fov = fov;
     Block.Aspect = aspect;

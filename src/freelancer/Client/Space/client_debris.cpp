@@ -17,7 +17,7 @@
 #include "Space/Effects/particle_effect.h"    // CliCreateEffectOneShot (FUN_00503070)
 #include "Space/star_sys.h"           // StarSysGetActiveSystemId / StarSysFindNebula
 #include "Common/Graphics/vis_effect_arch.h"    // FindEffectArch (FUN_0040f080)
-#include "x86math.h"            // I3DMathEngine, FTransform
+#include "x86math.h"            // I3DMathEngine, Transform
 
 #include <cfloat>
 #include <cstdint>
@@ -336,37 +336,37 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
             Where = get_position();
         Vector const Velocity = get_velocity();
         Matrix const Look = LookMatrix(Velocity);
-        FTransform World;
-        World.Rotation = reinterpret_cast<FMatrix const&>(Look);
-        World.Translation.X = Where.x;
-        World.Translation.Y = Where.y;
-        World.Translation.Z = Where.z;
+        Transform World;
+        World.Rotation = Look;
+        World.Translation.x = Where.x;
+        World.Translation.y = Where.y;
+        World.Translation.z = Where.z;
 
         // The inverse of the object's frame: rotation transposed (FUN_00447b60), translation
         // -(M^T * P) (FUN_00447be0); FUN_00447bb0 packs the two.
         Transform const& ObjectFrame = reinterpret_cast<Transform const&>(get_orientation());
-        FMatrix const& Rotation = reinterpret_cast<FMatrix const&>(ObjectFrame.Rotation);
-        FVector ObjectPos;
-        ObjectPos.X = ObjectFrame.Translation.x;
-        ObjectPos.Y = ObjectFrame.Translation.y;
-        ObjectPos.Z = ObjectFrame.Translation.z;
-        FVector Rotated;
+        Matrix const& Rotation = ObjectFrame.Rotation;
+        Vector ObjectPos;
+        ObjectPos.x = ObjectFrame.Translation.x;
+        ObjectPos.y = ObjectFrame.Translation.y;
+        ObjectPos.z = ObjectFrame.Translation.z;
+        Vector Rotated;
         ShipTransposeRotate(Rotated, Rotation, ObjectPos);
-        FTransform Inverse;
+        Transform Inverse;
         int Row = 0;
         for (Row = 0; Row < 3; ++Row)
         {
             int Col = 0;
             for (Col = 0; Col < 3; ++Col)
-                Inverse.Rotation.D[Row][Col] = Rotation.D[Col][Row];
+                Inverse.Rotation.E[Row][Col] = Rotation.E[Col][Row];
         }
-        Inverse.Translation.X = -Rotated.X;
-        Inverse.Translation.Y = -Rotated.Y;
-        Inverse.Translation.Z = -Rotated.Z;
+        Inverse.Translation.x = -Rotated.x;
+        Inverse.Translation.y = -Rotated.y;
+        Inverse.Translation.z = -Rotated.z;
 
         if (G_DebrisMathEngine == nullptr)
             G_DebrisMathEngine = Acquire3DMathEngine();
-        FTransform Local;
+        Transform Local;
         G_DebrisMathEngine->MulTransform(Local, Inverse, World);
 
         // The trail id is tested again (retail).
@@ -435,9 +435,9 @@ FClientDebrisGameobj* CreateDebrisGameobjFromArch(Archetype::Root* Arch,
     std::memset(&Parms, 0, sizeof(Parms));
     Parms.Mass = 1.0f;
     Parms.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-    Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-    Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-    Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+    Parms.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+    Parms.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+    Parms.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
     Parms.SystemId = 0;
     Parms.Type = 2;
     Parms.bPhysicalUnmoveable = 0;

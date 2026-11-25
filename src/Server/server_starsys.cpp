@@ -1649,12 +1649,8 @@ unsigned int StarSystem::scan_objects(unsigned int* OutIds, unsigned int MaxCoun
 
     // Up to 0x800 hits; the query's return value is not used, the count is read back from
     // the block.
-    struct FBucketQuery
-    {
-        Vector Pos;
-        float Radius;
-    } Sphere;
-    Sphere.Pos = *Pos;
+    Geometry::Sphere Sphere;
+    Sphere.Center = *Pos;
     Sphere.Radius = Radius;
     struct FBucketResult
     {
@@ -1664,9 +1660,9 @@ unsigned int StarSystem::scan_objects(unsigned int* OutIds, unsigned int MaxCoun
     } Found;
     Found.Capacity = 0x800u;
     Found.Count = 0u;
-    // ISpatialPartition +0x1c (sphere query); the stack sphere and result have the layouts of
-    // Geometry::Sphere and FSpatialQueryResult.
-    static_cast<ISpatialPartition*>(Bucket)->QuerySphere(reinterpret_cast<Geometry::Sphere const*>(&Sphere),
+    // ISpatialPartition +0x1c (sphere query); the stack result has the layout of
+    // FSpatialQueryResult.
+    static_cast<ISpatialPartition*>(Bucket)->QuerySphere(&Sphere,
                                                          reinterpret_cast<FSpatialQueryResult*>(&Found));
 
     // Each hit while the buffer has room; a non-zero get_type result skips it.
@@ -1758,16 +1754,11 @@ void StarSystem::update_near_ships(float Step)
         unsigned int Count;
         void* Items[0x800];
     };
-    struct FScanSphere {
-        Vector Center;
-        float Radius;
-    };
     FScanList Scan;                     // on retail's 0x20a0-byte frame
     Scan.Capacity = 0x800;
     Scan.Count = 0;
 
-    // ISpatialPartition +0x1c (sphere query); FScanSphere / FScanList have the layouts of
-    // Geometry::Sphere and FSpatialQueryResult.
+    // ISpatialPartition +0x1c (sphere query); FScanList has the layout of FSpatialQueryResult.
     ISpatialPartition* const Partition = static_cast<ISpatialPartition*>(Bucket);
 
     for (SystemPlayerNode* Node = static_cast<SystemPlayerNode*>(PlayerListHead)->Next;
@@ -1778,11 +1769,10 @@ void StarSystem::update_near_ships(float Step)
         GameObject* const Ship = Server_LookupGameObject(ShipId);
         if (Ship == nullptr)
             continue;
-        FScanSphere Sphere;
+        Geometry::Sphere Sphere;
         Sphere.Radius = 10000.0f;       // DAT_06d88af0
         Sphere.Center = Ship->get_position();
-        Partition->QuerySphere(reinterpret_cast<Geometry::Sphere const*>(&Sphere),
-                               reinterpret_cast<FSpatialQueryResult*>(&Scan));
+        Partition->QuerySphere(&Sphere, reinterpret_cast<FSpatialQueryResult*>(&Scan));
     }
 
     FSystemListNode* It = nullptr;
@@ -2380,7 +2370,7 @@ void StarSystem::add_ship(GameObject* Obj, PhySys::CreateParms* Parms, Vector co
     Raw->WorldPosition = Pos;
     Raw->Orientation = Orient;
 
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Raw->EngineInstanceId), 0, nullptr);
+    DALib::Engine->UpdateInstance(Raw->EngineInstanceId, 0, nullptr);
 
     Obj->enter_system(this, Parms);
 

@@ -410,8 +410,7 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
 
             Matrix const Look = LookMatrix(Dir);
             Quaternion Orient;
-            Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
-                                                       reinterpret_cast<FMatrix const&>(Look));
+            Server_MathEngine()->MatrixToQuaternion(Orient, Look);
             *OutOrient = Orient;
         }
         else
@@ -441,8 +440,7 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
             RingEq->launch_pos(*OutPos, LaunchOrient, *OutKind);
 
             Quaternion Orient;
-            Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
-                                                       reinterpret_cast<FMatrix const&>(LaunchOrient));
+            Server_MathEngine()->MatrixToQuaternion(Orient, LaunchOrient);
             *OutOrient = Orient;
         }
 
@@ -468,18 +466,17 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
         Solar->launch_pos(*OutPos, LaunchOrient, Kind);
 
         Quaternion Orient;
-        Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
-                                                   reinterpret_cast<FMatrix const&>(LaunchOrient));
+        Server_MathEngine()->MatrixToQuaternion(Orient, LaunchOrient);
         *OutOrient = Orient;
         return;
     }
 
     PlayerData& Slot = Players[PlayerId];
-    OutPos->x = Slot.initial_pos[0];
-    OutPos->y = Slot.initial_pos[1];
-    OutPos->z = Slot.initial_pos[2];
+    OutPos->x = Slot.initial_pos.x;
+    OutPos->y = Slot.initial_pos.y;
+    OutPos->z = Slot.initial_pos.z;
     Quaternion Orient;
-    Server_MathEngine()->MatrixToQuaternion(reinterpret_cast<FQuaternion&>(Orient),
-                                               reinterpret_cast<FMatrix const&>(Slot.initial_ornt));
+    Server_MathEngine()->MatrixToQuaternion(
+        Orient, Slot.initial_ornt);
     *OutOrient = Orient;
 }

@@ -53,7 +53,7 @@ void FEquipVisualSet::Clear()
     {
         if (Instances[Index] != -1)
         {
-            DALib::Engine->DestroyInstance(reinterpret_cast<void*>(Instances[Index]));
+            DALib::Engine->DestroyInstance(Instances[Index]);
             Instances[Index] = -1;
         }
         ArchIds[Index] = 0;
@@ -112,9 +112,9 @@ bool FEquipVisualSet::Attach(int HpIndex, Archetype::Equipment const* Equip)
         return false;
 
     // FUN_0041c540.
-    Instances[HpIndex] = static_cast<long>(reinterpret_cast<intptr_t>(MiscUtilLoadEngineInstance(
+    Instances[HpIndex] = MiscUtilLoadEngineInstance(
         Good->AttachmentArchetype.Value, DALib::Data, nullptr, nullptr,
-        Archetype::CliObjMaterialPaths(Companion), &MaterialEntries, nullptr)));
+        Archetype::CliObjMaterialPaths(Companion), &MaterialEntries, nullptr);
 
     char const* const HpChild = Good->HpChild.Value;
     if (HpChild != nullptr)
@@ -126,8 +126,8 @@ bool FEquipVisualSet::Attach(int HpIndex, Archetype::Equipment const* Equip)
         FHardpointKey ParentKey;
         ParentKey.Name = Summary->get_name(HpIndex);
         ParentKey.Crc = DACOM_CRC::GetCRC32(ParentKey.Name);
-        void* const Child = reinterpret_cast<void*>(Instances[HpIndex]);
-        void* const Parent = reinterpret_cast<void*>(Summary->get_instance(HpIndex));
+        const InstanceIndex Child = Instances[HpIndex];
+        const InstanceIndex Parent = Summary->get_instance(HpIndex);
         DALib::Hardpoint->ConnectHardpoints(Parent, &ParentKey, Child, &ChildKey);
         return true;
     }
@@ -142,8 +142,8 @@ bool FEquipVisualSet::Attach(int HpIndex, Archetype::Equipment const* Equip)
     memcpy(&Payload[4], &PosInfo.Position, 3 * sizeof(float));
     HardpointInfo const& OrientInfo = Summary->get_info(HpIndex);
     memcpy(&Payload[7], &OrientInfo.Orient, 9 * sizeof(float));
-    void* const Child = reinterpret_cast<void*>(Instances[HpIndex]);
-    void* const Parent = reinterpret_cast<void*>(Summary->get_instance(HpIndex));
+    const InstanceIndex Child = Instances[HpIndex];
+    const InstanceIndex Parent = Summary->get_instance(HpIndex);
     DALib::Engine->CreateJoint(Parent, Child, Payload);
     return true;
 }
@@ -153,7 +153,7 @@ void FEquipVisualSet::Detach(int HpIndex)
     // FUN_00458160.
     if (Instances[HpIndex] != -1)
     {
-        DALib::Engine->DestroyInstance(reinterpret_cast<void*>(Instances[HpIndex]));
+        DALib::Engine->DestroyInstance(Instances[HpIndex]);
         Instances[HpIndex] = -1;
     }
     ArchIds[HpIndex] = 0;

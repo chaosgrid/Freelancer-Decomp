@@ -75,12 +75,12 @@ namespace
             Bytes[ByteIndex] = 0xFFu;
     }
 
-    void MakeIdentityTransform(FTransform* Out)
+    void MakeIdentityTransform(Transform* Out)
     {
-        std::memset(Out, 0, sizeof(FTransform));
-        Out->Rotation.D[0][0] = 1.0f;
-        Out->Rotation.D[1][1] = 1.0f;
-        Out->Rotation.D[2][2] = 1.0f;
+        std::memset(Out, 0, sizeof(Transform));
+        Out->Rotation.E[0][0] = 1.0f;
+        Out->Rotation.E[1][1] = 1.0f;
+        Out->Rotation.E[2][2] = 1.0f;
     }
 }
 
@@ -112,7 +112,7 @@ int FvfTexcoordBlockBytes(unsigned Fvf)
 }
 
 // FUN_00406880
-void CopyTransform12(FTransform* Dest, FTransform const* Source)
+void CopyTransform12(Transform* Dest, Transform const* Source)
 {
     unsigned* Dst = reinterpret_cast<unsigned*>(Dest);
     unsigned const* Src = reinterpret_cast<unsigned const*>(Source);
@@ -141,7 +141,7 @@ void PartCacheEntryConstruct(FPartCacheEntry* Entry)
     Entry->Vertices = nullptr;
     Entry->IndexCount = 0;
     Entry->Indices = nullptr;
-    Entry->InstanceId = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    Entry->InstanceId = InvalidInstanceIndex;
     Entry->Tag = 0xFFFFFFFFu;
     Entry->bHidden = 0;
     Entry->bActive = 1;
@@ -171,7 +171,7 @@ void PartCacheClear(FPartCache* Cache)
 }
 
 // FUN_00405fb0 (thiscall on the entry, RET 8: Wire, Xform). The wire is used untested.
-void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, FTransform const* Xform)
+void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, Transform const* Xform)
 {
     unsigned char* HeaderBytes = static_cast<unsigned char*>(Wire->GetMeshData());
     unsigned char* PartBytes = static_cast<unsigned char*>(Wire->GetWireData());
@@ -241,16 +241,16 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, FTransform
             if (Mapped == 0xFFFFu)
             {
                 *RemapSlot = Compacted;
-                FVector const* Source = reinterpret_cast<FVector const*>(
+                Vector const* Source = reinterpret_cast<Vector const*>(
                     VertexPool
                     + static_cast<unsigned>(static_cast<unsigned short>(IbBias + RawIndex))
                           * Stride);
-                FVector Transformed;
+                Vector Transformed;
                 PartCacheMath()->TransformXform(Transformed, *Xform, *Source);
                 FPartCacheVertex* OutVert = Entry->Vertices + Compacted;
-                OutVert->X = Transformed.X;
-                OutVert->Y = Transformed.Y;
-                OutVert->Z = Transformed.Z;
+                OutVert->X = Transformed.x;
+                OutVert->Y = Transformed.y;
+                OutVert->Z = Transformed.z;
                 OutVert->Tag = Entry->Tag;
                 Mapped = Compacted;
                 Compacted = static_cast<unsigned short>(Compacted + 1);
@@ -266,7 +266,7 @@ void PartCacheBuildFromWire(FPartCacheEntry* Entry, IVMeshWire* Wire, FTransform
 // FUN_00406230 (thiscall on the entry, RET 8: Mesh, Xform). Run twice: a counting pass (no
 // index buffer yet) and a filling pass. The Cell* locals are out-arguments the code never
 // reads.
-unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform const* Xform)
+unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, Transform const* Xform)
 {
     unsigned short* Remap = nullptr;
     unsigned ReturnCursor = 0;
@@ -361,15 +361,15 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform 
                             Compacted += 1;
                             Remap[RawIndex] = Mapped;
 
-                            FVector const* Source =
-                                reinterpret_cast<FVector const*>(Positions + RawIndex * 3U);
-                            FVector Transformed;
+                            Vector const* Source =
+                                reinterpret_cast<Vector const*>(Positions + RawIndex * 3U);
+                            Vector Transformed;
                             PartCacheMath()->TransformXform(Transformed, *Xform, *Source);
 
                             FPartCacheVertex* OutVert = Entry->Vertices + Mapped;
-                            OutVert->X = Transformed.X;
-                            OutVert->Y = Transformed.Y;
-                            OutVert->Z = Transformed.Z;
+                            OutVert->X = Transformed.x;
+                            OutVert->Y = Transformed.y;
+                            OutVert->Z = Transformed.z;
                             OutVert->Tag = Entry->Tag;
                         }
 
@@ -396,7 +396,7 @@ unsigned PartCacheBuildFromMesh(FPartCacheEntry* Entry, IMesh* Mesh, FTransform 
 }
 
 // FUN_00406200
-void PartCacheBuildFromMeshTwice(FPartCacheEntry* Entry, IMesh* Mesh, FTransform const* Xform)
+void PartCacheBuildFromMeshTwice(FPartCacheEntry* Entry, IMesh* Mesh, Transform const* Xform)
 {
     unsigned First = PartCacheBuildFromMesh(Entry, Mesh, Xform);
     Entry->IndexCount = First;
@@ -407,7 +407,7 @@ namespace
 {
     // The record search FUN_00405930 / FUN_00405a00 inline for the instance and for every
     // child: PartCount compared SIGNED and re-read per pass.
-    FPartCacheEntry* PartCacheFindRecord(FPartCache* Cache, void* Instance)
+    FPartCacheEntry* PartCacheFindRecord(FPartCache* Cache, InstanceIndex Instance)
     {
         int const PartCount = static_cast<int>(Cache->PartCount);
         for (int PartIndex = 0; PartIndex < PartCount; ++PartIndex)
@@ -434,9 +434,9 @@ namespace
 
 // FUN_00405930 (thiscall, RET 8: Instance, bRecurseChildren). No test of the cache or of
 // DALib::Engine.
-void PartCacheMarkHidden(FPartCache* Cache, void* Instance, bool bRecurseChildren)
+void PartCacheMarkHidden(FPartCache* Cache, InstanceIndex Instance, bool bRecurseChildren)
 {
-    void* const kInvalid = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    const InstanceIndex kInvalid = InvalidInstanceIndex;
 
     FPartCacheEntry* Found = PartCacheFindRecord(Cache, Instance);
     if (Found != nullptr)
@@ -445,7 +445,7 @@ void PartCacheMarkHidden(FPartCache* Cache, void* Instance, bool bRecurseChildre
     if (!bRecurseChildren)
         return;
 
-    void* Child = DALib::Engine->GetRelatedInstance(Instance, 0, kInvalid);
+    InstanceIndex Child = DALib::Engine->GetRelatedInstance(Instance, 0, kInvalid);
     while (Child != kInvalid)
     {
         Found = PartCacheFindRecord(Cache, Child);
@@ -469,9 +469,9 @@ void PartCacheClearHiddenActive(FPartCache* Cache)
 
 // FUN_00405a00 (thiscall, RET 0xc: Instance, bRecurseChildren, Tag). Returns whether any
 // record matched. No test of the cache, of the vertex array or of DALib::Engine.
-bool PartCacheActivatePart(FPartCache* Cache, void* Instance, bool bRecurseChildren, unsigned Tag)
+bool PartCacheActivatePart(FPartCache* Cache, InstanceIndex Instance, bool bRecurseChildren, unsigned Tag)
 {
-    void* const kInvalid = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    const InstanceIndex kInvalid = InvalidInstanceIndex;
     bool bFound = false;
 
     FPartCacheEntry* Found = PartCacheFindRecord(Cache, Instance);
@@ -484,7 +484,7 @@ bool PartCacheActivatePart(FPartCache* Cache, void* Instance, bool bRecurseChild
     if (!bRecurseChildren)
         return bFound;
 
-    void* Child = DALib::Engine->GetRelatedInstance(Instance, 0, kInvalid);
+    InstanceIndex Child = DALib::Engine->GetRelatedInstance(Instance, 0, kInvalid);
     while (Child != kInvalid)
     {
         Found = PartCacheFindRecord(Cache, Child);
@@ -499,9 +499,9 @@ bool PartCacheActivatePart(FPartCache* Cache, void* Instance, bool bRecurseChild
 }
 
 // FUN_00405b10 (thiscall on the cache, RET 8: Instance, Tag).
-bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
+bool PartCacheBuild(FPartCache* Cache, InstanceIndex Instance, unsigned Tag)
 {
-    void* const kInvalid = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    const InstanceIndex kInvalid = InvalidInstanceIndex;
 
     if (Instance == kInvalid)
         return false;
@@ -526,18 +526,18 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
     Cache->MergedIndices = nullptr;
 
     // The parts are cached in the instance's identity pose.
-    FTransform SavedTransform;
-    float* TransformPtr = Engine->GetInstanceTransform(Instance);
-    CopyTransform12(&SavedTransform, reinterpret_cast<FTransform const*>(TransformPtr));
+    Transform SavedTransform;
+    const Transform* TransformPtr = Engine->GetInstanceTransform(Instance);
+    CopyTransform12(&SavedTransform, TransformPtr);
 
-    FTransform Identity;
+    Transform Identity;
     MakeIdentityTransform(&Identity);
     Engine->SetInstanceMatrix(Instance, &Identity);
     Engine->UpdateInstance(Instance, 0, nullptr);
 
     // Root + children.
     Cache->PartCount = 1;
-    void* Child = Engine->GetRelatedInstance(Instance, 0, kInvalid);
+    InstanceIndex Child = Engine->GetRelatedInstance(Instance, 0, kInvalid);
     while (Child != kInvalid)
     {
         Cache->PartCount += 1;
@@ -567,9 +567,9 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
     Entries[0].InstanceId = Instance;
     Entries[0].bSkipWeightTest = 0;
 
-    FTransform WorldXform;
+    Transform WorldXform;
     TransformPtr = Engine->GetInstanceTransform(Instance);
-    CopyTransform12(&WorldXform, reinterpret_cast<FTransform const*>(TransformPtr));
+    CopyTransform12(&WorldXform, TransformPtr);
 
     {
         // EH states 1 and 2: FUN_00526a20 release-and-clear holders, destroyed Mesh first.
@@ -602,7 +602,7 @@ bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
         Entry->bSkipWeightTest = 0;
 
         TransformPtr = Engine->GetInstanceTransform(Child);
-        CopyTransform12(&WorldXform, reinterpret_cast<FTransform const*>(TransformPtr));
+        CopyTransform12(&WorldXform, TransformPtr);
 
         {
             FPartComHolder Wire;
@@ -675,7 +675,7 @@ namespace
     }
 }
 
-void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
+void PartCacheDraw(FPartCache* Cache, ICamera* Camera, Transform const* Xform)
 {
     // FUN_00406510.
     PartDrawApplyStates(DALib::Pipeline, kPartDrawStatesOff);
@@ -777,16 +777,16 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
     DALib::Pipeline->GetPipelineState(7, &bCombined);
     if (bCombined != 0)
     {
-        FTransform const* const View =
-            reinterpret_cast<FTransform const*>(Camera->GetViewTransform());
-        FTransform Product;
+        Transform const* const View =
+            Camera->GetViewTransform();
+        Transform Product;
         PartCacheMath()->MulTransform(Product, *View, *Xform);
-        FTransform Modelview = Product;
-        DALib::Pipeline->SetModelview(reinterpret_cast<float const*>(&Modelview));
+        Transform Modelview = Product;
+        DALib::Pipeline->SetModelview(&Modelview);
     }
     else
     {
-        DALib::Pipeline->SetWorld(reinterpret_cast<float const*>(Xform));
+        DALib::Pipeline->SetWorld(Xform);
         DALib::Pipeline->SetView(Camera->GetViewTransform());
     }
 
@@ -798,17 +798,17 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
 }
 
 // FUN_00402580
-int BindRendererLods(void* Instance, int PreferredLod, FRendererLodMap* Saved)
+int BindRendererLods(InstanceIndex Instance, int PreferredLod, FRendererLodMap* Saved)
 {
     int LargestMax = 0;
-    if (Instance == reinterpret_cast<void*>(-1))
+    if (Instance == InvalidInstanceIndex)
         return 0;
 
     if (Saved != nullptr)
     {
         int Current = 0;
         if (DALib::Renderer->GetInstanceCurrentLod(Instance, &Current) >= 0)
-            (*Saved)[Instance] = Current;
+            (*Saved)[(void*)Instance] = Current;
     }
 
     int LodCount = 0;
@@ -823,14 +823,14 @@ int BindRendererLods(void* Instance, int PreferredLod, FRendererLodMap* Saved)
     if (MaxIndex > 0)
         LargestMax = MaxIndex;
 
-    void* Child = DALib::Engine->GetRelatedInstance(Instance, 0, reinterpret_cast<void*>(-1));
-    while (Child != reinterpret_cast<void*>(-1))
+    InstanceIndex Child = DALib::Engine->GetRelatedInstance(Instance, 0, -1);
+    while (Child != InvalidInstanceIndex)
     {
         if (Saved != nullptr)
         {
             int Current = 0;
             if (DALib::Renderer->GetInstanceCurrentLod(Child, &Current) >= 0)
-                (*Saved)[Child] = Current;
+                (*Saved)[(void*)Child] = Current;
         }
 
         int ChildCount = 0;
@@ -852,11 +852,11 @@ int BindRendererLods(void* Instance, int PreferredLod, FRendererLodMap* Saved)
 }
 
 // FUN_00402720
-void ApplyRendererDetailQueue(void* /*UnusedInstance*/, FRendererLodMap const* Saved)
+void ApplyRendererDetailQueue(InstanceIndex /*UnusedInstance*/, FRendererLodMap const* Saved)
 {
     for (FRendererLodMap::const_iterator It = Saved->begin(); It != Saved->end(); ++It)
     {
-        void* const Inst = It->first;
+        const InstanceIndex Inst = (InstanceIndex)It->first;
         int DetailIndex = It->second;
 
         int LodCount = 0;

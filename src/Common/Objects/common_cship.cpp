@@ -159,9 +159,9 @@ void CShip::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     PhySys::CreateParms Phy;
     memset(&Phy, 0, sizeof(Phy));
     Phy.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-    Phy.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-    Phy.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-    Phy.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+    Phy.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+    Phy.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+    Phy.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
     Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     _itoa((int)Id, Phy.Name, 0x18);
     Phy.Mass = Archetype->Mass;
@@ -211,7 +211,7 @@ void CShip::init(CreateParms const& Parms)
     if (ShipArch->BayDoorAnim.Value[0] != '\0')
     {
         unsigned long const PlayId = DALib::Anim->PlayScript(AsOpaqueDword(Archetype->AnimIndex),
-                                                             AsOpaqueDword(EngineInstanceId),
+                                                             EngineInstanceId,
                                                              ShipArch->BayDoorAnim.Value,
                                                              nullptr, nullptr);
         BayAnim.Index = (int)PlayId;
@@ -824,7 +824,7 @@ bool CShip::generate_follow_offset(IObjInspect const* Inspect, Transform& OutOff
     Spin.E[2][2] = 1.0f;
 
     Vector Rotated;
-    Acquire3DMathEngine()->TransformMatrix((FVector&)Rotated, (FMatrix const&)Spin, (FVector const&)Offset);
+    Acquire3DMathEngine()->TransformMatrix(Rotated, Spin, Offset);
     OutOffset.Translation = Rotated;
 
     // vtable +0x64; only the centre is used.
@@ -832,8 +832,7 @@ bool CShip::generate_follow_offset(IObjInspect const* Inspect, Transform& OutOff
     (void)get_physical_radius_r(Center);
 
     Matrix const Orient = Orientation;
-    Acquire3DMathEngine()->TransformMatrix((FVector&)Rotated, (FMatrix const&)Orient,
-                                           (FVector const&)OutOffset.Translation);
+    Acquire3DMathEngine()->TransformMatrix(Rotated, Orient, OutOffset.Translation);
 
     OutOffset.Translation.x = (float)((double)(Rotated.x) + Center.x);
     OutOffset.Translation.y = (float)((double)(Rotated.y) + Center.y);
@@ -1559,8 +1558,7 @@ bool CShip::check_formation_follower_status(float MaxDistance)
 
         // I3DMathEngine slot 0x28, this+8 read as one Transform.
         Vector Slot;
-        Acquire3DMathEngine()->TransformXform((FVector&)Slot, (FTransform const&)Orientation,
-                                              (FVector const&)Offset);
+        Acquire3DMathEngine()->TransformXform(Slot, (Transform const&)Orientation, Offset);
 
         Vector const& FollowerPos = Follower->get_position();
         double const Dx = (double)(FollowerPos.x) - Slot.x;

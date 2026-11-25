@@ -271,10 +271,10 @@ void __cdecl ResetFormationState(FContentShipBase* Ship)
     Offset.z = 0.0f;
     if (Ship->Formation != nullptr)
     {
-        FVector SlotPosition = Ship->Formation->GetSlotPosition(Ship->FormationSlot);
-        Offset.x = SlotPosition.X;
-        Offset.y = SlotPosition.Y;
-        Offset.z = SlotPosition.Z;
+        Vector SlotPosition = Ship->Formation->GetSlotPosition(Ship->FormationSlot);
+        Offset.x = SlotPosition.x;
+        Offset.y = SlotPosition.y;
+        Offset.z = SlotPosition.z;
     }
 
     pub::AI::SetPersonalityParams Params;
@@ -940,21 +940,21 @@ bool __cdecl IsShipAtDockPoint(unsigned int SystemId, unsigned int const* ShipId
         std::fabs(static_cast<double>(Hardpoint.z) - ShipPosition.z) < 10.0)
         return true;
 
-    FTransform Transform;
-    std::memcpy(&Transform.Rotation, &HardpointOrientation, sizeof(Transform.Rotation));
-    Transform.Translation.X = Hardpoint.x;
-    Transform.Translation.Y = Hardpoint.y;
-    Transform.Translation.Z = Hardpoint.z;
-    FVector Back;
-    Back.X = 0.0f;
-    Back.Y = 0.0f;
-    Back.Z = -5000.0f;
-    FVector FarPoint;
-    ContentMathEngine()->TransformXform(FarPoint, Transform, Back);
+    Transform HardpointXform;
+    HardpointXform.Rotation = HardpointOrientation;
+    HardpointXform.Translation.x = Hardpoint.x;
+    HardpointXform.Translation.y = Hardpoint.y;
+    HardpointXform.Translation.z = Hardpoint.z;
+    Vector Back;
+    Back.x = 0.0f;
+    Back.y = 0.0f;
+    Back.z = -5000.0f;
+    Vector FarPoint;
+    ContentMathEngine()->TransformXform(FarPoint, HardpointXform, Back);
     Vector Far;
-    Far.x = FarPoint.X;
-    Far.y = FarPoint.Y;
-    Far.z = FarPoint.Z;
+    Far.x = FarPoint.x;
+    Far.y = FarPoint.y;
+    Far.z = FarPoint.z;
 
     double ToFarSquare = DistanceSquared(ShipPosition, Far);
     float ToFarStored = static_cast<float>(ToFarSquare);
@@ -1642,18 +1642,20 @@ I3DMathEngine* GetSpaceMathEngine()
 
 namespace
 {
-    FVector ToFVector(Vector const& Source)
+    // PlaceLaunchedShip hands the math engine copies of its operands (the frame has a slot
+    // for each), not the originals.
+    Vector CopyVector(Vector const& Source)
     {
-        FVector Out;
-        Out.X = Source.x;
-        Out.Y = Source.y;
-        Out.Z = Source.z;
+        Vector Out;
+        Out.x = Source.x;
+        Out.y = Source.y;
+        Out.z = Source.z;
         return Out;
     }
 
-    FMatrix ToFMatrix(Matrix const& Source)
+    Matrix CopyMatrix(Matrix const& Source)
     {
-        FMatrix Out;
+        Matrix Out;
         std::memcpy(&Out, &Source, sizeof(Out));
         return Out;
     }
@@ -1709,15 +1711,15 @@ namespace
                                       static_cast<double>(Axis.y) * Axis.y +
                                       static_cast<double>(Axis.z) * Axis.z);
             float Scale = static_cast<float>(SinHalf / Length);
-            FQuaternion Quat;
-            Quat.W = static_cast<float>(std::cos(1.5707963267948966));
-            Quat.X = Scale * Axis.x;
-            Quat.Y = Scale * Axis.y;
-            Quat.Z = Scale * Axis.z;
-            FMatrix Rotation;
+            Quaternion Quat;
+            Quat.w = static_cast<float>(std::cos(1.5707963267948966));
+            Quat.x = Scale * Axis.x;
+            Quat.y = Scale * Axis.y;
+            Quat.z = Scale * Axis.z;
+            Matrix Rotation;
             GetSpaceMathEngine()->QuaternionToMatrix(Rotation, Quat);
-            FMatrix Current = ToFMatrix(Params->Orientation);
-            FMatrix Product;
+            Matrix Current = CopyMatrix(Params->Orientation);
+            Matrix Product;
             GetSpaceMathEngine()->MulMatrix(Product, Rotation, Current);
             std::memcpy(&Params->Orientation, &Product, sizeof(Product));
         }
@@ -1730,16 +1732,16 @@ namespace
         std::memset(&MountOrientation, 0, sizeof(MountOrientation));
         pub::FindHardpoint("HpMount", Params->ShipArchId, MountPosition, MountOrientation);
 
-        FMatrix Current = ToFMatrix(Params->Orientation);
-        FVector Rotated;
-        GetSpaceMathEngine()->TransformMatrix(Rotated, Current, ToFVector(MountPosition));
+        Matrix Current = CopyMatrix(Params->Orientation);
+        Vector Rotated;
+        GetSpaceMathEngine()->TransformMatrix(Rotated, Current, CopyVector(MountPosition));
         Vector MountPoint;
-        MountPoint.x = Rotated.X + HardpointPosition->x;
-        MountPoint.y = Rotated.Y + HardpointPosition->y;
-        MountPoint.z = Rotated.Z + HardpointPosition->z;
+        MountPoint.x = Rotated.x + HardpointPosition->x;
+        MountPoint.y = Rotated.y + HardpointPosition->y;
+        MountPoint.z = Rotated.z + HardpointPosition->z;
 
-        FMatrix MountProduct;
-        GetSpaceMathEngine()->MulMatrix(MountProduct, Current, ToFMatrix(MountOrientation));
+        Matrix MountProduct;
+        GetSpaceMathEngine()->MulMatrix(MountProduct, Current, CopyMatrix(MountOrientation));
 
         Vector Offset;
         Offset.x = HardpointPosition->x - MountPoint.x;
@@ -1751,13 +1753,13 @@ namespace
                           Params->Orientation.E[1][1], Params->Orientation.E[2][1],
                           Params->Orientation.E[0][2], Params->Orientation.E[1][2],
                           Params->Orientation.E[2][2]);
-        FVector Local;
-        GetSpaceMathEngine()->TransformMatrix(Local, ToFMatrix(Transposed), ToFVector(Offset));
-        FVector Back;
+        Vector Local;
+        GetSpaceMathEngine()->TransformMatrix(Local, CopyMatrix(Transposed), CopyVector(Offset));
+        Vector Back;
         GetSpaceMathEngine()->TransformMatrix(Back, Current, Local);
-        Params->Position.x = Back.X + HardpointPosition->x;
-        Params->Position.y = Back.Y + HardpointPosition->y;
-        Params->Position.z = Back.Z + HardpointPosition->z;
+        Params->Position.x = Back.x + HardpointPosition->x;
+        Params->Position.y = Back.y + HardpointPosition->y;
+        Params->Position.z = Back.z + HardpointPosition->z;
     }
 
     // The whole-queue erase of FUN_06f607e0: element by element from the front.
@@ -1956,7 +1958,7 @@ FContentNpcShip* __cdecl LaunchQueuedShips()
 
 // FUN_06f66c80 (GetSlotTransform = FUN_06efcbe0, result not tested).
 void __cdecl PlaceFormationBlocks(std::list<FContentNpcShipParams>* Blocks, FFormation* Formation,
-                                  FTransform const* Placement)
+                                  Transform const* Placement)
 {
     unsigned int FormationId = AllocateFormationId();
     int Slot = 0;
@@ -1976,24 +1978,24 @@ void __cdecl PlaceFormationBlocks(std::list<FContentNpcShipParams>* Blocks, FFor
     // (a player slot left at -1 by pass 1, or an index past the slots) gets the previous
     // block's transform. Declared outside the loop for the same carry-over; retail's first
     // values are indeterminate, the port's are zero.
-    FVector SlotPosition;
-    SlotPosition.X = 0.0f;
-    SlotPosition.Y = 0.0f;
-    SlotPosition.Z = 0.0f;
-    FMatrix SlotOrientation;
+    Vector SlotPosition;
+    SlotPosition.x = 0.0f;
+    SlotPosition.y = 0.0f;
+    SlotPosition.z = 0.0f;
+    Matrix SlotOrientation;
     std::memset(&SlotOrientation, 0, sizeof(SlotOrientation));
     for (std::list<FContentNpcShipParams>::iterator It = Blocks->begin(); It != Blocks->end();
          ++It)
     {
         Formation->GetSlotTransform(It->FormationSlot, &SlotPosition, &SlotOrientation);
 
-        FVector World;
+        Vector World;
         GetSpaceMathEngine()->TransformXform(World, *Placement, SlotPosition);
-        It->Position.x = World.X;
-        It->Position.y = World.Y;
-        It->Position.z = World.Z;
+        It->Position.x = World.x;
+        It->Position.y = World.y;
+        It->Position.z = World.z;
 
-        FMatrix Orientation;
+        Matrix Orientation;
         GetSpaceMathEngine()->MulMatrix(Orientation, Placement->Rotation, SlotOrientation);
         std::memcpy(&It->Orientation, &Orientation, sizeof(Orientation));
     }

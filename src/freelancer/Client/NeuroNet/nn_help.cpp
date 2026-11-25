@@ -541,7 +541,7 @@ bool NnHelp::Create(Win3D* NewParent, void* Data)
     }
 
     SetOffset(0.0f, 0.0f, 0.0f);
-    SetPosition(Position);
+    SetPosition(&Position.x);
     return Win3D::Create(NewParent, Data); // FUN_004b5060
 }
 

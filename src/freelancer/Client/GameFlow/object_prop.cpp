@@ -48,13 +48,6 @@ namespace
 
     // The 0x30-byte frame FUN_004464f0 builds for Engine +0x9c: the 9-dword orientation first,
     // then the position (+0x24..+0x2c).
-    struct FInstanceMatrix
-    {
-        Matrix Orient;
-        Vector Pos;
-    };
-    static_assert(sizeof(FInstanceMatrix) == 0x30, "engine instance matrix 0x30");
-
     // Inlined in FUN_00446ac0 / FUN_00446b40: which options show a prop of Type.
     bool IsPropTypeShown(int Type)
     {
@@ -95,7 +88,7 @@ FObjectProp::~FObjectProp()
     // FUN_00446020. A detached prop leaves its instances alone.
     if (bDetached == 0 && Instance != kRoomObjectNoInstance)
     {
-        std::list<void*>::iterator It = Attached.begin();
+        std::list<InstanceIndex>::iterator It = Attached.begin();
         for (; It != Attached.end(); ++It)
             DALib::Engine->DestroyInstance(*It);
         DALib::Engine->DestroyInstance(Instance);
@@ -116,11 +109,11 @@ void FObjectProp::Update(double DeltaSeconds)
     float const Delta = static_cast<float>(DeltaSeconds);
     if (bRunningLights != 0)
         Flashlights.Update(Hardpoints, Delta);
-    DALib::Anim->MixerWalk(reinterpret_cast<unsigned long>(Instance), Delta);
+    DALib::Anim->MixerWalk(static_cast<unsigned long>(Instance), Delta);
     DALib::Engine->UpdateInstance(Instance, 2, AsOpaqueDword(Delta));
 }
 
-void* FObjectProp::GetEngineInstance()
+InstanceIndex FObjectProp::GetEngineInstance()
 {
     // LAB_00443870.
     return Instance;
@@ -136,7 +129,7 @@ void FObjectProp::DrawOpaque(ICamera* /*Camera*/)
     // A type-5 prop first casts its shadow (FUN_0044b370).
     if (Type == PetalCategoryEquipmentCart)
     {
-        RoomControlDrawShadow(Owner, reinterpret_cast<unsigned long>(GetEngineInstance()), 0,
+        RoomControlDrawShadow(Owner, static_cast<unsigned long>(GetEngineInstance()), 0,
                               0);
     }
     RoomControlDrawObject(Owner, this); // FUN_0044af60
@@ -219,9 +212,9 @@ void FObjectProp::Load(FPropData const& Data)
     if (Data.Type == PetalCategorySpaceship && Data.Loadout.length() != 0 && RtcSlider::is_enabled("ship_loadouts"))
         LoadLoadout(Data.Loadout.c_str());
 
-    FInstanceMatrix Xform;
-    Xform.Orient = Data.Orient;
-    Xform.Pos = Data.Pos;
+    Transform Xform;
+    Xform.Rotation = Data.Orient;
+    Xform.Translation = Data.Pos;
     DALib::Engine->SetInstanceMatrix(Instance, &Xform);
     DALib::Engine->UpdateInstance(Instance, 0, nullptr);
 }
@@ -346,13 +339,13 @@ void FObjectProp::AttachEquipment(void const* ItemPtr, HardpointSummary* Summary
     if (!Arch->is_attached())
         return;
 
-    void* Child = MiscUtilLoadEngineInstance(Arch->DaArchetype.Value, DALib::Data, nullptr,
+    InstanceIndex Child = MiscUtilLoadEngineInstance(Arch->DaArchetype.Value, DALib::Data, nullptr,
                                              nullptr, Archetype::CliObjMaterialPaths(Companion),
                                              &MaterialEntries, nullptr);
     Attached.push_back(Child);
 
     // FUN_00406cd0.
-    void* ArchHandle = DALib::Engine->GetInstanceArchetype(Child);
+    ArchetypeIndex ArchHandle = DALib::Engine->GetInstanceArchetype(Child);
     Archetype::CliObjRecomputeLodPickExplicit(Companion, reinterpret_cast<long>(ArchHandle),
                                               nullptr, false);
     DALib::Engine->ReleaseHandle(ArchHandle);
@@ -371,6 +364,6 @@ void FObjectProp::AttachEquipment(void const* ItemPtr, HardpointSummary* Summary
     FHardpointKey ParentKey;
     ParentKey.Name = HpName;
     ParentKey.Crc = DACOM_CRC::GetCRC32(HpName);
-    DALib::Hardpoint->ConnectHardpoints(reinterpret_cast<void*>(Parent), &ParentKey, Child,
+    DALib::Hardpoint->ConnectHardpoints(Parent, &ParentKey, Child,
                                         &ChildKey);
 }

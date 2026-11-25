@@ -50,8 +50,8 @@ Transform ResolveTractorSourceXform(CEqObj const* Owner, Transform const& LocalX
         (Transform const*)((unsigned char const*)Owner + offsetof(EngineObject, Orientation));
 
     Transform Result;
-    Acquire3DMathEngine()->MulTransform((FTransform&)Result, (FTransform const&)*OwnerXform,
-                                        (FTransform const&)LocalXform);   // +0x1C
+    Acquire3DMathEngine()->MulTransform(Result, *OwnerXform,
+                                        LocalXform);   // +0x1C
     return Result;
 }
 }  // namespace

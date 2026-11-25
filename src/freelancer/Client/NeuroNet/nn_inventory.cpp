@@ -941,8 +941,8 @@ NnInventory::~NnInventory()
         NavBarShowDealerTab(); // FUN_00442850
     }
 
-    float const PanelOrigin[3] = {0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f)};
-    NnMainButtonSetPanelOrigin(0x66, PanelOrigin);
+    Vector const PanelOrigin = {0.0f, NnFloatBits(0x3d9ba5e3), NnFloatBits(0xbfa4dd2f)};
+    NnMainButtonSetPanelOrigin(0x66, &PanelOrigin);
 }
 
 void NnInventory::SetPosition(float const* NewPosition)
@@ -2008,13 +2008,14 @@ void NnInventory::CreateControls()
 // in Bar's frame (Win3D +0x3c orientation, +0x60 + +0xa8 position) from x = X to x = -HalfX.
 static void NnInventoryDrawBarQuad(WinControl const* Bar, float X, float HalfX, float HalfY)
 {
-    float Transform[12];
+    float Frame[12];
+    float const* const BarOrientation = &Bar->Orientation.E[0][0];
     for (int Index = 0; Index < 9; ++Index)
-        Transform[Index] = Bar->Orientation[Index];
-    Transform[9] = Bar->Offset[0] + Bar->Position[0];
-    Transform[10] = Bar->Offset[1] + Bar->Position[1];
-    Transform[11] = Bar->Offset[2] + Bar->Position[2];
-    Win3DBindModelview(nullptr, Transform); // FUN_00422690(0, &Transform)
+        Frame[Index] = BarOrientation[Index];
+    Frame[9] = Bar->Offset[0] + Bar->Position.x;
+    Frame[10] = Bar->Offset[1] + Bar->Position.y;
+    Frame[11] = Bar->Offset[2] + Bar->Position.z;
+    Win3DBindModelview(nullptr, reinterpret_cast<Transform const*>(Frame)); // FUN_00422690(0, &Transform)
     Win3DDisable(kWin3DTexture2D);          // FUN_00421ed0(0xde1)
     Win3DEnable(kWin3DBlend);               // FUN_00421dd0(0xbe2)
     Win3DSetBlendFunc(2, 4);                // FUN_004220c0
@@ -2219,11 +2220,11 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
             Info.IdsAlt = 0x43b;
             Info.Ids = 0x43b;
             // IEngine slot 40 (+0xa0): 3x4 transform, floats 9..11 the position.
-            float const* const Transform =
+            const Transform* const Transform =
                 DALib::Engine->GetInstanceTransform(FullCargoBar->MeshHolder.EngineInstance);
-            Info.WorldPos[0] = Transform[9];
-            Info.WorldPos[1] = Transform[10];
-            Info.WorldPos[2] = Transform[11];
+            Info.WorldPos[0] = Transform->Translation.x;
+            Info.WorldPos[1] = Transform->Translation.y;
+            Info.WorldPos[2] = Transform->Translation.z;
             Info.HalfExtents[0] = FullCargoBar->HalfExtents[0];
             Info.HalfExtents[1] = FullCargoBar->HalfExtents[1];
             Info.HalfExtents[2] = FullCargoBar->HalfExtents[2];
@@ -4399,9 +4400,9 @@ void NnInventoryOpenDealer(int TradeMode, FNnInventoryResultFn ResultFn, void* R
     }
 
     // {-0.64, 0.33, -1.288}.
-    float const PanelOrigin[3] = {NnFloatBits(0xbf23d70a), NnFloatBits(0x3ea8f5c3),
-                                  NnFloatBits(0xbfa4dd2f)};
-    NnMainButtonSetPanelOrigin(0x66, PanelOrigin);
+    Vector const PanelOrigin = {NnFloatBits(0xbf23d70a), NnFloatBits(0x3ea8f5c3),
+                                NnFloatBits(0xbfa4dd2f)};
+    NnMainButtonSetPanelOrigin(0x66, &PanelOrigin);
     // FUN_0045dcb0 on DAT_0066d3f0 (not null-tested).
     G_NnMainButton->SetInfoCardLayout();
 

@@ -659,7 +659,7 @@ namespace Archetype
         // No engine test.
         if (BEAM_ARCH_INDEX == -1)
             return;
-        DALib::Engine->ReleaseHandle((void*)BEAM_ARCH_INDEX);
+        DALib::Engine->ReleaseHandle(BEAM_ARCH_INDEX);
         BEAM_ARCH_INDEX = -1;
     }
 
@@ -670,7 +670,7 @@ namespace Archetype
         if (DaArchetype.Value[0] == '\0')
         {
             EngineIndex = BEAM_ARCH_INDEX;
-            DALib::Engine->AddRefHandle((void*)EngineIndex);
+            DALib::Engine->AddRefHandle(EngineIndex);
             LoadCount += 1;
             return true;
         }
@@ -685,7 +685,7 @@ namespace Archetype
         {
             if (EngineIndex != -1)
             {
-                DALib::Engine->ReleaseHandle((void*)EngineIndex);
+                DALib::Engine->ReleaseHandle(EngineIndex);
                 EngineIndex = -1;
             }
             CliObjFreeResources(Companion);

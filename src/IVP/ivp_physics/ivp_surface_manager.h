@@ -54,6 +54,19 @@ struct IVP_SurfaceManager_OutList
     int32_t Capacity; // +0x00
     int32_t Count;    // +0x04
     void**  Elems;    // +0x08
+
+    // 0x0635d3e0: grow to 2*capacity+1,
+    // copying the live elements; the old buffer is freed unless it is the inline
+    // buffer right after the header (or null). Callers: the compact ledge
+    // solver, the polygon surface manager, IVP_Create_Exact_Mindists'
+    // ledge lists.
+    void grow();
+
+    // 0x06350590: grow only when the vector is
+    // full (count >= capacity). Retail's sole caller (0634e223,
+    // IVP_Create_Exact_Mindists) is ported with this test inlined
+    // (ivp_mindist_create.cpp, FLedgeList::Add), so nothing calls it here.
+    void ensure_room();
 };
 static_assert(offsetof(IVP_SurfaceManager_OutList, Capacity) == 0x00, "IVP_SurfaceManager_OutList+0x00");
 static_assert(offsetof(IVP_SurfaceManager_OutList, Count) == 0x04, "IVP_SurfaceManager_OutList+0x04");
@@ -143,6 +156,6 @@ constexpr std::size_t kIVPSurfaceManagerGeometryBlockAlign = 0x10;
 // initializer LAB_06362350 (table entry 063ea610) via the thunk FUN_06362360;
 // FUN_06362550 registers LAB_06362560 (the destructor) with atexit. Retail has
 // no getter: IVP_Ball's ctor takes the address directly (063625c4).
-extern IVP_SurfaceManager_Default g_IVP_DefaultSurfaceManager_0658afe0;
+extern IVP_SurfaceManager_Default g_IVP_DefaultSurfaceManager;
 
 #pragma pack(pop)

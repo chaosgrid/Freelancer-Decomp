@@ -636,25 +636,23 @@ namespace AlchemyImpl
         Nine[8] = 1.0f;
     }
 
-    // The math engine's Rotate (+0x30) on the 12-float FTransform layout (3x3 row-major,
+    // The math engine's Rotate (+0x30) on the 12-float Transform layout (3x3 row-major,
     // then translation): Out = R * (X, Y, Z). Every retail caller (field Begins gravity
     // 0x0622424b, air, collide 0x0621ab79) goes through the engine singleton
     // (FUN_0623e830, cached per call site), so the port calls the same engine rather
     // than an inline product with its own rounding.
-    void TransformDirection(const float* Xform12, float X, float Y, float Z, float* Out)
+    void TransformDirection(const Transform* Xform, float X, float Y, float Z, Vector* Out)
     {
-        const FVector Source = { X, Y, Z };
-        Acquire3DMath()->Rotate(*reinterpret_cast<FVector*>(Out),
-                                *reinterpret_cast<const FTransform*>(Xform12), Source);
+        const Vector Source = { X, Y, Z };
+        Acquire3DMath()->Rotate(*Out, *Xform, Source);
     }
 
     // The math engine's TransformXform (+0x28): Out = R * (X, Y, Z) + T (radial Begin
     // 0x06236f19.., collide Begin 0x0621ac0b, list bounds sphere).
-    void TransformPoint(const float* Xform12, float X, float Y, float Z, float* Out)
+    void TransformPoint(const Transform* Xform, float X, float Y, float Z, Vector* Out)
     {
-        const FVector Source = { X, Y, Z };
-        Acquire3DMath()->TransformXform(*reinterpret_cast<FVector*>(Out),
-                                        *reinterpret_cast<const FTransform*>(Xform12), Source);
+        const Vector Source = { X, Y, Z };
+        Acquire3DMath()->TransformXform(*Out, *Xform, Source);
     }
 
     // The lerp every retail field Apply inlines (e.g. radial 0x062366c8): one rounding
@@ -793,19 +791,19 @@ namespace AlchemyImpl
         return (ICamera*)G_DrawCookie;
     }
 
-    bool GetDrawCameraPosition(float* Out)
+    bool GetDrawCameraPosition(Vector* Out)
     {
         if (Out == nullptr)
             return false;
         ICamera* Camera = DrawCameraFromCookie();
         if (Camera == nullptr)
             return false;
-        const float* Pos = Camera->GetPosition();
+        const float* Pos = (const float*)Camera->GetPosition();
         if (Pos == nullptr)
             return false;
-        Out[0] = Pos[0];
-        Out[1] = Pos[1];
-        Out[2] = Pos[2];
+        Out->x = Pos[0];
+        Out->y = Pos[1];
+        Out->z = Pos[2];
         return true;
     }
 
@@ -814,7 +812,7 @@ namespace AlchemyImpl
         ICamera* Camera = DrawCameraFromCookie();
         if (Camera == nullptr)
             return nullptr;
-        return Camera->GetViewTransform();
+        return (const float*)Camera->GetViewTransform();
     }
 
     const float* GetDrawCameraOrientation()
@@ -822,29 +820,29 @@ namespace AlchemyImpl
         ICamera* Camera = DrawCameraFromCookie();
         if (Camera == nullptr)
             return nullptr;
-        return Camera->GetOrientation();
+        return (const float*)Camera->GetOrientation();
     }
 
-    FVector* TransformPerpBoundsCenter(const FTransform& Transform, FVector& Out,
-                                       const FVector& Input)
+    Vector* TransformPerpBoundsCenter(const Transform& Xform, Vector& Out,
+                                       const Vector& Input)
     {
-        FVector Temporary;
-        Shared3DMath()->TransformXform(Temporary, Transform, Input);
+        Vector Temporary;
+        Shared3DMath()->TransformXform(Temporary, Xform, Input);
         std::memcpy(&Out, &Temporary, sizeof(Out));
         return &Out;
     }
 
-    FVector* TransformOrientedBoundsCenter(const FTransform& Transform, FVector& Out,
-                                           const FVector& Input)
+    Vector* TransformOrientedBoundsCenter(const Transform& Xform, Vector& Out,
+                                           const Vector& Input)
     {
-        Shared3DMath()->TransformXform(Out, Transform, Input);
+        Shared3DMath()->TransformXform(Out, Xform, Input);
         return &Out;
     }
 
-    FTransform* ComputeGeneralInverseTransform(const FTransform& Source,
-                                              FTransform& Out, float& OutW)
+    Transform* ComputeGeneralInverseTransform(const Transform& Source,
+                                              Transform& Out, float& OutW)
     {
-        FTransform Temporary;
+        Transform Temporary;
         Shared3DMath()->GeneralInverse(Temporary, OutW, Source);
         std::memcpy(&Out, &Temporary, sizeof(Out));
         return &Out;
@@ -1173,11 +1171,10 @@ namespace AlchemyImpl
     // vt+0x1c, lazily cached in DAT_06257978 -- the same engine Acquire3DMath hands out)
     // into a stack local, then a 12-dword copy to Out. Callers: beam 0x0620592d, dust
     // 0x0620fd3f, basic 0x06216629, mesh 0x062253a9, oriented 0x0622d079.
-    void ComposeTransform(float* Out12, const float* A12, const float* B12)
+    void ComposeTransform(float* Out12, const float* A12, const Transform& B)
     {
-        FTransform Result;
-        Shared3DMath()->MulTransform(Result, *reinterpret_cast<const FTransform*>(A12),
-                                       *reinterpret_cast<const FTransform*>(B12));
+        Transform Result;
+        Shared3DMath()->MulTransform(Result, *reinterpret_cast<const Transform*>(A12), B);
         std::memcpy(Out12, &Result, sizeof(Result));
     }
 

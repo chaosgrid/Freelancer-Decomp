@@ -790,8 +790,8 @@ static void IkCopy9(float* Dest, const float* Src)
 // The single-joint body LAB_065fb540 inlines; Bone is the IEngine +0xC4 result.
 static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float* Bone)
 {
-    void* const Joint = (void*)((ptrdiff_t)Gate->Joint);
-    const float* ParentRot = G_Engine->GetInstanceOrientation(G_Engine->GetInstanceParent(Joint));
+    const InstanceIndex Joint = Gate->Joint;
+    const float* ParentRot = (const float*)G_Engine->GetInstanceOrientation(G_Engine->GetInstanceParent(Joint));
     float Local[9];
     IkCopy9(Local, ParentRot);
     float Trans[9];
@@ -806,13 +806,13 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
         Trans[6] = Local[2];
         Trans[7] = Local[5];
         Trans[8] = Local[8];
-        AcquireMathEngine()->MulMatrix(*(FMatrix*)Local,
-                                       *(const FMatrix*)Trans,
-                                       *(const FMatrix*)Event->TargetB);
+        AcquireMathEngine()->MulMatrix(*(Matrix*)Local,
+                                       *(const Matrix*)Trans,
+                                       *(const Matrix*)Event->TargetB);
     }
     else
     {
-        const float* Pos = G_Engine->GetInstancePosition(Joint);
+        const float* Pos = (const float*)G_Engine->GetInstancePosition(Joint);
         float P[3];
         IkCopy3(P, Pos);
         const float* Target = (const float*)Event->TargetA;
@@ -845,9 +845,9 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
         Trans[6] = Local[2];
         Trans[7] = Local[5];
         Trans[8] = Local[8];
-        AcquireMathEngine()->MulMatrix(*(FMatrix*)Local,
-                                       *(const FMatrix*)Trans,
-                                       *(const FMatrix*)Look);
+        AcquireMathEngine()->MulMatrix(*(Matrix*)Local,
+                                       *(const Matrix*)Trans,
+                                       *(const Matrix*)Look);
     }
     float Result[9];
     IkCopy9(Result, Local);
@@ -858,8 +858,8 @@ static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float*
         IkCopy9(Result, Clamped);
     }
     float Q[4];
-    AcquireMathEngine()->MatrixToQuaternion(*(FQuaternion*)Q,
-                                            *(const FMatrix*)Result); // +0x50
+    AcquireMathEngine()->MatrixToQuaternion(*(Quaternion*)Q,
+                                            *(const Matrix*)Result); // +0x50
     IkCopy4(Event->Quats, Q);
 }
 
@@ -878,7 +878,7 @@ int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* Bi
             if ((int)Channels[Index] == MatchId)
             {
                 G_Engine->GetJointParams(
-                    (void*)((ptrdiff_t)JointIds[Index]), 0,
+                    JointIds[Index], 0,
                     OutQuat);
                 return 1;
             }
@@ -891,7 +891,7 @@ int DACOM_API FIkEvent::Apply(float* OutQuat, unsigned long ChannelKey, void* Bi
     if (OldTick == 0 && Gate->SkipFlag == 0)
     {
         const float* Bone = (const float*)(G_Engine->GetInstanceRelative(
-            (void*)((ptrdiff_t)Gate->Joint)));
+            Gate->Joint));
         if (JointCount == 1)
             IkSolveSingleJoint(this, Gate, Bone);
         else if ((StateFlags & 2) != 0)
@@ -1083,9 +1083,9 @@ static void IkQuatLog(float* Out3, const float* QuatA, const float* QuatB)
     ConjA[2] = -QuatA[2];
     ConjA[3] = -QuatA[3];
     float Prod[4];
-    AcquireMathEngine()->MulQuat(*(FQuaternion*)Prod,
-                                 *(const FQuaternion*)UseB,
-                                 *(const FQuaternion*)ConjA); // +0x18
+    AcquireMathEngine()->MulQuat(*(Quaternion*)Prod,
+                                 *(const Quaternion*)UseB,
+                                 *(const Quaternion*)ConjA); // +0x18
     float Log3[3];
     IkQuatLogVec(Log3, Prod);
     Out3[0] = Log3[0] + Log3[0];
@@ -1166,8 +1166,8 @@ static void IkDlsWriteIdentity(float* Cells, int First)
 
 static void IkMathMatrixToQuat(float* Out4, const float* Mat9)
 {
-    AcquireMathEngine()->MatrixToQuaternion(*(FQuaternion*)Out4,
-                                            *(const FMatrix*)Mat9); // +0x50
+    AcquireMathEngine()->MatrixToQuaternion(*(Quaternion*)Out4,
+                                            *(const Matrix*)Mat9); // +0x50
 }
 
 // The write-back: for each unlocked joint among the first JointIters, the local rotation
@@ -1202,19 +1202,13 @@ static void IkDlsWriteQuats(FIkEvent* Event, int JointIters)
     }
 }
 
-// An IK joint id (JointIds[i], StartJoint) is an IEngine instance handle.
-static void* IkJointInstance(int JointId)
-{
-    return (void*)((ptrdiff_t)JointId);
-}
-
 // The entry reads of the chain's start: IEngine +0x90 (position) and +0x98 (orientation).
 static void IkDlsReadStart(FIkEvent* Event)
 {
-    const float* StartPos = G_Engine->GetInstancePosition(IkJointInstance(Event->StartJoint));
+    const float* StartPos = (const float*)G_Engine->GetInstancePosition(Event->StartJoint);
     IkCopy3(G_IkNewPos[0], StartPos);
     IkCopy3(G_IkCurPos[0], StartPos);
-    IkCopy9(G_IkNewRot[0], G_Engine->GetInstanceOrientation(IkJointInstance(Event->StartJoint)));
+    IkCopy9(G_IkNewRot[0], (const float*)G_Engine->GetInstanceOrientation(Event->StartJoint));
     IkCopy9(G_IkCurRot[0], G_IkNewRot[0]);
 }
 
@@ -1320,9 +1314,9 @@ static void IkDlsFillRestPull(FIkEvent* Event, int JointIters, float* Rest9, flo
 
 static void IkMathTransform(float* Out3, const float* Mat9, const float* Vec3)
 {
-    AcquireMathEngine()->TransformMatrix(*(FVector*)Out3,
-                                         *(const FMatrix*)Mat9,
-                                         *(const FVector*)Vec3); // +0x2C
+    AcquireMathEngine()->TransformMatrix(*(Vector*)Out3,
+                                         *(const Matrix*)Mat9,
+                                         *(const Vector*)Vec3); // +0x2C
 }
 
 // The trial step over the first JointIters joints.
@@ -1333,7 +1327,7 @@ static void IkDlsStepJoints(FIkEvent* Event, int JointIters, const float* Delta,
     while (Joint < JointIters)
     {
         const float* Bone = (const float*)(
-            G_Engine->GetInstanceRelative(IkJointInstance(Event->JointIds[Joint])));
+            G_Engine->GetInstanceRelative(Event->JointIds[Joint]));
         if (Event->LockBytes[Joint] == 0)
         {
             Held3[0] = Cursor[-2];
@@ -1512,12 +1506,12 @@ void FIkEvent::SolveDls()
     int Joint = 0;
     while (Joint < JointCount)
     {
-        G_Engine->GetJointParams(IkJointInstance(JointIds[Joint]), 0, Quats + Joint * 4);
-        G_Engine->GetInstanceRelative(IkJointInstance(JointIds[Joint]));
+        G_Engine->GetJointParams(JointIds[Joint], 0, Quats + Joint * 4);
+        G_Engine->GetInstanceRelative(JointIds[Joint]);
         IkCopy3(G_IkCurPos[Joint + 1],
-                G_Engine->GetInstancePosition(IkJointInstance(JointIds[Joint])));
+                (const float*)G_Engine->GetInstancePosition(JointIds[Joint]));
         IkCopy9(G_IkCurRot[Joint + 1],
-                G_Engine->GetInstanceOrientation(IkJointInstance(JointIds[Joint])));
+                (const float*)G_Engine->GetInstanceOrientation(JointIds[Joint]));
         Joint += 1;
     }
 
@@ -1568,7 +1562,7 @@ void FIkEvent::SolveDls()
                 else
                 {
                     const float* Bone = (const float*)(
-                        G_Engine->GetInstanceRelative(IkJointInstance(JointIds[Link])));
+                        G_Engine->GetInstanceRelative(JointIds[Link]));
                     IkMathTransform(Arm, G_IkCurRot[Link], Bone + 1);
                 }
                 if (LockBytes[Link - 1] != 0)
@@ -1606,11 +1600,11 @@ void FIkEvent::SolveDlsAlt()
     int Joint = 0;
     while (Joint < JointCount)
     {
-        G_Engine->GetJointParams(IkJointInstance(JointIds[Joint]), 0, Quats + Joint * 4);
+        G_Engine->GetJointParams(JointIds[Joint], 0, Quats + Joint * 4);
         IkCopy3(G_IkCurPos[Joint + 1],
-                G_Engine->GetInstancePosition(IkJointInstance(JointIds[Joint])));
+                (const float*)G_Engine->GetInstancePosition(JointIds[Joint]));
         IkCopy9(G_IkCurRot[Joint + 1],
-                G_Engine->GetInstanceOrientation(IkJointInstance(JointIds[Joint])));
+                (const float*)G_Engine->GetInstanceOrientation(JointIds[Joint]));
         Joint += 1;
     }
 
@@ -1653,7 +1647,7 @@ void FIkEvent::SolveDlsAlt()
             if (Frame.bPos)
             {
                 const float* Bone = (const float*)(
-                    G_Engine->GetInstanceRelative(IkJointInstance(JointIds[Link])));
+                    G_Engine->GetInstanceRelative(JointIds[Link]));
                 float Arm[3];
                 IkMathTransform(Arm, G_IkCurRot[Link], Bone + 1);
                 if (LockBytes[Link - 1] != 0)
@@ -1675,7 +1669,7 @@ void FIkEvent::SolveDlsAlt()
 // by FUN_06600de0 on first use). They add no checks.
 static void IkMathMulMatrix(float* Out9, const float* Left9, const float* Right9)
 {
-    AcquireMathEngine()->MulMatrix(*(FMatrix*)Out9,
-                                   *(const FMatrix*)Left9,
-                                   *(const FMatrix*)Right9); // +0x20
+    AcquireMathEngine()->MulMatrix(*(Matrix*)Out9,
+                                   *(const Matrix*)Left9,
+                                   *(const Matrix*)Right9); // +0x20
 }

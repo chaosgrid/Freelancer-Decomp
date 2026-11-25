@@ -10,7 +10,7 @@
 #include "common_aisteer.h"   // SustainedThresholdTimer, RefreshWeaponFireControlConfig
 #include "common_behavior.h"  // Behavior_GetTransform (FUN_062e61f0)
 #include "common_csys.h"      // Transform, Acquire3DMathEngine
-#include "x86math.h"          // I3DMathEngine::TransposeTransform / TransformMatrix, FVector, FMatrix
+#include "x86math.h"          // I3DMathEngine::TransposeTransform / TransformMatrix, Vector, Matrix
 #include "common_misc.h"      // SUBOBJ_ID_NONE
 #include "common_iface.h"     // IBehaviorManager::Pathfind, IObjInspect, ObjRwFromWatchable
 #include "common_pathfind.h"  // PathfindManager::IsCruiseUnobstructed (FUN_062de160)
@@ -303,9 +303,7 @@ void ThrustManager::SetNudgeDirection(Vector const& WorldDir)
     // engine cache) -- the nudge vector to apply.
     Transform const* const Frame = Behavior_GetTransform(OwnerShip());
     Vector Nudge;
-    Acquire3DMathEngine()->TransposeTransform(reinterpret_cast<FVector&>(Nudge),
-                                              reinterpret_cast<FMatrix const&>(Frame->Rotation),
-                                              reinterpret_cast<FVector const&>(Local));
+    Acquire3DMathEngine()->TransposeTransform(Nudge, Frame->Rotation, Local);
 
     // A failed query returns without committing.
     Vector Current;
@@ -345,9 +343,7 @@ void ThrustManager::BlendNudgeDirection(Vector const& WorldDir, float DeltaTime)
     Vector NudgeWorld;
     {
         Matrix const& Orientation = Owner->SelfTarget.Iface->get_transform().Rotation;
-        Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(NudgeWorld),
-                                               reinterpret_cast<FMatrix const&>(Orientation),
-                                               reinterpret_cast<FVector const&>(NudgeLocal));
+        Acquire3DMathEngine()->TransformMatrix(NudgeWorld, Orientation, NudgeLocal);
     }
 
     // A current nudge not aligned with the wanted direction (dot < 0.99f) is dropped.

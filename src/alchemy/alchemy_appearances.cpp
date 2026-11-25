@@ -240,7 +240,7 @@ namespace AlchemyImpl
         {
             if (Pipeline == nullptr || Xform12 == nullptr)
                 return;
-            Pipeline->SetModelview(Xform12);
+            Pipeline->SetModelview((const Transform*)Xform12);
         }
 
         // {Pipeline, State, Saved} render-state saver of FUN_06206850 (stack +0x8/+0xc/+0x10):
@@ -293,16 +293,16 @@ namespace AlchemyImpl
         // make through the lazily cached engine DAT_06257a28.
         void CameraSpacePoint(const float* ViewWorld12, const float* Point, float* Out)
         {
-            Acquire3DMath()->TransformXform(*reinterpret_cast<FVector*>(Out),
-                                            *reinterpret_cast<const FTransform*>(ViewWorld12),
-                                            *reinterpret_cast<const FVector*>(Point));
+            Acquire3DMath()->TransformXform(*reinterpret_cast<Vector*>(Out),
+                                            *reinterpret_cast<const Transform*>(ViewWorld12),
+                                            *reinterpret_cast<const Vector*>(Point));
         }
 
-        void CameraSpaceVector(const float* ViewWorld12, const float* Vector, float* Out)
+        void CameraSpaceVector(const float* ViewWorld12, const float* Vec, float* Out)
         {
-            Acquire3DMath()->TransformMatrix(*reinterpret_cast<FVector*>(Out),
-                                             *reinterpret_cast<const FMatrix*>(ViewWorld12),
-                                             *reinterpret_cast<const FVector*>(Vector));
+            Acquire3DMath()->TransformMatrix(*reinterpret_cast<Vector*>(Out),
+                                             *reinterpret_cast<const Matrix*>(ViewWorld12),
+                                             *reinterpret_cast<const Vector*>(Vec));
         }
 
         // Frame block {texture, U0, V0, U1, V1}: descriptor flag 0x1000 swaps U0/U1, 0x2000
@@ -973,9 +973,9 @@ namespace AlchemyImpl
                     EPerpRectBoundsDistance::PerpUnroundedXyz);
             }
         }
-        FVector WorldCenter;
-        TransformPerpBoundsCenter(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
-            WorldCenter, *reinterpret_cast<const FVector*>(OutSphere));
+        Vector WorldCenter;
+        TransformPerpBoundsCenter(NodeWorldXform_,
+            WorldCenter, *reinterpret_cast<const Vector*>(OutSphere));
         float WorldSphere[4];
         std::memcpy(WorldSphere, &WorldCenter, sizeof(WorldCenter));
         std::memcpy(WorldSphere + 3, OutSphere + 3, sizeof(float));
@@ -1053,7 +1053,7 @@ namespace AlchemyImpl
             0.0f, 0.0f, 1.0f,
             0.0f, 0.0f, 0.0f,
         };
-        G_RenderPipeline->SetModelview(IdentityXform12);
+        G_RenderPipeline->SetModelview((const Transform*)IdentityXform12);
 
         AlDrawContextDraw(G_BasicDrawContext);
         return GR_OK;
@@ -1091,7 +1091,7 @@ namespace AlchemyImpl
         const bool bStreak = (Descriptor_->Flags & 4u) != 0;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
         float ViewWorld[12];
-        ComposeTransform(ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
+        ComposeTransform(ViewWorld, (const float*)Camera->GetViewTransform(), NodeWorldXform_);
         float FrameBlock[5];
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
         FlipBasicAppearanceFrame(Descriptor_->Flags, FrameBlock);
@@ -1099,9 +1099,9 @@ namespace AlchemyImpl
         for (; Particle != nullptr; Particle = Particle->Next)
         {
             float C[3];
-            Shared3DMath()->TransformXform(*reinterpret_cast<FVector*>(C),
-                *reinterpret_cast<const FTransform*>(ViewWorld),
-                *reinterpret_cast<const FVector*>(&Particle->PosX));
+            Shared3DMath()->TransformXform(*reinterpret_cast<Vector*>(C),
+                *reinterpret_cast<const Transform*>(ViewWorld),
+                *reinterpret_cast<const Vector*>(&Particle->PosX));
             if (C[2] > 0.0f)
                 continue;
             float OuterTime;
@@ -1148,9 +1148,9 @@ namespace AlchemyImpl
             if (bStreak)
             {
                 float V[3];
-                Shared3DMath()->TransformMatrix(*reinterpret_cast<FVector*>(V),
-                    *reinterpret_cast<const FMatrix*>(ViewWorld),
-                    *reinterpret_cast<const FVector*>(&Particle->VelX));
+                Shared3DMath()->TransformMatrix(*reinterpret_cast<Vector*>(V),
+                    *reinterpret_cast<const Matrix*>(ViewWorld),
+                    *reinterpret_cast<const Vector*>(&Particle->VelX));
                 const double N0 = static_cast<double>(C[1]) * V[2] - static_cast<double>(V[1]) * C[2];
                 const double N1 = static_cast<double>(V[0]) * C[2] - static_cast<double>(C[0]) * V[2];
                 const double N2 = static_cast<double>(C[0]) * V[1] - static_cast<double>(V[0]) * C[1];
@@ -1256,11 +1256,11 @@ namespace AlchemyImpl
         const FPooledParticle* Particle = InstanceListHead_;
         const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        const float* const View = Camera->GetViewTransform();
-        FTransform ViewTemporary;
+        const float* const View = (const float*)Camera->GetViewTransform();
+        Transform ViewTemporary;
         Shared3DMath()->MulTransform(ViewTemporary,
-            *reinterpret_cast<const FTransform*>(View),
-            *reinterpret_cast<const FTransform*>(NodeWorldXform_));
+            *reinterpret_cast<const Transform*>(View),
+            NodeWorldXform_);
         float ViewWorld[12];
         std::memcpy(ViewWorld, &ViewTemporary, sizeof(ViewTemporary));
         float FrameBlock[5];
@@ -1284,9 +1284,9 @@ namespace AlchemyImpl
             if (Alpha < FloatFromBits(0x3c23d70au))
                 continue;
             float C[3];
-            Shared3DMath()->TransformXform(*reinterpret_cast<FVector*>(C),
-                *reinterpret_cast<const FTransform*>(ViewWorld),
-                *reinterpret_cast<const FVector*>(&Particle->PosX));
+            Shared3DMath()->TransformXform(*reinterpret_cast<Vector*>(C),
+                *reinterpret_cast<const Transform*>(ViewWorld),
+                *reinterpret_cast<const Vector*>(&Particle->PosX));
             const unsigned long Color = ForwardAppearanceColorEval(
                 Descriptor_->ColorRamp, AppearanceOuterTime_, InnerTime);
             const std::int64_t AlphaInteger = static_cast<std::int64_t>(static_cast<double>(Alpha) * 255.0);
@@ -1553,10 +1553,10 @@ namespace AlchemyImpl
                     EPerpRectBoundsDistance::RectRoundedYzx);
             }
         }
-        FVector WorldCenter;
+        Vector WorldCenter;
         Shared3DMath()->TransformXform(WorldCenter,
-            *reinterpret_cast<const FTransform*>(NodeWorldXform_),
-            *reinterpret_cast<const FVector*>(OutSphere));
+            NodeWorldXform_,
+            *reinterpret_cast<const Vector*>(OutSphere));
         float WorldSphere[4];
         std::memcpy(WorldSphere, &WorldCenter, sizeof(WorldCenter));
         std::memcpy(WorldSphere + 3, OutSphere + 3, sizeof(float));
@@ -1653,9 +1653,9 @@ namespace AlchemyImpl
         const bool bStretch = (Descriptor_->Flags & 4u) != 0;
         const bool bCentered = (Descriptor_->Flags & 1u) != 0;
         const bool bViewFade = (Descriptor_->Flags & 0x10u) != 0;
-        FTransform InvNode;
+        Transform InvNode;
         float InverseW;
-        ComputeGeneralInverseTransform(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
+        ComputeGeneralInverseTransform(NodeWorldXform_,
             InvNode, InverseW);
         float FrameBlock[5];
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
@@ -1675,10 +1675,10 @@ namespace AlchemyImpl
         }
         std::int32_t LastFrame = -1;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        const float* const CameraPosition = Camera->GetPosition();
-        FVector LocalCamera;
+        const float* const CameraPosition = (const float*)Camera->GetPosition();
+        Vector LocalCamera;
         Shared3DMath()->TransformXform(LocalCamera, InvNode,
-            *reinterpret_cast<const FVector*>(CameraPosition));
+            *reinterpret_cast<const Vector*>(CameraPosition));
         const float Scale = static_cast<float>(ForwardAppearanceSingleEval(
             Descriptor_->EffectScaleRamp, AppearanceOuterTime_, LodInput_));
         for (; Particle != nullptr; Particle = Particle->Next)
@@ -1695,12 +1695,12 @@ namespace AlchemyImpl
             // Only an ordered less-or-equal skips; unordered continues.
             if (Length <= TinyLength || HalfWidth <= TinyLength || Alpha <= TinyAlpha)
                 continue;
-            FVector Position;
-            FVector Velocity;
+            Vector Position;
+            Vector Velocity;
             std::memcpy(&Position, &Particle->PosX, sizeof(Position));
             std::memcpy(&Velocity, &Particle->VelX, sizeof(Velocity));
-            const double VelocitySquared = ((static_cast<double>(Velocity.Z) * Velocity.Z) +
-                (static_cast<double>(Velocity.Y) * Velocity.Y)) + (static_cast<double>(Velocity.X) * Velocity.X);
+            const double VelocitySquared = ((static_cast<double>(Velocity.z) * Velocity.z) +
+                (static_cast<double>(Velocity.y) * Velocity.y)) + (static_cast<double>(Velocity.x) * Velocity.x);
             const float VelocitySeed = static_cast<float>(VelocitySquared);
             std::int32_t VelocityBits;
             std::memcpy(&VelocityBits, &VelocitySeed, sizeof(VelocityBits));
@@ -1714,24 +1714,24 @@ namespace AlchemyImpl
             if (!(Speed <= TinyLength))
             {
                 const double InverseSpeed = 1.0 / Speed;
-                Velocity.X = static_cast<float>(static_cast<double>(Velocity.X) * InverseSpeed);
-                Velocity.Y = static_cast<float>(static_cast<double>(Velocity.Y) * InverseSpeed);
-                Velocity.Z = static_cast<float>(InverseSpeed * Velocity.Z);
+                Velocity.x = static_cast<float>(static_cast<double>(Velocity.x) * InverseSpeed);
+                Velocity.y = static_cast<float>(static_cast<double>(Velocity.y) * InverseSpeed);
+                Velocity.z = static_cast<float>(InverseSpeed * Velocity.z);
             }
             else
             {
-                Velocity.X = 0.0f;
-                Velocity.Y = 1.0f;
-                Velocity.Z = 0.0f;
+                Velocity.x = 0.0f;
+                Velocity.y = 1.0f;
+                Velocity.z = 0.0f;
             }
-            FVector Direction;
-            Direction.Z = static_cast<float>(static_cast<double>(Position.Z) - LocalCamera.Z);
-            Direction.Y = static_cast<float>(static_cast<double>(Position.Y) - LocalCamera.Y);
-            Direction.X = static_cast<float>(static_cast<double>(Position.X) - LocalCamera.X);
+            Vector Direction;
+            Direction.z = static_cast<float>(static_cast<double>(Position.z) - LocalCamera.z);
+            Direction.y = static_cast<float>(static_cast<double>(Position.y) - LocalCamera.y);
+            Direction.x = static_cast<float>(static_cast<double>(Position.x) - LocalCamera.x);
             if (bViewFade)
             {
-                const double DirectionSquared = ((static_cast<double>(Direction.Z) * Direction.Z) +
-                    (static_cast<double>(Direction.X) * Direction.X)) + (static_cast<double>(Direction.Y) * Direction.Y);
+                const double DirectionSquared = ((static_cast<double>(Direction.z) * Direction.z) +
+                    (static_cast<double>(Direction.x) * Direction.x)) + (static_cast<double>(Direction.y) * Direction.y);
                 const float DirectionSeed = static_cast<float>(DirectionSquared);
                 std::int32_t DirectionBits;
                 std::memcpy(&DirectionBits, &DirectionSeed, sizeof(DirectionBits));
@@ -1744,18 +1744,18 @@ namespace AlchemyImpl
                 if (!(DirectionLength <= TinyLength))
                 {
                     const double InverseDirection = 1.0 / DirectionLength;
-                    Direction.X = static_cast<float>(static_cast<double>(Direction.X) * InverseDirection);
-                    Direction.Y = static_cast<float>(static_cast<double>(Direction.Y) * InverseDirection);
-                    Direction.Z = static_cast<float>(InverseDirection * Direction.Z);
+                    Direction.x = static_cast<float>(static_cast<double>(Direction.x) * InverseDirection);
+                    Direction.y = static_cast<float>(static_cast<double>(Direction.y) * InverseDirection);
+                    Direction.z = static_cast<float>(InverseDirection * Direction.z);
                 }
                 else
                 {
-                    Direction.X = 0.0f;
-                    Direction.Y = 1.0f;
-                    Direction.Z = 0.0f;
+                    Direction.x = 0.0f;
+                    Direction.y = 1.0f;
+                    Direction.z = 0.0f;
                 }
-                const double UnroundedFacing = std::fabs(((static_cast<double>(Direction.Z) * Velocity.Z) +
-                    (static_cast<double>(Velocity.Y) * Direction.Y)) + (static_cast<double>(Direction.X) * Velocity.X));
+                const double UnroundedFacing = std::fabs(((static_cast<double>(Direction.z) * Velocity.z) +
+                    (static_cast<double>(Velocity.y) * Direction.y)) + (static_cast<double>(Direction.x) * Velocity.x));
                 const float Facing = static_cast<float>(UnroundedFacing);
                 // Only an ordered greater skips, tested on the unrounded value.
                 if (UnroundedFacing > FacingCull)
@@ -1799,21 +1799,21 @@ namespace AlchemyImpl
                     }
                 }
             }
-            FVector P0;
-            FVector P1;
+            Vector P0;
+            Vector P1;
             if (bCentered)
             {
                 const double Half = bStretch ? ((static_cast<double>(Speed) * SpeedStretch) + Length) * 0.5 :
                     static_cast<double>(Length) * 0.5;
-                const float ExtentX = static_cast<float>(static_cast<double>(Velocity.X) * Half);
-                const float ExtentY = static_cast<float>(static_cast<double>(Velocity.Y) * Half);
-                const float ExtentZ = static_cast<float>(Half * Velocity.Z);
-                P0.Z = static_cast<float>(static_cast<double>(Position.Z) - ExtentZ);
-                P0.Y = static_cast<float>(static_cast<double>(Position.Y) - ExtentY);
-                P0.X = static_cast<float>(static_cast<double>(Position.X) - ExtentX);
-                P1.X = static_cast<float>(static_cast<double>(ExtentX) + Position.X);
-                P1.Y = static_cast<float>(static_cast<double>(ExtentY) + Position.Y);
-                P1.Z = static_cast<float>(static_cast<double>(ExtentZ) + Position.Z);
+                const float ExtentX = static_cast<float>(static_cast<double>(Velocity.x) * Half);
+                const float ExtentY = static_cast<float>(static_cast<double>(Velocity.y) * Half);
+                const float ExtentZ = static_cast<float>(Half * Velocity.z);
+                P0.z = static_cast<float>(static_cast<double>(Position.z) - ExtentZ);
+                P0.y = static_cast<float>(static_cast<double>(Position.y) - ExtentY);
+                P0.x = static_cast<float>(static_cast<double>(Position.x) - ExtentX);
+                P1.x = static_cast<float>(static_cast<double>(ExtentX) + Position.x);
+                P1.y = static_cast<float>(static_cast<double>(ExtentY) + Position.y);
+                P1.z = static_cast<float>(static_cast<double>(ExtentZ) + Position.z);
             }
             else
             {
@@ -1821,29 +1821,29 @@ namespace AlchemyImpl
                 if (bStretch)
                 {
                     const double Extent = (static_cast<double>(Speed) * SpeedStretch) + Length;
-                    const double ExtentX = static_cast<double>(Velocity.X) * Extent;
-                    const float ExtentY = static_cast<float>(Extent * Velocity.Y);
-                    const float ExtentZ = static_cast<float>(Extent * Velocity.Z);
-                    P1.X = static_cast<float>(ExtentX + Position.X);
-                    P1.Y = static_cast<float>(static_cast<double>(ExtentY) + Position.Y);
-                    P1.Z = static_cast<float>(static_cast<double>(ExtentZ) + Position.Z);
+                    const double ExtentX = static_cast<double>(Velocity.x) * Extent;
+                    const float ExtentY = static_cast<float>(Extent * Velocity.y);
+                    const float ExtentZ = static_cast<float>(Extent * Velocity.z);
+                    P1.x = static_cast<float>(ExtentX + Position.x);
+                    P1.y = static_cast<float>(static_cast<double>(ExtentY) + Position.y);
+                    P1.z = static_cast<float>(static_cast<double>(ExtentZ) + Position.z);
                 }
                 else
                 {
-                    const double ExtentX = static_cast<double>(Velocity.X) * Length;
-                    const double ExtentY = static_cast<double>(Velocity.Y) * Length;
-                    const float ExtentZ = static_cast<float>(static_cast<double>(Velocity.Z) * Length);
-                    P1.X = static_cast<float>(ExtentX + Position.X);
-                    P1.Y = static_cast<float>(ExtentY + Position.Y);
-                    P1.Z = static_cast<float>(static_cast<double>(ExtentZ) + Position.Z);
+                    const double ExtentX = static_cast<double>(Velocity.x) * Length;
+                    const double ExtentY = static_cast<double>(Velocity.y) * Length;
+                    const float ExtentZ = static_cast<float>(static_cast<double>(Velocity.z) * Length);
+                    P1.x = static_cast<float>(ExtentX + Position.x);
+                    P1.y = static_cast<float>(ExtentY + Position.y);
+                    P1.z = static_cast<float>(static_cast<double>(ExtentZ) + Position.z);
                 }
             }
-            const double NormalX = (static_cast<double>(Direction.Z) * Velocity.Y) -
-                (static_cast<double>(Velocity.Z) * Direction.Y);
-            const float NormalY = static_cast<float>((static_cast<double>(Velocity.Z) * Direction.X) -
-                (static_cast<double>(Direction.Z) * Velocity.X));
-            const double NormalZ = (static_cast<double>(Direction.Y) * Velocity.X) -
-                (static_cast<double>(Direction.X) * Velocity.Y);
+            const double NormalX = (static_cast<double>(Direction.z) * Velocity.y) -
+                (static_cast<double>(Velocity.z) * Direction.y);
+            const float NormalY = static_cast<float>((static_cast<double>(Velocity.z) * Direction.x) -
+                (static_cast<double>(Direction.z) * Velocity.x));
+            const double NormalZ = (static_cast<double>(Direction.y) * Velocity.x) -
+                (static_cast<double>(Direction.x) * Velocity.y);
             const double NormalSquared = ((NormalX * NormalX) + (static_cast<double>(NormalY) * NormalY)) +
                 (NormalZ * NormalZ);
             const float NormalSeed = static_cast<float>(NormalSquared);
@@ -1871,10 +1871,10 @@ namespace AlchemyImpl
             else
             {
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
-                Vertex->X = static_cast<float>(static_cast<double>(P1.X) - Qx);
+                Vertex->X = static_cast<float>(static_cast<double>(P1.x) - Qx);
                 Vertex->Diffuse = Diffuse;
-                Vertex->Y = static_cast<float>(static_cast<double>(P1.Y) - Qy);
-                Vertex->Z = static_cast<float>(static_cast<double>(P1.Z) - Qz);
+                Vertex->Y = static_cast<float>(static_cast<double>(P1.y) - Qy);
+                Vertex->Z = static_cast<float>(static_cast<double>(P1.z) - Qz);
                 Vertex->U = static_cast<float>(UA);
                 Vertex->V = static_cast<float>(VA);
                 Context.LockedVerts = Vertex + 1;
@@ -1889,10 +1889,10 @@ namespace AlchemyImpl
             else
             {
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
-                Vertex->X = static_cast<float>(static_cast<double>(Qx) + P1.X);
+                Vertex->X = static_cast<float>(static_cast<double>(Qx) + P1.x);
                 Vertex->Diffuse = Diffuse;
-                Vertex->Y = static_cast<float>(static_cast<double>(Qy) + P1.Y);
-                Vertex->Z = static_cast<float>(static_cast<double>(Qz) + P1.Z);
+                Vertex->Y = static_cast<float>(static_cast<double>(Qy) + P1.y);
+                Vertex->Z = static_cast<float>(static_cast<double>(Qz) + P1.z);
                 Vertex->U = static_cast<float>(UB);
                 Vertex->V = static_cast<float>(VB);
                 Context.LockedVerts = Vertex + 1;
@@ -1907,10 +1907,10 @@ namespace AlchemyImpl
             else
             {
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
-                Vertex->X = static_cast<float>(static_cast<double>(P0.X) - Qx);
+                Vertex->X = static_cast<float>(static_cast<double>(P0.x) - Qx);
                 Vertex->Diffuse = Diffuse;
-                Vertex->Y = static_cast<float>(static_cast<double>(P0.Y) - Qy);
-                Vertex->Z = static_cast<float>(static_cast<double>(P0.Z) - Qz);
+                Vertex->Y = static_cast<float>(static_cast<double>(P0.y) - Qy);
+                Vertex->Z = static_cast<float>(static_cast<double>(P0.z) - Qz);
                 Vertex->U = static_cast<float>(UC);
                 Vertex->V = static_cast<float>(VC);
                 Context.LockedVerts = Vertex + 1;
@@ -1925,10 +1925,10 @@ namespace AlchemyImpl
             else
             {
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
-                Vertex->X = static_cast<float>(static_cast<double>(P0.X) + Qx);
+                Vertex->X = static_cast<float>(static_cast<double>(P0.x) + Qx);
                 Vertex->Diffuse = Diffuse;
-                Vertex->Y = static_cast<float>(static_cast<double>(P0.Y) + Qy);
-                Vertex->Z = static_cast<float>(static_cast<double>(P0.Z) + Qz);
+                Vertex->Y = static_cast<float>(static_cast<double>(P0.y) + Qy);
+                Vertex->Z = static_cast<float>(static_cast<double>(P0.z) + Qz);
                 Vertex->U = static_cast<float>(UD);
                 Vertex->V = static_cast<float>(VD);
                 Context.LockedVerts = Vertex + 1;
@@ -2040,9 +2040,9 @@ namespace AlchemyImpl
                     EPerpRectBoundsDistance::PerpUnroundedXyz);
             }
         }
-        FVector WorldCenter;
-        TransformPerpBoundsCenter(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
-            WorldCenter, *reinterpret_cast<const FVector*>(OutSphere));
+        Vector WorldCenter;
+        TransformPerpBoundsCenter(NodeWorldXform_,
+            WorldCenter, *reinterpret_cast<const Vector*>(OutSphere));
         float WorldSphere[4];
         std::memcpy(WorldSphere, &WorldCenter, sizeof(WorldCenter));
         std::memcpy(WorldSphere + 3, OutSphere + 3, sizeof(float));
@@ -2062,19 +2062,19 @@ namespace AlchemyImpl
         const bool bParallel = DeltaX * DeltaX <= Epsilon &&
             static_cast<double>(Six[4]) * Six[4] <= Epsilon &&
             static_cast<double>(Six[5]) * Six[5] <= Epsilon;
-        FVector* const Axis = reinterpret_cast<FVector*>(
+        Vector* const Axis = reinterpret_cast<Vector*>(
             reinterpret_cast<unsigned char*>(InstanceListTail_) + 0x30);
         if (bParallel)
         {
-            Axis->X = 0.0f;
-            Axis->Y = 0.0f;
-            Axis->Z = 1.0f;
+            Axis->x = 0.0f;
+            Axis->y = 0.0f;
+            Axis->z = 1.0f;
         }
         else
         {
-            Axis->X = 1.0f;
-            Axis->Y = 0.0f;
-            Axis->Z = 0.0f;
+            Axis->x = 1.0f;
+            Axis->y = 0.0f;
+            Axis->z = 0.0f;
         }
         return GR_OK;
     }
@@ -2130,13 +2130,13 @@ namespace AlchemyImpl
         G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
 
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        const float* const View = Camera->GetViewTransform();
-        FTransform ViewWorld;
-        Shared3DMath()->MulTransform(ViewWorld, *reinterpret_cast<const FTransform*>(View),
-                                   *reinterpret_cast<const FTransform*>(NodeWorldXform_));
-        FTransform Modelview;
+        const float* const View = (const float*)Camera->GetViewTransform();
+        Transform ViewWorld;
+        Shared3DMath()->MulTransform(ViewWorld, *reinterpret_cast<const Transform*>(View),
+                                   NodeWorldXform_);
+        Transform Modelview;
         std::memcpy(&Modelview, &ViewWorld, sizeof(Modelview));
-        G_RenderPipeline->SetModelview(reinterpret_cast<const float*>(&Modelview));
+        G_RenderPipeline->SetModelview(&Modelview);
 
         AlDrawContextDraw(G_PerpDrawContext);
         return GR_OK;
@@ -2163,9 +2163,9 @@ namespace AlchemyImpl
         FPooledParticle* Particle = InstanceListHead_;
         const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
         const bool bCameraFade = (Descriptor_->Flags & 0x10u) != 0;
-        FTransform InvNode;
+        Transform InvNode;
         float InverseW;
-        ComputeGeneralInverseTransform(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
+        ComputeGeneralInverseTransform(NodeWorldXform_,
                                        InvNode, InverseW);
         float FrameBlock[5];
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
@@ -2185,7 +2185,7 @@ namespace AlchemyImpl
         }
         std::int32_t LastFrame = -1;
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        FVector CameraPosition;
+        Vector CameraPosition;
         std::memcpy(&CameraPosition, Camera->GetPosition(), sizeof(CameraPosition));
         const float Scale = static_cast<float>(ForwardAppearanceSingleEval(
             Descriptor_->EffectScaleRamp, AppearanceOuterTime_, LodInput_));
@@ -2203,12 +2203,12 @@ namespace AlchemyImpl
                 continue;
 
             float* const Axis = reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(Particle) + 0x30);
-            FVector Velocity;
+            Vector Velocity;
             std::memcpy(&Velocity, &Particle->VelX, sizeof(Velocity));
-            FVector PreviousAxis;
+            Vector PreviousAxis;
             std::memcpy(&PreviousAxis, Axis, sizeof(PreviousAxis));
-            const double VelocitySquared = ((static_cast<double>(Velocity.X) * Velocity.X) +
-                (static_cast<double>(Velocity.Z) * Velocity.Z)) + (static_cast<double>(Velocity.Y) * Velocity.Y);
+            const double VelocitySquared = ((static_cast<double>(Velocity.x) * Velocity.x) +
+                (static_cast<double>(Velocity.z) * Velocity.z)) + (static_cast<double>(Velocity.y) * Velocity.y);
             const float RoundedVelocitySquared = static_cast<float>(VelocitySquared);
             std::int32_t VelocityBits;
             std::memcpy(&VelocityBits, &RoundedVelocitySquared, sizeof(VelocityBits));
@@ -2221,38 +2221,38 @@ namespace AlchemyImpl
             if (!(VelocityLength <= TinyLength))
             {
                 const double InverseLength = 1.0 / VelocityLength;
-                Velocity.X = static_cast<float>(static_cast<double>(Velocity.X) * InverseLength);
-                Velocity.Y = static_cast<float>(static_cast<double>(Velocity.Y) * InverseLength);
-                Velocity.Z = static_cast<float>(static_cast<double>(Velocity.Z) * InverseLength);
+                Velocity.x = static_cast<float>(static_cast<double>(Velocity.x) * InverseLength);
+                Velocity.y = static_cast<float>(static_cast<double>(Velocity.y) * InverseLength);
+                Velocity.z = static_cast<float>(static_cast<double>(Velocity.z) * InverseLength);
             }
             else
             {
-                Velocity.X = 0.0f;
-                Velocity.Y = 1.0f;
-                Velocity.Z = 0.0f;
-                const double DifferenceX = -static_cast<double>(PreviousAxis.X);
-                const double DifferenceY = 1.0 - PreviousAxis.Y;
-                const double DifferenceZ = -static_cast<double>(PreviousAxis.Z);
+                Velocity.x = 0.0f;
+                Velocity.y = 1.0f;
+                Velocity.z = 0.0f;
+                const double DifferenceX = -static_cast<double>(PreviousAxis.x);
+                const double DifferenceY = 1.0 - PreviousAxis.y;
+                const double DifferenceZ = -static_cast<double>(PreviousAxis.z);
                 if (DifferenceX * DifferenceX <= TinyAxisSquared &&
                     DifferenceY * DifferenceY <= TinyAxisSquared &&
                     DifferenceZ * DifferenceZ <= TinyAxisSquared)
                 {
-                    Velocity.X = 1.0f;
-                    Velocity.Y = 0.0f;
+                    Velocity.x = 1.0f;
+                    Velocity.y = 0.0f;
                 }
             }
-            FVector Position;
+            Vector Position;
             std::memcpy(&Position, &Particle->PosX, sizeof(Position));
             if (bCameraFade)
             {
-                FVector LocalCamera;
+                Vector LocalCamera;
                 Shared3DMath()->TransformXform(LocalCamera, InvNode, CameraPosition);
-                FVector ToCamera;
-                ToCamera.X = static_cast<float>(static_cast<double>(LocalCamera.X) - Position.X);
-                ToCamera.Y = static_cast<float>(static_cast<double>(LocalCamera.Y) - Position.Y);
-                ToCamera.Z = static_cast<float>(static_cast<double>(LocalCamera.Z) - Position.Z);
-                const double CameraSquared = ((static_cast<double>(ToCamera.X) * ToCamera.X) +
-                    (static_cast<double>(ToCamera.Z) * ToCamera.Z)) + (static_cast<double>(ToCamera.Y) * ToCamera.Y);
+                Vector ToCamera;
+                ToCamera.x = static_cast<float>(static_cast<double>(LocalCamera.x) - Position.x);
+                ToCamera.y = static_cast<float>(static_cast<double>(LocalCamera.y) - Position.y);
+                ToCamera.z = static_cast<float>(static_cast<double>(LocalCamera.z) - Position.z);
+                const double CameraSquared = ((static_cast<double>(ToCamera.x) * ToCamera.x) +
+                    (static_cast<double>(ToCamera.z) * ToCamera.z)) + (static_cast<double>(ToCamera.y) * ToCamera.y);
                 const float RoundedCameraSquared = static_cast<float>(CameraSquared);
                 std::int32_t CameraBits;
                 std::memcpy(&CameraBits, &RoundedCameraSquared, sizeof(CameraBits));
@@ -2265,18 +2265,18 @@ namespace AlchemyImpl
                 if (!(CameraLength <= TinyLength))
                 {
                     const double InverseLength = 1.0 / CameraLength;
-                    ToCamera.X = static_cast<float>(static_cast<double>(ToCamera.X) * InverseLength);
-                    ToCamera.Y = static_cast<float>(static_cast<double>(ToCamera.Y) * InverseLength);
-                    ToCamera.Z = static_cast<float>(static_cast<double>(ToCamera.Z) * InverseLength);
+                    ToCamera.x = static_cast<float>(static_cast<double>(ToCamera.x) * InverseLength);
+                    ToCamera.y = static_cast<float>(static_cast<double>(ToCamera.y) * InverseLength);
+                    ToCamera.z = static_cast<float>(static_cast<double>(ToCamera.z) * InverseLength);
                 }
                 else
                 {
-                    ToCamera.X = 0.0f;
-                    ToCamera.Y = 1.0f;
-                    ToCamera.Z = 0.0f;
+                    ToCamera.x = 0.0f;
+                    ToCamera.y = 1.0f;
+                    ToCamera.z = 0.0f;
                 }
-                const double Dot = ((static_cast<double>(ToCamera.X) * Velocity.X) +
-                    (static_cast<double>(ToCamera.Z) * Velocity.Z)) + (static_cast<double>(ToCamera.Y) * Velocity.Y);
+                const double Dot = ((static_cast<double>(ToCamera.x) * Velocity.x) +
+                    (static_cast<double>(ToCamera.z) * Velocity.z)) + (static_cast<double>(ToCamera.y) * Velocity.y);
                 const double UnroundedFacing = 1.0 - std::fabs(Dot);
                 const float Facing = static_cast<float>(UnroundedFacing);
                 // Only an ordered greater skips, tested on the unrounded value.
@@ -2321,12 +2321,12 @@ namespace AlchemyImpl
                     }
                 }
             }
-            const float NormalX = static_cast<float>((static_cast<double>(Velocity.Z) * PreviousAxis.Y) -
-                (static_cast<double>(Velocity.Y) * PreviousAxis.Z));
-            const float NormalY = static_cast<float>((static_cast<double>(PreviousAxis.Z) * Velocity.X) -
-                (static_cast<double>(Velocity.Z) * PreviousAxis.X));
-            const float NormalZ = static_cast<float>((static_cast<double>(Velocity.Y) * PreviousAxis.X) -
-                (static_cast<double>(PreviousAxis.Y) * Velocity.X));
+            const float NormalX = static_cast<float>((static_cast<double>(Velocity.z) * PreviousAxis.y) -
+                (static_cast<double>(Velocity.y) * PreviousAxis.z));
+            const float NormalY = static_cast<float>((static_cast<double>(PreviousAxis.z) * Velocity.x) -
+                (static_cast<double>(Velocity.z) * PreviousAxis.x));
+            const float NormalZ = static_cast<float>((static_cast<double>(Velocity.y) * PreviousAxis.x) -
+                (static_cast<double>(PreviousAxis.y) * Velocity.x));
             const float NormalSquared = static_cast<float>(((static_cast<double>(NormalX) * NormalX) +
                 (static_cast<double>(NormalZ) * NormalZ)) + (static_cast<double>(NormalY) * NormalY));
             std::int32_t NormalBits;
@@ -2340,20 +2340,20 @@ namespace AlchemyImpl
             const float NormalizedY = static_cast<float>(static_cast<double>(NormalY) * NormalInverse);
             const double UnroundedNormalizedZ = static_cast<double>(NormalZ) * NormalInverse;
             const float NormalizedZ = static_cast<float>(UnroundedNormalizedZ);
-            FVector NewAxis;
-            NewAxis.X = static_cast<float>((UnroundedNormalizedZ * Velocity.Y) -
-                (static_cast<double>(NormalizedY) * Velocity.Z));
-            NewAxis.Y = static_cast<float>((static_cast<double>(Velocity.Z) * NormalizedX) -
-                (static_cast<double>(NormalizedZ) * Velocity.X));
-            NewAxis.Z = static_cast<float>((static_cast<double>(NormalizedY) * Velocity.X) -
-                (static_cast<double>(Velocity.Y) * NormalizedX));
+            Vector NewAxis;
+            NewAxis.x = static_cast<float>((UnroundedNormalizedZ * Velocity.y) -
+                (static_cast<double>(NormalizedY) * Velocity.z));
+            NewAxis.y = static_cast<float>((static_cast<double>(Velocity.z) * NormalizedX) -
+                (static_cast<double>(NormalizedZ) * Velocity.x));
+            NewAxis.z = static_cast<float>((static_cast<double>(NormalizedY) * Velocity.x) -
+                (static_cast<double>(Velocity.y) * NormalizedX));
             std::memcpy(Axis, &NewAxis, sizeof(NewAxis));
             const float ScaledNormalX = static_cast<float>(NormalizedX * HalfSize);
             const float ScaledNormalY = static_cast<float>(static_cast<double>(NormalizedY) * HalfSize);
             const float ScaledNormalZ = static_cast<float>(static_cast<double>(NormalizedZ) * HalfSize);
-            const float ScaledAxisX = static_cast<float>(static_cast<double>(NewAxis.X) * HalfSize);
-            const float ScaledAxisY = static_cast<float>(static_cast<double>(NewAxis.Y) * HalfSize);
-            const double UnroundedScaledAxisZ = static_cast<double>(NewAxis.Z) * HalfSize;
+            const float ScaledAxisX = static_cast<float>(static_cast<double>(NewAxis.x) * HalfSize);
+            const float ScaledAxisY = static_cast<float>(static_cast<double>(NewAxis.y) * HalfSize);
+            const double UnroundedScaledAxisZ = static_cast<double>(NewAxis.z) * HalfSize;
             const float ScaledAxisZ = static_cast<float>(UnroundedScaledAxisZ);
             const float SumX = static_cast<float>(static_cast<double>(ScaledAxisX) + ScaledNormalX);
             const float SumY = static_cast<float>(static_cast<double>(ScaledAxisY) + ScaledNormalY);
@@ -2371,17 +2371,17 @@ namespace AlchemyImpl
             {
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
                 Vertex->Diffuse = Diffuse;
-                Vertex->X = static_cast<float>(DifferenceX + Position.X);
-                Vertex->Y = static_cast<float>(DifferenceY + Position.Y);
-                Vertex->Z = static_cast<float>(DifferenceZ + Position.Z);
+                Vertex->X = static_cast<float>(DifferenceX + Position.x);
+                Vertex->Y = static_cast<float>(DifferenceY + Position.y);
+                Vertex->Z = static_cast<float>(DifferenceZ + Position.z);
                 Vertex->U = static_cast<float>(U1);
                 Vertex->V = static_cast<float>(V0);
                 Context.LockedVerts = Vertex + 1;
                 IndexA = Context.VertCount;
                 Context.VertCount = static_cast<unsigned short>(Context.VertCount + 1);
             }
-            const double VertexBY = static_cast<double>(Position.Y) - SumY;
-            const float VertexBZ = static_cast<float>(static_cast<double>(Position.Z) - SumZ);
+            const double VertexBY = static_cast<double>(Position.y) - SumY;
+            const float VertexBZ = static_cast<float>(static_cast<double>(Position.z) - SumZ);
             unsigned short IndexB;
             if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
                 IndexB = static_cast<unsigned short>(Context.RequestedVerts);
@@ -2390,7 +2390,7 @@ namespace AlchemyImpl
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
                 std::memcpy(&Vertex->Z, &VertexBZ, sizeof(VertexBZ));
                 std::memcpy(&Vertex->U, &FrameBlock[1], sizeof(Vertex->U));
-                Vertex->X = static_cast<float>(static_cast<double>(Position.X) - SumX);
+                Vertex->X = static_cast<float>(static_cast<double>(Position.x) - SumX);
                 Vertex->Diffuse = Diffuse;
                 std::memcpy(&Vertex->V, &FrameBlock[2], sizeof(Vertex->V));
                 Vertex->Y = static_cast<float>(VertexBY);
@@ -2398,8 +2398,8 @@ namespace AlchemyImpl
                 IndexB = Context.VertCount;
                 Context.VertCount = static_cast<unsigned short>(Context.VertCount + 1);
             }
-            const double VertexCY = static_cast<double>(SumY) + Position.Y;
-            const float VertexCZ = static_cast<float>(static_cast<double>(SumZ) + Position.Z);
+            const double VertexCY = static_cast<double>(SumY) + Position.y;
+            const float VertexCZ = static_cast<float>(static_cast<double>(SumZ) + Position.z);
             unsigned short IndexC;
             if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
                 IndexC = static_cast<unsigned short>(Context.RequestedVerts);
@@ -2408,7 +2408,7 @@ namespace AlchemyImpl
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(Context.LockedVerts);
                 std::memcpy(&Vertex->Z, &VertexCZ, sizeof(VertexCZ));
                 std::memcpy(&Vertex->U, &FrameBlock[3], sizeof(Vertex->U));
-                Vertex->X = static_cast<float>(static_cast<double>(SumX) + Position.X);
+                Vertex->X = static_cast<float>(static_cast<double>(SumX) + Position.x);
                 Vertex->Diffuse = Diffuse;
                 std::memcpy(&Vertex->V, &FrameBlock[4], sizeof(Vertex->V));
                 Vertex->Y = static_cast<float>(VertexCY);
@@ -2425,9 +2425,9 @@ namespace AlchemyImpl
                 Vertex.V = FrameBlock[4];
                 Vertex.U = FrameBlock[1];
                 Vertex.Diffuse = Diffuse;
-                Vertex.Z = static_cast<float>(static_cast<double>(Position.Z) - DifferenceZ);
-                Vertex.Y = static_cast<float>(static_cast<double>(Position.Y) - DifferenceY);
-                Vertex.X = static_cast<float>(static_cast<double>(Position.X) - DifferenceX);
+                Vertex.Z = static_cast<float>(static_cast<double>(Position.z) - DifferenceZ);
+                Vertex.Y = static_cast<float>(static_cast<double>(Position.y) - DifferenceY);
+                Vertex.X = static_cast<float>(static_cast<double>(Position.x) - DifferenceX);
                 FAlchemyVertex* const Out = static_cast<FAlchemyVertex*>(Context.LockedVerts);
                 std::memcpy(Out, &Vertex, sizeof(Vertex));
                 Context.LockedVerts = Out + 1;
@@ -2572,9 +2572,9 @@ namespace AlchemyImpl
                     EPerpRectBoundsDistance::RectRoundedYzx);
             }
         }
-        FVector WorldCenter;
-        TransformOrientedBoundsCenter(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
-            WorldCenter, *reinterpret_cast<const FVector*>(OutSphere));
+        Vector WorldCenter;
+        TransformOrientedBoundsCenter(NodeWorldXform_,
+            WorldCenter, *reinterpret_cast<const Vector*>(OutSphere));
         float WorldSphere[4];
         std::memcpy(WorldSphere, &WorldCenter, sizeof(WorldCenter));
         std::memcpy(WorldSphere + 3, OutSphere + 3, sizeof(float));
@@ -2618,13 +2618,13 @@ namespace AlchemyImpl
         if (!AlDrawContextBegin(G_OrientedDrawContext, 4, VertCount, IndexCount))
             return GR_OK;
         const bool bCameraFade = (Descriptor_->Flags & 0x40u) != 0;
-        FTransform InverseNode;
-        FVector CameraPosition;
+        Transform InverseNode;
+        Vector CameraPosition;
         if (bCameraFade)
         {
-            FTransform InverseTemporary;
+            Transform InverseTemporary;
             float InverseW;
-            ComputeGeneralInverseTransform(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
+            ComputeGeneralInverseTransform(NodeWorldXform_,
                 InverseTemporary, InverseW);
             std::memcpy(&InverseNode, &InverseTemporary, sizeof(InverseNode));
             ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
@@ -2661,7 +2661,7 @@ namespace AlchemyImpl
                 unsigned long InnerBits;
                 std::memcpy(&OuterBits, &AppearanceOuterTime_, sizeof(OuterBits));
                 std::memcpy(&InnerBits, &InnerTime, sizeof(InnerBits));
-                Descriptor_->LocalTransform->Evaluate(OuterBits, InnerBits, M);
+                Descriptor_->LocalTransform->Evaluate(OuterBits, InnerBits, reinterpret_cast<Transform*>(M));
                 Position[0] = static_cast<float>(static_cast<double>(M[9]) + Position[0]);
                 Position[1] = static_cast<float>(static_cast<double>(Position[1]) + M[10]);
                 Position[2] = static_cast<float>(static_cast<double>(Position[2]) + M[11]);
@@ -2684,12 +2684,12 @@ namespace AlchemyImpl
                 const float NormalX = static_cast<float>(static_cast<double>(A3) * B7 - A6 * B4);
                 const float NormalY = static_cast<float>(A6 * B1 - B7 * A0);
                 const float NormalZ = static_cast<float>(B4 * A0 - static_cast<double>(A3) * B1);
-                FVector LocalCamera;
+                Vector LocalCamera;
                 TransformOrientedBoundsCenter(InverseNode, LocalCamera, CameraPosition);
                 float Direction[3];
-                Direction[2] = static_cast<float>(static_cast<double>(LocalCamera.Z) - Position[2]);
-                Direction[1] = static_cast<float>(static_cast<double>(LocalCamera.Y) - Position[1]);
-                Direction[0] = static_cast<float>(static_cast<double>(LocalCamera.X) - Position[0]);
+                Direction[2] = static_cast<float>(static_cast<double>(LocalCamera.z) - Position[2]);
+                Direction[1] = static_cast<float>(static_cast<double>(LocalCamera.y) - Position[1]);
+                Direction[0] = static_cast<float>(static_cast<double>(LocalCamera.x) - Position[0]);
                 const double SquareX = static_cast<double>(Direction[0]) * Direction[0];
                 const double SquareZ = static_cast<double>(Direction[2]) * Direction[2];
                 const double SumXz = SquareX + SquareZ;
@@ -2863,8 +2863,8 @@ namespace AlchemyImpl
         G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
         float ViewWorld[12];
-        ComposeTransform(ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
-        G_RenderPipeline->SetModelview(ViewWorld);
+        ComposeTransform(ViewWorld, (const float*)Camera->GetViewTransform(), NodeWorldXform_);
+        G_RenderPipeline->SetModelview((const Transform*)ViewWorld);
         AlDrawContextDraw(G_OrientedDrawContext);
         return GR_OK;
     }
@@ -3014,9 +3014,9 @@ namespace AlchemyImpl
                     EPerpRectBoundsDistance::PerpUnroundedXyz);
             }
         }
-        FVector WorldCenter;
-        TransformPerpBoundsCenter(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
-            WorldCenter, *reinterpret_cast<const FVector*>(OutSphere));
+        Vector WorldCenter;
+        TransformPerpBoundsCenter(NodeWorldXform_,
+            WorldCenter, *reinterpret_cast<const Vector*>(OutSphere));
         float WorldSphere[4];
         std::memcpy(WorldSphere, &WorldCenter, sizeof(WorldCenter));
         std::memcpy(WorldSphere + 3, OutSphere + 3, sizeof(float));
@@ -3090,7 +3090,7 @@ namespace AlchemyImpl
             return GR_OK;
 
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        const float* CameraView = Camera->GetViewTransform();
+        const float* CameraView = (const float*)Camera->GetViewTransform();
         ComposeTransform(ViewXform_, CameraView, NodeWorldXform_);
 
         unsigned long VertCount = 0;
@@ -3106,9 +3106,9 @@ namespace AlchemyImpl
         StoreAlchemyFpuFloat(CameraDelta[1], static_cast<double>(CameraPos[1]) - LastCameraPos_[1]);
         StoreAlchemyFpuFloat(CameraDelta[2], static_cast<double>(CameraPos[2]) - LastCameraPos_[2]);
         float Step[3];
-        Shared3DMath()->TransformMatrix(*reinterpret_cast<FVector*>(Step),
-            *reinterpret_cast<const FMatrix*>(CameraView),
-            *reinterpret_cast<const FVector*>(CameraDelta));
+        Shared3DMath()->TransformMatrix(*reinterpret_cast<Vector*>(Step),
+            *reinterpret_cast<const Matrix*>(CameraView),
+            *reinterpret_cast<const Vector*>(CameraDelta));
         const double SquareX = static_cast<double>(Step[0]) * Step[0];
         const double SquareY = static_cast<double>(Step[1]) * Step[1];
         const double SumXy = SquareX + SquareY;
@@ -3173,9 +3173,9 @@ namespace AlchemyImpl
                 float* LastView =
                     reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(Particle) + 0x30);
                 float C[3];
-                Shared3DMath()->TransformXform(*reinterpret_cast<FVector*>(C),
-                    *reinterpret_cast<const FTransform*>(ViewXform_),
-                    *reinterpret_cast<const FVector*>(&Particle->PosX));
+                Shared3DMath()->TransformXform(*reinterpret_cast<Vector*>(C),
+                    *reinterpret_cast<const Transform*>(ViewXform_),
+                    *reinterpret_cast<const Vector*>(&Particle->PosX));
 
                 if (!(C[2] > -1.0f) && !(LastView[2] > -1.0f))
                 {
@@ -3591,9 +3591,9 @@ namespace AlchemyImpl
                     EPerpRectBoundsDistance::RectRoundedYzx);
             }
         }
-        FVector WorldCenter;
-        TransformPerpBoundsCenter(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
-            WorldCenter, *reinterpret_cast<const FVector*>(OutSphere));
+        Vector WorldCenter;
+        TransformPerpBoundsCenter(NodeWorldXform_,
+            WorldCenter, *reinterpret_cast<const Vector*>(OutSphere));
         float WorldSphere[4];
         std::memcpy(WorldSphere, &WorldCenter, sizeof(WorldCenter));
         std::memcpy(WorldSphere + 3, OutSphere + 3, sizeof(float));
@@ -3722,8 +3722,8 @@ namespace AlchemyImpl
 
         float ViewWorld[12];
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        ComposeTransform(ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
-        G_RenderPipeline->SetModelview(ViewWorld);
+        ComposeTransform(ViewWorld, (const float*)Camera->GetViewTransform(), NodeWorldXform_);
+        G_RenderPipeline->SetModelview((const Transform*)ViewWorld);
     }
 
     // FUN_06205720, __thiscall on the node: the beam ribbon.
@@ -3882,13 +3882,13 @@ namespace AlchemyImpl
                 continue;
             }
 
-            float* FieldWorld = nullptr;
+            Transform* FieldWorld = nullptr;
             Field->GetNodeTransform(0, &FieldWorld);
             float NegNodePos[3];
-            BeamNegate(NegNodePos, NodeWorldXform_ + 9);
-            TransformPerpBoundsCenter(*reinterpret_cast<const FTransform*>(FieldWorld),
-                *reinterpret_cast<FVector*>(Tip),
-                *reinterpret_cast<const FVector*>(NegNodePos));
+            BeamNegate(NegNodePos, &NodeWorldXform_.Translation.x);
+            TransformPerpBoundsCenter(*FieldWorld,
+                *reinterpret_cast<Vector*>(Tip),
+                *reinterpret_cast<const Vector*>(NegNodePos));
             float Difference[3];
             BeamSubtract(Difference, &Head->PosX, Tip);
             if (BeamLongSegmentXyz(Difference))
@@ -3925,17 +3925,17 @@ namespace AlchemyImpl
         State.Idx[3] = 0;
         State.Counter = 0;
         State.Node = this;
-        FillIdentity3x3(State.Xform);
-        State.Xform[9] = 0.0f;
-        State.Xform[10] = 0.0f;
-        State.Xform[11] = 0.0f;
+        FillIdentity3x3(&State.Xform.Rotation.E[0][0]);
+        State.Xform.Translation.x = 0.0f;
+        State.Xform.Translation.y = 0.0f;
+        State.Xform.Translation.z = 0.0f;
         State.PrevPos[0] = 0.0f;
         State.PrevPos[1] = 0.0f;
         State.PrevPos[2] = 0.0f;
         float Basis[12];
         ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
-        ComposeTransform(Basis, Camera->GetOrientation(), NodeWorldXform_);
-        std::memcpy(State.Xform, Basis, sizeof(Basis));
+        ComposeTransform(Basis, (const float*)Camera->GetOrientation(), NodeWorldXform_);
+        std::memcpy(&State.Xform, Basis, sizeof(Basis));
 
         const float* LeadPos = &Head->PosX;
         bool bTipNoCap = false;
@@ -3952,14 +3952,14 @@ namespace AlchemyImpl
                 float BasisColumn[3];
                 float Side[3];
                 float VertexPos[3];
-                BeamBasis(BasisColumn, State.Xform, 0);
+                BeamBasis(BasisColumn, &State.Xform.Rotation.E[0][0], 0);
                 const float WidthA = static_cast<float>(LoadAppearanceScalar(HalfWidth));
                 BeamScale(Side, BasisColumn, WidthA);
                 BeamSubtract(VertexPos, Tip, Side);
                 NewIdx[0] = StoreBeamRawVertex(VertexPos, Diffuse, State.Node->Texture_.Frame[1], V);
                 BeamAdd(VertexPos, Tip, Side);
                 NewIdx[1] = StoreBeamRawVertex(VertexPos, Diffuse, State.Node->Texture_.Frame[3], V);
-                BeamBasis(BasisColumn, State.Xform, 1);
+                BeamBasis(BasisColumn, &State.Xform.Rotation.E[0][0], 1);
                 const float WidthB = static_cast<float>(LoadAppearanceScalar(HalfWidth));
                 BeamScale(Side, BasisColumn, WidthB);
                 BeamSubtract(VertexPos, Tip, Side);
@@ -4089,9 +4089,9 @@ namespace AlchemyImpl
         float Side[3];
         float VertexPos[3];
         // The inline rail-A extraction loads/stores X, Y, Z successively.
-        BasisColumn[0] = static_cast<float>(LoadAppearanceScalar(State.Xform[0]));
-        BasisColumn[1] = static_cast<float>(LoadAppearanceScalar(State.Xform[3]));
-        BasisColumn[2] = static_cast<float>(LoadAppearanceScalar(State.Xform[6]));
+        BasisColumn[0] = static_cast<float>(LoadAppearanceScalar(State.Xform.Rotation.E[0][0]));
+        BasisColumn[1] = static_cast<float>(LoadAppearanceScalar(State.Xform.Rotation.E[1][0]));
+        BasisColumn[2] = static_cast<float>(LoadAppearanceScalar(State.Xform.Rotation.E[2][0]));
         const float WidthA = static_cast<float>(LoadAppearanceScalar(HalfWidth));
         BeamScale(Side, BasisColumn, WidthA);
         BeamSubtract(VertexPos, Pos, Side);
@@ -4099,9 +4099,9 @@ namespace AlchemyImpl
         BeamAdd(VertexPos, Pos, Side);
         NewIdx[1] = StoreBeamConvertedVertex(VertexPos, Diffuse, State.Node->Texture_.Frame[3], V);
         // Unlike rail A, rail B multiplies the loaded X/Y/Z values before storing.
-        const double Bx = LoadAppearanceScalar(State.Xform[1]);
-        const double By = LoadAppearanceScalar(State.Xform[4]);
-        const double Bz = LoadAppearanceScalar(State.Xform[7]);
+        const double Bx = LoadAppearanceScalar(State.Xform.Rotation.E[0][1]);
+        const double By = LoadAppearanceScalar(State.Xform.Rotation.E[1][1]);
+        const double Bz = LoadAppearanceScalar(State.Xform.Rotation.E[2][1]);
         StoreAlchemyFpuFloat(Side[2], Bz * HalfWidth);
         StoreAlchemyFpuFloat(Side[1], By * HalfWidth);
         StoreAlchemyFpuFloat(Side[0], Bx * HalfWidth);
@@ -4211,9 +4211,9 @@ namespace AlchemyImpl
         }
         if (G_3DMath == nullptr)
             G_3DMath = Create3DMath();
-        FVector WorldCenter;
-        G_3DMath->TransformXform(WorldCenter, *reinterpret_cast<const FTransform*>(NodeWorldXform_),
-                                *reinterpret_cast<const FVector*>(OutSphere));
+        Vector WorldCenter;
+        G_3DMath->TransformXform(WorldCenter, NodeWorldXform_,
+                                *reinterpret_cast<const Vector*>(OutSphere));
         std::memcpy(OutSphere, &WorldCenter, sizeof(WorldCenter));
         return Count == 0 ? GR_GENERIC : GR_OK;
     }
@@ -4331,19 +4331,19 @@ namespace AlchemyImpl
         if (G_FxMeshFactory == nullptr)
             return GR_OK;
 
-        float* World12 = nullptr;
+        Transform* World12 = nullptr;
         GetNodeTransform(0, &World12);
 
         // Both halves of Six are transformed as points (math engine DAT_06257a6c) -- the
         // velocity picks up the translation too, as in retail.
         I3DMathEngine* const Math = Acquire3DMath();
         float WorldSix[6];
-        Math->TransformXform(*reinterpret_cast<FVector*>(&WorldSix[0]),
-                             *reinterpret_cast<const FTransform*>(World12),
-                             *reinterpret_cast<const FVector*>(&Six[0])); // +0x28
-        Math->TransformXform(*reinterpret_cast<FVector*>(&WorldSix[3]),
-                             *reinterpret_cast<const FTransform*>(World12),
-                             *reinterpret_cast<const FVector*>(&Six[3])); // +0x28
+        Math->TransformXform(*reinterpret_cast<Vector*>(&WorldSix[0]),
+                             *World12,
+                             *reinterpret_cast<const Vector*>(&Six[0])); // +0x28
+        Math->TransformXform(*reinterpret_cast<Vector*>(&WorldSix[3]),
+                             *World12,
+                             *reinterpret_cast<const Vector*>(&Six[3])); // +0x28
 
         // IFxMeshFactory slot 3 with the set's MeshId (+0x60) and MeshName buffer (+0x74,
         // never null: assigned "" at construction). The only callee, freelancer.exe
@@ -4373,19 +4373,19 @@ namespace AlchemyImpl
                 unsigned long TimeB = 0;
                 std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
                 std::memcpy(&TimeB, &Phase, sizeof(TimeB));
-                Set->ParticleTransform->Evaluate(TimeA, TimeB, Anim);
+                Set->ParticleTransform->Evaluate(TimeA, TimeB, reinterpret_cast<Transform*>(Anim));
             }
             const float T[12] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
                                   Six[0], Six[1], Six[2] };
             float A[12];
-            Math->MulTransform(*reinterpret_cast<FTransform*>(A),
-                               *reinterpret_cast<const FTransform*>(World12),
-                               *reinterpret_cast<const FTransform*>(T)); // +0x1C
+            Math->MulTransform(*reinterpret_cast<Transform*>(A),
+                               *World12,
+                               *reinterpret_cast<const Transform*>(T)); // +0x1C
             float B[12];
-            Math->MulTransform(*reinterpret_cast<FTransform*>(B),
-                               *reinterpret_cast<const FTransform*>(A),
-                               *reinterpret_cast<const FTransform*>(Anim)); // +0x1C
-            Mesh->SetTransform(B);
+            Math->MulTransform(*reinterpret_cast<Transform*>(B),
+                               *reinterpret_cast<const Transform*>(A),
+                               *reinterpret_cast<const Transform*>(Anim)); // +0x1C
+            Mesh->SetTransform((const Transform*)B);
         }
 
         // A counted local copy, released by FUN_06225940.
@@ -4495,13 +4495,13 @@ namespace AlchemyImpl
     //   MeshApp_UseParticleTransform the spawn's World * T * Anim, else the mesh's own
     //   transform (slot 4) with the translation replaced by the world position; both into
     //   mesh slot 3.
-    GENRESULT DACOM_API FxMeshAppearance::ComposeNodeTransform(void* Unused, const float* Parent12)
+    GENRESULT DACOM_API FxMeshAppearance::ComposeNodeTransform(void* Unused, const Transform* Parent)
     {
-        const GENRESULT Result = FGenericFxObjectBase::ComposeNodeTransform(Unused, Parent12);
+        const GENRESULT Result = FGenericFxObjectBase::ComposeNodeTransform(Unused, Parent);
         if (Result != GR_OK)
             return Result;
 
-        float* World = nullptr;
+        Transform* World = nullptr;
         GetNodeTransform(0, &World);
 
         FPooledParticle* Item = InstanceListHead_;
@@ -4523,32 +4523,32 @@ namespace AlchemyImpl
                         unsigned long TimeB = 0;
                         std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
                         std::memcpy(&TimeB, &Phase, sizeof(TimeB));
-                        Set->ParticleTransform->Evaluate(TimeA, TimeB, Anim);
+                        Set->ParticleTransform->Evaluate(TimeA, TimeB, reinterpret_cast<Transform*>(Anim));
                     }
                     const float T[12] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
                                           Item->PosX, Item->PosY, Item->PosZ };
                     float X[12];
-                    Math->MulTransform(*reinterpret_cast<FTransform*>(X),
-                                       *reinterpret_cast<const FTransform*>(World),
-                                       *reinterpret_cast<const FTransform*>(T)); // +0x1C
+                    Math->MulTransform(*reinterpret_cast<Transform*>(X),
+                                       *World,
+                                       *reinterpret_cast<const Transform*>(T)); // +0x1C
                     float Y[12];
-                    Math->MulTransform(*reinterpret_cast<FTransform*>(Y),
-                                       *reinterpret_cast<const FTransform*>(X),
-                                       *reinterpret_cast<const FTransform*>(Anim)); // +0x1C
-                    Mesh->SetTransform(Y);
+                    Math->MulTransform(*reinterpret_cast<Transform*>(Y),
+                                       *reinterpret_cast<const Transform*>(X),
+                                       *reinterpret_cast<const Transform*>(Anim)); // +0x1C
+                    Mesh->SetTransform((const Transform*)Y);
                 }
                 else
                 {
                     float M[12];
                     std::memcpy(M, Mesh->GetTransform(), sizeof(M));
                     float WorldPos[3];
-                    Math->TransformXform(*reinterpret_cast<FVector*>(WorldPos),
-                                         *reinterpret_cast<const FTransform*>(World),
-                                         *reinterpret_cast<const FVector*>(&Item->PosX)); // +0x28
+                    Math->TransformXform(*reinterpret_cast<Vector*>(WorldPos),
+                                         *World,
+                                         *reinterpret_cast<const Vector*>(&Item->PosX)); // +0x28
                     M[9] = WorldPos[0];
                     M[10] = WorldPos[1];
                     M[11] = WorldPos[2];
-                    Mesh->SetTransform(M);
+                    Mesh->SetTransform((const Transform*)M);
                 }
             }
             Item = Item->Next;
@@ -4740,10 +4740,10 @@ namespace AlchemyImpl
         }
 
         // FUN_062307f0: preserve aliased inputs until the service returns.
-        void MultiplyParticleQuaternions(FQuaternion& Out, const FQuaternion& A,
-            const FQuaternion& B)
+        void MultiplyParticleQuaternions(Quaternion& Out, const Quaternion& A,
+            const Quaternion& B)
         {
-            FQuaternion Product;
+            Quaternion Product;
             ParticleMath()->MulQuat(Product, A, B);
             std::memcpy(&Out, &Product, sizeof(Product));
         }
@@ -4779,15 +4779,15 @@ namespace AlchemyImpl
         }
 
         // FUN_06206c40 calculates all three Z/Y/X products before X/Y/Z stores.
-        __declspec(noinline) void ScaleParticleQuaternionVector(FQuaternion& Out,
+        __declspec(noinline) void ScaleParticleQuaternionVector(Quaternion& Out,
             const float* Axis, const float& Scale)
         {
             const double Z = static_cast<double>(Scale) * Axis[2];
             const double Y = static_cast<double>(Scale) * Axis[1];
             const double X = static_cast<double>(Scale) * Axis[0];
-            StoreAlchemyFpuFloat(Out.X, X);
-            StoreAlchemyFpuFloat(Out.Y, Y);
-            StoreAlchemyFpuFloat(Out.Z, Z);
+            StoreAlchemyFpuFloat(Out.x, X);
+            StoreAlchemyFpuFloat(Out.y, Y);
+            StoreAlchemyFpuFloat(Out.z, Z);
         }
 #pragma float_control(pop)
 #pragma optimize("", on)
@@ -4923,7 +4923,7 @@ namespace AlchemyImpl
             const double LenSqB = SumXy + SquareZ;
             const float Speed = static_cast<float>(ParticleInverseSqrt(LenSqB) * LenSqB);
 
-            FQuaternion Q;
+            Quaternion Q;
             // >= 0.99 or unordered takes the other axis.
             if (std::fabs(static_cast<double>(N[1])) < 0.9900000095367432)
             {
@@ -4934,7 +4934,7 @@ namespace AlchemyImpl
                 const float Scale = static_cast<float>(static_cast<double>(Sine) / ParticleAxisLength(Axis));
                 const double RoundedHalf = StoredHalf;
                 const float Cosine = static_cast<float>(ComputeAlchemyFpuCosine(RoundedHalf));
-                std::memcpy(&Q.W, &Cosine, sizeof(Cosine));
+                std::memcpy(&Q.w, &Cosine, sizeof(Cosine));
                 ScaleParticleQuaternionVector(Q, Axis, Scale);
             }
             else
@@ -4944,36 +4944,36 @@ namespace AlchemyImpl
                 const volatile float StoredHalf = static_cast<float>(Half);
                 const float Sine = static_cast<float>(ComputeAlchemyFpuSine(Half));
                 const float Scale = static_cast<float>(static_cast<double>(Sine) / ParticleAxisLength(Axis));
-                FQuaternion Q1;
+                Quaternion Q1;
                 const double RoundedHalf = StoredHalf;
                 const float Cosine = static_cast<float>(ComputeAlchemyFpuCosine(RoundedHalf));
-                std::memcpy(&Q1.W, &Cosine, sizeof(Cosine));
+                std::memcpy(&Q1.w, &Cosine, sizeof(Cosine));
                 ScaleParticleQuaternionVector(Q1, Axis, Scale);
                 const float TwistAxis[3] = {0.0f, 0.0f, 1.0f};
                 const double Twist = ParticleTwistAngle();
                 const float TwistSine = static_cast<float>(ComputeAlchemyFpuSine(Twist));
                 const float TwistScale = static_cast<float>(
                     static_cast<double>(TwistSine) / ParticleAxisLength(TwistAxis));
-                FQuaternion Q2;
+                Quaternion Q2;
                 const float TwistCosine = static_cast<float>(ComputeAlchemyFpuCosine(Twist));
-                std::memcpy(&Q2.W, &TwistCosine, sizeof(TwistCosine));
+                std::memcpy(&Q2.w, &TwistCosine, sizeof(TwistCosine));
                 ScaleParticleQuaternionVector(Q2, TwistAxis, TwistScale);
                 MultiplyParticleQuaternions(Q, Q1, Q2);
             }
-            std::memcpy(R->VelQuat, &Q, sizeof(Q));
+            std::memcpy(&R->VelQuat, &Q, sizeof(Q));
             R->Blend = 0.0f;
 
-            FMatrix Rotation;
+            Matrix Rotation;
             // Retail reloads the class cache after the MulQuat callback.
             if ((ParticleProps()->Flags & 2) != 0)
             {
                 // Speed >= 0.5 (or unordered) takes Speed * Dt.
                 if (Speed < 0.5f)
                 {
-                    R->VelQuat[0] = 1.0f;
-                    R->VelQuat[1] = 0.0f;
-                    R->VelQuat[2] = 0.0f;
-                    R->VelQuat[3] = 0.0f;
+                    R->VelQuat.w = 1.0f;
+                    R->VelQuat.x = 0.0f;
+                    R->VelQuat.y = 0.0f;
+                    R->VelQuat.z = 0.0f;
                     R->Blend = (static_cast<double>(Dt) + R->Blend) +
                         static_cast<double>(FloatFromBits(0x3c23d70au)); // DAT_0624c350
                 }
@@ -4986,23 +4986,23 @@ namespace AlchemyImpl
                 // Capture the raw interpolation word before lazy creation.
                 float SlerpWeight;
                 std::memcpy(&SlerpWeight, &R->Blend, sizeof(SlerpWeight));
-                FQuaternion Slerped;
+                Quaternion Slerped;
                 ParticleMath()->QuatSlerpValue(Slerped,
-                    *reinterpret_cast<const FQuaternion*>(R->BlendQuat),
-                    *reinterpret_cast<const FQuaternion*>(R->VelQuat), &SlerpWeight);
-                std::memcpy(R->BlendQuat, &Slerped, sizeof(Slerped));
+                    R->BlendQuat,
+                    R->VelQuat, &SlerpWeight);
+                std::memcpy(&R->BlendQuat, &Slerped, sizeof(Slerped));
                 ParticleMath()->QuaternionToMatrix(Rotation,
-                    *reinterpret_cast<const FQuaternion*>(R->BlendQuat)); // +0x54
+                    R->BlendQuat); // +0x54
             }
             else
             {
                 ParticleMath()->QuaternionToMatrix(Rotation,
-                    *reinterpret_cast<const FQuaternion*>(R->VelQuat)); // +0x54
+                    R->VelQuat); // +0x54
             }
             std::memcpy(M, &Rotation, sizeof(float) * 9);
         }
 
-        R->LifeEffect->SetTransform(reinterpret_cast<void*>(1), M);
+        R->LifeEffect->SetTransform(1, (const Transform*)M);
     }
 #pragma float_control(pop)
 
@@ -5077,14 +5077,14 @@ namespace AlchemyImpl
                 Tail->UnusedSpawnWords_0x4c[0] = 0x3f800000u;
                 Tail->UnusedSpawnWords_0x4c[1] = 0;
                 Tail->UnusedSpawnWords_0x4c[2] = 0;
-                Tail->BlendQuat[0] = 1.0f;
-                Tail->BlendQuat[3] = 0.0f;
-                Tail->BlendQuat[2] = 0.0f;
-                Tail->BlendQuat[1] = 0.0f;
-                Tail->VelQuat[0] = 1.0f;
-                Tail->VelQuat[3] = 0.0f;
-                Tail->VelQuat[2] = 0.0f;
-                Tail->VelQuat[1] = 0.0f;
+                Tail->BlendQuat.w = 1.0f;
+                Tail->BlendQuat.z = 0.0f;
+                Tail->BlendQuat.y = 0.0f;
+                Tail->BlendQuat.x = 0.0f;
+                Tail->VelQuat.w = 1.0f;
+                Tail->VelQuat.z = 0.0f;
+                Tail->VelQuat.y = 0.0f;
+                Tail->VelQuat.x = 0.0f;
                 Tail->Blend = 0.0f;
                 IntegrateRecord(InstanceListTail_, 0.0f);
 
@@ -5142,7 +5142,7 @@ namespace AlchemyImpl
     // Duration (ordered) that has none yet, when DeathName is set and both DAT_06257b90 and
     // DAT_06257b98 are bound; then the shared compose FUN_062401a0.
     GENRESULT DACOM_API FxParticleAppearance::ComposeNodeTransform(void* Unused,
-                                                                   const float* Parent12)
+                                                                   const Transform* Parent)
     {
         if (ParticleProps()->DeathName.Length != 0)
         {
@@ -5166,7 +5166,7 @@ namespace AlchemyImpl
                                        0.0f, 0.0f, 0.0f};
                         // Position dwords copied without conversion.
                         std::memcpy(M + 9, &Record->PosX, 3 * sizeof(float));
-                        R->DeathEffect->SetTransform(reinterpret_cast<void*>(1), M);
+                        R->DeathEffect->SetTransform(1, (const Transform*)M);
                         if (IsNonzeroParticleField(AppearanceOuterTime_))
                             ForwardEffectFloat(R->DeathEffect, &IFxEffect::SetOuterTime,
                                                AppearanceOuterTime_);
@@ -5177,7 +5177,7 @@ namespace AlchemyImpl
                 Record = Record->Next;
             }
         }
-        return FGenericFxObjectBase::ComposeNodeTransform(Unused, Parent12);
+        return FGenericFxObjectBase::ComposeNodeTransform(Unused, Parent);
     }
     // FUN_0622f8b0: node+0x8c, then the original argument to each life/death effect
     // (IFxEffect slot 6).

@@ -356,11 +356,11 @@ bool CEShield::Connect(char const* HpName)
     CObject* RadiusOwner = Attachment->GetPhysicsOwner();
     Vector WorldCenter;
     float const Radius = RadiusOwner->get_physical_radius_r(WorldCenter);
-    FTransform const* InstXform = (FTransform const*)DALib::Engine->GetInstanceTransform((void*)Root);
+    Transform const* InstXform = DALib::Engine->GetInstanceTransform(Root);
     I3DMathEngine* Math = Acquire3DMathEngine();
     Vector LocalCenter;
-    Math->InverseTransform((FVector&)LocalCenter, *InstXform, (FVector const&)WorldCenter);
-    DALib::Engine->SetInstanceExtent((void*)Root, 1, Radius, (float const*)&LocalCenter);
+    Math->InverseTransform(LocalCenter, *InstXform, WorldCenter);
+    DALib::Engine->SetInstanceExtent(Root, 1, Radius, &LocalCenter);
 
     return true;
 }
@@ -445,7 +445,7 @@ void CEShieldIntruderChecker::Attach(CEShield* Shield)
 
     // The part is looked up by the CRC half of the root instance's name.
     FEngineName Name;
-    DALib::Engine->GetInstanceName(&Name, (void*)Shield->GetRootIndex());
+    DALib::Engine->GetInstanceName(&Name, Shield->GetRootIndex());
     PhyArch::Part const* Part = Shield->Arch->get_phy_part(Name.Crc);
     if (Part != nullptr)
     {

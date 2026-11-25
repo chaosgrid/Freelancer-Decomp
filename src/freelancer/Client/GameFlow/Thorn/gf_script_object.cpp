@@ -496,7 +496,7 @@ void FGfScript::DrawEffects(ICamera* Camera)
 // index FUN_0044fdd0 / FUN_0044ff30 just used.
 void FGfScript::SetEntityPropDetached(int Index, unsigned char bDetached)
 {
-    void* Instance = Spawned[Index]->GetEngineInstance();
+    InstanceIndex Instance = Spawned[Index]->GetEngineInstance();
     Sequence->SetPropDetached(Instance, bDetached);
 }
 
@@ -863,7 +863,7 @@ void FGfScriptSequence::Setup()
 {
     RefreshLoadingProgress();
     ICamera* const Camera = GetRoomRuntimeCamera(Room);
-    float const* const Transform = Camera->GetOrientation();
+    const float* const Transform = (const float*)Camera->GetOrientation();
     int Index = 0;
     for (Index = 0; Index < 3; ++Index)
         CameraPos[Index] = Transform[9 + Index];
@@ -1190,7 +1190,7 @@ void FGfScriptSequence::ClearProps()
 }
 
 // FUN_00455d20. The props are not null-tested.
-void FGfScriptSequence::SetPropDetached(void* Instance, unsigned char bDetached)
+void FGfScriptSequence::SetPropDetached(InstanceIndex Instance, unsigned char bDetached)
 {
     std::list<FProp>::iterator It = Props.begin();
     for (; It != Props.end(); ++It)
@@ -1583,9 +1583,9 @@ void FGfScriptManager::Shutdown()
 
 // FUN_0044fa60. No check for a -1 instance on the way (the one caller tests the result
 // afterwards).
-void* GfEngineInstanceAncestor(void* Instance, int Levels)
+InstanceIndex GfEngineInstanceAncestor(InstanceIndex Instance, int Levels)
 {
-    void* Current = Instance;
+    InstanceIndex Current = Instance;
     if (Levels > 0)
     {
         int Remaining = Levels;

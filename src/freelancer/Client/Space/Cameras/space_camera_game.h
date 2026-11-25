@@ -74,7 +74,7 @@ enum EGameCameraSlot
 struct FGameCamera : FSpaceCamera
 {
     ~FGameCamera() = default;
-    void GetVelocity(float* Out3) override;
+    void GetVelocity(Vector* Out3) override;
     int SetProperty(char const* Key, char const* Value) override;
     virtual void ScaleEnvironmentEffects();               // formerly slot +0x50
     virtual char const* GetName();                        // formerly slot +0x54
@@ -168,7 +168,7 @@ const char* HudCameraGetName();
 
 // Slot 0x48 (0x0051b700): copies the three floats at +0xdc into the caller's vector, replacing
 // the base's write-a-zero-vector stub.
-void GameCameraGetVelocity(const FGameCamera* Cam, float* OutVelocity);
+void GameCameraGetVelocity(const FGameCamera* Cam, Vector* OutVelocity);
 
 // Slot 0x6c (FUN_0051b650): the per-frame update every GameCamera shares. With a non-zero dt
 // the velocity (+0xdc) becomes (position - last position) / dt; the position (the camera's

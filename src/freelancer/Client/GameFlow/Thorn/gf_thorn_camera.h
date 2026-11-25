@@ -16,6 +16,7 @@
 // A Thorn_CameraReference (operator new(0x70), ctor FUN_00450c60, identity vtable 0x005ccd5c)
 // holds another script's camera at +0x6c and forwards every facet call to it.
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "GameFlow/Thorn/gf_thorn_component.h"
 
 class FRoomCamera;
@@ -31,14 +32,14 @@ struct FThornCamera : FThornComponent
     void Register(FRoomCamera* Camera, int Priority, unsigned char bCanBeActive);
 
     // ICompoundControl (0x005ccbe8 / 0x005ccbec)
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override; // 11 LAB_00450940
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;    // 12 LAB_00450aa0
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_00450940
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_00450aa0
 
     // IGeoTransformControl (0x005ccb5c..0x005ccb68)
-    GENRESULT DACOM_API SetPosition(float* Position) override;           // 3  LAB_00450880
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;         // 4  LAB_004508e0
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;        // 5  LAB_004509f0
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;      // 6  LAB_00450a50
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;           // 3  LAB_00450880
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;         // 4  LAB_004508e0
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;        // 5  LAB_004509f0
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;      // 6  LAB_00450a50
 
     // ICameraControl (0x005ccb24..0x005ccb48; slots 4, 5, 9, 10 stay LAB_00454190)
     GENRESULT DACOM_API SetFov(const float* Fov) override;                      // 3  LAB_00450b40
@@ -50,7 +51,7 @@ struct FThornCamera : FThornComponent
 
     // identity tail
     void Stop() override;                                                // 14 LAB_00450860
-    void* GetEngineInstance() override;                                  // 17 FUN_00450870
+    InstanceIndex GetEngineInstance() override;                                  // 17 FUN_00450870
 
     int PoolSlot; // +0x6c index into G_GfCameraPool, -1 until Register
 };
@@ -63,14 +64,14 @@ struct FThornCameraReference : FThornComponent
                           FThornEntitySnap const* Desc);
 
     // ICompoundControl
-    GENRESULT DACOM_API SetTransform(float const* Transform12) override; // 11 LAB_00450dc0
-    GENRESULT DACOM_API GetTransform(float* OutTransform12) override;    // 12 LAB_00450ea0
+    GENRESULT DACOM_API SetTransform(const Transform* Transform12) override; // 11 LAB_00450dc0
+    GENRESULT DACOM_API GetTransform(Transform* OutTransform12) override;    // 12 LAB_00450ea0
 
     // IGeoTransformControl
-    GENRESULT DACOM_API SetPosition(float* Position) override;           // 3  LAB_00450d20
-    GENRESULT DACOM_API SetOrientation(float* Orient9) override;         // 4  LAB_00450d70
-    GENRESULT DACOM_API GetPosition(float* OutPosition) override;        // 5  LAB_00450e00
-    GENRESULT DACOM_API GetOrientation(float* OutOrient9) override;      // 6  LAB_00450e50
+    GENRESULT DACOM_API SetPosition(const Vector* Position) override;           // 3  LAB_00450d20
+    GENRESULT DACOM_API SetOrientation(const Matrix* Orient9) override;         // 4  LAB_00450d70
+    GENRESULT DACOM_API GetPosition(Vector* OutPosition) override;        // 5  LAB_00450e00
+    GENRESULT DACOM_API GetOrientation(Matrix* OutOrient9) override;      // 6  LAB_00450e50
 
     // ICameraControl
     GENRESULT DACOM_API SetFov(const float* Fov) override;                      // 3  LAB_00450ee0
@@ -82,7 +83,7 @@ struct FThornCameraReference : FThornComponent
 
     // identity tail
     void Stop() override;                                                // 14 LAB_00450cd0
-    void* GetEngineInstance() override;                                  // 17 LAB_00450ce0
+    InstanceIndex GetEngineInstance() override;                                  // 17 LAB_00450ce0
 
     FThornComponent* Target; // +0x6c the referenced camera, or null
 };

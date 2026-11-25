@@ -926,6 +926,9 @@
     <ClInclude Include="..\IVP\ivp_utility\ivp_message_router.h">
       <Filter>IVP\ivp_utility</Filter>
     </ClInclude>
+    <ClInclude Include="..\IVP\ivp_utility\ivp_message.h">
+      <Filter>IVP\ivp_utility</Filter>
+    </ClInclude>
     <ClInclude Include="..\IVP\ivp_physics\ivp_great_matrix.h">
       <Filter>IVP\ivp_physics</Filter>
     </ClInclude>

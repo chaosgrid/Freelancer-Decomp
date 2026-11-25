@@ -117,9 +117,9 @@ protected:
     void NotifyParent();
     // The mouse ray on the scrollbar plane in local coordinates (+0x3dc inverse), through the
     // TU's math engine DAT_0067d9fc.
-    FVector RayToLocal(float const* Ray) const;
+    Vector RayToLocal(float const* Ray) const;
     // The same, but MouseEvent transforms through FUN_004e7090 (DAT_00674b1c).
-    FVector RayToLocalViaHud(float const* Ray) const;
+    Vector RayToLocalViaHud(float const* Ray) const;
 
     bool bActive_;                     // +0x32c — ctor 1; gates the draw hover tint and the drag
     bool bCustomColor_;                // +0x32d — ctor 0; draw uses +0x32e for every part
@@ -146,7 +146,7 @@ protected:
     float Step_;                       // +0x3d0 — payload +0x14
     bool bDragging_;                   // +0x3d4
     float DragOffset_;                 // +0x3d8
-    float InverseLayout_[12];          // +0x3dc — ctor identity; SetPosition inverse of +0x3c
+    Transform InverseLayout_;          // +0x3dc — ctor identity; SetPosition inverse of +0x3c
     unsigned long ArrowIdleColor_;     // +0x40c — DAT_00679bb0
     unsigned long ArrowHotColor_;      // +0x410 — DAT_00679bb0
     unsigned long BarIdleColor_;       // +0x414 — DAT_00679bb0

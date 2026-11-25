@@ -332,7 +332,7 @@ int __stdcall RngWriteSeed(const unsigned char* Data, unsigned int Size)
     {
         return 0;
     }
-    Status = RegSetValueExA(Key, "Seed", 0, 3u, Data, Size);
+    Status = RegSetValueExA(Key, "Seed", 0, REG_BINARY, Data, Size);
     RegCloseKey(Key);
     if (Status == 0)
     {

@@ -127,7 +127,7 @@ void FaceIdea::SetBasis(Matrix const& Basis)
 {
     TargetKind = 4;
     // Nine dwords to +0x34: sizeof(Matrix), and the extent of the ctor-zeroed block.
-    std::memcpy(ZeroBlock34, &Basis, sizeof(ZeroBlock34));
+    std::memcpy(&ZeroBlock34, &Basis, sizeof(ZeroBlock34));
 }
 
 // FUN_062d75e0.
@@ -208,7 +208,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
     // A tag above 5 reaches the shared tail with this frame never written
     // (uninitialised stack in retail, unreachable since every writer stores 0..5);
     // the port value-initialises it.
-    Matrix WorkingFrame{};
+    Matrix WorkingFrame;
     Vector SteerVector{ 0.0f, 0.0f, 0.0f };
 
     // Shared "no target" fallback (LAB_062d6a4a). The steering gate (FUN_062e92e0)
@@ -343,7 +343,7 @@ int FaceIdea::Update(float /*DeltaTime*/)
 
     case 4:
         // Raw 9-float frame, copied verbatim (no orientation rebuild at all).
-        WorkingFrame = *reinterpret_cast<Matrix const*>(ZeroBlock34);
+        WorkingFrame = ZeroBlock34;
         break;
 
     default:

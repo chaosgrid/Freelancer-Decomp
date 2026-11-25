@@ -72,34 +72,34 @@ namespace
 
     // The inverse frame the ObjectShip functions build inline: FUN_00447be0 (R^T P), FUN_00411350
     // (negated), FUN_00447b60 with the nine elements pushed transposed, FUN_00447bb0.
-    void ShipInverseFrame(FTransform& Out, FMatrix const& R, FVector const& P)
+    void ShipInverseFrame(Transform& Out, Matrix const& R, Vector const& P)
     {
-        FVector Rotated;
+        Vector Rotated;
         ShipTransposeRotate(Rotated, R, P);
-        FVector Negated;
-        Negated.X = -Rotated.X;
-        Negated.Y = -Rotated.Y;
-        Negated.Z = -Rotated.Z;
+        Vector Negated;
+        Negated.x = -Rotated.x;
+        Negated.y = -Rotated.y;
+        Negated.z = -Rotated.z;
         int Row = 0;
         for (Row = 0; Row < 3; ++Row)
         {
             int Col = 0;
             for (Col = 0; Col < 3; ++Col)
-                Out.Rotation.D[Row][Col] = R.D[Col][Row];
+                Out.Rotation.E[Row][Col] = R.E[Col][Row];
         }
         Out.Translation = Negated;
     }
 
-    void ToFMatrix(FMatrix& Out, Matrix const& In)
+    void ToFMatrix(Matrix& Out, Matrix const& In)
     {
         memcpy(&Out, &In, sizeof(Out));
     }
 
-    void ToFVector(FVector& Out, Vector const& In)
+    void ToFVector(Vector& Out, Vector const& In)
     {
-        Out.X = In.x;
-        Out.Y = In.y;
-        Out.Z = In.z;
+        Out.x = In.x;
+        Out.y = In.y;
+        Out.z = In.z;
     }
 
     // FUN_00447ec0 (cdecl Out, Format, ...) -- vsprintf into a 0x100-byte local, then
@@ -134,9 +134,9 @@ namespace
 }
 
 // FUN_00447be0.
-void ShipTransposeRotate(FVector& Out, FMatrix const& M, FVector const& V)
+void ShipTransposeRotate(Vector& Out, Matrix const& M, Vector const& V)
 {
-    FVector Scratch;
+    Vector Scratch;
     ObjectShipMath()->TransposeTransform(Scratch, M, V);
     Out = Scratch;
 }
@@ -182,7 +182,7 @@ FObjectShipEngineFx::~FObjectShipEngineFx()
     Lifetime = 0.0f;
 }
 
-void FObjectShipEngineFx::Start(unsigned ArchId, float InLifetime, void* InInstance,
+void FObjectShipEngineFx::Start(unsigned ArchId, float InLifetime, InstanceIndex InInstance,
                                 Vector const& InPos, Matrix const& InOrient)
 {
     // FUN_00446ca0.
@@ -230,16 +230,16 @@ void FObjectShipEngineFx::Update(float Delta)
         return;
 
     // The effect's frame = the instance's transform times the local frame.
-    FTransform Local;
+    Transform Local;
     ToFMatrix(Local.Rotation, Orient);
     ToFVector(Local.Translation, Pos);
-    FTransform const* const InstanceXform =
-        reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
-    FTransform Product;
+    Transform const* const InstanceXform =
+        DALib::Engine->GetInstanceTransform(Instance);
+    Transform Product;
     ObjectShipMath()->MulTransform(Product, *InstanceXform, Local);
-    FTransform Xform = Product;
+    Transform Xform = Product;
 
-    Particles.Effect->SetTransform(nullptr, &Xform);
+    Particles.Effect->SetTransform(0, &Xform);
     Particles.Effect->ComposeTransforms(FloatArg(Delta));
     Particles.Effect->Update(FloatArg(Delta));
 
@@ -395,7 +395,7 @@ void FObjectShip::RebuildModel()
         GfShipPlaceOnMount(Instance, &Frame);
         // +0x13.
         bEnvMap = Archetype::CliObjEnvmapMaterial(Companion)[0] != '\0' ? 1 : 0;
-        Visuals.Populate(static_cast<long>(reinterpret_cast<intptr_t>(Instance)));
+        Visuals.Populate(Instance);
         if (RtcSlider::is_enabled("ship_loadouts"))
         {
             Visuals.AttachAll(Equipment);
@@ -419,9 +419,9 @@ void FObjectShip::BuildHardpointArrays()
     for (Index = 0; Index < HpCount; ++Index)
     {
         LoopSounds[Index].Instance =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Visuals.Summary->get_instance(Index)));
+            Visuals.Summary->get_instance(Index);
         RumbleSounds[Index].Instance =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Visuals.Summary->get_instance(Index)));
+            Visuals.Summary->get_instance(Index);
     }
 }
 
@@ -433,7 +433,7 @@ void FObjectShip::Update(double DeltaSeconds)
     if (GetGameOption(kGameOptShips) == 0)
         return;
 
-    float const Delta = static_cast<float>(DeltaSeconds);
+    float const Delta = DeltaSeconds;
     int Index = 0;
     for (Index = 0; Index < Visuals.Count; ++Index)
     {
@@ -441,27 +441,27 @@ void FObjectShip::Update(double DeltaSeconds)
         FObjectShipEngineSound& Loop = LoopSounds[Index];
         if (Loop.Instance != kRoomObjectNoInstance && Loop.Source != nullptr)
         {
-            float const* const At = DALib::Engine->GetInstancePosition(Loop.Instance);
+            const float* const At = (const float*)DALib::Engine->GetInstancePosition(Loop.Instance);
             float Where[3] = {At[0], At[1], At[2]};
             Loop.Source->SetPosition(Where);
         }
         FObjectShipEngineSound& Rumble = RumbleSounds[Index];
         if (Rumble.Instance != kRoomObjectNoInstance && Rumble.Source != nullptr)
         {
-            float const* const At = DALib::Engine->GetInstancePosition(Rumble.Instance);
-            float Where[3] = {At[0], At[1], At[2]};
+            const Vector* const At = DALib::Engine->GetInstancePosition(Rumble.Instance);
+            float Where[3] = {At->x, At->y, At->z};
             Rumble.Source->SetPosition(Where);
         }
         EngineFx[Index].Update(Delta);
     }
 
-    DALib::Anim->MixerWalk(static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)), Delta);
+    DALib::Anim->MixerWalk(static_cast<unsigned long>(Instance), Delta);
     DALib::Engine->UpdateInstance(Instance, 0, AsOpaqueDword(Delta));
     if (bRunningLights != 0)
         Visuals.UpdateFlashLights(Delta);
 }
 
-void* FObjectShip::GetEngineInstance()
+InstanceIndex FObjectShip::GetEngineInstance()
 {
     // LAB_00451360.
     return Instance;
@@ -485,7 +485,7 @@ void FObjectShip::DrawOpaque(ICamera* Camera)
         float const Height = GetFloorHeight();
         unsigned long HeightBits = 0;
         memcpy(&HeightBits, &Height, sizeof(HeightBits));
-        RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
+        RoomControlDrawShadow(Owner, static_cast<unsigned long>(Instance),
                               HeightBits, 0);
     }
     RoomControlDrawObject(Owner, this);
@@ -545,8 +545,8 @@ void FObjectShip::StartEngineEffects()
         if (Index == -1)
             continue;
         HardpointInfo const& Info = Visuals.Summary->get_info(Index);
-        void* const HpInstance =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Visuals.Summary->get_instance(Index)));
+        const InstanceIndex HpInstance =
+            Visuals.Summary->get_instance(Index);
         EngineFx[Index].Start(ArchId, -1.0f, HpInstance, Info.Position, Info.Orient);
     }
 }
@@ -594,13 +594,13 @@ void FObjectShip::StartEngineSound()
             // character_loop_sound (+0x78), the element's source as the handle. Retail keeps
             // bits 3..7 of the flag byte from an unwritten stack slot; the port writes 0.
             FObjectShipEngineSound& Loop = LoopSounds[Index];
-            float const* const LoopAt = DALib::Engine->GetInstancePosition(Loop.Instance);
+            const Vector* const LoopAt = DALib::Engine->GetInstancePosition(Loop.Instance);
             FEngineSoundKey LoopKey;
             LoopKey.Offset = 0;
             LoopKey.Flags = 3;
-            LoopKey.Pos[0] = LoopAt[0];
-            LoopKey.Pos[1] = LoopAt[1];
-            LoopKey.Pos[2] = LoopAt[2];
+            LoopKey.Pos[0] = LoopAt->x;
+            LoopKey.Pos[1] = LoopAt->y;
+            LoopKey.Pos[2] = LoopAt->z;
             LoopKey.Field14 = 0;
             PlayClientSoundArch(LookupClientSoundArch(Archetype::CliEngineCharacterLoopSound(Companion)),
                                 reinterpret_cast<unsigned*>(&LoopKey),
@@ -608,13 +608,13 @@ void FObjectShip::StartEngineSound()
 
             // rumble_sound (+0x60), the same way.
             FObjectShipEngineSound& Rumble = RumbleSounds[Index];
-            float const* const RumbleAt = DALib::Engine->GetInstancePosition(Rumble.Instance);
+            const Vector* const RumbleAt = DALib::Engine->GetInstancePosition(Rumble.Instance);
             FEngineSoundKey RumbleKey;
             RumbleKey.Offset = 0;
             RumbleKey.Flags = 3;
-            RumbleKey.Pos[0] = RumbleAt[0];
-            RumbleKey.Pos[1] = RumbleAt[1];
-            RumbleKey.Pos[2] = RumbleAt[2];
+            RumbleKey.Pos[0] = RumbleAt->x;
+            RumbleKey.Pos[1] = RumbleAt->y;
+            RumbleKey.Pos[2] = RumbleAt->z;
             RumbleKey.Field14 = 0;
             PlayClientSoundArch(LookupClientSoundArch(Archetype::CliEngineRumbleSound(Companion)),
                                 reinterpret_cast<unsigned*>(&RumbleKey),
@@ -823,7 +823,7 @@ void FDealerShipObject::Load(FDealerShipDesc const& Desc)
         GfShipPlaceOnMount(Instance, &Frame);
         bEnvMap = Archetype::CliObjEnvmapMaterial(Companion)[0] != '\0' ? 1 : 0;
         // No "ship_loadouts" test and no flashlights here, unlike the player's ship.
-        Visuals.Populate(static_cast<long>(reinterpret_cast<intptr_t>(Instance)));
+        Visuals.Populate(Instance);
         Visuals.AttachAll(Desc.Loadout);
     }
     // On both paths.
@@ -839,7 +839,7 @@ void FDealerShipObject::Update(double DeltaSeconds)
     DALib::Engine->UpdateInstance(Instance, 0, AsOpaqueDword(static_cast<float>(DeltaSeconds)));
 }
 
-void* FDealerShipObject::GetEngineInstance()
+InstanceIndex FDealerShipObject::GetEngineInstance()
 {
     // LAB_00443870.
     return Instance;
@@ -853,7 +853,7 @@ void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
         float const Height = GetFloorHeight();
         unsigned long HeightBits = 0;
         memcpy(&HeightBits, &Height, sizeof(HeightBits));
-        RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
+        RoomControlDrawShadow(Owner, static_cast<unsigned long>(Instance),
                               HeightBits, 0);
     }
     RoomControlDrawObject(Owner, this);
@@ -863,10 +863,10 @@ void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
 // Free functions
 // ---------------------------------------------------------------------------------------
 
-void GfShipApplyCollisionDamage(void* InstancePtr)
+void GfShipApplyCollisionDamage(InstanceIndex InstancePtr)
 {
     // FUN_004482b0. Always the player's ship archetype and collision groups.
-    long const Instance = static_cast<long>(reinterpret_cast<intptr_t>(InstancePtr));
+    long const Instance = InstancePtr;
     Archetype::Ship* const Ship = Archetype::GetShip(GetPlayerShipArchetypeIdRetail());
     std::list<CollisionGroupDesc>& Groups = GetPlayerCollisionGroupListRetail();
     int PartCount = 0;
@@ -883,7 +883,7 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
         int PartIndex = 0;
         for (PartIndex = 0; PartIndex < PartCount; ++PartIndex)
         {
-            void* const Part = reinterpret_cast<void*>(static_cast<intptr_t>(Parts[PartIndex]));
+            const InstanceIndex Part = Parts[PartIndex];
             FEngineName NameOut;
             char const* Name = DALib::Engine->GetInstanceName(&NameOut, Part)->Text;
             if (Name == nullptr)
@@ -914,7 +914,7 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
         {
             char const* const HpName = Dmg->Hardpoint.Value;
             Archetype::Root* const Arch = Archetype::GetSimple(Dmg->Arch.Id);
-            void* const Child = MiscUtilLoadEngineInstance(
+            const InstanceIndex Child = MiscUtilLoadEngineInstance(
                 Arch->DaArchetype.Value, DALib::Data, nullptr, nullptr,
                 Archetype::CliObjMaterialPaths(Arch->Companion), nullptr, nullptr);
             FHardpointKey ChildKey;
@@ -924,7 +924,7 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
             ParentKey.Name = HpName;
             ParentKey.Crc = DACOM_CRC::GetCRC32(HpName);
             long const Parent = Summary.find_name_instance(HpName);
-            DALib::Hardpoint->ConnectHardpoints(reinterpret_cast<void*>(static_cast<intptr_t>(Parent)),
+            DALib::Hardpoint->ConnectHardpoints(static_cast<intptr_t>(Parent),
                                                 &ParentKey, Child, &ChildKey);
         }
     }
@@ -933,10 +933,10 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
     ::operator delete(Parts);
 }
 
-void GfShipPlaceOnMount(void* Instance, Csys const* Frame)
+void GfShipPlaceOnMount(InstanceIndex Instance, Csys const* Frame)
 {
     // FUN_00448c40. Only the low byte of GetHardpoint's result is tested.
-    void* const ArchHandle = DALib::Engine->GetInstanceArchetype(Instance);
+    const ArchetypeIndex ArchHandle = DALib::Engine->GetInstanceArchetype(Instance);
     FHardpointKey Key;
     Key.Name = "HpMount";
     Key.Crc = DACOM_CRC::GetCRC32("HpMount");
@@ -950,26 +950,26 @@ void GfShipPlaceOnMount(void* Instance, Csys const* Frame)
     }
     DALib::Engine->ReleaseHandle(ArchHandle);
 
-    FMatrix MountRotation;
+    Matrix MountRotation;
     ToFMatrix(MountRotation, Mount.Orient);
-    FVector MountPos;
+    Vector MountPos;
     ToFVector(MountPos, Mount.Position);
-    FTransform Inverse;
+    Transform Inverse;
     ShipInverseFrame(Inverse, MountRotation, MountPos);
 
     // DAT_00668aac, this function's own math engine.
-    FTransform FrameXform;
+    Transform FrameXform;
     ToFMatrix(FrameXform.Rotation, Frame->Orient);
     ToFVector(FrameXform.Translation, Frame->Pos);
-    FTransform Placed;
+    Transform Placed;
     ObjectShipMountMath()->MulTransform(Placed, FrameXform, Inverse);
 
-    FTransform Copy = Placed;
+    Transform Copy = Placed;
     DALib::Engine->SetInstanceMatrix(Instance, &Copy);
     DALib::Engine->UpdateInstance(Instance, 0, nullptr);
 }
 
-Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, void* RootInstance)
+Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, InstanceIndex RootInstance)
 {
     // FUN_004478c0.
     Csys Out;
@@ -984,33 +984,33 @@ Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, void
     }
 
     // The hardpoint record is 0x48 bytes.
-    void* const HpInstance =
-        reinterpret_cast<void*>(static_cast<intptr_t>(Summary->get_instance(Index)));
+    const InstanceIndex HpInstance =
+        Summary->get_instance(Index);
     HardpointInfo const Info = Summary->get_info(Index);
-    FMatrix LocalRotation;
+    Matrix LocalRotation;
     ToFMatrix(LocalRotation, Info.Orient);
-    FVector LocalPos;
+    Vector LocalPos;
     ToFVector(LocalPos, Info.Position);
 
-    FTransform const* const HpXform =
-        reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(HpInstance));
-    FTransform const* const RootXform =
-        reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(RootInstance));
+    Transform const* const HpXform =
+        DALib::Engine->GetInstanceTransform(HpInstance);
+    Transform const* const RootXform =
+        DALib::Engine->GetInstanceTransform(RootInstance);
 
-    FTransform HpInverse;
+    Transform HpInverse;
     ShipInverseFrame(HpInverse, HpXform->Rotation, HpXform->Translation);
-    FTransform Relative;
+    Transform Relative;
     ObjectShipMath()->MulTransform(Relative, HpInverse, *RootXform);
-    FTransform RelativeCopy = Relative;
+    Transform RelativeCopy = Relative;
 
-    FTransform LocalInverse;
+    Transform LocalInverse;
     ShipInverseFrame(LocalInverse, LocalRotation, LocalPos);
-    FTransform Result;
+    Transform Result;
     ObjectShipMath()->MulTransform(Result, LocalInverse, RelativeCopy);
 
-    Out.Pos.x = Result.Translation.X;
-    Out.Pos.y = Result.Translation.Y;
-    Out.Pos.z = Result.Translation.Z;
+    Out.Pos.x = Result.Translation.x;
+    Out.Pos.y = Result.Translation.y;
+    Out.Pos.z = Result.Translation.z;
     memcpy(&Out.Orient, &Result.Rotation, sizeof(Out.Orient));
     return Out;
 }

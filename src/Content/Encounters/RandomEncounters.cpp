@@ -394,18 +394,18 @@ namespace
 
     // FUN_06f83ec0 (cdecl): *Out = TransformMatrix(*Matrix, *Source) through a local (math
     // engine slot +0x2c).
-    void TransformByMatrix(FVector* Out, FMatrix const* Matrix, FVector const* Source)
+    void TransformByMatrix(Vector* Out, Matrix const* Mat, Vector const* Source)
     {
-        FVector Result;
-        ContentMathEngine()->TransformMatrix(Result, *Matrix, *Source);
+        Vector Result;
+        ContentMathEngine()->TransformMatrix(Result, *Mat, *Source);
         *Out = Result;
     }
 
     // FUN_06f83f10 (cdecl): *Out = MulMatrix(*A, *B) through a local (slot +0x20), copied as
     // 9 dwords.
-    void MultiplyMatrices(FMatrix* Out, FMatrix const* A, FMatrix const* B)
+    void MultiplyMatrices(Matrix* Out, Matrix const* A, Matrix const* B)
     {
-        FMatrix Result;
+        Matrix Result;
         ContentMathEngine()->MulMatrix(Result, *A, *B);
         *Out = Result;
     }
@@ -576,28 +576,27 @@ void FRandEncTLParams::Spawn(bool bForced)
     ShipNameCounter = 0;
     pub::SpaceObj::GetLocation(TargetObjectId, TargetPosition, TargetRotation);
     std::list<FRandEncPosition> FreePositions(Positions);
-    FMatrix TargetMatrix;
-    static_assert(sizeof(Matrix) == sizeof(FMatrix), "Matrix is 3x3 floats");
-    std::memcpy(&TargetMatrix, &TargetRotation, sizeof(FMatrix));
+    // The frame holds a second copy of the target's rotation next to TargetRotation.
+    Matrix TargetMatrix = TargetRotation;
 
     float const TurnCos = static_cast<float>(std::cos(GRandEncLaneTurnAngle));
     float const TurnSin = static_cast<float>(std::sin(GRandEncLaneTurnAngle));
-    FMatrix Turn;
-    Turn.D[0][0] = TurnCos;
-    Turn.D[0][1] = 0.0f;
-    Turn.D[0][2] = TurnSin;
-    Turn.D[1][0] = 0.0f;
-    Turn.D[1][1] = 1.0f;
-    Turn.D[1][2] = 0.0f;
-    Turn.D[2][0] = -TurnSin;
-    Turn.D[2][1] = 0.0f;
-    Turn.D[2][2] = TurnCos;
+    Matrix Turn;
+    Turn.E[0][0] = TurnCos;
+    Turn.E[0][1] = 0.0f;
+    Turn.E[0][2] = TurnSin;
+    Turn.E[1][0] = 0.0f;
+    Turn.E[1][1] = 1.0f;
+    Turn.E[1][2] = 0.0f;
+    Turn.E[2][0] = -TurnSin;
+    Turn.E[2][1] = 0.0f;
+    Turn.E[2][2] = TurnCos;
 
-    FTransform Placement;
+    Transform Placement;
     SetMatrixIdentity(&Placement.Rotation);
-    Placement.Translation.X = 0.0f;
-    Placement.Translation.Y = 0.0f;
-    Placement.Translation.Z = 0.0f;
+    Placement.Translation.x = 0.0f;
+    Placement.Translation.y = 0.0f;
+    Placement.Translation.z = 0.0f;
 
     // The list, then the directive holder (retail releases it while still empty, a no-op).
     FMissionDirectiveList LeaderDirectives;
@@ -619,16 +618,16 @@ void FRandEncTLParams::Spawn(bool bForced)
         if (Picked == FreePositions.end())
             continue;
 
-        FVector PointOffset;
-        FVector const Point = {Picked->Position.x, Picked->Position.y, Picked->Position.z};
+        Vector PointOffset;
+        Vector const Point = {Picked->Position.x, Picked->Position.y, Picked->Position.z};
         TransformByMatrix(&PointOffset, &TargetMatrix, &Point);
-        Placement.Translation.X = TargetPosition.x + PointOffset.X;       // FUN_06f0bb80
-        Placement.Translation.Y = TargetPosition.y + PointOffset.Y;
-        Placement.Translation.Z = TargetPosition.z + PointOffset.Z;
+        Placement.Translation.x = TargetPosition.x + PointOffset.x;       // FUN_06f0bb80
+        Placement.Translation.y = TargetPosition.y + PointOffset.y;
+        Placement.Translation.z = TargetPosition.z + PointOffset.z;
 
         FreePositions.erase(Picked);
 
-        FMatrix Rotation;
+        Matrix Rotation;
         MultiplyMatrices(&Rotation, &Turn, &TargetMatrix);
         Placement.Rotation = Rotation;
         SpawnLaneFormation(&Placement, -1, &LeaderDirectives.Items, nullptr, nullptr);
@@ -643,7 +642,7 @@ void FRandEncTLParams::Spawn(bool bForced)
 }
 
 // FUN_06f832b0.
-bool FRandEncTLParams::SpawnLaneFormation(FTransform const* Placement, int Count,
+bool FRandEncTLParams::SpawnLaneFormation(Transform const* Placement, int Count,
                                           std::list<FObjListDirective*> const* Directives,
                                           std::list<FRandEncShipChoice> const* Choices,
                                           std::list<TString<0x30>>* Names)
@@ -687,10 +686,10 @@ bool FRandEncTLParams::SpawnLaneFormation(FTransform const* Placement, int Count
 
         // Longevity 24.0f = DAT_06fbc18c.
         Params.ControllerId = ControllerId;
-        std::memcpy(&Params.Orientation, &Placement->Rotation, sizeof(FMatrix));
-        Params.Position.x = Placement->Translation.X;
-        Params.Position.y = Placement->Translation.Y;
-        Params.Position.z = Placement->Translation.Z;
+        Params.Orientation = Placement->Rotation;
+        Params.Position.x = Placement->Translation.x;
+        Params.Position.y = Placement->Translation.y;
+        Params.Position.z = Placement->Translation.z;
         Params.Longevity = 24.0f;
         for (std::list<unsigned int>::iterator Label = Labels.begin(); Label != Labels.end();
              ++Label)

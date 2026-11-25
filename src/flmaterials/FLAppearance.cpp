@@ -148,7 +148,7 @@ namespace
         {
             if (bOwnTransform_ != 0)
                 return CameraTransform_ + 9;
-            return Inner_->GetPosition();
+            return (const float*)Inner_->GetPosition();
         }
 
         // +0x10 LAB_066fdc80: byte+9 → this+0x0C, else inner GetOrientation.
@@ -156,7 +156,7 @@ namespace
         {
             if (bOwnTransform_ != 0)
                 return CameraTransform_;
-            return Inner_->GetOrientation();
+            return (const float*)Inner_->GetOrientation();
         }
 
         // +0x14 LAB_066fdcc0: tail-call inner GetViewport.
@@ -208,13 +208,13 @@ namespace
         // +0x34 LAB_066fddc0 RET 0x14: tail-call inner Project.
         virtual int DACOM_API Project(float* OutX, float* OutY, float* OutZ, float const* World)
         {
-            return Inner_->Project(OutX, OutY, OutZ, World);
+            return Inner_->Project(OutX, OutY, OutZ, (const Vector*)World);
         }
 
         // +0x38 LAB_066fddd0 RET 0x10: tail-call inner Unproject.
         virtual void DACOM_API Unproject(float* OutWorld3, float ScreenX, float ScreenY)
         {
-            Inner_->Unproject(OutWorld3, ScreenX, ScreenY);
+            Inner_->Unproject((Vector*)OutWorld3, ScreenX, ScreenY);
         }
 
         // +0x3C LAB_066fddf0 RET 0xC. Byte+8 clear forwards ClassifySphere. Byte+8 set
@@ -222,7 +222,7 @@ namespace
         virtual int DACOM_API ClassifySphere(float const* Center, float Radius)
         {
             if (bBackdropClip_ == 0)
-                return Inner_->ClassifySphere(Center, Radius);
+                return Inner_->ClassifySphere((const Vector*)Center, Radius);
 
             const float ZNear = GetZNear();
             const float ZFar = GetZFar();
@@ -262,7 +262,7 @@ namespace
         {
             if (bOwnTransform_ != 0)
                 return ViewTransform_;
-            return Inner_->GetViewTransform();
+            return (const float*)Inner_->GetViewTransform();
         }
 
         void BindArg(void* Arg, unsigned char bBackdropClip, unsigned char bOwnTransform)
@@ -305,9 +305,9 @@ namespace
             I3DMathEngine* Math = G_MathEngine;
             float Dest[3];
             // These references view float storage without a numeric conversion.
-            Math->TransposeTransform(reinterpret_cast<FVector&>(Dest[0]),
-                                     reinterpret_cast<const FMatrix&>(CameraTransform_[0]),
-                                     reinterpret_cast<const FVector&>(CameraTransform_[9]));
+            Math->TransposeTransform(reinterpret_cast<Vector&>(Dest[0]),
+                                     reinterpret_cast<const Matrix&>(CameraTransform_[0]),
+                                     reinterpret_cast<const Vector&>(CameraTransform_[9]));
             float Transposed[12];
             Transposed[0] = CameraTransform_[0];
             Transposed[1] = CameraTransform_[3];
@@ -401,20 +401,20 @@ namespace
             unsigned long DACOM_API AddRef() override;
             unsigned long DACOM_API Release() override;
             int DACOM_API Initialize() override;
-            int DACOM_API CreateArchetype(void* A, void* B) override { (void)A; (void)B; return GR_OK; }
-            int DACOM_API DuplicateArchetype(void* A, void* B) override { (void)A; (void)B; return GR_OK; }
-            int DACOM_API DestroyArchetype(void* A) override { (void)A; return GR_OK; }
-            int DACOM_API QueryArchetype(void* A, const char* B, void** C) override
+            int DACOM_API CreateArchetype(ArchetypeIndex A, IFileSystem* B) override { (void)A; (void)B; return GR_OK; }
+            int DACOM_API DuplicateArchetype(ArchetypeIndex A, ArchetypeIndex B) override { (void)A; (void)B; return GR_OK; }
+            int DACOM_API DestroyArchetype(ArchetypeIndex A) override { (void)A; return GR_OK; }
+            int DACOM_API QueryArchetype(ArchetypeIndex A, const char* B, void** C) override
             {
                 (void)A;
                 (void)B;
                 (void)C;
                 return GR_GENERIC;
             }
-            int DACOM_API CreateInstance(void* A, void* B) override { (void)A; (void)B; return GR_OK; }
-            int DACOM_API DestroyInstance(void* A) override;
-            int DACOM_API UpdateInstance(void* A, void* B) override { (void)A; (void)B; return GR_OK; }
-            int DACOM_API QueryInstance(void* A, const char* B, void** C) override
+            int DACOM_API CreateInstance(InstanceIndex A, ArchetypeIndex B) override { (void)A; (void)B; return GR_OK; }
+            int DACOM_API DestroyInstance(InstanceIndex A) override;
+            int DACOM_API UpdateInstance(InstanceIndex A, void* B) override { (void)A; (void)B; return GR_OK; }
+            int DACOM_API QueryInstance(InstanceIndex A, const char* B, void** C) override
             {
                 (void)A;
                 (void)B;
@@ -446,11 +446,11 @@ namespace
         GENRESULT DACOM_API SetDirectionalLight(const float* First, const float* Second) override;
         GENRESULT DACOM_API SetDirectionalLightEnabled(unsigned char Flag) override;
         GENRESULT DACOM_API GetOverrideMaterial(unsigned long Index, void** Out) override;
-        GENRESULT DACOM_API DrawBackdrop(void* A, void* Extra) override;
-        GENRESULT DACOM_API DrawStarsphere(void* A, void* Extra) override;
+        GENRESULT DACOM_API DrawBackdrop(void* A, InstanceIndex Extra) override;
+        GENRESULT DACOM_API DrawStarsphere(void* A, InstanceIndex Extra) override;
         GENRESULT DACOM_API DrawFadingShadows(void* A, void* B, void* C, void* D) override;
         GENRESULT DACOM_API DrawFixedShadows(void* A, void* B, void* C, void* D) override;
-        GENRESULT DACOM_API CountVisibleGeometry(void* A, void* B, void* C) override;
+        GENRESULT DACOM_API CountVisibleGeometry(void* A, InstanceIndex B, void* C) override;
 
         GENRESULT FinishCreate(FAggDesc18* Desc, void** Instance);
         GENRESULT EngineInitialize();
@@ -531,7 +531,7 @@ namespace
         return OwnerFromEngineFace(this)->EngineInitialize();
     }
 
-    int DACOM_API FFLAppearanceBase::FEngineFace::DestroyInstance(void* Instance)
+    int DACOM_API FFLAppearanceBase::FEngineFace::DestroyInstance(InstanceIndex Instance)
     {
         // LAB_066fda20: adjust the receiver and forward to IFLAppearance slot 5.
         return OwnerFromEngineFace(this)->RemoveInstanceValue(
@@ -856,7 +856,7 @@ namespace
 
     struct FShadowInstance
     {
-        void* Id;
+        InstanceIndex Id;
         float Radius;
     };
 
@@ -981,7 +981,7 @@ namespace
             return (GENRESULT)-1;
 
         PipelineApplyRsTable(Appearance->Pipeline_, kShadowDrawRs);
-        PipelineSetModelview(Appearance->Pipeline_, ((ICamera*)A)->GetViewTransform());
+        PipelineSetModelview(Appearance->Pipeline_, (const float*)((ICamera*)A)->GetViewTransform());
         FShadowRenderStateScope DepthFunction(Appearance->Pipeline_, D3DRS_ZFUNC, 4);
         FShadowRenderStateScope CullMode(Appearance->Pipeline_, D3DRS_CULLMODE, 1);
         FShadowRenderStateScope DepthBias(Appearance->Pipeline_, D3DRS_ZBIAS, 4);
@@ -1006,15 +1006,15 @@ namespace
                 for (int Index = 0; Index < InstanceCount; ++Index)
                 {
                     IEngine* Engine = (IEngine*)Appearance->Engine_;
-                    float* Transform = Engine->GetInstanceTransform(Instances[Index].Id);
-                    float PosX = Transform[9];
-                    float PosY = Transform[10];
-                    float PosZ = Transform[11];
-                    void* Archetype = Engine->GetInstanceArchetype(Instances[Index].Id);
+                    const Transform* Transform = Engine->GetInstanceTransform(Instances[Index].Id);
+                    float PosX = Transform->Translation.x;
+                    float PosY = Transform->Translation.y;
+                    float PosZ = Transform->Translation.z;
+                    ArchetypeIndex Archetype = Engine->GetInstanceArchetype(Instances[Index].Id);
                     Engine->ReleaseHandle(Archetype);
                     float Extents[6];
                     bool bUsedFallback = true;
-                    if (bUseBounds != 0 && Archetype != (void*)((unsigned long)-1))
+                    if (bUseBounds != 0 && Archetype != InvalidArchetypeIndex)
                         bUsedFallback = Appearance->Renderer_->GetBounds(Archetype, 1.0f, Extents) < 0;
                     if (bUsedFallback)
                     {
@@ -1024,9 +1024,9 @@ namespace
                         Extents[3] = kShadowExtentAdd;
                         Extents[4] = kShadowExtentZ;
                         Extents[5] = -kShadowExtentZ;
-                        const float OffsetX = (float)((double)kShadowZBias * Transform[2]);
-                        const float OffsetY = (float)((double)kShadowZBias * Transform[5]);
-                        const float OffsetZ = (float)((double)kShadowZBias * Transform[8]);
+                        const float OffsetX = (float)((double)kShadowZBias * Transform->Rotation.E[0][2]);
+                        const float OffsetY = (float)((double)kShadowZBias * Transform->Rotation.E[1][2]);
+                        const float OffsetZ = (float)((double)kShadowZBias * Transform->Rotation.E[2][2]);
                         PosX = (float)((double)OffsetX + PosX);
                         PosY = (float)((double)OffsetY + PosY);
                         PosZ = (float)((double)OffsetZ + PosZ);
@@ -1061,7 +1061,7 @@ namespace
                         continue;
                     const int ColorByte = (int)((Alpha * Alpha) * kShadowColorScale);
                     Writer.ColorValue = ((unsigned long)ColorByte << 24) | 0x00FFFFFF;
-                    const double Angle = std::atan2((double)Transform[2], (double)Transform[8]);
+                    const double Angle = std::atan2((double)Transform->Rotation.E[0][2], (double)Transform->Rotation.E[2][2]);
                     const double SinA = std::sin(Angle) * G_ShadowQuadScale;
                     const double CosA = std::cos(Angle) * G_ShadowQuadScale;
                     const double WidthX = (double)Extents[0] - Extents[1];
@@ -1101,7 +1101,7 @@ namespace
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFLAppearanceBase::DrawBackdrop(void* A, void* Extra)
+    GENRESULT DACOM_API FFLAppearanceBase::DrawBackdrop(void* A, InstanceIndex Extra)
     {
         if (Renderer_ == nullptr)
             return GR_OK;
@@ -1113,7 +1113,7 @@ namespace
         if (Camera->OwnTransform() != 0)
         {
             const float Translation[3] = {};
-            Camera->SetOrientationAndTranslation(((ICamera*)A)->GetOrientation(), Translation);
+            Camera->SetOrientationAndTranslation((const float*)((ICamera*)A)->GetOrientation(), Translation);
             float Inverse[12];
             Camera->BuildInverseTransform(Inverse);
             float* Dest = Camera->ViewTransform();
@@ -1134,7 +1134,7 @@ namespace
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFLAppearanceBase::DrawStarsphere(void* A, void* Extra)
+    GENRESULT DACOM_API FFLAppearanceBase::DrawStarsphere(void* A, InstanceIndex Extra)
     {
         if (Renderer_ == nullptr)
             return GR_OK;
@@ -1144,7 +1144,7 @@ namespace
         FCameraBlob* Camera = (FCameraBlob*)Scratch88_;
         Camera->BindArg(A, 0, 1);
         {
-            const float* Orientation = ((ICamera*)A)->GetOrientation();
+            const float* Orientation = (const float*)((ICamera*)A)->GetOrientation();
             float Translation[3];
             Translation[0] = 0.0f;
             Translation[1] = 0.0f;
@@ -1182,7 +1182,7 @@ namespace
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFLAppearanceBase::CountVisibleGeometry(void* A, void* B, void* C)
+    GENRESULT DACOM_API FFLAppearanceBase::CountVisibleGeometry(void* A, InstanceIndex B, void* C)
     {
         void* Visible = nullptr;
         const GENRESULT Got = GetOverrideMaterial(8, &Visible);

@@ -36,9 +36,9 @@ void CMine::init_physics(Vector const& Velocity, Vector const& AngularVelocity)
     // zero test on the mass.
     PhySys::CreateParms Phy;
     memset(&Phy, 0, sizeof(Phy));
-    Phy.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-    Phy.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-    Phy.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+    Phy.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+    Phy.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+    Phy.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
     Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     Phy.bEnableCollisions = 1;
     _itoa((int)OwnerId, Phy.Name, 0x18);
@@ -89,9 +89,9 @@ void CCounterMeasure::init_physics(Vector const& Velocity, Vector const& Angular
     // FUN_062a85a0. The same body as CMine::init_physics.
     PhySys::CreateParms Phy;
     memset(&Phy, 0, sizeof(Phy));
-    Phy.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-    Phy.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-    Phy.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+    Phy.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+    Phy.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+    Phy.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
     Phy.Type = PhySys::ANIM_TECHNIQUE_MERGED;
     Phy.bEnableCollisions = 1;
     _itoa((int)OwnerId, Phy.Name, 0x18);

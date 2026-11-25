@@ -85,8 +85,8 @@ namespace
                                              char const* ChildHp)
     {
         unsigned long* Result = nullptr;
-        void* ParentHandle = DALib::Engine->GetInstanceArchetype((void*)ParentInst);
-        if (ParentHandle != (void*)-1)
+        ArchetypeIndex ParentHandle = DALib::Engine->GetInstanceArchetype(ParentInst);
+        if (ParentHandle != InvalidArchetypeIndex)
         {
             FHardpointKey ParentKey;
             ParentKey.Name = ParentHp;
@@ -95,8 +95,8 @@ namespace
             // Retail tests only AL.
             if ((unsigned char)DALib::Hardpoint->GetHardpoint(ParentHandle, &ParentKey, &ParentData) != 0)
             {
-                void* ChildHandle = DALib::Engine->GetInstanceArchetype((void*)ChildInst);
-                if (ChildHandle != (void*)-1)
+                ArchetypeIndex ChildHandle = DALib::Engine->GetInstanceArchetype(ChildInst);
+                if (ChildHandle != InvalidArchetypeIndex)
                 {
                     FHardpointKey ChildKey;
                     ChildKey.Name = ChildHp;
@@ -114,12 +114,10 @@ namespace
                             Joint.ChildPos = ChildData.Position;
                             I3DMathEngine* Math = Acquire3DMathEngine();  // DAT_063fc114
                             Matrix Combined;
-                            Math->MulMatrix((FMatrix&)Combined, (FMatrix const&)ParentData.Orient,
-                                            (FMatrix const&)ChildData.Orient);
+                            Math->MulMatrix(Combined, ParentData.Orient, ChildData.Orient);
                             Joint.Orient = Combined;
                             Vector Axis;
-                            Math->TransformMatrix((FVector&)Axis, (FMatrix const&)Joint.Orient,
-                                                  (FVector const&)ChildData.Axis);
+                            Math->TransformMatrix(Axis, Joint.Orient, ChildData.Axis);
                             Joint.Axis = Axis;
 
                             // A range >= 2pi opens the limits to [-pi, pi]; a NaN range takes
@@ -155,7 +153,7 @@ namespace
                                 Joint.Min = ChildData.Min;
                                 Joint.Max = ChildData.Max;
                             }
-                            DALib::Engine->CreateJoint((void*)ParentInst, (void*)ChildInst,
+                            DALib::Engine->CreateJoint(ParentInst, ChildInst,
                                                        (unsigned long const*)&Joint);
                         }
                         else
@@ -166,10 +164,10 @@ namespace
                             FHardpointKey ParentConnectKey;
                             ParentConnectKey.Name = ParentHp;
                             ParentConnectKey.Crc = DACOM_CRC::GetCRC32(ParentHp);
-                            DALib::Hardpoint->ConnectHardpoints((void*)ParentInst, &ParentConnectKey,
-                                                                (void*)ChildInst, &ChildConnectKey);
+                            DALib::Hardpoint->ConnectHardpoints(ParentInst, &ParentConnectKey,
+                                                                ChildInst, &ChildConnectKey);
                         }
-                        Result = DALib::Engine->GetInstanceRelative((void*)ChildInst);
+                        Result = DALib::Engine->GetInstanceRelative(ChildInst);
                     }
                 }
                 DALib::Engine->ReleaseHandle(ChildHandle);
@@ -232,7 +230,7 @@ CObject* CNonPhysAttachment::GetPhysicsOwner() const
     // FUN_062937c0: only -1 means "no instance".
     if (EngineInstanceId == -1)
         return nullptr;
-    return (CObject*)DALib::Engine->GetInstanceUserData((void*)EngineInstanceId);
+    return (CObject*)DALib::Engine->GetInstanceUserData(EngineInstanceId);
 }
 
 void CNonPhysAttachment::EnableCollisions(bool bEnable)
@@ -264,7 +262,7 @@ bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
     // FUN_062938c0
     Archetype::AttachedEquipment* Arch = (Archetype::AttachedEquipment*)Equip->Arch;
     EngineInstanceId = Arch->create_instance(nullptr);
-    DALib::Engine->UpdateInstance((void*)EngineInstanceId, 0, nullptr);
+    DALib::Engine->UpdateInstance(EngineInstanceId, 0, nullptr);
     if (EngineInstanceId == -1)
         return false;
 
@@ -280,16 +278,16 @@ bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
     }
 
     HpCrc = DACOM_CRC::GetCRC32(Equip->GetParentHPName().Value);
-    void* ParentUser = DALib::Engine->GetInstanceUserData((void*)Equip->GetParentConnector(false));
-    DALib::Engine->SetInstanceUserData((void*)EngineInstanceId, ParentUser);
+    void* ParentUser = DALib::Engine->GetInstanceUserData(Equip->GetParentConnector(false));
+    DALib::Engine->SetInstanceUserData(EngineInstanceId, ParentUser);
 
     AppendPartMapEntry((CObject*)ParentUser, HpCrc, EngineInstanceId, false);
 
-    void* Child = DALib::Engine->GetRelatedInstance((void*)EngineInstanceId, 0, (void*)-1);
-    while (Child != (void*)-1)
+    InstanceIndex Child = DALib::Engine->GetRelatedInstance(EngineInstanceId, 0, -1);
+    while (Child != InvalidInstanceIndex)
     {
         DALib::Engine->SetInstanceUserData(Child, ParentUser);
-        Child = DALib::Engine->GetRelatedInstance((void*)EngineInstanceId, 0, Child);
+        Child = DALib::Engine->GetRelatedInstance(EngineInstanceId, 0, Child);
     }
     bCollisions = 1;
     return true;
@@ -301,7 +299,7 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
     CObject* Debris = nullptr;
     if (bMakeDebris)
     {
-        void* Inst = (void*)EngineInstanceId;
+        InstanceIndex Inst = EngineInstanceId;
         CObject* ParentObj = (CObject*)DALib::Engine->GetInstanceUserData(Inst);
         if (ParentObj != nullptr)
         {
@@ -317,7 +315,7 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
             }
         }
 
-        void* ParentInst = DALib::Engine->GetInstanceParent(Inst);
+        InstanceIndex ParentInst = DALib::Engine->GetInstanceParent(Inst);
         DALib::Engine->DestroyJoint(ParentInst, Inst);
         Debris = CObject::Alloc(CObject::ClassEquipmentObj);
         Debris->open(Equip->Arch);
@@ -330,9 +328,9 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
         PhySys::CreateParms Parms;
         Parms.Mass = Equip->Arch->Mass;
         Parms.LinearDamping = 0.0f;
-        Parms.AngularDamping[0] = 0.0f;
-        Parms.AngularDamping[1] = 0.0f;
-        Parms.AngularDamping[2] = 0.0f;
+        Parms.AngularDamping.x = 0.0f;
+        Parms.AngularDamping.y = 0.0f;
+        Parms.AngularDamping.z = 0.0f;
         Parms.SystemId = ParentObj->PhysicsSystemId;
         Parms.Type = 2;
         Parms.bPhysicalUnmoveable = 0;
@@ -431,7 +429,7 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
     EquipObject = CObject::Alloc(CObject::ClassEquipmentObj);
     EquipObject->open(Arch);
     Arch->create_instance(EquipObject);
-    DALib::Engine->UpdateInstance((void*)EquipObject->EngineInstanceId, 0, nullptr);
+    DALib::Engine->UpdateInstance(EquipObject->EngineInstanceId, 0, nullptr);
 
     if (EquipObject == nullptr)
     {
@@ -464,9 +462,9 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
     PhySys::CreateParms Parms;
     Parms.Mass = 1.0f;
     Parms.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-    Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-    Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-    Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+    Parms.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+    Parms.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+    Parms.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
     Parms.SystemId = ParentObj->PhysicsSystemId;
     Parms.Type = 2;
     Parms.bPhysicalUnmoveable = 0;

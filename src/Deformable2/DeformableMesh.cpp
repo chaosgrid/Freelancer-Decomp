@@ -58,11 +58,11 @@ FDeformMesh* LoadDeformMesh(FLodHolder* Holder, IFileSystem* MeshFs, const char*
         FEngineName ArchName;
         ArchName.Text = Name;
         ArchName.Crc = DACOM_CRC::GetCRC32(Name);
-        void* Handle = G_Engine->CreateArchetypeHandle(&ArchName, MeshFs);
+        ArchetypeIndex Handle = G_Engine->CreateArchetypeHandle(&ArchName, MeshFs);
         IVMeshPart* Library = nullptr;
         // This query ABI accepts the const IID as an opaque mutable token.
         if (G_Engine->QueryEngineComponent((int)((intptr_t)Handle),
-                                           const_cast<char*>(Iids::VMeshLibrary),
+                                           Iids::VMeshLibrary,
                                            (void**)(&Library)) < 0)
         {
             G_Engine->ReleaseHandle(Handle);

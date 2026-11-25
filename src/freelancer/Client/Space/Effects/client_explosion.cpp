@@ -21,7 +21,7 @@
 #include "Space/player_behavior.h"       // GetPlayerObjRW (FUN_0054baf0)
 #include "Space/star_sys.h"              // StarSysGetActiveSystemId (FUN_00554e90)
 #include "Common/Graphics/vis_effect_arch.h"       // FindEffectArch (FUN_0040f080)
-#include "x86math.h"               // FTransform
+#include "x86math.h"               // Transform
 
 #include <cmath>
 #include <cstdlib>
@@ -204,11 +204,11 @@ bool Action_Explode::update(float Dt)
             continue;
         // Both read before the id test.
         Transform const& GameobjXform = Gameobj->get_transform();
-        FTransform World;
-        World.Rotation = reinterpret_cast<FMatrix const&>(GameobjXform.Rotation);
-        World.Translation.X = Pos.x;
-        World.Translation.Y = Pos.y;
-        World.Translation.Z = Pos.z;
+        Transform World;
+        World.Rotation = GameobjXform.Rotation;
+        World.Translation.x = Pos.x;
+        World.Translation.y = Pos.y;
+        World.Translation.z = Pos.z;
         Vector const Velocity = Gameobj->get_velocity();
         if (Effect.Fx.IsEmpty())                                          // node +0x08
             continue;
@@ -311,9 +311,9 @@ void Action_Explode::Shatter()
             std::memset(&Parms, 0, sizeof(Parms));
             Parms.Mass = 1.0f;
             Parms.LinearDamping = PhySys::DEFAULT_LINEAR_DAMPING;
-            Parms.AngularDamping[0] = PhySys::DEFAULT_ANGULAR_DAMPING.x;
-            Parms.AngularDamping[1] = PhySys::DEFAULT_ANGULAR_DAMPING.y;
-            Parms.AngularDamping[2] = PhySys::DEFAULT_ANGULAR_DAMPING.z;
+            Parms.AngularDamping.x = PhySys::DEFAULT_ANGULAR_DAMPING.x;
+            Parms.AngularDamping.y = PhySys::DEFAULT_ANGULAR_DAMPING.y;
+            Parms.AngularDamping.z = PhySys::DEFAULT_ANGULAR_DAMPING.z;
             Parms.SystemId = 0;
             Parms.Type = 2;
             Parms.bPhysicalUnmoveable = 0;
@@ -391,25 +391,25 @@ void Action_Explode::CollectChildPieces(long Instance, int MaxPieces,
 {
     // FUN_00536c20. `this` is not read.
     IEngine* const Engine = DALib::Engine;
-    void* const Inst = reinterpret_cast<void*>(Instance);
+    const InstanceIndex Inst = Instance;
 
     // An instance with children: each child is collected (which detaches it) and the first
     // child is asked for again until there is none.
-    void* Child = Engine->GetRelatedInstance(Inst, 1u, G_InvalidEngineHandle);
-    if (Child != G_InvalidEngineHandle)
+    InstanceIndex Child = Engine->GetRelatedInstance(Inst, 1u, InvalidInstanceIndex);
+    if (Child != InvalidInstanceIndex)
     {
         do
         {
             CollectChildPieces(reinterpret_cast<long>(Child), MaxPieces, Pieces);
-            Child = Engine->GetRelatedInstance(Inst, 1u, G_InvalidEngineHandle);
-        } while (Child != G_InvalidEngineHandle);
+            Child = Engine->GetRelatedInstance(Inst, 1u, InvalidInstanceIndex);
+        } while (Child != InvalidInstanceIndex);
         return;
     }
 
     // A leaf: the root (no parent) stays; any other leaf is detached from its parent after both
     // owners are read.
-    void* const Parent = Engine->GetInstanceParent(Inst);
-    if (Parent == G_InvalidEngineHandle)
+    const InstanceIndex Parent = Engine->GetInstanceParent(Inst);
+    if (Parent == InvalidInstanceIndex)
         return;
     CObject* const Owner = static_cast<CObject*>(Engine->GetInstanceUserData(Inst));
     CObject* const ParentOwner = static_cast<CObject*>(Engine->GetInstanceUserData(Parent));

@@ -577,7 +577,7 @@ HUD_Steer::~HUD_Steer()
 {
     // FUN_004c8c20; the holder's own destructor then runs the same release again and finds
     // nothing.
-    if (MeshHolder.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (MeshHolder.EngineInstance != InvalidInstanceIndex)
         ClientUiMeshHolderRelease(&MeshHolder);
 }
 
@@ -673,10 +673,10 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
     MeshHolder.UserFloats[4] = static_cast<float>(G_HudChromeColorRgba[3] * Inv255);
 
     // The roll is multiplied by -0.99999994f (DAT_005d6ee0), not negated.
-    FMatrix Rotation;
-    HudMatrixRotationY(&Rotation.D[0][0], 0.0f);
-    HudMatrixRotateRows12(&Rotation.D[0][0], 0.0f);
-    HudMatrixRotateRows01(&Rotation.D[0][0],
+    Matrix Rotation;
+    HudMatrixRotationY(&Rotation.E[0][0], 0.0f);
+    HudMatrixRotateRows12(&Rotation.E[0][0], 0.0f);
+    HudMatrixRotateRows01(&Rotation.E[0][0],
                           static_cast<float>(static_cast<double>(Angle) * -0.9999999403953552));
 
     // One arrow segment every 0.15 (DAT_005d6edc) while below the length: placed at
@@ -687,20 +687,20 @@ void HUD_Steer::Render(FSpaceCamera* Camera, float DeltaSeconds)
     {
         do
         {
-            FVector Local;
-            Local.X = 0.0f;
-            Local.Y = static_cast<float>(static_cast<double>(T) * 0.26499998569488525);
-            Local.Z = 0.0f;
+            Vector Local;
+            Local.x = 0.0f;
+            Local.y = static_cast<float>(static_cast<double>(T) * 0.26499998569488525);
+            Local.z = 0.0f;
             if (G_HudSteerMath == nullptr)
                 G_HudSteerMath = Acquire3DMathEngine();
-            FVector Placed;
+            Vector Placed;
             G_HudSteerMath->TransformMatrix(Placed, Rotation, Local);
 
-            FTransform Xform;
+            Transform Xform;
             Xform.Rotation = Rotation;
-            Xform.Translation.X = Placed.X;
-            Xform.Translation.Y = Placed.Y;
-            Xform.Translation.Z = -1.0f;
+            Xform.Translation.x = Placed.x;
+            Xform.Translation.y = Placed.y;
+            Xform.Translation.z = -1.0f;
             if (G_HudSteerMath == nullptr)
                 G_HudSteerMath = Acquire3DMathEngine();
             float const Scale = static_cast<float>(static_cast<double>(T) * 0.5 +

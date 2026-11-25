@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "engine/engine_instance.h" // InstanceIndex / ArchetypeIndex
 #include "Common/Graphics/client_mesh_load.h"
 #include "Space/Cameras/space_camera.h"
 
@@ -31,13 +32,13 @@ void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor,
 // IFLAppearance::GetOverrideMaterial; bDepthTested picks the depth func / z-write states as
 // above, restored afterwards. Both callers pass 1 for the selector.
 // Nothing unless game option 0xb is on.
-void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
+void SubmitWin3DTintedEngineInstance(void* ArchAnchor, InstanceIndex EngineInstance,
                                      unsigned char MaterialSelector, unsigned long Flags,
                                      unsigned char const ColorRgba[4],
                                      unsigned char bDepthTested, float Scale);
 
 // FUN_00434630 — wraps tinted submit: Flags |= 0x8200; if !bFrontCull Flags |= 0x2000.
-void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, void* EngineInstance,
+void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, InstanceIndex EngineInstance,
                                             unsigned char bFrontCull,
                                             unsigned char const ColorRgba[4],
                                             unsigned char bDepthTested, float Scale,
@@ -49,7 +50,7 @@ void SubmitWin3DTintedEngineInstanceWrapped(void* ArchAnchor, void* EngineInstan
 // Flags | 0x100 (| 0x2000 without bFrontCull, | 0x30 with a scaled identity when Scale != 1).
 // Returns the renderer's answer. Callers: SubmitWin3DOutlinedEngineInstance and 0x00548411
 // (not ported).
-int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsigned char bFrontCull,
+int SubmitWin3DMaterialEngineInstance(void* Camera, InstanceIndex EngineInstance, unsigned char bFrontCull,
                                       unsigned char const ColorRgba[4],
                                       unsigned char bDepthTested, float Scale,
                                       unsigned char bParam10, unsigned long Flags);
@@ -57,7 +58,7 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsign
 // FUN_00434670 (cdecl, 6 args) -- the outlined wire: the material submit in black with
 // bDepthTested 0 and parameter 0xa off, then the tinted submit with ColorRgba and
 // Flags | 0x8100 (| 0x2000 without bFrontCull). Caller: StaticControl::Draw.
-void SubmitWin3DOutlinedEngineInstance(void* Camera, void* EngineInstance,
+void SubmitWin3DOutlinedEngineInstance(void* Camera, InstanceIndex EngineInstance,
                                        unsigned char bFrontCull, unsigned char const ColorRgba[4],
                                        float Scale, unsigned long Flags);
 

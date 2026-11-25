@@ -188,7 +188,7 @@ struct FRoomRuntime : public FRoomObject, public EventHandler
     RoomData* Room;                     // +0x40 FUN_0043a3d0
     // +0x44 / +0x48: -1 from FUN_004496b0, then FUN_0044a030 takes them from the prop whose
     // RoomPropInfo +0x3f is set: its slot-6 engine instance and its script table's +0x0c script.
-    void* MainInstance;                 // +0x44 RoomData::fixup argument
+    InstanceIndex MainInstance;         // +0x44 RoomData::fixup argument
     unsigned long MainScript;           // +0x48 FUN_00555bf0 on +0x4c when not -1
     FAnimScriptSet Scripts;             // +0x4C FUN_00555a40 (0x18) → +0x64
     // +0x64: the playback of each room animation (FUN_004498b0), -1 when it has none.
@@ -245,12 +245,12 @@ struct FRoomRuntime : public FRoomObject, public EventHandler
     unsigned char bCameraMoveSkippable; // +0x1340
     unsigned char Pad1341[3];
     float CameraMoveElapsed;            // +0x1344
-    FQuaternion CameraToQuat;           // +0x1348
+    Quaternion CameraToQuat;           // +0x1348
     float CameraToPos[3];               // +0x1358
     float CameraToHalfFovX;             // +0x1364
     float CameraToZNear;                // +0x1368
     float CameraToZFar;                 // +0x136c
-    FQuaternion CameraFromQuat;         // +0x1370
+    Quaternion CameraFromQuat;         // +0x1370
     float CameraFromPos[3];             // +0x1380
     float CameraFromHalfFovX;           // +0x138c
     float CameraFromZNear;              // +0x1390
@@ -391,7 +391,7 @@ float FRoomObject::GetFloorHeight()
     return FloorHeight;
 }
 
-void* FRoomObject::GetEngineInstance()
+InstanceIndex FRoomObject::GetEngineInstance()
 {
     // FUN_00450870.
     return kRoomObjectNoInstance;
@@ -855,16 +855,16 @@ namespace
     float SetCameraMoveEnds(FRoomRuntime* Runtime, RoomCameraInfo const* Info)
     {
         RoomCameraMath()->MatrixToQuaternion(Runtime->CameraToQuat,
-                                             *reinterpret_cast<FMatrix const*>(&Info->Frame.Orient));
+                                             Info->Frame.Orient);
         memcpy(Runtime->CameraToPos, &Info->Frame.Pos, sizeof(Runtime->CameraToPos));
         Runtime->CameraToHalfFovX = Info->Fov;
         Runtime->CameraToZNear = Info->NearPlane;
         Runtime->CameraToZFar = Info->FarPlane;
 
         FRoomCamera* const Camera = Runtime->Camera;
-        float const* const Orient = Camera->GetOrientation();
+        const float* const Orient = (const float*)Camera->GetOrientation();
         RoomCameraMath()->MatrixToQuaternion(Runtime->CameraFromQuat,
-                                             *reinterpret_cast<FMatrix const*>(Orient));
+                                             *reinterpret_cast<Matrix const*>(Orient));
         memcpy(Runtime->CameraFromPos, Camera->GetPosition(), sizeof(Runtime->CameraFromPos));
         Runtime->CameraFromHalfFovX = Camera->GetHalfFovXDeg();
         Runtime->CameraFromZNear = Camera->GetZNear();
@@ -873,7 +873,7 @@ namespace
 
     // FUN_00556cd0 on the +0x500 camera with {Orient, Pos} (orientation first, as retail packs
     // the 0x30-byte frame on its stack), then FUN_00556ce0 / 556e00 / 556f10.
-    void ApplyRoomCameraFrame(FRoomRuntime* Runtime, FMatrix const& Orient, float const* Pos,
+    void ApplyRoomCameraFrame(FRoomRuntime* Runtime, Matrix const& Orient, float const* Pos,
                               float HalfFovX, float ZNear, float ZFar)
     {
         float Transform[12];
@@ -904,13 +904,13 @@ namespace
         RoomCameraInfo const* const Info = FindRoomDataCamera(Runtime, CameraName);
         if (Info == nullptr)
             return false;
-        FQuaternion ToQuat;
+        Quaternion ToQuat;
         RoomCameraMath()->MatrixToQuaternion(ToQuat,
-                                             *reinterpret_cast<FMatrix const*>(&Info->Frame.Orient));
+                                             Info->Frame.Orient);
         FRoomCamera* const Camera = Runtime->Camera;
-        FQuaternion FromQuat;
+        Quaternion FromQuat;
         RoomCameraMath()->MatrixToQuaternion(FromQuat,
-                                             *reinterpret_cast<FMatrix const*>(
+                                             *reinterpret_cast<Matrix const*>(
                                                  Camera->GetOrientation()));
         float FromPos[3];
         memcpy(FromPos, Camera->GetPosition(), sizeof(FromPos));
@@ -923,10 +923,10 @@ namespace
                CameraMoveNear(Info->Fov, FromHalfFovX, kCameraFovEps) &&
                CameraMoveNear(Info->NearPlane, FromZNear, kCameraPosEps) &&
                CameraMoveNear(Info->FarPlane, FromZFar, kCameraPosEps) &&
-               CameraMoveNear(ToQuat.W, FromQuat.W, kCameraQuatEps) &&
-               CameraMoveNear(ToQuat.X, FromQuat.X, kCameraQuatEps) &&
-               CameraMoveNear(ToQuat.Y, FromQuat.Y, kCameraQuatEps) &&
-               CameraMoveNear(ToQuat.Z, FromQuat.Z, kCameraQuatEps);
+               CameraMoveNear(ToQuat.w, FromQuat.w, kCameraQuatEps) &&
+               CameraMoveNear(ToQuat.x, FromQuat.x, kCameraQuatEps) &&
+               CameraMoveNear(ToQuat.y, FromQuat.y, kCameraQuatEps) &&
+               CameraMoveNear(ToQuat.z, FromQuat.z, kCameraQuatEps);
     }
 }
 
@@ -942,7 +942,7 @@ bool RoomControlSnapCamera(FRoomRuntime* Runtime, char const* CameraName)
     Runtime->CameraFromZFar = SetCameraMoveEnds(Runtime, Info);
 
     // The destination goes back through the quaternion (slot 0x54), as retail.
-    FMatrix Orient;
+    Matrix Orient;
     RoomCameraMath()->QuaternionToMatrix(Orient, Runtime->CameraToQuat);
     ApplyRoomCameraFrame(Runtime, Orient, Runtime->CameraToPos, Runtime->CameraToHalfFovX,
                          Runtime->CameraToZNear, Runtime->CameraToZFar);
@@ -981,10 +981,10 @@ bool RoomControlTrackCamera(FRoomRuntime* Runtime, char const* CameraName,
         CameraMoveNear(Runtime->CameraToHalfFovX, Runtime->CameraFromHalfFovX, kFovEps) &&
         CameraMoveNear(Runtime->CameraToZNear, Runtime->CameraFromZNear, kPosEps) &&
         CameraMoveNear(Runtime->CameraToZFar, FromZFar, kPosEps) &&
-        CameraMoveNear(Runtime->CameraFromQuat.X, Runtime->CameraToQuat.X, kQuatEps) &&
-        CameraMoveNear(Runtime->CameraFromQuat.Y, Runtime->CameraToQuat.Y, kQuatEps) &&
-        CameraMoveNear(Runtime->CameraFromQuat.Z, Runtime->CameraToQuat.Z, kQuatEps) &&
-        CameraMoveNear(Runtime->CameraFromQuat.W, Runtime->CameraToQuat.W, kQuatEps))
+        CameraMoveNear(Runtime->CameraFromQuat.x, Runtime->CameraToQuat.x, kQuatEps) &&
+        CameraMoveNear(Runtime->CameraFromQuat.y, Runtime->CameraToQuat.y, kQuatEps) &&
+        CameraMoveNear(Runtime->CameraFromQuat.z, Runtime->CameraToQuat.z, kQuatEps) &&
+        CameraMoveNear(Runtime->CameraFromQuat.w, Runtime->CameraToQuat.w, kQuatEps))
     {
         Runtime->bCameraMoving = 0;
         G_bNnKeepPanelOpen = 0;
@@ -1010,7 +1010,7 @@ void RoomControlUpdateCameraMove(FRoomRuntime* Runtime, float Delta)
     {
         Runtime->bCameraMoving = 0;
         G_bNnKeepPanelOpen = 0;
-        FMatrix Orient;
+        Matrix Orient;
         RoomCameraMath()->QuaternionToMatrix(Orient, Runtime->CameraToQuat);
         ApplyRoomCameraFrame(Runtime, Orient, Runtime->CameraToPos, Runtime->CameraToHalfFovX,
                              Runtime->CameraToZNear, Runtime->CameraToZFar);
@@ -1043,9 +1043,9 @@ void RoomControlUpdateCameraMove(FRoomRuntime* Runtime, float Delta)
                                 static_cast<double>(Runtime->CameraFromPos[2]));
 
     // Slerp (slot 0x58), back to a matrix (slot 0x54).
-    FQuaternion Quat;
+    Quaternion Quat;
     RoomCameraMath()->QuatSlerp(Quat, Runtime->CameraFromQuat, Runtime->CameraToQuat, T);
-    FMatrix Orient;
+    Matrix Orient;
     RoomCameraMath()->QuaternionToMatrix(Orient, Quat);
     float Transform[12];
     memcpy(Transform, &Orient, sizeof(float) * 9);
@@ -1079,7 +1079,7 @@ bool FRoomRuntime::OnEvent(unsigned MsgId)
         return false;
     bCameraMoving = 0;
     G_bNnKeepPanelOpen = 0;
-    FMatrix Orient;
+    Matrix Orient;
     RoomCameraMath()->QuaternionToMatrix(Orient, CameraToQuat);
     ApplyRoomCameraFrame(this, Orient, CameraToPos, CameraToHalfFovX, CameraToZNear,
                          CameraToZFar);
@@ -2232,7 +2232,7 @@ namespace
         // clear the light list (thunk FUN_004101e0).
         if (Object->bLit != 0)
         {
-            void* const Instance = Object->GetEngineInstance();
+            const InstanceIndex Instance = Object->GetEngineInstance();
             GfLightsApplyNearest(Room->FrameLights, Room->FrameLightCount, Instance,
                                  Object->LightGroup, Room->Camera);
             return;
@@ -2272,7 +2272,7 @@ namespace
 void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
 {
     // FUN_0044af60.
-    void* const Instance = Object->GetEngineInstance();
+    const InstanceIndex Instance = Object->GetEngineInstance();
     if (Instance == kRoomObjectNoInstance)
         return;
 
@@ -2283,8 +2283,8 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
     if (RtcSlider::is_enabled("shadow_glare") && Data->bGlareLight)
     {
         // Engine slot 36 (+0x90): the instance position.
-        float const* InstancePos = DALib::Engine->GetInstancePosition(Instance);
-        float Pos[3] = {InstancePos[0], InstancePos[1], InstancePos[2]};
+        const Vector* InstancePos = DALib::Engine->GetInstancePosition(Instance);
+        float Pos[3] = {InstancePos->x, InstancePos->y, InstancePos->z};
         float Direction[3];
         if (Data->bGlareLightWorldSpaceDir)
         {
@@ -2339,11 +2339,11 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
                 Appearance = nullptr;
                 if (bHaveEnv)
                 {
-                    void* const EnvInstance = Object->GetEngineInstance();
+                    const InstanceIndex EnvInstance = Object->GetEngineInstance();
                     if (DALib::Engine->QueryInterface(Iids::FLAppearance,
                                                       reinterpret_cast<void**>(&Appearance)) >= 0)
                     {
-                        Appearance->SetInstanceValue(static_cast<int>(reinterpret_cast<intptr_t>(EnvInstance)),
+                        Appearance->SetInstanceValue(static_cast<int>(EnvInstance),
                                           const_cast<char*>("envmapbasic"));
                     }
                     if (Appearance != nullptr)

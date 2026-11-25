@@ -16,7 +16,7 @@
 #include "../ivp_compact_builder/ivp_compact_ledge.h"
 #include "../ivp_collision/ivp_oo_watcher.h" // IVP_OO_Watcher (delegate_collisions_for_object)
 #include "../ivp_utility/ivp_core_trap.h" // IVP_CoreTrap (LAB_0634dc00)
-#include "../ivp_utility/ivp_crc32.h" // g_Crc32Table_063edcdc (IVP_OV_HashNodeKey)
+#include "../ivp_utility/ivp_crc32.h" // g_IVP_Crc32Table (IVP_OV_HashNodeKey)
 
 #include <cassert>
 #include <cmath>
@@ -75,9 +75,9 @@ namespace
 {
     // FUN_0635c570: the unbiased IEEE-754 exponent of a float passed as its raw
     // bits, i.e. floor(log2(|x|)) for a normal. Sole caller: compute_query_cell.
-    int __cdecl IvpFloatExponent(unsigned param_1)
+    int __cdecl IvpFloatExponent(unsigned FloatBits)
     {
-        return (int)((param_1 >> 0x17) & 0xff) - 0x7f;
+        return (int)((FloatBits >> 0x17) & 0xff) - 0x7f;
     }
 
     // ------------------------------------------------------------------------
@@ -189,7 +189,7 @@ IVP_OV_Element::~IVP_OV_Element()
     IVP_Environment* Env = real_object->environment;
 
     // FUN_0634caf0: every delegator's object_is_removed_from_collision_detection.
-    IVP_Environment_Notify_Object_Removed_From_Collision_Detection(Env, real_object);
+    Env->notify_object_removed_from_collision_detection(real_object);
 
     IVP_OV_Tree_Manager* Tree = Env->ov_tree_manager;
     Tree->remove_ov_element(this);
@@ -951,7 +951,7 @@ uint32_t IVP_OV_HashNodeKey(const IVP_OV_Node* Node)
 
     uint32_t Crc = 0xffffffffu;
     for (int32_t I = 0; I < 0x14; ++I) // the five key dwords
-        Crc = (Crc >> 8) ^ g_Crc32Table_063edcdc[(Bytes[I] ^ Crc) & 0xff]; // DAT_063edcdc
+        Crc = (Crc >> 8) ^ g_IVP_Crc32Table[(Bytes[I] ^ Crc) & 0xff]; // DAT_063edcdc
 
     // The top bit keeps a live tag from matching the hash's "slot empty" zero.
     return Crc | 0x80000000u;
@@ -1150,14 +1150,14 @@ void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
         const uint32_t FlagsA = CoreA->Flags;
         if ((FlagsA & 0x300u) != 0)
         {
-            if ((OtherObj->core->Flags & 0x300u) != 0)
+            if ((OtherObj->core->Flags & IVP_CORE_PINNED) != 0)
                 continue;
-            if ((CoreA->Flags & 0x300u) != 0 && (OtherObj->core->Flags & 0x0cu) != 0)
+            if ((CoreA->Flags & IVP_CORE_PINNED) != 0 && (OtherObj->core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) != 0)
                 continue;
         }
         if ((FlagsA & 0x0cu) != 0)
         {
-            if ((OtherObj->core->Flags & 0x300u) != 0)
+            if ((OtherObj->core->Flags & IVP_CORE_PINNED) != 0)
                 continue;
         }
 

@@ -29,7 +29,7 @@
 #include "dacom.h"
 #include "DALib.h"    // DALib::Engine (the instance-id helpers below)
 #include "engine/engbase.h"
-#include "x86math.h"  // FQuaternion, FMatrix
+#include "x86math.h"  // Quaternion, Matrix
 #include "ivp_collision/ivp_collision.h"
 #include "ivp_physics/ivp_core.h"
 #include "ivp_physics/ivp_real_object.h"
@@ -168,43 +168,30 @@ namespace CmnPhySys
         return G_PhysicalSystems.find(SystemId)._Ptr->_Myval.second;
     }
 
-    // IEngine (engine/engbase.h) types its instance parameters and results as void*, but
-    // they carry retail's engine instance id -- a long, -1 for "none". The physics code
-    // keeps ids in a long and converts only at the IEngine call; each helper below is
-    // exactly one IEngine slot call, nothing more.
-    inline void* PhySys_InstanceHandle(long Instance)
-    {
-        return (void*)(intptr_t)Instance;
-    }
-
-    inline long PhySys_InstanceId(void* Handle)
-    {
-        return (long)(intptr_t)Handle;
-    }
-
+    // Each helper below is exactly one IEngine slot call on an engine instance id (-1 for
+    // "none"), nothing more.
     // IEngine +0xd8 GetRelatedInstance(From, Flags, Cursor): Cursor -1 starts a walk, -1 ends it.
     inline long PhySys_RelatedInstance(long From, unsigned long Flags, long Cursor)
     {
-        return PhySys_InstanceId(
-            DALib::Engine->GetRelatedInstance(PhySys_InstanceHandle(From), Flags, PhySys_InstanceHandle(Cursor)));
+        return (DALib::Engine->GetRelatedInstance(From, Flags, Cursor));
     }
 
     // IEngine +0x80 GetInstanceUserData: the CObject PhySys stored on the instance, or null.
     inline CObject* PhySys_InstanceObject(long Instance)
     {
-        return (CObject*)DALib::Engine->GetInstanceUserData(PhySys_InstanceHandle(Instance));
+        return (CObject*)DALib::Engine->GetInstanceUserData(Instance);
     }
 
     // IEngine +0x7c SetInstanceUserData.
     inline void PhySys_SetInstanceObject(long Instance, CObject* Object)
     {
-        DALib::Engine->SetInstanceUserData(PhySys_InstanceHandle(Instance), Object);
+        DALib::Engine->SetInstanceUserData(Instance, Object);
     }
 
     // IEngine +0xd4 GetInstanceParent.
     inline long PhySys_InstanceParent(long Instance)
     {
-        return PhySys_InstanceId(DALib::Engine->GetInstanceParent(PhySys_InstanceHandle(Instance)));
+        return (DALib::Engine->GetInstanceParent(Instance));
     }
 
     // FUN_062883c0: re-pose Object's jointed child instances (common_physys.cpp).

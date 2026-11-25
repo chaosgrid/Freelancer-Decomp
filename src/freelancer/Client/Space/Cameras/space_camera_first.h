@@ -37,11 +37,11 @@ struct FFirstPersonCamera : FHudCamera
     bool OnEvent(unsigned MsgId) override;
 
 
-    float CockpitHpPosition[3];      // +0x100  zeroed; the attach writes the "HpCockpit" hardpoint
-    float CockpitHpOrientation[9];   // +0x10c  identity; likewise
-    float HeadPosition[3];           // +0x130  zeroed; loader fills it from IEngine slot 0x90
-    float HeadOrientation[9];        // +0x13c  identity; loader fills it from IEngine slot 0x98
-    float EyePosition[3];            // +0x160  zeroed; the eye point the attach and update place
+    Vector CockpitHpPosition;        // +0x100  zeroed; the attach writes the "HpCockpit" hardpoint
+    Matrix CockpitHpOrientation;     // +0x10c  identity; likewise
+    Vector HeadPosition;             // +0x130  zeroed; loader fills it from IEngine slot 0x90
+    Matrix HeadOrientation;          // +0x13c  identity; loader fills it from IEngine slot 0x98
+    Vector EyePosition;              // +0x160  zeroed; the eye point the attach and update place
     float EyeOrientation[9];         // +0x16c  identity, never written again; the update
                                      //         multiplies it onto the head orientation
 

@@ -13,6 +13,7 @@
 #include <vector>
 
 class FContentNpcShip;
+class Vector;                      // common_ini.h
 struct FContentNpcShipParams;      // NpcShip.h (TU43)
 struct FSpacePopExclusionSphere;   // Populators.h
 struct FSpawnPlan;                 // Guides.h (FGuideDesc +0x10)
@@ -52,12 +53,11 @@ extern std::list<FContentNpcShip*> GSpaceSupportGuidedShips;
 // inside a sphere when its distance is strictly below the radius). No vector -> true.
 // bAll && bInside: inside every sphere; bAll && !bInside: outside every sphere; !bAll &&
 // bInside: inside at least one; !bAll && !bInside: outside at least one.
-bool __cdecl TestExclusionSpheres(float const* Position,
+bool __cdecl TestExclusionSpheres(Vector const* Position,
                                   std::vector<FSpacePopExclusionSphere> const* Spheres,
                                   bool const* bAll, bool const* bInside);
 
 struct FNnPathLeg;                 // MissionObject.h
-class Vector;                      // common_ini.h
 
 // FUN_06f5e910 (cdecl; only caller GameSupport msg 0x31): BuildNnPath (SpacePaths.h,
 // FUN_06f5ea40) with the last seven arguments; when it returns false (no lane path needed)

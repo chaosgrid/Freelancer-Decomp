@@ -125,9 +125,7 @@ int MoveIdea::Update(float DeltaTime)
     // nav centre.
     Transform const& Xform = Handle->SelfTarget.Iface->get_transform();
     Vector Rotated;
-    Acquire3DMathEngine()->TransformMatrix(reinterpret_cast<FVector&>(Rotated),
-                                           reinterpret_cast<FMatrix const&>(Xform.Rotation),
-                                           reinterpret_cast<FVector const&>(Offset4c));
+    Acquire3DMathEngine()->TransformMatrix(Rotated, Xform.Rotation, Offset4c);
 
     Vector const& NavCentre = Nav->CachedPos;
     Vector Lead;
@@ -387,10 +385,10 @@ void MoveIdea::Commit()
     // Unconditional: zero Pathfind's +0x64 dword and +0x200..+0x208 Vector,
     // re-reading Context->+0xc each time.
     *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
-    float* const Dest = reinterpret_cast<float*>(SlotArrayOf(Context) + 0x200);
-    Dest[0] = 0.0f;
-    Dest[1] = 0.0f;
-    Dest[2] = 0.0f;
+    Vector* const Dest = reinterpret_cast<Vector*>(SlotArrayOf(Context) + 0x200);
+    Dest->x = 0.0f;
+    Dest->y = 0.0f;
+    Dest->z = 0.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -407,10 +405,10 @@ void MoveIdea::SetPosition(Vector const& Pos)
 
     // Mirror into Pathfind+0x200, re-read from Position (not Pos).
     unsigned char* const Slots = SlotArrayOf(Context);
-    float* const Dest = reinterpret_cast<float*>(Slots + 0x200);
-    Dest[0] = Position.x;
-    Dest[1] = Position.y;
-    Dest[2] = Position.z;
+    Vector* const Dest = reinterpret_cast<Vector*>(Slots + 0x200);
+    Dest->x = Position.x;
+    Dest->y = Position.y;
+    Dest->z = Position.z;
 }
 
 // FUN_062d5890, RET 4.
@@ -423,17 +421,16 @@ void MoveIdea::SetDirection(Vector const& Dir)
 
 // FUN_062d58f0, RET 4. Direction = -(Src's +0x08/+0x14/+0x20), i.e. minus column 2
 // of a 3x3 basis.
-void MoveIdea::SetDirectionFrom(void const* Src)
+void MoveIdea::SetDirectionFrom(Matrix const* Src)
 {
-    unsigned char const* const Base = static_cast<unsigned char const*>(Src);
 
     TargetKind48 = 3;
 
     // All three loads happen before any store (matters only if Src aliased
     // Direction).
-    float const SrcX = *reinterpret_cast<float const*>(Base + 0x08);
-    float const SrcY = *reinterpret_cast<float const*>(Base + 0x14);
-    float const SrcZ = *reinterpret_cast<float const*>(Base + 0x20);
+    float const SrcX = Src->E[0][2];
+    float const SrcY = Src->E[1][2];
+    float const SrcZ = Src->E[2][2];
     Direction.x = -SrcX;
     Direction.y = -SrcY;
     Direction.z = -SrcZ;
@@ -452,10 +449,10 @@ void MoveIdea::SetWatchObject(void const* Object2)
         TargetKind48 = 0;
         Watcher.set(nullptr);
         *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
-        float* const Dest = reinterpret_cast<float*>(Slots + 0x200);
-        Dest[0] = 0.0f;
-        Dest[1] = 0.0f;
-        Dest[2] = 0.0f;
+        Vector* const Dest = reinterpret_cast<Vector*>(Slots + 0x200);
+        Dest->x = 0.0f;
+        Dest->y = 0.0f;
+        Dest->z = 0.0f;
         return;
     }
 
@@ -470,10 +467,10 @@ void MoveIdea::SetWatchObject(void const* Object2)
     *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = static_cast<int>(Outer->get_id());
     IObjRW* const OuterAgain = ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target()));
     Vector const& Pos = OuterAgain->get_position();
-    float* const PosDest = reinterpret_cast<float*>(Slots + 0x200);
-    PosDest[0] = Pos.x;
-    PosDest[1] = Pos.y;
-    PosDest[2] = Pos.z;
+    Vector* const PosDest = reinterpret_cast<Vector*>(Slots + 0x200);
+    PosDest->x = Pos.x;
+    PosDest->y = Pos.y;
+    PosDest->z = Pos.z;
 }
 
 // FUN_062d5980, RET 4. Handle + 0x18 is never tested.

@@ -19,7 +19,7 @@
 #include "ivp_mindist_settings.h"
 #include "ivp_simulation_unit.h"
 #include "../ivp_utility/ivp_core_trap.h"
-#include "../ivp_collision/ivp_listmanager_topology.h" // IVP_UnlinkPairRecordFromObjects (FUN_06355200), IVP_UpdatePairRecordContactFrame
+#include "../ivp_collision/ivp_listmanager_topology.h" // IVP_Contact_Point::UnlinkFromObjects (FUN_06355200), IVP_Contact_Point::UpdateContactFrame
 
 #include <cmath>
 #include <cstdint>
@@ -605,7 +605,7 @@ void IVP_ListManager::RemoveDistFromSystem(IVP_Contact_Point* Dist)
     // Destructor FUN_06355200, then operator delete.
     if (Dist != nullptr)
     {
-        IVP_UnlinkPairRecordFromObjects(Dist);
+        Dist->UnlinkFromObjects();
         delete Dist;
     }
 }
@@ -828,7 +828,7 @@ double IVP_ListManager::MaxEnergyGain() const
     for (int I = static_cast<int>(RegisteredCores.n_elems) - 1; I >= 0; --I)
     {
         const IVP_Core* Core = RegisteredCores.elems[I];
-        if ((Core->Flags & 0xc) == 0)
+        if ((Core->Flags & IVP_CORE_PHYSICAL_UNMOVEABLE) == 0)
         {
             Sum = (double)(Core->Mass) * (double)(9.81000041961670f) * (double)(0.1f) + Sum;
         }
@@ -881,7 +881,7 @@ void IVP_ListManager::RecalcAllContactPoints()
         {
             IVP_Contact_Point* Dist = Pair->AttachedCtx.elems[J];
             const float OldGap = Dist->GapDistance;
-            IVP_UpdatePairRecordContactFrame(Dist);
+            Dist->UpdateContactFrame();
             Sum = (float)(((double)(OldGap) - (double)(Dist->GapDistance)) *
                                          (double)(Dist->NowFrictionPressure) +
                                      (double)(Sum));
@@ -953,12 +953,12 @@ void IVP_Friction_Sys_Static::do_simulation_controller(IVP_Event_Sim* EventSim, 
     }
     Fs->union_find_necessary = 0;
 
-    IVP_Core* SplitCore = IVP_ListManager_FindDisconnectedCore(FrictionSystem);
+    IVP_Core* SplitCore = FrictionSystem->FindDisconnectedCore();
     if (SplitCore == nullptr)
     {
         return;
     }
-    IVP_ListManager_SplitOffCoreGroup(FrictionSystem, SplitCore);
+    FrictionSystem->SplitOffCoreGroup(SplitCore);
     IVP_Simulation_Unit* Unit = SplitCore->OwningSimUnit;
     Unit->State = (Unit->State & 0xfffffdffu) | 0x100u;
 }
@@ -993,17 +993,17 @@ void IVP_Friction_Sys_Energy::do_simulation_controller(IVP_Event_Sim* EventSim, 
     IVP_ListManager* Fs = FrictionSystem;
     if (static_cast<int16_t>(Fs->CtxListCount) <= 1)
     {
-        IVP_UpdatePairRecordContactFrame(Fs->CtxListHead);
+        Fs->CtxListHead->UpdateContactFrame();
         return;
     }
 
     Fs->RecalcAllContactPoints();
     if ((EventSim->sim_unit->State & 0x3000u) != 0)
     {
-        IVP_ListManager_ClearAllCorePairBudgets(FrictionSystem);
+        FrictionSystem->ClearAllCorePairBudgets();
     }
     if ((EventSim->sim_unit->State & 0x0c00u) == 0)
     {
-        IVP_ListManager_TickAllCorePairBudgets(FrictionSystem);
+        FrictionSystem->TickAllCorePairBudgets();
     }
 }

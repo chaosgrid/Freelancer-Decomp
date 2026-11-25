@@ -6,40 +6,12 @@
 
 #include "MovieMod.h"
 #include "MovieField.h"
+#include "MovieFieldHigh.h"
+#include "MovieFieldMid.h"
 #include "MovieGraph.h"
 #include "MovieWindow.h"
 
 #include <intrin.h>
-
-// Callees this file does not define. Signatures are the pushes at the call
-// sites (stdcall: the caller does not adjust ESP).
-
-// 0x06ac3110. RET 0xC. Zeros Groups * Field[0] dwords and returns 1.
-long __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
-
-// 0x06ac3140. RET 0x10. Copies Groups * Field[0] dwords from First to Second and returns 1.
-long __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
-
-// 0x06ac7e60. RET 0x8. 06ac69a0 takes the nonzero EAX as success and skips the slot write.
-long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
-
-// 0x06ac7f20. RET 0x10. Pushes are Sign, FieldHolder, SlotLimbs, Limbs.
-long __stdcall Movie_CopyOrNegatePair(unsigned int* Limbs, unsigned int* SlotLimbs, int* FieldHolder, int Sign);
-
-// 0x06ac7760. RET 0x14. Pushes are Sign, Context, Slot, Limbs, Saved. EAX is ignored here.
-void __stdcall Movie_AssignWindowSlot(unsigned int* Saved, unsigned int* Limbs, int Slot, int* Context, int Sign);
-
-// 0x06ac8190. RET 0x8. Defined in MovieFieldHigh.cpp.
-long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
-
-// 0x06ac6bb0. RET 0x10. Defined in MovieFieldHigh.cpp. Fourth push is the scratch base.
-long __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* FieldHolder, unsigned int* Upper);
-
-// 0x06ac7210. Defined in MovieFieldHigh.cpp.
-long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch);
-
-// 0x06ac7570. RET 0xC. The third argument is popped and not read.
-long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
 
 // Slot stride is 0x14f dwords (0x53c bytes). Work+0x53c0 is the scratch passed to the products.
 static unsigned int* Movie_ExponentSlot(unsigned int* Work, unsigned int Index)
@@ -318,7 +290,7 @@ void __stdcall Movie_AdvanceFieldRecordStates(int* Context)
                 Movie_MultiplyFieldLimbs(Record, Record, Local400, (unsigned int*)Field) != 0 &&
                 Movie_AddFieldLimbs(Local400, Local400, Local300, Field) != 0 &&
                 Movie_AddFieldLimbs(Local400, Local300, Local400, Field) != 0 &&
-                Movie_AddFieldLimbs(Local400, Outer + 1, Local400, Field) != 0 &&
+                Movie_AddFieldLimbs(Local400, ((FMovieFieldRecord*)Outer)->Left, Local400, Field) != 0 &&
                 Movie_MultiplyFieldLimbs(Local400, Selected, Local400, (unsigned int*)Field) != 0)
             {
                 MathOk = 1;
@@ -331,7 +303,7 @@ void __stdcall Movie_AdvanceFieldRecordStates(int* Context)
             {
                 if (MathOk != 0 &&
                     Movie_AddFieldLimbs(Local400, Local300, Local300, Field) != 0 &&
-                    Movie_SubtractFieldLimbs(Local300, Outer + 1, Local300, Field) != 0 &&
+                    Movie_SubtractFieldLimbs(Local300, ((FMovieFieldRecord*)Outer)->Left, Local300, Field) != 0 &&
                     Movie_SubtractFieldLimbs(Local300, Record, Local300, Field) != 0 &&
                     Movie_SubtractFieldLimbs(Local300, At2N, Local200, Field) != 0)
                 {
@@ -522,7 +494,7 @@ long __stdcall Movie_QueueOrCommitFieldLimbs(unsigned int* Limbs, unsigned int S
     {
         return 0;
     }
-    unsigned int* Constant = (unsigned int*)((unsigned char*)Field + 0x12c);
+    unsigned int* Constant = ((FMovieField*)Field)->One;
     if (Movie_FieldLimbsEqual((int)High, (int)Constant, Field) != 0)
     {
         return Movie_CommitFieldSlot(Limbs, (int)Slot, Context, (int)Sign);
@@ -554,7 +526,7 @@ long __stdcall Movie_MultiplyPairedLimbs(unsigned int* Left, unsigned int* Right
 {
     int* Field = (int*)FieldHolder[0];
     int LimbCount = Field[0];
-    unsigned int* Constant = (unsigned int*)((unsigned char*)Field + 0x12c);
+    unsigned int* Constant = ((FMovieField*)Field)->One;
     unsigned int* LeftHalf = Left + LimbCount;
     unsigned int* LeftTail = LeftHalf + LimbCount;
     unsigned int* RightHalf = Right + LimbCount;
@@ -701,7 +673,7 @@ long __stdcall Movie_MultiplyPairedLimbs(unsigned int* Left, unsigned int* Right
             Movie_MultiplyFieldLimbs(Scratch3, Scratch2, Scratch2, (unsigned int*)Field) != 0 &&
             Movie_SubtractFieldLimbs(Scratch2, Scratch1, Scratch2, Field) != 0 &&
             Movie_MultiplyFieldLimbs(DestTail, DestTail, Dest, (unsigned int*)Field) != 0 &&
-            Movie_MultiplyFieldLimbs(FieldHolder + 1, Dest, Dest, (unsigned int*)Field) != 0 &&
+            Movie_MultiplyFieldLimbs(((FMovieFieldRecord*)FieldHolder)->Left, Dest, Dest, (unsigned int*)Field) != 0 &&
             Movie_AddFieldLimbs(Dest, Scratch0, Dest, Field) != 0 &&
             Movie_AddFieldLimbs(Scratch6, DestTail, Scratch0, Field) != 0 &&
             Movie_MultiplyFieldLimbs(Scratch0, Scratch6, Scratch6, (unsigned int*)Field) != 0 &&

@@ -139,8 +139,8 @@ struct FSoundInstanceNode
     float MaxDistSq;               // +0x34
     float MinDistance;             // +0x38
     float MinDistSq;               // +0x3C
-    FVec3 Position;                // +0x40
-    FVec3 Direction;               // +0x4C listener→source (payload +0x44)
+    Vector Position;                // +0x40
+    Vector Direction;               // +0x4C listener→source (payload +0x44)
     unsigned char bIs3dCache;      // +0x58 payload+0x50
     unsigned char Pad59[3];
     unsigned long LastStartTick;   // +0x5C payload+0x54
@@ -201,17 +201,17 @@ public:
     GENRESULT DACOM_API SetEaxPreview(int Env, float Vol, float Decay, float Damp) override;
     GENRESULT DACOM_API GetEaxPreview(unsigned long* Env, unsigned long* Vol, unsigned long* Decay,
                                       unsigned long* Damp) override;
-    GENRESULT DACOM_API SetOrientation(FVec3* Front, FVec3* Up) override;
-    GENRESULT DACOM_API SetOrientationFromMatrix(float* Matrix) override;
-    GENRESULT DACOM_API SetListenerPosition(FVec3* Pos) override;
-    GENRESULT DACOM_API SetListenerVelocity(FVec3* Vel) override;
+    GENRESULT DACOM_API SetOrientation(Vector* Front, Vector* Up) override;
+    GENRESULT DACOM_API SetOrientationFromMatrix(const Matrix* Orient) override;
+    GENRESULT DACOM_API SetListenerPosition(Vector* Pos) override;
+    GENRESULT DACOM_API SetListenerVelocity(Vector* Vel) override;
     GENRESULT DACOM_API SetDistanceFactor(float Value) override;
     GENRESULT DACOM_API SetDopplerFactor(float Value) override;
     GENRESULT DACOM_API SetRolloffFactor(float Value) override;
-    GENRESULT DACOM_API GetOrientationSpace(FVec3* Pos, FVec3* Vel) override;
-    GENRESULT DACOM_API GetOrientationMatrix(float* Out9) override;
-    GENRESULT DACOM_API GetListenerPosition(FVec3* Out) override;
-    GENRESULT DACOM_API GetListenerVelocity(FVec3* Out) override;
+    GENRESULT DACOM_API GetOrientationSpace(Vector* Pos, Vector* Vel) override;
+    GENRESULT DACOM_API GetOrientationMatrix(Matrix* Out9) override;
+    GENRESULT DACOM_API GetListenerPosition(Vector* Out) override;
+    GENRESULT DACOM_API GetListenerVelocity(Vector* Out) override;
     float DACOM_API GetDistanceFactor() override;
     float DACOM_API GetDopplerFactor() override;
     float DACOM_API GetRolloffFactor() override;
@@ -306,11 +306,11 @@ public:
     unsigned long Channels;         // +0x9C
     unsigned long BitsPerSample;    // +0xA0
     int CoordScale;                 // +0xA4
-    FVec3 Front;                    // +0xA8
-    FVec3 Up;                       // +0xB4
+    Vector Front;                    // +0xA8
+    Vector Up;                       // +0xB4
     unsigned long PadC0[3];         // +0xC0 only the ctor writes it (zeros, 06ee1d49)
-    FVec3 Position;                 // +0xCC
-    FVec3 Velocity;                 // +0xD8
+    Vector Position;                 // +0xCC
+    Vector Velocity;                 // +0xD8
     float DistanceFactor;           // +0xE4
     float DopplerFactor;            // +0xE8
     float RolloffFactor;            // +0xEC
